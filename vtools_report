@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+#
+# $File: vtools_report $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
+#
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import sys, os
+import argparse
+import subprocess
+import logging
+
+#
+# These functions are utility functions used by all reports
+#
+def addVerbosityArg(parser):
+    parser.add_argument('-v', '--verbosity', default='0', choices=['0','1','2'],
+        help='''Output error and warning (0), info (1) and debug (2) information
+            of vtools and vtools_report. Debug information are always recorded
+            in project and vtools_report log files.''')
+
+# global logger object, which will be set by getLogger() when the script
+# is executed. If this sc
+verbosity = '1'
+logger = None
+
+def getLogger():
+    # create a logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    # output to standard output
+    cout = logging.StreamHandler()
+    levels = {
+        None: logging.INFO,
+        '0': logging.ERROR,
+        '1': logging.INFO,
+        '2': logging.DEBUG
+        }
+    #
+    cout.setLevel(levels[verbosity])
+    cout.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+    logger.addHandler(cout)
+    # output to a log file vtools_report.log
+    ch = logging.FileHandler('vtools_report.log', mode='a')
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
+    logger.addHandler(ch)
+    return logger
+
+
+def getoutput(cmd):
+    # add -v option if unspecified
+    if True not in [x.startswith('-v') for x in cmd]:
+        cmd.append('-v{}'.format(verbosity))
+    # call vtools and return its output
+    logger.info(' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
+    # '.' is added to $PATH so that command (vtool) that is in the current directory
+    # can be executed.
+    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])})
+
+#
+# These functions call vtools to extract information that are needed by other
+# reports.
+#
+def getNumOfSamples():
+    # FIXME: should we rely on SELECT COUNT(1) FROM sample?
+    logger.info('Getting number of samples')
+    return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
+
+#
+# Command trans_ratio
+#
+def transRatioArguments(parser):
+    parser.add_argument('-n', '--num_field', required=True,
+        help='''Name of the field that holds sample variant count, which is the field name for
+            command 'vtools sample_stat --num FIELD_NAME''')
+    parser.add_argument('--by_count', action='store_true',
+        help='Output transition/transversion rate for each sample variant frequency (count) group')
+    parser.add_argument('-t', '--table', default='variant',
+        help='''Variant table for which transversion/transversion mutants are counted.
+            Default to the master variant table''')
+    parser.add_argument('-s', '--save', help='If specified, save results to a file.')
+
+def transRatio(args):
+    if args.save:
+        logger.info('Saving output to {}'.format(args.save))
+        out = open(args.save, "w")
+    else:
+        out = sys.stdout
+    #
+    if args.by_count:
+        out.write('sample_count\tnum_of_transition\tnum_of_transversion\tratio\n')
+        nSample = getNumOfSamples()
+        for i in range(1, 2 * nSample + 1):
+            transition = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
+            	"((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))",
+                '-c']))
+            transversion = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
+            	"((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+                " (ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
+                " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))",
+                '-c']))
+            out.write('{}\t{}\t{}\t{:.3f}\n'.format(i, transition, transversion,
+                transition / float(transversion) if transversion != 0 else 0))
+    else:
+        out.write('num_of_transition\tnum_of_transversion\tratio\n')
+        transition = int(getoutput(['vtools', 'select', args.table, 
+            "(ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C')",
+            '--output', 'sum({})'.format(args.num_field)]))
+        transversion = int(getoutput(['vtools', 'select', args.table, 
+            "(ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+            "(ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
+            "(ref='C' AND alt='G') OR (ref='G' AND alt='C')",
+            '--output', 'sum({})'.format(args.num_field)]))
+        out.write('{}\t{}\t{:.3f}\n'.format(transition, transversion, 
+            transition / float(transversion) if transversion != 0 else 0))
+    out.close()
+    
+#
+# Command avg_depth
+#
+def avgDepthArguments(parser):
+    parser.add_argument('-n', '--num_field', required=True,
+        help='''Name of the field that holds sample variant count, which is the field name for
+            command 'vtools sample_stat --num FIELD_NAME''')
+    parser.add_argument('-d', '--depth_field', required=True,
+        help='''Name of the field that holds average depth of each variant, which is the field
+            name for command 'vtools sample_stat --depth FIELD_NAME''')
+    parser.add_argument('--by_count', action='store_true',
+        help='Output transition/transversion rate for each sample variant frequency (count) group')
+    parser.add_argument('-t', '--table', default='variant',
+        help='''Variant table for which transversion/transversion mutants are counted.
+            Default to the master variant table''')
+    parser.add_argument('-s', '--save', help='If specified, save results to a file.')
+
+def avgDepth(args):
+    if args.save:
+        logger.info('Saving output to {}'.format(args.save))
+        out = open(args.save, "w")
+    else:
+        out = sys.stdout
+    # 
+    if args.by_count:
+        out.write('sample_count\tnum_of_variant\taverage_depth\n')
+        nSample = getNumOfSamples()
+        for i in range(1, 2 * nSample + 1):
+            output = getoutput(['vtools', 'select', args.table, '{}={}'.format(args.num_field, i),
+                '--output', 'count(1)', 'avg({})'.format(args.depth_field)])
+            count, depth = output.split()
+            out.write('{}\t{}\t{:.3f}\n'.format(i, int(count), float(depth) if depth != 'NA' else 0))
+    else:
+        num, depth = getoutput(['vtools', 'output', args.table, 'sum({})'.format(args.num_field),
+            'sum({}*{})'.format(args.num_field, args.depth_field)]).split()
+        out.write('{:.3f}\n'.format(float(depth) / int(num)))
+    out.close()
+
+if __name__ == '__main__':
+    #
+    master_parser = argparse.ArgumentParser(description='''A collection of functions that
+        analyze data using vtools and generate various reports''',
+        prog='vtools_report',
+        #formatter_class=argparse.RawDescriptionHelpFormatter,
+        fromfile_prefix_chars='@',  
+        epilog='''Use 'vtools_report cmd -h' for details about each command.
+        Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
+    master_parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+    subparsers = master_parser.add_subparsers(title='Available reports:')
+    #
+    # command trans_ratio
+    parser = subparsers.add_parser('trans_ratio',
+        help='Transition count, transversion count and transition/transversion ratio',
+        description='''This command counts the number of transition (A<->G and C<->T) and
+            transversion variants (others) and calculate its ratio. A ratio of 2 is expected
+            from a normal sample. If option '--by_count' is specified, it will calculate
+            this ratio for variants with different sample allele frequency (count). This
+            commands requires a field that stores the sample count for each variant, which
+            should be prepared using command 'vtools sample_stat --num FIELD_NAME'.''')
+    transRatioArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=transRatio)
+    #
+    # command avg_depth
+    parser = subparsers.add_parser('avg_depth',
+        help='Average depth for each variant, can be divided by sample variant count',
+        description='''Command 'vtools sample_stat --depth FIELD' calculates the average
+            depth of variants across sample (e.g. average depth of three variants if the 
+            variant appears three times in the sample). This command report average depth
+            of all variants, or variants divided by sample allele count (output count,
+            number of variant, and average depth for count from 1 to 2*#sample). This
+            command requires a field that stores the sample count for each variant and
+            a field to store average depth of each variant, which should be prepared
+            using command 'vtools sample_stat --num FIELD_NAME --depth FIELD_NAME'.''')
+    avgDepthArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=avgDepth)
+    # 
+    # getting args
+    args = master_parser.parse_args()
+    # setting global logger
+    verbosity = args.verbosity
+    logger = getLogger()
+    # calling the associated functions
+    args.func(args)
+
+

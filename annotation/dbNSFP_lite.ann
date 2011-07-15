@@ -1,0 +1,133 @@
+#Variant tools schema version 1.0
+#
+# - The first line is required
+# - Lines starting with # and ; are comments
+# - Inline comments starts with ;
+# - Required sections:
+#
+#   [reference genome]: reference genome name and coordinate fields. Multiple coordinates
+#          can be specified.
+#   
+#   [data sources]: This section can have keys
+#       * description: description of the database
+#       * direct_url: we might provide sqlite3 annotation databases from our
+#           server. The database will be downloaded directly if possible.
+#       * source_type: type of source files, we currently only supported
+#           tab based text file (txt)
+#       * source_url: where to download source file.
+#       * source_files: filenames to used after we download, and possibly unpack
+#           the file to a remporary directory.
+# 
+#   fields sections for the fields that will be imported.
+#       * index: 1-based index of the number of columns in the database
+#       * type: can be "chromosome", "0-based position", "1-based position",
+#               and SQL allowed types such as "DECIMAL(7,6) NOT NULL"
+#       * null (optional) if specified, values that will be treated as NULL.
+#       * comment (optional) a description of the field
+#
+[reference genome]
+hg18=chr, hg18pos, alt
+hg19=chr, hg19pos, alt
+
+[data sources]
+description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH
+anno_type=variant
+direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/dbNSFP.DB
+source_url=http://dl.dropbox.com/u/17001647/dbNSFP/dbNSFP1.1.chr1-22XY.zip
+source_type=txt
+source_pattern=dbNSFP.ch
+
+[chr]
+index=1
+type=chromosome
+
+[hg18pos]
+index=2
+type=1-based position
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative nucleotide allele (as on the + strand)
+
+[hg19pos]
+index=7
+type=1-based position
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+comment=gene name
+
+[PhyloP_score]
+index=17
+type=FLOAT NULL
+null=NA
+comment=PhyloP score, phyloPnew=1-0.5x10^phyloPori if phyloPori>0 or phyloPnew=0.5x10^phyloPori if phyloPori<0
+
+[PlyloP_pred]
+index=18
+type=VARCHAR(2) NULL
+null=NA
+comment=PhyloP prediction, C(onserved) or N(on-conserved)
+
+[SIFT_score]
+index=19
+type=FLOAT NULL
+null=NA
+comment=SIFT score, SIFTnew=1-SIFTori
+
+[SIFT_pred]
+index=20
+type=VARCHAR(2) NULL
+null=NA
+comment=SIFT prediction, D(amaging) or T(olerated)
+
+[Polyphen2_score]
+index=21
+type=FLOAT NULL
+null=NA
+comment=Polyphen2 score, i.e. pph2_prob
+
+[Polyphen2_pred]
+index=22
+type=VARCHAR(2) NULL
+null=NA
+comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign") 
+
+[LRT_score]
+index=23
+type=FLOAT NULL
+null=NA
+comment=LRT score, LRTnew=1-LRTorix0.5 if <1, or LRTnew=LRTorix0.5 if >=1
+
+[LRT_pred]
+index=24
+type=VARCHAR(2) NULL
+null=NA
+comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
+
+[MutationTaster_score]
+index=25
+type=FLOAT NULL
+null=NA
+comment=MutationTaster score
+
+[MutationTaster_pred]
+index=26
+type=VARCHAR(2) NULL
+null=NA
+comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
+
+[Ancestral_allele]
+index=27
+type=CHAR(1) NULL
+null=NA
+comment=Ancestral allele (based on 1000 genomes reference data)
+

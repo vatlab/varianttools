@@ -1,0 +1,90 @@
+#Variant tools schema version 1.0
+#
+# This is test decription for a few records in dbNSFP
+#
+[reference genome]
+hg18=chr, hg18pos, alt
+hg19=chr, hg19pos, alt
+
+[data sources]
+direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/testNSFP.DB	; if available, downloadDB will try to get it
+source_type=txt                     
+source_url=testNSFP.zip             ; download source?
+source_pattern=testNSFP             ; something that identifies db files in a directory or a zip file
+
+[chr]
+index=1
+type=chromosome
+
+[hg18pos]
+index=2
+type=1-based position
+
+[hg19pos]
+index=7
+type=1-based position
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference allele
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative allele
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+
+[phylop_score]
+index=17
+type=DECIMAL(7,6) NULL
+null=NA
+
+[phylop_pred]
+index=18
+type=VARCHAR(2) NULL
+null=NA
+
+[sift_score]
+index=19
+type=DECIMAL(7,6) NULL
+null=NA
+
+[sift_pred]
+index=20
+type=VARCHAR(2) NULL
+null=NA
+
+[polyphen2_score]
+index=21
+type=DECIMAL(7,6) NULL
+null=NA
+
+[polyphen2_pred]
+index=22
+type=VARCHAR(2) NULL
+null=NA
+
+[LRT_score]
+index=23
+type=DECIMAL(7,6) NULL
+null=NA
+
+[LRT_pred]
+index=24
+type=VARCHAR(2) NULL
+null=NA
+
+[MutationTaster_score]
+index=25
+type=DECIMAL(7,6) NULL
+null=NA
+
+[MutationTaster_pred]
+index=26
+type=VARCHAR(2) NULL
+null=NA
+
