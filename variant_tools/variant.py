@@ -78,10 +78,10 @@ def outputVariants(proj, table, output_fields, args):
     # avoid duplicate, add 'chr' to make sure the master variant table is linked
     fields_info = [proj.sourceOfField(x, table) for x in ['chr'] + fields]
     processed = set()
-    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != table]:
-        if (tbl, conn) not in processed:
+    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != table.lower()]:
+        if (tbl.lower(), conn) not in processed:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-            processed.add((tbl, conn))
+            processed.add((tbl.lower(), conn))
     # LIMIT clause
     limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
     query = 'SELECT {} {} {};'.format(select_clause, from_clause, limit_clause)
@@ -141,11 +141,11 @@ def select(args):
             from_clause = 'FROM {} '.format(args.from_table)
             # avoid duplicate
             processed = set()
-            for table, conn in [(x.table, x.link) for x in fields_info if x.table != args.from_table]:
-                if (table, conn) not in processed:
+            for table, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != args.from_table.lower()]:
+                if (table.lower(), conn) not in processed:
                     from_clause += ', {} '.format(table)
                     where_clause += ' AND ({}) '.format(conn)
-                    processed.add((table, conn))
+                    processed.add((table.lower(), conn))
             #
             # select items
             query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
@@ -230,11 +230,11 @@ def exclude(args):
             from_clause = 'FROM {} '.format(args.from_table)
             # avoid duplicate
             processed = set()
-            for table, conn in [(x.table, x.link) for x in fields_info if x.table != args.from_table]:
-                if (table, conn) not in processed:
+            for table, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != args.from_table.lower()]:
+                if (table.lower(), conn) not in processed:
                     from_clause += ', {} '.format(table)
                     where_clause += ' AND ({}) '.format(conn)
-                    processed.add((table, conn))
+                    processed.add((table.lower(), conn))
             #
             # step 1: getting all variants
             proj.logger.info('Getting existing variants ...')
