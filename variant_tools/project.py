@@ -666,7 +666,7 @@ class Project:
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
         info += 'Database engine:             {}\n'.format(self.db.engine)
         info += 'Variant tables:              {}\n'.format(', '.join(self.getVariantTables()))
-        info += 'Annotation databases:        {}\n'.format(', '.join([x.name for x in self.annoDB]))
+        info += 'Annotation databases:        {}\n'.format(', '.join([os.path.join(x.dir, x.name) for x in self.annoDB]))
         return info
 
     #
