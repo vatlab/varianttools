@@ -52,7 +52,7 @@ def generalOutputArguments(parser):
         help='''Group output by fields. This option is useful for aggregation output
             where sumamry statistics are grouped by one or more fields.''')
 
-def outputVariants(proj, table, output_fields, args, query=None):
+def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
     # output
     if not args.save:
@@ -93,7 +93,7 @@ def outputVariants(proj, table, output_fields, args, query=None):
     where_clause = ''
     if query is not None:
         # FIXME: if the query has a simple where clause, we should use that directly.
-        where_clause = ' WHERE {}.variant_id in ({})'.format(table, query)
+        where_clause = ' WHERE {}.variant_id {} IN ({})'.format(table, 'NOT' if reverse else '', query)
     # GROUP BY clause
     group_clause = ''
     if args.group_by:
@@ -141,7 +141,7 @@ def selectArguments(parser):
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
 
-def select(args):
+def select(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # table?
@@ -194,6 +194,9 @@ def select(args):
                 cur = proj.db.cursor()
                 cur.execute(query)
                 count = cur.fetchone()[0]
+                # exclude ...
+                if reverse:
+                    count = proj.db.numOfRows(args.from_table) - int(count)
                 proj.db.stopProgress()
                 #
                 if not args.save:
@@ -205,8 +208,12 @@ def select(args):
                     out.close()
             # case 2: to table
             elif args.to_table:
-                query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
-                    from_clause, where_clause)
+                if not reverse:
+                    query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
+                        from_clause, where_clause)
+                else:
+                    query = 'SELECT {0}.variant_id FROM {0} WHERE {0}.variant_id NOT IN (SELECT {0}.variant_id {1} {2});'.format(args.from_table,
+                        from_clause, where_clause)
                 proj.logger.debug('Running query {}'.format(query))
                 proj.logger.info('Selecting variants')
                 cur = proj.db.cursor()
@@ -247,9 +254,7 @@ def select(args):
             elif args.output: 
                 query = 'SELECT {}.variant_id {} {}'.format(args.from_table,
                     from_clause, where_clause)
-                outputVariants(proj, args.from_table, args.output, args, query)
-                
-
+                outputVariants(proj, args.from_table, args.output, args, query, reverse)
     except Exception as e:
         sys.exit(e) 
 
@@ -269,88 +274,7 @@ def excludeArguments(parser):
 
 
 def exclude(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            # table?
-            if not proj.isVariantTable(args.from_table):
-                raise ValueError('Variant table {} does not exist.'.format(args.from_table))
-            if not args.to_table and not args.output and not args.count:
-                proj.logger.warning('Neither --to_table and --output is specified. Nothing to do.')
-                return
-            # fields? We need to replace things like sift_score to dbNSFP.sift_score
-            condition, fields = consolidateFieldName(proj, args.from_table, ' AND '.join(['({})'.format(x) for x in args.condition]))
-            #
-            # add 'pos' to always link to the variant table
-            fields_info = [proj.sourceOfField(x, args.from_table) for x in ['pos'] + fields]
-            # WHERE clause: () is important because OR in condition might go beyond condition
-            where_clause = ' WHERE ({})'.format(condition)
-            # 
-            # FROM clause
-            from_clause = 'FROM {} '.format(args.from_table)
-            # avoid duplicate
-            processed = set()
-            for table, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != args.from_table.lower()]:
-                if (table.lower(), conn) not in processed:
-                    from_clause += ', {} '.format(table)
-                    where_clause += ' AND ({}) '.format(conn)
-                    processed.add((table.lower(), conn))
-            #
-            # step 1: getting all variants
-            proj.logger.info('Getting existing variants ...')
-            cur = proj.db.cursor()
-            cur.execute('SELECT variant_id FROM {};'.format(args.from_table))
-            IDs = set([x[0] for x in cur.fetchall()])
-            proj.logger.info('{:,} variants are identified.'.format(len(IDs)))
-            #
-            # select items
-            query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
-                from_clause, where_clause)
-            proj.logger.debug('Running query {}'.format(query))
-            proj.logger.info('Figuring out excluded variants')
-            proj.db.startProgress('Running')
-            cur.execute(query)
-            excluded = set([x[0] for x in cur.fetchall()])
-            proj.db.stopProgress()
-            proj.logger.info('{:,} variants to be excluded.'.format(len(excluded)))
-            #
-            remaining = IDs - excluded
-            #
-            # handle a simple case that does not worth writing a temporary table
-            if args.count:
-                if not args.save:
-                    print len(remaining)
-                else:
-                    proj.logger.info('Save output to {}'.format(args.save))
-                    out = open(args.save, 'w')
-                    out.write('{}\n'.format(len(remaining)))
-                    out.close()
-                if not args.to_table:
-                    return
-            # write variants to a specified or temporary table
-            to_table = args.to_table if args.to_table else proj.getTempTable()
-            proj.logger.info('Writing {:,} variants to table {}'.format(len(remaining), to_table))
-            if proj.db.hasTable(to_table):
-                proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(to_table))
-                proj.db.removeTable(to_table)
-            #
-            proj.createVariantTable(to_table)
-            prog = ProgressBar(to_table, len(remaining))
-            query = 'INSERT INTO {} VALUES ({});'.format(to_table, proj.db.PH)
-            # sort variant_id so that variant_id will be in order, which might
-            # improve database performance
-            for count,id in enumerate(sorted(remaining)):
-                cur.execute(query, (id,))
-                if count % proj.db.batch == 0:
-                    proj.db.commit()
-                    prog.update(count)
-            proj.db.commit()
-            prog.done()
-            if args.output:
-                outputVariants(proj, to_table, args.output, args)
-    except Exception as e:
-        sys.exit(e) 
-
-
+    select(args, reverse=True)
 
 def compareArguments(parser):
     parser.add_argument('table_A', help='''variant table A.''')
