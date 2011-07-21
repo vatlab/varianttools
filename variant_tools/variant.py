@@ -49,7 +49,7 @@ def generalOutputArguments(parser):
         help='''Output reference genome. If set to alternative build, chr and pos
             in the fields will be replaced by alt_chr and alt_pos''')
 
-def outputVariants(proj, table, output_fields, args):
+def outputVariants(proj, table, output_fields, args, query=None):
     '''Output selected fields'''
     # output
     if not args.save:
@@ -82,9 +82,13 @@ def outputVariants(proj, table, output_fields, args):
         if (tbl.lower(), conn) not in processed:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
             processed.add((tbl.lower(), conn))
+    # WHERE clause
+    where_clause = ''
+    if query is not None:
+        where_clause = ' WHERE {}.variant_id = ({})'.format(table, query)
     # LIMIT clause
     limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
-    query = 'SELECT {} {} {};'.format(select_clause, from_clause, limit_clause)
+    query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, limit_clause)
     proj.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
@@ -147,50 +151,86 @@ def select(args):
                     where_clause += ' AND ({}) '.format(conn)
                     processed.add((table.lower(), conn))
             #
-            # select items
-            query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
-                from_clause, where_clause)
-            proj.logger.debug('Running query {}'.format(query))
-            proj.logger.info('Selecting variants')
-            cur = proj.db.cursor()
-            proj.db.startProgress('Running')
-            cur.execute(query)
-            selected = set([x[0] for x in cur.fetchall()])
-            proj.db.stopProgress()
-            proj.logger.info('{} variants selected.'.format(len(selected)))
+            # we are treating different outcomes different, for better performance
             #
-            # handle a simple case that does not worth writing a temporary table
-            if args.count:
+            # NOTE: count/output do not co-exist
+            #
+            # case:       count,  to_table, output
+            # 1:           Y       N       N   <- select count(variant)
+            # 2:           N       Y       Y   <- generate table, then count and output
+            #              Y       Y       N
+            #              N       Y       N
+            # 3:           N       N       Y   <- direct output
+            #
+            # Others:      N       N       N   <- do nothing.
+            #              Y       Y       Y   <- not allowed
+            #              Y       N       Y
+            #
+            # case 1: simple count.
+            if args.count and not args.to_table and not args.output:
+                query = 'SELECT count({}.variant_id) {} {};'.format(args.from_table,
+                    from_clause, where_clause)
+                proj.logger.debug('Running query {}'.format(query))
+                proj.db.startProgress('Counting variants')
+                cur = proj.db.cursor()
+                cur.execute(query)
+                count = cur.fetchone()[0]
+                proj.db.stopProgress()
+                #
                 if not args.save:
-                    print len(selected)
+                    print count
                 else:
                     proj.logger.info('Save output to {}'.format(args.save))
                     out = open(args.save, 'w')
-                    out.write('{}\n'.format(len(selected)))
+                    out.write('{}\n'.format(count)
                     out.close()
-                if not args.to_table:
-                    return
-            # write variants to a specified or temporary table
-            to_table = args.to_table if args.to_table else proj.getTempTable()
-            proj.logger.info('Writing {} variants to table {}'.format(len(selected), to_table))
-            if proj.db.hasTable(to_table):
-                proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(to_table))
-                proj.db.removeTable(to_table)
-            #
-            proj.createVariantTable(to_table)
-            prog = ProgressBar(to_table, len(selected))
-            query = 'INSERT INTO {} VALUES ({});'.format(to_table, proj.db.PH)
-            # sort variant_id so that variant_id will be in order, which might
-            # improve database performance
-            for count,id in enumerate(sorted(selected)):
-                cur.execute(query, (id,))
-                if count % proj.db.batch == 0:
-                    proj.db.commit()
-                    prog.update(count)
-            proj.db.commit()
-            prog.done()
-            if args.output:
-                outputVariants(proj, to_table, args.output, args)
+            # case 2: to table
+            elif args.to_table:
+                query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
+                    from_clause, where_clause)
+                proj.logger.debug('Running query {}'.format(query))
+                proj.logger.info('Selecting variants')
+                cur = proj.db.cursor()
+                proj.db.startProgress('Running')
+                cur.execute(query)
+                selected = set([x[0] for x in cur.fetchall()])
+                proj.db.stopProgress()
+                proj.logger.info('{} variants selected.'.format(len(selected)))
+                #
+                proj.logger.info('Writing {} variants to table {}'.format(len(selected), args.to_table))
+                if proj.db.hasTable(args.to_table):
+                    proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(args.to_table))
+                    proj.db.removeTable(args.to_table)
+                #
+                proj.createVariantTable(args.to_table)
+                prog = ProgressBar(args.to_table, len(selected))
+                query = 'INSERT INTO {} VALUES ({});'.format(args.to_table, proj.db.PH)
+                # sort variant_id so that variant_id will be in order, which might
+                # improve database performance
+                for count,id in enumerate(sorted(selected)):
+                    cur.execute(query, (id,))
+                    if count % proj.db.batch == 0:
+                        proj.db.commit()
+                        prog.update(count)
+                proj.db.commit()
+                prog.done()
+                if args.output:
+                    outputVariants(proj, args.to_table, args.output, args)
+                if args.count:
+                    if not args.save:
+                        print len(selected)
+                    else:
+                        proj.logger.info('Save output to {}'.format(args.save))
+                        out = open(args.save, 'w')
+                        out.write('{}\n'.format(len(selected))
+                        out.close()
+            # case 3: output, but do not write to table, and not count
+            elif args.output: 
+                query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
+                    from_clause, where_clause)
+                outputVariants(proj, args.from_table, args.output, args, query)
+                
+
     except Exception as e:
         sys.exit(e) 
 
