@@ -48,6 +48,9 @@ def generalOutputArguments(parser):
     grp.add_argument('--build',
         help='''Output reference genome. If set to alternative build, chr and pos
             in the fields will be replaced by alt_chr and alt_pos''')
+    grp.add_argument('-g', '--group_by', nargs='*',
+        help='''Group output by fields. This option is useful for aggregation output
+            where sumamry statistics are grouped by one or more fields.''')
 
 def outputVariants(proj, table, output_fields, args, query=None):
     '''Output selected fields'''
@@ -91,9 +94,18 @@ def outputVariants(proj, table, output_fields, args, query=None):
     if query is not None:
         # FIXME: if the query has a simple where clause, we should use that directly.
         where_clause = ' WHERE {}.variant_id in ({})'.format(table, query)
+    # GROUP BY clause
+    group_clause = ''
+    if args.group_by:
+        # is group_by fields outputted?
+        tmp, group_fields = consolidateFieldName(proj, table, ','.join(args.group_by))
+        for f in group_fields:
+            if f.lower() not in [x.lower() for x in fields]:
+                raise ValueError('Group attribute {} is not outputted'.format(f))
+        group_clause = ' GROUP BY {}'.format(', '.join(group_fields))
     # LIMIT clause
     limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
-    query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, limit_clause)
+    query = 'SELECT {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, limit_clause)
     proj.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
