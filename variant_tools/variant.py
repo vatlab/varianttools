@@ -182,7 +182,7 @@ def select(args):
                 else:
                     proj.logger.info('Save output to {}'.format(args.save))
                     out = open(args.save, 'w')
-                    out.write('{}\n'.format(count)
+                    out.write('{}\n'.format(count))
                     out.close()
             # case 2: to table
             elif args.to_table:
@@ -222,11 +222,11 @@ def select(args):
                     else:
                         proj.logger.info('Save output to {}'.format(args.save))
                         out = open(args.save, 'w')
-                        out.write('{}\n'.format(len(selected))
+                        out.write('{}\n'.format(len(selected)))
                         out.close()
             # case 3: output, but do not write to table, and not count
             elif args.output: 
-                query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
+                query = 'SELECT {}.variant_id {} {}'.format(args.from_table,
                     from_clause, where_clause)
                 outputVariants(proj, args.from_table, args.output, args, query)
                 
