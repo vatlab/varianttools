@@ -145,8 +145,9 @@ def avgDepthArguments(parser):
     parser.add_argument('-d', '--depth_field', required=True,
         help='''Name of the field that holds average depth of each variant, which is the field
             name for command 'vtools sample_stat --depth FIELD_NAME''')
-    parser.add_argument('--by_count', action='store_true',
-        help='Output transition/transversion rate for each sample variant frequency (count) group')
+    parser.add_argument('--group_by', nargs='*', default=[],
+        help='''Output transition/transversion ratio for each group, for example,
+            '--group_by NUM_FIELD to output ratio for each sample variant frequency (count).''')
     parser.add_argument('-t', '--table', default='variant',
         help='''Variant table for which transversion/transversion mutants are counted.
             Default to the master variant table''')
@@ -159,18 +160,10 @@ def avgDepth(args):
     else:
         out = sys.stdout
     # 
-    if args.by_count:
-        out.write('sample_count\tnum_of_variant\taverage_depth\n')
-        nSample = getNumOfSamples()
-        for i in range(1, 2 * nSample + 1):
-            output = getoutput(['vtools', 'select', args.table, '{}={}'.format(args.num_field, i),
-                '--output', 'count(1)', 'avg({})'.format(args.depth_field)])
-            count, depth = output.split()
-            out.write('{}\t{}\t{:.3f}\n'.format(i, int(count), float(depth) if depth != 'NA' else 0))
-    else:
-        num, depth = getoutput(['vtools', 'output', args.table, 'sum({})'.format(args.num_field),
-            'sum({}*{})'.format(args.num_field, args.depth_field)]).split()
-        out.write('{:.3f}\n'.format(float(depth) / int(num)))
+    out.write('{}num_of_variant\taverage_depth\n'.format(''.join([x+'\t' for x in args.group_by])))
+    out.write(getoutput(['vtools', 'output', args.table] + args.group_by + 
+        ['sum({0}*{1})/sum({0})'.format(args.num_field, args.depth_field)] +
+        (['--group_by'] + args.group_by if args.group_by else [])))
     out.close()
 
 if __name__ == '__main__':
