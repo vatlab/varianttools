@@ -339,10 +339,10 @@ class DatabaseEngine:
             return
         if db.endswith('.DB'):
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db, db[:-3]))
+                db, os.path.split(db)[-1].split('.')[0]))
         else:
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db + '.DB', db))
+                db + '.DB', os.path.split(db)[-1]))
 
     def analyze(self):
         '''Analyze a database for better performance'''
@@ -397,16 +397,24 @@ class DatabaseEngine:
     #
     # Table
     #
-    def tables(self):
+    def tables(self, dbName=None):
         '''List all tables in a database'''
         cur = self.database.cursor()
         try:
             if self.engine == 'mysql':
-                cur.execute("SHOW TABLES;")
-                return [x[0] for x in cur.fetchall()]
+                if dbName is None:
+                    cur.execute("SHOW TABLES;")
+                    return [x[0] for x in cur.fetchall()]
+                else:
+                    cur.execute("SHOW TABLES IN {};".format(dbName))
+                    return [x[0] for x in cur.fetchall()]
             else:
-                cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
+                if dbName is None:
+                    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                    return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
+                else:
+                    cur.execute("SELECT name FROM {}.sqlite_master WHERE type='table';".format(dbName))
+                    return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
         except:
             return []
 
@@ -415,12 +423,8 @@ class DatabaseEngine:
         if '.' not in table:
             return table.lower() in [x.lower() for x in self.tables()]
         else:
-            dbName, table = table.split('.')
-            # this is cheaper than creating a new connection
-            db = self.newConnection()
-            db.connect(dbName)
-            res = db.hasTable(table)
-            return res
+            dbName, tableName = table.split('.')
+            return tableName.lower() in [x.lower() for x in self.tables(dbName)]
 
     def dropIndex(self, index, table):
         if self.engine == 'mysql':

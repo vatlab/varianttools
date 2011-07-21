@@ -477,7 +477,8 @@ def use(args):
                     except Exception as e:
                         proj.logger.debug(e)
                 # do not know what to do
-                raise ValueError('Can not find annotation database {}'.format(annoDB))
+                #FIXME if line 470 fails due to "No reference genome information" then the error prompt below is misleading(wanggao) 
+                raise ValueError('Cannot find annotation database {}'.format(annoDB))
     except Exception as e:
         sys.exit(e)
 

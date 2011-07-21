@@ -59,6 +59,7 @@ class AnnoDB:
         else:
             raise ValueError("Cannot locate annotation database {}".format(annoDB))
         #
+        self.dir = os.path.split(annoDB)[0]
         self.name = os.path.split(annoDB)[-1].split('.')[0]
         for table in [self.name, self.name + '_field', self.name + '_info']:
             if not db.hasTable(table):
@@ -367,10 +368,11 @@ class Project:
 
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
+        # DBs in different paths but with the same name are considered to be the same.
         if db.name not in [x.name for x in self.annoDB]:
-            self.logger.info('Using annotatin DB {} in project {}.'.format(db.name, self.name))
+            self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
             self.annoDB.append(db)
-            self.saveProperty('annoDB', str([x.name for x in self.annoDB]))
+            self.saveProperty('annoDB', str([os.path.join(x.dir, x.name) for x in self.annoDB]))
         else:
             self.logger.info('Annotatin DB {} has already been used in this project.'.format(db.name))
 
@@ -1069,11 +1071,6 @@ def show(args):
                 if not args.items:
                     raise ValueError('Please specify a table to display')
                 table = args.items[0]
-                if '.' in table:
-                    dbName, table = table.split('.')
-                    # NOTE: proj.db is now connected to another database, we are not trying to
-                    # connect back because this command will exist after the table is displayed.
-                    proj.db.connect(dbName)
                 if not proj.db.hasTable(table):
                     raise ValueError('Table {} does not exist'.format(table))
                 # print content of table
