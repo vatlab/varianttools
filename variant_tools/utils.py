@@ -519,7 +519,7 @@ def consolidateFieldName(proj, table, clause):
     values = []
     for toktype, toval, _, _, _ in tokens:
         values.append(toval)
-        if toktype == token.NAME:
+        if toktype == token.NAME and toval.lower() not in ['and', 'or', 'count', 'avg']:
             # in the case of table.field
             if len(values) > 2 and values[-2] == '.':
                 res.append((toktype, toval))
