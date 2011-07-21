@@ -162,7 +162,7 @@ def avgDepth(args):
     # 
     out.write('{}num_of_variant\taverage_depth\n'.format(''.join([x+'\t' for x in args.group_by])))
     out.write(getoutput(['vtools', 'output', args.table] + args.group_by + 
-        ['sum({0}*{1})/sum({0})'.format(args.num_field, args.depth_field)] +
+        ['COUNT(1)', 'SUM({0}*{1})/SUM({0})'.format(args.num_field, args.depth_field)] +
         (['--group_by'] + args.group_by if args.group_by else [])))
     out.close()
 
