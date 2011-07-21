@@ -85,7 +85,8 @@ def outputVariants(proj, table, output_fields, args, query=None):
     # WHERE clause
     where_clause = ''
     if query is not None:
-        where_clause = ' WHERE {}.variant_id = ({})'.format(table, query)
+        # FIXME: if the query has a simple where clause, we should use that directly.
+        where_clause = ' WHERE {}.variant_id in ({})'.format(table, query)
     # LIMIT clause
     limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
     query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, limit_clause)
