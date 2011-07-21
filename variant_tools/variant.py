@@ -75,8 +75,12 @@ def outputVariants(proj, table, output_fields, args, query=None):
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
-    # avoid duplicate, add 'chr' to make sure the master variant table is linked
-    fields_info = [proj.sourceOfField(x, table) for x in ['chr'] + fields]
+    # If fields not from table is used, add 'chr' to make sure the master variant table is linked
+    if set([x.split('.')[0].lower() for x in fields]) != set([table.lower()]):
+        fields_info = [proj.sourceOfField(x, table) for x in ['chr'] + fields]
+    else:
+        fields_info = [proj.sourceOfField(x, table) for x in fields]
+    #
     processed = set()
     for tbl, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != table.lower()]:
         if (tbl.lower(), conn) not in processed:
@@ -136,9 +140,11 @@ def select(args):
                 return
             # fields? We need to replace things like sift_score to dbNSFP.sift_score
             condition, fields = consolidateFieldName(proj, args.from_table, ' AND '.join(['({})'.format(x) for x in args.condition]))
-            #
-            # add 'pos' to always link to the variant table
-            fields_info = [proj.sourceOfField(x, args.from_table) for x in ['pos'] + fields]
+            # If fields not from table is used, add 'chr' to make sure the master variant table is linked
+            if set([x.split('.')[0].lower() for x in fields]) != set([args.from_table.lower()]):
+                fields_info = [proj.sourceOfField(x, args.from_table) for x in ['chr'] + fields]
+            else:
+                fields_info = [proj.sourceOfField(x, args.from_table) for x in fields]
             # WHERE clause: () is important because OR in condition might go beyond condition
             where_clause = ' WHERE ({})'.format(condition)
             # 
