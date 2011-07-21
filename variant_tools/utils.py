@@ -89,7 +89,7 @@ SQL_KEYWORDS = set([
     'ATAN', 'AVG', 'BETWEEN', 'AND', 'BINARY', 'BIN', 'BIT_AND',
     'BIT_OR', 'CASE', 'CAST', 'CEIL', 'CHAR', 'CHARSET', 'CONCAT', 'CONV', 'COS', 'COT',
     'COUNT', 'DATE', 'DAY', 'DIV', 'EXP', 'IS', 'LIKE', 'MAX', 'MIN', 'MOD', 'MONTH',
-    'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES'
+    'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
 def setOptions(verbosity=None):
