@@ -79,7 +79,7 @@ class AnnoDBConfiger:
         if len(self.build) == 0:
             raise ValueError('No reference genome is specified for database {}'.format(annoDB))
         if not proj.build is None:
-            if not proj.build in self.build.keys() and (proj.alt_build is None or \
+            if (not self.build.keys()[0] == '*') and (not proj.build in self.build.keys()) and (proj.alt_build is None or \
                 proj.alt_build not in self.build.keys()):
                 raise ValueError('Annotation database cannot be used for the existing project.')
 
@@ -425,7 +425,7 @@ def useArguments(parser):
         help='''A list of source files. If specified, vtools will not try to
             download and select source files. This is used only when no local
             annotation database is located.''')
-    parser.add_argument('--by', nargs='*', default=[],
+    parser.add_argument('-l', '--linked_by', nargs='*', default=[],
         help='''A list of fields that are used to link the annotation database to
             tables in the existing project. This parameter is reuired only for
             'attribute' type of annotation databases that link to fields of existing
@@ -455,31 +455,31 @@ def use(args):
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
                     cfg = AnnoDBConfiger(proj, annoDB)
-                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.by))
+                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif annoDB.endswith('.DB'):
                 if proj.db.engine != 'sqlite3':
                     raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                 if os.path.isfile(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.by))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
                 # no extension? try mysql database, .ann and .DB
                 if proj.db.engine == 'mysql' and proj.db.hasDatabase(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.by))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by))
                 if os.path.isfile(annoDB + '.DB'):
                     if proj.db.engine != 'sqlite3':
                         raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                     try:
-                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.by))
+                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by))
                     except Exception as e:
                         proj.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann')
                     try:
-                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.by))
+                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by))
                     except Exception as e:
                         proj.logger.debug(e)
                 # do not know what to do
