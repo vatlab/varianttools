@@ -1,0 +1,28 @@
+#Variant tools schema version 1.0
+#
+[linked fields]
+*=ccdsId
+
+[data sources]
+description=kegg pathway for CCDS gene
+anno_type=attribute
+direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/keggPathway.DB
+source_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/keggPathway.txt.gz
+source_type=txt
+
+[ccdsId]
+index=1
+type=VARCHAR(24) NULL
+comment=CCDS gene ID
+
+[KgID]
+index=2
+type=VARCHAR(24) NULL
+comment=Kegg pathway ID
+
+[KgDesc]
+index=3
+type=VARCHAR(128) NULL
+comment=Description of pathway
+
+
