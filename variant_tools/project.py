@@ -742,7 +742,6 @@ class Project:
             # Annotation database
             if table.lower() in [x.name.lower() for x in self.annoDB]:
                 db = [x for x in self.annoDB if x.name.lower() == table][0]
-                self.logger.info('{} {} {} {}'.format(db.name, db.anno_type, db.build, db.linked_by))
                 if db.anno_type == 'attribute':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
@@ -844,6 +843,12 @@ class Project:
         for db in self.annoDB:
             if field.lower() in [x.name.lower() for x in db.fields]:
                 table = db.name
+                if db.anno_type == 'attribute':
+                    return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
+                        FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, table),
+                            link= ' AND '.join(['{}.{}={}'.format(table, x, y) for x,y in zip(db.build, db.linked_by)]))]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
