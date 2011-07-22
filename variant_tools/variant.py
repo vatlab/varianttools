@@ -201,47 +201,36 @@ def select(args, reverse=False):
                     out.close()
             # case 2: to table
             elif args.to_table:
-                if not reverse:
-                    query = 'SELECT {}.variant_id {} {};'.format(args.from_table,
-                        from_clause, where_clause)
-                else:
-                    query = 'SELECT {0}.variant_id FROM {0} WHERE {0}.variant_id NOT IN (SELECT {0}.variant_id {1} {2});'.format(args.from_table,
-                        from_clause, where_clause)
-                proj.logger.debug('Running query {}'.format(query))
-                proj.logger.info('Selecting variants')
-                cur = proj.db.cursor()
-                proj.db.startProgress('Running')
-                cur.execute(query)
-                selected = set([x[0] for x in cur.fetchall()])
-                proj.db.stopProgress()
-                proj.logger.info('{} variants selected.'.format(len(selected)))
-                #
-                proj.logger.info('Writing {} variants to table {}'.format(len(selected), args.to_table))
                 if proj.db.hasTable(args.to_table):
                     proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(args.to_table))
                     proj.db.removeTable(args.to_table)
                 #
                 proj.createVariantTable(args.to_table)
-                prog = ProgressBar(args.to_table, len(selected))
-                query = 'INSERT INTO {} VALUES ({});'.format(args.to_table, proj.db.PH)
-                # sort variant_id so that variant_id will be in order, which might
-                # improve database performance
-                for count,id in enumerate(sorted(selected)):
-                    cur.execute(query, (id,))
-                    if count % proj.db.batch == 0:
-                        proj.db.commit()
-                        prog.update(count)
+                if not reverse:
+                    query = 'INSERT INTO {0} SELECT {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
+                        from_clause, where_clause)
+                else:
+                    query = 'INSERT INTO {0} SELECT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
+                        format(args.to_table, args.from_table, from_clause, where_clause)
+                proj.logger.debug('Running query {}'.format(query))
+                #
+                cur = proj.db.cursor()
+                proj.db.startProgress('Running')
+                cur.execute(query)
+                proj.db.stopProgress()
                 proj.db.commit()
-                prog.done()
+                #
+                count = proj.db.numOfRows(args.to_table)
+                proj.logger.info('{} variants selected.'.format(count))
                 if args.output:
                     outputVariants(proj, args.to_table, args.output, args)
                 if args.count:
                     if not args.save:
-                        print len(selected)
+                        print count
                     else:
                         proj.logger.info('Save output to {}'.format(args.save))
                         out = open(args.save, 'w')
-                        out.write('{}\n'.format(len(selected)))
+                        out.write('{}\n'.format(count))
                         out.close()
             # case 3: output, but do not write to table, and not count
             elif args.output: 
