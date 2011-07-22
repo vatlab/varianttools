@@ -5,7 +5,7 @@
 # - Inline comments starts with ;
 # - Required sections:
 #
-#   [reference genome]: reference genome name and coordinate fields. Multiple coordinates
+#   [linked fields]: reference genome name and coordinate fields. Multiple coordinates
 #          can be specified.
 #   
 #   [data sources]: This section can have keys
@@ -25,7 +25,7 @@
 #       * null (optional) if specified, values that will be treated as NULL.
 #       * comment (optional) a description of the field
 #
-[reference genome]
+[linked fields]
 hg18=chr, hg18pos, alt
 hg19=chr, hg19pos, alt
 

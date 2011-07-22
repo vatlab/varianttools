@@ -82,9 +82,9 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     #
     processed = set()
     for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-        if (tbl.lower(), conn) not in processed:
+        if (tbl.lower(), conn.lower()) not in processed:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-            processed.add((tbl.lower(), conn))
+            processed.add((tbl.lower(), conn.lower()))
     # WHERE clause
     where_clause = ''
     if query is not None:

@@ -1,5 +1,5 @@
 #Variant tools schema version 1.0
-[reference genome]
+[linked fields]
 hg19=chr, txStart, txEnd
 
 [data sources]

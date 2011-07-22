@@ -72,8 +72,8 @@ class AnnoDBConfiger:
         # some fields have to be determined.
         if self.name is None:
             raise ValueError('No valid name is set')
-        if self.anno_type not in ['position', 'variant', 'range']:
-            raise ValueError('vtools only support point and interval annotation types')
+        if self.anno_type not in ['position', 'variant', 'range', 'attribute']:
+            raise ValueError('vtools only support position, variant, range, and attribute types')
         if len(self.fields) == 0:
             raise ValueError('No valid field is located from database {}'.format(annoDB))
         if len(self.build) == 0:
@@ -97,17 +97,15 @@ class AnnoDBConfiger:
         parser.read(filename)
         # sections?
         sections = parser.sections()
-        if 'reference genome' not in sections:
+        if 'linked fields' not in sections:
             raise ValueError('Ignore invalid annotation file {}. Missing build section.'.format(filename))
         if 'data sources' not in sections:
             raise ValueError('Ignore invalid annotation file {}. Missing source section.'.format(filename))
-        # reference genome
+        # linked fields for each reference genome
         try:
             self.build = {}
-            for item in parser.items('reference genome'):
+            for item in parser.items('linked fields'):
                 fields = [x.strip() for x in item[1].split(',')]
-                if len(fields) < 2:
-                    raise ValueError('Reference genome should be specified as at least a chr and pos pair.')
                 for field in fields:
                     if field not in sections:
                         self.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
@@ -142,7 +140,7 @@ class AnnoDBConfiger:
         # sections
         self.fields = []
         for section in sections:
-            if section == 'reference genome' or section == 'data sources':
+            if section == 'linked fields' or section == 'data sources':
                 continue
             try:
                 items = [x[0] for x in parser.items(section)]
@@ -163,7 +161,8 @@ class AnnoDBConfiger:
         'Create an annotation table '
         items = []
         for build in self.build.keys():
-            items.append('{0}_bin INTEGER'.format(build))
+            if build != '*':
+                items.append('{0}_bin INTEGER'.format(build))
         for field in self.fields:
             if 'chromosome' in field.type:
                 items.append('{0} VARCHAR(20)'.format(field.name))
@@ -290,6 +289,8 @@ class AnnoDBConfiger:
         # First: Ucsc bins calculated for position fields
         build_info = []
         for key,items in self.build.items():
+            if key == '*':
+                continue
             try:
                 # items have chr/pos, chr/pos/alt, chr/start/end for different annotation types
                 field = [x for x in self.fields if x.name == items[1]][0]
@@ -309,7 +310,7 @@ class AnnoDBConfiger:
                 field_info.append((field.index, None, field.null))
         # files?
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
-                            ','.join([db.PH] * (len(self.fields) + len(self.build))) + ');'
+                            ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
             self.logger.info('Importing annotation data from {0}'.format(f))
             all_records = 0
@@ -351,7 +352,6 @@ class AnnoDBConfiger:
                                 item = None
                             records.append(item)
                         # 
-                        # self.logger.debug("RECORDS: " + str(records))
                         cur.execute(insert_query, records)
                     except Exception as e:
                         # if any problem happens, just ignore
@@ -380,15 +380,16 @@ class AnnoDBConfiger:
         # 
         # Method 2: this creates index for each link method
         for key in self.build.keys():
-            cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
-                .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+            if key != '*':
+                cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
+                    .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         # This is only useful for sqlite
         db.analyze()
         if tdir is not None:
             shutil.rmtree(tdir)
         
 
-    def prepareDB(self, source_files = []):
+    def prepareDB(self, source_files=[], linked_by=[]):
         '''Importing data to database. If direct_url or source_url is specified,
         they will overwrite settings in configuraiton file. If successful, this
         function set self.db to a live connection.
@@ -410,7 +411,7 @@ class AnnoDBConfiger:
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
         self.importFromSource(source_files)
-        return AnnoDB(self.proj, self.name)
+        return AnnoDB(self.proj, self.name, linked_by)
 
 
 def useArguments(parser):
@@ -424,6 +425,11 @@ def useArguments(parser):
         help='''A list of source files. If specified, vtools will not try to
             download and select source files. This is used only when no local
             annotation database is located.''')
+    parser.add_argument('--by', nargs='*', default=[],
+        help='''A list of fields that are used to link the annotation database to
+            tables in the existing project. This parameter is reuired only for
+            'attribute' type of annotation databases that link to fields of existing
+            tables.''')
 
 
 def use(args):
@@ -449,31 +455,31 @@ def use(args):
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
                     cfg = AnnoDBConfiger(proj, annoDB)
-                    return proj.useAnnoDB(cfg.prepareDB(args.files))
+                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.by))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif annoDB.endswith('.DB'):
                 if proj.db.engine != 'sqlite3':
                     raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                 if os.path.isfile(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.by))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
                 # no extension? try mysql database, .ann and .DB
                 if proj.db.engine == 'mysql' and proj.db.hasDatabase(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.by))
                 if os.path.isfile(annoDB + '.DB'):
                     if proj.db.engine != 'sqlite3':
                         raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                     try:
-                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB'))
+                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.by))
                     except Exception as e:
                         proj.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann')
                     try:
-                        return proj.useAnnoDB(cfg.prepareDB(args.files))
+                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.by))
                     except Exception as e:
                         proj.logger.debug(e)
                 # do not know what to do

@@ -51,7 +51,7 @@ class AnnoDB:
     The annotation.py module is responsible of creating this structure from
     various sources.
     '''
-    def __init__(self, proj, annoDB):
+    def __init__(self, proj, annoDB, linked_by=[]):
         proj.logger.debug('Loading annotation database {}'.format(annoDB))
         db = proj.db.newConnection()
         if db.hasDatabase(annoDB):
@@ -77,6 +77,9 @@ class AnnoDB:
             raise ValueError('Annotation database {} does not provide any field.'.format(annoDB))
         #
         self.anno_type = 'variant'
+        self.linked_by = []
+        for f in linked_by:
+            self.linked_by.append(proj.linkFieldToTable(f, 'variant')[-1].field)
         self.description = ''
         self.refGenomes = None
         self.build = None
@@ -90,7 +93,10 @@ class AnnoDB:
             elif rec[0] == 'build':
                 self.refGenomes = eval(rec[1])
                 for key in self.refGenomes.keys():
-                    if proj.build is None:
+                    # no reference genome is needed
+                    if key == '*':
+                        self.build = self.refGenomes[key]
+                    elif proj.build is None:
                         proj.logger.warning('Project does not have a primary build. Using {} from the annotation database'.format(key))
                         proj.setRefGenome(key)
                         self.build = self.refGenomes[key]
@@ -104,6 +110,8 @@ class AnnoDB:
             proj.logger.warning('No description for annotation database {}'.format(annoDB))
         if self.build is None and self.alt_build is None:
             raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
+        if self.anno_type == 'attribute' and len(self.linked_by) != len(self.build):
+            raise ValueError('Please specify link fields for attributes {} using parameter --by'.format(','.join(self.build)))
 
     def __repr__(self):
         '''Describe this annotation database'''
@@ -356,9 +364,11 @@ class Project:
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]')):
             try:
-                self.annoDB.append(AnnoDB(self, db))
+                linked_by = eval(self.loadProperty('{}_linked_by'.format(os.path.split(db)[-1]), default='[]'))
+                self.annoDB.append(AnnoDB(self, db, linked_by))
                 self.db.attach(db)
-            except:
+            except Exception as e:
+                self.logger.warning(e)
                 self.logger.warning('Cannot open annotation database {}'.format(db))
         #
         # get existing meta information
@@ -373,6 +383,7 @@ class Project:
             self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
             self.annoDB.append(db)
             self.saveProperty('annoDB', str([os.path.join(x.dir, x.name) for x in self.annoDB]))
+            self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
         else:
             self.logger.info('Annotatin DB {} has already been used in this project.'.format(db.name))
 
@@ -731,6 +742,13 @@ class Project:
             # Annotation database
             if table.lower() in [x.name.lower() for x in self.annoDB]:
                 db = [x for x in self.annoDB if x.name.lower() == table][0]
+                self.logger.info('{} {} {} {}'.format(db.name, db.anno_type, db.build, db.linked_by))
+                if db.anno_type == 'attribute':
+                    return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
+                        FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, table),
+                            link= ' AND '.join(['{}.{}={}'.format(table, x, y) for x,y in zip(db.build, db.linked_by)]))]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
                         return self.linkFieldToTable('{}.variant_id'.format(varinat_table), 'variant') + [
@@ -781,7 +799,7 @@ class Project:
                                     .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
-
+            raise ValueError('Failed to locate field {}'.format(field))
         # get all fields
         if field.lower() not in ['chr', 'pos', 'ref', 'alt', 'variant_id']:
             matching_fields = []
