@@ -78,14 +78,10 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
-    # If fields not from table is used, add 'chr' to make sure the master variant table is linked
-    if set([x.split('.')[0].lower() for x in fields]) != set([table.lower()]):
-        fields_info = [proj.sourceOfField(x, table) for x in ['chr'] + fields]
-    else:
-        fields_info = [proj.sourceOfField(x, table) for x in fields]
+    fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
     #
     processed = set()
-    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != table.lower()]:
+    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
         if (tbl.lower(), conn) not in processed:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
             processed.add((tbl.lower(), conn))
@@ -152,11 +148,8 @@ def select(args, reverse=False):
                 return
             # fields? We need to replace things like sift_score to dbNSFP.sift_score
             condition, fields = consolidateFieldName(proj, args.from_table, ' AND '.join(['({})'.format(x) for x in args.condition]))
-            # If fields not from table is used, add 'chr' to make sure the master variant table is linked
-            if set([x.split('.')[0].lower() for x in fields]) != set([args.from_table.lower()]):
-                fields_info = [proj.sourceOfField(x, args.from_table) for x in ['chr'] + fields]
-            else:
-                fields_info = [proj.sourceOfField(x, args.from_table) for x in fields]
+            # 
+            fields_info = sum([proj.linkFieldToTable(x, args.from_table) for x in fields], [])
             # WHERE clause: () is important because OR in condition might go beyond condition
             where_clause = ' WHERE ({})'.format(condition)
             # 
@@ -164,7 +157,7 @@ def select(args, reverse=False):
             from_clause = 'FROM {} '.format(args.from_table)
             # avoid duplicate
             processed = set()
-            for table, conn in [(x.table, x.link) for x in fields_info if x.table.lower() != args.from_table.lower()]:
+            for table, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
                 if (table.lower(), conn) not in processed:
                     from_clause += ', {} '.format(table)
                     where_clause += ' AND ({}) '.format(conn)

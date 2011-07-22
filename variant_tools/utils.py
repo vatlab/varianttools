@@ -568,19 +568,19 @@ def consolidateFieldName(proj, table, clause):
             if len(values) > 2 and values[-2] == '.':
                 res.append((toktype, toval))
                 try:
-                    info = proj.sourceOfField(''.join(values[-3:]), table)
-                    fields.append(info.field)
+                    for info in proj.linkFieldToTable(''.join(values[-3:]), table):
+                        fields.append(info.field)
                 except Exception as e:
                     proj.logger.debug(e)
                 continue
             #
             try:
-                info = proj.sourceOfField(toval, table)
-                fields.append(info.field)
+                for info in proj.linkFieldToTable(toval, table):
+                    fields.append(info.field)
                 res.append((token.NAME, info.field))
             except Exception as e:
                 proj.logger.debug(e)
-                # unrecognize, most like an 'AND'
+                # unrecognize
                 res.append((toktype, toval))
         else:
             res.append((toktype, toval))

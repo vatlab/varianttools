@@ -699,69 +699,86 @@ class Project:
     #
     # Handling field query
     #
-    def sourceOfField(self, field, variant_table):
-        '''Return database and table or a field. variant_table will be processed first
-        so field in this table will have higher priority.'''
-        #
+    def linkFieldToTable(self, field, variant_table):
+        '''Return one or more FieldConnections that link a field to a variant_table'''
         # if field is specified by table.field, good
         if '.' in field:
+            # possibly two dots (db.table.field), but never seen them.
             table, field = '.'.join(field.split('.')[:-1]).lower(), field.split('.')[-1].lower()
             if self.db.hasTable(table):
-                if variant_table == 'variant':
-                    return FieldConnection(
+                if variant_table.lower() == table.lower():
+                    # [] connection
+                    # the field is in variant_table itself, no link is needed
+                    return [FieldConnection(
                         field='{}.{}'.format(table, field),
-                        table=table,
-                        link='')
+                        table='',  # no need to join table
+                        link='') ]
+                elif variant_table.lower() == 'variant':
+                    # [] <-> [master] connection
+                    # outputting master variant table field from a non-master variant table
+                    return [FieldConnection(
+                        field='{}.{}'.format(table, field),
+                        table='variant', # need to join table with the master variant table
+                        link='{}.variant_id = variant.variant_id'.format(table))]
                 else:
-                    return FieldConnection(
+                    # [] <-> [] connection
+                    # outputting non-master variant table field from another non-master variant table
+                    # here we link table directly to another variant table by variant id.
+                    return [FieldConnection(
                         field='{}.{}'.format(table, field),
-                        table=table,
-                        link='{}.variant_id = {}.variant_id'.format(variant_table, table))
+                        table=table, # need to join table with another table
+                        link='{}.variant_id = {}.variant_id'.format(variant_table, table))]
             # Annotation database
-            if table in [x.name.lower() for x in self.annoDB]:
+            if table.lower() in [x.name.lower() for x in self.annoDB]:
                 db = [x for x in self.annoDB if x.name.lower() == table][0]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(varinat_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
-                                .format(table, self.build, db.build[0], db.build[1]))
+                                .format(table, self.build, db.build[0], db.build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             # FIXME: how to use bin here?
                             link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'
-                                    .format(table, db.build[0], db.build[1], db.build[2]))
+                                    .format(table, db.build[0], db.build[1], db.build[2]))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 if db.alt_build is not None:
                     if db.anno_type == 'position':  # chr and pos
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3}'\
-                                .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))
+                                .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             # FIXME: how to use bin here?
                             link= 'variant.alt_chr = {0}.{1} AND variant.alt_pos >= {0}.{2} AND variant.alt_pos <= {0}.{3}'\
-                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))
+                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
 
@@ -783,73 +800,80 @@ class Project:
         #
         #
         # in variant_table?
-        if variant_table is not None and field.lower() in [x.lower() for x in self.db.getHeaders(variant_table)]:
-            return FieldConnection(
+        if field.lower() in [x.lower() for x in self.db.getHeaders(variant_table)]:
+            return [FieldConnection(
                 field='{}.{}'.format(variant_table, field),
-                table=variant_table,
-                link='')
-        #
+                table='',  # no link is necessary
+                link='')]
         # in the master variant table
         if variant_table.lower() != 'variant' and field.lower() in [x.lower() for x in self.db.getHeaders('variant')]:
-            return FieldConnection(
+            return [FieldConnection(
                 field='variant.{}'.format(field),
                 table='variant',
-                link='{}.variant_id = variant.variant_id'.format(variant_table))
+                link='{}.variant_id = variant.variant_id'.format(variant_table))]
         # other variant tables
         for table in self.getVariantTables():
-            if table == variant_table.lower():
+            # this case has been checked (in variant_table)
+            if table.lower() == variant_table.lower():
                 continue
             if field.lower() in [x.lower() for x in self.db.getHeaders(table)]:
-                return FieldConnection(
+                # direct link to another variant table
+                return [FieldConnection(
                     field= '{}.{}'.format(table, field),
                     table= '{}.{}'.format(table, table),
-                    link= '{}.variant_id = {}.variant_id'.format(table, variant_table))
+                    link= '{}.variant_id = {}.variant_id'.format(table, variant_table))]
         # annotation database?
         for db in self.annoDB:
             if field.lower() in [x.name.lower() for x in db.fields]:
                 table = db.name
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
-                                .format(table, self.build, db.build[0], db.build[1]))
+                                .format(table, self.build, db.build[0], db.build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin?
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'\
-                                    .format(table, db.build[0], db.build[1], db.build[2]))
+                                    .format(table, db.build[0], db.build[1], db.build[2]))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 elif db.alt_build is not None:
                     if db.anno_type == 'position':  # chr and pos
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3}'\
-                                .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))
+                                .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin here?
-                        return FieldConnection(
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'\
-                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))
+                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 else:
