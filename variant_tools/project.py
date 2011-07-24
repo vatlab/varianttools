@@ -950,9 +950,9 @@ def init(args):
 def removeArguments(parser):
     parser.add_argument('type', choices=['project', 'table', 'sample', 'column'],
         help='''Type of items to be removed.''')
-    parser.add_argument('items', nargs='+',
-        help='''Items to be removed. It should a the name of project
-            for type project, names of one or more variant tables for
+    parser.add_argument('items', nargs='*',
+        help='''Items to be removed. It can be the name of project for type
+            project (optional), names of one or more variant tables for
             type table, a pattern for type 'sample', a name of a column.''')
     
 
@@ -960,7 +960,7 @@ def remove(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             if args.type == 'project':
-                if args.items[0] != proj.name:
+                if len(args.items) > 0 and args.items[0] != proj.name:
                     raise ValueError('Cannot remove project: Incorrect project name')
                 proj.remove()
             elif args.type == 'table':
