@@ -25,11 +25,12 @@
 #
 
 import os
+import glob
 import unittest
 import subprocess
 
 
-class ProcTest(unittest.TestCase):
+class ProcessTestCase(unittest.TestCase):
     def assertOutput(self, cmd, output):
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         self.assertEqual(
@@ -48,7 +49,15 @@ class ProcTest(unittest.TestCase):
             return
 
 
-class TestInit(ProcTest):
+class TestInit(ProcessTestCase):
+    def setUp(self):
+        'Clear any existing project'
+        for f in glob.glob('*.proj') + glob.glob('*.DB'):
+            try:
+                os.remove(f)
+            except:
+                pass
+
     def testInit(self):
         self.assertFail(['vtools', 'init'])
         self.assertSucc(['vtools', 'init', 'test'])
