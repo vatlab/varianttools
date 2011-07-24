@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_init $
+# $File: test_init.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -28,40 +28,15 @@ import os
 import glob
 import unittest
 import subprocess
-
-
-class ProcessTestCase(unittest.TestCase):
-    def assertOutput(self, cmd, output):
-        # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        self.assertEqual(
-            subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}),
-            output)
-
-    def assertSucc(self, cmd):
-        # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        self.assertEqual(subprocess.check_call(cmd, env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}),
-            0)
-
-    def assertFail(self, cmd):
-        try:
-            subprocess.check_call(cmd, env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
-        except subprocess.CalledProcessError:
-            return
-
+from testUtils import ProcessTestCase
 
 class TestInit(ProcessTestCase):
-    def setUp(self):
-        'Clear any existing project'
-        for f in glob.glob('*.proj') + glob.glob('*.DB'):
-            try:
-                os.remove(f)
-            except:
-                pass
-
     def testInit(self):
+        'Test command vtools init'
         self.assertFail(['vtools', 'init'])
         self.assertSucc(['vtools', 'init', 'test'])
         self.assertFail(['vtools', 'init', 'test1'])
+        self.assertSucc(['vtools', 'init', 'test', '-f'])
 
 
 if __name__ == '__main__':
