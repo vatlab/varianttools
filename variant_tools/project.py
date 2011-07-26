@@ -683,13 +683,13 @@ class Project:
     #
     # temporary table which are created in separate database
     # because it is very slow for delite to remove temporary table
-    def getTempTable(self):
-        '''Return a table name that does not exist in database'''
-        self.db.attach('{}_temp'.format(self.name))
-        while True:
-            name = '{}_temp._tmp_{}'.format(self.name, random.randint(0, 10000))
-            if not self.db.hasTable(name):
-                return name   
+    # def getTempTable(self):
+    #     '''Return a table name that does not exist in database'''
+    #     self.db.attach('{}_temp'.format(self.name))
+    #     while True:
+    #         name = '{}_temp._tmp_{}'.format(self.name, random.randint(0, 10000))
+    #         if not self.db.hasTable(name):
+    #             return name   
 
     def checkFieldName(self, name, exclude=None):
         '''Check if a field name has been used, or is the SQL keyword'''
