@@ -202,8 +202,8 @@ def select(args, reverse=False):
             # case 2: to table
             elif args.to_table:
                 if proj.db.hasTable(args.to_table):
-                    proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(args.to_table))
-                    proj.db.removeTable(args.to_table)
+                    new_table = proj.db.backupTable(args.to_table)
+                    self.logger.warning('Existing table {} is renamed to {}.'.format(args.to_table, new_table))
                 #
                 proj.createVariantTable(args.to_table)
                 if not reverse:
@@ -312,8 +312,8 @@ def compare(args):
                 if table == 'variant':
                     raise ValueError('Cannot overwrite master variant table')
                 if proj.db.hasTable(table):
-                    proj.logger.warning('Removing existing table {}, which can be slow for sqlite3 database'.format(table))
-                    proj.db.removeTable(table)
+                    new_table = proj.db.backupTable(table)
+                    self.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
                 proj.createVariantTable(table)
                 prog = ProgressBar('Writing to ' + table, len(var))
                 query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
