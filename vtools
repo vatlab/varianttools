@@ -28,6 +28,7 @@ import argparse
 
 from variant_tools import project
 from variant_tools import vcf
+from variant_tools import tsv
 from variant_tools import sample
 from variant_tools import liftOver
 from variant_tools import annotation
@@ -91,6 +92,16 @@ if __name__ == '__main__':
     vcf.importVCFArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=vcf.importVCF)
+    # 
+    # command import_tsv
+    parser = subparsers.add_parser('import_tsv',
+        help='Import variants from files in tab (or comma) separated value formats',
+        description='''Import variants from one or more tab or comma separated files.
+            This command can be used to import variants to a new project (without sample), or
+            create a variant table from a list of variants for further analysis. ''')
+    tsv.importTSVArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=tsv.importTSV)
     # 
     # command import_phenotype
     parser = subparsers.add_parser('import_phenotype', help='Import sample phenotype')
