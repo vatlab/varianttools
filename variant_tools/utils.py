@@ -493,6 +493,16 @@ class DatabaseEngine:
         cur.execute('ALTER TABLE {} RENAME TO {};'.format(fromTable, toTable))
         self.database.commit()
         
+    def backupTable(self, table):
+        '''Backup a table to table_timestamp'''
+        while True:
+            new_table = '{}_{}'.format(table, time.strftime('%b%d_%H%M%S', time.gmtime()))
+            if not self.hasTable(new_table):
+                self.renameTable(table, new_table)
+                return new_table
+            time.sleep(1)
+        
+
     def removeColumns(self, table, cols):
         '''Remove columns from a table'''
         cur = self.database.cursor()
