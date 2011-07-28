@@ -164,7 +164,7 @@ class LiftOverTool:
         cur = self.db.cursor()
         headers = self.db.getHeaders('variant')
         if not 'alt_pos' in headers:
-            self.logger.info('Adding columns alt_bin, alt_chr and alt_pos to table variant')
+            self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
             self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
             self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
             self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')

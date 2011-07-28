@@ -73,7 +73,7 @@ class Sample:
                 raise ValueError('No phenotype is defined for sample {} in file {}'.format(rec[3], rec[1]))
             table.append([rec[0], rec[2], rec[3]] + record[(rec[1], rec[3])])
         self.logger.info('Importing phenotypes into table sample')
-        # check column names
+        # check field names
         for name in headers[2:]:
             self.proj.checkFieldName(name, exclude='sample')
         # create a new table
@@ -86,7 +86,7 @@ class Sample:
                 cur.execute(query, line)
         except Exception as e:
             self.proj.db.removeTable(temp_table_name)
-            self.logger.error('Failed to create sample table. Perhaps an invalid column name is specified.')
+            self.logger.error('Failed to create sample table. Perhaps an invalid field name is specified.')
             self.logger.debug(e)
             raise e
         # everything is OK.
@@ -219,12 +219,12 @@ class Sample:
                 continue
             if field in headers:
                 # NOTE: there is a possible problem of type mismatch 
-                # e.g. saving frequency to an integer column
-                self.logger.info('Updating existing column {}'.format(field))
+                # e.g. saving frequency to an integer field
+                self.logger.info('Updating existing field {}'.format(field))
                 if fldtype == 'FLOAT':
-                    self.logger.warning('Result will be wrong if this column was created to hold integer values')
+                    self.logger.warning('Result will be wrong if this field was created to hold integer values')
             else:
-                self.logger.info('Adding column {}'.format(field))
+                self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
         #
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))

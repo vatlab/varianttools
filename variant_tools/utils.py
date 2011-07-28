@@ -503,8 +503,8 @@ class DatabaseEngine:
             time.sleep(1)
         
 
-    def removeColumns(self, table, cols):
-        '''Remove columns from a table'''
+    def removeFields(self, table, cols):
+        '''Remove fields from a table'''
         cur = self.database.cursor()
         if self.engine == 'mysql':
             cur.execute('ALTER TABLE {} {};'.format(table,
@@ -548,7 +548,7 @@ class DatabaseEngine:
         self.database.set_progress_handler(None, self.batch)
 
     def getHeaders(self, table):
-        '''Obtain column names of a table'''
+        '''Obtain field names of a table'''
         cur = self.database.cursor()
         try:
             if self.engine == 'mysql':

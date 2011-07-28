@@ -141,7 +141,7 @@ class Project:
             file_id:    file ID
             filename:   filename
 
-    3. Table "variant" has the following columns:
+    3. Table "variant" has the following fields:
 
             variant_id:  varaint ID
             bin:        UCSC bin
@@ -160,14 +160,14 @@ class Project:
 
        There can be mulitple variant tables in a project. The master
        variant table will be named "variant". The last three
-       columns are maitained by liftOver and sample modules.
+       fields are maintained by liftOver and sample modules.
 
     If genetic samples are involved, the following tables will be
     created:
 
     1. Table "sample" is used to store the source of variant and genotype
        information. A file will not be re-imported if its name appears in this
-       table. This table has the following columns:
+       table. This table has the following fields:
 
             sample_id:   sample id
             file_id:     ID of filename
@@ -948,12 +948,12 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'table', 'sample', 'column'],
+    parser.add_argument('type', choices=['project', 'table', 'sample', 'field'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed. It can be the name of project for type
             project (optional), names of one or more variant tables for
-            type table, a pattern for type 'sample', a name of a column.''')
+            type table, a pattern for type 'sample', a name of a field.''')
     
 
 def remove(args):
@@ -970,11 +970,11 @@ def remove(args):
                 # NOTE: we should move function selectSampleByPhenotype
                 # to the Project class in order to implement this feature.
                 raise ValueError("This feature has not been implemented.")
-            elif args.type == 'column':
+            elif args.type == 'field':
                 from_table = defaultdict(list)
                 for item in args.items:
                     if item.lower() in ['variant_id', 'chr', 'pos', 'alt']:
-                        raise ValueError('Columns variant_id, chr, pos and alt cannot be removed')
+                        raise ValueError('Fields variant_id, chr, pos and alt cannot be removed')
                     found = False
                     for table in proj.getVariantTables():
                         if item.lower() in [x.lower() for x in proj.db.getHeaders(table)]:
@@ -982,11 +982,11 @@ def remove(args):
                             found = True
                             break
                     if not found:
-                        raise ValueError('Column {} does not exist in any of the variant tables.'.format(item))
+                        raise ValueError('Field {} does not exist in any of the variant tables.'.format(item))
                 # remove...
                 for table, items in from_table.items():
                     proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
-                    proj.db.removeColumns(table, items)
+                    proj.db.removeFields(table, items)
     except Exception as e:
         sys.exit(e)
 

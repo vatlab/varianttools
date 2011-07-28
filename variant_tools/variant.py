@@ -330,14 +330,14 @@ def compare(args):
         sys.exit(e) 
 
 
-def addColumnArguments(parser):
+def addFieldArguments(parser):
     parser.add_argument('table', help='''variant table to which the properties will be attached.''')
     parser.add_argument('fields', nargs='+',
-        help='''Column names that will be added to the variant table''')
+        help='''Field names that will be added to the variant table''')
     parser.add_argument('-f', '--file', required=True,
         help='''A file from which properties will be read.''')
     parser.add_argument('-c', '--columns', required=True, nargs='+', type=int,
-        help='Columns (1-based) to import, corresponding to each field to import.')
+        help='Columns (1-based) to import from file, corresponding to each field to import.')
     grp = parser.add_argument_group('Input file description')
     grp.add_argument('--variant_columns', nargs='+', type=int,
         help='''Columns to hold chr, pos and alt, default to 1, 2 and 4. If a list
@@ -352,7 +352,7 @@ def addColumnArguments(parser):
         help='Treat values matching this value as missing.')
 
 
-def addColumn(args):
+def addField(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # table?
@@ -488,11 +488,11 @@ def addColumn(args):
             for idx, field in enumerate(args.fields):
                 if field in headers:
                     # NOTE: there is a possible problem of type mismatch 
-                    # e.g. saving frequency to an integer column
-                    proj.logger.info('Updating existing column {}'.format(field))
-                    proj.logger.warning('Result might be wrong if this column was created to hold other types of values')
+                    # e.g. saving frequency to an integer field
+                    proj.logger.info('Updating existing field {}'.format(field))
+                    proj.logger.warning('Result might be wrong if this field was created to hold other types of values')
                 else:
-                    proj.logger.info('Adding column {}'.format(field))
+                    proj.logger.info('Adding field {}'.format(field))
                     proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, 
                         typeOfValues([x[idx] for x in variants.values() if x[idx] is not None])))
             #
