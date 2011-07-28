@@ -335,9 +335,14 @@ def addFieldArguments(parser):
     parser.add_argument('fields', nargs='+',
         help='''Field names that will be added to the variant table''')
     parser.add_argument('-f', '--file', required=True,
-        help='''A file from which properties will be read.''')
+        help='''A file from which properties will be read. The file should have columns (--variant_columns)
+            that match the variants by chromosome, position pair, or chromosome position and alternative
+            allele, or attribute of variants at specified columns (--anchor_fields).''')
     parser.add_argument('-c', '--columns', required=True, nargs='+', type=int,
         help='Columns (1-based) to import from file, corresponding to each field to import.')
+    parser.add_argument('--anchor_fields', nargs='*',
+        help='''If specified, values in these fields will be compared to variant_columns of
+            the external file and determines fields to add.''')
     grp = parser.add_argument_group('Input file description')
     grp.add_argument('--variant_columns', nargs='+', type=int,
         help='''Columns to hold chr, pos and alt, default to 1, 2 and 4. If a list
@@ -372,7 +377,29 @@ def addField(args):
             else:
                 raise ValueError('Specified reference genome must be the primary or alternative reference genome of the project.')
             # getting variants from table
-            if len(args.variant_columns) == 2:
+            if args.anchor_fields is not None:
+                link_type = 'field'
+                select_clause, fields = consolidateFieldName(proj, args.table, ','.join(args.anchor_fields))
+                # alternative reference genome
+                if args.build and args.build == proj.alt_build:
+                    for idx,item in enumerate(fields):
+                        if item == 'chr':
+                            fields[idx] = 'alt_chr'
+                        if item == 'pos':
+                            fields[idx] = 'alt_pos'
+                #
+                # FROM clause
+                from_clause = 'FROM {} '.format(args.table)
+                fields_info = sum([proj.linkFieldToTable(x, args.table) for x in fields], [])
+                #
+                processed = set()
+                for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                    if (tbl.lower(), conn.lower()) not in processed:
+                        from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                        processed.add((tbl.lower(), conn.lower()))
+                query = 'SELECT {}.variant_id, {} {};'.format(args.table, select_clause, from_clause)
+            elif len(args.variant_columns) == 2:
+                link_type = 'position'
                 chr_col = args.variant_columns[0] - 1
                 pos_col = args.variant_columns[1] - 1
                 alt_col = None
@@ -389,6 +416,7 @@ def addField(args):
                         query = 'SELECT {0}.variant_id, variant.alt_chr, variant.alt_pos FROM {0} \
                             LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id;'.format(args.table)
             elif len(args.variant_columns) == 3:
+                link_type = 'variant'
                 chr_col = args.variant_columns[0] - 1
                 pos_col = args.variant_columns[1] - 1
                 alt_col = args.variant_columns[2] - 1
@@ -415,8 +443,17 @@ def addField(args):
             cur.execute(query)
             variants = {}
             for count, rec in enumerate(cur):
-                if alt_col is None:
-                    # items with the same chr,pos will be numbered by an index
+                if link_type == 'field':
+                    # items with the same fields will be numbered by an index
+                    idx = 0
+                    while True:
+                        if (tuple(rec[1:]), idx) not in variants:
+                            variants[(tuple(rec[1:]), idx)] = [None] * len(args.fields) + [rec[0]]
+                            break
+                        else:
+                            idx += 1
+                elif link_type == 'position':
+                    # items with the same field will be numbered by an index
                     idx = 0
                     while True:
                         if (rec[1], rec[2], idx) not in variants:
@@ -424,7 +461,7 @@ def addField(args):
                             break
                         else:
                             idx += 1
-                else:
+                elif link_type == 'variant':
                     variants[(rec[1], rec[2], rec[3])] = [None] * len(args.fields) + [rec[0]]
                 if count % proj.db.batch == 0:
                     prog.update(count)
@@ -439,20 +476,38 @@ def addField(args):
                     tokens = [x.strip() for x in line.split(args.delimiter)]
                     # get anchor fields
                     try:
-                        chr = tokens[chr_col]
-                        if chr.startswith('chr'):
-                            chr = chr[3:]
-                        pos = int(tokens[pos_col])
-                        if args.zero:
-                            pos += 1
-                        # record into the variant table
-                        if alt_col is None:
+                        if link_type in ['variant', 'position']:
+                            chr = tokens[chr_col]
+                            if chr.startswith('chr'):
+                                chr = chr[3:]
+                            pos = int(tokens[pos_col])
+                            if args.zero:
+                                pos += 1
+                        else:
+                            anc_vals = tuple([tokens[x-1] for x in args.variant_columns])
+                        #
+                        if link_type == 'field':
+                            if first_ten < 10:
+                                proj.logger.debug('{}: {}'.format('\t'.join(anc_vals),
+                                    '\t'.join([tokens[x] if tokens[x] != args.na else 'None' for x in cols])))
+                                first_ten += 1
+                            if (anc_vals, 0) in variants:
+                                idx = 0
+                                vals = [tokens[c] if tokens[c] != args.na else 'None' for c in cols]
+                                while True:
+                                    try:
+                                        variants[(anc_vals, idx)][:-1] = vals
+                                        rec_count += 1
+                                        idx += 1
+                                    except:
+                                        break
+                        elif link_type == 'position':
                             if first_ten < 10:
                                 proj.logger.debug('{}\t{}\t{}'.format(chr, pos, 
-                                    [tokens[c] if tokens[c] != args.na else None for c in cols]))
+                                    [tokens[c] if tokens[c] != args.na else 'None' for c in cols]))
                                 first_ten += 1
                             if (chr, pos, 0) in variants:
-                                vals = [tokens[c] if tokens[c] != args.na else None for c in cols]
+                                vals = [tokens[c] if tokens[c] != args.na else 'None' for c in cols]
                                 idx = 0
                                 while True:
                                     try:
@@ -461,7 +516,7 @@ def addField(args):
                                         idx += 1
                                     except:
                                         break
-                        else:
+                        elif link_type == 'variant':
                             if first_ten < 10:
                                 proj.logger.debug('{}\t{}\t{}\t{}'.format(chr, pos, tokens[alt_col],
                                     [tokens[c] if tokens[c] != args.na else None for c in cols]))
