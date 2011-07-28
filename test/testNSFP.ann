@@ -2,7 +2,7 @@
 #
 # This is test decription for a few records in dbNSFP
 #
-[reference genome]
+[linked fields]
 hg18=chr, hg18pos, alt
 hg19=chr, hg19pos, alt
 
