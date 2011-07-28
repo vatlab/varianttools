@@ -306,7 +306,7 @@ def importVCFArguments(parser):
         help='''Import only variants, and ignore sample and their genotypes.''')
     parser.add_argument('--info', nargs='*', default=['DP'],
         help='''Variant information fields to import. This command only support
-            'DP' (total depth). When 'DP' is listed (default), vtools will looke
+            'DP' (total depth). When 'DP' is listed (default), vtools will look
             for total depth (DP=) in the INFO field of each variant and set average
             depth to each individual (DP/numSample in the vcf file) in field 'DP'.''')
 

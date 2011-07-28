@@ -93,8 +93,8 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=vcf.importVCF)
     # 
-    # command import_tsv
-    parser = subparsers.add_parser('import_tsv',
+    # command import_txt
+    parser = subparsers.add_parser('import_txt',
         help='Import variants from files in tab (or comma) separated value formats',
         description='''Import variants from one or more tab or comma separated files.
             This command can be used to import variants to a new project (without sample), or
