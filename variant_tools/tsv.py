@@ -195,7 +195,7 @@ def importTSVArguments(parser):
         help='''A list of files that will be imported. The file should be in 
             tab or command separated value format. Gzipped files are acceptable.''')
     parser.add_argument('-t', '--table',
-        help='''If specified, a variable table will be created with variants from
+        help='''If specified, a variant table will be created with variants from
             the input files. This option is usually used to create a table of variants
             from a manually selected list of variants of a project.''')
     grp = parser.add_argument_group('Description of input files')
