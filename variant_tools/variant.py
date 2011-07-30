@@ -207,10 +207,10 @@ def select(args, reverse=False):
                 #
                 proj.createVariantTable(args.to_table)
                 if not reverse:
-                    query = 'INSERT INTO {0} SELECT {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
+                    query = 'INSERT INTO {0} SELECT distinct {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
                         from_clause, where_clause)
                 else:
-                    query = 'INSERT INTO {0} SELECT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
+                    query = 'INSERT INTO {0} SELECT distinct {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
                         format(args.to_table, args.from_table, from_clause, where_clause)
                 proj.logger.debug('Running query {}'.format(query))
                 #
