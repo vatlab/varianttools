@@ -174,7 +174,7 @@ class Project:
             sample_name: name of sample specified in .vcf file, will be empty
                          if no sample information is available (e.g. a bed file
                          is provided).
-            PHENOTYPE    phenotype might be added by command 'phenotype import'
+            PHENOTYPE    phenotype might be added by command 'import_phenotype'
 
     2. Table "sample_variant_$sample_id" stores variants of each sample
             variant_id:  ID of variant
@@ -993,10 +993,10 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'phenotype', 'sample', 'fields'], nargs='?', default='project',
+        'sample', 'fields'], nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
-            verbosity=2), table (a specific table), or phenotype/sample 
+            verbosity=2), table (a specific table), or sample 
             (sample and phenotype information). Default to project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
@@ -1041,7 +1041,7 @@ def show(args):
                     cur.execute('SELECT * FROM {} LIMIT 0,{};'.format(table, args.limit))
                 for rec in cur:
                     out.write(', '.join([str(x) for x in rec]) + '\n')
-            elif args.type == 'phenotype' or args.type == 'sample':
+            elif 'args.type == 'sample':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
                     return

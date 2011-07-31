@@ -49,6 +49,10 @@ class vcfImporter:
         self.db = proj.db
         self.logger = proj.logger
         #
+        if len(files) == 0:
+            raise IOError('Please specify the filename of the input data.')
+            sys.exit(1)
+        #
         if build:
             self.proj.setRefGenome(build)
         # handle wildcast etc because windows system does not expand *

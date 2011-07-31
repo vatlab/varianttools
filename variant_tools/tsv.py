@@ -36,6 +36,10 @@ class tsvImporter:
         self.db = proj.db
         self.logger = proj.logger
         #
+        if len(files) == 0:
+            raise IOError('Please specify the filename of the input data.')
+            sys.exit(1)
+        #
         if build is None:
             if self.proj.build is None:
                 raise ValueError('Please specify the reference genome of the input data.')
@@ -43,7 +47,7 @@ class tsvImporter:
             if self.proj.build is None:
                 self.proj.setRefGenome(build)
             elif build != self.proj.build:
-                raise valueError('Specified build {} must be the primary build of the project'.format(build))
+                raise ValueError('Specified build {} must be the primary build of the project'.format(build))
         #
         self.table = table
         if self.table == 'variant':

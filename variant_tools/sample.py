@@ -256,7 +256,7 @@ def importPhenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('filename', 
         help='''Import phenotype from a tab delimited file. The file should have
-            a header, and two columns filename and sample_name as the first two columns.''')
+            a header, and filename and sample_name as the first two columns.''')
 
 def importPhenotype(args):
     try:
