@@ -149,16 +149,16 @@ class tsvImporter:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
                     skipped_records += 1
-                if all_records == skipped_records:
-                    self.logger.warning('No valid record is imported')
-                    # FIXME: should remove the input_filename from the database. 
                 if all_records % self.db.batch == 0:
                     self.db.commit()
                     prog.update(all_records)
             self.db.commit()
             prog.done()
         self.logger.info('{:,} new variants from {:,} records are imported, with {:,} invalid records.'\
-            .format(inserted_variants, all_records, skipped_records))
+            .format(inserted_variants, all_records, skipped_records))                
+        if all_records == skipped_records:
+          self.logger.warning('No valid record is imported')
+          cur.execute("DELETE FROM filename WHERE (filename) = ({});".format(self.db.PH), (filename,))
         return inserted_variants
 
     def importData(self):
