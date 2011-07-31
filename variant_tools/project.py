@@ -1041,7 +1041,7 @@ def show(args):
                     cur.execute('SELECT * FROM {} LIMIT 0,{};'.format(table, args.limit))
                 for rec in cur:
                     out.write(', '.join([str(x) for x in rec]) + '\n')
-            elif 'args.type == 'sample':
+            elif args.type == 'sample':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
                     return

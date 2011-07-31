@@ -149,6 +149,9 @@ class tsvImporter:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
                     skipped_records += 1
+                if all_records == skipped_records:
+                    self.logger.warning('No valid record is imported')
+                    # FIXME: should remove the input_filename from the database. 
                 if all_records % self.db.batch == 0:
                     self.db.commit()
                     prog.update(all_records)
