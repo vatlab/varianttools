@@ -26,6 +26,7 @@
 
 import os
 import sys
+import gzip
 from .project import Project
 from .utils import ProgressBar, lineCount, getMaxUcscBin
 
