@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 #
 # $File: test_import_vcf.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
@@ -30,35 +30,28 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd, numOfSample
 
-class TestImportVCF(ProcessTestCase):
+def fileDiff(filename1, filename2):
+    return str(subprocess.check_output(['diff', filename1, filename2],
+        stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+    
+class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
+        runCmd('vtools import_vcf CEU.vcf --build hg18')
+        runCmd('vtools import_txt input.tsv -c 1 2 4 5')
     def removeProj(self):
         runCmd('vtools remove project')
-        
-    def testImportVCF(self):
-        'Test command import_vcf'
-        self.assertFail('vtools import_vcf')
-        self.assertFail('vtools import_vcf non_existing.vcf')
-        # no build information, fail
-        self.assertFail('vtools import_vcf SAMP1.vcf')
-        # specify build information
-        self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
-        self.assertEqual(numOfSample(), 1)
-        self.assertSucc('vtools import_vcf SAMP2.vcf')
-        self.assertEqual(numOfSample(), 2)
-        # file will be ignored if re-imported
-        self.assertSucc('vtools import_vcf SAMP1.vcf')
-        self.assertEqual(numOfSample(), 2)
-        # another sample
-        self.assertSucc('vtools import_vcf CEU.vcf')
-        self.assertFail('vtools import_vcf CEU.vcf --build hg19')
-        self.assertEqual(numOfSample(), 62)
-        # file will be ignored if re-imported
-        self.assertSucc('vtools import_vcf CEU.vcf')
-        self.assertEqual(numOfSample(), 62)
-
+    def testImportPhenotype(self):
+        'Test command import_phenotype'
+        # too few arguments
+        self.assertFail('vtools import_phenotype')
+        self.assertSucc('vtools import_phenotype -h')
+        # opening project project_name. Importing phenotypes into table sample.
+        self.assertSucc('vtools import_phenotype phenotype.txt')
+        self.assertSucc('vtools show sample -s phenotype1.txt')
+        self.assertEqual(fileDiff('phenotype.txt', 'phenotype1.txt'), '')
+        runCmd('rm phenotype1.txt')
 
 if __name__ == '__main__':
     unittest.main()
