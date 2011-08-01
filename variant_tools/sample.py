@@ -222,7 +222,7 @@ class Sample:
                 # e.g. saving frequency to an integer field
                 self.logger.info('Updating existing field {}'.format(field))
                 if fldtype == 'FLOAT':
-                    self.logger.warning('Result will be wrong if this field was created to hold integer values')
+                    self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
             else:
                 self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
