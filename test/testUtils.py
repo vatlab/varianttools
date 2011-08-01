@@ -26,20 +26,21 @@
 
 import os
 import unittest
-import subprocess
-
+import shlex, subprocess
 
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
+# used to be empty; force delete
     def setUp(self):
         'Clear any existing project'
-        runCmd(['vtools', 'remove', 'project'])
+        runCmd('vtools remove project')
 
     def tearDown(self):
         'Clear any existing project'
-        runCmd(['vtools', 'remove', 'project'])
-
+        runCmd('vtools remove project')
+# compare if the command output is what we want
     def assertOutput(self, cmd, output):
+        cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         self.assertEqual(
             subprocess.check_output(cmd, stderr=subprocess.PIPE,
@@ -47,11 +48,13 @@ class ProcessTestCase(unittest.TestCase):
             output)
 
     def assertSucc(self, cmd):
+        cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         self.assertEqual(subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
 
     def assertFail(self, cmd):
+        cmd = shlex.split(cmd)
         try:
             subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
@@ -59,6 +62,7 @@ class ProcessTestCase(unittest.TestCase):
             return
 
 def runCmd(cmd):
+    cmd = shlex.split(cmd)
     subprocess.call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
 

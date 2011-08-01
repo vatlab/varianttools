@@ -33,28 +33,31 @@ from testUtils import ProcessTestCase, runCmd, numOfSample
 class TestImportVCF(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd(['vtools', 'init', 'test'])
-
+        runCmd('vtools init test -f')
+    def removeProj(self):
+        runCmd('vtools remove project')
+        
     def testImportVCF(self):
         'Test command import_vcf'
-        self.assertFail(['vtools', 'import_vcf'])
-        self.assertFail(['vtools', 'import_vcf', 'non_existing.vcf'])
+        self.assertFail('vtools import_vcf')
+        self.assertFail('vtools import_vcf non_existing.vcf')
         # no build information, fail
-        self.assertFail(['vtools', 'import_vcf', 'SAMP1.vcf'])
+        self.assertFail('vtools import_vcf SAMP1.vcf')
         # specify build information
-        self.assertSucc(['vtools', 'import_vcf', 'SAMP1.vcf', '--build', 'hg18'])
+        self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 1)
-        self.assertSucc(['vtools', 'import_vcf', 'SAMP2.vcf'])
+        self.assertSucc('vtools import_vcf SAMP2.vcf')
         self.assertEqual(numOfSample(), 2)
         # file will be ignored if re-imported
-        self.assertSucc(['vtools', 'import_vcf', 'SAMP1.vcf'])
+        self.assertSucc('vtools import_vcf SAMP1.vcf')
         self.assertEqual(numOfSample(), 2)
         # another sample
-        self.assertSucc(['vtools', 'import_vcf', 'CEU.vcf'])
+        self.assertSucc('vtools import_vcf CEU.vcf')
+        self.assertFail('vtools import_vcf CEU.vcf --build hg19')
         self.assertEqual(numOfSample(), 62)
         # file will be ignored if re-imported
-        self.assertSucc(['vtools', 'import_vcf', 'CEU.vcf'])
-        self.assertEqual(numOfSample(), 62)
+        self.assertSucc('vtools import_vcf CEU.vcf')
+        elf.assertEqual(numOfSample(), 62)
 
 
 if __name__ == '__main__':

@@ -33,10 +33,10 @@ from testUtils import ProcessTestCase
 class TestInit(ProcessTestCase):
     def testInit(self):
         'Test command vtools init'
-        self.assertFail(['vtools', 'init'])
-        self.assertSucc(['vtools', 'init', 'test'])
-        self.assertFail(['vtools', 'init', 'test1'])
-        self.assertSucc(['vtools', 'init', 'test', '-f'])
+        self.assertFail('vtools init')
+        self.assertSucc('vtools init test')
+        self.assertFail('vtools init test')
+        self.assertSucc('vtools init test -f')
 
 
 if __name__ == '__main__':

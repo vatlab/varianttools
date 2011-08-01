@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# $File: test_import_txt.py $
-# $LastChangedDate: 2011-July-29 5:00:00 -0500 (Friday, 29 July 2011) $
+# $File: test_import_vcf.py $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
 # This file is part of variant_tools, a software application to annotate,
@@ -33,19 +33,28 @@ from testUtils import ProcessTestCase, runCmd, numOfSample
 class TestImportTXT(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd(['vtools', 'init', 'test'])
-
-    def testImportVCF(self):
+        runCmd('vtools init test')
+    def removeProj(self):
+        runCmd('vtools remove project')
+    def testImportTXT(self):
         'Test command import_txt'
-        self.assertFail(['vtools', 'import_txt'])
-        self.assertFail(['vtools', 'import_txt', 'non_existing.tsv'])
+        self.assertFail('vtools import_txt')
+        self.assertFail('vtools import_txt non_existing.txt')
+        # help information
+        self.assertSucc('vtools import_txt -h')
         # no build information, fail
-        self.assertFail(['vtools', 'import_txt', 'input.tsv'])
-        # specify build information
-        self.assertSucc(['vtools', 'import_txt', 'input.tsv', '--build', 'hg18'])
-        #file will be ignored if re-imported
-        self.assertSucc(['vtools', 'import_txt', 'input.tsv'])
-
+        self.assertFail('vtools import_txt input.tsv')
+        # no columns, fail
+        self.assertFail('vtools import_txt input.tsv --build hg18')
+        # Four columns are required for each variant (chr, pos, ref, and alt)
+        self.assertFail('vtools import_txt input.tsv --build hg18 -c 1 2 3 4 5')
+        
+        # import with four columns
+        self.assertSucc('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
+        ## re-import, fail
+        self.assertFail('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
+        # import different genome reference
+        self.assertFail('vtools import_txt input.tsv -c 1 3 4 5 --build hg19')
 
 if __name__ == '__main__':
     unittest.main()
