@@ -7,7 +7,7 @@ hg18=chr, hg18pos, alt
 hg19=chr, hg19pos, alt
 
 [data sources]
-direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/testNSFP.DB	; if available, downloadDB will try to get it
+#direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/testNSFP.DB	; if available, downloadDB will try to get it
 source_type=txt                     
 source_url=testNSFP.zip             ; download source?
 source_pattern=testNSFP             ; something that identifies db files in a directory or a zip file

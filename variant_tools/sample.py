@@ -70,8 +70,10 @@ class Sample:
         table = []
         for rec in cur:
             if (rec[1], rec[3]) not in record:
-                raise ValueError('No phenotype is defined for sample {} in file {}'.format(rec[3], rec[1]))
-            table.append([rec[0], rec[2], rec[3]] + record[(rec[1], rec[3])])
+                self.logger.warning('No phenotype is defined for sample {} in file {}'.format(rec[3], rec[1]))
+                table.append([rec[0], rec[2], rec[3]] + [None]*(nFields-2))
+            else:
+                table.append([rec[0], rec[2], rec[3]] + record[(rec[1], rec[3])])
         self.logger.info('Importing phenotypes into table sample')
         # check field names
         for name in headers[2:]:
