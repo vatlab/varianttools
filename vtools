@@ -27,8 +27,7 @@
 import argparse
 
 from variant_tools import project
-from variant_tools import vcf
-from variant_tools import tsv
+from variant_tools import importer
 from variant_tools import sample
 from variant_tools import liftOver
 from variant_tools import annotation
@@ -89,9 +88,9 @@ if __name__ == '__main__':
     # command import_vcf
     parser = subparsers.add_parser('import_vcf',
         help='Import regular or compressed vcf (version 4.0) files')
-    vcf.importVCFArguments(parser)
+    importer.importVCFArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=vcf.importVCF)
+    parser.set_defaults(func=importer.importVCF)
     # 
     # command import_txt
     parser = subparsers.add_parser('import_txt',
@@ -99,9 +98,9 @@ if __name__ == '__main__':
         description='''Import variants from one or more tab or comma separated files.
             This command can be used to import variants to a new project (without sample), or
             create a variant table from a list of variants for further analysis. ''')
-    tsv.importTSVArguments(parser)
+    importer.importTxtArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=tsv.importTSV)
+    parser.set_defaults(func=importer.importTxt)
     # 
     # command import_phenotype
     parser = subparsers.add_parser('import_phenotype', help='Import sample phenotype')
@@ -174,9 +173,9 @@ if __name__ == '__main__':
     #
     # command export_vcf (pending)
     parser = subparsers.add_parser('export_vcf', help='Export vcf files')
-    vcf.exportVCFArguments(parser)
+    importer.exportVCFArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=vcf.exportVCF)
+    parser.set_defaults(func=importer.exportVCF)
     #
     # getting args
     args = master_parser.parse_args()
