@@ -250,6 +250,8 @@ class vcfImporter:
                                 gt = var[0] + var[2]  # GT can be separated by / or |
                                 if gt in ['01', '10']:
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                elif gt in ['02', '20']:
+                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
                                 elif gt == '11':
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
                                 elif gt in ['12', '21']:
