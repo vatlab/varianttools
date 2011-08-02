@@ -50,13 +50,13 @@ class ProcessTestCase(unittest.TestCase):
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        self.assertEqual(subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        self.assertEqual(subprocess.check_call(cmd, 
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
 
     def assertFail(self, cmd):
         cmd = shlex.split(cmd)
         try:
-            subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            subprocess.check_call(cmd, 
                 env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
         except subprocess.CalledProcessError:
             return

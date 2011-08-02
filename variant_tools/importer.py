@@ -305,7 +305,7 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, col, table, build, delimiter, zero):
+    def __init__(self, proj, files, col, build, delimiter, zero):
         Importer.__init__(self, proj, files, build)
         #
         if build is None:
@@ -444,7 +444,7 @@ def importTxt(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             importer = txtImporter(proj=proj, files=args.input_files,
-                col=args.columns, table=args.table, build=args.build,
+                col=args.columns, build=args.build,
                 delimiter=args.delimiter, zero=args.zero)
             importer.importData()
         proj.close()
