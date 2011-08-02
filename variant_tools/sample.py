@@ -190,7 +190,7 @@ class Sample:
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
-                        variants[rec[0]] = [0, 0, 0, 0] if depth is not None else [0, 0, 0]
+                        variants[rec[0]] = [0, 0, 0, 0, 0] if depth is not None else [0, 0, 0]
                     # type heterozygote
                     if rec[1] == 1:
                         variants[rec[0]][0] += 1
@@ -202,14 +202,10 @@ class Sample:
                         variants[rec[0]][2] += 1
                     else:
                         self.logger.warning('Invalid genotype type {}'.format(rec[1]))
-                    if depth is not None:
-                        try:
-                            # FIXME: Can some depth information be missing? If so , we should test
-                            # if rec[2] is None
-                            variants[rec[0]][3] += rec[2]
-                        except Exception as e:
-                            self.logger.error('Cannot calculate mean depth. Is the vcf files imported with --import_depth option?')
-                            raise e
+                    if depth is not None and len(rec) > 2:
+                        # some variant might not have depth information so we need to keep the count
+                        variants[rec[0]][3] += rec[2]
+                        variants[rec[0]][4] += 1
                 count += 1
                 if count % self.db.batch == 0:
                     prog.update(count)
@@ -233,6 +229,7 @@ class Sample:
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
             ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, freq, hom, het, other, depth] if x is not None]))
+        warning = False
         for count,id in enumerate(variants):
             value = variants[id]
             res = []
@@ -249,10 +246,10 @@ class Sample:
             if other is not None:
                 res.append(value[2])
             if depth is not None:
-                # value[0] + value[1] + value[2] are number of individuals
-                # other counts as 'half-individual' because depth will show up in
-                # two variants.
-                res.append(value[3] / (value[0] + value[1] + value[2] * 0.5))
+                if not warning and value[4] != value[0] + value[1] + value[2]:
+                    self.logger.warning('Some variants do not have depth information. Average depth are calculated based on known depth.')
+                    warning = True
+                res.append(None if value[4] == 0 else float(value[3]) / value[4])
             cur.execute(update_query, res + [id])
             if count % self.db.batch == 0:
                 self.db.commit()
