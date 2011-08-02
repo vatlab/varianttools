@@ -30,31 +30,38 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd
 
-class TestImportTXT(ProcessTestCase):
+class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test')
+        runCmd('vtools init test -f')
+        runCmd('vtools import_vcf CEU.vcf --build hg18')
     def removeProj(self):
         runCmd('vtools remove project')
-    def testImportTXT(self):
-        'Test command import_txt'
-        self.assertFail('vtools import_txt')
-        self.assertFail('vtools import_txt non_existing.txt')
-        # help information
-        self.assertSucc('vtools import_txt -h')
-        # no build information, fail
-        self.assertFail('vtools import_txt input.tsv')
-        # no columns, fail
-        self.assertFail('vtools import_txt input.tsv --build hg18')
-        # Four columns are required for each variant (chr, pos, ref, and alt)
-        self.assertFail('vtools import_txt input.tsv --build hg18 -c 1 2 3 4 5')
-        
-        # import with four columns
-        self.assertSucc('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
-        ## re-import, fail
-        self.assertFail('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
-        # import different genome reference
-        self.assertFail('vtools import_txt input.tsv -c 1 3 4 5 --build hg19')
+    def testShow(self):
+        'Test command vtools show'
+        self.assertSucc('vtools show -h')
+        # Please specify a table to display
+        self.assertFail('vtools show table')
+        self.assertSucc('vtools show tables')
+        # show project
+        self.assertSucc('vtools show')
+        # show project
+        self.assertSucc('vtools show project')
+        self.assertSucc('vtools show table variant')
+        # Save the first 20 lines to variant.txt
+        self.assertSucc('vtools show table variant -l 20 -s variant.txt')
+        # Save output to variant.txt
+        self.assertSucc('vtools show table variant -l -1 -s variant.txt')
+        # Count the lines of variant.txt
+        self.assertSucc('wc -l variant.txt')
+        # Display the last five lines on the screen
+        self.assertSucc('tail -5 variant.txt')
+        self.assertSucc('vtools show sample')
+        # Save output to phenotype.txt
+        self.assertSucc('vtools show sample -s phenotype.txt')
+        runCmd('vtools use testNSFP.ann')
+        self.assertSucc('vtools show table testNSFP')
+        self.assertSucc('vtools show fields')
 
 if __name__ == '__main__':
     unittest.main()
