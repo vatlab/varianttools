@@ -191,10 +191,13 @@ class Sample:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
                         variants[rec[0]] = [0, 0, 0, 0] if depth is not None else [0, 0, 0]
+                    # type heterozygote
                     if rec[1] == 1:
                         variants[rec[0]][0] += 1
+                    # type homozygote
                     elif rec[1] == 2:
                         variants[rec[0]][1] += 1
+                    # type double heterozygote with two different alternative alleles
                     elif rec[1] == -1:
                         variants[rec[0]][2] += 1
                     else:
@@ -234,17 +237,22 @@ class Sample:
             value = variants[id]
             res = []
             if num is not None:
+                # het + hom * 2 + other
                 res.append(value[0] + value[1] * 2 + value[2])
             if freq is not None:
+                # (het + hom * 2 + other) / (2N)
                 res.append((value[0] + value[1] * 2 + value[2])/(2. * numSample))
             if hom is not None:
-                res.append(value[0])
-            if het is not None:
                 res.append(value[1])
+            if het is not None:
+                res.append(value[0])
             if other is not None:
                 res.append(value[2])
             if depth is not None:
-                res.append(value[3] / (value[0] + value[1] + value[2]))
+                # value[0] + value[1] + value[2] are number of individuals
+                # other counts as 'half-individual' because depth will show up in
+                # two variants.
+                res.append(value[3] / (value[0] + value[1] + value[2] * 0.5))
             cur.execute(update_query, res + [id])
             if count % self.db.batch == 0:
                 self.db.commit()
