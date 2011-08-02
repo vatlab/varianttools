@@ -50,17 +50,13 @@ class tsvImporter:
             elif build != self.proj.build:
                 raise ValueError('Specified build {} must be the primary build of the project'.format(build))
         #
-        self.table = table
-        if self.table == 'variant':
-            raise ValueError('Value for parameter --table should not be the master variant table')
-        #
         self.files = []
         cur = self.db.cursor()
         cur.execute('SELECT filename from filename;')
         existing_files = [x[0] for x in cur.fetchall()]
         for f in files:
             filename = os.path.split(f)[-1]
-            if self.table is None and filename in existing_files:
+            if filename in existing_files:
                 self.logger.info('Ignoring imported file {}'.format(filename))
             else:
                 self.files.append(f)
@@ -97,9 +93,7 @@ class tsvImporter:
         cur.execute('SELECT variant_id, chr, pos, alt FROM variant;')
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
-            # 0 means NOT new variant, records with the 1-flag will be written to self.table
-            # if applicable.
-            self.variantIndex[(rec[1], rec[2], rec[3])] = [rec[0], 0]
+            self.variantIndex[(rec[1], rec[2], rec[3])] = rec[0]
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
@@ -136,15 +130,11 @@ class tsvImporter:
                         raise ValueError('Incorrect reference allele: {}'.format(ref))
                     if len(alt) != 1:
                         raise ValueError('Incorrect alternative allele: {}'.format(alt))
-                    try:
-                        variant_info = self.variantIndex[(chr, pos, alt)]
-                        # already exist
-                        variant_info[1] = 1
-                    except:
+                    if (chr, pos, alt) not in self.variantIndex:
                         bin = getMaxUcscBin(pos - 1, pos)
                         cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
                         variant_id = cur.lastrowid
-                        self.variantIndex[(chr, pos, alt)] = [variant_id, 1]
+                        self.variantIndex[(chr, pos, alt)] = variant_id
                         inserted_variants += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
@@ -171,25 +161,6 @@ class tsvImporter:
             imported += self.importTSV(f)
         self.logger.info('All files imported. A total of {0:,} new records are inserted.'.format(imported))
         #
-        if not self.table:
-            return imported
-        # write to table
-        if self.db.hasTable(self.table):
-            new_table = self.db.backupTable(self.table)
-            self.logger.warning('Existing table {} is renamed to {}.'.format(self.table, new_table))
-        self.proj.createVariantTable(self.table)
-        prog = ProgressBar('Creating ' + self.table, imported)
-        query = 'INSERT INTO {} VALUES ({});'.format(self.table, self.db.PH)
-        # get variants with flag 1
-        var = [x for x,y in self.variantIndex.values() if y == 1]
-        cur = self.db.cursor()
-        for count,id in enumerate(sorted(var)):
-            cur.execute(query, (id,))
-            if count % self.db.batch == 0:
-                self.db.commit()
-                prog.update(count)
-        self.db.commit()
-        prog.done()
         return imported
 
 #
@@ -202,10 +173,6 @@ def importTSVArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be in 
             tab or command separated value format. Gzipped files are acceptable.''')
-    parser.add_argument('-t', '--table',
-        help='''If specified, a variant table will be created with variants from
-            the input files. This option is usually used to create a table of variants
-            from a manually selected list of variants of a project.''')
     grp = parser.add_argument_group('Description of input files')
     grp.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18). This should be the
