@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: vcf.py $
+# $File: importer.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -87,6 +87,20 @@ class Importer:
                 prog.update(count)
         prog.done()
 
+    def recordFileAndSample(self, filename, sampleNames, sampleFields = []):
+        cur = self.db.cursor()
+        cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
+        filenameID = cur.lastrowid
+        self.proj.createSampleTableIfNeeded()
+        sample_ids = []
+        for samplename in sampleNames:
+            cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
+                (filenameID, samplename))
+            sample_ids.append(cur.lastrowid)
+            self.proj.createNewSampleVariantTable('{0}_genotype.sample_variant_{1}'.format(self.proj.name, cur.lastrowid),
+                sampleFields)
+        return sample_ids
+        
     def importData(self):
         '''Start importing'''
         # 
@@ -178,26 +192,14 @@ class vcfImporter(Importer):
         #
         # handle meta information and get sample names
         sampleNames = self.getMetaInfo(input_filename)
-        #
-        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        cur = self.db.cursor()
-        filename = os.path.split(input_filename)[-1]
-        cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
-        filenameID = cur.lastrowid
-        #
         if not sampleNames:
             # FIXME: can VCF only has variant, but not sample information?
             self.logger.debug('Ignoring invalid file {} or file without sample'.format(filename))
             return 0
         #
-        self.proj.createSampleTableIfNeeded()
-        sample_ids = []
-        for samplename in sampleNames:
-            cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                (filenameID, samplename))
-            sample_ids.append(cur.lastrowid)
-            self.proj.createNewSampleVariantTable('{0}_genotype.sample_variant_{1}'.format(self.proj.name, cur.lastrowid),
-                ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
+        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
+        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], sampleNames, 
+            ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
         all_records = 0
         skipped_records = 0
@@ -206,6 +208,7 @@ class vcfImporter(Importer):
         #
         DP_pattern = re.compile('.*DP=(\d+)')
         #
+        cur = self.db.cursor()
         variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         # sample variants are inserted into different tables in a separate database.
         sample_variant_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
@@ -307,40 +310,31 @@ class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
     def __init__(self, proj, files, col, build, delimiter, zero):
         Importer.__init__(self, proj, files, build)
-        #
-        if build is None:
-            if self.proj.build is None:
-                raise ValueError('Please specify the reference genome of the input data.')
-        else:
-            if self.proj.build is None:
-                self.proj.setRefGenome(build)
-            elif build != self.proj.build:
-                raise ValueError('Specified build {} must be the primary build of the project'.format(build))
+        # we cannot guess build information from txt files
+        if build is None and self.proj.build is None:
+            raise ValueError('Please specify the reference genome of the input data.')
         #
         self.col = [x - 1 for x in col]
         if len(self.col) != 4:
             raise ValueError('Four columns are required for each variant (chr, pos, ref, and alt)')
         self.delimiter = delimiter
         self.zero = zero
-        #
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
-        #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        cur = self.db.cursor()
         filename = os.path.split(input_filename)[-1]
-        try:
-            cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
-        except Exception as e:
-            # filename might already exist, does not matter in this case.
-            self.logger.debug(e)
+        # assuming one sample for each file
+        sample_id = self.recordFileAndSample(filename, [filename.split('.')[0]])[0]
         #
         all_records = 0
         skipped_records = 0
         inserted_variants = 0
         #
+        cur = self.db.cursor()
         variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+        sample_variant_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2}, {2});'\
+            .format(self.proj.name, sample_id, self.db.PH)
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
@@ -356,12 +350,17 @@ class txtImporter(Importer):
                         raise ValueError('Incorrect reference allele: {}'.format(ref))
                     if len(alt) != 1:
                         raise ValueError('Incorrect alternative allele: {}'.format(alt))
-                    if (chr, pos, alt) not in self.variantIndex:
+                    # variant
+                    try:
+                        variant_id = self.variantIndex[(chr, pos, alt)]
+                    except: # new variant
                         bin = getMaxUcscBin(pos - 1, pos)
                         cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
                         variant_id = cur.lastrowid
                         self.variantIndex[(chr, pos, alt)] = variant_id
                         inserted_variants += 1
+                    # sample variant, the variant type is always hetero???
+                    cur.execute(sample_variant_insert_query, (variant_id, 1))
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -443,6 +442,7 @@ def importTxtArguments(parser):
 def importTxt(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
                 col=args.columns, build=args.build,
                 delimiter=args.delimiter, zero=args.zero)
