@@ -31,7 +31,74 @@ import re
 from .project import Project
 from .utils import ProgressBar, lineCount, getMaxUcscBin
 
-class vcfImporter:
+class Importer:
+    '''A general class for importing variants'''
+    def __init__(self, proj, files, build):
+        self.proj = proj
+        self.db = proj.db
+        self.logger = proj.logger
+        #
+        if len(files) == 0:
+            raise IOError('Please specify the filename of the input data.')
+            sys.exit(1)
+        #
+        if build:
+            self.proj.setRefGenome(build)
+        #
+        self.files = []
+        cur = self.db.cursor()
+        cur.execute('SELECT filename from filename;')
+        existing_files = [x[0] for x in cur.fetchall()]
+        for f in files:
+            filename = os.path.split(f)[-1]
+            if filename in existing_files:
+                self.logger.info('Ignoring imported file {}'.format(filename))
+            else:
+                self.files.append(f)
+        if len(self.files) == 0:
+            return
+        self.proj.dropIndexOnMasterVariantTable()
+        #
+        self.createLocalVariantIndex()
+
+    def __del__(self):
+        self.proj.createIndexOnMasterVariantTable()
+
+    def openFile(self, filename):
+        if filename.lower().endswith('.gz'):
+            return gzip.open(filename, 'rb')
+        else:
+            # text file
+            return open(filename, 'r')
+
+    def createLocalVariantIndex(self):
+        '''Create index on variant (chr, pos, alt) -> variant_id'''
+        self.variantIndex = {}
+        cur = self.db.cursor()
+        numVariants = self.db.numOfRows('variant')
+        if numVariants == 0:
+            return
+        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        cur.execute('SELECT variant_id, chr, pos, alt FROM variant;')
+        prog = ProgressBar('Getting existing variants', numVariants)
+        for count, rec in enumerate(cur):
+            self.variantIndex[(rec[1], rec[2], rec[3])] = rec[0]
+            if count % self.db.batch == 0:
+                prog.update(count)
+        prog.done()
+
+    def importData(self):
+        '''Start importing'''
+        # 
+        inserted = 0
+        for count,f in enumerate(self.files):
+            self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
+            inserted += self.importFromFile(f)
+        self.logger.info('All files imported. A total of {0:,} new records are inserted.'.format(inserted))
+        return inserted
+
+
+class vcfImporter(Importer):
     '''A vcf importer to import genotype from one or more vcf files.
     In case of vcf file, it records the type of variant for this sample, 
     which can be 1 for genotype 0/1, heterozygous, 2 for genotype 1/1,
@@ -45,47 +112,13 @@ class vcfImporter:
         keyword paramters such as user, passwd and host are passed to
         MySQLdb.connect.
         '''
-        self.proj = proj
-        self.db = proj.db
-        self.logger = proj.logger
-        #
-        if len(files) == 0:
-            raise IOError('Please specify the filename of the input data.')
-            sys.exit(1)
-        #
-        if build:
-            self.proj.setRefGenome(build)
-        # handle wildcast etc because windows system does not expand *
-        self.files = []
+        Importer.__init__(self, proj, files, build)
         # vcf tools only support DP for now
         self.import_depth = 'DP' in info
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        for f in files:
-            filename = os.path.split(f)[-1]
-            if filename in existing_files:
-                self.logger.info('Ignoring imported file {}'.format(filename))
-            else:
-                self.files.append(f)
-        if len(self.files) == 0:
-            return
         # FIXME: self.infoFields and formatFields should initially read from
         # table variant_meta if this table already exists.        # 
         self.infoFields = None  # will be assigned when the first vcf file is read
         self.formatFields = None
-        self.createLocalVariantIndex()
-        self.proj.dropIndexOnMasterVariantTable()
-
-    def __del__(self):
-        self.proj.createIndexOnMasterVariantTable()
-
-    def openVCF(self, filename):
-        if filename.lower().endswith('.gz'):
-            return gzip.open(filename, 'rb')
-        else:
-            # text file
-            return open(filename, 'r')
 
     def getMetaInfo(self, filename):
         '''Probe vcf files for additional information to be put to the variant_meta table.
@@ -94,7 +127,7 @@ class vcfImporter:
         formatFields = []
         samples = []
         build = None
-        with self.openVCF(filename) as input:
+        with self.openFile(filename) as input:
             line = input.readline()
             if not line.startswith('##fileformat=VCF'):
                 self.logger.error('Invalid vcf file. file not started with line ##fileformat')
@@ -140,23 +173,7 @@ class vcfImporter:
                 self.proj.setRefGenome(build)
         return samples
 
-    def createLocalVariantIndex(self):
-        '''Create index on variant (chr, pos, alt) -> variant_id'''
-        self.variantIndex = {}
-        cur = self.db.cursor()
-        numVariants = self.db.numOfRows('variant')
-        if numVariants == 0:
-            return
-        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        cur.execute('SELECT variant_id, chr, pos, alt FROM variant;')
-        prog = ProgressBar('Getting existing variants', numVariants)
-        for count, rec in enumerate(cur):
-            self.variantIndex[(rec[1], rec[2], rec[3])] = rec[0]
-            if count % self.db.batch == 0:
-                prog.update(count)
-        prog.done()
-
-    def importVCF(self, input_filename):
+    def importFromFile(self, input_filename):
         '''Import a VCF file to sample_variant'''
         #
         # handle meta information and get sample names
@@ -194,7 +211,7 @@ class vcfImporter:
         sample_variant_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
             .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        with self.openVCF(input_filename) as input_file:
+        with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
                     # FIXME: # record sample meta information
@@ -285,21 +302,87 @@ class vcfImporter:
             .format(inserted_variants, all_records, skipped_records))
         return inserted_variants
 
-    def importData(self):
-        '''Start importing'''
-        # 
-        inserted = 0
-        for count,f in enumerate(self.files):
-            self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
-            inserted += self.importVCF(f)
-        self.logger.info('All files imported. A total of {0:,} new records are inserted.'.format(inserted))
-        return inserted
+
+class txtImporter(Importer):
+    '''Import variants from one or more tab or comma separated files.'''
+    def __init__(self, proj, files, col, table, build, delimiter, zero):
+        Importer.__init__(self, proj, files, build)
+        #
+        if build is None:
+            if self.proj.build is None:
+                raise ValueError('Please specify the reference genome of the input data.')
+        else:
+            if self.proj.build is None:
+                self.proj.setRefGenome(build)
+            elif build != self.proj.build:
+                raise ValueError('Specified build {} must be the primary build of the project'.format(build))
+        #
+        self.col = [x - 1 for x in col]
+        if len(self.col) != 4:
+            raise ValueError('Four columns are required for each variant (chr, pos, ref, and alt)')
+        self.delimiter = delimiter
+        self.zero = zero
+        #
+
+    def importFromFile(self, input_filename):
+        '''Import a TSV file to sample_variant'''
+        #
+        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
+        cur = self.db.cursor()
+        filename = os.path.split(input_filename)[-1]
+        try:
+            cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
+        except Exception as e:
+            # filename might already exist, does not matter in this case.
+            self.logger.debug(e)
+        #
+        all_records = 0
+        skipped_records = 0
+        inserted_variants = 0
+        #
+        variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
+        with self.openFile(input_filename) as input_file:
+            for line in input_file:
+                all_records += 1
+                try:
+                    # get data
+                    tokens = [x.strip() for x in line.split(self.delimiter)]
+                    chr, pos, ref, alt = [tokens[x] for x in self.col]
+                    if chr.startswith('chr'):
+                        chr = chr[3:]
+                    pos = int(pos) + 1 if self.zero else int(pos)
+                    if len(ref) != 1:
+                        raise ValueError('Incorrect reference allele: {}'.format(ref))
+                    if len(alt) != 1:
+                        raise ValueError('Incorrect alternative allele: {}'.format(alt))
+                    if (chr, pos, alt) not in self.variantIndex:
+                        bin = getMaxUcscBin(pos - 1, pos)
+                        cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
+                        variant_id = cur.lastrowid
+                        self.variantIndex[(chr, pos, alt)] = variant_id
+                        inserted_variants += 1
+                except Exception as e:
+                    self.logger.debug('Failed to process line: ' + line.strip())
+                    self.logger.debug(e)
+                    skipped_records += 1
+                if all_records % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(all_records)
+            self.db.commit()
+            prog.done()
+        self.logger.info('{:,} new variants from {:,} records are imported, with {:,} invalid records.'\
+            .format(inserted_variants, all_records, skipped_records))                
+        if all_records == skipped_records:
+          self.logger.warning('No valid record is imported')
+          cur.execute("DELETE FROM filename WHERE (filename) = ({});".format(self.db.PH), (filename,))
+        return inserted_variants
+
 #
 #
 # Functions provided by this script
 #
 #
-
 
 def importVCFArguments(parser):
     parser.add_argument('input_files', nargs='*',
@@ -339,145 +422,6 @@ def exportVCF(args):
     raise SystemError('This feature is currently not implemented')
 
 
-class tsvImporter:
-    '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, col, table, build, delimiter, zero):
-        self.proj = proj
-        self.db = proj.db
-        self.logger = proj.logger
-        #
-        if len(files) == 0:
-            raise IOError('Please specify the filename of the input data.')
-            sys.exit(1)
-        #
-        if build is None:
-            if self.proj.build is None:
-                raise ValueError('Please specify the reference genome of the input data.')
-        else:
-            if self.proj.build is None:
-                self.proj.setRefGenome(build)
-            elif build != self.proj.build:
-                raise ValueError('Specified build {} must be the primary build of the project'.format(build))
-        #
-        self.files = []
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        for f in files:
-            filename = os.path.split(f)[-1]
-            if filename in existing_files:
-                self.logger.info('Ignoring imported file {}'.format(filename))
-            else:
-                self.files.append(f)
-        if len(self.files) == 0:
-            return
-        #
-        self.col = [x - 1 for x in col]
-        if len(self.col) != 4:
-            raise ValueError('Four columns are required for each variant (chr, pos, ref, and alt)')
-        self.delimiter = delimiter
-        self.zero = zero
-        #
-        self.createLocalVariantIndex()
-        self.proj.dropIndexOnMasterVariantTable()
-
-    def __del__(self):
-        self.proj.createIndexOnMasterVariantTable()
-
-    def openTSV(self, filename):
-        if filename.lower().endswith('.gz'):
-            return gzip.open(filename, 'rb')
-        else:
-            # text file
-            return open(filename, 'r')
-
-    def createLocalVariantIndex(self):
-        '''Create index on variant (chr, pos, alt) -> variant_id'''
-        self.variantIndex = {}
-        cur = self.db.cursor()
-        numVariants = self.db.numOfRows('variant')
-        if numVariants == 0:
-            return
-        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        cur.execute('SELECT variant_id, chr, pos, alt FROM variant;')
-        prog = ProgressBar('Getting existing variants', numVariants)
-        for count, rec in enumerate(cur):
-            self.variantIndex[(rec[1], rec[2], rec[3])] = rec[0]
-            if count % self.db.batch == 0:
-                prog.update(count)
-        prog.done()
-
-    def importTxt(self, input_filename):
-        '''Import a TSV file to sample_variant'''
-        #
-        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        cur = self.db.cursor()
-        filename = os.path.split(input_filename)[-1]
-        try:
-            cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
-        except Exception as e:
-            # filename might already exist, does not matter in this case.
-            self.logger.debug(e)
-        #
-        all_records = 0
-        skipped_records = 0
-        inserted_variants = 0
-        #
-        variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        with self.openTSV(input_filename) as input_file:
-            for line in input_file:
-                all_records += 1
-                try:
-                    # get data
-                    tokens = [x.strip() for x in line.split(self.delimiter)]
-                    chr, pos, ref, alt = [tokens[x] for x in self.col]
-                    if chr.startswith('chr'):
-                        chr = chr[3:]
-                    pos = int(pos) + 1 if self.zero else int(pos)
-                    if len(ref) != 1:
-                        raise ValueError('Incorrect reference allele: {}'.format(ref))
-                    if len(alt) != 1:
-                        raise ValueError('Incorrect alternative allele: {}'.format(alt))
-                    if (chr, pos, alt) not in self.variantIndex:
-                        bin = getMaxUcscBin(pos - 1, pos)
-                        cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
-                        variant_id = cur.lastrowid
-                        self.variantIndex[(chr, pos, alt)] = variant_id
-                        inserted_variants += 1
-                except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
-                    skipped_records += 1
-                if all_records % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(all_records)
-            self.db.commit()
-            prog.done()
-        self.logger.info('{:,} new variants from {:,} records are imported, with {:,} invalid records.'\
-            .format(inserted_variants, all_records, skipped_records))                
-        if all_records == skipped_records:
-          self.logger.warning('No valid record is imported')
-          cur.execute("DELETE FROM filename WHERE (filename) = ({});".format(self.db.PH), (filename,))
-        return inserted_variants
-
-    def importData(self):
-        '''Start importing'''
-        # 
-        imported = 0
-        for count,f in enumerate(self.files):
-            self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
-            imported += self.importTxt(f)
-        self.logger.info('All files imported. A total of {0:,} new records are inserted.'.format(imported))
-        #
-        return imported
-
-#
-#
-# Functions provided by this script
-#
-#
-
 def importTxtArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be in 
@@ -499,7 +443,7 @@ def importTxtArguments(parser):
 def importTxt(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            importer = tsvImporter(proj=proj, files=args.input_files,
+            importer = txtImporter(proj=proj, files=args.input_files,
                 col=args.columns, table=args.table, build=args.build,
                 delimiter=args.delimiter, zero=args.zero)
             importer.importData()
