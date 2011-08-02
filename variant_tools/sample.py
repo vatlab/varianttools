@@ -70,7 +70,7 @@ class Sample:
         table = []
         for rec in cur:
             if (rec[1], rec[3]) not in record:
-                self.logger.warning('No phenotype is defined for sample {} in file {}'.format(rec[3], rec[1]))
+                self.logger.warning('No phenotype is defined for sample: filename={}\tsample_name={}'.format(rec[1], rec[3]))
                 table.append([rec[0], rec[2], rec[3]] + [None]*(nFields-2))
             else:
                 table.append([rec[0], rec[2], rec[3]] + record[(rec[1], rec[3])])
@@ -110,6 +110,9 @@ class Sample:
 
     def createVariantTableBySample(self, IDs, from_table, to_table):
         '''Create a variant table from genotype_table'''
+        if to_table == 'variant':
+            raise ValueError('Cannot overwrite master variant table')
+            sys.exit(1)
         if not self.proj.isVariantTable(from_table):
             raise ValueError('Variant table {} does not exist'.format(from_table))
         if self.db.hasTable(to_table):
