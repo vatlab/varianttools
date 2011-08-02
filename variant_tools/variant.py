@@ -144,8 +144,7 @@ def select(args, reverse=False):
             if not proj.isVariantTable(args.from_table):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
             if args.to_table == 'variant':
-                raise ValueError('Cannot overwrite master variant table')
-                sys.exit(1)
+                raise ValueError('Cannot overwrite master variant table. Please choose another name for the variant table')
             if not args.to_table and not args.output and not args.count:
                 proj.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
                 return

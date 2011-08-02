@@ -111,8 +111,7 @@ class Sample:
     def createVariantTableBySample(self, IDs, from_table, to_table):
         '''Create a variant table from genotype_table'''
         if to_table == 'variant':
-            raise ValueError('Cannot overwrite master variant table')
-            sys.exit(1)
+            raise ValueError('Cannot overwrite master variant table. Please choose another name for the variant table')
         if not self.proj.isVariantTable(from_table):
             raise ValueError('Variant table {} does not exist'.format(from_table))
         if self.db.hasTable(to_table):
