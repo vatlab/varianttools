@@ -368,21 +368,14 @@ class AnnoDBConfiger:
         # creating indexes
         self.logger.info('Creating indexes (this can take quite a while)')
         #
-        # Method 1: this creates single index for all link related fields
-        #
-        #fields = set()
-        #for key in self.build.keys():
-        #    fields.add(key + '_bin')
-        #    fields |= set(self.build[key])
-        #for field in fields:
-        #    cur.execute('''CREATE INDEX {0}_idx ON {1} ({0} ASC);'''.format(field, self.name, field))
-        #db.commit()
-        # 
-        # Method 2: this creates index for each link method
+        # creates index for each link method
         for key in self.build.keys():
             if key != '*':
                 cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
                     .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+            else:
+                cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
+                    .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         # This is only useful for sqlite
         db.analyze()
         if tdir is not None:
