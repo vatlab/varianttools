@@ -50,7 +50,7 @@ def generalOutputArguments(parser):
             in the fields will be replaced by alt_chr and alt_pos''')
     grp.add_argument('-g', '--group_by', nargs='*',
         help='''Group output by fields. This option is useful for aggregation output
-            where sumamry statistics are grouped by one or more fields.''')
+            where summary statistics are grouped by one or more fields.''')
 
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''

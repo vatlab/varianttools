@@ -1,6 +1,6 @@
 filename	sample_name	aff	sex	BMI
 CEU.vcf.gz	NA06985	2	F	19.64
-CEU.vcf.gz	NA06986	1	M	23.6
+CEU.vcf.gz	NA06986	1	M	None
 CEU.vcf.gz	NA06994	1	F	19.49
 CEU.vcf.gz	NA07000	2	F	21.52
 CEU.vcf.gz	NA07037	2	F	23.05

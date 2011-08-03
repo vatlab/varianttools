@@ -427,7 +427,7 @@ def useArguments(parser):
             annotation database is located.''')
     parser.add_argument('-l', '--linked_by', nargs='*', default=[],
         help='''A list of fields that are used to link the annotation database to
-            tables in the existing project. This parameter is reuired only for
+            tables in the existing project. This parameter is required only for
             'attribute' type of annotation databases that link to fields of existing
             tables.''')
 
