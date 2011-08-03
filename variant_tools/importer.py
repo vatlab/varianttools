@@ -325,7 +325,7 @@ class txtImporter(Importer):
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         filename = os.path.split(input_filename)[-1]
         # assuming one sample for each file
-        sample_id = self.recordFileAndSample(filename, [filename.split('.')[0]])[0]
+        sample_id = self.recordFileAndSample(filename, [None])[0]
         #
         all_records = 0
         skipped_records = 0
