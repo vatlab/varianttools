@@ -310,7 +310,7 @@ def sampleStatArguments(parser):
     parser.add_argument('-s', '--samples',
         help='''Criteria by which samples are chosen, the same as parameter 'condition'
             for command 'vtools subsample'. By default, all samples will be used.''')
-    parser.add_argument('-t', '--table',
+    parser.add_argument('table',
         help='''Variant table. The master variant table will be updated by default''')
     parser.add_argument('-n', '--num',
         help='''Name of the field to hold number of alternative alleles in the sample.''')
