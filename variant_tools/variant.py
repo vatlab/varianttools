@@ -67,15 +67,8 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
         raise ValueError('Variant table {} does not exist.'.format(table))
     #
     # fields
-    select_clause, fields = consolidateFieldName(proj, table, ','.join(output_fields))
-    #
-    # alternative reference genome
-    if args.build and args.build == proj.alt_build:
-        for idx,item in enumerate(fields):
-            if item == 'chr':
-                fields[idx] = 'alt_chr'
-            if item == 'pos':
-                fields[idx] = 'alt_pos'
+    select_clause, fields = consolidateFieldName(proj, table, ','.join(output_fields),
+        args.build and args.build == proj.alt_build)
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
@@ -412,14 +405,8 @@ def addField(args):
             # getting variants from table
             if args.anchor_fields is not None:
                 link_type = 'field'
-                select_clause, fields = consolidateFieldName(proj, args.table, ','.join(args.anchor_fields))
-                # alternative reference genome
-                if args.build and args.build == proj.alt_build:
-                    for idx,item in enumerate(fields):
-                        if item == 'chr':
-                            fields[idx] = 'alt_chr'
-                        if item == 'pos':
-                            fields[idx] = 'alt_pos'
+                select_clause, fields = consolidateFieldName(proj, args.table, ','.join(args.anchor_fields),
+                    args.build and args.build == proj.alt_build)
                 #
                 # FROM clause
                 from_clause = 'FROM {} '.format(args.table)

@@ -563,7 +563,7 @@ class DatabaseEngine:
 
 import token
 
-def consolidateFieldName(proj, table, clause):
+def consolidateFieldName(proj, table, clause, alt_build=False):
     '''Change sift_score > 0.5 to dbNSFP.sift_score > 0.5
     We are using a Python tokenizer here so the result might be wrong.
     '''
@@ -572,6 +572,8 @@ def consolidateFieldName(proj, table, clause):
     fields = []
     values = []
     for toktype, toval, _, _, _ in tokens:
+        if alt_build and toval in ['chr', 'pos']:
+            toval = 'alt_' + toval
         values.append(toval)
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             # in the case of table.field
