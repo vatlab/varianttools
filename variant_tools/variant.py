@@ -128,7 +128,8 @@ def selectArguments(parser):
     parser.add_argument('condition', nargs='*', default=[],
         help='''Conditions by which variants are selected. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
-            a single argument with conditions joined by 'OR'.''')
+            a single argument with conditions joined by 'OR'. If unspecified, all
+            variants (except those excluded by parameter --samples) will be selected.''')
     parser.add_argument('--samples', 
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -271,7 +272,8 @@ def excludeArguments(parser):
     parser.add_argument('condition', nargs='+',
         help='''Conditions by which matching variants are execluded. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
-            a single argument with conditions joined by 'OR'.''')
+            a single argument with conditions joined by 'OR'. If unspecified, all
+            variants (except those excluded by parameter --samples) will be excluded.''')
     parser.add_argument('-b', '--by_sample', action='store_true',
         help='''Variants are be default selected by fields. If this parameter is
             specified, conditions will be assumed to use columns shown in command
