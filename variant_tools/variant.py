@@ -267,8 +267,13 @@ def select(args, reverse=False):
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
     parser.add_argument('condition', nargs='+',
-        help='''Conditions by which matching variants are execluded. Multiple
-            conditions should be separated by 'AND' or 'OR'.''')
+        help='''Conditions by which matching variants are execluded. Multiple arguments are
+            automatically joined by 'AND' so 'OR' conditions should be provided by
+            a single argument with conditions joined by 'OR'.''')
+    parser.add_argument('-b', '--by_sample', action='store_true',
+        help='''Variants are be default selected by fields. If this parameter is
+            specified, conditions will be assumed to use columns shown in command
+            'vtools show sample' (e.g. 'aff=1', 'filename like "MG%%"').''')
     parser.add_argument('-t', '--to_table', 
         help='''Destination variant table. Default to a temporary table named''')
     grp = parser.add_mutually_exclusive_group()
