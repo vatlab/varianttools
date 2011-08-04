@@ -42,17 +42,17 @@ class TestSubsample(ProcessTestCase):
     def testSubsample(self):
         'Test command vtools subsample'
         # Cannot overwrite master variant table
-        self.assertFail('vtools select variant aff=1 --by_sample -t variant')
-        self.assertSucc('vtools select variant aff=1 --by_sample -t unaffected1')
-        self.assertSucc('vtools select variant "aff=\'1\'" --by_sample -t unaffected2')
+        self.assertFail('vtools select variant --samples aff=1  -t variant')
+        self.assertSucc('vtools select variant --samples aff=1  -t unaffected1')
+        self.assertSucc('vtools select variant --samples "aff=\'1\'"  -t unaffected2')
         # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant sex=\'M\' --by_sample -t sexm')
+        self.assertFail('vtools select variant --samples sex=\'M\'  -t sexm')
         # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant \'sex=M\' --by_sample -t sexm')
-        self.assertSucc('vtools select variant sex=\\\'M\\\' --by_sample -t sexm')
-        self.assertSucc('vtools select variant "sex=\'M\'" --by_sample -t sexm')
-        self.assertSucc('vtools select variant "filename like \'CEU%\'" --by_sample -t CEU')
-        self.assertSucc('vtools select variant "BMI<18.5" --by_sample -t Underweight')
+        self.assertFail('vtools select variant --samples \'sex=M\'  -t sexm')
+        self.assertSucc('vtools select variant --samples sex=\\\'M\\\'  -t sexm')
+        self.assertSucc('vtools select variant --samples "sex=\'M\'"  -t sexm')
+        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'"  -t CEU')
+        self.assertSucc('vtools select variant --samples "BMI<18.5"  -t Underweight')
 
 if __name__ == '__main__':
     unittest.main()

@@ -125,14 +125,14 @@ def output(args):
 
 def selectArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
-    parser.add_argument('condition', nargs='+',
+    parser.add_argument('condition', nargs='*', default=[],
         help='''Conditions by which variants are selected. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'.''')
-    parser.add_argument('-b', '--by_sample', action='store_true',
-        help='''Variants are be default selected by fields. If this parameter is
-            specified, conditions will be assumed to use columns shown in command
-            'vtools show sample' (e.g. 'aff=1', 'filename like "MG%%"').''')
+    parser.add_argument('--samples', 
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+            'filename like "MG%%"').''')
     parser.add_argument('-t', '--to_table',
         help='''Destination variant table. ''')
     grp = parser.add_mutually_exclusive_group()
@@ -154,7 +154,7 @@ def select(args, reverse=False):
             if not args.to_table and not args.output and not args.count:
                 proj.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
                 return
-            if not args.by_sample:
+            if len(args.condition) > 0:    
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
                 condition, fields = consolidateFieldName(proj, args.from_table, ' AND '.join(['({})'.format(x) for x in args.condition]))
                 # 
@@ -172,18 +172,20 @@ def select(args, reverse=False):
                         where_clause += ' AND ({}) '.format(conn)
                         processed.add((table.lower(), conn))
             else:
+                # select all variants
+                where_clause = ' WHERE 1 '
+                from_clause = 'FROM {} '.format(args.from_table)
+            # if limiting to specified samples
+            if args.samples:
                 p = Sample(proj)
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
-                IDs = p.selectSampleByPhenotype(' AND '.join(args.condition))
-                p.logger.info('{} samples are selected by condition {}'.format(len(IDs), ' AND '.join(args.condition)))
-                # from 
-                from_clause = 'FROM {} '.format(args.from_table)
-                # where
+                IDs = p.selectSampleByPhenotype(args.samples)
                 if len(IDs) == 0:
-                    where_clause = 'WHERE 0'
+                    p.logger.warning('No sample is selected by condition {}'.format(args.samples))
                 else:
-                    where_clause = 'WHERE {}.variant_id IN ({})'.format(
+                    p.logger.info('{} samples are selected by condition {}'.format(len(IDs), args.samples))
+                    where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         args.from_table, 
                         '\nUNION '.join(['SELECT variant_id FROM {}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs])) 
             #

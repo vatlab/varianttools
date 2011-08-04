@@ -231,9 +231,10 @@ def importPhenotype(args):
 
 def sampleStatArguments(parser):
     '''Arguments to calculate sample statistics such as allele frequency'''
-    parser.add_argument('-s', '--samples',
-        help='''Criteria by which samples are chosen, the same as parameter 'condition'
-            for command 'vtools subsample'. By default, all samples will be used.''')
+    parser.add_argument('--samples',
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+            'filename like "MG%%"').''')
     parser.add_argument('table',
         help='''Variant table. The master variant table will be updated by default''')
     parser.add_argument('-n', '--num',
