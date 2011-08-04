@@ -3,23 +3,40 @@
 # - The first line is required
 # - Lines starting with # and ; are comments
 # - Inline comments starts with ;
+
 # - Required sections:
 #
-#   [linked fields]: linked fields name and coordinate fields. Multiple coordinates
-#          can be specified.
-#   
+#   [linked fields]:
+#		A database can provide one or more sets of linked fields by which it is linked
+#		to the master variant table of the project. Each line should have format
+#	        
+#	        build=field1,field2,...
+#
+#	    where build is the build of a reference genome, or '*' if this annotation database
+#	    can be linked to project with any referenge genome. One or more fields can be
+#	    specified as 'linked fields':
+#
+#	    1. for 'variant' annotation database, they should be
+#	       names of chr, pos, and alt fields.
+#	    2. for 'position' annotation database, they should be
+#		   names of chr and pos fields.
+#		3. for 'range' annotation database, they should be names of
+#		   chr, start pos and ending pos fields.
+#		4. for 'field' annotation database, they should be names of fields
+#		   that link to the master variant table.
+#       
 #   [data sources]: This section can have keys
 #       * description: description of the database
-#       * direct_url: we might provide sqlite3 annotation databases from our
-#           server. The database will be downloaded directly if possible.
+#       * anno_type: can be one of 'variant', 'position', 'range' or 'field'
+#       * direct_url: URL to download annotation database directly. This is only
+#           used for sqlite projects.
 #       * source_type: type of source files, we currently only supported
 #           tab based text file (txt)
 #       * source_url: where to download source file.
-#       * source_files: filenames to used after we download, and possibly unpack
-#           the file to a remporary directory.
+#       * source_pattern: pattern of source files (used to exclude README etc)
 # 
 #   fields sections for the fields that will be imported.
-#       * index: 1-based index of the number of columns in the database
+#       * index: 1-based index of the index of the column in the database
 #       * type: can be "chromosome", "0-based position", "1-based position",
 #               and SQL allowed types such as "DECIMAL(7,6) NOT NULL"
 #       * null (optional) if specified, value that will be treated as NULL.
