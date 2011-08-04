@@ -36,7 +36,6 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools init test -f')
     def removeProj(self):
         runCmd('vtools remove project')
-        
     def testImportVCF(self):
         'Test command import_vcf'
         self.assertFail('vtools import_vcf')

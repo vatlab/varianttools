@@ -30,29 +30,28 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd
 
-class TestSubsample(ProcessTestCase):
+class TestSampleStat(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
         runCmd('vtools import_txt input.tsv -c 1 2 4 5')
         runCmd('vtools import_phenotype phenotype.txt')
+        runCmd('vtools import_vcf SAMP1.vcf')
+        runCmd('vtools subsample "filename like \'CEU%\'" -t CEU')
     def removeProj(self):
         runCmd('vtools remove project')
-    def testSubsample(self):
-        'Test command vtools subsample'
-        # Cannot overwrite master variant table
-        self.assertFail('vtools select variant --samples aff=1  -t variant')
-        self.assertSucc('vtools select variant --samples aff=1  -t unaffected1')
-        self.assertSucc('vtools select variant --samples "aff=\'1\'"  -t unaffected2')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples sex=\'M\'  -t sexm')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples \'sex=M\'  -t sexm')
-        self.assertSucc('vtools select variant --samples sex=\\\'M\\\'  -t sexm')
-        self.assertSucc('vtools select variant --samples "sex=\'M\'"  -t sexm')
-        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'"  -t CEU')
-        self.assertSucc('vtools select variant --samples "BMI<18.5"  -t Underweight')
+    def testSampleStat(self):
+        'Test command vtools sample_stat'
+        self.assertFail('vtools sample_stat')
+        self.assertSucc('vtools sample_stat -h')
+        self.assertFail('vtools sample_stat --num --freq --hom --het --other --depth')
+        self.assertFail('vtools sample_stat --num select')
+        self.assertSucc('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\'" --freq CEU_freq')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\'" --num CEU_num --hom CEU_hom --het CEU_het --other CEU_other')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\' and aff=\'2\'" --freq CEU_cases_freq --het CEU_cases_het')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\' and aff=\'1\'" --freq CEU_ctrls_freq --het CEU_ctrls_het')
 
 if __name__ == '__main__':
     unittest.main()

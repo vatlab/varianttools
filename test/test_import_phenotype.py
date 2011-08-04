@@ -38,7 +38,7 @@ class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf --build hg18')
+        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
         runCmd('vtools import_txt input.tsv -c 1 2 4 5')
     def removeProj(self):
         runCmd('vtools remove project')

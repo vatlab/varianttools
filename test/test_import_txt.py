@@ -48,7 +48,6 @@ class TestImportTXT(ProcessTestCase):
         self.assertFail('vtools import_txt input.tsv --build hg18')
         # Four columns are required for each variant (chr, pos, ref, and alt)
         self.assertFail('vtools import_txt input.tsv --build hg18 -c 1 2 3 4 5')
-        
         # import with four columns
         self.assertSucc('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
         ## re-import, fail

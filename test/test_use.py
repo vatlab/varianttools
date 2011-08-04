@@ -30,29 +30,26 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd
 
-class TestSubsample(ProcessTestCase):
+class TestUse(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
         runCmd('vtools import_txt input.tsv -c 1 2 4 5')
         runCmd('vtools import_phenotype phenotype.txt')
+        runCmd('vtools import_vcf SAMP1.vcf')
     def removeProj(self):
         runCmd('vtools remove project')
-    def testSubsample(self):
-        'Test command vtools subsample'
-        # Cannot overwrite master variant table
-        self.assertFail('vtools select variant --samples aff=1  -t variant')
-        self.assertSucc('vtools select variant --samples aff=1  -t unaffected1')
-        self.assertSucc('vtools select variant --samples "aff=\'1\'"  -t unaffected2')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples sex=\'M\'  -t sexm')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples \'sex=M\'  -t sexm')
-        self.assertSucc('vtools select variant --samples sex=\\\'M\\\'  -t sexm')
-        self.assertSucc('vtools select variant --samples "sex=\'M\'"  -t sexm')
-        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'"  -t CEU')
-        self.assertSucc('vtools select variant --samples "BMI<18.5"  -t Underweight')
+    def testUse(self):
+        'Test command vtools use'
+        self.assertFail('vtools use')
+        self.assertSucc('vtools use -h')
+        self.assertFail('vtools use ../non_existing_file/testNSFP.ann')
+        self.assertFail('vtools use ./non_existing_file.ann')
+        self.assertSucc('vtools use ./testNSFP.ann')
+        self.assertFail('vtools use ../non_existing_file/testNSFP.DB')
+        self.assertSucc('vtools use ./testNSFP.DB')
+        runCmd('vtools show fields')
 
 if __name__ == '__main__':
     unittest.main()

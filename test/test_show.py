@@ -34,7 +34,7 @@ class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf --build hg18')
+        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
     def removeProj(self):
         runCmd('vtools remove project')
     def testShow(self):

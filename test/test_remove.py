@@ -30,29 +30,29 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd
 
-class TestSubsample(ProcessTestCase):
+class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
         runCmd('vtools import_txt input.tsv -c 1 2 4 5')
         runCmd('vtools import_phenotype phenotype.txt')
-    def removeProj(self):
-        runCmd('vtools remove project')
-    def testSubsample(self):
-        'Test command vtools subsample'
-        # Cannot overwrite master variant table
-        self.assertFail('vtools select variant --samples aff=1  -t variant')
-        self.assertSucc('vtools select variant --samples aff=1  -t unaffected1')
-        self.assertSucc('vtools select variant --samples "aff=\'1\'"  -t unaffected2')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples sex=\'M\'  -t sexm')
-        # Failed to retrieve samples by condition "sex=M"
-        self.assertFail('vtools select variant --samples \'sex=M\'  -t sexm')
-        self.assertSucc('vtools select variant --samples sex=\\\'M\\\'  -t sexm')
-        self.assertSucc('vtools select variant --samples "sex=\'M\'"  -t sexm')
-        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'"  -t CEU')
-        self.assertSucc('vtools select variant --samples "BMI<18.5"  -t Underweight')
+        runCmd('vtools subsample aff=1 -t unaffected')
+        runCmd('vtools subsample "BMI<18.5" -t Underweight')
+        runCmd('vtools subsample "filename like \'CEU%\'" -t CEU')
+        runCmd('vtools sample_stat -t CEU -s "filename like \'CEU%\'" --freq CEU_freq')
+    def testRemove(self):
+        'Test command vtools remove'
+        self.assertFail('vtools remove')
+        self.assertSucc('vtools remove -h')
+        self.assertFail('vtools remove table')
+        # Removing table unaffected
+        self.assertSucc('vtools remove table unaffected')
+        # Removing table underweight
+        self.assertSucc('vtools remove table underweight')
+        # Removing field CEU_freq from variant table CEU
+        self.assertSucc('vtools remove field CEU_freq')
+        self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':
     unittest.main()
