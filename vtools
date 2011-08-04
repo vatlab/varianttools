@@ -117,13 +117,6 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.addField)
     #
-    # command subsample
-    parser = subparsers.add_parser('subsample', 
-        help='Create a new variant table using a subset of samples.')
-    sample.subsampleArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=sample.subsample)
-    #
     # command sample_stat
     parser = subparsers.add_parser('sample_stat',
         help='Calculate sample statistics (count, frequency etc) for all or selected samples.')

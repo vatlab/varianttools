@@ -108,54 +108,6 @@ class Sample:
         except Exception as e:
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
-    def createVariantTableBySample(self, IDs, from_table, to_table):
-        '''Create a variant table from genotype_table'''
-        if to_table == 'variant':
-            raise ValueError('Cannot overwrite master variant table. Please choose another name for the variant table')
-        if not self.proj.isVariantTable(from_table):
-            raise ValueError('Variant table {} does not exist'.format(from_table))
-        if self.db.hasTable(to_table):
-            self.logger.warning('Overwriting existing variant table {}, which can be slow for sqlite3 database.'.format(to_table))
-            self.db.removeTable(to_table)
-        if len(IDs) == 0:
-            self.logger.warning('No ID is selected. Create an empty variant table {}'.format(to_table))
-            self.proj.createVariantTable(to_table)
-            return
-        #
-        cur = self.db.cursor()
-        from_variants = set()
-        if from_table != 'variant':
-            self.logger.info('Getting variants from {}'.format(from_table))
-            cur.execute('SELECT variant_id FROM {};'.format(from_table))
-            from_variants = set([x[0] for x in cur.fetchall()])
-        #
-        prog = ProgressBar('Selecting variants',
-            sum([self.db.numOfRows('{}_genotype.sample_variant_{}'.format(self.proj.name, id)) for id in IDs]))
-        to_variants = set()
-        count = 0
-        for id in IDs:
-            cur.execute('SELECT variant_id from {}_genotype.sample_variant_{};'.format(self.proj.name, id))
-            for rec in cur:
-                if len(from_variants) == 0 or rec[0] in from_variants:
-                    to_variants.add(rec[0])
-                count += 1
-                if count % self.db.batch == 0:
-                    prog.update(count)
-        prog.done()
-        #
-        self.proj.createVariantTable(to_table)
-        query = 'INSERT INTO {} VALUES ({});'.format(to_table, self.db.PH)
-        prog = ProgressBar('Generating table {}'.format(to_table), len(to_variants))
-        # sort variant_id so that variant_id will be in order, which might
-        # improve database performance
-        for count,id in enumerate(sorted(to_variants)):
-            cur.execute(query, (id,))
-            if count % self.db.batch == 0:
-                self.db.commit()
-                prog.update(count)
-        self.db.commit()
-        prog.done()
-
     def calcSampleStat(self, IDs, variant_table, num, freq, hom, het, other, depth):
         '''Count sample allele frequency etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
@@ -276,34 +228,6 @@ def importPhenotype(args):
     except Exception as e:
         sys.exit(e)
                 
-def subsampleArguments(parser):
-    '''Arguments to select variants from certain sample'''
-    parser.add_argument('condition',
-        help='''Criteria by which samples are chosen. This parameter should be
-            a SQL expression using one or more fields shown in 'vtools show sample'
-            (e.g. 'aff=1' and 'filename like "MG%%"'. ''')
-    parser.add_argument('-f', '--from_table', default='variant',
-        help='''Source variant table. Default to the master variant table.''')
-    parser.add_argument('-t', '--to_table', required=True,
-        help='''Name of a new variant table.''')
-    
-def subsample(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            p = Sample(proj)
-            # we save genotype in a separate database to keep the main project size tolerable.
-            proj.db.attach(proj.name + '_genotype')
-            IDs = p.selectSampleByPhenotype(args.condition)
-            p.logger.info('{} samples are selected by condition {}'.format(len(IDs), args.condition))
-            if len(IDs) == 0:
-                return
-            # create variant table
-            p.createVariantTableBySample(IDs, args.from_table, args.to_table)
-        # temporary tables will be removed
-        proj.close()
-    except Exception as e:
-        sys.exit(e)
-
 
 def sampleStatArguments(parser):
     '''Arguments to calculate sample statistics such as allele frequency'''
