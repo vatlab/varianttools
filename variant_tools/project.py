@@ -67,8 +67,6 @@ class AnnoDB:
         else:
             self.name = os.path.splitext(self.filename)[0]
             self.version = None
-        proj.logger.info(self.name)
-        proj.logger.info(self.version)
         for table in [self.name, self.name + '_field', self.name + '_info']:
             if not db.hasTable(table):
                 raise ValueError('{} is not a valid annotation database. Missing table {}.'.format(annoDB, table))
