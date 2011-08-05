@@ -53,6 +53,9 @@ class TestSelect(ProcessTestCase):
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select ns \'genename = "PLEKHN1"\'')
         self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
+        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' or BMI<20" -t plekhn2')
+        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' and BMI<20" -t plekhn3')
+        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\'" "BMI<20" -t plekhn4')
         self.assertSucc('vtools select -c variant')
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
 
