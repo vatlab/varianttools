@@ -194,7 +194,7 @@ class vcfImporter(Importer):
         sampleNames = self.getMetaInfo(input_filename)
         if not sampleNames:
             # FIXME: can VCF only has variant, but not sample information?
-            self.logger.debug('Ignoring invalid file {} or file without sample'.format(filename))
+            self.logger.debug('Ignoring invalid file {} or file without sample'.format(input_filename))
             return 0
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
