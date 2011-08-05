@@ -590,7 +590,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 for info in proj.linkFieldToTable(toval, table):
                     fields.append(info.field)
                 res.append((token.NAME, info.field))
-            except Exception as e:
+            except ValueError as e:
                 proj.logger.debug(e)
                 # unrecognize
                 res.append((toktype, toval))
