@@ -67,6 +67,7 @@ class AnnoDBConfiger:
         self.source_url = None
         self.source_files = None
         self.fields = []
+        self.version = None
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
         # some fields have to be determined.
@@ -92,7 +93,12 @@ class AnnoDBConfiger:
         '''Read from an ini style configuration file'''
         self.logger.debug('Checking configuration file {}'.format(filename))
         self.path = os.path.split(filename)[0]
-        self.name = os.path.split(filename)[-1].split('.')[0]
+        # get filename, remove extension, and keep version as things after -.
+        self.name = os.path.splitext(os.path.split(filename)[-1])[0]
+        self.version = None
+        if '-' in self.name:
+            self.version = '-'.join(self.name.split('-')[1:])
+            self.name = self.name.split('-')[0]
         parser = ConfigParser.SafeConfigParser()
         parser.read(filename)
         # sections?
@@ -134,9 +140,13 @@ class AnnoDBConfiger:
                 self.description = item[1]
             elif item[0] == 'anno_type':
                 self.anno_type = item[1]
+            elif item[0] == 'version':
+                if self.version is not None and self.version != item[1]:
+                    raise Warning('Version obtained from filename ({}) is inconsistent with version specified in the annotation file ({})'.format(self.version, item[1]))
+                self.version = item[1]
             else:
                 raise ValueError('Invalid keyword {} in section "data sources".'.format(item[0]) + 
-                    'Only direct_url, source_url, source_type, source_pattern and description are allowed')
+                    'Only direct_url, source_url, source_type, version, source_pattern and description are allowed')
         # sections
         self.fields = []
         for section in sections:
@@ -278,8 +288,10 @@ class AnnoDBConfiger:
         self.logger.debug('Creating {}_info table'.format(self.name))
         query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
         self.createInfoTable(db)
+        cur.execute(query, ('name', self.name))
         cur.execute(query, ('anno_type', self.anno_type))
         cur.execute(query, ('description', self.description))
+        cur.execute(query, ('version', self.version))
         cur.execute(query, ('build', str(self.build)))
         db.commit()
         self.logger.debug('Creating table {}'.format(self.name))

@@ -34,6 +34,10 @@
 #           tab based text file (txt)
 #       * source_url: where to download source file.
 #       * source_pattern: pattern of source files (used to exclude README etc)
+#       * version: version of the database, which is not necessarily version 
+#         of the data source. The convension is sourceVersion_dbVersion. If
+#         unspecified, vtools will try to get it from filename. For example, 
+#         dbNSFP-1.1_0.db will have version number 1.1_0.
 # 
 #   fields sections for the fields that will be imported.
 #       * index: 1-based index of the index of the column in the database
@@ -48,6 +52,7 @@ hg19=chr, hg19pos, alt
 
 [data sources]
 description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH
+db_version=1.1_0 
 anno_type=variant
 direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/dbNSFP.DB
 source_url=http://dl.dropbox.com/u/17001647/dbNSFP/dbNSFP1.1.chr1-22XY.zip

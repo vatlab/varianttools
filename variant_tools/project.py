@@ -60,7 +60,15 @@ class AnnoDB:
             raise ValueError("Cannot locate annotation database {}".format(annoDB))
         #
         self.dir = os.path.split(annoDB)[0]
-        self.name = os.path.split(annoDB)[-1].split('.')[0]
+        self.filename = os.path.splitext(os.path.split(annoDB)[-1])[0]
+        if '-' in self.filename:
+            self.version = '-'.join(self.filename.split('-')[1:])
+            self.name = self.filename.split('-')[0]
+        else:
+            self.name = os.path.splitext(self.filename)[0]
+            self.version = None
+        proj.logger.info(self.name)
+        proj.logger.info(self.version)
         for table in [self.name, self.name + '_field', self.name + '_info']:
             if not db.hasTable(table):
                 raise ValueError('{} is not a valid annotation database. Missing table {}.'.format(annoDB, table))
@@ -84,10 +92,16 @@ class AnnoDB:
         self.refGenomes = None
         self.build = None
         self.alt_build = None
+        self.version = None
         cur.execute('SELECT * from {}_info;'.format(self.name))
         for rec in cur:
             if rec[0] == 'description':
                 self.description = rec[1]
+            # stored name and version, if exist, will override name and version obtained from filename.
+            elif rec[0] == 'name':
+                self.name = rec[1]
+            elif rec[0] == 'version':
+                self.version = rec[1]
             elif rec[0] == 'anno_type':
                 self.anno_type = rec[1]
             elif rec[0] == 'build':
@@ -115,7 +129,7 @@ class AnnoDB:
 
     def __repr__(self):
         '''Describe this annotation database'''
-        info = '\nAnnotation database {} ({})\n'.format(self.name, self.anno_type)
+        info = '\nAnnotation database {} ({} {})\n'.format(self.name, self.anno_type, ', ver {}'.format(self.version) if self.version else '')
         if self.description is not None:
             info += self.description + '\n'
         for key in self.refGenomes:
@@ -382,7 +396,7 @@ class Project:
         if db.name not in [x.name for x in self.annoDB]:
             self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
             self.annoDB.append(db)
-            self.saveProperty('annoDB', str([os.path.join(x.dir, x.name) for x in self.annoDB]))
+            self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
             self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
         else:
             self.logger.info('Annotatin DB {} has already been used in this project.'.format(db.name))
@@ -677,7 +691,8 @@ class Project:
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
         info += 'Database engine:             {}\n'.format(self.db.engine)
         info += 'Variant tables:              {}\n'.format(', '.join(self.getVariantTables()))
-        info += 'Annotation databases:        {}\n'.format(', '.join([os.path.join(x.dir, x.name) for x in self.annoDB]))
+        info += 'Annotation databases:        {}\n'.format(', '.join([os.path.join(x.dir, x.name) \
+            + ('({})'.format(x.version) if x.version else '') for x in self.annoDB]))
         return info
 
     #
