@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_select.py $
+# $File: test_import_vcf.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -34,26 +34,27 @@ class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf --build hg18')
-        runCmd('vtools import_vcf CEU.vcf --build hg19')
+        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
+        runCmd('vtools import_txt input.tsv -c 1 2 4 5')
+        runCmd('vtools import_phenotype phenotype.txt')
+        runCmd('vtools import_vcf SAMP1.vcf')
+        runCmd('vtools use ./testNSFP.ann')
     def removeProj(self):
         runCmd('vtools remove project')
     def testSelect(self):
-        'Test command select'
+        'Test command vtools select'
         self.assertFail('vtools select')
-        self.assertFail('vtools select non_existing_variant')
-        # help information
         self.assertSucc('vtools select -h')
-        # could return tuples by selection table under certain condition 
-        self.assertSucc('vtools select variant "genename = "PLEKHN1""')
-        # Limit selection from samples      
-        self.assertSucc('vtools select variant "genename = "PLEKHN1"" --samples "aff=1"')
-        # test with rename table
-        self.assertSucc('vtools select variant "genename = "PLEKHN1"" -t plekhn1')
-        # count the number of variant
+        # Variant table non_existing_variant does not exist.
+        self.assertFail('vtools select non_existing_variant')
+        # Neither --to_table and --output/--count is specified. Nothing to do.
+        self.assertFail('vtools select variant \'testNSFP.non_existing_item is not null\'')
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        # Neither --to_table and --output/--count is specified. Nothing to do.
+        self.assertFail('vtools select ns \'genename = "PLEKHN1"\'')
+        self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
         self.assertSucc('vtools select -c variant')
-        # output
-        self.assertSucc('vtools output plekhn1 chr pos ref alt genename sift_score --build=hg18')
+        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
 
 if __name__ == '__main__':
     unittest.main()
