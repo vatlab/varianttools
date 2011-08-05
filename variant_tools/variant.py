@@ -123,7 +123,7 @@ def selectArguments(parser):
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be selected.''')
-    parser.add_argument('--samples', 
+    parser.add_argument('--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
@@ -174,11 +174,11 @@ def select(args, reverse=False):
                 p = Sample(proj)
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
-                IDs = p.selectSampleByPhenotype(args.samples)
+                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
-                    p.logger.warning('No sample is selected by condition {}'.format(args.samples))
+                    p.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
                 else:
-                    p.logger.info('{} samples are selected by condition {}'.format(len(IDs), args.samples))
+                    p.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         args.from_table, 
                         '\nUNION '.join(['SELECT variant_id FROM {}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs])) 
@@ -262,12 +262,12 @@ def select(args, reverse=False):
 
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
-    parser.add_argument('condition', nargs='+',
+    parser.add_argument('condition', nargs='*', default=[],
         help='''Conditions by which variants are execluded. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be excluded.''')
-    parser.add_argument('--samples', 
+    parser.add_argument('--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')

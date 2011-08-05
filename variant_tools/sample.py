@@ -231,7 +231,7 @@ def importPhenotype(args):
 
 def sampleStatArguments(parser):
     '''Arguments to calculate sample statistics such as allele frequency'''
-    parser.add_argument('--samples',
+    parser.add_argument('--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
@@ -263,7 +263,7 @@ def sampleStat(args):
             p = Sample(proj)
             IDs = None
             if args.samples:
-                IDs = p.selectSampleByPhenotype(args.samples)
+                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
                     p.logger.info('No sample is selected (or available)')
                     return
