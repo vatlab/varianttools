@@ -263,16 +263,16 @@ def select(args, reverse=False):
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
     parser.add_argument('condition', nargs='+',
-        help='''Conditions by which matching variants are execluded. Multiple arguments are
+        help='''Conditions by which variants are execluded. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be excluded.''')
-    parser.add_argument('-b', '--by_sample', action='store_true',
-        help='''Variants are be default selected by fields. If this parameter is
-            specified, conditions will be assumed to use columns shown in command
-            'vtools show sample' (e.g. 'aff=1', 'filename like "MG%%"').''')
+    parser.add_argument('--samples', 
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+            'filename like "MG%%"').''')
     parser.add_argument('-t', '--to_table', 
-        help='''Destination variant table. Default to a temporary table named''')
+        help='''Destination variant table.''')
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant, which is a shortcut to '--output count(1)'.''')
