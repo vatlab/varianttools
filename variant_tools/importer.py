@@ -192,13 +192,9 @@ class vcfImporter(Importer):
         #
         # handle meta information and get sample names
         sampleNames = self.getMetaInfo(input_filename)
-        if not sampleNames:
-            # FIXME: can VCF only has variant, but not sample information?
-            self.logger.debug('Ignoring invalid file {} or file without sample'.format(input_filename))
-            return 0
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], sampleNames, 
+        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], sampleNames if sampleNames else [None], 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
         all_records = 0
@@ -247,10 +243,11 @@ class vcfImporter(Importer):
                             inserted_variants += 1
                         #
                         # FIXME: we should properly handle self.formatFields
-                        variants = [x.split(':')[0].count('1') for x in tokens[-len(sample_ids):]]
-                        for var_idx, var in enumerate(variants):
-                            if var != 0:  # genotype 0|0 are ignored
-                                cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
+                        if sample_ids:
+                            variants = [x.split(':')[0].count('1') for x in tokens[-len(sample_ids):]]
+                            for var_idx, var in enumerate(variants):
+                                if var != 0:  # genotype 0|0 are ignored
+                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
                     else:
                         all_records += 2
                         # there are two alternative alleles
@@ -264,34 +261,35 @@ class vcfImporter(Importer):
                                 variant_id[altidx] = cur.lastrowid
                                 self.variantIndex[(chr, pos, alt)] = variant_id[altidx]
                                 inserted_variants += 1
-                        # process variants
-                        for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
-                            if len(var) == 3:  # regular
-                                gt = var[0] + var[2]  # GT can be separated by / or |
-                                if gt in ['01', '10']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                elif gt in ['02', '20']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                elif gt == '11':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
-                                elif gt in ['12', '21']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
-                                elif gt == '22':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
-                                elif gt == '00':
-                                    pass
-                                else:
-                                    raise ValueError('I do not know how to process genotype {}'.format(var))
-                            else: # should have length 1
-                                if var == '1':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                elif var == '2':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                elif var == '0':
-                                    pass
-                                else:
-                                    raise ValueError('I do not know how to process genotype {}'.format(var))
+                        if sample_ids:
+                            # process variants
+                            for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
+                                if len(var) == 3:  # regular
+                                    gt = var[0] + var[2]  # GT can be separated by / or |
+                                    if gt in ['01', '10']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                    elif gt in ['02', '20']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                    elif gt == '11':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
+                                    elif gt in ['12', '21']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
+                                    elif gt == '22':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
+                                    elif gt == '00':
+                                        pass
+                                    else:
+                                        raise ValueError('I do not know how to process genotype {}'.format(var))
+                                else: # should have length 1
+                                    if var == '1':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                    elif var == '2':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                    elif var == '0':
+                                        pass
+                                    else:
+                                        raise ValueError('I do not know how to process genotype {}'.format(var))
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
