@@ -825,8 +825,7 @@ class Project:
                 raise ValueError('Failed to locate field {}. Please use command "vtools show fields" to see a list of available fields.'.format(field))
             # if duplicate records
             elif len(matching_fields) > 1:
-                self.logger.warning('There are more than one matching fields. Please use table.field to avoid error.')
-                self.logger.warning('Available fields are: ' + ', '.join(matching_fields))
+                raise RuntimeError('There are more than one matching fields {}. Please use table.field to avoid error.'.format(' ,'.join(matching_fields)))
         #
         #
         # in variant_table?

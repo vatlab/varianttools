@@ -582,7 +582,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 try:
                     for info in proj.linkFieldToTable(''.join(values[-3:]), table):
                         fields.append(info.field)
-                except Exception as e:
+                except ValueError as e:
                     proj.logger.debug(e)
                 continue
             #
