@@ -564,37 +564,48 @@ class DatabaseEngine:
 import token
 
 def consolidateFieldName(proj, table, clause, alt_build=False):
-    '''Change sift_score > 0.5 to dbNSFP.sift_score > 0.5
+    '''For input sift_score > 0.5, this function expand it to
+    dbNSFP.sift_score > 0.5 and return a list of fields (dbNSFP.sift_score
+    in this case). It also change pos to alt_pos if alt_build is true.
     We are using a Python tokenizer here so the result might be wrong.
     '''
-    tokens = tokenize.generate_tokens(cStringIO.StringIO(clause).readline)
+    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(clause).readline)]
     res = []
     fields = []
-    values = []
-    for toktype, toval, _, _, _ in tokens:
-        if alt_build and toval in ['chr', 'pos']:
+    for i in range(len(tokens)):
+        before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
+        after_dot = i > 1 and tokens[i-1][1] == '.'
+        #
+        toktype, toval, _, _, _ = tokens[i]
+        # replace chr by alt_chr if using an alternative reference genome.
+        if alt_build and toval in ['chr', 'pos'] and not before_dot:
             toval = 'alt_' + toval
-        values.append(toval)
+        #
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
-            # in the case of table.field
-            if len(values) > 2 and values[-2] == '.':
+            if before_dot:
+                # A.B, does not try to expand A
                 res.append((toktype, toval))
+            elif after_dot:
+                # A.B, do not expand
+                res.append((toktype, toval))
+                # try to get fields:
                 try:
-                    for info in proj.linkFieldToTable(''.join(values[-3:]), table):
+                    for info in proj.linkFieldToTable('{}.{}'.format(tokens[i-2][1], toval), table):
                         fields.append(info.field)
                 except ValueError as e:
                     proj.logger.debug(e)
-                continue
-            #
-            try:
-                for info in proj.linkFieldToTable(toval, table):
-                    fields.append(info.field)
-                res.append((token.NAME, info.field))
-            except ValueError as e:
-                proj.logger.debug(e)
-                # unrecognize
-                res.append((toktype, toval))
+            else:
+                # A: try to expand A and identify fields
+                try:
+                    for info in proj.linkFieldToTable(toval, table):
+                        fields.append(info.field)
+                    # use expanded field, ONLY the last one should have the expanded fieldname
+                    res.append((toktype, info.field))
+                except ValueError as e:
+                    proj.logger.debug(e)
+                    res.append((toktype, toval))
         else:
+            # fasttrack for symbols or function names
             res.append((toktype, toval))
     # a quick fix for a.b parsed to a .b. :-(
     return tokenize.untokenize(res).replace(' .', '.'), fields
