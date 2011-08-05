@@ -194,7 +194,8 @@ class vcfImporter(Importer):
         sampleNames = self.getMetaInfo(input_filename)
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], sampleNames if sampleNames else [None], 
+        no_sample = len(sampleNames) == 0
+        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], [None] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
         all_records = 0
@@ -221,6 +222,9 @@ class vcfImporter(Importer):
                     chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
                     pos = int(tokens[1])
                     ref = tokens[3]
+                    if len(ref) > 1:
+                        # this is a deletion
+                        raise ValueError('vtools currently does not handle deletion')
                     # FIXME: handle INFO and FORMAT, here we only extract info
                     # get depth.
                     if self.import_depth:
@@ -243,16 +247,20 @@ class vcfImporter(Importer):
                             inserted_variants += 1
                         #
                         # FIXME: we should properly handle self.formatFields
-                        if sample_ids:
+                        if no_sample:
+                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id, 1] + DP)
+                        else:
                             variants = [x.split(':')[0].count('1') for x in tokens[-len(sample_ids):]]
                             for var_idx, var in enumerate(variants):
                                 if var != 0:  # genotype 0|0 are ignored
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
                     else:
-                        all_records += 2
                         # there are two alternative alleles
                         variant_id = [0, 0]
                         for altidx, alt in enumerate(tokens[4].split(',')):
+                            if len(alt) > 1:
+                                raise ValueError('vtools currently does not handle insertion')
+                            all_records += 1
                             try:
                                 variant_id[altidx] = self.variantIndex[(chr, pos, alt)]
                             except:
@@ -261,7 +269,10 @@ class vcfImporter(Importer):
                                 variant_id[altidx] = cur.lastrowid
                                 self.variantIndex[(chr, pos, alt)] = variant_id[altidx]
                                 inserted_variants += 1
-                        if sample_ids:
+                        if no_sample:
+                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[0], 1] + DP)
+                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[1], 1] + DP)
+                        else:
                             # process variants
                             for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
                                 if len(var) == 3:  # regular
