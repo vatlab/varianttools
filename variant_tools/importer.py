@@ -121,13 +121,14 @@ class vcfImporter(Importer):
     an individual will have two variants with different alternative
     alleles, each with a type -1. That it to say, allele frequency should
     be calculated as sum (abs(type))/ (2*num_of_sample). '''
-    def __init__(self, proj, files, build=None, info=[]):
+    def __init__(self, proj, files, build=None, variant_only=False, info=[]):
         '''see importVariant.py -h for details about parameters. Additional
         keyword paramters such as user, passwd and host are passed to
         MySQLdb.connect.
         '''
         Importer.__init__(self, proj, files, build)
         # vcf tools only support DP for now
+        self.variant_only = variant_only
         self.import_depth = 'DP' in info
         # FIXME: self.infoFields and formatFields should initially read from
         # table variant_meta if this table already exists.        # 
@@ -194,7 +195,7 @@ class vcfImporter(Importer):
         sampleNames = self.getMetaInfo(input_filename)
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        no_sample = len(sampleNames) == 0
+        no_sample = args.variant_only or len(sampleNames) == 0
         sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], [None] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
@@ -411,12 +412,9 @@ def importVCFArguments(parser):
 def importVCF(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if args.variant_only:
-                raise ValueError('--variant_only has not been implemented')
-            else:
-                proj.db.attach(proj.name + '_genotype')
+            proj.db.attach(proj.name + '_genotype')
             importer = vcfImporter(proj=proj, files=args.input_files, build=args.build,
-                info=args.info)
+                variant_only=args.variant_only, info=[] if args.variant_only else args.info)
             importer.importData()
         proj.close()
     except Exception as e:
