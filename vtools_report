@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 #
 # $File: vtools_report $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
@@ -73,7 +73,7 @@ def getoutput(cmd):
         cmd.append('-v{}'.format(verbosity))
     # call vtools and return its output
     logger.info(' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
-    # '.' is added to $PATH so that command (vtool) that is in the current directory
+    # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])})
 
@@ -92,12 +92,11 @@ def getNumOfSamples():
 def transRatioArguments(parser):
     parser.add_argument('-n', '--num_field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
-            command 'vtools sample_stat --num FIELD_NAME''')
+            command 'vtools sample_stat --num FIELD_NAME'.''')
     parser.add_argument('--by_count', action='store_true',
         help='Output transition/transversion rate for each sample variant frequency (count) group')
-    parser.add_argument('-t', '--table', default='variant',
-        help='''Variant table for which transversion/transversion mutants are counted.
-            Default to the master variant table''')
+    parser.add_argument('table', 
+        help='''Variant table for which transversion/transversion mutants are counted.''')
 
 def transRatio(args):
     out = sys.stdout
@@ -136,16 +135,15 @@ def transRatio(args):
 def avgDepthArguments(parser):
     parser.add_argument('-n', '--num_field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
-            command 'vtools sample_stat --num FIELD_NAME''')
+            command 'vtools sample_stat --num FIELD_NAME'.''')
     parser.add_argument('-d', '--depth_field', required=True,
         help='''Name of the field that holds average depth of each variant, which is the field
-            name for command 'vtools sample_stat --depth FIELD_NAME''')
+            name for command 'vtools sample_stat --depth FIELD_NAME'.''')
     parser.add_argument('--group_by', nargs='*', default=[],
         help='''Output transition/transversion ratio for each group, for example,
             '--group_by NUM_FIELD to output ratio for each sample variant frequency (count).''')
-    parser.add_argument('-t', '--table', default='variant',
-        help='''Variant table for which transversion/transversion mutants are counted.
-            Default to the master variant table''')
+    parser.add_argument('table',
+        help='''Variant table for which transversion/transversion mutants are counted.''')
 
 def avgDepth(args):
     out = sys.stdout
@@ -166,7 +164,7 @@ if __name__ == '__main__':
         epilog='''Use 'vtools_report cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
     master_parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-    subparsers = master_parser.add_subparsers(title='Available reports:')
+    subparsers = master_parser.add_subparsers(title='Available reports')
     #
     # command trans_ratio
     parser = subparsers.add_parser('trans_ratio',
@@ -203,5 +201,3 @@ if __name__ == '__main__':
     logger = getLogger()
     # calling the associated functions
     args.func(args)
-
-

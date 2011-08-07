@@ -160,7 +160,6 @@ if __name__ == '__main__':
         help='''Compare two variant tables, count or output 
             intersect and difference to other tables''')
     variant.compareArguments(parser)
-    variant.generalOutputArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.compare)
     #

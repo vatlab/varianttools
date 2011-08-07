@@ -28,7 +28,7 @@ import sys
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount
 from .sample import Sample
-        
+
 
 def outputArguments(parser):
     parser.add_argument('table', help='''variants to output.''')
@@ -258,7 +258,6 @@ def excludeArguments(parser):
         help='''A list of fields that will be outputed. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
-
 def exclude(args):
     select(args, reverse=True)
 
@@ -273,12 +272,8 @@ def compareArguments(parser):
         help='''Save variants in both tables A and B.''')
     parser.add_argument('--A_or_B',  
         help='''Save variants in both tables A or B.''')
-    grp = parser.add_mutually_exclusive_group()
-    grp.add_argument('-c', '--count', action='store_true',
+    parser.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant that are only in A, only in B, in both A and B, and in A or B.''')
-    grp.add_argument('-o', '--output', nargs='*', default=[],
-        help='''A list of fields that will be outputed. SQL-compatible expressions
-            or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
 def compare(args):
     try:

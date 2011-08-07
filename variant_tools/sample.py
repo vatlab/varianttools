@@ -236,7 +236,7 @@ def sampleStatArguments(parser):
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
     parser.add_argument('table',
-        help='''Variant table. The master variant table will be updated by default''')
+        help='''Variant table for which the statistics will be calculated and updated.''')
     parser.add_argument('-n', '--num',
         help='''Name of the field to hold number of alternative alleles in the sample.''')
     parser.add_argument('-f', '--freq',
