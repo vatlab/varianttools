@@ -511,14 +511,19 @@ class Project:
     def createMasterVariantTable(self):
         '''Create a variant table with name. Fail if a table already exists.'''
         self.logger.debug('Creating table variant')
+        #
+        # ref and alt are 'VARCHAR' to support indels. sqlite database ignores VARCHAR length
+        # so it can support really long indels. MySQL will have trouble handling indels that
+        # are longer than 255 bp.
+        #
         self.db.execute('''\
             CREATE TABLE variant (
                 variant_id INTEGER PRIMARY KEY {0},
                 bin INTEGER NOT NULL,
                 chr VARCHAR(20) NOT NULL,
                 pos INTEGER NOT NULL,
-                ref CHAR(1) NOT NULL,
-                alt CHAR(1) NOT NULL);'''.format(self.db.AI))
+                ref VARCHAR(255) NOT NULL,
+                alt VARCHAR(255) NOT NULL);'''.format(self.db.AI))
         self.createIndexOnMasterVariantTable()
 
     def createIndexOnMasterVariantTable(self):
@@ -537,7 +542,7 @@ class Project:
         # 
         self.logger.debug('Creating index on master variant table')
         try:
-            self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, alt ASC);''')
+            self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists
             self.logger.debug(e)
