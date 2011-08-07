@@ -55,9 +55,9 @@ class Importer:
                 self.logger.info('Ignoring imported file {}'.format(filename))
             else:
                 self.files.append(f)
-        # for all, new SNV, new insertion, new deletion and invalid
-        self.count = [0, 0, 0, 0, 0]
-        self.total_count = [0, 0, 0, 0, 0]
+        # for all record, new SNV, insertion, deletion, complex variants, and invalid record
+        self.count = [0, 0, 0, 0, 0, 0]
+        self.total_count = [0, 0, 0, 0, 0, 0]
         if len(self.files) == 0:
             return
         self.proj.dropIndexOnMasterVariantTable()
@@ -116,9 +116,11 @@ class Importer:
         #    TCG -> TCAG
         #    C -> CTAG
         #    TCGCG -> TCGCGCG
+        # 4. Complex:
+        #    AA -> ATAAC
+        #    TACT -> TCTA
+        #    (as shown in 1000g vcf files)
         #
-        #
-        self.count[0] += 1
         if len(ref) > 1 or len(alt) > 1:
             # STEP 1: remove leading common string
             # 1. C -> G  (SNV)  
@@ -160,7 +162,7 @@ class Importer:
             elif len(alt) == 1 and len(ref) == 1:
                 self.count[1] += 1
             else:
-                raise ValueError('Do not know how to handle variants with ref={} and alt={}'.format(ref, alt))
+                self.count[4] += 1
             bin = getMaxUcscBin(pos - 1, pos)
             variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
             cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
@@ -173,12 +175,16 @@ class Importer:
         for count,f in enumerate(self.files):
             self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
             self.importFromFile(f)
+            self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                .format(sum(self.count[1:-1]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
+                ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
             for i in range(5):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
-        self.logger.info('{:,} records in {} files are processed. A total of {:,} new variants with {:,} SNVs, {:,} insertions and {:,} deletions are inserted.{}'\
-            .format(self.total_count[0], len(self.files), sum(self.total_count[2:]), self.total_count[1], self.total_count[2], self.total_count[3],
-            ' {} invalid records are ignored'.format(self.total_count[4]) if self.total_count[4] > 0 else ''))
+        if len(self.files) > 1:
+            self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                .format(sum(self.total_count[1:-1]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
+                ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
 
 
 class vcfImporter(Importer):
@@ -283,6 +289,7 @@ class vcfImporter(Importer):
                     # FIXME: # record sample meta information
                     if line.startswith('#'):
                         continue
+                    self.count[0] += 1
                     # get data
                     tokens = [x.strip() for x in line.split('\t')]
                     chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
@@ -351,15 +358,12 @@ class vcfImporter(Importer):
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    self.count[4] += 1
+                    self.count[5] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(self.count[0])
             self.db.commit()
             prog.done()
-        self.logger.info('{:,} records are processed. A total of {:,} new variants with {:,} SNVs, {:,} insertions and {:,} deletions are inserted.{}'\
-            .format(self.count[0], sum(self.count[2:]), self.count[1], self.count[2], self.count[3],
-            ' {} invalid records are ignored'.format(self.total_count[4]) if self.total_count[4] > 0 else ''))
 
 
 class txtImporter(Importer):
@@ -391,6 +395,9 @@ class txtImporter(Importer):
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
+                    if line.startswith('#'):
+                        continue
+                    self.count[0] += 1
                     # get data
                     tokens = [x.strip() for x in line.split(self.delimiter)]
                     chr, pos, ref, alt = [tokens[x] for x in self.col]
@@ -414,15 +421,12 @@ class txtImporter(Importer):
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    self.count[4] += 1
+                    self.count[5] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(self.count[0])
             self.db.commit()
             prog.done()
-        self.logger.info('{:,} records are processed. A total of {:,} new variants with {:,} SNVs, {:,} insertions and {:,} deletions are inserted.{}'\
-            .format(self.count[0], sum(self.count[2:]), self.count[1], self.count[2], self.count[3],
-            ' {} invalid records are ignored'.format(self.total_count[4]) if self.total_count[4] > 0 else ''))
 
 #
 #
