@@ -152,8 +152,10 @@ class Importer:
             return self.variantIndex[(chr, pos, ref, alt)]
         except:
             if alt == '':
+                alt = '-'
                 self.count[3] += 1
             elif ref == '':
+                ref = '-'
                 self.count[2] += 1
             elif len(alt) == 1 and len(ref) == 1:
                 self.count[1] += 1
