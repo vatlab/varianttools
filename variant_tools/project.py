@@ -1021,7 +1021,6 @@ def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             out = sys.stdout
-            proj.logger.info('Writing output')
             #
             if args.type == 'project':
                 out.write(proj.summarize())
@@ -1092,7 +1091,6 @@ def execute(args):
             proj.logger.debug('Executing SQL statement: "{}"'.format(query))
             cur.execute(query)
             proj.db.commit()
-            proj.logger.info('Writing output')
             for rec in cur:
                 out.write(', '.join(['{}'.format(x) for x in rec]) + '\n')
             out.close()  
