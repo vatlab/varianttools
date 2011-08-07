@@ -195,7 +195,7 @@ class vcfImporter(Importer):
         sampleNames = self.getMetaInfo(input_filename)
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        no_sample = args.variant_only or len(sampleNames) == 0
+        no_sample = self.variant_only or len(sampleNames) == 0
         sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], [None] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
