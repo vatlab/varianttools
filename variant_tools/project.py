@@ -1020,6 +1020,7 @@ def showArguments(parser):
 def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            proj.logger.info('Writing standard output')
             out = sys.stdout
             #
             if args.type == 'project':
@@ -1084,6 +1085,7 @@ def executeArguments(parser):
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            proj.logger.info('Writing standard output')
             out = sys.stdout
             #
             cur = proj.db.cursor()

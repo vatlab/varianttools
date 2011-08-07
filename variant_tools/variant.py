@@ -54,6 +54,7 @@ def generalOutputArguments(parser):
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
     # output
+    proj.logger.info('Writing standard output')
     out = sys.stdout
     #
     # table
