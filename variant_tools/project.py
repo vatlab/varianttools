@@ -1012,8 +1012,6 @@ def showArguments(parser):
             (sample and phenotype information). Default to project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
-    parser.add_argument('-s', '--save',
-        help='Save output to a file. If unspecified output will be written to the standard output.')
     parser.add_argument('-l', '--limit', default=10, type=int,
         help='''Number of record to display for option 'show table'. All
             records will be displayed if it is set to -1''')
@@ -1022,11 +1020,7 @@ def showArguments(parser):
 def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if not args.save:
-                out = sys.stdout
-            else:
-                proj.logger.info('Save output to {}.'.format(args.save))
-                out = open(args.save, 'w')
+            out = sys.stdout
             #
             if args.type == 'project':
                 out.write(proj.summarize())
@@ -1085,17 +1079,12 @@ def show(args):
 
 def executeArguments(parser):
     parser.add_argument('query', nargs='*', help='A SQL query to execute')
-    parser.add_argument('-s', '--save',
-        help='Save output to a file. If unspecified output will be written to the standard output.')
+
 
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if not args.save:
-                out = sys.stdout
-            else:
-                proj.logger.info('Save output to {}.'.format(args.save))
-                out = open(args.save, 'w')
+            out = sys.stdout
             #
             cur = proj.db.cursor()
             query = ' '.join(args.query)

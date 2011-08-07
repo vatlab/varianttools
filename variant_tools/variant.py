@@ -38,8 +38,6 @@ def outputArguments(parser):
 
 def generalOutputArguments(parser):
     grp = parser.add_argument_group('Output options')
-    grp.add_argument('-s', '--save', 
-        help='Save output to a file. If unspecified output will be written to the standard output.')
     grp.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
     grp.add_argument('--na', default='NA',
@@ -56,11 +54,7 @@ def generalOutputArguments(parser):
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
     # output
-    if not args.save:
-        out = sys.stdout
-    else:
-        proj.logger.info('Save output to {}.'.format(args.save))
-        out = open(args.save, 'w')
+    out = sys.stdout
     #
     # table
     if not proj.isVariantTable(table):
@@ -101,7 +95,6 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     cur = proj.db.cursor()
     cur.execute(query)
     proj.logger.info('Writing output')
-    prog = ProgressBar(args.save, proj.db.numOfRows(table)) if args.save else None
     for count, rec in enumerate(cur):
         out.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
         if prog and count % proj.db.batch == 0:
@@ -123,7 +116,7 @@ def selectArguments(parser):
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be selected.''')
-    parser.add_argument('--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
@@ -212,13 +205,7 @@ def select(args, reverse=False):
                     count = proj.db.numOfRows(args.from_table) - int(count)
                 proj.db.stopProgress()
                 #
-                if not args.save:
-                    print count
-                else:
-                    proj.logger.info('Save output to {}'.format(args.save))
-                    out = open(args.save, 'w')
-                    out.write('{}\n'.format(count))
-                    out.close()
+                print count
             # case 2: to table
             elif args.to_table:
                 if proj.db.hasTable(args.to_table):
@@ -245,13 +232,7 @@ def select(args, reverse=False):
                 if args.output:
                     outputVariants(proj, args.to_table, args.output, args)
                 if args.count:
-                    if not args.save:
-                        print count
-                    else:
-                        proj.logger.info('Save output to {}'.format(args.save))
-                        out = open(args.save, 'w')
-                        out.write('{}\n'.format(count))
-                        out.close()
+                    print count
             # case 3: output, but do not write to table, and not count
             elif args.output: 
                 query = 'SELECT {}.variant_id {} {}'.format(args.from_table,
@@ -267,7 +248,7 @@ def excludeArguments(parser):
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be excluded.''')
-    parser.add_argument('--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
