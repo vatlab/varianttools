@@ -54,7 +54,6 @@ def generalOutputArguments(parser):
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
     # output
-    proj.logger.info('Writing standard output')
     out = sys.stdout
     #
     # table
@@ -98,10 +97,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     proj.logger.info('Writing output')
     for count, rec in enumerate(cur):
         out.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
-        if prog and count % proj.db.batch == 0:
-            prog.update(count)
-    if prog:
-        prog.done()
+
 
 def output(args):
     try:
