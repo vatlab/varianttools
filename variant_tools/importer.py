@@ -317,44 +317,44 @@ class vcfImporter(Importer):
                             for var_idx, var in enumerate(variants):
                                 if var != 0:  # genotype 0|0 are ignored
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
-                        continue
-                    # now, this is the common case with insertion, deletion, and multiple alternative variants
-                    alts = tokens[4].split(',')
-                    variant_id = [0] * len(alts)
-                    for altidx, alt in enumerate(alts):
-                        variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
-                    if no_sample:
-                        for i in range(len(alts)):
-                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
                     else:
-                        # process variants
-                        for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
-                            if len(var) == 3:  # regular
-                                gt = var[0] + var[2]  # GT can be separated by / or |
-                                if gt in ['01', '10']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                elif gt in ['02', '20']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                elif gt == '11':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
-                                elif gt in ['12', '21']:
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
-                                elif gt == '22':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
-                                elif gt == '00':
-                                    pass
-                                else:
-                                    raise ValueError('I do not know how to process genotype {}'.format(var))
-                            else: # should have length 1
-                                if var == '1':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                elif var == '2':
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                elif var == '0':
-                                    pass
-                                else:
-                                    raise ValueError('I do not know how to process genotype {}'.format(var))
+                        # now, this is the common case with insertion, deletion, and multiple alternative variants
+                        alts = tokens[4].split(',')
+                        variant_id = [0] * len(alts)
+                        for altidx, alt in enumerate(alts):
+                            variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
+                        if no_sample:
+                            for i in range(len(alts)):
+                                cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
+                        else:
+                            # process variants
+                            for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
+                                if len(var) == 3:  # regular
+                                    gt = var[0] + var[2]  # GT can be separated by / or |
+                                    if gt in ['01', '10']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                    elif gt in ['02', '20']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                    elif gt == '11':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
+                                    elif gt in ['12', '21']:
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
+                                    elif gt == '22':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
+                                    elif gt == '00':
+                                        pass
+                                    else:
+                                        raise ValueError('I do not know how to process genotype {}'.format(var))
+                                else: # should have length 1
+                                    if var == '1':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                    elif var == '2':
+                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                    elif var == '0':
+                                        pass
+                                    else:
+                                        raise ValueError('I do not know how to process genotype {}'.format(var))
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
