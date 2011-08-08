@@ -348,7 +348,7 @@ def addFieldArguments(parser):
             the external file and determines fields to add.''')
     grp = parser.add_argument_group('Input file description')
     grp.add_argument('--variant_columns', nargs='+', type=int,
-        help='''Columns to hold chr, pos and alt, default to 1, 2 and 4. If a list
+        help='''Columns to hold chr, pos, ref and alt. If a list
             of two columns are given, they are assumed to be chr and pos.''')
     grp.add_argument('--build', 
         help='Reference genome used in specified file. Must be either the primary or alternative build of the project.')
@@ -412,26 +412,27 @@ def addField(args):
                     else:
                         query = 'SELECT {0}.variant_id, variant.alt_chr, variant.alt_pos FROM {0} \
                             LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id;'.format(args.table)
-            elif len(args.variant_columns) == 3:
+            elif len(args.variant_columns) == 4:
                 link_type = 'variant'
                 chr_col = args.variant_columns[0] - 1
                 pos_col = args.variant_columns[1] - 1
-                alt_col = args.variant_columns[2] - 1
+                ref_col = args.variant_columns[2] - 1
+                alt_col = args.variant_columns[3] - 1
                 if args.table == 'variant':
                     if build == proj.build:
-                        query = 'SELECT variant_id, chr, pos, alt FROM variant;'
+                        query = 'SELECT variant_id, chr, pos, ref, alt FROM variant;'
                     else:
-                        query = 'SELECT variant_id, alt_chr, alt_pos, alt FROM variant;'
+                        query = 'SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant;'
                 else:
                     if build == proj.build:
-                        query = 'SELECT {0}.variant_id, variant.chr, variant.pos, variant.alt FROM {0} \
+                        query = 'SELECT {0}.variant_id, variant.chr, variant.pos, variant.ref, variant.alt FROM {0} \
                             LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id;'.format(args.table)
                     else:
-                        query = 'SELECT {0}.variant_id, variant.alt_chr, variant.alt_pos, variant.alt FROM {0} \
+                        query = 'SELECT {0}.variant_id, variant.alt_chr, variant.alt_pos, variant.ref, variant.alt FROM {0} \
                             LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id;'.format(args.table)
             else:
-                raise ValueError('Specified file must have either chr, pos or chr, pos and alt fields.\
-                    You can check the log file for a list of records.')
+                raise ValueError('Parameter variant_columns must indexes for two columns chr, pos or four columns chr, pos, ref and alt,\
+                    or index for fields corresponding to those specified by parameter anchor_fields.')
             # columns?
             cols = [x - 1 for x in args.columns]
             # getting existing variants
@@ -459,7 +460,7 @@ def addField(args):
                         else:
                             idx += 1
                 elif link_type == 'variant':
-                    variants[(rec[1], rec[2], rec[3])] = [None] * len(args.fields) + [rec[0]]
+                    variants[(rec[1], rec[2], rec[3], rec[4])] = [None] * len(args.fields) + [rec[0]]
                 if count % proj.db.batch == 0:
                     prog.update(count)
             prog.done()
@@ -515,12 +516,12 @@ def addField(args):
                                         break
                         elif link_type == 'variant':
                             if first_ten < 10:
-                                proj.logger.debug('{}\t{}\t{}\t{}'.format(chr, pos, tokens[alt_col],
+                                proj.logger.debug('{}\t{}\t{}\t{}\t{}'.format(chr, pos, tokens[ref_col], tokens[alt_col],
                                     [tokens[c] if tokens[c] != args.na else None for c in cols]))
                                 first_ten += 1
-                            if (chr, pos, tokens[alt_col]) in variants:
+                            if (chr, pos, tokens[ref_col], tokens[alt_col]) in variants:
                                 vals = [tokens[c] if tokens[c] != args.na else None for c in cols]
-                                variants[(chr, pos, tokens[alt_col])][:-1] = vals
+                                variants[(chr, pos, tokens[ref_col], tokens[alt_col])][:-1] = vals
                                 rec_count += 1
                     except Exception as e:
                         err_count += 1
