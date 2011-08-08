@@ -52,7 +52,7 @@ hg19=chr, hg19pos, ref, alt
 
 [data sources]
 description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH
-db_version=1.1_0 
+version=1.1_0 
 anno_type=variant
 direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/dbNSFP.DB
 source_url=http://dl.dropbox.com/u/17001647/dbNSFP/dbNSFP1.1.chr1-22XY.zip
