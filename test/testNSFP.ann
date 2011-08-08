@@ -3,8 +3,8 @@
 # This is test decription for a few records in dbNSFP
 #
 [linked fields]
-hg18=chr, hg18pos, alt
-hg19=chr, hg19pos, alt
+hg18=chr, hg18pos, ref, alt
+hg19=chr, hg19pos, ref, alt
 
 [data sources]
 #direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/testNSFP.DB	; if available, downloadDB will try to get it

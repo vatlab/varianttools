@@ -118,6 +118,12 @@ class AnnoDB:
                     elif key == proj.alt_build:
                         self.alt_build = self.refGenomes[key]
         #
+        if self.anno_type == 'variant' and ((self.build is not None and len(self.build) != 4) or (self.alt_build is not None and len(self.alt_build) != 4)):
+            raise ValueError('There should be four linking fields for variant annotation databases.')
+        if self.anno_type == 'position' and ((self.build is not None and len(self.build) != 2) or (self.alt_build is not None and len(self.alt_build) != 2)):
+            raise ValueError('There should be two linking fields for positional annotation databases.')
+        if self.anno_type == 'range' and ((self.build is not None and len(self.build) != 3) or (self.alt_build is not None and len(self.alt_build) != 3)):
+            raise ValueError('There should be three linking fields for range-based annotation databases.')
         if self.description == '':
             proj.logger.warning('No description for annotation database {}'.format(annoDB))
         if self.build is None and self.alt_build is None:
@@ -511,14 +517,19 @@ class Project:
     def createMasterVariantTable(self):
         '''Create a variant table with name. Fail if a table already exists.'''
         self.logger.debug('Creating table variant')
+        #
+        # ref and alt are 'VARCHAR' to support indels. sqlite database ignores VARCHAR length
+        # so it can support really long indels. MySQL will have trouble handling indels that
+        # are longer than 255 bp.
+        #
         self.db.execute('''\
             CREATE TABLE variant (
                 variant_id INTEGER PRIMARY KEY {0},
                 bin INTEGER NOT NULL,
                 chr VARCHAR(20) NOT NULL,
                 pos INTEGER NOT NULL,
-                ref CHAR(1) NOT NULL,
-                alt CHAR(1) NOT NULL);'''.format(self.db.AI))
+                ref VARCHAR(255) NOT NULL,
+                alt VARCHAR(255) NOT NULL);'''.format(self.db.AI))
         self.createIndexOnMasterVariantTable()
 
     def createIndexOnMasterVariantTable(self):
@@ -537,7 +548,7 @@ class Project:
         # 
         self.logger.debug('Creating index on master variant table')
         try:
-            self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, alt ASC);''')
+            self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists
             self.logger.debug(e)
@@ -769,13 +780,13 @@ class Project:
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
                                 .format(table, self.build, db.build[0], db.build[1]))]
-                    elif db.anno_type == 'variant':  # chr, pos and alt
+                    elif db.anno_type == 'variant':  # chr, pos, alt and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
+                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
@@ -799,8 +810,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
@@ -874,8 +885,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
+                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin?
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
@@ -899,8 +910,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin here?
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [

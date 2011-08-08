@@ -55,6 +55,9 @@ class Importer:
                 self.logger.info('Ignoring imported file {}'.format(filename))
             else:
                 self.files.append(f)
+        # for all record, new SNV, insertion, deletion, complex variants, and invalid record
+        self.count = [0, 0, 0, 0, 0, 0]
+        self.total_count = [0, 0, 0, 0, 0, 0]
         if len(self.files) == 0:
             return
         self.proj.dropIndexOnMasterVariantTable()
@@ -72,17 +75,17 @@ class Importer:
             return open(filename, 'r')
 
     def createLocalVariantIndex(self):
-        '''Create index on variant (chr, pos, alt) -> variant_id'''
+        '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
         self.variantIndex = {}
         cur = self.db.cursor()
         numVariants = self.db.numOfRows('variant')
         if numVariants == 0:
             return
         self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        cur.execute('SELECT variant_id, chr, pos, alt FROM variant;')
+        cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
-            self.variantIndex[(rec[1], rec[2], rec[3])] = rec[0]
+            self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = rec[0]
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
@@ -101,15 +104,87 @@ class Importer:
                 sampleFields)
         return sample_ids
         
+    def addVariant(self, cur, chr, pos, ref, alt):
+        # different types of variants
+        # 1. C -> G  (SNV)  
+        #    TC-> TG  
+        # 2. TC -> T (deletion)
+        #    TCG -> TG
+        #    TCG -> T
+        #    TCGCG -> TCG
+        # 3. TC -> TCA (insertion)
+        #    TCG -> TCAG
+        #    C -> CTAG
+        #    TCGCG -> TCGCGCG
+        # 4. Complex:
+        #    AA -> ATAAC
+        #    TACT -> TCTA
+        #    (as shown in 1000g vcf files)
+        #
+        if len(ref) > 1 or len(alt) > 1:
+            # STEP 1: remove leading common string
+            # 1. C -> G  (SNV)  
+            #    C -> G  
+            # 2. C -> '' (deletion)
+            #    CG -> G
+            #    CG -> ''
+            #    CG -> ''
+            # 3. '' -> A (insertion)
+            #    G -> AG
+            #    '' -> TAG
+            #    '' -> CG
+            common_leading = 0
+            for i in range(min(len(ref), len(alt))):
+                if ref[i] == alt[i]:
+                    common_leading += 1
+            if common_leading > 0:
+                pos += common_leading
+                ref = ref[common_leading:]
+                alt = alt[common_leading:]
+            #
+            # STEP 2: remove ending common string
+            # now insertion should have empty ref, deletion should have empty alt
+            if len(alt) > 0 and ref.endswith(alt):  # CG -> G
+                ref = ref[:-len(alt)]
+                alt = ''
+            if len(ref) > 0 and alt.endswith(ref):  # G -> AG
+                alt = alt[:-len(ref)]
+                ref = ''
+        try:
+            return self.variantIndex[(chr, pos, ref, alt)]
+        except:
+            if alt in ['', '-', '.']:
+                alt = '-'
+                self.count[3] += 1
+            elif ref in ['', '-', '.']:
+                ref = '-'
+                self.count[2] += 1
+            elif len(alt) == 1 and len(ref) == 1:
+                self.count[1] += 1
+            else:
+                self.count[4] += 1
+            bin = getMaxUcscBin(pos - 1, pos)
+            variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+            cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
+            variant_id = cur.lastrowid
+            self.variantIndex[(chr, pos, ref, alt)] = variant_id
+            return variant_id
+
     def importData(self):
         '''Start importing'''
-        # 
-        inserted = 0
         for count,f in enumerate(self.files):
             self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
-            inserted += self.importFromFile(f)
-        self.logger.info('All files imported. A total of {0:,} new records are inserted.'.format(inserted))
-        return inserted
+            self.importFromFile(f)
+            self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                .format(sum(self.count[1:-1]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
+                ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
+            for i in range(5):
+                self.total_count[i] += self.count[i]
+                self.count[i] = 0
+        if len(self.files) > 1:
+            self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                .format(sum(self.total_count[1:-1]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
+                ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
 
 
 class vcfImporter(Importer):
@@ -199,15 +274,11 @@ class vcfImporter(Importer):
         sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], [None] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
-        all_records = 0
-        skipped_records = 0
-        inserted_variants = 0
         nSample = len(sample_ids)
         #
         DP_pattern = re.compile('.*DP=(\d+)')
         #
         cur = self.db.cursor()
-        variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         # sample variants are inserted into different tables in a separate database.
         sample_variant_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
             .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
@@ -218,14 +289,12 @@ class vcfImporter(Importer):
                     # FIXME: # record sample meta information
                     if line.startswith('#'):
                         continue
+                    self.count[0] += 1
                     # get data
                     tokens = [x.strip() for x in line.split('\t')]
                     chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
                     pos = int(tokens[1])
                     ref = tokens[3]
-                    if len(ref) > 1:
-                        # this is a deletion
-                        raise ValueError('vtools currently does not handle deletion')
                     # FIXME: handle INFO and FORMAT, here we only extract info
                     # get depth.
                     if self.import_depth:
@@ -233,19 +302,12 @@ class vcfImporter(Importer):
                         DP = [None if m is None else float(m.group(1))/nSample]
                     else:
                         DP = []
-                    if len(tokens[4]) == 1:
-                        all_records += 1
+                    # for efficiency, we separte out this most common case ...
+                    if len(ref) == 1 and len(tokens[4]) == 1:   
                         # the easy case: there is only one alternative allele,
                         # all genotypes should be 0/0, 0/1, 1/0, or 1/1.
                         alt = tokens[4][0]
-                        try:
-                            variant_id = self.variantIndex[(chr, pos, alt)]
-                        except:
-                            bin = getMaxUcscBin(pos - 1, pos)
-                            cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
-                            variant_id = cur.lastrowid
-                            self.variantIndex[(chr, pos, alt)] = variant_id
-                            inserted_variants += 1
+                        variant_id = self.addVariant(cur, chr, pos, ref, alt)
                         #
                         # FIXME: we should properly handle self.formatFields
                         if no_sample:
@@ -256,23 +318,14 @@ class vcfImporter(Importer):
                                 if var != 0:  # genotype 0|0 are ignored
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
                     else:
-                        # there are two alternative alleles
-                        variant_id = [0, 0]
-                        for altidx, alt in enumerate(tokens[4].split(',')):
-                            if len(alt) > 1:
-                                raise ValueError('vtools currently does not handle insertion')
-                            all_records += 1
-                            try:
-                                variant_id[altidx] = self.variantIndex[(chr, pos, alt)]
-                            except:
-                                bin = getMaxUcscBin(pos - 1, pos)
-                                cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
-                                variant_id[altidx] = cur.lastrowid
-                                self.variantIndex[(chr, pos, alt)] = variant_id[altidx]
-                                inserted_variants += 1
+                        # now, this is the common case with insertion, deletion, and multiple alternative variants
+                        alts = tokens[4].split(',')
+                        variant_id = [0] * len(alts)
+                        for altidx, alt in enumerate(alts):
+                            variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
                         if no_sample:
-                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[0], 1] + DP)
-                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[1], 1] + DP)
+                            for i in range(len(alts)):
+                                cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
                         else:
                             # process variants
                             for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
@@ -305,15 +358,12 @@ class vcfImporter(Importer):
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    skipped_records += 1
-                if all_records % self.db.batch == 0:
+                    self.count[5] += 1
+                if self.count[0] % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(all_records)
+                    prog.update(self.count[0])
             self.db.commit()
             prog.done()
-        self.logger.info('{:,} new variants from {:,} records are imported, with {:,} invalid records.'\
-            .format(inserted_variants, all_records, skipped_records))
-        return inserted_variants
 
 
 class txtImporter(Importer):
@@ -337,10 +387,6 @@ class txtImporter(Importer):
         # assuming one sample for each file
         sample_id = self.recordFileAndSample(filename, [None])[0]
         #
-        all_records = 0
-        skipped_records = 0
-        inserted_variants = 0
-        #
         cur = self.db.cursor()
         variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         sample_variant_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2}, {2});'\
@@ -348,8 +394,10 @@ class txtImporter(Importer):
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
-                all_records += 1
                 try:
+                    if line.startswith('#'):
+                        continue
+                    self.count[0] += 1
                     # get data
                     tokens = [x.strip() for x in line.split(self.delimiter)]
                     chr, pos, ref, alt = [tokens[x] for x in self.col]
@@ -361,31 +409,18 @@ class txtImporter(Importer):
                     if len(alt) != 1:
                         raise ValueError('Incorrect alternative allele: {}'.format(alt))
                     # variant
-                    try:
-                        variant_id = self.variantIndex[(chr, pos, alt)]
-                    except: # new variant
-                        bin = getMaxUcscBin(pos - 1, pos)
-                        cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
-                        variant_id = cur.lastrowid
-                        self.variantIndex[(chr, pos, alt)] = variant_id
-                        inserted_variants += 1
+                    variant_id = self.addVariant(cur, chr, pos, ref, alt)
                     # sample variant, the variant type is always hetero???
                     cur.execute(sample_variant_insert_query, (variant_id, 1))
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    skipped_records += 1
-                if all_records % self.db.batch == 0:
+                    self.count[5] += 1
+                if self.count[0] % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(all_records)
+                    prog.update(self.count[0])
             self.db.commit()
             prog.done()
-        self.logger.info('{:,} new variants from {:,} records are imported, with {:,} invalid records.'\
-            .format(inserted_variants, all_records, skipped_records))                
-        if all_records == skipped_records:
-          self.logger.warning('No valid record is imported')
-          cur.execute("DELETE FROM filename WHERE (filename) = ({});".format(self.db.PH), (filename,))
-        return inserted_variants
 
 #
 #
