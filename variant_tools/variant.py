@@ -299,6 +299,7 @@ def compare(args):
             #
             # output?
             if args.count:
+                proj.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
                 print '{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
                     len(variant_B - variant_A),
                     len(variant_A & variant_B),
