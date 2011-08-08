@@ -118,6 +118,12 @@ class AnnoDB:
                     elif key == proj.alt_build:
                         self.alt_build = self.refGenomes[key]
         #
+        if self.anno_type == 'variant' and ((self.build is not None and len(self.build) != 4) or (self.alt_build is not None and len(self.alt_build) != 4)):
+            raise ValueError('There should be four linking fields for variant annotation databases.')
+        if self.anno_type == 'position' and ((self.build is not None and len(self.build) != 2) or (self.alt_build is not None and len(self.alt_build) != 2)):
+            raise ValueError('There should be two linking fields for positional annotation databases.')
+        if self.anno_type == 'range' and ((self.build is not None and len(self.build) != 3) or (self.alt_build is not None and len(self.alt_build) != 3)):
+            raise ValueError('There should be three linking fields for range-based annotation databases.')
         if self.description == '':
             proj.logger.warning('No description for annotation database {}'.format(annoDB))
         if self.build is None and self.alt_build is None:
@@ -774,13 +780,13 @@ class Project:
                             table= '{}.{}'.format(table, table),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
                                 .format(table, self.build, db.build[0], db.build[1]))]
-                    elif db.anno_type == 'variant':  # chr, pos and alt
+                    elif db.anno_type == 'variant':  # chr, pos, alt and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
+                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
@@ -804,8 +810,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
@@ -879,8 +885,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.build, db.build[0], db.build[1], db.build[2]))]
+                            link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
+                                    .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin?
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
@@ -904,8 +910,8 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.alt = {0}.{4}'\
-                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
+                                    .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
                         # FIXME: how to use bin here?
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [

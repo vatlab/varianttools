@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 [linked fields]
-hg19=chr, start, end, 
+hg19=chr, start, end
 
 [data sources]
 anno_type=range
