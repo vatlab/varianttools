@@ -190,7 +190,7 @@ def select(args, reverse=False):
             #
             # case 1: simple count.
             if args.count and not args.to_table and not args.output:
-                query = 'SELECT count({}.variant_id) {} {};'.format(args.from_table,
+                query = 'SELECT COUNT(DISTINCT {}.variant_id) {} {};'.format(args.from_table,
                     from_clause, where_clause)
                 proj.logger.debug('Running query {}'.format(query))
                 proj.db.startProgress('Counting variants')
@@ -211,10 +211,10 @@ def select(args, reverse=False):
                 #
                 proj.createVariantTable(args.to_table)
                 if not reverse:
-                    query = 'INSERT INTO {0} SELECT distinct {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
+                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
                         from_clause, where_clause)
                 else:
-                    query = 'INSERT INTO {0} SELECT distinct {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
+                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
                         format(args.to_table, args.from_table, from_clause, where_clause)
                 proj.logger.debug('Running query {}'.format(query))
                 #
@@ -232,7 +232,7 @@ def select(args, reverse=False):
                     print count
             # case 3: output, but do not write to table, and not count
             elif args.output: 
-                query = 'SELECT {}.variant_id {} {}'.format(args.from_table,
+                query = 'SELECT DISTINCT {}.variant_id {} {}'.format(args.from_table,
                     from_clause, where_clause)
                 outputVariants(proj, args.from_table, args.output, args, query, reverse)
     except Exception as e:
