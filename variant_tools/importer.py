@@ -409,13 +409,7 @@ class txtImporter(Importer):
                     if len(alt) != 1:
                         raise ValueError('Incorrect alternative allele: {}'.format(alt))
                     # variant
-                    try:
-                        variant_id = self.variantIndex[(chr, pos, ref, alt)]
-                    except: # new variant
-                        bin = getMaxUcscBin(pos - 1, pos)
-                        cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
-                        variant_id = cur.lastrowid
-                        self.variantIndex[(chr, pos, ref, alt)] = variant_id
+                    variant_id = self.addVariant(cur, chr, pos, ref, alt)
                     # sample variant, the variant type is always hetero???
                     cur.execute(sample_variant_insert_query, (variant_id, 1))
                 except Exception as e:
