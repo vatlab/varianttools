@@ -50,14 +50,25 @@ class TestSelect(ProcessTestCase):
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select variant \'testNSFP.non_existing_item is not null\'')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        self.assertSucc('vtools select ns --samples "filename like \'input.tsv\'" -t ns_input')
+        # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
+        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'input.tsv\'" -t ns_input')
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select ns \'genename = "PLEKHN1"\'')
         self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
+        self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' or BMI<20" -t plekhn2')
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' and BMI<20" -t plekhn3')
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\'" "BMI<20" -t plekhn4')
+        # Existing table d_plekhn1 is renamed to d_plekhn1_Aug06_152135.
+        self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+        self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
+        self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
         self.assertSucc('vtools select -c variant')
-        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
+        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'" "aff=\'2\'" --count -v0')
+        self.assertSucc('vtools select variant "freq<0.01" --count -v0')
+        self.assertSucc('vtools select CEU "CEU_cases_freq>0.5" --samples "sample_name like \'NA0%\'" --output variant_id CEU_cases_freq > CEU_NA0_enriched.txt')
 
 if __name__ == '__main__':
     unittest.main()

@@ -49,7 +49,7 @@ class TestImportPhenotype(ProcessTestCase):
         self.assertSucc('vtools import_phenotype -h')
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools import_phenotype phenotype.txt')
-        self.assertSucc('vtools show sample -s phenotype1.txt')
+        runCmd('vtools show sample > phenotype1.txt')
         self.assertEqual(fileDiff('phenotype.txt', 'phenotype1.txt'), '')
         runCmd('rm phenotype1.txt')
 
