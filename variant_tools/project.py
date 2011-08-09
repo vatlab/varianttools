@@ -971,12 +971,12 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'table', 'sample', 'field'],
+    parser.add_argument('type', choices=['project', 'table', 'samples', 'field'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed. It can be the name of project for type
             project (optional), names of one or more variant tables for
-            type table, a pattern for type 'sample', a name of a field.''')
+            type table, a pattern for type 'samples', a name of a field.''')
     
 
 def remove(args):
@@ -989,7 +989,7 @@ def remove(args):
             elif args.type == 'table':
                 for table in args.items:
                     proj.removeVariantTable(table)
-            elif args.type == 'sample':
+            elif args.type == 'samples':
                 # NOTE: we should move function selectSampleByPhenotype
                 # to the Project class in order to implement this feature.
                 raise ValueError("This feature has not been implemented.")
@@ -1016,10 +1016,10 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'sample', 'fields'], nargs='?', default='project',
+        'samples', 'fields'], nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
-            verbosity=2), table (a specific table), or sample 
+            verbosity=2), table (a specific table), or samples 
             (sample and phenotype information). Default to project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
@@ -1058,7 +1058,7 @@ def show(args):
                     cur.execute('SELECT * FROM {} LIMIT 0,{};'.format(table, args.limit))
                 for rec in cur:
                     out.write(', '.join([str(x) for x in rec]) + '\n')
-            elif args.type == 'sample':
+            elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
                     return

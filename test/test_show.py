@@ -50,9 +50,9 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show table variant')
         self.assertSucc('vtools show table variant -l 20')
         self.assertSucc('vtools show table variant -l -1')
-        self.assertSucc('vtools show sample')
-        # Save output to phenotype.txt
-        self.assertSucc('vtools show sample > phenotypes.txt')
+        self.assertSucc('vtools show samples')
+        # Save output to samples.txt
+        self.assertSucc('vtools show samples > samples.txt')
         runCmd('vtools use testNSFP.ann')
         self.assertSucc('vtools show table testNSFP')
         self.assertSucc('vtools show fields')
