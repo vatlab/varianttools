@@ -140,10 +140,10 @@ def avgDepthArguments(parser):
         help='''Name of the field that holds average depth of each variant, which is the field
             name for command 'vtools sample_stat --depth FIELD_NAME'.''')
     parser.add_argument('--group_by', nargs='*', default=[],
-        help='''Output transition/transversion ratio for each group, for example,
-            '--group_by NUM_FIELD to output ratio for each sample variant frequency (count).''')
+        help='''Output average depth for each group, for example,
+            '--group_by NUM_FIELD to output depth for each sample variant frequency (count).''')
     parser.add_argument('table',
-        help='''Variant table for which transversion/transversion mutants are counted.''')
+        help='''Variant table for which average depth are calculated.''')
 
 def avgDepth(args):
     out = sys.stdout
