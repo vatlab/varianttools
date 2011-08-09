@@ -35,7 +35,7 @@ class TestUse(ProcessTestCase):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5')
+        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
         runCmd('vtools import_phenotype phenotype.txt')
         runCmd('vtools import_vcf SAMP1.vcf')
     def removeProj(self):

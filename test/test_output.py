@@ -35,11 +35,11 @@ class TestOutput(ProcessTestCase):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5')
+        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
         runCmd('vtools import_phenotype phenotype.txt')
         runCmd('vtools import_vcf SAMP1.vcf')
-        runCmd('vtools subsample "filename like \'CEU%\'" -t CEU')
-        runCmd('vtools subsample "BMI<18.5" -t Underweight')
+        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
+        runCmd('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
     def testOutput(self):
         'Test command vtools output'
         self.assertFail('vtools output')
@@ -51,16 +51,16 @@ class TestOutput(ProcessTestCase):
         self.assertSucc('vtools output variant freq num depth other -l 10')
         # too few arguments
         self.assertFail('vtools output variant > variant.txt')
-        self.assertSucc('vtools output variant variant_id freq num depth other > variant.txt')
-        self.assertSucc('vtools output Underweight chr pos ref alt -l -1')
-        self.assertFail('vtools output Underweight and variant freq -l 10')
+        self.assertSucc('vtools output variant variant_id freq num depth other')
+        self.assertSucc('vtools output CEU chr pos ref alt -l -1')
+        self.assertFail('vtools output CEU and variant freq -l 10')
         self.assertFail('vtools output variant sum(num)')
         self.assertSucc('vtools output variant "sum(num)" -v0')
         self.assertFail('vtools output variant count(1)')
         self.assertSucc('vtools output variant "count(1)"')
         self.assertSucc('vtools output variant "count(variant_id)"')
         self.assertSucc('vtools output variant "count(variant_id)" -v 0')
-        self.assertSucc('vtools output variant "avg(depth)''')
+        self.assertSucc('vtools output variant "avg(depth)"')
         self.assertSucc('vtools output CEU "avg(freq)"')
         self.assertFail('vtools output CEU "avg(bin)"')
 

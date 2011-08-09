@@ -48,13 +48,11 @@ class TestShow(ProcessTestCase):
         # show project
         self.assertSucc('vtools show project')
         self.assertSucc('vtools show table variant')
-        # Save the first 20 lines to variant.txt
-        self.assertSucc('vtools show table variant -l 20 > variant.txt')
-        # Save output to variant.txt
-        self.assertSucc('vtools show table variant -l -1 > variant.txt')
+        self.assertSucc('vtools show table variant -l 20')
+        self.assertSucc('vtools show table variant -l -1')
         self.assertSucc('vtools show sample')
         # Save output to phenotype.txt
-        self.assertSucc('vtools show sample > phenotype.txt')
+        self.assertSucc('vtools show sample > phenotypes.txt')
         runCmd('vtools use testNSFP.ann')
         self.assertSucc('vtools show table testNSFP')
         self.assertSucc('vtools show fields')

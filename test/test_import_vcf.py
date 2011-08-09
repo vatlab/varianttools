@@ -37,7 +37,7 @@ class TestImportVCF(ProcessTestCase):
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportVCF(self):
-        'Test command import_vcf'
+        'Test command vtools import_vcf'
         self.assertFail('vtools import_vcf')
         self.assertFail('vtools import_vcf non_existing.vcf')
         # no build information, fail
@@ -51,11 +51,11 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf SAMP1.vcf')
         self.assertEqual(numOfSample(), 2)
         # another sample
-        self.assertSucc('vtools import_vcf CEU.vcf')
-        self.assertFail('vtools import_vcf CEU.vcf --build hg19')
+        self.assertSucc('vtools import_vcf CEU.vcf.gz')
+        self.assertFail('vtools import_vcf CEU.vcf.gz --build hg19')
         self.assertEqual(numOfSample(), 62)
         # file will be ignored if re-imported
-        self.assertSucc('vtools import_vcf CEU.vcf')
+        self.assertSucc('vtools import_vcf CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
 
 

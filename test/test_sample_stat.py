@@ -35,10 +35,10 @@ class TestSampleStat(ProcessTestCase):
         'Create a project'
         runCmd('vtools init test -f')
         runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5')
+        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
         runCmd('vtools import_phenotype phenotype.txt')
         runCmd('vtools import_vcf SAMP1.vcf')
-        runCmd('vtools subsample "filename like \'CEU%\'" -t CEU')
+        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
     def removeProj(self):
         runCmd('vtools remove project')
     def testSampleStat(self):
