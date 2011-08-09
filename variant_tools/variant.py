@@ -84,7 +84,9 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
         # is group_by fields outputted?
         tmp, group_fields = consolidateFieldName(proj, table, ','.join(args.group_by))
         # the intermediate fields are not needed
-        group_fields = [x for x in group_fields if x.split('.')[-1].lower() in y.lower() for y in args.group_by]]
+        group_fields = [x for x in group_fields if 
+            (x.split('.')[-1].lower() in [y.lower() for y in args.group_by] or 
+            x.lower() in [y.lower() for y in args.group_by])]
         for f in group_fields:
             if f.lower() not in [x.lower() for x in fields]:
                 raise ValueError('Group attribute {} is not outputted'.format(f))
