@@ -33,7 +33,7 @@ from testUtils import ProcessTestCase, runCmd
 class TestImportTXT(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test')
+        runCmd('vtools init test -f')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportTXT(self):
