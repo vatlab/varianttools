@@ -40,6 +40,8 @@ class TestImportVCF(ProcessTestCase):
         'Test command vtools import_vcf'
         self.assertFail('vtools import_vcf')
         self.assertFail('vtools import_vcf non_existing.vcf')
+        # help information
+        self.assertSucc('vtools import_vcf -h')
         # no build information, fail
         self.assertFail('vtools import_vcf SAMP1.vcf')
         # specify build information
