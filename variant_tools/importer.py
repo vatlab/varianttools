@@ -456,13 +456,6 @@ def importVCF(args):
         sys.exit(e)
 
 
-def exportVCFArguments(parser):
-    pass
-
-def exportVCF(args):
-    raise SystemError('This feature is currently not implemented')
-
-
 def importTxtArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be in 

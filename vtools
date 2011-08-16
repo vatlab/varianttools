@@ -163,12 +163,6 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.compare)
     #
-    # command export_vcf (pending)
-    parser = subparsers.add_parser('export_vcf', help='Export vcf files')
-    importer.exportVCFArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=importer.exportVCF)
-    #
     # getting args
     args = master_parser.parse_args()
     # calling the associated functions
