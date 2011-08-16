@@ -42,15 +42,26 @@ class BaseAssociationStat:
         3. annotation
     These structures should not be changed during the calculation.
     '''
-    def __init__(self, args=[], logger=None):
+    def __init__(self, logger=None, name=None, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to 
         parse it'''
         self.phenotype = None
         self.genotype = None
         self.annotation = None
         self.logger = logger
-        logger.info(args)
+        self.name = name
+        self.parseArgs(*method_args)
 
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''A base association test method
+            test does nothing, but can be used to measure the performance of 
+            retrieving data from vtools.''',
+            prog='vtools associate --method ' + self.name)
+        # no argumant is added
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+            
     def setData(self, phenotype=None, genotype=None, annotation=None):
         '''Set or update internal data structure. These variables are set
         separately because it is likely that only some of them needs update.'''
@@ -72,19 +83,24 @@ def associateArguments(parser):
     parser.add_argument('phenotype', nargs='+',
         help='''A list of phenotypes that will be passed to the association
             statistics calculator''')
-    parser.add_argument('stat_args', nargs=argparse.REMAINDER,
-        help='''Any remaining arguments will be passed to the statistics
-            calculator''')
-    parser.add_argument('-m', '--method',
-        help='''Method of association test. A statistics calculator
-            will the same name will be located and used.''')
+    parser.add_argument('--covariants', nargs='*',
+        help='''Optional phenotypes that will be passed to statistical
+            tests as covariants. Values of these phenotypes should be integer
+            or float.''')
+    parser.add_argument('-m', '--methods', nargs='+',
+        help='''Method of one or more association tests. Parameters for each
+            method should be specified together as a quoted long argument (e.g.
+            --method "m --field mp" "m1 --permute 10000 --field m1p"), although
+            the common method parameters can be specified separately, as long as
+            they do not conflict with command arguments. (e.g. --method m1 m2 -p 10 
+            is equivalent to --method "m1 -p 10" "m2 -p 10".)''')
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
     parser.add_argument('-g', '--group_by', nargs='*',
-        help='''Group output by fields. This option is useful for aggregation output
-            where summary statistics are grouped by one or more fields.''')
+        help='''Group variants by fields. If specified, variants will be separated
+            into groups and are tested one by one.''')
 
 
 def associate(args, reverse=False):
@@ -95,8 +111,10 @@ def associate(args, reverse=False):
                 raise ValueError('Variant table {} does not exist.'.format(args.variants))
             #
             # step 0: find a subclass of the BaseAssociationStat
-            stat = BaseAssociationStat(args=args.stat_args, logger=proj.logger)
-            #
+            for m in args.methods:
+                m_name = m.split()[0]
+                m_args = m.split()[1:] + args.unknown_args
+                stat = BaseAssociationStat(proj.logger, m_name, m_args)
             # step 1: handle --samples
             #
             # step 2: collect phenotype
