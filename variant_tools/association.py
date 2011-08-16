@@ -31,7 +31,7 @@ from .sample import Sample
 import argparse
 
 
-class BaseAssociationStat:
+class BaseAssoTest:
     '''A base class that defines a common interface for association
     statistics calculator. Instances of these calculators will be created
     by vtools during command 'vtools asscoaition'. The results will be
@@ -139,4 +139,94 @@ def associate(args, reverse=False):
             #
     except Exception as e:
         sys.exit(e) 
+
+
+class WssTest(BaseAssoTest):
+    def __init__(self, phenotypes, genotypes, covariates, annotations, mode, weightingTheme):
+        self.y = phenotypes
+        self.x = genotypes
+        self.z = covariates
+        self.a = annotations
+        self.wt = weightingTheme
+        if mode == 'R':
+            scipy.where(x==2.0, 1.0, 0.0)
+        elif mode == 'D':
+            scipy.where(x!=0.0, 1.0, 0.0)
+        else:
+            pass
+        
+    def weighting(self):
+        nsamples = [self.y.shape[0]]*self.y.shape[1]
+        ncases = self.y.sum(axis=0)
+        nctrls = [s - cs for s, cs in zip(nsamples, ncases)]
+        nvariants = self.x.sum(axis=1)
+        #!NOTICE: Now focus only on the primary phenotype, y[:,0]
+        countsinctrls = [sum([m[i] for i in range(nsamples[0]) if not self.y[i, 0]]) for m in self.x.transpose()]
+        countsincases = [all - ct for all, ct in zip(nvariants, countsinctrls)]
+        # apply weighting theme based on annotation
+        if self.wt == 1:
+            weights = -scipy.log([1-i for i in self.a])
+        #
+        # apply weighting theme based on observed sample
+        # there can be many more other weighting themes ... or combinations of these themes
+        else:
+            # weigthing by variants exclusive to ctrls
+            q = [(m+1.0)/(nctrls[0]+2.0) for m in countsinctrls]
+            weights = [1.0/scipy.sqrt(freq*(1.0-freq)) for freq in q]
+        return weights, countsincases
+    
+    def simplePerm(self, nperm):
+        weights = self.weighting()
+        statistic = sum([w*c for w,c in zip(weights[0], weights[1])])
+        permcount1, permcount2 = 0, 0
+        for i in range(nperm):
+            numpy.random.shuffle(self.y[:,0])
+            weights = self.weighting()
+            perm_statistic = sum([w*c for w,c in zip(weights[0], weights[1])])
+            if perm_statistic >= statistic: permcount1 += 1
+            if perm_statistic <= statistic: permcount2 += 1
+        return permcount1, permcount2
+    
+    def regressionR(self, covariate=[1,2]):
+        # logistic regression using R via rpy2
+        # dirty codes for proof of concept
+        weights = scipy.array(self.weighting()[0])
+        regressors = scipy.matrix(self.x) * scipy.matrix(weights).transpose()
+        #   input = scipy.concatenate((y, regressors, z), axis=1)
+        R.assign('Y', Rfloats(self.y[:,0].tolist()))
+        R.assign('X', Rfloats(regressors.transpose().tolist()[0]))
+        for i in covariate:
+            R.assign('Z'+str(i), Rfloats(self.z[:, i-1].tolist()))
+        summary = R('glm(Y~X+Z1+Z2, family = "binomial")')
+        beta_x = summary[0][1]
+        return beta_x
+    
+    def regressionPerm(self, nperm, covariate=[1,2]):
+        statistic = self.regressionR(covariate)
+        permcount1, permcount2 = 0, 0
+        for i in range(nperm):
+            # permutation on X, permute the rows
+            numpy.random.shuffle(self.x)
+            perm_statistic = self.regressionR(covariate)
+            if perm_statistic >= statistic: permcount1 += 1
+            if perm_statistic <= statistic: permcount2 += 1
+        return permcount1, permcount2
+    
+    def calcP1(self, covariate, nperm):
+        # one-sided test
+        if covariate:
+            counts = self.regressionPerm(nperm, covariate)[0]
+            return float(counts)/float(nperm)
+        else:
+            counts = self.simplePerm(nperm)[0]
+            return float(counts)/float(nperm)        
+        
+    def calcP2(self, covariate, nperm):
+        # two-sided test
+        if covariate:
+            counts = min(self.regressionPerm(nperm, covariate))
+            return 2.0 * float(counts)/float(nperm)
+        else:
+            counts = min(self.simplePerm(nperm))
+            return 2.0 * float(counts)/float(nperm)
 
