@@ -29,6 +29,7 @@ import sys
 import gzip
 import re
 from .project import Project
+from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin
 
 class Importer:
@@ -71,14 +72,15 @@ class Importer:
         else:
             self.build = build
         #
+        self.import_alt_build = False
         if self.proj.build is None:
             self.proj.setRefGenome(self.build)
         elif self.build == self.proj.build:
             # perfect case
-            self.use_alt_build = False
+            pass
         elif self.build == self.proj.alt_build:
             # really troublesome
-            self.use_alt_build = True
+            self.import_alt_build = True
         elif self.proj.alt_build is None:
             raise ValueError('Please use vtools liftover to set an alternative ' + \
                 'reference genome before importing data with a reference genome that is ' + \
@@ -86,6 +88,19 @@ class Importer:
         else:
             raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
                 ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
+        #
+        # importing data to alternative reference genome
+        if self.import_alt_build:
+            self.logger.info('Reading coordinates in preparation for importing from alternative reference genome')
+            # we need to run lift over to convert coordinates before importing data.
+            alt_coordinates = set()
+            for f in self.files:
+                alt_coordinates |= set(self.getCoordinates(f))
+            tool = liftOverTool(self.proj)
+            self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
+            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+        else:
+            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
         self.proj.dropIndexOnMasterVariantTable()
         #
@@ -195,8 +210,12 @@ class Importer:
             else:
                 self.count[4] += 1
             bin = getMaxUcscBin(pos - 1, pos)
-            variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
-            cur.execute(variant_insert_query, (bin, chr, pos, ref, alt))
+            if self.import_alt_build:
+                alt_chr, alt_pos = chr, pos
+                chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
+                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_chr, alt_pos))
+            else:
+                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
             variant_id = cur.lastrowid
             self.variantIndex[(chr, pos, ref, alt)] = variant_id
             return variant_id
@@ -270,6 +289,31 @@ class vcfImporter(Importer):
                     break
         return samples
 
+    def getCoordinates(self, input_filename):
+        '''Get (chr, pos) of all variants, for backward liftOver'''
+        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
+        count = 0
+        coordinates = []
+        with self.openFile(input_filename) as input_file:
+            for line in input_file:
+                try:
+                    if line.startswith('#'):
+                        continue
+                    count += 1
+                    tokens = [x.strip() for x in line.split('\t')]
+                    chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
+                    pos = int(tokens[1])
+                    coordinates.append((chr, pos))
+                except Exception as e:
+                    self.logger.debug('Failed to process line: ' + line.strip())
+                    self.logger.debug(e)
+                if count % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(count)
+            self.db.commit()
+            prog.done()
+        return coordinates
+        
     def importFromFile(self, input_filename):
         '''Import a VCF file to sample_variant'''
         #
@@ -384,6 +428,34 @@ class txtImporter(Importer):
         self.delimiter = delimiter
         self.zero = zero
 
+    def getCoordinates(self, input_filename):
+        '''Read coordinates in prepration for reverse liftOver'''
+        count = 0
+        coordinates = []
+        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
+        with self.openFile(input_filename) as input_file:
+            for line in input_file:
+                try:
+                    if line.startswith('#'):
+                        continue
+                    count += 1
+                    # get data
+                    tokens = [x.strip() for x in line.split(self.delimiter)]
+                    chr, pos = tokens[self.col[0]], tokens[self.col[1]]
+                    if chr.startswith('chr'):
+                        chr = chr[3:]
+                    pos = int(pos) + 1 if self.zero else int(pos)
+                    coordinates.append((chr, pos))
+                except Exception as e:
+                    self.logger.debug('Failed to process line: ' + line.strip())
+                    self.logger.debug(e)
+                if count % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(count)
+            self.db.commit()
+            prog.done()
+        return coordinates
+
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
@@ -392,7 +464,6 @@ class txtImporter(Importer):
         sample_id = self.recordFileAndSample(filename, [None])[0]
         #
         cur = self.db.cursor()
-        variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         sample_variant_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2}, {2});'\
             .format(self.proj.name, sample_id, self.db.PH)
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
