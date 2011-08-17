@@ -356,6 +356,12 @@ class vcfImporter(Importer):
                         DP = [None if m is None else float(m.group(1))/nSample]
                     else:
                         DP = []
+                    # is GT the first field?
+                    try:
+                        GT_idx = 0 if tokens[8].startswith('GT') else tokens[8].split(':').index('GT')
+                    except Exception as e:
+                        self.logger.debug(e)
+                        raise ValueError('The genotype format field does not have GT')
                     # for efficiency, we separte out this most common case ...
                     if len(ref) == 1 and len(tokens[4]) == 1:   
                         # the easy case: there is only one alternative allele,
@@ -366,7 +372,7 @@ class vcfImporter(Importer):
                         if no_sample:
                             cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id, 1] + DP)
                         else:
-                            variants = [x.split(':')[0].count('1') for x in tokens[-len(sample_ids):]]
+                            variants = [x.split(':')[GT_idx].count('1') for x in tokens[-len(sample_ids):]]
                             for var_idx, var in enumerate(variants):
                                 if var != 0:  # genotype 0|0 are ignored
                                     cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
@@ -381,7 +387,7 @@ class vcfImporter(Importer):
                                 cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
                         else:
                             # process variants
-                            for var_idx, var in enumerate([x.split(':')[0] for x in tokens[-len(sample_ids):]]):
+                            for var_idx, var in enumerate([x.split(':')[GT_idx] for x in tokens[-len(sample_ids):]]):
                                 if len(var) == 3:  # regular
                                     gt = var[0] + var[2]  # GT can be separated by / or |
                                     if gt in ['01', '10']:
