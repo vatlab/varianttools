@@ -61,6 +61,11 @@ class ProcessTestCase(unittest.TestCase):
         except subprocess.CalledProcessError:
             return
 
+def outputOfCmd(cmd):
+    cmd = shlex.split(cmd)
+    return subprocess.check_output(cmd, stderr=subprocess.PIPE,
+            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
+    
 def runCmd(cmd):
     cmd = shlex.split(cmd)
     subprocess.call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

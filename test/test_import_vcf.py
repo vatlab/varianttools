@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfSample, numOfVariant
+from testUtils import ProcessTestCase, runCmd, numOfSample, numOfVariant, outputOfCmd
 
 class TestImportVCF(ProcessTestCase):
     def setUp(self):
@@ -72,6 +72,25 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf var_format.vcf --build hg19')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289 + 98)
+        #
+        # this is a difficult test to pass, basically, we will create another project
+        # in reverse order of reference genomes, using reversed liftover, and see
+        # it the output is the same
+        out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
+        self.assertSucc('vtools init test -f')
+        self.assertSucc('vtools import_vcf var_format.vcf --build hg19')
+        self.assertEqual(numOfVariant(), 98)
+        self.assertEqual(numOfSample(), 1)
+        self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
+        self.assertEqual(numOfSample(), 2)
+        # 101 cannot be mapped. damn.
+        self.assertEqual(numOfVariant(), 185 + 98)
+        out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
+        #
+        out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x])
+        out2 = '\n'.join([x for x in sorted(out2.split('\n')) if 'NA' not in x])
+        self.assertEqual(out1, out2)
+        # 
 
 if __name__ == '__main__':
     unittest.main()
