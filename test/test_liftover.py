@@ -48,5 +48,9 @@ class TestLiftover(ProcessTestCase):
         self.assertFail('vtools liftover non_existing_build')
         self.assertSucc('vtools liftover hg19')
 
+    #
+    # TODO: choose a marker with known hg18 and hg19 coordinates
+    # import and liftover, and check the results
+    #
 if __name__ == '__main__':
     unittest.main()

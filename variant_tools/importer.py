@@ -42,9 +42,6 @@ class Importer:
             raise IOError('Please specify the filename of the input data.')
             sys.exit(1)
         #
-        if build:
-            self.proj.setRefGenome(build)
-        #
         self.files = []
         cur = self.db.cursor()
         cur.execute('SELECT filename from filename;')
@@ -60,12 +57,46 @@ class Importer:
         self.total_count = [0, 0, 0, 0, 0, 0]
         if len(self.files) == 0:
             return
+        #
+        if build is None:
+            if self.proj.build is not None:
+                self.build = self.proj.build
+                self.logger.info('Using primary reference genome {} of the project.'.format(self.build))
+            else:
+                self.build = self.guessBuild(self.files[0])
+                if self.build is None:
+                    raise ValueError('Cannot determine a reference genome from files provided. Please specify it using parameter --build')
+                else:
+                    self.logger.info('Reference genome is determined to be {}'.format(self.build))
+        else:
+            self.build = build
+        #
+        if self.proj.build is None:
+            self.proj.setRefGenome(self.build)
+        elif self.build == self.proj.build:
+            # perfect case
+            self.use_alt_build = False
+        elif self.build == self.proj.alt_build:
+            # really troublesome
+            self.use_alt_build = True
+        elif self.proj.alt_build is None:
+            raise ValueError('Please use vtools liftover to set an alternative ' + \
+                'reference genome before importing data with a reference genome that is ' + \
+                'different from the primary reference genome of a project.')
+        else:
+            raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
+                ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
+        #
         self.proj.dropIndexOnMasterVariantTable()
         #
         self.createLocalVariantIndex()
 
     def __del__(self):
         self.proj.createIndexOnMasterVariantTable()
+
+    def guessBuild(self, file):
+        # by default, reference genome cannot be determined from file
+        return None
 
     def openFile(self, filename):
         if filename.lower().endswith('.gz'):
@@ -205,18 +236,24 @@ class vcfImporter(Importer):
         # vcf tools only support DP for now
         self.variant_only = variant_only
         self.import_depth = 'DP' in info
-        # FIXME: self.infoFields and formatFields should initially read from
-        # table variant_meta if this table already exists.        # 
-        self.infoFields = None  # will be assigned when the first vcf file is read
-        self.formatFields = None
+
+    def guessBuild(self, filename):
+        '''Called by the initializer to determine reference genome
+        '''
+        with self.openFile(filename) as input:
+            for line in input:
+                if line.startswith('##reference'):
+                    if 'NCBI36' in line.upper() or 'HG18' in line.upper() or 'HUMAN_B36' in line.upper():
+                        return 'hg18'
+                    elif 'GRCH37' in line.upper() or 'HG19' in line.upper() or 'HUMAN_B37' in line.upper():
+                        return 'hg19'
+                if not line.startswith('#'):
+                    return None
 
     def getMetaInfo(self, filename):
         '''Probe vcf files for additional information to be put to the variant_meta table.
         '''
-        infoFields = []
-        formatFields = []
         samples = []
-        build = None
         with self.openFile(filename) as input:
             line = input.readline()
             if not line.startswith('##fileformat=VCF'):
@@ -227,40 +264,10 @@ class vcfImporter(Importer):
                     Please use vcftools to convert your vcf file to a supported format')
             #
             for line in input:
-                if line.startswith('##reference'):
-                    # guess reference genome from VCF header file
-                    if 'NCBI36' in line.upper() or 'HG18' in line.upper() or 'HUMAN_B36' in line.upper():
-                        build = 'hg18'
-                    elif 'GRCH37' in line.upper() or 'HG19' in line.upper() or 'HUMAN_B37' in line.upper():
-                        build = 'hg19'
-                if line.startswith('INFO'):
-                    # FIXME: properly handle INFO
-                    pass
-                if line.startswith('FORMAT'):
-                    # FIXME: properly handle FORMAT
-                    pass
                 if line.startswith('#CHR'):
                     samples = line.split()[9:]
                 if not line.startswith('#'):
                     break
-        # set meta fields if this is the first file
-        if self.infoFields is None:
-            self.infoFields = infoFields
-        elif self.infoFields != infoFields:
-            # FIXME: give a warning?
-            pass
-        if self.formatFields is None:
-            self.formatFields = formatFields
-        elif self.formatFields != formatFields:
-            # FIXME: give a warning?
-            pass
-        if self.proj.build is None:
-            if build is None:
-                raise ValueError('Cannot determine reference genome build from the meta information vcf file\n'
-                        'Please use parameter --build to specify it.')
-            else:
-                self.logger.info('Reference genome build is determined to be {0}'.format(build))
-                self.proj.setRefGenome(build)
         return samples
 
     def importFromFile(self, input_filename):
@@ -286,7 +293,6 @@ class vcfImporter(Importer):
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
-                    # FIXME: # record sample meta information
                     if line.startswith('#'):
                         continue
                     self.count[0] += 1
@@ -295,8 +301,7 @@ class vcfImporter(Importer):
                     chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
                     pos = int(tokens[1])
                     ref = tokens[3]
-                    # FIXME: handle INFO and FORMAT, here we only extract info
-                    # get depth.
+                    # we only extract info get depth.
                     if self.import_depth:
                         m = DP_pattern.match(tokens[7])
                         DP = [None if m is None else float(m.group(1))/nSample]
@@ -309,7 +314,6 @@ class vcfImporter(Importer):
                         alt = tokens[4][0]
                         variant_id = self.addVariant(cur, chr, pos, ref, alt)
                         #
-                        # FIXME: we should properly handle self.formatFields
                         if no_sample:
                             cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id, 1] + DP)
                         else:
