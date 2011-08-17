@@ -77,14 +77,14 @@ class LiftOverTool:
                 return False
         return True
  
-    def obtainLiftOverChainFile(self):
+    def obtainLiftOverChainFile(self, from_build, to_build):
         '''Obtain liftOver chain file, download from UCSC website if needed.'''
         # select or download the right chain file
-        chainFile = '{0}To{1}.over.chain.gz'.format(self.proj.build, self.proj.alt_build.title())
+        chainFile = '{0}To{1}.over.chain.gz'.format(from_build, to_build.title())
         if not os.path.isfile(chainFile):
             try:
                 chainFileURL = 'http://hgdownload-test.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
-                    self.proj.build, chainFile)
+                    from_build, chainFile)
                 self.logger.info('Downloading liftOver chain file from UCSC')
                 downloadFile(chainFileURL)
             except Exception as e:
@@ -136,7 +136,7 @@ class LiftOverTool:
         if not self.obtainLiftOverTool():
             return {}
         # download chain file
-        chainFile = self.obtainLiftOverChainFile()
+        chainFile = self.obtainLiftOverChainFile(self.proj.build, self.proj.alt_build)
         if not chainFile:
             return {}
         # export existing variants to a temporary file
@@ -212,6 +212,57 @@ class LiftOverTool:
         self.proj.saveProperty('alt_build', alt_build)
         self.updateAltCoordinates()
 
+    def mapCoordinates(coordinates, from_build, to_build):
+        '''Given a set of coordinates (chr, pos) in build, from and to build of reference genome,
+        return a dictionary that maps (chr, pos) -> (alt_chr, alt_pos)
+        '''
+        if len(coordinates) == 0:
+            return {}
+        # download liftover 
+        if not self.obtainLiftOverTool():
+            raise RuntimeError('Failed to obtain UCSC LiftOver tool')
+        # download chain file
+        chainFile = self.obtainLiftOverChainFile(from_build, to_build)
+        if not chainFile:
+            raise RuntimeError('Failed to obtain UCSC chain file {}'.format(chainFile))
+        # export existing variants to a temporary file
+        tdir = tempfile.mkdtemp()
+        with open(os.path.join(tdir, 'var_in.bed'), 'w') as output:
+            for cor in sorted(coordinates):
+                output.write('{0}\t{1}\t{2}\t{3}\t{4}'.format(cor[0], cor[1] - 1, cor[1], cor[0], cor[1])
+        #
+        self.runLiftOver(os.path.join(tdir, 'var_in.bed'), chainFile,
+            os.path.join(tdir, 'var_out.bed'), os.path.join(tdir, 'unmapped.bed'))           
+        #
+        err_count = 0
+        with open(os.path.join(tdir, 'unmapped.bed')) as var_err:
+            for line in var_err:
+                if line.startswith('#'):
+                    continue
+                if err_count == 0:
+                    self.logger.debug('First 100 unmapped variants:')
+                if err_count < 100:
+                    self.logger.debug(line.rstrip())
+                err_count += 1
+        if err_count != 0:
+            self.logger.info('{0} records failed to map.'.format(err_count))
+        #
+        # create a map
+        coordinateMap = {}
+        mapped_file = os.path.join(tdir, 'var_out.bed')
+        prog = ProgressBar('Reading new coordinates', lineCount(mapped_file))
+        with open(mapped_file) as var_mapped:
+            for count, line in enumerate(var_mapped):
+                alt_chr, alt_start, alt_end, chr, pos = line.strip().split()
+                try:
+                    coordinateMap[(chr, int(pos))] = (alt_chr, int(alt_start) + 1)
+                except:
+                    pass
+                if count % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(count)
+        self.db.commit()
+        prog.done()
     
 #
 #
