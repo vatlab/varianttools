@@ -82,9 +82,11 @@ class Importer:
             # really troublesome
             self.import_alt_build = True
         elif self.proj.alt_build is None:
-            raise ValueError('Please use vtools liftover to set an alternative ' + \
-                'reference genome before importing data with a reference genome that is ' + \
-                'different from the primary reference genome of a project.')
+            self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
+            self.logger.info('Adding an alternative referenge genome ({}) to the project.'.format(self.build))
+            tool = LiftOverTool(self.proj)
+            tool.setAltRefGenome(self.build)
+            self.import_alt_build = True
         else:
             raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
                 ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
@@ -100,7 +102,7 @@ class Importer:
             self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
             self.logger.info('{:,} coordinates are mapped from {} to {}, variants in {} unmapped records will not be imported'.format(len(self.coordinateMap),
                 self.build, self.proj.build, len(alt_coordinates) - len(self.coordinateMap)))
-            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
@@ -153,6 +155,14 @@ class Importer:
         return sample_ids
         
     def addVariant(self, cur, chr, pos, ref, alt):
+        #
+        # if chr, pos are from alternative reference genome
+        alt_chr, alt_pos = chr, pos
+        if self.import_alt_build:
+            try:
+                chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
+            except Exception as e:
+                raise ValueError('Coordinate ({}, {}) cannot be mapped to the primary reference genome.'.format(alt_chr, alt_pos))
         # different types of variants
         # 1. C -> G  (SNV)  
         #    TC-> TG  
@@ -187,6 +197,7 @@ class Importer:
                     common_leading += 1
             if common_leading > 0:
                 pos += common_leading
+                alt_pos += common_leading
                 ref = ref[common_leading:]
                 alt = alt[common_leading:]
             #
@@ -198,10 +209,6 @@ class Importer:
             if len(ref) > 0 and alt.endswith(ref):  # G -> AG
                 alt = alt[:-len(ref)]
                 ref = ''
-        # if chr, pos are from alternative reference genome
-        if self.import_alt_build:
-            alt_chr, alt_pos = chr, pos
-            chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
         #
         try:
             return self.variantIndex[(chr, pos, ref, alt)]
@@ -218,7 +225,8 @@ class Importer:
                 self.count[4] += 1
             bin = getMaxUcscBin(pos - 1, pos)
             if self.import_alt_build:
-                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_chr, alt_pos))
+                alt_bin = getMaxUcscBin(alt_pos - 1, alt_pos)
+                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
             else:
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
             variant_id = cur.lastrowid
@@ -233,7 +241,7 @@ class Importer:
             self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
                 .format(sum(self.count[1:-1]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
                 ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
-            for i in range(5):
+            for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
         if len(self.files) > 1:

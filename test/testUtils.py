@@ -69,3 +69,7 @@ def runCmd(cmd):
 def numOfSample():
     return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
         stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+
+def numOfVariant(table='variant'):
+    return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
+        stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))

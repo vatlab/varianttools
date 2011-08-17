@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfSample
+from testUtils import ProcessTestCase, runCmd, numOfSample, numOfVariant
 
 class TestImportVCF(ProcessTestCase):
     def setUp(self):
@@ -36,6 +36,7 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools init test -f')
     def removeProj(self):
         runCmd('vtools remove project')
+
     def testImportVCF(self):
         'Test command vtools import_vcf'
         self.assertFail('vtools import_vcf')
@@ -60,6 +61,17 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
 
+    def testMixedBuild(self):
+        'Test importing vcf files with different reference genomes'
+        self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
+        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(), 289)
+        self.assertSucc('vtools import_vcf var_format.vcf --build hg19')
+        self.assertEqual(numOfSample(), 2)
+        self.assertEqual(numOfVariant(), 289 + 98)
+        self.assertSucc('vtools import_vcf var_format.vcf --build hg19')
+        self.assertEqual(numOfSample(), 2)
+        self.assertEqual(numOfVariant(), 289 + 98)
 
 if __name__ == '__main__':
     unittest.main()
