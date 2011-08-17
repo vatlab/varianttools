@@ -96,8 +96,9 @@ class Importer:
             alt_coordinates = set()
             for f in self.files:
                 alt_coordinates |= set(self.getCoordinates(f))
-            tool = liftOverTool(self.proj)
+            tool = LiftOverTool(self.proj)
             self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
+            del alt_coordinates
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)

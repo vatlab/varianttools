@@ -107,7 +107,7 @@ class LiftOverTool:
                 # NOTE: the change from 1-based index to 0-based (assumed by liftOver)
                 # NOTE: we add 'chr' to chromosome name (except for those long names) because
                 #       liftover uses chr1, chr2 etc
-                var_in.write('{0}\t{1}\t{2}\t{3}\n'.format(rec[1] if len(rec[1]) > 1 else 'chr' + rec[1],
+                var_in.write('{0}\t{1}\t{2}\t{3}\n'.format(rec[1] if len(rec[1]) > 2 else 'chr' + rec[1],
                     int(rec[2]) - 1, rec[2], rec[0]))
                 if count % self.db.batch == 0:
                     prog.update(count)
@@ -212,7 +212,7 @@ class LiftOverTool:
         self.proj.saveProperty('alt_build', alt_build)
         self.updateAltCoordinates()
 
-    def mapCoordinates(coordinates, from_build, to_build):
+    def mapCoordinates(self, coordinates, from_build, to_build):
         '''Given a set of coordinates (chr, pos) in build, from and to build of reference genome,
         return a dictionary that maps (chr, pos) -> (alt_chr, alt_pos)
         '''
@@ -229,7 +229,8 @@ class LiftOverTool:
         tdir = tempfile.mkdtemp()
         with open(os.path.join(tdir, 'var_in.bed'), 'w') as output:
             for cor in sorted(coordinates):
-                output.write('{0}\t{1}\t{2}\t{3}\t{4}'.format(cor[0], cor[1] - 1, cor[1], cor[0], cor[1])
+                output.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format(cor[0] if len(cor[0]) > 2 else 'chr' + cor[0],
+                   cor[1] - 1, cor[1], cor[0], cor[1]))
         #
         self.runLiftOver(os.path.join(tdir, 'var_in.bed'), chainFile,
             os.path.join(tdir, 'var_out.bed'), os.path.join(tdir, 'unmapped.bed'))           
@@ -245,24 +246,23 @@ class LiftOverTool:
                     self.logger.debug(line.rstrip())
                 err_count += 1
         if err_count != 0:
-            self.logger.info('{0} records failed to map.'.format(err_count))
+            self.logger.info('{0} out of {1} records failed to map.'.format(err_count, len(coordinates)))
         #
         # create a map
         coordinateMap = {}
         mapped_file = os.path.join(tdir, 'var_out.bed')
         prog = ProgressBar('Reading new coordinates', lineCount(mapped_file))
         with open(mapped_file) as var_mapped:
-            for count, line in enumerate(var_mapped):
-                alt_chr, alt_start, alt_end, chr, pos = line.strip().split()
+            for count, line in enumerate(var_mapped.readlines()):
                 try:
-                    coordinateMap[(chr, int(pos))] = (alt_chr, int(alt_start) + 1)
-                except:
-                    pass
+                    alt_chr, alt_start, alt_end, chr, pos = line.strip().split()
+                    coordinateMap[(chr, int(pos))] = (alt_chr[3:] if alt_chr.startswith('chr') else alt_chr, int(alt_start) + 1)
+                except Exception as e:
+                    self.logger.debug(e)
                 if count % self.db.batch == 0:
-                    self.db.commit()
                     prog.update(count)
-        self.db.commit()
         prog.done()
+        return coordinateMap
     
 #
 #
