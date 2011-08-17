@@ -98,7 +98,8 @@ class Importer:
                 alt_coordinates |= set(self.getCoordinates(f))
             tool = LiftOverTool(self.proj)
             self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
-            del alt_coordinates
+            self.logger.info('{:,} coordinates are mapped from {} to {}, variants in {} unmapped records will not be imported'.format(len(self.coordinateMap),
+                self.build, self.proj.build, len(alt_coordinates) - len(self.coordinateMap)))
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
@@ -197,6 +198,11 @@ class Importer:
             if len(ref) > 0 and alt.endswith(ref):  # G -> AG
                 alt = alt[:-len(ref)]
                 ref = ''
+        # if chr, pos are from alternative reference genome
+        if self.import_alt_build:
+            alt_chr, alt_pos = chr, pos
+            chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
+        #
         try:
             return self.variantIndex[(chr, pos, ref, alt)]
         except:
@@ -212,8 +218,6 @@ class Importer:
                 self.count[4] += 1
             bin = getMaxUcscBin(pos - 1, pos)
             if self.import_alt_build:
-                alt_chr, alt_pos = chr, pos
-                chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_chr, alt_pos))
             else:
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
