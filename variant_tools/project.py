@@ -534,19 +534,8 @@ class Project:
 
     def createIndexOnMasterVariantTable(self):
         # create indexes
-        #
-        # Method 1: create single indexes
-        #
-        #for field in ['bin', 'chr', 'pos', 'alt']:
-        #    try:
-        #        cur.execute('''CREATE INDEX variant_{0}_idx ON variant ({0} ASC);'''.format(field))
-        #    except Exception as e:
-        #        # the index might already exists
-        #        self.logger.debug(e)
-        #
-        # Method 2: create combined indexes
         # 
-        self.logger.debug('Creating index on master variant table')
+        self.logger.info('Creating index on master variant table. This might take quite a while.')
         try:
             self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
@@ -558,7 +547,7 @@ class Project:
         #
         # NOTE: for mysql, it might be better to use alt index disable/rebuild
         #
-        self.logger.debug('Dropping index of master variant table')
+        self.logger.info('Dropping index of master variant table. This might take quite a while.')
         try:
             # drop index has different syntax for mysql/sqlite3.
             self.db.dropIndex('variant_index', 'variant')
