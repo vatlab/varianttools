@@ -525,9 +525,9 @@ class Project:
         self.db.execute('''\
             CREATE TABLE variant (
                 variant_id INTEGER PRIMARY KEY {0},
-                bin INTEGER NOT NULL,
-                chr VARCHAR(20) NOT NULL,
-                pos INTEGER NOT NULL,
+                bin INTEGER NULL,
+                chr VARCHAR(20) NULL,
+                pos INTEGER NULL,
                 ref VARCHAR(255) NOT NULL,
                 alt VARCHAR(255) NOT NULL);'''.format(self.db.AI))
         self.createIndexOnMasterVariantTable()

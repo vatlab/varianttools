@@ -84,7 +84,7 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 2)
         # 101 cannot be mapped. damn.
-        self.assertEqual(numOfVariant(), 185 + 98)
+        self.assertEqual(numOfVariant(), 289 + 98)
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
         #
         out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x])

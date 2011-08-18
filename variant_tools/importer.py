@@ -79,9 +79,10 @@ class Importer:
             # perfect case
             pass
         elif self.build == self.proj.alt_build:
-            # really troublesome
+            # troublesome
             self.import_alt_build = True
         elif self.proj.alt_build is None:
+            # even more troublesome
             self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
             self.logger.info('Adding an alternative referenge genome ({}) to the project.'.format(self.build))
             tool = LiftOverTool(self.proj)
@@ -100,7 +101,7 @@ class Importer:
                 alt_coordinates |= set(self.getCoordinates(f))
             tool = LiftOverTool(self.proj)
             self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
-            self.logger.info('{:,} coordinates are mapped from {} to {}, variants in {} unmapped records will not be imported'.format(len(self.coordinateMap),
+            self.logger.info('{:,} coordinates are mapped from {} to {}, variants in {} unmapped records will have NULL chr and pos.'.format(len(self.coordinateMap),
                 self.build, self.proj.build, len(alt_coordinates) - len(self.coordinateMap)))
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
@@ -132,10 +133,16 @@ class Importer:
         if numVariants == 0:
             return
         self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
+        if self.import_alt_build:
+            cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
+        else:
+            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
-            self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = rec[0]
+            if self.import_alt_build:
+                self.variantIndex[(rec[1], rec[2], rec[3], rec[4], rec[5], rec[6])] = rec[0]
+            else:
+                self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = rec[0]
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
@@ -157,12 +164,15 @@ class Importer:
     def addVariant(self, cur, chr, pos, ref, alt):
         #
         # if chr, pos are from alternative reference genome
-        alt_chr, alt_pos = chr, pos
         if self.import_alt_build:
+            # actual meaning of chr and pos
+            alt_chr, alt_pos = chr, pos
             try:
+                # find chr and pos in primary reference genome
                 chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
-            except Exception as e:
-                raise ValueError('Coordinate ({}, {}) cannot be mapped to the primary reference genome.'.format(alt_chr, alt_pos))
+            except:
+                # Coordinate cannot be mapped to the primary reference genome.
+                chr = pos = None
         # different types of variants
         # 1. C -> G  (SNV)  
         #    TC-> TG  
@@ -196,8 +206,12 @@ class Importer:
                 if ref[i] == alt[i]:
                     common_leading += 1
             if common_leading > 0:
-                pos += common_leading
-                alt_pos += common_leading
+                # pos can be None (if failed to map from alt_pos)
+                if pos:
+                    pos += common_leading
+                # alt_pos is only meaningful in import_alt_build
+                if self.import_alt_build:
+                    alt_pos += common_leading
                 ref = ref[common_leading:]
                 alt = alt[common_leading:]
             #
@@ -210,8 +224,9 @@ class Importer:
                 alt = alt[:-len(ref)]
                 ref = ''
         #
+        var_key = (chr, pos, ref, alt, alt_chr, alt_pos) if self.import_alt_build else (chr, pos, ref, alt)
         try:
-            return self.variantIndex[(chr, pos, ref, alt)]
+            return self.variantIndex[var_key]
         except:
             if alt in ['', '-', '.']:
                 alt = '-'
@@ -223,14 +238,15 @@ class Importer:
                 self.count[1] += 1
             else:
                 self.count[4] += 1
-            bin = getMaxUcscBin(pos - 1, pos)
             if self.import_alt_build:
+                bin = getMaxUcscBin(pos - 1, pos) if pos else None
                 alt_bin = getMaxUcscBin(alt_pos - 1, alt_pos)
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
             else:
+                bin = getMaxUcscBin(pos - 1, pos)
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
             variant_id = cur.lastrowid
-            self.variantIndex[(chr, pos, ref, alt)] = variant_id
+            self.variantIndex[var_key] = variant_id
             return variant_id
 
     def importData(self):
