@@ -34,7 +34,7 @@ import zipfile
 import tempfile
 
 from project import AnnoDB, Project, Field
-from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin
+from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction
 
 
 class AnnoDBConfiger:
@@ -378,7 +378,7 @@ class AnnoDBConfiger:
                 .format(all_records, skipped_records))
         #
         # creating indexes
-        self.logger.info('Creating indexes (this can take quite a while)')
+        s = delayedAction(self.logger.info, 'Creating indexes (this can take quite a while)')
         #
         # creates index for each link method
         for key in self.build.keys():
@@ -390,6 +390,7 @@ class AnnoDBConfiger:
                     .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         # This is only useful for sqlite
         db.analyze()
+        del s
         if tdir is not None:
             shutil.rmtree(tdir)
         

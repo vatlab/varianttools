@@ -41,7 +41,7 @@ import time
 import tokenize
 import cStringIO
 import gzip
-import sched
+import threading
 
 
 runOptions = {
@@ -157,12 +157,12 @@ class delayedAction:
     if the action finishes very quick, the message will not be displayed.    
     '''
     def __init__(self, func, param, delay=5):
-        self.scheduler = sched.scheduler(time.time, time.sleep)
-        self.event = self.scheduler.enter(delay, 1, func, (param,))
-        self.scheduler.run()
+        self.timer = threading.Timer(delay, func, (param,))
+        self.timer.start()
 
     def __del__(self):
-        self.scheduler.cancel(self.event)
+        self.timer.cancel()
+
 
 from array import array
 try:
@@ -194,7 +194,9 @@ class ProgressBar:
             self.signal_set = True
         except:
             self.term_width = 79
-        self.outputProgress()
+        # display initial output after 1 second, if self.done() is called 
+        # before 1 second, nothing will be displayed.
+        self.action = delayedAction(self.outputProgress, (), 1)
 
     def empty(self, *args, **kwargs):
         return
@@ -236,6 +238,8 @@ class ProgressBar:
         if self.count > 0 and self.count != self.totalCount and cur_time - self.last_time < 1:
             return
         #
+        self.action = False
+        #
         msg = ['', '', '', '', '', '']
         # message
         msg[0] = self.message + ':'
@@ -274,6 +278,10 @@ class ProgressBar:
 
     def done(self):
         '''Finish, output a new line'''
+        if self.action:
+            # do not print anything
+            del self.action
+            return
         if self.totalCount:
             self.count = self.totalCount
         self.outputProgress(done=True)
