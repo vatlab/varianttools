@@ -41,6 +41,7 @@ import time
 import tokenize
 import cStringIO
 import gzip
+import sched
 
 
 runOptions = {
@@ -145,6 +146,23 @@ def typeOfValues(vals):
         except:
             return 'VARCHAR({})'.format(max([len(x) for x in vals]))
 
+class delayedAction:
+    '''Call the passed function with param after a few seconds. It is most often 
+    used to display certain message only if an action takes a long time.
+
+        action = delayedAction(self.logger.info, 'This might take a while', 5)
+        some_action_that_might_take_a_while
+        del action
+
+    if the action finishes very quick, the message will not be displayed.    
+    '''
+    def __init__(self, func, param, delay=5):
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        self.event = self.scheduler.enter(delay, 1, func, (param,))
+        self.scheduler.run()
+
+    def __del__(self):
+        self.scheduler.cancel(self.event)
 
 from array import array
 try:

@@ -32,7 +32,7 @@ import getpass
 import random
 import textwrap
 from collections import namedtuple, defaultdict
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS
+from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'type', 'null', 'comment'])
@@ -534,26 +534,30 @@ class Project:
 
     def createIndexOnMasterVariantTable(self):
         # create indexes
-        # 
-        self.logger.info('Creating index on master variant table. This might take quite a while.')
+        #
+        s = delayedAction(self.logger.info, 'Creating index on master variant table. This might take quite a while.')
         try:
             self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists
             self.logger.debug(e)
+        # the message will not be displayed if index is created within 5 seconds
+        del s
 
     def dropIndexOnMasterVariantTable(self):
         # before bulk inputting data, it is recommended to drop index.
         #
         # NOTE: for mysql, it might be better to use alt index disable/rebuild
         #
-        self.logger.info('Dropping index of master variant table. This might take quite a while.')
+        s = delayedAction(self.logger.info, 'Dropping index of master variant table. This might take quite a while.')
         try:
             # drop index has different syntax for mysql/sqlite3.
             self.db.dropIndex('variant_index', 'variant')
         except Exception as e:
             # the index might not exist
             self.logger.debug(e)
+        #
+        del s
 
     def createVariantTable(self, table):
         '''Create a variant table with name. Fail if a table already exists.
