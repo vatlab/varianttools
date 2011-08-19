@@ -111,7 +111,7 @@ def associate(args, reverse=False):
                 for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
                     if (tbl.lower(), conn.lower()) not in processed:
                         from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                        where_clause.append('()'.format(conn))
+                        where_clause.append('({})'.format(conn))
                         processed.add((tbl.lower(), conn.lower()))
                 where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
                 # select disinct fields
@@ -136,10 +136,23 @@ def associate(args, reverse=False):
                     else:
                         proj.createVariantTable(vtable, temporary=True)
                     #
-                    where_clause += ' AND ' + ', '.join(['{}={}'.format(x, proj.db.PH) for x in group_fields])
-                    query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {}'.format(from_clause, where_clause)
-                    cur = proj.db.cursor()
-                    cur.execute(query)
+                    group_fields, fields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
+                    from_clause = args.table
+                    where_clause = []
+                    fields_info = sum([proj.linkFieldToTable(x, args.table) for x in fields], [])
+                    #
+                    processed = set()
+                    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                        if (tbl.lower(), conn.lower()) not in processed:
+                            from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                            where_clause.append('({})'.format(conn))
+                            processed.add((tbl.lower(), conn.lower()))
+                    link_where = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
+                    where_clause = (link_where + ' AND ' if link_where else 'WHERE ') +\
+                        ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in fields])
+                    query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {} {};'.format(from_clause, where_clause)
+                    proj.logger.debug('Running query {}'.format(query))
+                    cur.execute(query, groups[i])
                 else:
                     vtable = args.table
                 # 
@@ -158,6 +171,7 @@ def associate(args, reverse=False):
                     proj.logger.debug('Running query {}'.format(query))
                     cur.execute(query)
                     genotype[ID] = cur.fetchall()
+                    # proj.logger.info(str(ID) + str(genotype[ID]))
                 #
                 # passing everything to association test
                 for test in tests:
@@ -203,6 +217,7 @@ class NullTest:
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
+        self.t = c_level_class(self.phenotype, self.genotype)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
@@ -222,15 +237,16 @@ class NullTest:
 
     def setPhenotype(self, data):
         '''Set phenotype data'''
-        self.phenotype = data
+        self.t.setPhenotype(data)
 
     def setGenotype(self, data):
         self.genotype = data
 
-
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant'''
+        self.t.permute()
+        return t.calculate()
         self.logger.info('Phenotype: {}'.format(len(self.phenotype)))
         self.logger.info('Genotype: {}'.format(len(self.genotype)))
         return 1
