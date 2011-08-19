@@ -162,7 +162,10 @@ class Importer:
         return sample_ids
         
     def addVariant(self, cur, chr, pos, ref, alt):
-        #
+        # this is usually the case but some badly formatted
+        # vcf file use small case for variants
+        ref = ref.upper()
+        alt = alt.upper()
         # if chr, pos are from alternative reference genome
         if self.import_alt_build:
             # actual meaning of chr and pos

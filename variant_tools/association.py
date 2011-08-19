@@ -26,63 +26,13 @@
 
 import sys
 from .project import Project
-from .utils import ProgressBar
+from .utils import ProgressBar, consolidateFieldName
 from .sample import Sample
 import argparse
 
 
-class AssoTest:
-    '''A base class that defines a common interface for association
-    statistics calculator. Instances of these calculators will be created
-    by vtools during command 'vtools asscoaition'. The results will be
-    automatically inserted back to related variant tables. A association
-    statistics calculator will have several data structures that stores
-        1. phenotype
-        2. genotype
-        3. annotation
-    These structures should not be changed during the calculation.
-    '''
-    def __init__(self, logger=None, name=None, *method_args):
-        '''Args is arbitrary arguments, might need an additional parser to 
-        parse it'''
-        self.phenotype = None
-        self.genotype = None
-        self.annotation = None
-        self.logger = logger
-        self.name = name
-        self.parseArgs(*method_args)
-
-    def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''A base association test method
-            test does nothing, but can be used to measure the performance of 
-            retrieving data from vtools.''',
-            prog='vtools associate --method ' + self.name)
-        # no argumant is added
-        args = parser.parse_args(method_args)
-        # incorporate args to this class
-        self.__dict__.update(vars(args))
-            
-    def setData(self, phenotype=None, genotype=None, annotation=None):
-        '''Set or update internal data structure. These variables are set
-        separately because it is likely that only some of them needs update.'''
-        if self.phenotype is not None:
-            self.phenotype = phenotype
-        if self.genotype is not None:
-            self.genotype = genotype
-        if annotation is not None:
-            self.annotation = annotation
-
-    def caclulate(self):
-        '''Calculate and return p-values. It can be either a single value
-        for all variants, or a list of p-values for each variant'''
-        return None
-
-def getAllTests():
-    '''Find all subclasses of AssoTest'''
-    return [name for name,obj in globals().iteritems() if type(obj) == type(AssoTest) and issubclass(obj, AssoTest)]
-
 def associateArguments(parser):
-    parser.add_argument('variants', help='''Variant table.''')
+    parser.add_argument('table', help='''Variant table.''')
     parser.add_argument('phenotype', nargs='+',
         help='''A list of phenotypes that will be passed to the association
             statistics calculator''')
@@ -111,10 +61,10 @@ def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # table?
-            if not proj.isVariantTable(args.variants):
-                raise ValueError('Variant table {} does not exist.'.format(args.variants))
+            if not proj.isVariantTable(args.table):
+                raise ValueError('Variant table {} does not exist.'.format(args.table))
             #
-            # step 0: get objects that subclasses of  AssoTest
+            # step 0: get objects that subclasses NullTest
             if not args.methods:
                 raise ValueError('Please specify at least a statistical tests. Available statistical tests are {}'.format(', '.join(getAllTests())))
             tests = []
@@ -123,48 +73,177 @@ def associate(args, reverse=False):
                 m_args = m.split()[1:] + args.unknown_args
                 try:
                     method = eval(m_name)
-                    if not issubclass(method, AssoTest):
-                        raise ValueError('Class {} is not a subclass of AssoTest'.format(m_name))
+                    if not issubclass(method, NullTest):
+                        raise ValueError('Class {} is not a subclass of NullTest'.format(m_name))
                     tests.append(method(proj.logger, m_name, m_args))
                 except NameError as e:
                     proj.logger.debug(e)
                     raise ValueError('Could not identify a statistical method {}. Please specify one of {}.'.format(m_name,
                         ', '.join(getAllTests())))
+            #
+            cur = proj.db.cursor()
             # step 1: handle --samples
-            IDs = None
+            p = Sample(proj)
             if args.samples:
-                p = Sample(proj)
                 IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
-                    p.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
+                    raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
                 else:
                     p.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+            else:
+                # select all samples
+                IDs = p.selectSampleByPhenotype('1')
             #
             # step 2: collect phenotype
-            stat.setData(phenotype=None)
+            pheno = p.phenotypeOfSamples(args.samples, args.phenotype)
+            for test in tests:
+                test.setPhenotype(pheno)
             #
-            # step 3: handle group_by --- ignored for now
+            # step 3: handle group_by
+            groups = ['all']
+            if args.group_by:
+                group_fields, fields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
+                from_clause = args.table
+                where_clause = []
+                fields_info = sum([proj.linkFieldToTable(x, args.table) for x in fields], [])
+                #
+                processed = set()
+                for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                    if (tbl.lower(), conn.lower()) not in processed:
+                        from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                        where_clause.append('()'.format(conn))
+                        processed.add((tbl.lower(), conn.lower()))
+                where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
+                # select disinct fields
+                query = 'SELECT {} FROM {} {};'.format(', '.join(['DISTINCT ' + x for x in fields]),
+                    from_clause, where_clause)
+                proj.logger.debug('Running query {}'.format(query))
+                # get group by
+                cur = proj.db.cursor()
+                cur.execute(query)
+                groups = cur.fetchall()
+                proj.logger.info('Find {} groups'.format(len(groups)))
+                proj.logger.debug('Group by: {}'.format(', '.join([str(x) for x in groups])))
+            #
+            # select variants:
             # for each group
-            for i in range(1):
-                # prog = ProgressBar(i, 100)
-            #
-            #     step 4: collect genotype
-                stat.setData(genotype=None) 
-            #
-            #     step 5: collect annotation
-                stat.setData(annotation=None)
-            #
-            #     step 6: call stat.calculate
-            #     NOTE: need to define a callback function
-                values = stat.calculate()
-            #
-            #     step 7: update variant table
-            #
+            proj.db.attach(proj.name + '_genotype')
+            for i in range(len(groups)):
+                if args.group_by:
+                    vtable = '__asso_tmp'
+                    if proj.db.hasTable(vtable):
+                        proj.db.truncateTable(vtable)
+                    else:
+                        proj.createVariantTable(vtable, temporary=True)
+                    #
+                    where_clause += ' AND ' + ', '.join(['{}={}'.format(x, proj.db.PH) for x in group_fields])
+                    query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {}'.format(from_clause, where_clause)
+                    cur = proj.db.cursor()
+                    cur.execute(query)
+                else:
+                    vtable = args.table
+                # 
+                # collect annotation
+                #  --- ignored for now
+                #
+                nVariant = proj.db.numOfRows(vtable)
+                if nVariant == 0:
+                    # this should not happen
+                    proj.logger.info('No variant exists for group {}. Ignoring.'.format(', '.join(groups[i])))
+                # selecting variants from each sample
+                genotype = {}
+                for ID in IDs:
+                    query = 'SELECT variant_id, variant_type FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                        .format(proj.name, ID, vtable)
+                    proj.logger.debug('Running query {}'.format(query))
+                    cur.execute(query)
+                    genotype[ID] = cur.fetchall()
+                #
+                # passing everything to association test
+                for test in tests:
+                    #
+                    test.setGenotype(genotype)
+                    #
+                    # step 6: call stat.calculate
+                    values = test.calculate()
+                    # step 7: update variant table
+                    fields = test.getOption('fields')
+                    # ...
     except Exception as e:
         sys.exit(e) 
 
 
-class WssTest(AssoTest):
+#
+#
+# Statistical Association tests. The first one is a NullTest that provides
+# some utility function and define an interface. All statistical tests should
+# subclass from this class.
+#
+def getAllTests():
+    '''List all tests (all classes that subclasses of NullTest) in this module'''
+    return [name for name,obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
+
+class NullTest:
+    '''A base class that defines a common interface for association
+    statistics calculator. Instances of these calculators will be created
+    by vtools during command 'vtools asscoaition'. The results will be
+    automatically inserted back to related variant tables. An association
+    statistics calculator will have several data structures that stores
+        1. phenotype
+        2. genotype
+        3. annotation
+    These structures should not be changed during the calculation.
+    '''
+    def __init__(self, logger=None, name=None, *method_args):
+        '''Args is arbitrary arguments, might need an additional parser to 
+        parse it'''
+        self.phenotype = None
+        self.genotype = None
+        self.annotation = None
+        self.logger = logger
+        self.name = name
+        self.parseArgs(*method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''A base association test method
+            test does nothing, but can be used to measure the performance of 
+            retrieving data from vtools.''',
+            prog='vtools associate --method ' + self.name)
+        # no argumant is added
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+    
+    def getOption(self, name):
+        '''Get option for the association test.'''
+        if name == 'fields':
+            # the null test does not set any field
+            return []
+
+    def setPhenotype(self, data):
+        '''Set phenotype data'''
+        self.phenotype = data
+
+    def setGenotype(self, data):
+        self.genotype = data
+
+
+    def calculate(self):
+        '''Calculate and return p-values. It can be either a single value
+        for all variants, or a list of p-values for each variant'''
+        self.logger.info('Phenotype: {}'.format(len(self.phenotype)))
+        self.logger.info('Genotype: {}'.format(len(self.genotype)))
+        return 1
+
+class ExternTest(NullTest):
+    '''A test that exports data in standard formats, call an external program
+    and prase its output. This is the simplest, but also the slowest method
+    to utilize a third-party association test program.
+    '''
+    def __init__(self):
+        pass
+
+class WssTest(NullTest):
     def __init__(self, phenotypes, genotypes, covariates, annotations, mode, weightingTheme):
         self.y = phenotypes
         self.x = genotypes

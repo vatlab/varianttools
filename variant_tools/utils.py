@@ -483,10 +483,10 @@ class DatabaseEngine:
                     return [x[0] for x in cur.fetchall()]
             else:
                 if dbName is None:
-                    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                    cur.execute("SELECT name FROM sqlite_master UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';")
                     return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
                 else:
-                    cur.execute("SELECT name FROM {}.sqlite_master WHERE type='table';".format(dbName))
+                    cur.execute("SELECT name FROM {0}.sqlite_master UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';".format(dbName))
                     return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
         except:
             return []
@@ -519,7 +519,7 @@ class DatabaseEngine:
     def truncateTable(self, table):
         '''Clear all record in a table'''
         cur = self.database.cursor()
-        cur.execute('DELETE FROM {};'.format(table)
+        cur.execute('DELETE FROM {};'.format(table))
         self.database.commit()
     
     def renameTable(self, fromTable, toTable):

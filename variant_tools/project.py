@@ -567,7 +567,7 @@ class Project:
         self.logger.debug('Creating table {}'.format(table))
         self.db.execute('''CREATE {0} TABLE {1} (
                 variant_id INTEGER PRIMARY KEY
-            );'''.format('TEMPORARY' if temp else '', table))
+            );'''.format('TEMPORARY' if temporary else '', table))
         self.db.commit()
 
     def createSampleTableIfNeeded(self, fields=[], table='sample'):

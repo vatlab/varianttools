@@ -108,6 +108,21 @@ class Sample:
         except Exception as e:
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
+    def phenotypeOfSamples(self, cond, phenotype):
+        '''Return specified phenotypes for individuals.'''
+        cur = self.db.cursor()
+        try:
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(phenotype)) + \
+                (' WHERE {}'.format(' AND '.join(cond)) if cond else '') + ';'
+            self.logger.debug('Select phenotype using query')
+            self.logger.debug(query)
+            cur.execute(query)
+            return cur.fetchall()
+        except Exception as e:
+            raise ValueError('Failed to retrieve phenotype '.format(', '.join(phenotype)))
+
+
+
     def calcSampleStat(self, IDs, variant_table, num, freq, hom, het, other, depth):
         '''Count sample allele frequency etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
