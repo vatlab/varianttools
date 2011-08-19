@@ -26,12 +26,12 @@
 
 import sys
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount
+from .utils import ProgressBar
 from .sample import Sample
 import argparse
 
 
-class BaseAssoTest:
+class AssoTest:
     '''A base class that defines a common interface for association
     statistics calculator. Instances of these calculators will be created
     by vtools during command 'vtools asscoaition'. The results will be
@@ -76,7 +76,10 @@ class BaseAssoTest:
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant'''
         return None
-        
+
+def getAllTests():
+    '''Find all subclasses of AssoTest'''
+    return [name for name,obj in globals().iteritems() if type(obj) == type(AssoTest) and issubclass(obj, AssoTest)]
 
 def associateArguments(parser):
     parser.add_argument('variants', help='''Variant table.''')
@@ -93,7 +96,8 @@ def associateArguments(parser):
             --method "m --field mp" "m1 --permute 10000 --field m1p"), although
             the common method parameters can be specified separately, as long as
             they do not conflict with command arguments. (e.g. --method m1 m2 -p 10 
-            is equivalent to --method "m1 -p 10" "m2 -p 10".)''')
+            is equivalent to --method "m1 -p 10" "m2 -p 10".). Available statistical
+            tests are {}.'''.format(', '.join(getAllTests())))
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -110,12 +114,31 @@ def associate(args, reverse=False):
             if not proj.isVariantTable(args.variants):
                 raise ValueError('Variant table {} does not exist.'.format(args.variants))
             #
-            # step 0: find a subclass of the BaseAssociationStat
+            # step 0: get objects that subclasses of  AssoTest
+            if not args.methods:
+                raise ValueError('Please specify at least a statistical tests. Available statistical tests are {}'.format(', '.join(getAllTests())))
+            tests = []
             for m in args.methods:
                 m_name = m.split()[0]
                 m_args = m.split()[1:] + args.unknown_args
-                stat = BaseAssociationStat(proj.logger, m_name, m_args)
+                try:
+                    method = eval(m_name)
+                    if not issubclass(method, AssoTest):
+                        raise ValueError('Class {} is not a subclass of AssoTest'.format(m_name))
+                    tests.append(method(proj.logger, m_name, m_args))
+                except NameError as e:
+                    proj.logger.debug(e)
+                    raise ValueError('Could not identify a statistical method {}. Please specify one of {}.'.format(m_name,
+                        ', '.join(getAllTests())))
             # step 1: handle --samples
+            IDs = None
+            if args.samples:
+                p = Sample(proj)
+                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
+                if len(IDs) == 0:
+                    p.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
+                else:
+                    p.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
             #
             # step 2: collect phenotype
             stat.setData(phenotype=None)
@@ -141,7 +164,7 @@ def associate(args, reverse=False):
         sys.exit(e) 
 
 
-class WssTest(BaseAssoTest):
+class WssTest(AssoTest):
     def __init__(self, phenotypes, genotypes, covariates, annotations, mode, weightingTheme):
         self.y = phenotypes
         self.x = genotypes
