@@ -559,15 +559,15 @@ class Project:
         #
         del s
 
-    def createVariantTable(self, table):
+    def createVariantTable(self, table, temporary=False):
         '''Create a variant table with name. Fail if a table already exists.
         '''
         if table == 'variant':
             raise ValueError('This function cannot be used to create a master variant table')
         self.logger.debug('Creating table {}'.format(table))
-        self.db.execute('''CREATE TABLE {0} (
+        self.db.execute('''CREATE {0} TABLE {1} (
                 variant_id INTEGER PRIMARY KEY
-            );'''.format(table))
+            );'''.format('TEMPORARY' if temp else '', table))
         self.db.commit()
 
     def createSampleTableIfNeeded(self, fields=[], table='sample'):

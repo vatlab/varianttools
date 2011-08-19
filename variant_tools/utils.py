@@ -515,6 +515,12 @@ class DatabaseEngine:
             # NOTE: It seems that re-generating a table can be VERY slow without vacuum.
         #    cur.execute('VACUUM;')
         self.database.commit()
+
+    def truncateTable(self, table):
+        '''Clear all record in a table'''
+        cur = self.database.cursor()
+        cur.execute('DELETE FROM {};'.format(table)
+        self.database.commit()
     
     def renameTable(self, fromTable, toTable):
         '''Rename a table from fromTable to toTable'''
