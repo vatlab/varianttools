@@ -273,14 +273,17 @@ class ProgressBar:
                 msg[2] = ' [{}>{}]'.format('=' * front,  ' ' * back)
         # use stderr to avoid messing up process output
         sys.stderr.write('\r' + ''.join(msg))
-        # stderr is not buffer... so this is not needed
-        #sys.stderr.flush()
 
     def done(self):
         '''Finish, output a new line'''
         if self.action:
-            # do not print anything
+            # do not a progress bar
             del self.action
+            # but print title and total count
+            if self.totalCount:
+                sys.stderr.write('{}: {:,}\n'.format(self.message, self.totalCount)
+            else:
+                sys.stderr.write('{}\n'.format(self.message)
             return
         if self.totalCount:
             self.count = self.totalCount
