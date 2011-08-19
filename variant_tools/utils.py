@@ -281,9 +281,9 @@ class ProgressBar:
             del self.action
             # but print title and total count
             if self.totalCount:
-                sys.stderr.write('{}: {:,}\n'.format(self.message, self.totalCount)
+                sys.stderr.write('{}: {:,}\n'.format(self.message, self.totalCount))
             else:
-                sys.stderr.write('{}\n'.format(self.message)
+                sys.stderr.write('{}\n'.format(self.message))
             return
         if self.totalCount:
             self.count = self.totalCount

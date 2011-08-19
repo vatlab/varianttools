@@ -167,7 +167,10 @@ if __name__ == '__main__':
     #
     # command associate
     parser = subparsers.add_parser('associate',
-        help='''Test association between variants and phenotypes''')
+        #FIXME: more description for vtools commands
+        help='''Test association between variants and phenotypes''',
+        description='''Call one or more statistical association tests and
+        return test results as fields to variants tested.''')
     association.associateArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=association.associate)
