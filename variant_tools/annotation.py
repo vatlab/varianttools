@@ -34,7 +34,7 @@ import zipfile
 import tempfile
 
 from project import AnnoDB, Project, Field
-from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction
+from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded
 
 
 class AnnoDBConfiger:
@@ -444,7 +444,11 @@ def use(args):
             res = urlparse.urlsplit(args.source)
             if not res.scheme:
                 # if a local file?
-                annoDB = args.source
+                s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source))
+                # do not remove local .gz file. Perhaps this is a script and we do not want to
+                # break that.
+                annoDB = decompressIfNeeded(args.source, inplace=False)
+                del s
             else:
                 # download?
                 if proj.db.engine == 'mysql':
@@ -453,6 +457,10 @@ def use(args):
                 proj.logger.info('Downloading annotation database from {}'.format(URL))
                 try:
                     annoDB = downloadFile(annoDB, '.')
+                    s = delayedAction(proj.logger.info, 'Decompressing {}'.format(annoDB))
+                    # for downloaded file, we decompress inplace
+                    annoDB = decompressIfNeeded(annoDB, inplace=True)
+                    del s
                 except Exception as e:
                     proj.logger.debug(e)
                     proj.logger.info('Failed to download database.')

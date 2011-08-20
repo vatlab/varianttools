@@ -291,6 +291,25 @@ class ProgressBar:
         sys.stderr.write('\n')
         sys.stderr.flush()
 
+def decompressIfNeeded(filename, inplace=True):
+    '''Decompress a file.gz and return file if needed'''
+    if filename.lower().endswith('.gz'):
+        new_filename = filename[:-3]
+        with gzip.open(filename, 'rb') as input, open(new_filename, 'wb') as output:
+            buffer = input.read(100000)
+            while buffer:
+                output.write(buffer)
+                buffer = input.read(100000)
+        #
+        if inplace:
+            try:
+                os.remove(filename)
+            except:
+                pass
+        return new_filename
+    else:
+        return filename
+
 #
 # Well, it is not easy to do reliable download
 # 
