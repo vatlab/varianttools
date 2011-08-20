@@ -182,7 +182,7 @@ def associate(args, reverse=False):
             # step 3: handle group_by
             asso.identifyGroups(args.group_by)
             proj.db.attach(proj.name + '_genotype')
-            for grp in asso.groups:
+            for grp in asso.groups: 
                 # select variants from each group:
                 vtable = asso.getVariants(grp)
                 # passing everything to association test
