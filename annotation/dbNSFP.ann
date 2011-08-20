@@ -51,7 +51,7 @@ hg18=chr, hg18pos, ref, alt
 hg19=chr, hg19pos, ref, alt
 
 [data sources]
-description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH
+description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" if you find this database useful.
 version=1.1_0 
 anno_type=variant
 direct_url=https://cge.mdanderson.org/~bpeng1/User/annoDB/dbNSFP.DB

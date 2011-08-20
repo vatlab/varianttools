@@ -34,6 +34,11 @@ import textwrap
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction
 
+VTOOLS_VERSION = '1.0'
+VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
+VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
+VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
+
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'type', 'null', 'comment'])
 #
@@ -258,7 +263,7 @@ class Project:
         self.proj_file = self.name + '.proj'
         # version of vtools, useful when opening a project created by a previous
         # version of vtools.
-        self.version = '1.0'
+        self.version = VTOOLS_VERSION
         #
         # set global verbosity level
         setOptions(verbosity=verbosity)
@@ -303,6 +308,8 @@ class Project:
     def create(self, **kwargs):
         '''Create a new project'''
         # open the project file
+        self.logger.info(VTOOLS_COPYRIGHT)
+        self.logger.info(VTOOLS_CONTACT)
         self.logger.info('Creating a new project {}'.format(self.name))
         self.db = DatabaseEngine(engine='sqlite3', batch=kwargs.get('batch', 10000))
         self.db.connect(self.proj_file)
@@ -399,6 +406,7 @@ class Project:
         # DBs in different paths but with the same name are considered to be the same.
         if db.name not in [x.name for x in self.annoDB]:
             self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
+            self.logger.info(db.description)
             self.annoDB.append(db)
             self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
             self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
@@ -694,7 +702,7 @@ class Project:
         info += 'Database engine:             {}\n'.format(self.db.engine)
         info += 'Variant tables:              {}\n'.format(', '.join(self.getVariantTables()))
         info += 'Annotation databases:        {}\n'.format(', '.join([os.path.join(x.dir, x.name) \
-            + ('({})'.format(x.version) if x.version else '') for x in self.annoDB]))
+            + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]))
         return info
 
     #
