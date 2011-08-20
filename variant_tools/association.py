@@ -57,127 +57,138 @@ def associateArguments(parser):
             into groups and are tested one by one.''')
 
 
+class AssociationTester(Sample):
+    def __init__(self, proj, table):
+        Sample.__init__(self, proj)
+        # table?
+        if not self.proj.isVariantTable(table):
+            raise ValueError('Variant table {} does not exist.'.format(table))
+        self.table = table
+
+    def getAssoTests(self, methods, common_args):
+        '''Get a list of methods from parameter methods, passing method specific and common 
+        args to its constructor. This function sets self.tests as a list of statistical tests'''
+        if not methods:
+            raise ValueError('Please specify at least a statistical tests. Available statistical tests are {}'.format(', '.join(getAllTests())))
+        self.tests = []
+        for m in methods:
+            name = m.split()[0]
+            args = m.split()[1:] + common_args
+            try:
+                method = eval(name)
+                self.tests.append(method(self.logger, name, args))
+            except NameError as e:
+                self.logger.debug(e)
+                raise ValueError('Could not identify a statistical method {}. Please specify one of {}.'.format(name,
+                    ', '.join(getAllTests())))
+
+    def getSamples(self, condition):
+        '''Get a list of samples from specified condition. This function sets self.IDs'''
+        if condition:
+            self.IDs = self.selectSampleByPhenotype(' AND '.join(condition))
+            if len(self.IDs) == 0:
+                raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(condition)))
+            else:
+                self.logger.info('{} condition are selected by condition: {}'.format(len(self.IDs), ' AND '.join(condition)))
+        else:
+            # select all condition
+            self.IDs = self.selectSampleByPhenotype('1')
+
+    def getPhenotype(self, condition, phenotype):
+        '''Get phenotype for specified samples (specified by condition).'''
+        try:
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(phenotype)) + \
+                (' WHERE {}'.format(' AND '.join(condition)) if condition else '') + ';'
+            self.logger.debug('Select phenotype using query {}'.format(query))
+            cur = self.db.cursor()
+            cur.execute(query)
+            self.phenotype = cur.fetchall()
+        except Exception as e:
+            self.logger.debug(e)
+            raise ValueError('Failed to retrieve phenotype '.format(', '.join(phenotype)))
+
+    def identifyGroups(self, group_by):
+        '''Get a list of groups according to group_by fields'''
+        self.group_by = group_by
+        if not group_by:
+            self.groups = ['all']
+        else:
+            group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
+            self.from_clause = self.table
+            where_clause = []
+            fields_info = sum([self.proj.linkFieldToTable(x, args.table) for x in fields], [])
+            #
+            processed = set()
+            for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                if (tbl.lower(), conn.lower()) not in processed:
+                    self.from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                    where_clause.append('({})'.format(conn))
+                    processed.add((tbl.lower(), conn.lower()))
+            #
+            self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
+            # select disinct fields
+            query = 'SELECT {} FROM {} {};'.format(', '.join(['DISTINCT ' + x for x in fields]),
+                self.from_clause, self.where_clause)
+            self.logger.debug('Running query {}'.format(query))
+            # get group by
+            cur = self.db.cursor()
+            cur.execute(query)
+            self.groups = cur.fetchall()
+            self.logger.info('Find {} groups'.format(len(self.groups)))
+            self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
+
+    def getVariants(self, group):
+        '''Get variants for a certain group'''
+        if not self.group_by:
+            # group must be 'all'
+            return self.table
+        vtable = '__asso_tmp'
+        if self.db.hasTable(vtable):
+            self.db.truncateTable(vtable)
+        else:
+            self.createVariantTable(vtable, temporary=True)
+        #
+        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in fields])
+        query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {} {};'.format(self.from_clause, where_clause)
+        self.logger.debug('Running query {}'.format(query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        return vtable
+
+    def getGenotype(self, vtable):
+        '''Get genotype for variants in specified table'''
+        genotype = {}
+        cur = self.db.cursor()
+        for ID in self.IDs:
+            query = 'SELECT variant_id, variant_type FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(self.proj.name, ID, vtable)
+            self.logger.debug('Running query {}'.format(query))
+            cur.execute(query)
+            genotype[ID] = cur.fetchall()
+        return genotype
+
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            # table?
-            if not proj.isVariantTable(args.table):
-                raise ValueError('Variant table {} does not exist.'.format(args.table))
-            #
-            # step 0: get objects that subclasses NullTest
-            if not args.methods:
-                raise ValueError('Please specify at least a statistical tests. Available statistical tests are {}'.format(', '.join(getAllTests())))
-            tests = []
-            for m in args.methods:
-                m_name = m.split()[0]
-                m_args = m.split()[1:] + args.unknown_args
-                try:
-                    method = eval(m_name)
-                    if not issubclass(method, NullTest):
-                        raise ValueError('Class {} is not a subclass of NullTest'.format(m_name))
-                    tests.append(method(proj.logger, m_name, m_args))
-                except NameError as e:
-                    proj.logger.debug(e)
-                    raise ValueError('Could not identify a statistical method {}. Please specify one of {}.'.format(m_name,
-                        ', '.join(getAllTests())))
-            #
-            cur = proj.db.cursor()
-            # step 1: handle --samples
-            p = Sample(proj)
-            if args.samples:
-                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
-                if len(IDs) == 0:
-                    raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
-                else:
-                    p.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
-            else:
-                # select all samples
-                IDs = p.selectSampleByPhenotype('1')
-            #
-            # step 2: collect phenotype
-            pheno = p.phenotypeOfSamples(args.samples, args.phenotype)
-            for test in tests:
-                test.setPhenotype(pheno)
-            #
+            asso = AssociationTester(proj, args.table)
+            # step 0: get testers
+            asso.getAssoTests(args.methods, args.unknown_args)
+            # step 1: get samples
+            asso.getSamples(args.samples)
+            # step 2: get phenotype and set it to everyone
+            asso.getPhenotype(args.samples, args.phenotype)
+            for test in asso.tests:
+                test.setPhenotype(asso.phenotype)
             # step 3: handle group_by
-            groups = ['all']
-            if args.group_by:
-                group_fields, fields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
-                from_clause = args.table
-                where_clause = []
-                fields_info = sum([proj.linkFieldToTable(x, args.table) for x in fields], [])
-                #
-                processed = set()
-                for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-                    if (tbl.lower(), conn.lower()) not in processed:
-                        from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                        where_clause.append('({})'.format(conn))
-                        processed.add((tbl.lower(), conn.lower()))
-                where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
-                # select disinct fields
-                query = 'SELECT {} FROM {} {};'.format(', '.join(['DISTINCT ' + x for x in fields]),
-                    from_clause, where_clause)
-                proj.logger.debug('Running query {}'.format(query))
-                # get group by
-                cur = proj.db.cursor()
-                cur.execute(query)
-                groups = cur.fetchall()
-                proj.logger.info('Find {} groups'.format(len(groups)))
-                proj.logger.debug('Group by: {}'.format(', '.join([str(x) for x in groups])))
-            #
-            # select variants:
-            # for each group
+            asso.identifyGroups(args.group_by)
             proj.db.attach(proj.name + '_genotype')
-            for i in range(len(groups)):
-                if args.group_by:
-                    vtable = '__asso_tmp'
-                    if proj.db.hasTable(vtable):
-                        proj.db.truncateTable(vtable)
-                    else:
-                        proj.createVariantTable(vtable, temporary=True)
-                    #
-                    group_fields, fields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
-                    from_clause = args.table
-                    where_clause = []
-                    fields_info = sum([proj.linkFieldToTable(x, args.table) for x in fields], [])
-                    #
-                    processed = set()
-                    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-                        if (tbl.lower(), conn.lower()) not in processed:
-                            from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                            where_clause.append('({})'.format(conn))
-                            processed.add((tbl.lower(), conn.lower()))
-                    link_where = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
-                    where_clause = (link_where + ' AND ' if link_where else 'WHERE ') +\
-                        ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in fields])
-                    query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {} {};'.format(from_clause, where_clause)
-                    proj.logger.debug('Running query {}'.format(query))
-                    cur.execute(query, groups[i])
-                else:
-                    vtable = args.table
-                # 
-                # collect annotation
-                #  --- ignored for now
-                #
-                nVariant = proj.db.numOfRows(vtable)
-                if nVariant == 0:
-                    # this should not happen
-                    proj.logger.info('No variant exists for group {}. Ignoring.'.format(', '.join(groups[i])))
-                # selecting variants from each sample
-                genotype = {}
-                for ID in IDs:
-                    query = 'SELECT variant_id, variant_type FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                        .format(proj.name, ID, vtable)
-                    proj.logger.debug('Running query {}'.format(query))
-                    cur.execute(query)
-                    genotype[ID] = cur.fetchall()
-                    # proj.logger.info(str(ID) + str(genotype[ID]))
-                #
+            for grp in asso.groups:
+                # select variants from each group:
+                vtable = asso.getVariants(grp)
                 # passing everything to association test
+                genotype = asso.getGenotype(vtable)
                 for test in tests:
-                    #
                     test.setGenotype(genotype)
-                    #
                     # step 6: call stat.calculate
                     values = test.calculate()
                     # step 7: update variant table
@@ -185,7 +196,6 @@ def associate(args, reverse=False):
                     # ...
     except Exception as e:
         sys.exit(e) 
-
 
 #
 #
@@ -217,7 +227,6 @@ class NullTest:
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
-        self.t = c_level_class(self.phenotype, self.genotype)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
