@@ -160,7 +160,7 @@ def select(args, reverse=False):
                 p = Sample(proj)
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
-                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
+                IDs = proj.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
                     p.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
                 else:

@@ -692,6 +692,29 @@ class Project:
         self.logger.info('Removing table {} (this might take a while)'.format(table))
         self.db.removeTable(table)
 
+    def selectSampleByPhenotype(self, cond):
+        '''Select samples by conditions such as "aff=1"'''
+        cur = self.db.cursor()
+        try:
+            query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {};'.format(cond)
+            self.logger.debug('Select samples using query')
+            self.logger.debug(query)
+            cur.execute(query)
+            return set([x[0] for x in cur.fetchall()])
+        except Exception as e:
+            self.logger.debug(e)
+            raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
+
+    def removeSample(self, ID):
+        '''Remove sample and their genotype, but not variants'''
+        cur = self.db.cursor()
+        cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = {};'.format(self.db.PH), (ID,))
+        res = cur.fetchone()
+        self.logger.info('Removing sample {} from file {}'.format(res[1], res[0]))
+        cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
+        self.db.commit()
+        self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
+        
     def summarize(self):
         '''Summarize key features of the project
         '''
@@ -977,7 +1000,9 @@ def removeArguments(parser):
     parser.add_argument('items', nargs='*',
         help='''Items to be removed. It can be the name of project for type
             project (optional), names of one or more variant tables for
-            type table, a pattern for type 'samples', a name of a field.''')
+            type table, a pattern for type 'samples', a name of a field. Note that
+            removal of samples will only remove sample information related to variants,
+            not variants themselves.''')
     
 
 def remove(args):
@@ -991,9 +1016,12 @@ def remove(args):
                 for table in args.items:
                     proj.removeVariantTable(table)
             elif args.type == 'samples':
-                # NOTE: we should move function selectSampleByPhenotype
-                # to the Project class in order to implement this feature.
-                raise ValueError("This feature has not been implemented.")
+                if len(args.items) == 0:
+                    raise ValueError('Please specify conditions to select samples to be removed')
+                proj.db.attach(proj.name + '_genotype')
+                IDs = proj.selectSampleByPhenotype(' AND '.join(args.items))
+                for ID in IDs:
+                    proj.removeSample(ID)
             elif args.type == 'field':
                 from_table = defaultdict(list)
                 for item in args.items:

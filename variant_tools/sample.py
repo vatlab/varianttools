@@ -96,18 +96,6 @@ class Sample:
         self.proj.db.renameTable(temp_table_name, 'sample')
         self.db.commit()
 
-    def selectSampleByPhenotype(self, cond):
-        '''Select samples by conditions such as "aff=1"'''
-        cur = self.db.cursor()
-        try:
-            query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {};'.format(cond)
-            self.logger.debug('Select samples using query')
-            self.logger.debug(query)
-            cur.execute(query)
-            return set([x[0] for x in cur.fetchall()])
-        except Exception as e:
-            raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
-
     def calcSampleStat(self, IDs, variant_table, num, freq, hom, het, other, depth):
         '''Count sample allele frequency etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
@@ -263,7 +251,7 @@ def sampleStat(args):
             p = Sample(proj)
             IDs = None
             if args.samples:
-                IDs = p.selectSampleByPhenotype(' AND '.join(args.samples))
+                IDs = proj.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
                     p.logger.info('No sample is selected (or available)')
                     return

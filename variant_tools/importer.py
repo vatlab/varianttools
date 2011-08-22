@@ -34,7 +34,7 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin
 
 class Importer:
     '''A general class for importing variants'''
-    def __init__(self, proj, files, build):
+    def __init__(self, proj, files, build, force):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
@@ -50,7 +50,18 @@ class Importer:
         for f in files:
             filename = os.path.split(f)[-1]
             if filename in existing_files:
-                self.logger.info('Ignoring imported file {}'.format(filename))
+                if force:
+                    self.logger.info('Re-importing imported file {}'.format(filename))
+                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                    for ID in IDs:
+                        proj.removeSample(ID)
+                    # remove file record
+                    cur = self.db.cursor()
+                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
+                    self.db.commit()
+                    self.files.append(f)
+                else:
+                    self.logger.info('Ignoring imported file {}'.format(filename))
             else:
                 self.files.append(f)
         # for all record, new SNV, insertion, deletion, complex variants, and invalid record
@@ -278,12 +289,12 @@ class vcfImporter(Importer):
     an individual will have two variants with different alternative
     alleles, each with a type -1. That it to say, allele frequency should
     be calculated as sum (abs(type))/ (2*num_of_sample). '''
-    def __init__(self, proj, files, build=None, variant_only=False, info=[]):
+    def __init__(self, proj, files, build=None, variant_only=False, info=[], force=False):
         '''see importVariant.py -h for details about parameters. Additional
         keyword paramters such as user, passwd and host are passed to
         MySQLdb.connect.
         '''
-        Importer.__init__(self, proj, files, build)
+        Importer.__init__(self, proj, files, build, force)
         # vcf tools only support DP for now
         self.variant_only = variant_only
         self.import_depth = 'DP' in info
@@ -454,8 +465,8 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, col, build, delimiter, zero):
-        Importer.__init__(self, proj, files, build)
+    def __init__(self, proj, files, col, build, delimiter, zero, force):
+        Importer.__init__(self, proj, files, build, force)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
@@ -555,6 +566,10 @@ def importVCFArguments(parser):
             'DP' (total depth). When 'DP' is listed (default), vtools will look
             for total depth (DP=) in the INFO field of each variant and set average
             depth to each individual (DP/numSample in the vcf file) in field 'DP'.''')
+    parser.add_argument('-f', '--force', action='store_true',
+        help='''Import files even if the files have been imported before. This option
+            can be used to import from updated file or continue disrupted import, but will
+            not remove wrongfully imported variants from the master variant table.''')
 
 
 def importVCF(args):
@@ -562,7 +577,8 @@ def importVCF(args):
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             importer = vcfImporter(proj=proj, files=args.input_files, build=args.build,
-                variant_only=args.variant_only, info=[] if args.variant_only else args.info)
+                variant_only=args.variant_only, info=[] if args.variant_only else args.info,
+                force=args.force)
             importer.importData()
         proj.close()
     except Exception as e:
@@ -586,6 +602,10 @@ def importTxtArguments(parser):
     grp.add_argument('-z', '--zero', action='store_true',
         help='''Whether or not specified file uses zero-based index. If unspecified, the
             position column is assumed to be 1-based.''')
+    parser.add_argument('-f', '--force', action='store_true',
+        help='''Import files even if the files have been imported before. This option
+            can be used to import from updated file or continue disrupted import, but will
+            not remove wrongfully imported variants from the master variant table.''')
 
 def importTxt(args):
     try:
@@ -593,7 +613,7 @@ def importTxt(args):
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
                 col=args.columns, build=args.build,
-                delimiter=args.delimiter, zero=args.zero)
+                delimiter=args.delimiter, zero=args.zero, force=args.force)
             importer.importData()
         proj.close()
     except Exception as e:
