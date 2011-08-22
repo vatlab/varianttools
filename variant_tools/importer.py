@@ -557,10 +557,17 @@ def importVCFArguments(parser):
         help='''A list of files that will be imported. The file should be in 
             VCF 4.0 format and can be compressed in gzip format.''')
     parser.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18). This should be the reference
-            genome of the input data and can only be the primary reference genome of the project.''')
+        help='''Build version of the reference genome (e.g. hg18) of the input data. If
+            unspecified, variant tools will try to determine the reference genome from the
+            header of VCF files, and use the primary reference genome of the project if a
+            reference genome cannot be determined. If a reference genome that is different
+            from the primary reference genome of the project is determined or specified, it
+            will become the alternative referenge genome of the project. The UCSC liftover
+            tool will be automatically called to map input coordinates to the primary
+            reference genome.''')
     parser.add_argument('--variant_only', action='store_true',
-        help='''Import only variants, and ignore sample and their genotypes.''')
+        help='''Import only variants. Sample variants will be ignored but a sample with
+            NULL sample name will still be created to trace the source of variants.''')
     parser.add_argument('--info', nargs='*', default=['DP'],
         help='''Variant information fields to import. This command only support
             'DP' (total depth). When 'DP' is listed (default), vtools will look
@@ -591,10 +598,12 @@ def importTxtArguments(parser):
             tab or command separated value format. Gzipped files are acceptable.''')
     grp = parser.add_argument_group('Description of input files')
     grp.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18). This should be the
-            reference genome of the input data and has to be the primary reference
-            genome of the project. If unspecified, it assumes to be the primary
-            reference genome of the exisiting project.''')
+        help='''Build version of the reference genome (e.g. hg18) of the input data. If
+            unspecified, it is assumed to be the primary reference genome of the project.
+            If a reference genome that is different from the primary reference genome of the
+            project is specified, it will become the alternative referenge genome of the
+            project. The UCSC liftover tool will be automatically called to map input
+            coordinates to the primary reference genome.''')
     grp.add_argument('-c', '--columns', default=[1,2,3,4], nargs='+', type=int,
         help='Columns for chromosome, position, reference and alternative alleles.')
     grp.add_argument('-d', '--delimiter', default='\t',

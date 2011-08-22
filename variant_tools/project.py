@@ -1020,6 +1020,8 @@ def remove(args):
                     raise ValueError('Please specify conditions to select samples to be removed')
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(args.items))
+                if len(IDs) == 0:
+                    proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(args.items)))
                 for ID in IDs:
                     proj.removeSample(ID)
             elif args.type == 'field':
