@@ -454,9 +454,9 @@ def use(args):
                 if proj.db.engine == 'mysql':
                     raise RuntimeError('MySQL databases are not portable and cannot be downloaded.')
                 #
-                proj.logger.info('Downloading annotation database from {}'.format(URL))
+                proj.logger.info('Downloading annotation database from {}'.format(args.source))
                 try:
-                    annoDB = downloadFile(annoDB, '.')
+                    annoDB = downloadFile(args.source, '.')
                     s = delayedAction(proj.logger.info, 'Decompressing {}'.format(annoDB))
                     # for downloaded file, we decompress inplace
                     annoDB = decompressIfNeeded(annoDB, inplace=True)
