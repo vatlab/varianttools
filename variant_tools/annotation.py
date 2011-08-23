@@ -439,11 +439,12 @@ class AnnoDBConfiger:
 
 def useArguments(parser):
     parser.add_argument('source',
-        help='''An annotation database that will be used directly, a URL to download an
-            annotation database, or path or URL to an annotation configuration file. In the last
-            case, vtools will try to download the annotation database from the URL specified
-            in the configuration file, import database from local files (use paramter --files),
-            or download and import from downloaded source files, if available.''')
+        help='''Use an annotation database ($source.DB or $source.DB.gz) if it is available,
+            download or build the database if a description file ($source.ann) is available.
+            Otherwise, this command will download a description file and the corresponding database
+            from web (http://vtools.houstonbioinformatics.org/annoDB/$source.ann and the latest
+            version of the datavase). If all means fail, this command will try to download the
+            source of the annotation database (or use source files provided by option --files).''')
     parser.add_argument('-f', '--files', nargs='*', default=[],
         help='''A list of source files. If specified, vtools will not try to
             download and select source files. This is used only when no local
@@ -458,15 +459,26 @@ def useArguments(parser):
 def use(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            res = urlparse.urlsplit(args.source)
-            if not res.scheme:
+            # try to get source.ann, source.DB, source.DB.gz or get source.ann from 
+            # http://vtools.houstonbioinformatics.org/annoDB
+            if os.path.isfile(args.source):
                 # if a local file?
                 s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source))
-                # do not remove local .gz file. Perhaps this is a script and we do not want to
-                # break that.
+                # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
                 annoDB = decompressIfNeeded(args.source, inplace=False)
                 del s
+            elif os.path.isfile(args.source + '.DB.gz'):
+                s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
+                annoDB = decompressIfNeeded(args.source + '.DB.gz', inplace=False)
+                del s
+            elif os.path.isfile(args.source + '.DB'):
+                annoDB = args.source + '.DB'
+            elif os.path.isfile(args.source + '.ann'):
+                annoDB = args.source + '.ann'
             else:
+                res = urlparse.urlsplit(args.source)
+                if not res.scheme:
+                    args.source = 'http://vtools.houstonbioinformatics.org/annoDB/{}.ann'.format(args.source)
                 # download?
                 if proj.db.engine == 'mysql':
                     raise RuntimeError('MySQL databases are not portable and cannot be downloaded.')
