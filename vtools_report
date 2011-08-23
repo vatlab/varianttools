@@ -89,14 +89,10 @@ def getNumOfSamples():
 def getSamples(args):
     sample_ids = []
     if args.samples:
-        sample_condition = args.samples[0]
-        if len(args.samples) > 1:
-            for index in range(1, len(args.samples)):
-        	    sample_condition += ' AND ' + args.samples[index]
-
+        sample_condition = ' AND '.join(args.samples)
         sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {}'.format(sample_condition)]).strip().split('\n')
     else:
-        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample where sample_id > 60']).strip().split('\n')
+        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample']).strip().split('\n')
             
     if len(sample_ids) == 1 and sample_ids[0].strip() == '': return []
     else: return sample_ids
