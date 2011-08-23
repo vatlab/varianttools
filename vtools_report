@@ -86,6 +86,21 @@ def getNumOfSamples():
     logger.info('Getting number of samples')
     return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
 
+def getSamples(args):
+    sample_ids = []
+    if args.samples:
+        sample_condition = args.samples[0]
+        if len(args.samples) > 1:
+            for index in range(1, len(args.samples)):
+        	    sample_condition += ' AND ' + args.samples[index]
+
+        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {}'.format(sample_condition)]).strip().split('\n')
+    else:
+        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample where sample_id > 60']).strip().split('\n')
+            
+    if len(sample_ids) == 1 and sample_ids[0].strip() == '': return []
+    else: return sample_ids
+    
 #
 # Command trans_ratio
 #
@@ -155,22 +170,32 @@ def avgDepth(args):
     out.close()
 
 #
-# Command indel_summary
+# Command variant_stat
 #
-def variantTypeCountsPerSampleArguments(parser):
+def variantStatArguments(parser):
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+            'filename like "MG%%"').''')
     parser.add_argument('table', 
-        help='''Variant table for which average depth are calculated.''')
+        help='''Variant table for which variant metrics are calculated.''')
 
-def variantTypeCountsPerSample(args):
+def variantStat(args):
     out = sys.stdout
-    out.write(	'sample_id\tnum_snps\tnum_insertions\tnum_deletions\t' + 
-    			'num_substitutions\tmin_insertion_size\tavg_insertion_size\tmax_insertion_size\t'
-    			'min_deletion_size\tavg_deletion_size\tmax_deletion_size\n')
-    
-    # 1) This vtools command will retrieve all the samples from the database. 
-    #    command: vtools execute 'SELECT sample_id FROM sample'
-    sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample']).strip().split('\n')
-    
+    temp_table_name = 'temp_for_vstats'
+        
+    # 1) Get samples based on the conditional parameter --samples
+    #    Exit the report if there are no samples to analyze.
+    sample_ids = getSamples(args)
+    if len(sample_ids) == 0:
+        out.write('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else []))
+        out.close()
+        exit()    
+        
+    out.write(  'sample_filename\tsample_name\tnum_snps\tnum_insertions\tnum_deletions\t' +
+                'num_substitutions\tmin_insertion_size\tavg_insertion_size\tmax_insertion_size\t' +
+                'min_deletion_size\tavg_deletion_size\tmax_deletion_size\n')
+                          
     # 2) Several vtools commands are run across each sample to calcluate various indel metrics.
     for sample_id in sample_ids:
 	
@@ -195,9 +220,15 @@ def variantTypeCountsPerSample(args):
     	min_deletion_size = deletion_metrics[2]
     	max_deletion_size = deletion_metrics[3]
     	
-    	out.write(	sample_id + '\t' + 
+    	# 2d) Get sample name and filename to make the report more meaningful
+    	sample_details = getoutput(['vtools', 'execute', 'select f.filename, s.sample_name from sample s, filename f where s.file_id=f.file_id and s.sample_id=' + sample_id + ' and f.file_id=s.file_id']).strip().split(',')
+    	sample_filename = sample_details[0].strip()
+    	sample_name = sample_details[1].strip()
+    	
+    	out.write(	sample_filename + '\t' + 
+    				sample_name + '\t' +
     				num_snps + '\t' + 
-    				str(num_insertions) + '\t' + 
+    				num_insertions + '\t' + 
     				num_deletions + '\t' +
     				num_substitutions + '\t' +
     				min_insertion_size + '\t' +
@@ -250,14 +281,14 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=avgDepth)
     #
-    # command variant_type_counts_per_sample
-    parser = subparsers.add_parser('variant_type_counts_per_sample',
+    # command variant_stat
+    parser = subparsers.add_parser('variant_stat',
         help='Reports number of snps, insertions, deletions and substitutions per sample with some size metrics to characterize the indels',
         description='''Command 'vtools variant_counts_per_sample' calculates the number of 
         	snps, insertions, deletions and substitutions per sample with some size metrics to characterize the indels.''')
-    variantTypeCountsPerSampleArguments(parser)
+    variantStatArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=variantTypeCountsPerSample)
+    parser.set_defaults(func=variantStat)
     # 
     # getting args
     args = master_parser.parse_args()
