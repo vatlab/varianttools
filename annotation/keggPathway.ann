@@ -1,5 +1,24 @@
 #Variant tools schema version 1.0
 #
+# To retrieve the kegg pathway details, a database query was run using the 
+# "hg19" MySQL database from USCS.  We have a local copy of the database, but with
+# a mysql client.  Or one can use the public MySQL server directly at UCSC:
+#
+# mysql --user=genome --host=genome-mysql.cse.ucsc.edu -A
+# (for help connecting, see: http://genome.ucsc.edu/FAQ/FAQdownloads#download29)
+#
+# Kegg Pathway Query: This will return three columns
+
+# select distinct ckm.ccdsId ccds_id, 
+#                 kmd.mapID kegg_pathway_id, 
+#                 kmd.description kegg_pathway_description 
+# from   hg19.ccdsKgMap ckm 
+#        join hg19.keggPathway kp on ckm.geneId=kp.kgID 
+#        join hg19.keggMapDesc kmd on kp.mapId=kmd.mapId 
+# into   outfile '/tmp/ccds_to_pathway.txt' 
+#        fields terminated by '\t' lines terminated by '\n'
+# 
+
 [linked fields]
 *=ccdsId
 
