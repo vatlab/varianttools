@@ -254,50 +254,7 @@ class AnnoDBConfiger:
             # text file
             return open(filename, 'r')
 
-    def importFromSource(self, source_files):
-        '''Importing data from source files'''
-        tdir = None
-        if source_files == []:
-            tdir = tempfile.mkdtemp()
-            source_files = self.getSourceFiles(tdir)
-        elif len(source_files) == 1 and source_files[0].endswith('.zip'):
-            # trick the program to handle the file as one that has been downloaded.
-            self.source_url = source_files[0]
-            tdir = tempfile.mkdtemp()
-            source_files = self.getSourceFiles(tdir)
-        #
-        self.logger.info('Importing database {} from sourece files {}'.format(self.name, source_files))
-        # create database and import file
-        db = self.proj.db.newConnection()
-        # remove database if already exist
-        db.removeDatabase(self.name)
-        # create a new one
-        db.connect(self.name)
-        cur = db.cursor()
-        
-        #
-        # creating the field table
-        self.logger.debug('Creating {}_field table'.format(self.name))
-        self.createFieldsTable(db)
-        for field in self.fields:
-            cur.execute('INSERT INTO {0}_field VALUES ({1},{1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
-                (field.name, field.index, field.type, field.null, field.comment))
-        db.commit()
-        #
-        # creating the info table
-        self.logger.debug('Creating {}_info table'.format(self.name))
-        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
-        self.createInfoTable(db)
-        cur.execute(query, ('name', self.name))
-        cur.execute(query, ('anno_type', self.anno_type))
-        cur.execute(query, ('description', self.description))
-        cur.execute(query, ('version', self.version))
-        cur.execute(query, ('build', str(self.build)))
-        db.commit()
-        self.logger.debug('Creating table {}'.format(self.name))
-        self.createAnnotationTable(db)
-        # figure out how to get columns from a file
-        #
+    def importTxtRecords(self, db, source_files):
         # First: Ucsc bins calculated for position fields
         build_info = []
         for key,items in self.build.items():
@@ -321,6 +278,7 @@ class AnnoDBConfiger:
             else:
                 field_info.append((field.index, None, field.null))
         # files?
+        cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
@@ -376,6 +334,61 @@ class AnnoDBConfiger:
             prog.done()
             self.logger.info('{0} records handled, {1} ignored.'\
                 .format(all_records, skipped_records))
+    
+    def importVcfRecords(self, db, source_files):
+        '''Import from vcf files'''
+        pass
+
+    def importFromSource(self, source_files):
+        '''Importing data from source files'''
+        tdir = None
+        if source_files == []:
+            tdir = tempfile.mkdtemp()
+            source_files = self.getSourceFiles(tdir)
+        elif len(source_files) == 1 and source_files[0].endswith('.zip'):
+            # trick the program to handle the file as one that has been downloaded.
+            self.source_url = source_files[0]
+            tdir = tempfile.mkdtemp()
+            source_files = self.getSourceFiles(tdir)
+        #
+        self.logger.info('Importing database {} from sourece files {}'.format(self.name, source_files))
+        # create database and import file
+        db = self.proj.db.newConnection()
+        # remove database if already exist
+        db.removeDatabase(self.name)
+        # create a new one
+        db.connect(self.name)
+        cur = db.cursor()
+        
+        #
+        # creating the field table
+        self.logger.debug('Creating {}_field table'.format(self.name))
+        self.createFieldsTable(db)
+        for field in self.fields:
+            cur.execute('INSERT INTO {0}_field VALUES ({1},{1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
+                (field.name, field.index, field.type, field.null, field.comment))
+        db.commit()
+        #
+        # creating the info table
+        self.logger.debug('Creating {}_info table'.format(self.name))
+        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
+        self.createInfoTable(db)
+        cur.execute(query, ('name', self.name))
+        cur.execute(query, ('anno_type', self.anno_type))
+        cur.execute(query, ('description', self.description))
+        cur.execute(query, ('version', self.version))
+        cur.execute(query, ('build', str(self.build)))
+        db.commit()
+        self.logger.debug('Creating table {}'.format(self.name))
+        self.createAnnotationTable(db)
+        #
+        # read records from files
+        if self.source_type == 'txt':
+            self.importTxtRecords(db, source_files)
+        elif self.source_type == 'vcf':
+            self.importVcfRecords(db, source_files)
+        else:
+            raise ValueError('Unrecognizable source input type: {}'.format(self.source_type))
         #
         # creating indexes
         s = delayedAction(self.logger.info, 'Creating indexes (this can take quite a while)')
@@ -392,8 +405,7 @@ class AnnoDBConfiger:
         db.analyze()
         del s
         if tdir is not None:
-            shutil.rmtree(tdir)
-        
+            shutil.rmtree(tdir) 
 
     def prepareDB(self, source_files=[], linked_by=[]):
         '''Importing data to database. If direct_url or source_url is specified,
