@@ -75,7 +75,7 @@ def getoutput(cmd):
     logger.info(' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
-    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])})
+    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])}).strip()
 
 #
 # These functions call vtools to extract information that are needed by other
@@ -87,15 +87,11 @@ def getNumOfSamples():
     return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
 
 def getSamples(args):
-    sample_ids = []
     if args.samples:
         sample_condition = ' AND '.join(args.samples)
-        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {}'.format(sample_condition)]).strip().split('\n')
+        return getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {}'.format(sample_condition)]).split('\n')
     else:
-        sample_ids = getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample']).strip().split('\n')
-            
-    if len(sample_ids) == 1 and sample_ids[0].strip() == '': return []
-    else: return sample_ids
+        return getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample']).split('\n')
     
 #
 # Command trans_ratio
@@ -178,15 +174,12 @@ def variantStatArguments(parser):
 
 def variantStat(args):
     out = sys.stdout
-    temp_table_name = 'temp_for_vstats'
-        
+    
     # 1) Get samples based on the conditional parameter --samples
     #    Exit the report if there are no samples to analyze.
     sample_ids = getSamples(args)
     if len(sample_ids) == 0:
-        out.write('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else []))
-        out.close()
-        exit()    
+        sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
         
     out.write(  'sample_filename\tsample_name\tnum_snps\tnum_insertions\tnum_deletions\t' +
                 'num_substitutions\tmin_insertion_size\tavg_insertion_size\tmax_insertion_size\t' +
@@ -197,29 +190,26 @@ def variantStat(args):
 	
     	# 2a) Get the counts for snps and substitutions:
     	#     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id = $sample_id' --count
-    	num_snps = getoutput(['vtools', 'select', args.table, "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)", '--samples', 'sample_id=' + sample_id, '--count']).strip()
-       	num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-' and alt != '-' and (length(ref) > 1 or length(alt) > 1)", '--samples', 'sample_id=' + sample_id, '--count']).strip()
+    	num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 or length(alt) = 1)",
+            '--samples', 'sample_id=' + sample_id, '--count'])
+       	num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
+            '--samples', 'sample_id=' + sample_id, '--count'])
     	
     	# 2b) Get the metrics to characterize the insertions
     	#     command: vtools select variant "ref = '-'" --samples 'sample_id = $sample_id' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
-    	insertion_metrics = getoutput(['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id=' + sample_id, '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).strip().split('\t')
-    	num_insertions = insertion_metrics[0]
-    	avg_insertion_size = insertion_metrics[1]
-    	min_insertion_size = insertion_metrics[2]
-    	max_insertion_size = insertion_metrics[3]
+    	num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
+            ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id=' + sample_id,
+            '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
     	
     	# 2c) Get the metrics to characterize the deletions
     	#     command: vtools select variant "alt = '-'" --samples 'sample_id = $sample_id' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'   	
-    	deletion_metrics = getoutput(['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id=' + sample_id, '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).strip().split('\t') 	
-    	num_deletions = deletion_metrics[0]
-    	avg_deletion_size = deletion_metrics[1]
-    	min_deletion_size = deletion_metrics[2]
-    	max_deletion_size = deletion_metrics[3]
+    	num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
+            ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id=' + sample_id,
+            '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t') 	
     	
     	# 2d) Get sample name and filename to make the report more meaningful
-    	sample_details = getoutput(['vtools', 'execute', 'select f.filename, s.sample_name from sample s, filename f where s.file_id=f.file_id and s.sample_id=' + sample_id + ' and f.file_id=s.file_id']).strip().split(',')
-    	sample_filename = sample_details[0].strip()
-    	sample_name = sample_details[1].strip()
+    	sample_filename, sample_name = getoutput(['vtools', 'execute',
+            'SELECT f.filename, s.sample_name FROM sample s, filename f WHERE s.file_id=f.file_id AND s.sample_id=' + sample_id + ' AND f.file_id=s.file_id']).split(',')
     	
     	out.write(	sample_filename + '\t' + 
     				sample_name + '\t' +
@@ -233,7 +223,7 @@ def variantStat(args):
     				min_deletion_size + '\t' +
     				avg_deletion_size + '\t' +
     				max_deletion_size + '\n')
-    	
+    #
     out.close()
 	
 
