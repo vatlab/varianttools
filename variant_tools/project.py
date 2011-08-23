@@ -134,7 +134,7 @@ class AnnoDB:
         if self.build is None and self.alt_build is None:
             raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
         if self.anno_type == 'attribute' and len(self.linked_by) != len(self.build):
-            raise ValueError('Please specify link fields for attributes {} using parameter --by'.format(','.join(self.build)))
+            raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
 
     def __repr__(self):
         '''Describe this annotation database'''

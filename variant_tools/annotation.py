@@ -413,18 +413,23 @@ class AnnoDBConfiger:
         function set self.db to a live connection.
         '''
         if not source_files:
-            if os.path.isfile(self.name + '.DB'):
+            dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
+            if os.path.isfile(dbFile):
                 try:
-                    return AnnoDB(self.proj, self.name)
-                except Exception as e:
+                    return AnnoDB(self.proj, dbFile)
+                except ValueError as e:
                     self.logger.debug(e)
                     self.logger.info('Existing database cannot be used.')
             # if there is a direct URL?
             if self.direct_url is not None:
                 self.logger.info('Downloading annotation database from {}'.format(self.direct_url))
                 try:
-                    return AnnoDB(self.proj, downloadFile(self.direct_url, '.'))
-                except Exception as e:
+                    dbFile = downloadFile(self.direct_url, '.')
+                    s = delayedAction(self.logger.info, 'Decompressing {}'.format(dbFile))
+                    dbFile = decompressIfNeeded(dbFile, inplace=True)
+                    del s
+                    return AnnoDB(self.proj, dbFile, linked_by)
+                except ValueError as e:
                     self.logger.debug(e)
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
