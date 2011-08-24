@@ -1,0 +1,121 @@
+#Variant tools schema version 1.0
+#
+# - The first line is required
+# - Lines starting with # and ; are comments
+# - Inline comments starts with ;
+
+# - Required sections:
+#
+#   [linked fields]:
+#		A database can provide one or more sets of linked fields by which it is linked
+#		to the master variant table of the project. Each line should have format
+#	        
+#	        build=field1,field2,...
+#
+#	    where build is the build of a reference genome, or '*' if this annotation database
+#	    can be linked to project with any referenge genome. One or more fields can be
+#	    specified as 'linked fields':
+#
+#	    1. for 'variant' annotation database, they should be
+#	       names of chr, pos, ref, and alt fields.
+#	    2. for 'position' annotation database, they should be
+#		   names of chr and pos fields.
+#		3. for 'range' annotation database, they should be names of
+#		   chr, start pos and ending pos fields.
+#		4. for 'field' annotation database, they should be names of fields
+#		   that link to the master variant table.
+#       
+#   [data sources]: This section can have keys
+#       * description: description of the database
+#       * anno_type: can be one of 'variant', 'position', 'range' or 'field'
+#       * direct_url: URL to download annotation database directly. This is only
+#           used for sqlite projects.
+#       * source_type: type of source files, we currently only supported
+#           tab based text file (txt)
+#       * source_url: where to download source file.
+#       * source_pattern: pattern of source files (used to exclude README etc)
+#       * version: version of the database, which is not necessarily version 
+#         of the data source. The convension is sourceVersion_dbVersion. If
+#         unspecified, vtools will try to get it from filename. For example, 
+#         dbNSFP-1.1_0.db will have version number 1.1_0.
+# 
+#   fields sections for the fields that will be imported.
+#       * index: 1-based index of the index of the column in the database
+#       * type: can be "chromosome", "0-based position", "1-based position",
+#               and SQL allowed types such as "DECIMAL(7,6) NOT NULL"
+#       * null (optional) if specified, value that will be treated as NULL.
+#       * comment (optional) a description of the field
+#
+[linked fields]
+hg18=chr, hg18pos, ref, alt
+hg19=chr, hg19pos, ref, alt
+
+[data sources]
+description=A subset of dbNSFP version 1.1 that contains only gene related fields. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" if you find this database useful.
+version=1.1_0 
+anno_type=variant
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbNSFP_gene-1.1_0.DB.gz
+source_url=http://dl.dropbox.com/u/17001647/dbNSFP/dbNSFP1.1.chr1-22XY.zip
+source_type=txt
+source_pattern=dbNSFP.ch
+
+[chr]
+index=1
+type=chromosome
+
+[hg18pos]
+index=2
+type=1-based position
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative nucleotide allele (as on the + strand)
+
+[hg19pos]
+index=7
+type=1-based position
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+null=NA
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+comment=gene name
+
+[geneid]
+index=9
+type=VARCHAR(48) NULL
+comment=gene Entrez ID
+
+[CCDSid]
+index=10
+type=VARCHAR(48) NULL
+comment=CCDS ID
+
+[UniSNP_ids]
+index=28
+type=VARCHAR(128)
+null=.
+comment="rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;..."
+
+[Alt_gene_name]
+index=30
+type=VARCHAR(128)
+comment=alternative gene names, separated by bar
+
+[dbXrefs]
+index=31
+type=VARCHAR(64)
+comment=database cross references (IDs of HGNC, MIM, Ensembl and HPRD, separated by bar)
+
+[Descriptive_gene_name]
+index=32
+type=VARCHAR(128)
+comment=descriptive gene name
+
