@@ -32,7 +32,7 @@ import getpass
 import random
 import textwrap
 from collections import namedtuple, defaultdict
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction
+from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL
 
 VTOOLS_VERSION = '1.0'
 VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
@@ -1047,11 +1047,13 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'fields'], nargs='?', default='project',
+        'samples', 'fields', 'annotations'], nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
-            verbosity=2), table (a specific table), or samples 
-            (sample and phenotype information). Default to project.''')
+            verbosity=2), table (a specific table), samples (sample and
+            phenotype information), fields (from variant tables and all used
+            annotation databases), and annotations (all available annotation
+            databases for variant tools). Default to project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
     parser.add_argument('-l', '--limit', default=10, type=int,
@@ -1115,6 +1117,10 @@ def show(args):
                             '\n'.join(textwrap.wrap(x.comment, initial_indent=' '*(27-len(db.name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
                 out.close()
+            elif args.type == 'annotations':
+                DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
+                for db in DBs:
+                    out.write('{}\n'.format(db))
     except Exception as e:
         sys.exit(e)
 

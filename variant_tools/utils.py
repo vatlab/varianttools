@@ -42,6 +42,7 @@ import tokenize
 import cStringIO
 import gzip
 import threading
+import re
 
 
 runOptions = {
@@ -163,6 +164,16 @@ class delayedAction:
     def __del__(self):
         self.timer.cancel()
 
+
+def filesInURL(URL, ext=''):
+    '''directory listing of a URL'''
+    fh = urllib.urlopen(URL)
+    files = []
+    for line in fh.readlines():
+        m = re.search('href="(.*){}"'.format(ext), line)
+        if m:
+            files.append(m.group(1))
+    return files
 
 from array import array
 try:
