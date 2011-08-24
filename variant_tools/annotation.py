@@ -32,6 +32,7 @@ import urlparse
 import gzip
 import zipfile
 import tempfile
+import re
 
 from project import AnnoDB, Project, Field
 from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded
@@ -275,6 +276,17 @@ class AnnoDBConfiger:
                 field_info.append((field.index, 1, field.null))
             elif field.type == 'chromosome':
                 field_info.append((field.index, 'c', field.null))
+            # if index is not pure digital, it should be in the form of
+            # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
+            # we need to get the fields...
+#             elif not field.index.isdigit():
+#                 try:
+#                     m = re.match( # number, separtor, name)
+#                     i, s, n = m.groups()
+#                 except:
+#                     # wrong index...
+#                 pattern = re.compile( # patter of [separator or begin]name=value[separator or end] )
+#                 field_info.append(i, pattern, field.null)
             else:
                 field_info.append((field.index, None, field.null))
         # files?
@@ -318,6 +330,13 @@ class AnnoDBConfiger:
                                     item = int(item) + adj
                                 elif adj == 'c' and item.startswith('chr'):
                                     item = item[3:]
+#                                 else: # must be a pattern
+#                                     try:
+#                                         m = adj.match(item)
+#                                         item = m.group(1)
+#                                     except:
+#                                         # cannot find item
+#                                         item = None
                             if item == null:
                                 item = None
                             records.append(item)
