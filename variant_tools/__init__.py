@@ -30,5 +30,5 @@ ver = sys.version_info
 if (ver.major, ver.minor) < (2, 7):
     raise SystemError('variant_tools only supports Python 2.7 or higher.')
 
-__all__ = ['utils', 'project', 'vcf', 'sample', 'annotation']
+__all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
