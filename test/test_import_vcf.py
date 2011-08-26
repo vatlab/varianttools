@@ -50,16 +50,22 @@ class TestImportVCF(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertSucc('vtools import_vcf SAMP2.vcf')
         self.assertEqual(numOfSample(), 2)
+        self.assertSucc('vtools import_vcf CEU.vcf.gz --variant_only')
+        self.assertEqual(numOfSample(), 3)
         # file will be ignored if re-imported
         self.assertSucc('vtools import_vcf SAMP1.vcf')
-        self.assertEqual(numOfSample(), 2)
-        # another sample
-        self.assertSucc('vtools import_vcf CEU.vcf.gz')
-        self.assertFail('vtools import_vcf CEU.vcf.gz --build hg19')
+        self.assertEqual(numOfSample(), 3)
+        # force re-import the same file with samples
+        self.assertSucc('vtools import_vcf CEU.vcf.gz -f')
         self.assertEqual(numOfSample(), 62)
         # file will be ignored if re-imported
         self.assertSucc('vtools import_vcf CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
+
+    def testImportIndel(self):
+        self.assertSucc('vtools import_vcf SAMP3_complex_variants.vcf')
+        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(), 137)
 
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'

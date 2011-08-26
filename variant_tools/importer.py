@@ -398,7 +398,8 @@ class vcfImporter(Importer):
                         DP = []
                     # is GT the first field?
                     try:
-                        GT_idx = 0 if tokens[8].startswith('GT') else tokens[8].split(':').index('GT')
+                        # the format field of a vcf can be empty ('.', does not contain GT) if there is no sample
+                        GT_idx = 0 if no_sample or tokens[8].startswith('GT') else tokens[8].split(':').index('GT')
                     except Exception as e:
                         self.logger.debug(e)
                         raise ValueError('The genotype format field does not have GT')
