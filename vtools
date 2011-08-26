@@ -166,14 +166,17 @@ if __name__ == '__main__':
     parser.set_defaults(func=variant.compare)
     #
     # command associate
-    parser = subparsers.add_parser('associate',
-        #FIXME: more description for vtools commands
-        help='''Test association between variants and phenotypes''',
-        description='''Call one or more statistical association tests and
-        return test results as fields to variants tested.''')
-    association.associateArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=association.associate)
+    #
+    # This command is not ready and will not be displayed in a formal release
+    if project.VTOOLS_VERSION.endswith('svn'):
+        parser = subparsers.add_parser('associate',
+            #FIXME: more description for vtools commands
+            help='''Test association between variants and phenotypes''',
+            description='''Call one or more statistical association tests and
+            return test results as fields to variants tested.''')
+        association.associateArguments(parser)
+        addVerbosityArg(parser)
+        parser.set_defaults(func=association.associate)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
