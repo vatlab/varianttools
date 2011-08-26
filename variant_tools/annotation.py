@@ -156,7 +156,7 @@ class AnnoDBConfiger:
             try:
                 items = [x[0] for x in parser.items(section)]
                 # 'index' - 1 because the input is in 1-based index
-                self.fields.append(Field(name=section, index=parser.getint(section, 'index') - 1,
+                self.fields.append(Field(name=section, index=parser.get(section, 'index'),
                     type=parser.get(section, 'type'),
                     null=parser.get(section, 'null') if 'null' in items else None,
                     comment=parser.get(section, 'comment') if 'comment' in items else ''))
@@ -264,7 +264,7 @@ class AnnoDBConfiger:
             try:
                 # items have chr/pos, chr/pos/alt, chr/start/end for different annotation types
                 field = [x for x in self.fields if x.name == items[1]][0]
-                build_info.append((field.index, 1 if field.type == '0-based position' else 0))
+                build_info.append((int(field.index), 1 if field.type == '0-based position' else 0))
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
@@ -273,22 +273,25 @@ class AnnoDBConfiger:
         for field in self.fields:
             # adjust for zero-based position
             if field.type == '0-based position':
-                field_info.append((field.index, 1, field.null))
+                field_info.append((int(field.index), 1, field.null))
             elif field.type == 'chromosome':
-                field_info.append((field.index, 'c', field.null))
+                field_info.append((int(field.index), 'c', field.null))
+            elif field.name == 'alt':
+                field_info.append((int(field.index), 'a', field.null))
             # if index is not pure digital, it should be in the form of
             # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
             # we need to get the fields...
-#             elif not field.index.isdigit():
-#                 try:
-#                     m = re.match( # number, separtor, name)
-#                     i, s, n = m.groups()
-#                 except:
-#                     # wrong index...
-#                 pattern = re.compile( # patter of [separator or begin]name=value[separator or end] )
-#                 field_info.append(i, pattern, field.null)
+            elif not field.index.isdigit():
+                try:
+                    i, s, n = re.match('(\d+)([\s\t:;,|])(\w+)', field.index).groups()
+                except:
+                     # wrong index...
+                     self.logger.debug("Regex is not working for {}".format(field))
+                pattern = re.compile('(^|{0}){1}((=[^{0}]+)*)($|{0})'.format(s, n)) # patter of [separator or begin]name=value[separator or end] )
+                #pattern = '(^|{0}){1}((=[^{0}]+)*)($|{0})'.format(s, n) # patter of [separator or begin]name=value[separator or end] )
+                field_info.append((int(i), pattern, field.null))
             else:
-                field_info.append((field.index, None, field.null))
+                field_info.append((int(field.index), None, field.null))
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
@@ -301,6 +304,7 @@ class AnnoDBConfiger:
             with self.openAnnoFile(f) as input_file:
                 for line in input_file:
                     all_records += 1
+                    multiple_alts = None
                     try:
                         if line.startswith('#'):
                             continue
@@ -309,6 +313,7 @@ class AnnoDBConfiger:
                         records = []
                         # calculate UCSC bin
                         for col,adj in build_info:
+                            col -= 1    # because user-specified indexes are 1-based
                             # FIXME, for anno_type == 'range', this should use begin and end coordinates of
                             # the region (just not sure how to get them right now
                             try:
@@ -324,24 +329,42 @@ class AnnoDBConfiger:
                             # self.logger.debug("BIN: " + str(max(bins)))
                         #
                         for col, adj, null in field_info:
+                            col -= 1
                             item = tokens[col]
                             if adj is not None:
                                 if adj == 1:
                                     item = int(item) + adj
-                                elif adj == 'c' and item.startswith('chr'):
-                                    item = item[3:]
-#                                 else: # must be a pattern
-#                                     try:
-#                                         m = adj.match(item)
-#                                         item = m.group(1)
-#                                     except:
-#                                         # cannot find item
-#                                         item = None
+                                elif adj == 'c':
+                                    if item.startswith('chr'):  # if the item doesn't start with chr, then item=chromsome_number
+                                        item = item[3:]
+                                elif adj == 'a':
+                                    multiple_alts = item.split(',')
+                                    alt_index = len(records)
+                                else: # must be a pattern
+                                    try:
+                                        #self.logger.debug('re.search("{}", "{}")'.format(adj, item))
+                                        item = adj.search(item).group(3)
+                                        #self.logger.debug("matched item = " + item)
+                                        if item is not None:
+                                            item = item[1:]
+                                        else: # a flag that exists (therefore set to True or 1)
+                                            item = 1
+                                    except:
+                                        # a flag that isn't listed (therefore set to False or 0)
+                                        item = 0
                             if item == null:
                                 item = None
+                            
                             records.append(item)
-                        # 
-                        cur.execute(insert_query, records)
+                                
+                        if multiple_alts != None:
+                            for alt in multiple_alts:
+                                alt_records = records
+                                records[alt_index] = alt
+                                cur.execute(insert_query, records)    
+                        else:        
+                            cur.execute(insert_query, records)
+                            
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)
@@ -353,10 +376,6 @@ class AnnoDBConfiger:
             prog.done()
             self.logger.info('{0} records handled, {1} ignored.'\
                 .format(all_records, skipped_records))
-    
-    def importVcfRecords(self, db, source_files):
-        '''Import from vcf files'''
-        pass
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''
@@ -370,7 +389,7 @@ class AnnoDBConfiger:
             tdir = tempfile.mkdtemp()
             source_files = self.getSourceFiles(tdir)
         #
-        self.logger.info('Importing database {} from sourece files {}'.format(self.name, source_files))
+        self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
         # create database and import file
         db = self.proj.db.newConnection()
         # remove database if already exist
@@ -404,8 +423,6 @@ class AnnoDBConfiger:
         # read records from files
         if self.source_type == 'txt':
             self.importTxtRecords(db, source_files)
-        elif self.source_type == 'vcf':
-            self.importVcfRecords(db, source_files)
         else:
             raise ValueError('Unrecognizable source input type: {}'.format(self.source_type))
         #
