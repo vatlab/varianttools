@@ -30,7 +30,7 @@ import gzip
 import re
 from .project import Project
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin
+from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction
 
 class Importer:
     '''A general class for importing variants'''
@@ -164,12 +164,14 @@ class Importer:
         filenameID = cur.lastrowid
         self.proj.createSampleTableIfNeeded()
         sample_ids = []
+        s = delayedAction(self.logger.info, 'Creating {} sample variant tables'.format(len(sampleNames)))
         for samplename in sampleNames:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                 (filenameID, samplename))
             sample_ids.append(cur.lastrowid)
             self.proj.createNewSampleVariantTable('{0}_genotype.sample_variant_{1}'.format(self.proj.name, cur.lastrowid),
                 sampleFields)
+        del s
         return sample_ids
         
     def addVariant(self, cur, chr, pos, ref, alt):
