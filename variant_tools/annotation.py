@@ -288,8 +288,7 @@ class AnnoDBConfiger:
                      # wrong index...
                      self.logger.debug("Regex is not working for {}".format(field))
                 pattern = re.compile('(^|{0}){1}((=[^{0}]+)*)($|{0})'.format(s, n)) # patter of [separator or begin]name=value[separator or end] )
-                #pattern = '(^|{0}){1}((=[^{0}]+)*)($|{0})'.format(s, n) # patter of [separator or begin]name=value[separator or end] )
-                field_info.append((int(i), pattern, field.null))
+                field_info.append((int(i), (n, pattern), field.null))
             else:
                 field_info.append((int(field.index), None, field.null))
         # files?
@@ -340,17 +339,21 @@ class AnnoDBConfiger:
                                 elif adj == 'a':
                                     multiple_alts = item.split(',')
                                     alt_index = len(records)
-                                else: # must be a pattern
+                                else: # must be a name,pattern pair
                                     try:
-                                        #self.logger.debug('re.search("{}", "{}")'.format(adj, item))
-                                        item = adj.search(item).group(3)
-                                        #self.logger.debug("matched item = " + item)
-                                        if item is not None:
-                                            item = item[1:]
-                                        else: # a flag that exists (therefore set to True or 1)
-                                            item = 1
-                                    except:
                                         # a flag that isn't listed (therefore set to False or 0)
+                                        if not adj[0] in item:
+                                            item = 0
+                                        else:
+                                            item = adj[1].search(item).group(3)
+                                            #self.logger.debug("matched item = " + item)
+                                            if item is not None:
+                                                item = item[1:]
+                                            else: # a flag that exists (therefore set to True or 1)
+                                                item = 1
+                                    except:
+                                        # this is the case missed by 'adj[0] in item'. For example
+                                        # Pilot1 is in item with field Pilot123
                                         item = 0
                             if item == null:
                                 item = None
