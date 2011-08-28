@@ -154,12 +154,12 @@ class AnnoDBConfiger:
             if section == 'linked fields' or section == 'data sources':
                 continue
             try:
-                items = [x[0] for x in parser.items(section)]
+                items = [x[0] for x in parser.items(section, raw=True)]
                 # 'index' - 1 because the input is in 1-based index
-                self.fields.append(Field(name=section, index=parser.get(section, 'index'),
-                    type=parser.get(section, 'type'),
-                    null=parser.get(section, 'null') if 'null' in items else None,
-                    comment=parser.get(section, 'comment') if 'comment' in items else ''))
+                self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
+                    type=parser.get(section, 'type', raw=True),
+                    null=parser.get(section, 'null', raw=True) if 'null' in items else None,
+                    comment=parser.get(section, 'comment', raw=True) if 'comment' in items else ''))
             except Exception as e:
                 self.logger.debug(e)
                 self.logger.error('Invalid section {} in configuration file {}'.format(section, filename))
