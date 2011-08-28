@@ -340,6 +340,8 @@ def downloadFile(URL, dest_dir = None):
             c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
             c.perform()
         prog.done()
+        if c.getinfo(pycurl.HTTP_CODE) == 404:
+            raise RuntimeError('ERROR 404: Not Found.')
         if os.path.isfile(dest):
             return dest
         else:
@@ -350,8 +352,8 @@ def downloadFile(URL, dest_dir = None):
     # use wget? Almost universally available under linux
     try:
         p = subprocess.Popen(['wget', '-O', dest, URL])
-        p.wait()
-        if os.path.isfile(dest):
+        ret = p.wait()
+        if ret == 0 and os.path.isfile(dest):
             return dest
         else:
             raise RuntimeError('Failed to download {} using wget'.format(URL))

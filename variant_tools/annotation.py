@@ -465,7 +465,7 @@ class AnnoDBConfiger:
                     dbFile = decompressIfNeeded(dbFile, inplace=True)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by)
-                except ValueError as e:
+                except Exception as e:
                     self.logger.debug(e)
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
