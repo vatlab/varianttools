@@ -35,7 +35,7 @@ import tempfile
 import re
 
 from project import AnnoDB, Project, Field
-from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded
+from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant
 
 
 class AnnoDBConfiger:
@@ -263,12 +263,19 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/alt, chr/start/end for different annotation types
-                field = [x for x in self.fields if x.name == items[1]][0]
-                build_info.append((int(field.index), 1 if field.type == '0-based position' else 0))
+                pos_idx, pos_adj = [(i, 1) if x.type == '0-based position' else (i, 0) for i, x in enumerate(self.fields) if x.name == items[1]][0]
+                if self.anno_type == 'variant':
+                    # save indexes for pos, ref and alt
+                    ref_idx = [i for i,x in enumerate(self.fields) if x.name == items[2]][0]
+                    alt_idx = [i for i,x in enumerate(self.fields) if x.name == items[3]][0]
+                    build_info.append((pos_idx, pos_adj, ref_idx, alt_idx))
+                else:
+                    build_info.append((pos_idx, pos_adj))
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
         field_info = []
+        variant_fields = [0] if self.anno_type == 'variant' else None
         # Other fields
         for field in self.fields:
             # adjust for zero-based position
@@ -276,8 +283,6 @@ class AnnoDBConfiger:
                 field_info.append((int(field.index), 1, field.null))
             elif field.type == 'chromosome':
                 field_info.append((int(field.index), 'c', field.null))
-            elif field.name == 'alt':
-                field_info.append((int(field.index), 'a', field.null))
             # if index is not pure digital, it should be in the form of
             # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
             # we need to get the fields...
@@ -303,29 +308,12 @@ class AnnoDBConfiger:
             with self.openAnnoFile(f) as input_file:
                 for line in input_file:
                     all_records += 1
-                    multiple_alts = None
                     try:
                         if line.startswith('#'):
                             continue
                         # get data
                         tokens = [x.strip() for x in line.split('\t')]
                         records = []
-                        # calculate UCSC bin
-                        for col,adj in build_info:
-                            col -= 1    # because user-specified indexes are 1-based
-                            # FIXME, for anno_type == 'range', this should use begin and end coordinates of
-                            # the region (just not sure how to get them right now
-                            try:
-                                # zero-based: v, v+1 (adj=1)
-                                # one-based:  v-1, v (adj=0)
-                                bin = getMaxUcscBin(int(tokens[col]) - 1 + adj, int(tokens[col]) + adj)
-                            except:
-                                # position might be None (e.g. dbNSFP has complete hg18 coordinates,
-                                # but incomplete hg19 coordinates)
-                                bin = None
-                            records.append(bin)
-                            #
-                            # self.logger.debug("BIN: " + str(max(bins)))
                         #
                         for col, adj, null in field_info:
                             col -= 1
@@ -336,9 +324,6 @@ class AnnoDBConfiger:
                                 elif adj == 'c':
                                     if item.startswith('chr'):  # if the item doesn't start with chr, then item=chromsome_number
                                         item = item[3:]
-                                elif adj == 'a':
-                                    multiple_alts = item.split(',')
-                                    alt_index = len(records)
                                 else: # must be a name,pattern pair
                                     try:
                                         # a flag that isn't listed (therefore set to False or 0)
@@ -357,17 +342,44 @@ class AnnoDBConfiger:
                                         item = 0
                             if item == null:
                                 item = None
-                            
+                            #
                             records.append(item)
-                                
-                        if multiple_alts != None:
-                            for alt in multiple_alts:
-                                alt_records = records
-                                records[alt_index] = alt
-                                cur.execute(insert_query, records)    
-                        else:        
+                        #
+                        # handle records
+                        if not build_info:
+                            # there is no build information, this is 'field' annotation, nothing to worry about
                             cur.execute(insert_query, records)
-                            
+                        elif len(build_info[0]) == 2:
+                            # there is no ref and alt, easy
+                            bins = []
+                            for pos_idx, pos_adj in build_info:
+                                try:
+                                    # zero-based: v, v+1 (adj=1)
+                                    # one-based:  v-1, v (adj=0)
+                                    bin = getMaxUcscBin(int(records[pos_col]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
+                                except:
+                                    # position might be None (e.g. dbNSFP has complete hg18 coordinates,
+                                    # but incomplete hg19 coordinates)
+                                    bin = None
+                                bins.append(bin)
+                            cur.execute(insert_query, bins + records)
+                        else:
+                            # variant... most troublesome
+                            all_alt = records[build_info[0][3]]
+                            # support multiple alternative alleles
+                            for input_alt in all_alt.split(','):
+                                bins = []
+                                for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
+                                    input_pos = int(records[pos_idx]) + pos_adj
+                                    input_ref = records[ref_idx]
+                                    bin, pos, ref, alt = normalizeVariant(input_pos, input_ref, input_alt)
+                                    # these differ build by build
+                                    bins.append(bin)
+                                    records[pos_idx] = pos
+                                    # these should be kept unchanged
+                                    records[ref_idx] = ref
+                                    records[alt_idx] = alt
+                                cur.execute(insert_query, bins + records)    
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)
