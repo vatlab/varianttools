@@ -262,7 +262,7 @@ class AnnoDBConfiger:
             if key == '*':
                 continue
             try:
-                # items have chr/pos, chr/pos/alt, chr/start/end for different annotation types
+                # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
                 pos_idx, pos_adj = [(i, 1) if x.type == '0-based position' else (i, 0) for i, x in enumerate(self.fields) if x.name == items[1]][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
@@ -356,7 +356,7 @@ class AnnoDBConfiger:
                                 try:
                                     # zero-based: v, v+1 (adj=1)
                                     # one-based:  v-1, v (adj=0)
-                                    bin = getMaxUcscBin(int(records[pos_col]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
+                                    bin = getMaxUcscBin(int(records[pos_idx]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
                                 except:
                                     # position might be None (e.g. dbNSFP has complete hg18 coordinates,
                                     # but incomplete hg19 coordinates)
@@ -365,13 +365,13 @@ class AnnoDBConfiger:
                             cur.execute(insert_query, bins + records)
                         else:
                             # variant... most troublesome
+                            input_ref = records[build_info[0][2]]
                             all_alt = records[build_info[0][3]]
                             # support multiple alternative alleles
                             for input_alt in all_alt.split(','):
                                 bins = []
                                 for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
                                     input_pos = int(records[pos_idx]) + pos_adj
-                                    input_ref = records[ref_idx]
                                     bin, pos, ref, alt = normalizeVariant(input_pos, input_ref, input_alt)
                                     # these differ build by build
                                     bins.append(bin)
