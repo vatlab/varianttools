@@ -30,7 +30,7 @@ import gzip
 import re
 from .project import Project
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction
+from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
 
 class Importer:
     '''A general class for importing variants'''
@@ -175,91 +175,42 @@ class Importer:
         return sample_ids
         
     def addVariant(self, cur, chr, pos, ref, alt):
-        # this is usually the case but some badly formatted
-        # vcf file use small case for variants
-        ref = ref.upper()
-        alt = alt.upper()
         # if chr, pos are from alternative reference genome
         if self.import_alt_build:
-            # actual meaning of chr and pos
-            alt_chr, alt_pos = chr, pos
+            alt_chr, input_pos = chr, pos 
             try:
                 # find chr and pos in primary reference genome
-                chr, pos = self.coordinateMap[(alt_chr, alt_pos)]
+                chr, pos = self.coordinateMap[(alt_chr, input_pos)]
             except:
                 # Coordinate cannot be mapped to the primary reference genome.
-                chr = pos = None
-        # different types of variants
-        # 1. C -> G  (SNV)  
-        #    TC-> TG  
-        # 2. TC -> T (deletion)
-        #    TCG -> TG
-        #    TCG -> T
-        #    TCGCG -> TCG
-        # 3. TC -> TCA (insertion)
-        #    TCG -> TCAG
-        #    C -> CTAG
-        #    TCGCG -> TCGCGCG
-        # 4. Complex:
-        #    AA -> ATAAC
-        #    TACT -> TCTA
-        #    (as shown in 1000g vcf files)
+                bin = chr = pos = None
+            # handling coordinate in alternative reference genome
+            alt_bin, alt_pos, ref, alt = normalizeVariant(input_pos, ref, alt)
+            # if there is a valid coordinate in the primary reference genome
+            if pos:
+                # if alt_pos is shifted, pos will also be shifted
+                pos += alt_pos - input_pos
+                bin = getMaxUcscBin(pos - 1, pos)
+            var_key = (chr, pos, ref, alt, alt_chr, alt_pos)
+        else:
+            bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
+            var_key = (chr, pos, ref, alt)
         #
-        if len(ref) > 1 or len(alt) > 1:
-            # STEP 1: remove leading common string
-            # 1. C -> G  (SNV)  
-            #    C -> G  
-            # 2. C -> '' (deletion)
-            #    CG -> G
-            #    CG -> ''
-            #    CG -> ''
-            # 3. '' -> A (insertion)
-            #    G -> AG
-            #    '' -> TAG
-            #    '' -> CG
-            common_leading = 0
-            for i in range(min(len(ref), len(alt))):
-                if ref[i] == alt[i]:
-                    common_leading += 1
-            if common_leading > 0:
-                # pos can be None (if failed to map from alt_pos)
-                if pos:
-                    pos += common_leading
-                # alt_pos is only meaningful in import_alt_build
-                if self.import_alt_build:
-                    alt_pos += common_leading
-                ref = ref[common_leading:]
-                alt = alt[common_leading:]
-            #
-            # STEP 2: remove ending common string
-            # now insertion should have empty ref, deletion should have empty alt
-            if len(alt) > 0 and ref.endswith(alt):  # CG -> G
-                ref = ref[:-len(alt)]
-                alt = ''
-            if len(ref) > 0 and alt.endswith(ref):  # G -> AG
-                alt = alt[:-len(ref)]
-                ref = ''
-        #
-        var_key = (chr, pos, ref, alt, alt_chr, alt_pos) if self.import_alt_build else (chr, pos, ref, alt)
         try:
             return self.variantIndex[var_key]
         except:
-            if alt in ['', '-', '.']:
-                alt = '-'
+            # new varaint!
+            if alt == '-':
                 self.count[3] += 1
-            elif ref in ['', '-', '.']:
-                ref = '-'
+            elif ref == '-':
                 self.count[2] += 1
             elif len(alt) == 1 and len(ref) == 1:
                 self.count[1] += 1
             else:
                 self.count[4] += 1
             if self.import_alt_build:
-                bin = getMaxUcscBin(pos - 1, pos) if pos else None
-                alt_bin = getMaxUcscBin(alt_pos - 1, alt_pos)
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
             else:
-                bin = getMaxUcscBin(pos - 1, pos)
                 cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
             variant_id = cur.lastrowid
             self.variantIndex[var_key] = variant_id

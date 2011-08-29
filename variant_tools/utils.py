@@ -741,3 +741,69 @@ def getMaxUcscBin(start, end):
         startBin >>= _BINNEXTSHIFT
         endBin >>= _BINNEXTSHIFT
     return bin
+
+
+def normalizeVariant(pos, ref, alt):
+    '''Normailize variants in different formats into a standard
+    format that variant tool accepts. This function returns a tuple
+    with UCSC bin, pos, ref, alt
+    '''
+    # this is usually the case but some badly formatted
+    # vcf file use small case for variants
+    ref = ref.upper()
+    alt = alt.upper()
+    # different types of variants
+    # 1. C -> G  (SNV)  
+    #    TC-> TG  
+    # 2. TC -> T (deletion)
+    #    TCG -> TG
+    #    TCG -> T
+    #    TCGCG -> TCG
+    # 3. TC -> TCA (insertion)
+    #    TCG -> TCAG
+    #    C -> CTAG
+    #    TCGCG -> TCGCGCG
+    # 4. Complex:
+    #    AA -> ATAAC
+    #    TACT -> TCTA
+    #    (as shown in 1000g vcf files)
+    #
+    if len(ref) > 1 or len(alt) > 1:
+        # STEP 1: remove leading common string
+        # 1. C -> G  (SNV)  
+        #    C -> G  
+        # 2. C -> '' (deletion)
+        #    CG -> G
+        #    CG -> ''
+        #    CG -> ''
+        # 3. '' -> A (insertion)
+        #    G -> AG
+        #    '' -> TAG
+        #    '' -> CG
+        common_leading = 0
+        for i in range(min(len(ref), len(alt))):
+            if ref[i] == alt[i]:
+                common_leading += 1
+        if common_leading > 0:
+            pos += common_leading
+            ref = ref[common_leading:]
+            alt = alt[common_leading:]
+        #
+        # STEP 2: remove ending common string
+        # now insertion should have empty ref, deletion should have empty alt
+        if len(alt) > 0 and ref.endswith(alt):  # CG -> G
+            ref = ref[:-len(alt)]
+            alt = ''
+        if len(ref) > 0 and alt.endswith(ref):  # G -> AG
+            alt = alt[:-len(ref)]
+            ref = ''
+    #
+    # ref or alt is something like '', '-', '.' or '*'
+    if not alt.isalpha():
+        alt = '-'
+    elif not ref.isalpha():
+        ref = '-'
+    bin = getMaxUcscBin(pos - 1, pos)
+    return bin, pos, ref, alt
+
+
