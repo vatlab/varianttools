@@ -784,6 +784,8 @@ def normalizeVariant(pos, ref, alt):
         for i in range(min(len(ref), len(alt))):
             if ref[i] == alt[i]:
                 common_leading += 1
+            else:
+                break
         if common_leading > 0:
             pos += common_leading
             ref = ref[common_leading:]
@@ -791,12 +793,15 @@ def normalizeVariant(pos, ref, alt):
         #
         # STEP 2: remove ending common string
         # now insertion should have empty ref, deletion should have empty alt
-        if len(alt) > 0 and ref.endswith(alt):  # CG -> G
-            ref = ref[:-len(alt)]
-            alt = ''
-        if len(ref) > 0 and alt.endswith(ref):  # G -> AG
-            alt = alt[:-len(ref)]
-            ref = ''
+        common_ending = 0
+        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
+            if ref[i] == alt[i]:
+                common_ending -= 1
+            else:
+                break
+        if common_ending < 0:
+            ref = ref[:common_ending]
+            alt = alt[:common_ending]
     #
     # ref or alt is something like '', '-', '.' or '*'
     if not alt.isalpha():
