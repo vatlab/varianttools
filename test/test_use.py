@@ -38,8 +38,10 @@ class TestUse(ProcessTestCase):
         runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
         runCmd('vtools import_phenotype phenotype.txt')
         runCmd('vtools import_vcf SAMP1.vcf')
+    
     def removeProj(self):
         runCmd('vtools remove project')
+
     def testUse(self):
         'Test command vtools use'
         self.assertFail('vtools use')
@@ -51,5 +53,32 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools use ./testNSFP.DB')
         runCmd('vtools show fields')
 
+    def testThousandGenomes(self):
+        'Test variants in thousand genomes'
+        # no hg19
+        self.assertFail('vtools use testThousandGenomes.ann --files testThousandGenomes.vcf.head')
+        # liftover
+        self.assertSucc('vtools liftover hg19')
+        # ok now
+        self.assertSucc('vtools use testThousandGenomes.ann --files testThousandGenomes.vcf.head')
+        # 137 lines, 9 with two alt
+        self.assertOutput('vtools execute "SELECT COUNT(1) FROM testThousandGenomes.testThousandGenomes;"', '146\n')
+        # test the handling of 10327   CT   C,CA
+        self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=10328;"',
+            '1, 10328, T, -\n1, 10328, T, A\n')
+        # test the handling of 83934	rs59235392	AG	A,AGAAA	.
+        self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=83935;"',
+            '1, 83935, G, -\n')
+        self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=83936;"',
+            '1, 83936, -, AAA\n')
+        #
+        # Now, let us import vcf regularly.
+        self.assertSucc('vtools init test --force')
+        self.assertSucc('vtools import_vcf testThousandGenomes.vcf.head')
+        self.assertSucc('vtools use testThousandGenomes')
+        # do we have all the variants matched up?
+        self.assertOutput('vtools select variant -c', '146\n')
+        self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')
+        
 if __name__ == '__main__':
     unittest.main()
