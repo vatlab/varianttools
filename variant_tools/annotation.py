@@ -365,21 +365,25 @@ class AnnoDBConfiger:
                             cur.execute(insert_query, bins + records)
                         else:
                             # variant... most troublesome
-                            input_ref = records[build_info[0][2]]
-                            all_alt = records[build_info[0][3]]
+                            #
+                            # We assume that the fields for ref and alt are the same for multiple reference genomes.
+                            # Otherwise we cannot do this.
+                            all_alt = records[build_info[0][3]].split(',')
                             # support multiple alternative alleles
-                            for input_alt in all_alt.split(','):
+                            for input_alt in all_alt:
                                 bins = []
+                                # if there are multiple alternative alleles, we need to use a copy of records because
+                                # some of them will be adjusted. Otherwise, we can change the record itself. Note that
+                                # my_records = records does not cost much in Python.
+                                my_records = [x for x in records] if len(all_alt) > 0 else records
                                 for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
-                                    input_pos = int(records[pos_idx]) + pos_adj
-                                    bin, pos, ref, alt = normalizeVariant(input_pos, input_ref, input_alt)
+                                    bin, pos, ref, alt = normalizeVariant(int(my_records[pos_idx]) + pos_adj, my_records[ref_idx], input_alt)
                                     # these differ build by build
                                     bins.append(bin)
-                                    records[pos_idx] = pos
-                                    # these should be kept unchanged
-                                    records[ref_idx] = ref
-                                    records[alt_idx] = alt
-                                cur.execute(insert_query, bins + records)    
+                                    my_records[pos_idx] = pos
+                                    my_records[ref_idx] = ref
+                                    my_records[alt_idx] = alt
+                                cur.execute(insert_query, bins + my_records)    
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)
