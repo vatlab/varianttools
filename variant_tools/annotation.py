@@ -234,7 +234,8 @@ class AnnoDBConfiger:
                 self.logger.debug(e)
                 self.logger.error('Invalid section {} in configuration file {}'.format(section, filename))
                 return False
-        self.fields.sort(key=lambda k: k.index)
+        # Do not sort fields, use the order sepcified in the .ann file.
+        #self.fields.sort(key=lambda k: k.index.split()[0])
         for field in self.fields:
             self.logger.debug("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
 
