@@ -39,6 +39,7 @@ hg18=chr, txStart, txEnd
 anno_type=range
 description=UCSC Known Genes
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene_hg18.DB.gz
 source_type=txt
 
 [chr]

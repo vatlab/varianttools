@@ -40,6 +40,7 @@ anno_type=position
 description=dbSNP version 130
 version=
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snp130.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP130.DB.gz
 source_type=txt
 
 [chr]
