@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: knownGene.ann $
+# $File: refGene.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -37,8 +37,9 @@ hg19=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
-description=UCSC Known Genes
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
+description=refseq genes
+version=
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
 source_type=txt
 
 [chr]

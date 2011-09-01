@@ -33,12 +33,12 @@
 #
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg18=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
 description=UCSC Known Genes
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
 source_type=txt
 
 [chr]
