@@ -1,7 +1,7 @@
 #Variant tools schema version 1.0
 #
 # Test file for the thousandGenomes annotation database.
-
+#
 [linked fields]
 hg19=chr, pos, ref, alt
 
@@ -47,12 +47,12 @@ type=INTEGER
 comment=RS orientation is reversed
 
 [NS_INFO]
-index=8 FlagExtractor('NS', ';')
+index=8 ValueExtractor('NS=', ';')
 type=INTEGER
 comment=Number of Samples With Data
 
 [AF_INFO]
-index=8 FlagExtractor('AF', ';')
+index=8 ValueExtractor('AF=', ';')
 type=FLOAT
 comment=Allele Frequency
 
@@ -82,7 +82,7 @@ type=INTEGER
 comment=SNP Clinical Significance, 0 - unknown, 1 - untested, 2 - non-pathogenic, 3 - probable-non-pathogenic, 4 - probable-pathogenic, 5 - pathogenic, 6 - drug-response, 7 - histocompatibility, 255 - other
 
 [GMAF_INFO]
-index=8 
+index=8 ValueExtractor('GMAF=', ':')
 type=FLOAT
 comment=Global Minor Allele Frequency [0, 0.5_INFO]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset
 

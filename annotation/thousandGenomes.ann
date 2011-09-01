@@ -1,58 +1,42 @@
 #Variant tools schema version 1.0
 #
-# - The first line is required
-# - Lines starting with # and ; are comments
-# - Inline comments starts with ;
-
-# - Required sections:
+# $File: thousandGenomes.ann $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
 #
-#   [linked fields]:
-#		A database can provide one or more sets of linked fields by which it is linked
-#		to the master variant table of the project. Each line should have format
-#	        
-#	        build=field1,field2,...
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
 #
-#	    where build is the build of a reference genome, or '*' if this annotation database
-#	    can be linked to project with any referenge genome. One or more fields can be
-#	    specified as 'linked fields':
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
 #
-#	    1. for 'variant' annotation database, they should be
-#	       names of chr, pos, ref, and alt fields.
-#	    2. for 'position' annotation database, they should be
-#		   names of chr and pos fields.
-#		3. for 'range' annotation database, they should be names of
-#		   chr, start pos and ending pos fields.
-#		4. for 'field' annotation database, they should be names of fields
-#		   that link to the master variant table.
-#       
-#   [data sources]: This section can have keys
-#       * description: description of the database
-#       * anno_type: can be one of 'variant', 'position', 'range' or 'field'
-#       * direct_url: URL to download annotation database directly. This is only
-#           used for sqlite projects.
-#       * source_type: type of source files, we currently supported
-#           tab based text file (txt) and vcf file.
-#       * source_url: where to download source file.
-#       * source_pattern: pattern of source files (used to exclude README etc)
-#       * version: version of the database, which is not necessarily version 
-#         of the data source. The convension is sourceVersion_dbVersion. If
-#         unspecified, vtools will try to get it from filename. For example, 
-#         dbNSFP-1.1_0.db will have version number 1.1_0.
-# 
-#   fields sections for the fields that will be imported.
-#       * index: 1-based index of the index of the column in the database
-#       * vcf_info: name of the field in vcf file
-#       * type: can be "chromosome", "0-based position", "1-based position",
-#               and SQL allowed types such as "DECIMAL(7,6) NOT NULL"
-#       * null (optional) if specified, value that will be treated as NULL.
-#       * comment (optional) a description of the field
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#   Note: this regular expression find/replace statements can convert the header comments into
-#   ann section descriptions:
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New for
+# a description of the format of this file.
+#
+#
+# ChangeLog:
+#   2011-9-1: Public release.
+#   2011-7-15: Initial import.
+#
+# Note: this regular expression find/replace statements can convert the header
+# comments into ann section descriptions:
 #       find: .*ID=(\w+).*Type=(\w+).*Description="(.*)".*\n
 #       replace: [$1]\nindex=8;$1\ntype=$2\ncomment=$3\n\n
 #       find/replace: Flag/INTEGER
-#
+
 [linked fields]
 hg19=chr, pos, ref, alt
 
@@ -99,12 +83,12 @@ type=INTEGER
 comment=RS orientation is reversed
 
 [NS_INFO]
-index=8 FlagExtractor('NS', ';')
+index=8 ValueExtractor('NS=', ';')
 type=INTEGER
 comment=Number of Samples With Data
 
 [AF_INFO]
-index=8 FlagExtractor('AF', ';')
+index=8 ValueExtractor('AF=', ';')
 type=FLOAT
 comment=Allele Frequency
 
@@ -134,7 +118,7 @@ type=INTEGER
 comment=SNP Clinical Significance, 0 - unknown, 1 - untested, 2 - non-pathogenic, 3 - probable-non-pathogenic, 4 - probable-pathogenic, 5 - pathogenic, 6 - drug-response, 7 - histocompatibility, 255 - other
 
 [GMAF_INFO]
-index=8 
+index=8 ValueExtractor('GMAF=', ':')
 type=FLOAT
 comment=Global Minor Allele Frequency [0, 0.5_INFO]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset
 
