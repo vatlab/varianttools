@@ -32,11 +32,81 @@ import urlparse
 import gzip
 import zipfile
 import tempfile
-import re
 
 from project import AnnoDB, Project, Field
 from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant
 
+# Extractors to extract value from a field
+class FieldExtractor:
+    def __init__(self, index, sep=';', default=None):
+        '''Define an extractor that returns the index-th (1-based) field of the fields
+        separated by specified delimiter. Return default is unsuccessful.'''
+        self.index = index - 1
+        self.sep = sep
+        self.default = default
+    
+    def __call__(self, item):
+        try:
+            return item.split(self.sep)[self.index]
+        except:
+            return self.default
+
+class FlagExtractor:
+    def __init__(self, name, sep=';'):
+        '''Define an extractor that returns 1 is item contains name as one of the fields,
+        and 0 otherwise. No space is allowed between delimiter and flag.'''
+        self.n = name
+        self.s = name + sep
+        self.e = sep + name
+        self.m = sep + name + sep
+    
+    def __call__(self, item):
+        # this should be faster than
+        #
+        #     if self.name in item.split(self.sep):
+        # 
+        # because we do not have to split the whole string.
+        #
+        if self.n not in item:
+            return '0'
+        # put the most common case first
+        if self.m in item or item.startswith(self.s) or item.endswith(self.e) or item == self.n:
+            return '1'
+        else:
+            return '0'
+
+class ValueExtractor:
+    def __init__(self, name, sep=';', default=None):
+        '''Define an extractor that returns the value after name in one of the fields,
+        and a default value if no such field is found. No space is allowed between 
+        delimiter and the name.'''
+        self.name = name
+        self.sep = sep
+        self.pos = len(name)
+        self.default = default
+
+    def __call__(self, item):
+        if self.name not in item:
+            return self.default
+        for field in item.split(self.sep):
+            if field.startswith(self.name):
+                return field[self.pos:]
+        return self.default
+
+class SequentialExtractor:
+    def __init__(self, extractors):
+        '''Define an extractor that calls a list of extractors. The string extracted from
+        the first extractor will be passed to the second, and so on.'''
+        self.extractors = extractors
+
+    def __call__(self, item):
+        for e in self.extractors:
+            # if item is None or ''
+            if not item:
+                return item
+            item = e(item)
+        return item
+  
 
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -287,13 +357,19 @@ class AnnoDBConfiger:
             # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
             # we need to get the fields...
             elif not field.index.isdigit():
-                try:
-                    i, s, n = re.match('(\d+)([\s\t:;,|])(\w+)', field.index).groups()
-                except:
-                     # wrong index...
-                     self.logger.debug("Regex is not working for {}".format(field))
-                pattern = re.compile('(^|{0}){1}((=[^{0}]+)*)($|{0})'.format(s, n)) # patter of [separator or begin]name=value[separator or end] )
-                field_info.append((int(i), (n, pattern), field.null))
+                i = field.index.split()[0]
+                #
+                # get an instance of an extractor, or a function
+                e = eval(' '.join(field.index.split()[1:]))
+                # 1. Not all passed object has __call__ (user can define a lambda function)
+                # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
+                #    e will improve performance because __call__ does not have to be looked up each time.
+                # 3. Passing object directly has an unexpected side effect on performance because comparing
+                #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
+                if hasattr(e, '__call__'):
+                    e = e.__call__
+                #
+                field_info.append((int(i), e, field.null))
             else:
                 field_info.append((int(field.index), None, field.null))
         # files?
@@ -324,22 +400,12 @@ class AnnoDBConfiger:
                                 elif adj == 'c':
                                     if item.startswith('chr'):  # if the item doesn't start with chr, then item=chromsome_number
                                         item = item[3:]
-                                else: # must be a name,pattern pair
+                                else: # must be an extractor or a function
                                     try:
-                                        # a flag that isn't listed (therefore set to False or 0)
-                                        if not adj[0] in item:
-                                            item = 0
-                                        else:
-                                            item = adj[1].search(item).group(3)
-                                            #self.logger.debug("matched item = " + item)
-                                            if item is not None:
-                                                item = item[1:]
-                                            else: # a flag that exists (therefore set to True or 1)
-                                                item = 1
+                                        item = adj(item)
                                     except:
-                                        # this is the case missed by 'adj[0] in item'. For example
-                                        # Pilot1 is in item with field Pilot123
-                                        item = 0
+                                        # missing ....
+                                        item = None
                             if item == null:
                                 item = None
                             #
