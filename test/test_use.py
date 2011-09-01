@@ -79,6 +79,13 @@ class TestUse(ProcessTestCase):
         # do we have all the variants matched up?
         self.assertOutput('vtools select variant -c', '146\n')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')
+
+    def testNSFP(self):
+        'Test variants in dbNSFP'
+        self.assertSucc('vtools use ./testNSFP.ann --files ./testNSFP.zip')
+        # see if YRI=10/118 is correctly extracted
+        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '10, 118\n')
+        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9, 118\n')
         
 if __name__ == '__main__':
     unittest.main()

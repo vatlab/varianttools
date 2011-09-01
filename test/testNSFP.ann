@@ -90,3 +90,40 @@ index=26
 type=VARCHAR(2) NULL
 null=NA
 
+[CEU_alt_lc]
+index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CEU population, reported by 1000 genome low coverage data"
+
+[CEU_total_lc]
+index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CEU population, reported by 1000 genome low coverage data"
+
+[YRI_alt_lc]
+index=34 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the YRI population, reported by 1000 genome low coverage data"
+
+[YRI_total_lc]
+index=34 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the YRI population, reported by 1000 genome low coverage data"
+
+[CHBJPT_alt_lc]
+index=34 SequentialExtractor([ValueExtractor('CHBJPT:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CHBJPT population, reported by 1000 genome low coverage data"
+
+[CHBJPT_total_lc]
+index=34 SequentialExtractor([ValueExtractor('CHBJPT:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CHBJPT population, reported by 1000 genome low coverage data"
+
+
