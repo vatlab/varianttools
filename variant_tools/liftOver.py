@@ -102,6 +102,7 @@ class LiftOverTool:
         cur.execute('SELECT variant_id, chr, pos FROM variant;')
         # output ID so that we can re-insert
         prog = ProgressBar('Exporting variants', self.db.numOfRows("variant"))
+        count = 0
         with open(filename, 'w') as var_in:
             for count, rec in enumerate(cur):
                 # NOTE: the change from 1-based index to 0-based (assumed by liftOver)
