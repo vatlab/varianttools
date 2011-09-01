@@ -227,28 +227,129 @@ index=32
 type=VARCHAR(128)
 comment=descriptive gene name
 
-[CEU_alt_1000_genomes_high_coverage]
+[CEU_alt_hc]
 index=33 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(1, '/')])
 type=INTEGER
 null=.
 comment="Number of alternative allele in the CEU population, reported by 1000 genome high coverage data"
 
-[CEU_total_1000_genomes_high_coverage]
+[CEU_total_hc]
 index=33 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(2, '/')])
 type=INTEGER
 null=.
 comment="Total number of allele in the CEU population, reported by 1000 genome high coverage data"
 
-[CEU_alt_1000_genomes_low_coverage]
+
+[YRI_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the YRI population, reported by 1000 genome high coverage data"
+
+[YRI_total_hc]
+index=33 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the YRI population, reported by 1000 genome high coverage data"
+
+
+[LWK_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('LWK:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the LWK population, reported by 1000 genome high coverage data"
+
+[LWK_total_hc]
+index=33 SequentialExtractor([ValueExtractor('LWK:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the LWK population, reported by 1000 genome high coverage data"
+
+
+[TSI_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('TSI:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the TSI population, reported by 1000 genome high coverage data"
+
+[TSI_total_hc]
+index=33 SequentialExtractor([ValueExtractor('TSI:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the TSI population, reported by 1000 genome high coverage data"
+
+[CHB_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('CHB:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CHB population, reported by 1000 genome high coverage data"
+
+[CHB_total_hc]
+index=33 SequentialExtractor([ValueExtractor('CHB:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CHB population, reported by 1000 genome high coverage data"
+
+
+[JPT_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('JPT:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the JPT population, reported by 1000 genome high coverage data"
+
+[JPT_total_hc]
+index=33 SequentialExtractor([ValueExtractor('JPT:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the JPT population, reported by 1000 genome high coverage data"
+
+[CHD_alt_hc]
+index=33 SequentialExtractor([ValueExtractor('CHD:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CHD population, reported by 1000 genome high coverage data"
+
+[CHD_total_hc]
+index=33 SequentialExtractor([ValueExtractor('CHD:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CHD population, reported by 1000 genome high coverage data"
+
+
+[CEU_alt_lc]
 index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(1, '/')])
 type=INTEGER
 null=.
 comment="Number of alternative allele in the CEU population, reported by 1000 genome low coverage data"
 
-[CEU_total_1000_genomes_low_coverage]
+[CEU_total_lc]
 index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(2, '/')])
 type=INTEGER
 null=.
 comment="Total number of allele in the CEU population, reported by 1000 genome low coverage data"
+
+[YRI_alt_lc]
+index=34 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the YRI population, reported by 1000 genome low coverage data"
+
+[YRI_total_lc]
+index=34 SequentialExtractor([ValueExtractor('YRI:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the YRI population, reported by 1000 genome low coverage data"
+
+[CHBJPT_alt_lc]
+index=34 SequentialExtractor([ValueExtractor('CHBJPT:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CHBJPT population, reported by 1000 genome low coverage data"
+
+[CHBJPT_total_lc]
+index=34 SequentialExtractor([ValueExtractor('CHBJPT:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CHBJPT population, reported by 1000 genome low coverage data"
 
 
