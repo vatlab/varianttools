@@ -227,15 +227,28 @@ index=32
 type=VARCHAR(128)
 comment=descriptive gene name
 
-[freq_1000_genomes_high_coverage]
-index=33
-type=VARCHAR(128)
-comment="allele frequencies reported by 1000 genome high coverage data, in format: pop1:alt allele #/total allele #;pop2:alt allele #/total allele #;..."
-
-[freq_1000_genomes_low_coverage]
-index=34
-type=VARCHAR(128)
+[CEU_alt_1000_genomes_high_coverage]
+index=33 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(1, '/')])
+type=INTEGER
 null=.
-comment="allele frequencies reported by 1000 genome low coverage data, in format: pop1:alt allele #/total allele #;pop2:alt allele #/total allele #;..."
+comment="Number of alternative allele in the CEU population, reported by 1000 genome high coverage data"
+
+[CEU_total_1000_genomes_high_coverage]
+index=33 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CEU population, reported by 1000 genome high coverage data"
+
+[CEU_alt_1000_genomes_low_coverage]
+index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(1, '/')])
+type=INTEGER
+null=.
+comment="Number of alternative allele in the CEU population, reported by 1000 genome low coverage data"
+
+[CEU_total_1000_genomes_low_coverage]
+index=34 SequentialExtractor([ValueExtractor('CEU:'), FieldExtractor(2, '/')])
+type=INTEGER
+null=.
+comment="Total number of allele in the CEU population, reported by 1000 genome low coverage data"
 
 
