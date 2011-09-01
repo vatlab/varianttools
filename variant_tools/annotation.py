@@ -395,7 +395,9 @@ class AnnoDBConfiger:
                         for col, adj, null in field_info:
                             col -= 1
                             item = tokens[col]
-                            if adj is not None:
+                            if item == null:
+                                item = None
+                            elif adj is not None:
                                 if adj == 1:
                                     item = int(item) + adj
                                 elif adj == 'c':
@@ -407,6 +409,7 @@ class AnnoDBConfiger:
                                     except:
                                         # missing ....
                                         item = None
+                            # adjusted item can still be null
                             if item == null:
                                 item = None
                             #
