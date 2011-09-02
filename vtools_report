@@ -285,9 +285,16 @@ if __name__ == '__main__':
     #
     # command variant_stat
     parser = subparsers.add_parser('variant_stat',
-        help='Reports number of snps, insertions, deletions and substitutions per sample with some size metrics to characterize the indels',
-        description='''Command 'vtools variant_counts_per_sample' calculates the number of 
-        	snps, insertions, deletions and substitutions per sample with some size metrics to characterize the indels.''')
+        help='''Reports number of snps, insertions, deletions and substitutions for
+            groups of samples with some size metrics to characterize the indels''',
+        description='''Command 'vtools variant_stat' calculates the number of 
+        	snps, insertions, deletions and substitutions for groups of samples
+            with some size metrics to characterize the indels. The statistics can
+            be calculated for all samples (effectively for the master variant table
+            when parameters --samples and --group_by are ignored), a subset of samples
+            (e.g. --samples aff=1), grouped by samples (e.g. --group_by aff), or for
+            each sample separately (e.g. --group_by filename sample_name, because those
+            two fields in the sample table uniquely identify each sample.''')
     variantStatArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variantStat)
