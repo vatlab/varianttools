@@ -179,7 +179,6 @@ class AnnoDB:
                 print('Missing entries: {:,}'.format(res[1]))
                 if numeric:
                     print('Range: {} - {}'.format(res[2], res[3]))
-        return info
 
 #  Project management
 #
