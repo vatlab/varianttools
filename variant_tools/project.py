@@ -995,14 +995,16 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'table', 'samples', 'field'],
+    parser.add_argument('type', choices=['project', 'table', 'samples', 'field', 'annotation'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed. It can be the name of project for type
             project (optional), names of one or more variant tables for
-            type table, a pattern for type 'samples', a name of a field. Note that
-            removal of samples will only remove sample information related to variants,
-            not variants themselves.''')
+            type table, a pattern for type 'samples', name of fields or annotation
+            databases. Note that removal of samples will only remove sample information
+            related to variants, not variants themselves; removal of annotation databases
+            will stop using these databases in the project, but will not removing them
+            from disk.''')
     
 
 def remove(args):
@@ -1041,6 +1043,18 @@ def remove(args):
                 for table, items in from_table.items():
                     proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
                     proj.db.removeFields(table, items)
+            elif args.type == 'annotation':
+                for item in args.items:
+                    removed = False
+                    for i in range(len(proj.annoDB)):
+                        if proj.annoDB[i].name == item:
+                            proj.logger.info('Removing annotation database {} from the project'.format(item))
+                            proj.annoDB.pop(i)
+                            removed = True
+                            break
+                    if not removed:
+                        proj.logger.warning('Cannot remove annotation database {} from the project'.format(item))
+                proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in proj.annoDB]))
     except Exception as e:
         sys.exit(e)
 
