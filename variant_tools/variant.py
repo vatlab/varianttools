@@ -157,14 +157,18 @@ def select(args, reverse=False):
                 from_clause = 'FROM {} '.format(args.from_table)
             # if limiting to specified samples
             if args.samples:
-                p = Sample(proj)
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(args.samples))
                 if len(IDs) == 0:
-                    p.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
+                    proj.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
+                    # nothing will be selected
+                    where_clause += ' AND 0'
+                elif len(IDs) == proj.db.numOfRows('sample'):
+                    proj.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                    # we do not have to add anything to where_clause
                 else:
-                    p.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                    proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         args.from_table, 
                         '\nUNION '.join(['SELECT variant_id FROM {}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs])) 
