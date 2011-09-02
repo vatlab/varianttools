@@ -58,9 +58,9 @@ class AnnoDB:
     '''
     def __init__(self, proj, annoDB, linked_by=[]):
         proj.logger.debug('Loading annotation database {}'.format(annoDB))
-        db = proj.db.newConnection()
-        if db.hasDatabase(annoDB):
-            db.connect(annoDB)
+        self.db = proj.db.newConnection()
+        if self.db.hasDatabase(annoDB):
+            self.db.connect(annoDB)
         else:
             raise ValueError("Cannot locate annotation database {}".format(annoDB))
         #
@@ -73,11 +73,11 @@ class AnnoDB:
             self.name = os.path.splitext(self.filename)[0]
             self.version = None
         for table in [self.name, self.name + '_field', self.name + '_info']:
-            if not db.hasTable(table):
+            if not self.db.hasTable(table):
                 raise ValueError('{} is not a valid annotation database. Missing table {}.'.format(annoDB, table))
         # read fields from DB
         self.fields = []
-        cur = db.cursor()
+        cur = self.db.cursor()
         cur.execute('SELECT * from {}_field;'.format(self.name))
         for rec in cur:
             self.fields.append(Field(*rec))
@@ -136,16 +136,49 @@ class AnnoDB:
         if self.anno_type == 'attribute' and len(self.linked_by) != len(self.build):
             raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
 
-    def __repr__(self):
+    def describe(self, verbose=False):
         '''Describe this annotation database'''
-        info = '\nAnnotation database {} ({} {})\n'.format(self.name, self.anno_type, ', ver {}'.format(self.version) if self.version else '')
+        print('Annotation database {} {}'.format(self.name, '(version {})'.format(self.version) if self.version else ''))
         if self.description is not None:
-            info += self.description + '\n'
+            print('Description: {}'.format(self.description))
+        print('Database type: {}'.format(self.anno_type))
+        # get linking fields
+        if verbose:
+            # number of records
+            print('Number of records: {:,}'.format(self.db.numOfRows(self.name)))
+            fields = self.refGenomes.values()[0]
+            cur = self.db.cursor()
+            cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(fields), self.name))
+            count = cur.fetchone()[0]
+            if self.anno_type == 'variant':
+                print('Number of unique variants: {:,}'.format(count))
+            elif self.anno_type == 'position':
+                print('Number of unique positions: {:,}'.format(count))
+            elif self.anno_type == 'range':
+                print('Number of unique ranges: {:,}'.format(count))
+            elif self.anno_type == 'field':
+                print('Number of unique entries: {:,}'.format(count))
+        #
         for key in self.refGenomes:
-            info += 'Reference genome {}: {}\n'.format(key, self.refGenomes[key])
+            print('Reference genome {}: {}'.format(key, self.refGenomes[key]))
         for field in self.fields:
-            info += '    {:<20}{}\n'.format(field.name, '\n'.join(textwrap.wrap(
-                field.comment, initial_indent=' ', subsequent_indent=' '*25)))
+            if not verbose:
+                print('    {:<20}{}'.format(field.name, '\n'.join(textwrap.wrap(
+                    field.comment, initial_indent=' ', subsequent_indent=' '*25))))
+            else:
+                print('\nField:   {}'.format(field.name))
+                print('Type:    {}'.format(field.type))
+                if field.commet:
+                    print('Comment: {}'.format('\n'.join(textwrap.wrap(
+                        field.comment, initial_indent='', subsequent_indent=' '*9))))
+                numeric = 'int' in field.type.lower() or 'float' in field.type.lower()
+                cur.execute('SELECT COUNT(DISTINCT {0}), COUNT({0} IS NULL {2}) FROM {1};'.format(field.name, self.name,
+                    ', MIN({}), MAX({})'.format(field.name) if numeric else ''))
+                res = cur.fetchone()
+                print('Unique Entries: {:,}'.format(res[0]))
+                print('Missing entries: {:,}'.format(res[1]))
+                if numeric:
+                    print('Range: {} - {}'.format(res[2], res[3]))
         return info
 
 #  Project management
@@ -1061,13 +1094,14 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'fields', 'annotations'], nargs='?', default='project',
+        'samples', 'fields', 'annotations', 'annotation'], nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
             verbosity=2), table (a specific table), samples (sample and
             phenotype information), fields (from variant tables and all used
-            annotation databases), and annotations (all available annotation
-            databases for variant tools). Default to project.''')
+            annotation databases), annotations (all available annotation
+            databases for variant tools) and specified annotation. Default to
+            project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
     parser.add_argument('-l', '--limit', default=10, type=int,
@@ -1078,14 +1112,13 @@ def showArguments(parser):
 def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            out = sys.stdout
             #
             if args.type == 'project':
-                out.write(proj.summarize())
+                print(proj.summarize())
             elif args.type == 'tables':
-                out.write('{:<20} {}\n'.format('table', '#variants'))
+                print('{:<20} {}'.format('table', '#variants'))
                 for table in proj.db.tables() if args.verbosity=='2' else proj.getVariantTables():
-                    out.write('{:<20} {:,}\n'.format(table, proj.db.numOfRows(table)))
+                    print('{:<20} {:,}'.format(table, proj.db.numOfRows(table)))
             elif args.type == 'table':
                 if not args.items:
                     raise ValueError('Please specify a table to display')
@@ -1097,14 +1130,14 @@ def show(args):
                     raise ValueError('Table {} does not exist'.format(table))
                 # print content of table
                 headers = proj.db.getHeaders(table)
-                out.write(', '.join(headers) + '\n')
+                print(', '.join(headers))
                 cur = proj.db.cursor()
                 if args.limit < 0:
                     cur.execute('SELECT * FROM {};'.format(table, 10))
                 else:
                     cur.execute('SELECT * FROM {} LIMIT 0,{};'.format(table, args.limit))
                 for rec in cur:
-                    out.write(', '.join([str(x) for x in rec]) + '\n')
+                    print(', '.join([str(x) for x in rec]))
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
@@ -1112,29 +1145,35 @@ def show(args):
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
                 # headers are ID, file, sample, FIELDS
-                out.write('filename\tsample_name{}\n'.format(''.join(['\t'+x for x in fields[3:]])))
+                print('filename\tsample_name{}'.format(''.join(['\t'+x for x in fields[3:]])))
                 cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id;'\
                     .format(', '.join(fields[2:])))
                 for rec in cur:
-                    out.write('\t'.join(['{}'.format(x) for x in rec]) + '\n')
-                out.close()  
+                    print('\t'.join(['{}'.format(x) for x in rec]))
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
                     proj.logger.info('No annotation database is attached.')
                 for table in proj.getVariantTables():
-                    out.write(''.join(['{}.{}\n'.format(table, field) for field in proj.db.getHeaders(table)]))
+                    print(''.join(['{}.{}'.format(table, field) for field in proj.db.getHeaders(table)]))
                 for db in proj.annoDB:
                     if args.verbosity == '0':
-                        out.write(''.join(['{}.{}\n'.format(db.name, x.name) for x in db.fields]))
+                        print(''.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
                     else:
-                        out.write(''.join(['{}.{} {}\n'.format(db.name, x.name,
+                        print(''.join(['{}.{} {}'.format(db.name, x.name,
                             '\n'.join(textwrap.wrap(x.comment, initial_indent=' '*(27-len(db.name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
-                out.close()
+            elif args.type == 'annotation':
+                for item in args.items:
+                    try:
+                        annoDB = [x for x in proj.annoDB if x.name.lower() == item.lower()][0]
+                    except Exception as e:
+                        proj.logger.debug(e)
+                        raise IndexError('Database {} is not currently used in the project'.format(item))
+                    annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
                 DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
                 for db in DBs:
-                    out.write('{}\n'.format(db))
+                    print(db)
     except Exception as e:
         sys.exit(e)
 
@@ -1146,16 +1185,13 @@ def executeArguments(parser):
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            out = sys.stdout
-            #
             cur = proj.db.cursor()
             query = ' '.join(args.query)
             proj.logger.debug('Executing SQL statement: "{}"'.format(query))
             cur.execute(query)
             proj.db.commit()
             for rec in cur:
-                out.write(', '.join(['{}'.format(x) for x in rec]) + '\n')
-            out.close()  
+                print(', '.join(['{}'.format(x) for x in rec]))
     except Exception as e:
         sys.exit(e)
 
