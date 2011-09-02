@@ -39,7 +39,7 @@ def addVerbosityArg(parser):
             in project and vtools_report log files.''')
 
 # global logger object, which will be set by getLogger() when the script
-# is executed. If this sc
+# is executed. 
 verbosity = '1'
 logger = None
 
@@ -86,13 +86,33 @@ def getNumOfSamples():
     logger.info('Getting number of samples')
     return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
 
-def getSamples(args):
-    if args.samples:
-        sample_condition = ' AND '.join(args.samples)
-        return getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {}'.format(sample_condition)]).split('\n')
-    else:
-        return getoutput(['vtools', 'execute', 'SELECT sample_id FROM sample']).split('\n')
-    
+def getSamples(samples, group_by=[]):
+    '''return a generator that returns samples group by group. To use this functions, call it like
+    for group, IDs in getSamples(condi, group_by):
+        # do something with group and IDs.
+    '''
+    output = getoutput(['vtools', 'execute', 'SELECT {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {} {};'\
+        .format('sample_id, {}'.format(', '.join(group_by)) if group_by else 'sample_id',
+            'WHERE {}'.format(' AND '.join(samples)) if samples else '',
+            'GROUP BY {}'.format(', '.join(group_by)) if group_by else '')]).split('\n')
+    # we return results batch by batch as a generator
+    IDs = []
+    group = ()
+    for line in output:
+        fields = [x.strip() for x in line.split(',')]
+        ID = fields[0]
+        g = tuple(fields[1:])
+        if group == ():
+            group = g
+        if g == group:
+            IDs.append(ID)
+        else:
+            yield (group, IDs)
+            # start a new group
+            group = g
+            IDs = [ID]
+    yield (group, IDs)
+
 #
 # Command trans_ratio
 #
@@ -169,6 +189,10 @@ def variantStatArguments(parser):
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
+    parser.add_argument('-g', '--group_by', nargs='*', default=[],
+        help='''Group samples by certain conditions such as 'aff=1'. A common
+            usage is to group variants by 'filename' and 'sample_name' so that
+            variant statistics are outputted for each sample.''')
     parser.add_argument('table', 
         help='''Variant table for which variant metrics are calculated.''')
 
@@ -177,42 +201,34 @@ def variantStat(args):
     
     # 1) Get samples based on the conditional parameter --samples
     #    Exit the report if there are no samples to analyze.
-    sample_ids = getSamples(args)
-    if len(sample_ids) == 0:
-        sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
-        
-    out.write(  'sample_filename\tsample_name\tnum_snps\tnum_insertions\tnum_deletions\t' +
+    out.write('\t'.join(args.group_by) + '\tnum_sample\tnum_snps\tnum_insertions\tnum_deletions\t' +
                 'num_substitutions\tmin_insertion_size\tavg_insertion_size\tmax_insertion_size\t' +
                 'min_deletion_size\tavg_deletion_size\tmax_deletion_size\n')
-                          
-    # 2) Several vtools commands are run across each sample to calcluate various indel metrics.
-    for sample_id in sample_ids:
-	
+    for group, sample_ids in getSamples(args.samples, args.group_by):
+        if len(sample_ids) == 0:
+            sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
+        #
     	# 2a) Get the counts for snps and substitutions:
-    	#     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id = $sample_id' --count
+    	#     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
     	num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 or length(alt) = 1)",
-            '--samples', 'sample_id=' + sample_id, '--count'])
+            '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
        	num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
-            '--samples', 'sample_id=' + sample_id, '--count'])
-    	
+            '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
+    	#
     	# 2b) Get the metrics to characterize the insertions
-    	#     command: vtools select variant "ref = '-'" --samples 'sample_id = $sample_id' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
+    	#     command: vtools select variant "ref = '-'" --samples 'sample_id IN $sample_ids' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
     	num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
-            ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id=' + sample_id,
+            ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
             '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
-    	
+        #    	
     	# 2c) Get the metrics to characterize the deletions
-    	#     command: vtools select variant "alt = '-'" --samples 'sample_id = $sample_id' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'   	
+    	#     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'   	
     	num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
-            ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id=' + sample_id,
+            ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t') 	
-    	
-    	# 2d) Get sample name and filename to make the report more meaningful
-    	sample_filename, sample_name = getoutput(['vtools', 'execute',
-            'SELECT f.filename, s.sample_name FROM sample s, filename f WHERE s.file_id=f.file_id AND s.sample_id=' + sample_id + ' AND f.file_id=s.file_id']).split(',')
-    	
-    	out.write(	sample_filename + '\t' + 
-    				sample_name + '\t' +
+    	#
+    	out.write(	'\t'.join(group) + '\t' + 
+                    len(sample_ids) + '\t' +
     				num_snps + '\t' + 
     				num_insertions + '\t' + 
     				num_deletions + '\t' +
