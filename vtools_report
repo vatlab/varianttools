@@ -82,7 +82,6 @@ def getoutput(cmd):
 # reports.
 #
 def getNumOfSamples():
-    # FIXME: should we rely on SELECT COUNT(1) FROM sample?
     logger.info('Getting number of samples')
     return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
 
@@ -225,18 +224,6 @@ def variantStat(args):
 			min_deletion_size, avg_deletion_size, max_deletion_size]))
 	
 
-#
-# Command annotation
-#
-def annotationArguments(parser):
-    parser.add_argument('database', 
-        help='''Annotation database to be summarized, which should have been used by the
-            current project using command "vtools use".''')
-
-def annotation(args):
-    pass
-    
-
 if __name__ == '__main__':
     #
     master_parser = argparse.ArgumentParser(description='''A collection of functions that
@@ -293,19 +280,6 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=variantStat)
     #
-    # command annotation
-    parser = subparsers.add_parser('annotation',
-        help='''Reports properties of each fields in specified annotation database
-            in detail.''',
-        description='''Command 'vtools annotation' outputs summary statistics
-            including number of variants, valid (not NULL) and unique entries,
-            and range and mean for numerical fields. You generally do not need
-            to run this command to provided annotation databases because such 
-            information are provided online.''')
-    annotationArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=annotation)
-    # 
     # getting args
     args = master_parser.parse_args()
     # setting global logger
