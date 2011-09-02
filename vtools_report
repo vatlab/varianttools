@@ -227,18 +227,9 @@ def variantStat(args):
             ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t') 	
     	#
-    	out.write(	'\t'.join(group) + '\t' + 
-                    len(sample_ids) + '\t' +
-    				num_snps + '\t' + 
-    				num_insertions + '\t' + 
-    				num_deletions + '\t' +
-    				num_substitutions + '\t' +
-    				min_insertion_size + '\t' +
-    				avg_insertion_size + '\t' +
-    				max_insertion_size + '\t' +
-    				min_deletion_size + '\t' +
-    				avg_deletion_size + '\t' +
-    				max_deletion_size + '\n')
+    	out.write('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
+			num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
+			min_deletion_size, avg_deletion_size, max_deletion_size]) + '\n')
     #
     out.close()
 	
@@ -298,6 +289,19 @@ if __name__ == '__main__':
     variantStatArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variantStat)
+    #
+    # command annotation
+    parser = subparser.add_parser('annotation',
+        help='''Reports properties of each fields in specified annotation database
+            in detail.''',
+        description='''Command 'vtools annotation' outputs summary statistics
+            including number of variants, valid (not NULL) and unique entries,
+            and range and mean for numerical fields. You generally do not need
+            to run this command to provided annotation databases because such 
+            information are provided online.''')
+    annotationArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=annotation)
     # 
     # getting args
     args = master_parser.parse_args()
