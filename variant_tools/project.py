@@ -166,19 +166,32 @@ class AnnoDB:
                 print('    {:<20}{}'.format(field.name, '\n'.join(textwrap.wrap(
                     field.comment, initial_indent=' ', subsequent_indent=' '*25))))
             else:
-                print('\nField:   {}'.format(field.name))
-                print('Type:    {}'.format(field.type))
-                if field.commet:
+                print('\nField:           {}'.format(field.name))
+                numeric = False
+                if 'chromosome' in field.type.lower():
+                    print('Type:            chromosome')
+                elif 'position' in field.type.lower():
+                    print('Type:            integer')
+                    numeric = True
+                elif 'int' in field.type.lower():
+                    print('Type:            integer')
+                    numeric = True
+                elif 'float' in field.type.lower():
+                    print('Type:            float')
+                    numeric = True
+                else:
+                    print('Type:            string')
+                if field.comment:
                     print('Comment: {}'.format('\n'.join(textwrap.wrap(
-                        field.comment, initial_indent='', subsequent_indent=' '*9))))
-                numeric = 'int' in field.type.lower() or 'float' in field.type.lower()
-                cur.execute('SELECT COUNT(DISTINCT {0}), COUNT({0} IS NULL {2}) FROM {1};'.format(field.name, self.name,
-                    ', MIN({}), MAX({})'.format(field.name) if numeric else ''))
+                        field.comment, initial_indent='        ', subsequent_indent=' '*17))))
+                cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
+                print('Missing entries: {:,}'.format(cur.fetchone()[0]))
+                cur.execute('SELECT COUNT(DISTINCT {0}) {2} FROM {1};'.format(field.name, self.name,
+                    ', MIN({0}), MAX({0})'.format(field.name) if numeric else ''))
                 res = cur.fetchone()
-                print('Unique Entries: {:,}'.format(res[0]))
-                print('Missing entries: {:,}'.format(res[1]))
+                print('Unique Entries:  {:,}'.format(res[0]))
                 if numeric:
-                    print('Range: {} - {}'.format(res[2], res[3]))
+                    print('Range:           {} - {}'.format(res[1], res[2]))
 
 #  Project management
 #
