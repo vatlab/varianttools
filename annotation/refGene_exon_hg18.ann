@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: refGene_hg19.ann $
+# $File: refGene.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -33,14 +33,14 @@
 #
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg18=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
 description=refseq Genes
 version=
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_hg19.DB.gz
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/refGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_exon_hg18.DB.gz
 source_type=txt
 
 [name]
@@ -82,6 +82,16 @@ index=9
 type=INTEGER NULL
 comment=Number of exons
 
+[exon_start]
+index=10 FieldsExtractor(',')
+type=0-based position, not null
+comment=exon start position
+
+[exon_end]
+index=11 FieldsExtractor(',')
+type=1-based position, not null
+comment=exon end position
+
 [score]
 index=12
 type=INTEGER NULL
@@ -101,4 +111,3 @@ comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
 index=15
 type=VARCHAR(10)
 comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'
-

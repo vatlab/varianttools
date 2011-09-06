@@ -33,14 +33,14 @@
 #
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg19=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
-description=refseq Genes
+description=Exon locations of refseq Genes
 version=
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_hg19.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_exon_hg19.DB.gz
 source_type=txt
 
 [name]
@@ -81,6 +81,16 @@ comment=Coding region end
 index=9
 type=INTEGER NULL
 comment=Number of exons
+
+[exon_start]
+index=10 FieldsExtractor(',')
+type=0-based position, not null
+comment=exon start position
+
+[exon_end]
+index=11 FieldsExtractor(',')
+type=1-based position, not null
+comment=exon end position
 
 [score]
 index=12

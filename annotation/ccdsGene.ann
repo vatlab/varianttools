@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: ccds_gene.ann $
+# $File: ccdsGene.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -28,65 +28,76 @@
 #
 #
 # ChangeLog:
-#   2011-9-6: Initial import.
+#   2011-9-1: Public release.
+#   2011-7-15: Initial import.
 #
 
 [linked fields]
-hg19=chr, cds_from, cds_to
+hg19=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
-description=CCDS gene
+description=ccds Genes
 version=20110422
-source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/CCDS/archive/HsGRCH37.2/CCDS.20110422.txt
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
 direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110422.DB.gz
 source_type=txt
 
-[chr]
-index=1
-type=chromosome
-
-[nc_accession]
+[name]
 index=2
 type=VARCHAR(255)
-comment=nc accession
+comment=Gene name
 
-[gene]
+[chr]
 index=3
-type=VARCHAR(255)
-comment=gene name
+type=chromosome
 
-[gene_id]
+[strand]
 index=4
-type=INTEGER
-comment=gene id
-
-[ccds_id]
-index=5
-type=VARCHAR(255)
-comment=ccds id
-
-[ccds_status]
-index=6
-type=VARCHAR(20)
-comment=ccds status, can be Public, Reviewed, Under review, or Withdrawn
-
-[ccds_strand]
-index=7
 type=CHAR(1) NULL
 comment=which DNA strand contains the observed alleles
 
-[cds_from]
-index=8
+[txStart]
+index=5
 type=0-based position
-comment=coding sequence start position (1-based)
+comment=Transcription start position
 
-[cds_to]
-index=9
+[txEnd]
+index=6
 type=1-based position
-comment=coding sequence ending position (1-based)
+comment=Transcription end position
 
-[match_type]
-index=11
-type=VARCHAR(20)
-comment=match type, mostly identical.
+[cdsStart]
+index=7
+type=0-based position
+comment=Coding region start
+
+[cdsEnd]
+index=8
+type=1-based position
+comment=Coding region end
+
+[exonCount]
+index=9
+type=INTEGER NULL
+comment=Number of exons
+
+[score]
+index=12
+type=INTEGER NULL
+comment=Score
+
+[name2]
+index=13
+type=VARCHAR(255)
+comment=Alternative name
+
+[cdsStartStat]
+index=14
+type=VARCHAR(10)
+comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
+
+[cdsEndStat]
+index=15
+type=VARCHAR(10)
+comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'

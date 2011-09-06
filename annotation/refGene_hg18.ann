@@ -92,3 +92,12 @@ index=13
 type=VARCHAR(255)
 comment=Alternative name
 
+[cdsStartStat]
+index=14
+type=VARCHAR(10)
+comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
+
+[cdsEndStat]
+index=15
+type=VARCHAR(10)
+comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'
