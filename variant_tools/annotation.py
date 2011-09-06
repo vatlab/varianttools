@@ -320,6 +320,19 @@ class AnnoDBConfiger:
                     return os.path.join(self.path, self.source_url)
                 else:
                     tempFile = os.path.join(self.path, self.source_url)
+            elif self.source_url.upper().startswith('SQL:'):
+                res = urlparse.urlparse(self.source_url)
+                user = res.user
+                password = res.password
+                query = res.netloc
+                db = DababaseEngine(engine='mysql', user=user, passwd=password)
+                cur = db.cursor()
+                res = db.execute(query)
+                filename = os.path.join(tdir, '{}_sql.txt'.format(self.name))
+                with open(filename, 'w') as output:
+                    for rec in res:
+                        output.write('{}\n'.format(','.join([str(x) for x in rec])))
+                return [filename]
             else:
                 filename = os.path.split(self.source_url)[-1]
                 self.logger.info('Downloading {}'.format(filename))
