@@ -40,7 +40,7 @@ VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
 # define a field type
-Field = namedtuple('Field', ['name', 'index', 'type', 'null', 'comment'])
+Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -78,7 +78,7 @@ class AnnoDB:
         # read fields from DB
         self.fields = []
         cur = self.db.cursor()
-        cur.execute('SELECT * from {}_field;'.format(self.name))
+        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
         for rec in cur:
             self.fields.append(Field(*rec))
             # FIXME: We should enforce comment for all fields.

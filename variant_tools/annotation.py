@@ -37,7 +37,7 @@ from project import AnnoDB, Project, Field
 from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant
 
 # Extractors to extract value from a field
-class FieldsExtractor:
+class ExtractField:
     def __init__(self, index, sep=';', default=None):
         '''Define an extractor that returns the index-th (1-based) field of the fields
         separated by specified delimiter. Return default if unsuccessful.'''
@@ -51,7 +51,7 @@ class FieldsExtractor:
         except:
             return self.default
 
-class FieldsExtractor:
+class SplitField:
     def __init__(self, sep=',', default=[]):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. Return default if unsuccessful. These items
@@ -65,7 +65,7 @@ class FieldsExtractor:
         except:
             return self.default
 
-class FlagExtractor:
+class ExtractFlag:
     def __init__(self, name, sep=';'):
         '''Define an extractor that returns 1 is item contains name as one of the fields,
         and 0 otherwise. No space is allowed between delimiter and flag.'''
@@ -89,7 +89,7 @@ class FlagExtractor:
         else:
             return '0'
 
-class ValueExtractor:
+class ExtractValue:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that returns the value after name in one of the fields,
         and a default value if no such field is found. No space is allowed between 
@@ -107,19 +107,39 @@ class ValueExtractor:
                 return field[self.pos:]
         return self.default
 
-class PositionAdjuster:
-    def __init__(self, adj=1):
+class IncreaseBy:
+    def __init__(self, inc=1):
         '''Adjust position'''
-        self.adj = adj
+        self.inc = inc
 
     def __call__(self, item):
-        return str(int(item) + self.adj) if item.isdigit() else None
+        return str(int(item) + self.inc) if item.isdigit() else None
+
+class RemoveLeading:
+    def __init__(self, val):
+        self.val = val
+        self.vlen = len(val)
+
+    def __call__(self, item):
+        return item[self.vlen:] if item.startswith(self.val) else item
+
+class Nullify:
+    def __init__(self, val):
+        self.val = val
+
+    def __call__(self, item):
+        return None if item == val else item
 
 class SequentialExtractor:
     def __init__(self, extractors):
         '''Define an extractor that calls a list of extractors. The string extracted from
         the first extractor will be passed to the second, and so on.'''
-        self.extractors = extractors
+        self.extractors = []
+        for e in extractors:
+            if hasattr(e, '__call__'):
+                self.extractors.append(e.__call__)
+            else:
+                self.extractors.append(e)
 
     def __call__(self, item):
         for e in self.extractors:
@@ -256,7 +276,7 @@ class AnnoDBConfiger:
                 # 'index' - 1 because the input is in 1-based index
                 self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
                     type=parser.get(section, 'type', raw=True),
-                    null=parser.get(section, 'null', raw=True) if 'null' in items else None,
+                    adj=parser.get(section, 'adj', raw=True) if 'adj' in items else None,
                     comment=parser.get(section, 'comment', raw=True) if 'comment' in items else ''))
             except Exception as e:
                 self.logger.debug(e)
@@ -274,15 +294,7 @@ class AnnoDBConfiger:
             if build != '*':
                 items.append('{0}_bin INTEGER'.format(build))
         for field in self.fields:
-            if 'chromosome' in field.type.lower():
-                items.append('{0} VARCHAR(20)'.format(field.name))
-            elif 'position' in field.type.lower():
-                if 'not null' in field.type.lower():
-                    items.append('{0} INTEGER NOT NULL'.format(field.name))
-                else:
-                    items.append('{0} INTEGER'.format(field.name))
-            else:
-                items.append('{0} {1}'.format(field.name, field.type))
+            items.append('{0} {1}'.format(field.name, field.type))
         query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
             ',\n'.join(items) + ');'
         self.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
@@ -300,7 +312,6 @@ class AnnoDBConfiger:
             name VARCHAR(40),
             field INT,
             type VARCHAR(80),
-            null_val VARCHAR(20),
             comment VARCHAR(256)
         )'''.format(self.name))
 
@@ -378,14 +389,14 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
-                pos_idx, pos_adj = [(i, 1) if '0-based position' in x.type else (i, 0) for i, x in enumerate(self.fields) if x.name == items[1]][0]
+                pos_idx = [i for i,x in enumerate(self.fields) if x.name == items[1]][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
                     ref_idx = [i for i,x in enumerate(self.fields) if x.name == items[2]][0]
                     alt_idx = [i for i,x in enumerate(self.fields) if x.name == items[3]][0]
-                    build_info.append((pos_idx, pos_adj, ref_idx, alt_idx))
+                    build_info.append((pos_idx, ref_idx, alt_idx))
                 else:
-                    build_info.append((pos_idx, pos_adj))
+                    build_info.append((pos_idx, ))
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
@@ -393,35 +404,24 @@ class AnnoDBConfiger:
         variant_fields = [0] if self.anno_type == 'variant' else None
         # Other fields
         for field in self.fields:
-            # adjust for zero-based position
-            if field.index.isdigit():
-                if '0-based position' in field.type:
-                    field_info.append((int(field.index), 1, field.null))
-                elif field.type == 'chromosome':
-                    field_info.append((int(field.index), 'c', field.null))
-                # if index is not pure digital, it should be in the form of
-                # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
-                # we need to get the fields...
-                else:
-                    field_info.append((int(field.index), None, field.null))
-            else:
-                i = field.index.split()[0]
+            try:
                 #
                 # get an instance of an extractor, or a function
-                e = eval(' '.join(field.index.split()[1:]))
+                e = eval(field.adj) if field.adj else None
                 # 1. Not all passed object has __call__ (user can define a lambda function)
                 # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
                 #    e will improve performance because __call__ does not have to be looked up each time.
                 # 3. Passing object directly has an unexpected side effect on performance because comparing
                 #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
+                if hasattr(e, '__iter__'):
+                    # if there are multiple functors, use a sequential extractor to handle them
+                    e = SequentialExtractor(e)
                 if hasattr(e, '__call__'):
                     e = e.__call__
-                #
-                if '0-based position' in field.type:
-                    # adjust position after it is extracted
-                    field_info.append((int(i), SequentialExtractor([e, PositionAdjuster()]), field.null))
-                else:
-                    field_info.append((int(i), e, field.null))
+                field_info.append((int(field.index), e))
+            except Exception as e:
+                self.logger.debug(e)
+                raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
@@ -441,35 +441,24 @@ class AnnoDBConfiger:
                         tokens = [x.strip() for x in line.split('\t')]
                         records = []
                         #
-                        for col, adj, null in field_info:
+                        for col, adj in field_info:
                             col -= 1
                             item = tokens[col]
-                            if item == null:
-                                item = None
-                            elif adj is not None:
-                                if adj == 1:
-                                    item = int(item) + adj
-                                elif adj == 'c':
-                                    if item.startswith('chr'):  # if the item doesn't start with chr, then item=chromsome_number
-                                        item = item[3:]
-                                else: # must be an extractor or a function
-                                    try:
-                                        item = adj(item)
-                                        if type(item) == list:
-                                            if len(item) == 1:
-                                                # trivial case
-                                                item = item[0]
-                                            elif num_records == 1:
-                                                # these records will be handled separately.
-                                                num_records = len(item)
-                                            elif num_records != len(item):
-                                                raise ValueError('Fields in a record should generate the same number of annotations.')
-                                    except:
-                                        # missing ....
-                                        item = None
-                            # adjusted item can still be null
-                            if item == null:
-                                item = None
+                            if adj is not None:
+                                try:
+                                    item = adj(item)
+                                    if type(item) == list:
+                                        if len(item) == 1:
+                                            # trivial case
+                                            item = item[0]
+                                        elif num_records == 1:
+                                            # these records will be handled separately.
+                                            num_records = len(item)
+                                        elif num_records != len(item):
+                                            raise ValueError('Fields in a record should generate the same number of annotations.')
+                                except:
+                                    # missing ....
+                                    item = None
                             #
                             records.append(item)
                         #
@@ -482,15 +471,15 @@ class AnnoDBConfiger:
                             else:
                                 for i in range(num_records):
                                     cur.execute(insert_query, [x[i] if type(x) == list else x for x in records])
-                        elif len(build_info[0]) == 2:
+                        elif len(build_info[0]) == 1:
                             if num_records == 1:
                                 # there is no ref and alt, easy
                                 bins = []
-                                for pos_idx, pos_adj in build_info:
+                                for pos_idx, in build_info:
                                     try:
                                         # zero-based: v, v+1 (adj=1)
                                         # one-based:  v-1, v (adj=0)
-                                        bin = getMaxUcscBin(int(records[pos_idx]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
+                                        bin = getMaxUcscBin(int(records[pos_idx]) - 1, int(records[pos_idx]))
                                     except:
                                         # position might be None (e.g. dbNSFP has complete hg18 coordinates,
                                         # but incomplete hg19 coordinates)
@@ -502,9 +491,9 @@ class AnnoDBConfiger:
                                     # get the i-th record 
                                     rec = [x[i] if type(x) == list else x for x in records]
                                     bins = []
-                                    for pos_idx, pos_adj in build_info:
+                                    for pos_idx, in build_info:
                                         try:
-                                            bin = getMaxUcscBin(int(rec[pos_idx]) + pos_adj - 1, int(rec[pos_idx]) + pos_adj)
+                                            bin = getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx]))
                                         except:
                                             bin = None
                                         bins.append(bin)
@@ -522,8 +511,8 @@ class AnnoDBConfiger:
                                 # some of them will be adjusted. Otherwise, we can change the record itself. Note that
                                 # rec = records does not cost much in Python.
                                 rec = [x for x in records] if len(all_alt) > 0 else records
-                                for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
-                                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) + pos_adj, rec[ref_idx], input_alt)
+                                for pos_idx, ref_idx, alt_idx in build_info:
+                                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]), rec[ref_idx], input_alt)
                                     # these differ build by build
                                     bins.append(bin)
                                     rec[pos_idx] = pos
@@ -536,8 +525,8 @@ class AnnoDBConfiger:
                                 for i in range(num_records):
                                     bins = []
                                     rec = [x[i] if type(x) == list else x for x in records]
-                                    for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
-                                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) + pos_adj, rec[ref_idx], input_alt)
+                                    for pos_idx, ref_idx, alt_idx in build_info:
+                                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]), rec[ref_idx], input_alt)
                                         bins.append(bin)
                                         rec[pos_idx] = pos
                                         rec[ref_idx] = ref
@@ -581,8 +570,8 @@ class AnnoDBConfiger:
         self.logger.debug('Creating {}_field table'.format(self.name))
         self.createFieldsTable(db)
         for field in self.fields:
-            cur.execute('INSERT INTO {0}_field VALUES ({1},{1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
-                (field.name, field.index, field.type, field.null, field.comment))
+            cur.execute('INSERT INTO {0}_field VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
+                (field.name, field.index, field.type, field.comment))
         db.commit()
         #
         # creating the info table
