@@ -32,36 +32,31 @@
 #
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg19=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
 description=CCDS exons
 version=20110420
-source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/CCDS/archive/HsGRCH37.2/CCDS_exons.20110420.txt
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
 direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccds_exons-20110420.DB.gz
 source_type=txt
 
-[chr]
-index=1
-type=chromosome
-
-[nc_accession]
+[name]
 index=2
 type=VARCHAR(255)
-comment=nc accession
+comment=CCDS gene name
 
-[ccds_id]
+[chr]
 index=3
-type=VARCHAR(255)
-comment=ccds id
+type=chromosome
 
-[cds_strand]
+[strand]
 index=4
 type=CHAR(1) NULL
 comment=which DNA strand contains the observed alleles
 
-[exon_ordinal_position]
+[txStart]
 index=5
 type=0-based position
 comment=Transcription start position
@@ -86,6 +81,16 @@ index=9
 type=INTEGER NULL
 comment=Number of exons
 
+[exon_start]
+index=10 FieldsExtractor(',')
+type=0-based position, not null
+comment=exon start position
+
+[exon_end]
+index=11 FieldsExtractor(',')
+type=1-based position, not null
+comment=exon end position
+
 [score]
 index=12
 type=INTEGER NULL
@@ -96,3 +101,12 @@ index=13
 type=VARCHAR(255)
 comment=Alternative name
 
+[cdsStartStat]
+index=14
+type=VARCHAR(10)
+comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
+
+[cdsEndStat]
+index=15
+type=VARCHAR(10)
+comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'

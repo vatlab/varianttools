@@ -113,10 +113,7 @@ class PositionAdjuster:
         self.adj = adj
 
     def __call__(self, item):
-        if type(item) == list:
-            return [str(int(x) + self.adj) for x in item]
-        else:
-            return str(int(x) + self.adj)
+        return str(int(item) + self.adj) if item.isdigit() else None
 
 class SequentialExtractor:
     def __init__(self, extractors):
@@ -277,10 +274,13 @@ class AnnoDBConfiger:
             if build != '*':
                 items.append('{0}_bin INTEGER'.format(build))
         for field in self.fields:
-            if 'chromosome' in field.type:
+            if 'chromosome' in field.type.lower():
                 items.append('{0} VARCHAR(20)'.format(field.name))
-            elif 'position' in field.type:
-                items.append('{0} INTEGER'.format(field.name))
+            elif 'position' in field.type.lower():
+                if 'not null' in field.type.lower():
+                    items.append('{0} INTEGER NOT NULL'.format(field.name))
+                else:
+                    items.append('{0} INTEGER'.format(field.name))
             else:
                 items.append('{0} {1}'.format(field.name, field.type))
         query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
@@ -378,7 +378,7 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
-                pos_idx, pos_adj = [(i, 1) if x.type == '0-based position' else (i, 0) for i, x in enumerate(self.fields) if x.name == items[1]][0]
+                pos_idx, pos_adj = [(i, 1) if '0-based position' in x.type else (i, 0) for i, x in enumerate(self.fields) if x.name == items[1]][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
                     ref_idx = [i for i,x in enumerate(self.fields) if x.name == items[2]][0]
@@ -395,7 +395,7 @@ class AnnoDBConfiger:
         for field in self.fields:
             # adjust for zero-based position
             if field.index.isdigit():
-                if field.type == '0-based position':
+                if '0-based position' in field.type:
                     field_info.append((int(field.index), 1, field.null))
                 elif field.type == 'chromosome':
                     field_info.append((int(field.index), 'c', field.null))
@@ -417,11 +417,11 @@ class AnnoDBConfiger:
                 if hasattr(e, '__call__'):
                     e = e.__call__
                 #
-                if field.type == '0-based position':
-                    field_info.append((int(i), e, field.null))
-                else:
+                if '0-based position' in field.type:
                     # adjust position after it is extracted
                     field_info.append((int(i), SequentialExtractor([e, PositionAdjuster()]), field.null))
+                else:
+                    field_info.append((int(i), e, field.null))
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
@@ -433,7 +433,6 @@ class AnnoDBConfiger:
             prog = ProgressBar(os.path.split(f)[-1], lineCount(f))
             with self.openAnnoFile(f) as input_file:
                 for line in input_file:
-                    all_records += 1
                     num_records = 1
                     try:
                         if line.startswith('#'):
@@ -474,6 +473,7 @@ class AnnoDBConfiger:
                             #
                             records.append(item)
                         #
+                        all_records += num_records
                         # handle records
                         if not build_info:
                             # there is no build information, this is 'field' annotation, nothing to worry about
@@ -542,7 +542,7 @@ class AnnoDBConfiger:
                                         rec[pos_idx] = pos
                                         rec[ref_idx] = ref
                                         rec[alt_idx] = alt
-                                    cur.execute(insert_query, bins + rec)    
+                                    cur.execute(insert_query, bins + rec)
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)
@@ -552,7 +552,7 @@ class AnnoDBConfiger:
                         db.commit()
             db.commit()
             prog.done()
-            self.logger.info('{0} records handled, {1} ignored.'\
+            self.logger.info('{0} records are handled, {1} ignored.'\
                 .format(all_records, skipped_records))
 
     def importFromSource(self, source_files):
