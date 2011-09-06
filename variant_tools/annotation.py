@@ -107,6 +107,17 @@ class ValueExtractor:
                 return field[self.pos:]
         return self.default
 
+class PositionAdjuster:
+    def __init__(self, adj=1):
+        '''Adjust position'''
+        self.adj = adj
+
+    def __call__(self, item):
+        if type(item) == list:
+            return [str(int(x) + self.adj) for x in item]
+        else:
+            return str(int(x) + self.adj)
+
 class SequentialExtractor:
     def __init__(self, extractors):
         '''Define an extractor that calls a list of extractors. The string extracted from
@@ -119,7 +130,7 @@ class SequentialExtractor:
             if not item:
                 return item
             # if multiple records are returned, apply to each of them
-            if type(item) = list:
+            if type(item) == list:
                 if type(item[0]) == list:
                     raise ValueError('Nested vector extracted is not allowed')
                 item = [e(x) for x in item]
@@ -383,14 +394,17 @@ class AnnoDBConfiger:
         # Other fields
         for field in self.fields:
             # adjust for zero-based position
-            if field.type == '0-based position':
-                field_info.append((int(field.index), 1, field.null))
-            elif field.type == 'chromosome':
-                field_info.append((int(field.index), 'c', field.null))
-            # if index is not pure digital, it should be in the form of
-            # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
-            # we need to get the fields...
-            elif not field.index.isdigit():
+            if field.index.isdigit():
+                if field.type == '0-based position':
+                    field_info.append((int(field.index), 1, field.null))
+                elif field.type == 'chromosome':
+                    field_info.append((int(field.index), 'c', field.null))
+                # if index is not pure digital, it should be in the form of
+                # 20:DEPTH where 20 is index, : is separator and DEPTH is field name
+                # we need to get the fields...
+                else:
+                    field_info.append((int(field.index), None, field.null))
+            else:
                 i = field.index.split()[0]
                 #
                 # get an instance of an extractor, or a function
@@ -403,9 +417,11 @@ class AnnoDBConfiger:
                 if hasattr(e, '__call__'):
                     e = e.__call__
                 #
-                field_info.append((int(i), e, field.null))
-            else:
-                field_info.append((int(field.index), None, field.null))
+                if field.type == '0-based position':
+                    field_info.append((int(i), e, field.null))
+                else:
+                    # adjust position after it is extracted
+                    field_info.append((int(i), SequentialExtractor([e, PositionAdjuster()]), field.null))
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
@@ -461,7 +477,7 @@ class AnnoDBConfiger:
                         # handle records
                         if not build_info:
                             # there is no build information, this is 'field' annotation, nothing to worry about
-                            if num_records == 1 
+                            if num_records == 1:
                                 cur.execute(insert_query, records)
                             else:
                                 for i in range(num_records):
