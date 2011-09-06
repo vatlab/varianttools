@@ -37,10 +37,10 @@ from project import AnnoDB, Project, Field
 from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant
 
 # Extractors to extract value from a field
-class FieldExtractor:
+class FieldsExtractor:
     def __init__(self, index, sep=';', default=None):
         '''Define an extractor that returns the index-th (1-based) field of the fields
-        separated by specified delimiter. Return default is unsuccessful.'''
+        separated by specified delimiter. Return default if unsuccessful.'''
         self.index = index - 1
         self.sep = sep
         self.default = default
@@ -48,6 +48,20 @@ class FieldExtractor:
     def __call__(self, item):
         try:
             return item.split(self.sep)[self.index]
+        except:
+            return self.default
+
+class FieldsExtractor:
+    def __init__(self, sep=',', default=[]):
+        '''Define an extractor that returns all items in a field separated by
+        specified delimiter. Return default if unsuccessful. These items
+        will lead to multiple records in the database.'''
+        self.sep = sep
+        self.default = default
+    
+    def __call__(self, item):
+        try:
+            return item.split(self.sep)
         except:
             return self.default
 
@@ -104,7 +118,13 @@ class SequentialExtractor:
             # if item is None or ''
             if not item:
                 return item
-            item = e(item)
+            # if multiple records are returned, apply to each of them
+            if type(item) = list:
+                if type(item[0]) == list:
+                    raise ValueError('Nested vector extracted is not allowed')
+                item = [e(x) for x in item]
+            else:
+                item = e(item)
         return item
   
 
@@ -385,6 +405,7 @@ class AnnoDBConfiger:
             with self.openAnnoFile(f) as input_file:
                 for line in input_file:
                     all_records += 1
+                    num_records = 1
                     try:
                         if line.startswith('#'):
                             continue
@@ -406,6 +427,15 @@ class AnnoDBConfiger:
                                 else: # must be an extractor or a function
                                     try:
                                         item = adj(item)
+                                        if type(item) == list:
+                                            if len(item) == 1:
+                                                # trivial case
+                                                item = item[0]
+                                            elif num_records == 1:
+                                                # these records will be handled separately.
+                                                num_records = len(item)
+                                            elif num_records != len(item):
+                                                raise ValueError('Fields in a record should generate the same number of annotations.')
                                     except:
                                         # missing ....
                                         item = None
@@ -418,23 +448,40 @@ class AnnoDBConfiger:
                         # handle records
                         if not build_info:
                             # there is no build information, this is 'field' annotation, nothing to worry about
-                            cur.execute(insert_query, records)
+                            if num_records == 1 
+                                cur.execute(insert_query, records)
+                            else:
+                                for i in range(num_records):
+                                    cur.execute(insert_query, [x[i] if type(x) == list else x for x in records])
                         elif len(build_info[0]) == 2:
-                            # there is no ref and alt, easy
-                            bins = []
-                            for pos_idx, pos_adj in build_info:
-                                try:
-                                    # zero-based: v, v+1 (adj=1)
-                                    # one-based:  v-1, v (adj=0)
-                                    bin = getMaxUcscBin(int(records[pos_idx]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
-                                except:
-                                    # position might be None (e.g. dbNSFP has complete hg18 coordinates,
-                                    # but incomplete hg19 coordinates)
-                                    bin = None
-                                bins.append(bin)
-                            cur.execute(insert_query, bins + records)
-                        else:
-                            # variant... most troublesome
+                            if num_records == 1:
+                                # there is no ref and alt, easy
+                                bins = []
+                                for pos_idx, pos_adj in build_info:
+                                    try:
+                                        # zero-based: v, v+1 (adj=1)
+                                        # one-based:  v-1, v (adj=0)
+                                        bin = getMaxUcscBin(int(records[pos_idx]) + pos_adj - 1, int(records[pos_idx]) + pos_adj)
+                                    except:
+                                        # position might be None (e.g. dbNSFP has complete hg18 coordinates,
+                                        # but incomplete hg19 coordinates)
+                                        bin = None
+                                    bins.append(bin)
+                                cur.execute(insert_query, bins + records)
+                            else:
+                                for i in range(num_records):
+                                    # get the i-th record 
+                                    rec = [x[i] if type(x) == list else x for x in records]
+                                    bins = []
+                                    for pos_idx, pos_adj in build_info:
+                                        try:
+                                            bin = getMaxUcscBin(int(rec[pos_idx]) + pos_adj - 1, int(rec[pos_idx]) + pos_adj)
+                                        except:
+                                            bin = None
+                                        bins.append(bin)
+                                    cur.execute(insert_query, bins + rec)
+                        elif num_records == 1:
+                            # variant, single record, although alt can lead to multiple records
                             #
                             # We assume that the fields for ref and alt are the same for multiple reference genomes.
                             # Otherwise we cannot do this.
@@ -444,16 +491,29 @@ class AnnoDBConfiger:
                                 bins = []
                                 # if there are multiple alternative alleles, we need to use a copy of records because
                                 # some of them will be adjusted. Otherwise, we can change the record itself. Note that
-                                # my_records = records does not cost much in Python.
-                                my_records = [x for x in records] if len(all_alt) > 0 else records
+                                # rec = records does not cost much in Python.
+                                rec = [x for x in records] if len(all_alt) > 0 else records
                                 for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
-                                    bin, pos, ref, alt = normalizeVariant(int(my_records[pos_idx]) + pos_adj, my_records[ref_idx], input_alt)
+                                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) + pos_adj, rec[ref_idx], input_alt)
                                     # these differ build by build
                                     bins.append(bin)
-                                    my_records[pos_idx] = pos
-                                    my_records[ref_idx] = ref
-                                    my_records[alt_idx] = alt
-                                cur.execute(insert_query, bins + my_records)    
+                                    rec[pos_idx] = pos
+                                    rec[ref_idx] = ref
+                                    rec[alt_idx] = alt
+                                cur.execute(insert_query, bins + rec)    
+                        else:
+                            all_alt = records[build_info[0][3]].split(',')
+                            for input_alt in all_alt:
+                                for i in range(num_records):
+                                    bins = []
+                                    rec = [x[i] if type(x) == list else x for x in records]
+                                    for pos_idx, pos_adj, ref_idx, alt_idx in build_info:
+                                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) + pos_adj, rec[ref_idx], input_alt)
+                                        bins.append(bin)
+                                        rec[pos_idx] = pos
+                                        rec[ref_idx] = ref
+                                        rec[alt_idx] = alt
+                                    cur.execute(insert_query, bins + rec)    
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)
