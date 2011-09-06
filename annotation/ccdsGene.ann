@@ -39,7 +39,7 @@ anno_type=range
 description=CCDS gene
 version=20110422
 source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/CCDS/archive/HsGRCH37.2/CCDS.20110422.txt
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110420.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110422.DB.gz
 source_type=txt
 
 [chr]
