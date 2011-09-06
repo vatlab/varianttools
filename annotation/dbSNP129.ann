@@ -62,7 +62,7 @@ comment=end position in chrom (1-based). start=end means zero-length feature
 [name]
 index=5
 type=VARCHAR(48) NULL
-null=.
+adj=Nullify('.')
 comment=dbSNP reference SNP identifier
 
 [strand]

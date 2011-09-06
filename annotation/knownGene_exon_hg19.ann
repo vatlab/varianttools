@@ -82,12 +82,12 @@ comment=Number of exons
 [exon_start]
 index=9
 adj=SplitField(','), IncreaseBy(1)
-type=INTEGER, not null
+type=INTEGER NOT NULL
 comment=exon start position
 
 [exon_end]
 index=10
 adj=SplitField(',')
-type=INTEGER, not null
+type=INTEGER NOT NULL
 comment=exon end position
 

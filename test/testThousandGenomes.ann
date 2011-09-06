@@ -15,11 +15,12 @@ source_pattern=testThousandGenomes
 
 [chr]
 index=1
-type=chromosome
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
 
 [pos]
 index=2
-type=1-based position
+type=INTEGER
 
 [dbsnp_id]
 index=3
@@ -37,272 +38,326 @@ type=VARCHAR(48) NOT NULL
 comment=Alternative allele (as on the + strand)
 
 [RSPOS_INFO]
-index=8 ValueExtractor('RSPOS=', ';')
+index=8
+adj=ExtractValue('RSPOS=', ';')
 type=INTEGER
 comment=Chr position reported in dbSNP
 
 [RV_INFO]
-index=8 FlagExtractor('RV', ';')
+index=8
+adj=ExtractFlag('RV', ';')
 type=INTEGER
 comment=RS orientation is reversed
 
 [NS_INFO]
-index=8 ValueExtractor('NS=', ';')
+index=8
+adj=ExtractValue('NS=', ';')
 type=INTEGER
 comment=Number of Samples With Data
 
 [AF_INFO]
-index=8 ValueExtractor('AF=', ';')
+index=8
+adj=ExtractValue('AF=', ';')
 type=FLOAT
 comment=Allele Frequency
 
 [VP_INFO]
-index=8 ValueExtractor('VP=', ';')
+index=8
+adj=ExtractValue('VP=', ';')
 type=VARCHAR(48)
 comment=Variation Property
 
 [dbSNPBuildID_INFO]
-index=8 ValueExtractor('dbSNPBuildID=', ';')
+index=8
+adj=ExtractValue('dbSNPBuildID=', ';')
 type=INTEGER
 comment=First SNP Build for RS
 
 [SAO_INFO]
-index=8 ValueExtractor('SAO=', ';')
+index=8
+adj=ExtractValue('SAO=', ';')
 type=INTEGER
 comment=SNP Allele Origin: 0 - unspecified, 1 - Germline, 2 - Somatic, 3 - Both
 
 [SSR_INFO]
-index=8 ValueExtractor('SSR=', ';')
+index=8
+adj=ExtractValue('SSR=', ';')
 type=INTEGER
 comment=SNP Suspect Reason Code, 0 - unspecified, 1 - Paralog, 2 - byEST, 3 - Para_EST, 4 - oldAlign, 5 - other
 
 [SCS_INFO]
-index=8 ValueExtractor('SCS=', ';')
+index=8
+adj=ExtractValue('SCS=', ';')
 type=INTEGER
 comment=SNP Clinical Significance, 0 - unknown, 1 - untested, 2 - non-pathogenic, 3 - probable-non-pathogenic, 4 - probable-pathogenic, 5 - pathogenic, 6 - drug-response, 7 - histocompatibility, 255 - other
 
 [GMAF_INFO]
-index=8 ValueExtractor('GMAF=', ':')
+index=8
+adj=ExtractValue('GMAF=', ':')
 type=FLOAT
 comment=Global Minor Allele Frequency [0, 0.5_INFO]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset
 
 [WGT_INFO]
-index=8 ValueExtractor('WGT=', ';')
+index=8
+adj=ExtractValue('WGT=', ';')
 type=INTEGER
 comment=Weight, 00 - unmapped, 1 - weight 1, 2 - weight 2, 3 - weight 3 or more
 
 [VC_INFO]
-index=8 ValueExtractor('VC=', ';')
+index=8
+adj=ExtractValue('VC=', ';')
 type=VARCHAR(48)
 comment=Variation Class
 
 [CLN_INFO]
-index=8 FlagExtractor('CLN', ';')
+index=8
+adj=ExtractFlag('CLN', ';')
 type=INTEGER
 comment=SNP is Clinical(LSDB,OMIM,TPA,Diagnostic)
 
 [PM_INFO]
-index=8 FlagExtractor('PM', ';')
+index=8
+adj=ExtractFlag('PM', ';')
 type=INTEGER
 comment=SNP is Precious(Clinical,Pubmed Cited)
 
 [TPA_INFO]
-index=8 FlagExtractor('TPA', ';')
+index=8
+adj=ExtractFlag('TPA', ';')
 type=INTEGER
 comment=Provisional Third Party Annotation(TPA) (currently rs from PHARMGKB who will give phenotype data)
 
 [PMC_INFO]
-index=8 FlagExtractor('PMC', ';')
+index=8
+adj=ExtractFlag('PMC', ';')
 type=INTEGER
 comment=Links exist to PubMed Central article
 
 [S3D_INFO]
-index=8 FlagExtractor('S3D', ';')
+index=8
+adj=ExtractFlag('S3D', ';')
 type=INTEGER
 comment=Has 3D structure - SNP3D table
 
 [SLO_INFO]
-index=8 FlagExtractor('SLO', ';')
+index=8
+adj=ExtractFlag('SLO', ';')
 type=INTEGER
 comment=Has SubmitterLinkOut - From SNP->SubSNP->Batch.link_out
 
 [NSF_INFO]
-index=8 FlagExtractor('NSF', ';')
+index=8
+adj=ExtractFlag('NSF', ';')
 type=INTEGER
 comment=Has non-synonymous frameshift A coding region variation where one allele in the set changes all downstream amino acids. FxnClass = 44
 
 [NSM_INFO]
-index=8 FlagExtractor('NSM', ';')
+index=8
+adj=ExtractFlag('NSM', ';')
 type=INTEGER
 comment=Has non-synonymous missense A coding region variation where one allele in the set changes protein peptide. FxnClass = 42
 
 [NSN_INFO]
-index=8 FlagExtractor('NSN', ';')
+index=8
+adj=ExtractFlag('NSN', ';')
 type=INTEGER
 comment=Has non-synonymous nonsense A coding region variation where one allele in the set changes to STOP codon (TER). FxnClass = 41
 
 [REF_INFO]
-index=8 FlagExtractor('REF', ';')
+index=8
+adj=ExtractFlag('REF', ';')
 type=INTEGER
 comment=Has reference A coding region variation where one allele in the set is identical to the reference sequence. FxnCode = 8
 
 [SYN_INFO]
-index=8 FlagExtractor('SYN', ';')
+index=8
+adj=ExtractFlag('SYN', ';')
 type=INTEGER
 comment=Has synonymous A coding region variation where one allele in the set does not change the encoded amino acid. FxnCode = 3
 
 [U3_INFO]
-index=8 FlagExtractor('U3', ';')
+index=8
+adj=ExtractFlag('U3', ';')
 type=INTEGER
 comment=In 3' UTR Location is in an untranslated region (UTR). FxnCode = 53
 
 [U5_INFO]
-index=8 FlagExtractor('U5', ';')
+index=8
+adj=ExtractFlag('U5', ';')
 type=INTEGER
 comment=In 5' UTR Location is in an untranslated region (UTR). FxnCode = 55
 
 [ASS_INFO]
-index=8 FlagExtractor('ASS', ';')
+index=8
+adj=ExtractFlag('ASS', ';')
 type=INTEGER
 comment=In acceptor splice site FxnCode = 73
 
 [DSS_INFO]
-index=8 FlagExtractor('DSS', ';')
+index=8
+adj=ExtractFlag('DSS', ';')
 type=INTEGER
 comment=In donor splice-site FxnCode = 75
 
 [INT_INFO]
-index=8 FlagExtractor('INT', ';')
+index=8
+adj=ExtractFlag('INT', ';')
 type=INTEGER
 comment=In Intron FxnCode = 6
 
 [R3_INFO]
-index=8 FlagExtractor('R3', ';')
+index=8
+adj=ExtractFlag('R3', ';')
 type=INTEGER
 comment=In 3' gene region FxnCode = 13
 
 [R5_INFO]
-index=8 FlagExtractor('R5', ';')
+index=8
+adj=ExtractFlag('R5', ';')
 type=INTEGER
 comment=In 5' gene region FxnCode = 15
 
 [OTH_INFO]
-index=8 FlagExtractor('OTH', ';')
+index=8
+adj=ExtractFlag('OTH', ';')
 type=INTEGER
 comment=Has other snp with exactly the same set of mapped positions on NCBI refernce assembly.
 
 [CFL_INFO]
-index=8 FlagExtractor('CFL', ';')
+index=8
+adj=ExtractFlag('CFL', ';')
 type=INTEGER
 comment=Has Assembly conflict. This is for weight 1 and 2 snp that maps to different chromosomes on different assemblies.
 
 [ASP_INFO]
-index=8 FlagExtractor('ASP', ';')
+index=8
+adj=ExtractFlag('ASP', ';')
 type=INTEGER
 comment=Is Assembly specific. This is set if the snp only maps to one assembly
 
 [MUT_INFO]
-index=8 FlagExtractor('MUT', ';')
+index=8
+adj=ExtractFlag('MUT', ';')
 type=INTEGER
 comment=Is mutation (journal citation, explicit fact): a low frequency variation that is cited in journal and other reputable sources
 
 [VLD_INFO]
-index=8 FlagExtractor('VLD', ';')
+index=8
+adj=ExtractFlag('VLD', ';')
 type=INTEGER
 comment=Is Validated.  This bit is set if the snp has 2+ minor allele count based on frequency or genotype data.
 
 [G5A_INFO]
-index=8 FlagExtractor('G5A', ';')
+index=8
+adj=ExtractFlag('G5A', ';')
 type=INTEGER
 comment=>5% minor allele frequency in each and all populations
 
 [G5_INFO]
-index=8 FlagExtractor('G5', ';')
+index=8
+adj=ExtractFlag('G5', ';')
 type=INTEGER
 comment=>5% minor allele frequency in 1+ populations
 
 [HD_INFO]
-index=8 FlagExtractor('HD', ';')
+index=8
+adj=ExtractFlag('HD', ';')
 type=INTEGER
 comment=Marker is on high density genotyping kit (50K density or greater).  The snp may have phenotype associations present in dbGaP.
 
 [GNO_INFO]
-index=8 FlagExtractor('GNO', ';')
+index=8
+adj=ExtractFlag('GNO', ';')
 type=INTEGER
 comment=Genotypes available. The snp has individual genotype (in SubInd table).
 
 [KGPilot1_INFO]
-index=8 FlagExtractor('KGPilot1', ';')
+index=8
+adj=ExtractFlag('KGPilot1', ';')
 type=INTEGER
 comment=1000 Genome discovery(pilot1) 2009
 
 [KGPilot123_INFO]
-index=8 FlagExtractor('KGPilot123', ';')
+index=8
+adj=ExtractFlag('KGPilot123', ';')
 type=INTEGER
 comment=1000 Genome discovery all pilots 2010(1,2,3)
 
 [KGVAL_INFO]
-index=8 FlagExtractor('KGVAL', ';')
+index=8
+adj=ExtractFlag('KGVAL', ';')
 type=INTEGER
 comment=1000 Genome validated by second method
 
 [KGPROD_INFO]
-index=8 FlagExtractor('KGPROD', ';')
+index=8
+adj=ExtractFlag('KGPROD', ';')
 type=INTEGER
 comment=1000 Genome production phase
 
 [PH1_INFO]
-index=8 FlagExtractor('PH1', ';')
+index=8
+adj=ExtractFlag('PH1', ';')
 type=INTEGER
 comment=Phase 1 genotyped: filtered, non-redundant
 
 [PH2_INFO]
-index=8 FlagExtractor('PH2', ';')
+index=8
+adj=ExtractFlag('PH2', ';')
 type=INTEGER
 comment=Phase 2 genotyped: filtered, non-redundant
 
 [PH3_INFO]
-index=8 FlagExtractor('PH3', ';')
+index=8
+adj=ExtractFlag('PH3', ';')
 type=INTEGER
 comment=Phase 3 genotyped: filtered, non-redundant
 
 [CDA_INFO]
-index=8 FlagExtractor('CDA', ';')
+index=8
+adj=ExtractFlag('CDA', ';')
 type=INTEGER
 comment=Variation is interrogated in a clinical diagnostic assay
 
 [LSD_INFO]
-index=8 FlagExtractor('LSD', ';')
+index=8
+adj=ExtractFlag('LSD', ';')
 type=INTEGER
 comment=Submitted from a locus-specific database
 
 [MTP_INFO]
-index=8 FlagExtractor('MTP', ';')
+index=8
+adj=ExtractFlag('MTP', ';')
 type=INTEGER
 comment=Microattribution/third-party annotation(TPA:GWAS,PAGE)
 
 [OM_INFO]
-index=8 FlagExtractor('OM', ';')
+index=8
+adj=ExtractFlag('OM', ';')
 type=INTEGER
 comment=Has OMIM/OMIA
 
 [NOC_INFO]
-index=8 FlagExtractor('NOC', ';')
+index=8
+adj=ExtractFlag('NOC', ';')
 type=INTEGER
 comment=Contig allele not present in SNP allele list. The reference sequence allele at the mapped position is not present in the SNP allele list, adjusted for orientation.
 
 [WTD_INFO]
-index=8 FlagExtractor('WTD', ';')
+index=8
+adj=ExtractFlag('WTD', ';')
 type=INTEGER
 comment=Is Withdrawn by submitter If one member ss is withdrawn by submitter, then this bit is set.  If all member ss' are withdrawn, then the rs is deleted to SNPHistory
 
 [NOV_INFO]
-index=8 FlagExtractor('NOV', ';')
+index=8
+adj=ExtractFlag('NOV', ';')
 type=INTEGER
 comment=Rs cluster has non-overlapping allele sets. True when rs set has more than 2 alleles from different submissions and these sets share no alleles in common.
 
 [GCF_INFO]
-index=8 FlagExtractor('GCF', ';')
+index=8
+adj=ExtractFlag('GCF', ';')
 type=INTEGER
 comment=Has Genotype Conflict Same (rs, ind), different genotype.  N/N is not included.
 

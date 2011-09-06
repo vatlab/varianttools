@@ -78,53 +78,53 @@ comment=alternative amino acid
 [hg19pos]
 index=7
 type=INTEGER
-null=NA
+adj=Nullify('NA')
 comment=physical position on the chromosome as to hg19 (1-based coordinate)
 
 [PhyloP_score]
 index=8
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=PhyloP score, phyloPnew=1-0.5x10^phyloPori if phyloPori>0 or phyloPnew=0.5x10^phyloPori if phyloPori<0
 
 [SIFT_score]
 index=9
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=SIFT score, SIFTnew=1-SIFTori
 
 [Polyphen2_score]
 index=10
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=Polyphen2 score, i.e. pph2_prob
 
 [LRT_score]
 index=11
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=LRT score, LRTnew=1-LRTorix0.5 if <1, or LRTnew=LRTorix0.5 if >=1
 
 [LRT_pred]
 index=12
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
 
 [MutationTaster_score]
 index=13
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=MutationTaster score
 
 [MutationTaster_pred]
 index=14
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
 
 [LRT_Omega]
 index=15
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)

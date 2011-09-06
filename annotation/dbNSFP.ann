@@ -79,7 +79,7 @@ comment=alternative amino acid
 index=7
 type=INTEGER
 comment=physical position on the chromosome as to hg19 (1-based coordinate)
-null=NA
+adj=Nullify('NA')
 
 [genename]
 index=8
@@ -124,7 +124,7 @@ comment=coding sequence (CDS) strand (+ or ?)
 [LRT_Omega]
 index=16
 type=FLOAT NULL
-null=NA
+adj=Nullify('NA')
 comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)
 
 [PhyloP_score]
@@ -135,7 +135,7 @@ comment=PhyloP score, phyloPnew=1-0.5x10^phyloPori if phyloPori>0 or phyloPnew=0
 [PlyloP_pred]
 index=18
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=PhyloP prediction, C(onserved) or N(on-conserved)
 
 [SIFT_score]
@@ -146,7 +146,7 @@ comment=SIFT score, SIFTnew=1-SIFTori
 [SIFT_pred]
 index=20
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=SIFT prediction, D(amaging) or T(olerated)
 
 [Polyphen2_score]
@@ -157,7 +157,7 @@ comment=Polyphen2 score, i.e. pph2_prob
 [Polyphen2_pred]
 index=22
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign") 
 
 [LRT_score]
@@ -168,7 +168,7 @@ comment=LRT score, LRTnew=1-LRTorix0.5 if <1, or LRTnew=LRTorix0.5 if >=1
 [LRT_pred]
 index=24
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
 
 [MutationTaster_score]
@@ -179,25 +179,25 @@ comment=MutationTaster score
 [MutationTaster_pred]
 index=26
 type=VARCHAR(2) NULL
-null=NA
+adj=Nullify('NA')
 comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
 
 [Ancestral_allele]
 index=27
 type=CHAR(1) NULL
-null=NA
+adj=Nullify('NA')
 comment=Ancestral allele (based on 1000 genomes reference data)
 
 [UniSNP_ids]
 index=28
+adj=Nullify('.')
 type=VARCHAR(128)
-null=.
 comment="rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;..."
 
 [Allele_freq]
 index=29
 type=VARCHAR(48)
-null=.
+adj=Nullify('.')
 comment="allele frequency recorded in dbSNP, in format: allele1/count of allele1;allele2/count of allele2;..."
 
 [Alt_gene_name]
@@ -217,147 +217,127 @@ comment=descriptive gene name
 
 [CEU_alt_hc]
 index=33
-adj=ExtractValue('CEU:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the CEU population, reported by 1000 genome high coverage data"
 
 [CEU_total_hc]
 index=33
-adj=ExtractValue('CEU:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the CEU population, reported by 1000 genome high coverage data"
 
 
 [YRI_alt_hc]
 index=33
-adj=ExtractValue('YRI:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the YRI population, reported by 1000 genome high coverage data"
 
 [YRI_total_hc]
 index=33
-adj=ExtractValue('YRI:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the YRI population, reported by 1000 genome high coverage data"
 
 
 [LWK_alt_hc]
 index=33
-adj=ExtractValue('LWK:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('LWK:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the LWK population, reported by 1000 genome high coverage data"
 
 [LWK_total_hc]
 index=33
-adj=ExtractValue('LWK:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('LWK:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the LWK population, reported by 1000 genome high coverage data"
 
 
 [TSI_alt_hc]
 index=33
-adj=ExtractValue('TSI:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('TSI:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the TSI population, reported by 1000 genome high coverage data"
 
 [TSI_total_hc]
 index=33
-adj=ExtractValue('TSI:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('TSI:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the TSI population, reported by 1000 genome high coverage data"
 
 [CHB_alt_hc]
 index=33
-adj=ExtractValue('CHB:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('CHB:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the CHB population, reported by 1000 genome high coverage data"
 
 [CHB_total_hc]
 index=33
-adj=ExtractValue('CHB:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('CHB:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the CHB population, reported by 1000 genome high coverage data"
 
 
 [JPT_alt_hc]
 index=33
-adj=ExtractValue('JPT:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('JPT:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the JPT population, reported by 1000 genome high coverage data"
 
 [JPT_total_hc]
 index=33
-adj=ExtractValue('JPT:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('JPT:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the JPT population, reported by 1000 genome high coverage data"
 
 [CHD_alt_hc]
 index=33
-adj=ExtractValue('CHD:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('CHD:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the CHD population, reported by 1000 genome high coverage data"
 
 [CHD_total_hc]
 index=33
-adj=ExtractValue('CHD:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('CHD:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the CHD population, reported by 1000 genome high coverage data"
 
 
 [CEU_alt_lc]
 index=34
-adj=ExtractValue('CEU:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the CEU population, reported by 1000 genome low coverage data"
 
 [CEU_total_lc]
 index=34
-adj=ExtractValue('CEU:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the CEU population, reported by 1000 genome low coverage data"
 
 [YRI_alt_lc]
 index=34
-adj=ExtractValue('YRI:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the YRI population, reported by 1000 genome low coverage data"
 
 [YRI_total_lc]
 index=34
-adj=ExtractValue('YRI:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the YRI population, reported by 1000 genome low coverage data"
 
 [CHBJPT_alt_lc]
 index=34
-adj=ExtractValue('CHBJPT:'), ExtractField(1, '/')
+adj=Nullify('.'), ExtractValue('CHBJPT:'), ExtractField(1, '/')
 type=INTEGER
-null=.
 comment="Number of alternative allele in the CHBJPT population, reported by 1000 genome low coverage data"
 
 [CHBJPT_total_lc]
 index=34
-adj=ExtractValue('CHBJPT:'), ExtractField(2, '/')
+adj=Nullify('.'), ExtractValue('CHBJPT:'), ExtractField(2, '/')
 type=INTEGER
-null=.
 comment="Total number of allele in the CHBJPT population, reported by 1000 genome low coverage data"
 
 
