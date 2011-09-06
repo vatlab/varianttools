@@ -1,0 +1,98 @@
+#Variant tools schema version 1.0
+#
+# $File: ccds_exons-20110420.ann $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
+#
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New for
+# a description of the format of this file.
+#
+#
+# ChangeLog:
+#   2011-9-6: Initial import.
+#
+
+[linked fields]
+hg19=chr, txStart, txEnd
+
+[data sources]
+anno_type=range
+description=CCDS exons
+version=20110420
+source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/CCDS/archive/HsGRCH37.2/CCDS_exons.20110420.txt
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccds_exons-20110420.DB.gz
+source_type=txt
+
+[chr]
+index=1
+type=chromosome
+
+[nc_accession]
+index=2
+type=VARCHAR(255)
+comment=nc accession
+
+[ccds_id]
+index=3
+type=VARCHAR(255)
+comment=ccds id
+
+[cds_strand]
+index=4
+type=CHAR(1) NULL
+comment=which DNA strand contains the observed alleles
+
+[exon_ordinal_position]
+index=5
+type=0-based position
+comment=Transcription start position
+
+[txEnd]
+index=6
+type=1-based position
+comment=Transcription end position
+
+[cdsStart]
+index=7
+type=0-based position
+comment=Coding region start
+
+[cdsEnd]
+index=8
+type=1-based position
+comment=Coding region end
+
+[exonCount]
+index=9
+type=INTEGER NULL
+comment=Number of exons
+
+[score]
+index=12
+type=INTEGER NULL
+comment=Score
+
+[name2]
+index=13
+type=VARCHAR(255)
+comment=Alternative name
+
