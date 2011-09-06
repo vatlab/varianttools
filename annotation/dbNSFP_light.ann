@@ -49,11 +49,11 @@ source_pattern=dbNSFP_light.ch
 
 [chr]
 index=1
-type=chromosome
+type=VARCHAR(20)
 
 [pos]
 index=2
-type=1-based position
+type=INTEGER
 
 [ref]
 index=3
@@ -77,7 +77,7 @@ comment=alternative amino acid
 
 [hg19pos]
 index=7
-type=1-based position
+type=INTEGER
 null=NA
 comment=physical position on the chromosome as to hg19 (1-based coordinate)
 

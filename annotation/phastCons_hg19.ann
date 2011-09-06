@@ -10,16 +10,18 @@ source_type=txt
 
 [chr]
 index=2
-type=chromosome
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
 
 [start]
 index=3
-type=0-based position
+type=INTEGER
+adj=IncreaseBy(1)
 comment=Start position in chromosome
 
 [end]
 index=4
-type=1-based position
+type=INTEGER
 comment=End position in chromosome
 
 [score]
