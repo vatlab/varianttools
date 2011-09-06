@@ -1,0 +1,92 @@
+#Variant tools schema version 1.0
+#
+# $File: ccds_gene.ann $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
+#
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New for
+# a description of the format of this file.
+#
+#
+# ChangeLog:
+#   2011-9-6: Initial import.
+#
+
+[linked fields]
+hg19=chr, cds_from, cds_to
+
+[data sources]
+anno_type=range
+description=CCDS gene
+version=20110422
+source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/CCDS/archive/HsGRCH37.2/CCDS.20110422.txt
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110420.DB.gz
+source_type=txt
+
+[chr]
+index=1
+type=chromosome
+
+[nc_accession]
+index=2
+type=VARCHAR(255)
+comment=nc accession
+
+[gene]
+index=3
+type=VARCHAR(255)
+comment=gene name
+
+[gene_id]
+index=4
+type=INTEGER
+comment=gene id
+
+[ccds_id]
+index=5
+type=VARCHAR(255)
+comment=ccds id
+
+[ccds_status]
+index=6
+type=VARCHAR(20)
+comment=ccds status, can be Public, Reviewed, Under review, or Withdrawn
+
+[ccds_strand]
+index=7
+type=CHAR(1) NULL
+comment=which DNA strand contains the observed alleles
+
+[cds_from]
+index=8
+type=0-based position
+comment=coding sequence start position (1-based)
+
+[cds_to]
+index=9
+type=1-based position
+comment=coding sequence ending position (1-based)
+
+[match_type]
+index=11
+type=VARCHAR(20)
+comment=match type, mostly identical.
