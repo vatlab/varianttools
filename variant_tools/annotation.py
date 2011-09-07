@@ -312,7 +312,11 @@ class AnnoDBConfiger:
             name VARCHAR(40),
             field INT,
             type VARCHAR(80),
-            comment VARCHAR(256)
+            comment VARCHAR(256),
+            missing_entries INT,
+            distinct_entries INT,
+            min_value INT,
+            max_value INT
         )'''.format(self.name))
 
     def createInfoTable(self, db):
@@ -570,7 +574,7 @@ class AnnoDBConfiger:
         self.logger.debug('Creating {}_field table'.format(self.name))
         self.createFieldsTable(db)
         for field in self.fields:
-            cur.execute('INSERT INTO {0}_field VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
+            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
                 (field.name, field.index, field.type, field.comment))
         db.commit()
         #

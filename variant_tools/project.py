@@ -140,24 +140,38 @@ class AnnoDB:
         '''Describe this annotation database'''
         print('Annotation database {} {}'.format(self.name, '(version {})'.format(self.version) if self.version else ''))
         if self.description is not None:
-            print('Description: {}'.format(self.description))
+            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
+                initial_indent='', subsequent_indent=' '*4))))
         print('Database type: {}'.format(self.anno_type))
         # get linking fields
         if verbose:
             # number of records
-            print('Number of records: {:,}'.format(self.db.numOfRows(self.name)))
+            num_records = self.db.numOfRows(self.name)
+            print('Number of records: {:,}'.format(num_records))
             fields = self.refGenomes.values()[0]
             cur = self.db.cursor()
-            cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(fields), self.name))
-            count = cur.fetchone()[0]
+            # Get number of unique keys
+            count = None
+            try:
+                cur.execute('SELECT value FROM {}_info WHERE name="distinct_keys";'.format(self.name))
+                count = int(cur.fetchone()[0])
+            except:
+                pass
+            #
+            if not count:
+                cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(fields), self.name))
+                count = cur.fetchone()[0]
+                cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
+                self.db.commit()
+            #
             if self.anno_type == 'variant':
-                print('Number of unique variants: {:,}'.format(count))
+                print('Number of distinct variants: {:,}'.format(count))
             elif self.anno_type == 'position':
-                print('Number of unique positions: {:,}'.format(count))
+                print('Number of distinct positions: {:,}'.format(count))
             elif self.anno_type == 'range':
-                print('Number of unique ranges: {:,}'.format(count))
+                print('Number of distinct ranges: {:,}'.format(count))
             elif self.anno_type == 'field':
-                print('Number of unique entries: {:,}'.format(count))
+                print('Number of distinct entries: {:,}'.format(count))
         #
         for key in self.refGenomes:
             print('Reference genome {}: {}'.format(key, self.refGenomes[key]))
@@ -184,11 +198,40 @@ class AnnoDB:
                 if field.comment:
                     print('Comment: {}'.format('\n'.join(textwrap.wrap(
                         field.comment, initial_indent='        ', subsequent_indent=' '*17))))
-                cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
-                print('Missing entries: {:,}'.format(cur.fetchone()[0]))
-                cur.execute('SELECT COUNT(DISTINCT {0}) {2} FROM {1};'.format(field.name, self.name,
-                    ', MIN({0}), MAX({0})'.format(field.name) if numeric else ''))
+                missing = None
+                cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'.format(self.name, field.name))
+                missing = cur.fetchone()[0]
+                #
+                if not missing:
+                    cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
+                    missing = cur.fetchone()[0]
+                    cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
+                        (missing,))
+                    self.db.commit()
+                print('Missing entries: {:,} {}'.format(missing, '({:.1f}% of {:,} records)'.format(100. * missing/num_records, num_records) if missing else ''))
+                
+                if missing == num_records:
+                    continue
+                res = None
+                cur.execute('SELECT distinct_entries {2} FROM {0}_field WHERE name={1};'.format(
+                    self.name, self.db.PH, ', min_value, max_value' if numeric else ''), (field.name,))
                 res = cur.fetchone()
+                #
+                if not res or not res[0]:
+                    if numeric:
+                        print('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1};'.format(field.name, self.name))
+                        cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
+                        res = cur.fetchone()
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (res[0], res[1], res[2], field.name))
+                    else:
+                        cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
+                        res = cur.fetchone()
+                        print res
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (res[0], field.name))
+                    self.db.commit()
+                #
                 print('Unique Entries:  {:,}'.format(res[0]))
                 if numeric:
                     print('Range:           {} - {}'.format(res[1], res[2]))
