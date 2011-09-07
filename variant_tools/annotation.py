@@ -33,9 +33,11 @@ import gzip
 import zipfile
 import tempfile
 
-from project import AnnoDB, Project, Field
-from utils import ProgressBar, downloadFile, lineCount, \
+from .project import AnnoDB, Project, Field
+from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
+from .importer import ExtractField, SplitField, ExtractFlag, ExtractValue, IncreaseBy, \
+    RemoveLeading, Nullify, SequentialExtractor
 
 # Extractors to extract value from a field
 class ExtractField:
@@ -387,7 +389,7 @@ class AnnoDBConfiger:
             return open(filename, 'r')
 
     def importTxtRecords(self, db, source_files):
-        # First: Ucsc bins calculated for position fields
+        #
         build_info = []
         for key,items in self.build.items():
             if key == '*':
@@ -423,7 +425,11 @@ class AnnoDBConfiger:
                     e = SequentialExtractor(e)
                 if hasattr(e, '__call__'):
                     e = e.__call__
-                field_info.append((int(field.index) - 1, e))
+                idx = [int(x) - 1 for x in field.index.split()]
+                if len(idx) == 1:
+                    field_info.append((idx[0], e))
+                else:
+                    field_info.append((tuple(idx), e))
             except Exception as e:
                 self.logger.debug(e)
                 raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
@@ -447,7 +453,7 @@ class AnnoDBConfiger:
                         records = []
                         #
                         for col, adj in field_info:
-                            item = tokens[col]
+                            item = tokens[col] if type(col) == int else '\t'.join([tokens[x] for x in col])
                             if adj is not None:
                                 try:
                                     item = adj(item)
