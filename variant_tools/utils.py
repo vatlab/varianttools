@@ -302,6 +302,15 @@ class ProgressBar:
         sys.stderr.write('\n')
         sys.stderr.flush()
 
+def compressFile(infile, outfile):
+    '''Compress a file from infile to outfile'''
+    with open(infile, 'rb') as input, gzip.open(outfile, 'wb') as output:
+            buffer = input.read(100000)
+            while buffer:
+                output.write(buffer)
+                buffer = input.read(100000)
+    return outfile
+
 def decompressIfNeeded(filename, inplace=True):
     '''Decompress a file.gz and return file if needed'''
     if filename.lower().endswith('.gz'):

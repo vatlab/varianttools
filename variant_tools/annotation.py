@@ -34,7 +34,8 @@ import zipfile
 import tempfile
 
 from project import AnnoDB, Project, Field
-from utils import ProgressBar, downloadFile, lineCount, DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant
+from utils import ProgressBar, downloadFile, lineCount, \
+    DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
 
 # Extractors to extract value from a field
 class ExtractField:
@@ -613,13 +614,14 @@ class AnnoDBConfiger:
         del s
         if tdir is not None:
             shutil.rmtree(tdir) 
+        return db.dbName
 
-    def prepareDB(self, source_files=[], linked_by=[]):
+    def prepareDB(self, source_files=[], linked_by=[], rebuild=False):
         '''Importing data to database. If direct_url or source_url is specified,
         they will overwrite settings in configuraiton file. If successful, this
         function set self.db to a live connection.
         '''
-        if not source_files:
+        if not source_files and not rebuild:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
             if os.path.isfile(dbFile):
                 try:
@@ -641,6 +643,10 @@ class AnnoDBConfiger:
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
         self.importFromSource(source_files)
+        if rebuild:
+            dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
+            self.logger.info('Creating compressed database {}'.format(dbFile))
+            compressFile(self.name + '.DB', dbFile)
         return AnnoDB(self.proj, self.name, linked_by)
 
 
@@ -661,6 +667,10 @@ def useArguments(parser):
             tables in the existing project. This parameter is required only for
             'attribute' type of annotation databases that link to fields of existing
             tables.''')
+    parser.add_argument('--rebuild', action='store_true',
+        help='''If set, variant tools will always rebuild the annotation database from source,
+            ignoring existing local and online database. In addition to $name.DB, variant tools
+            will also create $name-$version.DB.gz that can be readily distributed.''')
 
 
 def use(args):
@@ -705,9 +715,11 @@ def use(args):
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
                     cfg = AnnoDBConfiger(proj, annoDB)
-                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by))
+                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
+            elif args.rebuild:
+                raise ValueError('Only an .ann file can be specified when option --rebuild is set')
             elif annoDB.endswith('.DB'):
                 if proj.db.engine != 'sqlite3':
                     raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
@@ -729,7 +741,7 @@ def use(args):
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann')
                     try:
-                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by))
+                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                     except Exception as e:
                         proj.logger.debug(e)
                 # do not know what to do
