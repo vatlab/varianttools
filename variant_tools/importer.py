@@ -111,6 +111,18 @@ class IncreaseBy:
     def __call__(self, item):
         return str(int(item) + self.inc) if item.isdigit() else None
 
+class MapValue:
+    '''Map value to another one, return default if unmapped'''
+    def __init__(self, map, default=None):
+        self.map = map
+        self.default = default
+
+    def __call__(self, item):
+        try:
+            return self.map[item]
+        except:
+            return self.default
+        
 class RemoveLeading:
     def __init__(self, val):
         self.val = val

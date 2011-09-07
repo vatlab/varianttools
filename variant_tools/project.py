@@ -31,6 +31,7 @@ import logging
 import getpass
 import random
 import textwrap
+import ConfigParser
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL
 
@@ -200,6 +201,89 @@ class AnnoDB:
                 print('Unique Entries:  {:,}'.format(res[0]))
                 if numeric:
                     print('Range:           {} - {}'.format(res[1], res[2]))
+
+
+class fileFMT:
+    def __init__(self, name):
+        '''Input file format'''
+        # locate a file format specification file
+        self.description = None
+        self.variant_fields = []
+        self.sample_variant_fields = []
+        #
+        if os.path.isfile(name + '.fmt'):
+            self.name = os.path.split(name)[-1]
+            self.parseFMT(name + '.fmt') 
+        else:
+            url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
+            try:
+                fmt = downloadFile(url, '.')
+            except Exception as e:
+                raise ValueError('Failed to download format specification file {}.fmt'.format(name))
+            self.name = name
+            self.parseFMT(fmt)
+        #
+        if len(self.variant_fields) < 4:
+            raise ValueError('There should be at least four variant fields for chr, pos, ref, and alt alleles')
+
+    def parseFMT(self, filename):
+        parser = ConfigParser.SafeConfigParser()
+        parser.read(filename)
+        # sections?
+        sections = parser.sections()
+        if 'format description' not in sections:
+            raise ValueError("Missing section 'format description'")
+        #
+        fields = []
+        for section in sections:
+            if section == 'format description':
+                continue
+            try:
+                items = [x[0] for x in parser.items(section, raw=True)]
+                fields.append(
+                    Field(name=section,
+                        index=parser.get(section, 'index', raw=True),
+                        type=parser.get(section, 'type', raw=True),
+                        adj=parser.get(section, 'adj', raw=True) if 'adj' in items else None,
+                        comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                    )
+            except Exception as e:
+                raise ValueError('Invalid section {} in configuration file {}'.format(section, self.name))
+        #
+        for item in parser.items('format description'):
+            if item[0] == 'description':
+                self.description = item[1]
+            if item[0] == 'variant_fields':
+                for name in item[1].split(','):
+                    fld = [x for x in fields if x.name == name]
+                    if len(fld) != 1:
+                        raise ValueError('Cannot find field {} in the format specification file'.format(name))
+                    self.variant_fields.append(fld[0])
+            if item[0] == 'sample_variant_fields':
+                for name in item[1].split(','):
+                    fld = [x for x in fields if x.name == name]
+                    if len(fld) != 1:
+                        raise ValueError('Cannot find field {} in the format specification file'.format(name))
+                    self.sample_variant_fields.append(fld[0])
+                
+
+    def describe(self):
+        print 'Format:      {}'.format(self.name)
+        if self.description is not None:
+            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
+                initial_indent='', subsequent_indent=' '*4))))
+        #
+        print 'Variant fields:'
+        for fld in self.variant_fields:
+            print '  {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                subsequent_indent=' '*8)))
+        if len(self.sample_variant_fields) > 0:
+            print 'Sample variant fields:'
+            for fld in self.sample_variant_fields:
+                print '   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*8)))
+
+
 
 #  Project management
 #
@@ -1114,13 +1198,15 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'fields', 'annotations', 'annotation'], nargs='?', default='project',
+        'samples', 'fields', 'annotations', 'annotation', 'formats', 'format'],
+        nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
             verbosity=2), table (a specific table), samples (sample and
             phenotype information), fields (from variant tables and all used
             annotation databases), annotations (all available annotation
-            databases for variant tools) and specified annotation. Default to
+            databases for variant tools), specified annotation, all supported
+            input formats, and details of specific format. Default to
             project.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be name of a table for type 'table'.''')
@@ -1194,6 +1280,18 @@ def show(args):
                 DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
                 for db in DBs:
                     print(db)
+            elif args.type == 'formats':
+                FMTs = filesInURL('http://vtools.houstonbioinformatics.org/input_fmt', ext='.fmt')
+                for fmt in FMTs:
+                    print(fmt)
+            elif args.type == 'format':
+                for item in args.items:
+                    try:
+                        fmt = fileFMT(item)
+                    except Exception as e:
+                        proj.logger.debug(e)
+                        raise IndexError('Input file format {} is not currently supported by variant tools'.format(item))
+                    fmt.describe()
     except Exception as e:
         sys.exit(e)
 
