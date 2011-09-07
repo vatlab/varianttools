@@ -609,9 +609,33 @@ class AnnoDBConfiger:
             else:
                 cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
                     .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+        del s
+        s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
         # This is only useful for sqlite
         db.analyze()
+        # calculating database statistics
+        cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
+        count = cur.fetchone()[0]
+        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, db.PH), ('distinct_keys', str(count)))
         del s
+        for field in self.fields:
+            s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))
+            cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
+            missing = cur.fetchone()[0]
+            cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, db.PH, field.name),
+                (missing,))
+            if 'int' in field.type.lower() or 'float' in field.type.lower():
+                cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
+                res = cur.fetchone()
+                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                    self.name, db.PH), (res[0], res[1], res[2], field.name))
+            else:
+                cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
+                res = cur.fetchone()
+                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
+                    self.name, db.PH), (res[0], field.name))
+            del s
+        db.commit()
         if tdir is not None:
             shutil.rmtree(tdir) 
         return db.dbName
@@ -643,6 +667,7 @@ class AnnoDBConfiger:
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
         self.importFromSource(source_files)
+        #
         if rebuild:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
             self.logger.info('Creating compressed database {}'.format(dbFile))
