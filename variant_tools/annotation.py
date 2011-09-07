@@ -128,7 +128,7 @@ class Nullify:
         self.val = val
 
     def __call__(self, item):
-        return None if item == val else item
+        return None if item == self.val else item
 
 class SequentialExtractor:
     def __init__(self, extractors):
@@ -418,7 +418,7 @@ class AnnoDBConfiger:
                     e = SequentialExtractor(e)
                 if hasattr(e, '__call__'):
                     e = e.__call__
-                field_info.append((int(field.index), e))
+                field_info.append((int(field.index) - 1, e))
             except Exception as e:
                 self.logger.debug(e)
                 raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
@@ -442,7 +442,6 @@ class AnnoDBConfiger:
                         records = []
                         #
                         for col, adj in field_info:
-                            col -= 1
                             item = tokens[col]
                             if adj is not None:
                                 try:
@@ -456,7 +455,8 @@ class AnnoDBConfiger:
                                             num_records = len(item)
                                         elif num_records != len(item):
                                             raise ValueError('Fields in a record should generate the same number of annotations.')
-                                except:
+                                except Exception as e:
+                                    self.logger.debug(e)
                                     # missing ....
                                     item = None
                             #
@@ -503,7 +503,7 @@ class AnnoDBConfiger:
                             #
                             # We assume that the fields for ref and alt are the same for multiple reference genomes.
                             # Otherwise we cannot do this.
-                            all_alt = records[build_info[0][3]].split(',')
+                            all_alt = records[build_info[0][2]].split(',')
                             # support multiple alternative alleles
                             for input_alt in all_alt:
                                 bins = []
@@ -512,7 +512,7 @@ class AnnoDBConfiger:
                                 # rec = records does not cost much in Python.
                                 rec = [x for x in records] if len(all_alt) > 0 else records
                                 for pos_idx, ref_idx, alt_idx in build_info:
-                                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]), rec[ref_idx], input_alt)
+                                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
                                     # these differ build by build
                                     bins.append(bin)
                                     rec[pos_idx] = pos
@@ -520,13 +520,13 @@ class AnnoDBConfiger:
                                     rec[alt_idx] = alt
                                 cur.execute(insert_query, bins + rec)    
                         else:
-                            all_alt = records[build_info[0][3]].split(',')
+                            all_alt = records[build_info[0][2]].split(',')
                             for input_alt in all_alt:
                                 for i in range(num_records):
                                     bins = []
                                     rec = [x[i] if type(x) == list else x for x in records]
                                     for pos_idx, ref_idx, alt_idx in build_info:
-                                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]), rec[ref_idx], input_alt)
+                                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
                                         bins.append(bin)
                                         rec[pos_idx] = pos
                                         rec[ref_idx] = ref

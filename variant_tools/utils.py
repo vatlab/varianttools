@@ -787,7 +787,8 @@ def normalizeVariant(pos, ref, alt):
             else:
                 break
         if common_leading > 0:
-            pos += common_leading
+            if pos:
+                pos += common_leading
             ref = ref[common_leading:]
             alt = alt[common_leading:]
         #
@@ -808,7 +809,7 @@ def normalizeVariant(pos, ref, alt):
         alt = '-'
     elif not ref.isalpha():
         ref = '-'
-    bin = getMaxUcscBin(pos - 1, pos)
+    bin = getMaxUcscBin(pos - 1, pos) if pos else None
     return bin, pos, ref, alt
 
 
