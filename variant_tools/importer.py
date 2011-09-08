@@ -164,6 +164,138 @@ class SequentialExtractor:
         return item
 
 
+class TextProcessor:
+    '''An intepreter that read a record, process it and return processed records.'''
+    def __init__(self, fields, build, logger):
+        '''Fields: a list of fields with index, adj (other items are not used)
+        builds: index(es) of position, reference allele and alternative alleles. If 
+            positions are available, UCSC bins are prepended to the records. If reference
+            and alternative alleles are available, the records are processed for correct
+            format of ref and alt alleles.
+        '''
+        self.logger = logger
+        self.build = build
+        self.fields = []
+        for field in fields:
+            try:
+                # get an instance of an extractor, or a function
+                e = eval(field.adj) if field.adj else None
+                # 1. Not all passed object has __call__ (user can define a lambda function)
+                # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
+                #    e will improve performance because __call__ does not have to be looked up each time.
+                # 3. Passing object directly has an unexpected side effect on performance because comparing
+                #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
+                if hasattr(e, '__iter__'):
+                    # if there are multiple functors, use a sequential extractor to handle them
+                    e = SequentialExtractor(e)
+                if hasattr(e, '__call__'):
+                    e = e.__call__
+                idx = [int(x) - 1 for x in field.index.split()]
+                if len(idx) == 1:
+                    self.fields.append((idx[0], e))
+                else:
+                    self.fields.append((tuple(idx), e))
+            except Exception as e:
+                self.logger.debug(e)
+                raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
+
+    def process(self, line):
+        tokens = [x.strip() for x in line.split('\t')]
+        records = []
+        num_records = 1
+        #
+        for col, adj in self.fields:
+            item = tokens[col] if type(col) == int else '\t'.join([tokens[x] for x in col])
+            if adj is not None:
+                try:
+                    item = adj(item)
+                    if type(item) == list:
+                        if len(item) == 1:
+                            # trivial case
+                            item = item[0]
+                        elif num_records == 1:
+                            # these records will be handled separately.
+                            num_records = len(item)
+                        elif num_records != len(item):
+                            raise ValueError('Fields in a record should generate the same number of annotations.')
+                except Exception as e:
+                    self.logger.debug(e)
+                    # missing ....
+                    item = None
+            #
+            records.append(item)
+        # handle records
+        if not self.build:
+            # there is no build information, this is 'field' annotation, nothing to worry about
+            if num_records == 1:
+                yield records
+            else:
+                for i in range(num_records):
+                    yield [x[i] if type(x) == list else x for x in records]
+        elif len(self.build[0]) == 1:
+            if num_records == 1:
+                # there is no ref and alt, easy
+                bins = []
+                for pos_idx, in self.build:
+                    try:
+                        # zero-based: v, v+1 (adj=1)
+                        # one-based:  v-1, v (adj=0)
+                        bin = getMaxUcscBin(int(records[pos_idx]) - 1, int(records[pos_idx]))
+                    except:
+                        # position might be None (e.g. dbNSFP has complete hg18 coordinates,
+                        # but incomplete hg19 coordinates)
+                        bin = None
+                    bins.append(bin)
+                yield bins + records
+            else:
+                for i in range(num_records):
+                    # get the i-th record 
+                    rec = [x[i] if type(x) == list else x for x in records]
+                    bins = []
+                    for pos_idx, in self.build:
+                        try:
+                            bin = getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx]))
+                        except:
+                            bin = None
+                        bins.append(bin)
+                    yield bins + rec
+        elif num_records == 1:
+            # variant, single record, although alt can lead to multiple records
+            #
+            # We assume that the fields for ref and alt are the same for multiple reference genomes.
+            # Otherwise we cannot do this.
+            all_alt = records[self.build[0][2]].split(',')
+            # support multiple alternative alleles
+            for input_alt in all_alt:
+                bins = []
+                # if there are multiple alternative alleles, we need to use a copy of records because
+                # some of them will be adjusted. Otherwise, we can change the record itself. Note that
+                # rec = records does not cost much in Python.
+                rec = [x for x in records] if len(all_alt) > 0 else records
+                for pos_idx, ref_idx, alt_idx in self.build:
+                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
+                    # these differ build by build
+                    bins.append(bin)
+                    rec[pos_idx] = pos
+                    rec[ref_idx] = ref
+                    rec[alt_idx] = alt
+                yield bins + rec
+        else:
+            all_alt = records[self.build[0][2]].split(',')
+            for input_alt in all_alt:
+                for i in range(num_records):
+                    bins = []
+                    rec = [x[i] if type(x) == list else x for x in records]
+                    for pos_idx, ref_idx, alt_idx in self.build:
+                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
+                        bins.append(bin)
+                        rec[pos_idx] = pos
+                        rec[ref_idx] = ref
+                        rec[alt_idx] = alt
+                    yield bins + rec
+
+
+
 class Importer:
     '''A general class for importing variants'''
     def __init__(self, proj, files, build, force):
