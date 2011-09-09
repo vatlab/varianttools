@@ -331,6 +331,7 @@ class Importer:
         # for all record, new SNV, insertion, deletion, complex variants, and invalid record
         self.count = [0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0]
+        self.import_alt_build = False
         if len(self.files) == 0:
             return
         #
@@ -347,7 +348,6 @@ class Importer:
         else:
             self.build = build
         #
-        self.import_alt_build = False
         if self.proj.build is None:
             self.proj.setRefGenome(self.build)
         elif self.build == self.proj.build:
@@ -366,12 +366,6 @@ class Importer:
         else:
             raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
                 ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
-        #
-        # importing data to alternative reference genome
-        if self.import_alt_build:
-            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
-        else:
-            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
         self.proj.dropIndexOnMasterVariantTable()
         #
@@ -427,30 +421,6 @@ class Importer:
         del s
         return sample_ids
         
-    def addVariant(self, cur, chr, pos, ref, alt):
-        # if chr, pos are from alternative reference genome
-        bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
-        var_key = (chr, pos, ref, alt)
-        #
-        try:
-            return self.variantIndex[var_key][0]
-        except:
-            # new varaint!
-            if alt == '-':
-                self.count[3] += 1
-            elif ref == '-':
-                self.count[2] += 1
-            elif len(alt) == 1 and len(ref) == 1:
-                self.count[1] += 1
-            else:
-                self.count[4] += 1
-            # alt_chr and alt_pos are updated if adding by alternative reference genome
-            cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
-            variant_id = cur.lastrowid
-            # one for new variant
-            self.variantIndex[var_key] = (variant_id, 1)
-            return variant_id
-
     def importData(self):
         '''Start importing'''
         for count,f in enumerate(self.files):
@@ -518,6 +488,11 @@ class vcfImporter(Importer):
         # vcf tools only support DP for now
         self.variant_only = variant_only
         self.import_depth = 'DP' in info
+        # importing data to alternative reference genome
+        if self.import_alt_build:
+            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+        else:
+            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
 
     def guessBuild(self, filename):
         '''Called by the initializer to determine reference genome
@@ -551,6 +526,30 @@ class vcfImporter(Importer):
                 if not line.startswith('#'):
                     break
         return samples
+
+    def addVariant(self, cur, chr, pos, ref, alt):
+        # if chr, pos are from alternative reference genome
+        bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
+        var_key = (chr, pos, ref, alt)
+        #
+        try:
+            return self.variantIndex[var_key][0]
+        except:
+            # new varaint!
+            if alt == '-':
+                self.count[3] += 1
+            elif ref == '-':
+                self.count[2] += 1
+            elif len(alt) == 1 and len(ref) == 1:
+                self.count[1] += 1
+            else:
+                self.count[4] += 1
+            # alt_chr and alt_pos are updated if adding by alternative reference genome
+            cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
+            variant_id = cur.lastrowid
+            # one for new variant
+            self.variantIndex[var_key] = (variant_id, 1)
+            return variant_id
 
     def importFromFile(self, input_filename):
         '''Import a VCF file to sample_variant'''
@@ -661,7 +660,7 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, force):
+    def __init__(self, proj, files, build, format, sample_name=None, force=False):
         Importer.__init__(self, proj, files, build, force)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
@@ -671,36 +670,82 @@ class txtImporter(Importer):
             fmt = fileFMT(format)
         except Exception as e:
             self.logger.debug(e)
-            raise IndexError('Input file format {} is not currently supported by variant tools'.format(item))
+            raise IndexError('Input file format {} is not currently supported by variant tools'.format(format))
         #
-        pos_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[1]][0]
-        ref_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[2]][0]
-        alt_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[3]][0]
-        self.processor = TextProcessor(fmt.fields, [(pos_idx, ref_idx, alt_idx)], self.logger)
+        self.sample_name = sample_name
+        #
+        self.var_processor = TextProcessor(fmt.variant_fields, [(1, 2, 3)], self.logger)
+        self.sample_var_processor = TextProcessor(fmt.sample_variant_fields, [], self.logger) \
+            if fmt.sample_variant_fields else None
+        #
+        extra_fields = [x.name for x in fmt.variant_fields[4:]]
+        if extra_fields:
+            cur = self.db.cursor()
+            headers = self.db.getHeaders('variant')
+            for f in fmt.variant_fields[4:]:
+                if f.name not in headers:
+                    s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
+                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
+                    del s
+        #
+        if self.import_alt_build:
+            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt {0}) VALUES ({1});'\
+                .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
+        else:
+            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt {0}) VALUES ({1});'\
+                .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
+
+    def addVariant(self, cur, rec):
+        #
+        var_key = tuple(rec[1:5])
+        if var_key in self.variantIndex:
+            variant_id = self.variantIndex[var_key][0]
+            if len(rec) > 5:
+                # need to update other fields
+                pass
+            return variant_id
+        else:
+            # new varaint!
+            if rec[4] == '-':
+                self.count[3] += 1
+            elif rec[3] == '-':
+                self.count[2] += 1
+            elif len(rec[4]) == 1 and len(rec[3]) == 1:
+                self.count[1] += 1
+            else:
+                self.count[4] += 1
+            # alt_chr and alt_pos are updated if adding by alternative reference genome
+            cur.execute(self.variant_insert_query, rec)
+            variant_id = cur.lastrowid
+            # one for new variant
+            self.variantIndex[var_key] = (variant_id, 1)
+            return variant_id
+
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         filename = os.path.split(input_filename)[-1]
         # assuming one sample for each file
-        sample_id = self.recordFileAndSample(filename, [None])[0]
+        sample_id = self.recordFileAndSample(filename, [self.sample_name])[0]
         #
         cur = self.db.cursor()
+        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         sample_variant_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2}, {2});'\
             .format(self.proj.name, sample_id, self.db.PH)
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
                     if line.startswith('#'):
                         continue
-                    for rec in processor.process(line):
+                    for rec in self.var_processor.process(line):
                         self.count[0] += 1
-                        cur.execute(insert_query, rec)
-                    #
-                    variant_id = self.addVariant(cur, chr, pos, ref, alt)
-                    # sample variant, the variant type is always hetero???
-                    cur.execute(sample_variant_insert_query, (variant_id, 1))
+                        cur.execute(self.variant_insert_query, rec)
+                        #
+                        variant_id = self.addVariant(cur, rec)
+                        if self.sample_var_processor:
+                            for sample_rec in self.sample_var_processor.process(line):
+                                cur.execute(self.sample_variant_insert_query, [variant_id] + sample_rec)
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -761,20 +806,23 @@ def importTxtArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be in 
             tab or command separated value format. Gzipped files are acceptable.''')
-    grp = parser.add_argument_group('Description of input files')
-    grp.add_argument('--build',
+    parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
             If a reference genome that is different from the primary reference genome of the
             project is specified, it will become the alternative referenge genome of the
             project. The UCSC liftover tool will be automatically called to map input
             coordinates to the primary reference genome.''')
-    grp.add_argument('--format',
+    parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types (use 'vtools show formats' to list them, or 
             'vtools show format FMT' for details about a specific format), or a local
             format specification file (with extension .fmt,
             see http://varianttools.sourceforge.net/Format/New for details).''')
+    parser.add_argument('--sample_name',
+        help='''Name of the sample imported by the text file. If no sample name is
+            specified, a sample will have no name but can still be identify by its 
+            source filename in the sample table.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
@@ -785,7 +833,8 @@ def importTxt(args):
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
-                build=args.build, format=args.format, force=args.force)
+                build=args.build, format=args.format, sample_name=args.sample_name,
+                force=args.force)
             importer.importData()
         proj.close()
     except Exception as e:

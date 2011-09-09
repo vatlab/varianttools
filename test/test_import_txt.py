@@ -43,17 +43,7 @@ class TestImportTXT(ProcessTestCase):
         # help information
         self.assertSucc('vtools import_txt -h')
         # no build information, fail
-        self.assertFail('vtools import_txt input.tsv')
-        # no columns, fail
-        self.assertFail('vtools import_txt input.tsv --build hg18')
-        # Four columns are required for each variant (chr, pos, ref, and alt)
-        self.assertFail('vtools import_txt input.tsv --build hg18 -c 1 2 3 4 5')
-        # import with four columns
-        self.assertSucc('vtools import_txt input.tsv -c 1 2 4 5 --build hg18 --zero')
-        ## re-import, fail
-        self.assertFail('vtools import_txt input.tsv -c 1 2 4 5 --build hg18')
-        # import different genome reference
-        self.assertFail('vtools import_txt input.tsv -c 1 3 4 5 --build hg19')
+        self.assertFail('vtools import_txt --format ANNOVAR input.tsv')
 
 if __name__ == '__main__':
     unittest.main()
