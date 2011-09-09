@@ -38,9 +38,9 @@ hg19=chr, start
 [data sources]
 anno_type=position
 description=dbSNP version 131
-version=0
+version=hg19_131
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp131.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP131.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg19_131.DB.gz
 source_type=txt
 
 [chr]

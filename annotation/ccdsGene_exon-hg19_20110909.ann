@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: refGene_hg19.ann $
+# $File: ccds_exons-20110420.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -28,25 +28,24 @@
 #
 #
 # ChangeLog:
-#   2011-9-1: Public release.
-#   2011-7-15: Initial import.
+#   2011-9-6: Initial import.
 #
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg19=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
-description=refseq Genes
-version=
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_hg19.DB.gz
+description=CCDS exons
+version=hg19_20110909
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_exon_hg19-20110909.DB.gz
 source_type=txt
 
 [name]
 index=2
 type=VARCHAR(255)
-comment=Gene name
+comment=CCDS gene name
 
 [chr]
 index=3
@@ -85,6 +84,18 @@ index=9
 type=INTEGER NULL
 comment=Number of exons
 
+[exon_start]
+index=10
+adj=SplitField(','), IncreaseBy(1)
+type=INTEGER NOT NULL
+comment=exon start position
+
+[exon_end]
+index=11
+adj=SplitField(',')
+type=INTEGER NOT NULL
+comment=exon end position
+
 [score]
 index=12
 type=INTEGER NULL
@@ -104,4 +115,3 @@ comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
 index=15
 type=VARCHAR(10)
 comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'
-

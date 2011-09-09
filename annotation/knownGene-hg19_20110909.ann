@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: ccdsGene.ann $
+# $File: knownGene.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -37,70 +37,46 @@ hg19=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
-description=CCDS Genes
-version=20110422
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_hg19-20110422.DB.gz
+description=UCSC Known Genes
+version=hg19_20110909
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg19_20110909.DB.gz
 source_type=txt
 
-[name]
-index=2
-type=VARCHAR(255)
-comment=Gene name (usually a CCDS transcript ID)
-
 [chr]
-index=3
+index=2
 adj=RemoveLeading('chr')
 type=VARCHAR(20)
 
 [strand]
-index=4
+index=3
 type=CHAR(1) NULL
 comment=which DNA strand contains the observed alleles
 
 [txStart]
-index=5
+index=4
 type=INTEGER
 adj=IncreaseBy(1)
 comment=Transcription start position
 
 [txEnd]
-index=6
+index=5
 type=INTEGER
 comment=Transcription end position
 
 [cdsStart]
-index=7
+index=6
 type=INTEGER
 adj=IncreaseBy(1)
 comment=Coding region start
 
 [cdsEnd]
-index=8
+index=7
 type=INTEGER
 comment=Coding region end
 
 [exonCount]
-index=9
+index=8
 type=INTEGER NULL
 comment=Number of exons
 
-[score]
-index=12
-type=INTEGER NULL
-comment=Score
-
-[name2]
-index=13
-type=VARCHAR(255)
-comment=Alternate name 
-
-[cdsStartStat]
-index=14
-type=VARCHAR(10)
-comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
-
-[cdsEndStat]
-index=15
-type=VARCHAR(10)
-comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'

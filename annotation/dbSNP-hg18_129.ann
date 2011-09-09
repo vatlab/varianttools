@@ -1,6 +1,6 @@
 #Variant tools schema version 1.0
 #
-# $File: dbSNP130.ann $
+# $File: dbSNP129.ann $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -37,10 +37,10 @@ hg18=chr, start
 
 [data sources]
 anno_type=position
-description=dbSNP version 130
-version=
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snp130.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP130.DB.gz
+description=dbSNP version 129
+version=hg18_129
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snp129.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg18_129.DB.gz
 source_type=txt
 
 [chr]

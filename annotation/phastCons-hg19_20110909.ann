@@ -5,6 +5,8 @@ hg19=chr, start, end
 [data sources]
 anno_type=range
 description=UCSC Known Genes
+version=hg19_20110909
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/phastCons-hg19_20110909.DB.gz
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/phastCons46way.txt.gz
 source_type=txt
 

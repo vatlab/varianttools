@@ -33,14 +33,14 @@
 #
 
 [linked fields]
-hg18=chr, exon_start, exon_end
+hg19=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
-description=Exon locations of UCSC Known Genes
-version=20110909
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene_exon_hg18-20110909.DB.gz
+description=UCSC Known Genes
+version=hg19_20110909
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene_exon-hg19_20110909.DB.gz
 source_type=txt
 
 [chr]
