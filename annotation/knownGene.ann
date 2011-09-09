@@ -38,9 +38,9 @@ hg19=chr, txStart, txEnd
 [data sources]
 anno_type=range
 description=UCSC Known Genes
-version=20110909
+version=hg19_20110909
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene_hg19-20110909.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg19_20110909.DB.gz
 source_type=txt
 
 [chr]

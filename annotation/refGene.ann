@@ -38,9 +38,9 @@ hg19=chr, txStart, txEnd
 [data sources]
 anno_type=range
 description=refseq Genes
-version=
+version=hg19_20110909
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_hg19.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene-hg19_20110909.DB.gz
 source_type=txt
 
 [name]

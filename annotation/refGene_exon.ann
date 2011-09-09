@@ -38,9 +38,9 @@ hg19=chr, exon_start, exon_end
 [data sources]
 anno_type=range
 description=Exon locations of refseq Genes
-version=
+version=hg19_20110909
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_exon_hg19.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_exon-hg19_20110909.DB.gz
 source_type=txt
 
 [name]
