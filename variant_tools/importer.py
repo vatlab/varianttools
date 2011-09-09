@@ -369,16 +369,7 @@ class Importer:
         #
         # importing data to alternative reference genome
         if self.import_alt_build:
-            self.logger.info('Reading coordinates in preparation for importing from alternative reference genome')
-            # we need to run lift over to convert coordinates before importing data.
-            alt_coordinates = set()
-            for f in self.files:
-                alt_coordinates |= set(self.getCoordinates(f))
-            tool = LiftOverTool(self.proj)
-            self.coordinateMap = tool.mapCoordinates(alt_coordinates, self.build, self.proj.build)
-            self.logger.info('{:,} coordinates are mapped from {} to {}, variants in {} unmapped records will have NULL chr and pos.'.format(len(self.coordinateMap),
-                self.build, self.proj.build, len(alt_coordinates) - len(self.coordinateMap)))
-            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
@@ -409,15 +400,13 @@ class Importer:
             return
         self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
         if self.import_alt_build:
-            cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
+            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant;')
         else:
             cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
-            if self.import_alt_build:
-                self.variantIndex[(rec[1], rec[2], rec[3], rec[4], rec[5], rec[6])] = rec[0]
-            else:
-                self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = rec[0]
+            # zero for existing loci
+            self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = (rec[0], 0)
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
@@ -440,28 +429,11 @@ class Importer:
         
     def addVariant(self, cur, chr, pos, ref, alt):
         # if chr, pos are from alternative reference genome
-        if self.import_alt_build:
-            alt_chr, input_pos = chr, pos 
-            try:
-                # find chr and pos in primary reference genome
-                chr, pos = self.coordinateMap[(alt_chr, input_pos)]
-            except:
-                # Coordinate cannot be mapped to the primary reference genome.
-                bin = chr = pos = None
-            # handling coordinate in alternative reference genome
-            alt_bin, alt_pos, ref, alt = normalizeVariant(input_pos, ref, alt)
-            # if there is a valid coordinate in the primary reference genome
-            if pos:
-                # if alt_pos is shifted, pos will also be shifted
-                pos += alt_pos - input_pos
-                bin = getMaxUcscBin(pos - 1, pos)
-            var_key = (chr, pos, ref, alt, alt_chr, alt_pos)
-        else:
-            bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
-            var_key = (chr, pos, ref, alt)
+        bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
+        var_key = (chr, pos, ref, alt)
         #
         try:
-            return self.variantIndex[var_key]
+            return self.variantIndex[var_key][0]
         except:
             # new varaint!
             if alt == '-':
@@ -472,12 +444,11 @@ class Importer:
                 self.count[1] += 1
             else:
                 self.count[4] += 1
-            if self.import_alt_build:
-                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
-            else:
-                cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
+            # alt_chr and alt_pos are updated if adding by alternative reference genome
+            cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
             variant_id = cur.lastrowid
-            self.variantIndex[var_key] = variant_id
+            # one for new variant
+            self.variantIndex[var_key] = (variant_id, 1)
             return variant_id
 
     def importData(self):
@@ -495,6 +466,38 @@ class Importer:
             self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
                 .format(sum(self.total_count[1:-1]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
                 ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
+        if self.total_count[0] > 0 and self.proj.alt_build is not None:
+            coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
+            # we need to run lift over to convert coordinates before importing data.
+            tool = LiftOverTool(self.proj)
+            if self.import_alt_build:
+                self.logger.info('Mapping {} new variants from {} to {} reference genome'.format(self.total_count[0], self.proj.alt_build, self.proj.build))
+                coordinateMap = tool.mapCoordinates(coordinates, self.proj.alt_build, self.proj.build)
+                query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            else:
+                self.logger.info('Mapping {} new variants from {} to {} reference genome'.format(self.total_count[0], self.proj.build, self.proj.alt_build))
+                coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
+                query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            # update records
+            prog = ProgressBar('Updating coordinates', self.total_count[0])
+            count = 0
+            cur = self.db.cursor()
+            for k,v in self.variantIndex.iteritems():
+                if v[1] == 1:
+                    count += 1
+                    try:
+                        (chr, pos) = coordinateMap[(k[0], k[1])]
+                    except Exception as e:
+                        self.logger.debug(e)
+                        # unmapped
+                        continue
+                    cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, v[0]))
+                    if count % self.db.batch == 0:
+                        self.db.commit()
+                        prog.update(count)
+            self.db.commit()
+            prog.done()
+            
 
 
 class vcfImporter(Importer):
@@ -549,31 +552,6 @@ class vcfImporter(Importer):
                     break
         return samples
 
-    def getCoordinates(self, input_filename):
-        '''Get (chr, pos) of all variants, for backward liftOver'''
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        count = 0
-        coordinates = []
-        with self.openFile(input_filename) as input_file:
-            for line in input_file:
-                try:
-                    if line.startswith('#'):
-                        continue
-                    count += 1
-                    tokens = [x.strip() for x in line.split('\t')]
-                    chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
-                    pos = int(tokens[1])
-                    coordinates.append((chr, pos))
-                except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
-                if count % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(count)
-            self.db.commit()
-            prog.done()
-        return coordinates
-        
     def importFromFile(self, input_filename):
         '''Import a VCF file to sample_variant'''
         #
@@ -694,34 +672,6 @@ class txtImporter(Importer):
             raise ValueError('Four columns are required for each variant (chr, pos, ref, and alt)')
         self.delimiter = delimiter
         self.zero = zero
-
-    def getCoordinates(self, input_filename):
-        '''Read coordinates in prepration for reverse liftOver'''
-        count = 0
-        coordinates = []
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        with self.openFile(input_filename) as input_file:
-            for line in input_file:
-                try:
-                    if line.startswith('#'):
-                        continue
-                    count += 1
-                    # get data
-                    tokens = [x.strip() for x in line.split(self.delimiter)]
-                    chr, pos = tokens[self.col[0]], tokens[self.col[1]]
-                    if chr.startswith('chr'):
-                        chr = chr[3:]
-                    pos = int(pos) + 1 if self.zero else int(pos)
-                    coordinates.append((chr, pos))
-                except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
-                if count % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(count)
-            self.db.commit()
-            prog.done()
-        return coordinates
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
