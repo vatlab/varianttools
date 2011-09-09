@@ -147,13 +147,16 @@ class AnnoDB:
         # get linking fields
         if verbose:
             # number of records
-            num_records = self.db.numOfRows(self.name)
+            cur = self.db.cursor()
+            cur.execute('SELECT value FROM {}_info WHERE name="num_records";'.format(self.name))
+            num_records = int(cur.fetchone()[0])
             print('Number of records: {:,}'.format(num_records))
             fields = self.refGenomes.values()[0]
-            cur = self.db.cursor()
+            
             # Get number of unique keys
             cur.execute('SELECT value FROM {}_info WHERE name="distinct_keys";'.format(self.name))
             count = int(cur.fetchone()[0])
+            
             #
             if self.anno_type == 'variant':
                 print('Number of distinct variants: {:,}'.format(count))

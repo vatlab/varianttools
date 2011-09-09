@@ -385,6 +385,8 @@ class AnnoDBConfiger:
         cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
         count = cur.fetchone()[0]
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, db.PH), ('distinct_keys', str(count)))
+        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, db.PH), ('num_records', db.numOfRows(self.name)))
+
         del s
         for field in self.fields:
             s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))
