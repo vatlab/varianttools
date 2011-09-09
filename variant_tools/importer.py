@@ -166,7 +166,7 @@ class SequentialExtractor:
 
 class TextProcessor:
     '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, logger):
+    def __init__(self, fields, build, delimiter, logger):
         '''Fields: a list of fields with index, adj (other items are not used)
         builds: index(es) of position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
@@ -176,6 +176,7 @@ class TextProcessor:
         self.logger = logger
         self.build = build
         self.fields = []
+        self.delimiter = delimiter
         for field in fields:
             try:
                 # get an instance of an extractor, or a function
@@ -200,7 +201,7 @@ class TextProcessor:
                 raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
 
     def process(self, line):
-        tokens = [x.strip() for x in line.split('\t')]
+        tokens = [x.strip() for x in line.split(self.delimiter)]
         records = []
         num_records = 1
         #
@@ -674,8 +675,8 @@ class txtImporter(Importer):
         #
         self.sample_name = sample_name
         #
-        self.var_processor = TextProcessor(fmt.variant_fields, [(1, 2, 3)], self.logger)
-        self.sample_var_processor = TextProcessor(fmt.sample_variant_fields, [], self.logger) \
+        self.var_processor = TextProcessor(fmt.variant_fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        self.sample_var_processor = TextProcessor(fmt.sample_variant_fields, [], fmt.delimiter, self.logger) \
             if fmt.sample_variant_fields else None
         #
         extra_fields = [x.name for x in fmt.variant_fields[4:]]
@@ -740,12 +741,13 @@ class txtImporter(Importer):
                         continue
                     for rec in self.var_processor.process(line):
                         self.count[0] += 1
-                        cur.execute(self.variant_insert_query, rec)
                         #
                         variant_id = self.addVariant(cur, rec)
                         if self.sample_var_processor:
                             for sample_rec in self.sample_var_processor.process(line):
-                                cur.execute(self.sample_variant_insert_query, [variant_id] + sample_rec)
+                                cur.execute(sample_variant_insert_query, [variant_id] + sample_rec)
+                        else:
+                            cur.execute(sample_variant_insert_query, [variant_id, None])
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -813,12 +815,13 @@ def importTxtArguments(parser):
             project is specified, it will become the alternative referenge genome of the
             project. The UCSC liftover tool will be automatically called to map input
             coordinates to the primary reference genome.''')
-    parser.add_argument('--format',
+    parser.add_argument('--format', required=True,
         help='''Format of the input text file. It can be one of the variant tools
             supported file types (use 'vtools show formats' to list them, or 
             'vtools show format FMT' for details about a specific format), or a local
             format specification file (with extension .fmt,
-            see http://varianttools.sourceforge.net/Format/New for details).''')
+            see http://varianttools.sourceforge.net/Format/New for details).
+        ''')
     parser.add_argument('--sample_name',
         help='''Name of the sample imported by the text file. If no sample name is
             specified, a sample will have no name but can still be identify by its 

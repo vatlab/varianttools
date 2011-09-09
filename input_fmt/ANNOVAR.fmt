@@ -29,6 +29,7 @@
 [format description]
 description=Input format of ANNOVAR. No genotype is defined.
 variant_fields=chr,pos,ref,alt
+delimiter=None    ; both space and tab are allowed
 
 [chr]
 index=1

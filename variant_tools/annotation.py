@@ -68,6 +68,7 @@ class AnnoDBConfiger:
         self.source_url = None
         self.source_files = None
         self.fields = []
+        self.delimiter = '\t'
         self.version = None
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
@@ -141,6 +142,8 @@ class AnnoDBConfiger:
                 self.description = item[1]
             elif item[0] == 'anno_type':
                 self.anno_type = item[1]
+            elif item[0] == 'delimiter':
+                self.delimiter = eval(item[1])
             elif item[0] == 'version':
                 if self.version is not None and self.version != item[1]:
                     raise Warning('Version obtained from filename ({}) is inconsistent with version specified in the annotation file ({})'.format(self.version, item[1]))
@@ -286,7 +289,7 @@ class AnnoDBConfiger:
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
-        processor = TextProcessor(self.fields, build_info, self.logger)
+        processor = TextProcessor(self.fields, build_info, self.delimiter, self.logger)
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \

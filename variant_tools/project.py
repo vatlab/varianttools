@@ -217,6 +217,9 @@ class fileFMT:
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
             self.parseFMT(name + '.fmt') 
+        elif name.endswith('.fmt') and os.path.isfile(name):
+            self.name = os.path.split(name)[-1][:-4]
+            self.parseFMT(name) 
         else:
             url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
             try:
@@ -253,9 +256,12 @@ class fileFMT:
             except Exception as e:
                 raise ValueError('Invalid section {} in configuration file {}'.format(section, self.name))
         #
+        self.delimiter = '\t'
         for item in parser.items('format description'):
             if item[0] == 'description':
                 self.description = item[1]
+            if item[0] == 'delimiter':
+                self.delimiter = eval(item[1])
             if item[0] == 'variant_fields':
                 for name in item[1].split(','):
                     fld = [x for x in fields if x.name == name]
@@ -745,7 +751,7 @@ class Project:
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL,
-                variant_type INT NOT NULL
+                variant_type INT
             '''.format(table) + 
             ''.join([', {} FLOAT NULL'.format(f) for f in fields]) + ');'
          )
