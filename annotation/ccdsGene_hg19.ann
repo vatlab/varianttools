@@ -40,7 +40,7 @@ anno_type=range
 description=CCDS Genes
 version=20110422
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110422.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_hg19-20110422.DB.gz
 source_type=txt
 
 [name]

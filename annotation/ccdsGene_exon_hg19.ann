@@ -39,7 +39,7 @@ anno_type=range
 description=CCDS exons
 version=20110420
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccds_exons-20110420.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_exon_hg19-20110420.DB.gz
 source_type=txt
 
 [name]
