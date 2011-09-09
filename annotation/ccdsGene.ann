@@ -37,16 +37,16 @@ hg19=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
-description=ccds Genes
+description=CCDS Genes
 version=20110422
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-20110422.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_hg19-20110422.DB.gz
 source_type=txt
 
 [name]
 index=2
 type=VARCHAR(255)
-comment=Gene name
+comment=Gene name (usually a CCDS transcript ID)
 
 [chr]
 index=3
@@ -93,7 +93,7 @@ comment=Score
 [name2]
 index=13
 type=VARCHAR(255)
-comment=Alternative name
+comment=Alternate name 
 
 [cdsStartStat]
 index=14
