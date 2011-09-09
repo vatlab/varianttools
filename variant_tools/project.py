@@ -1260,12 +1260,12 @@ def show(args):
                 if len(proj.annoDB) == 0:
                     proj.logger.info('No annotation database is attached.')
                 for table in proj.getVariantTables():
-                    print(''.join(['{}.{}'.format(table, field) for field in proj.db.getHeaders(table)]))
+                    print('\n'.join(['{}.{}'.format(table, field) for field in proj.db.getHeaders(table)]))
                 for db in proj.annoDB:
                     if args.verbosity == '0':
-                        print(''.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
+                        print('\n'.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
                     else:
-                        print(''.join(['{}.{} {}'.format(db.name, x.name,
+                        print('\n'.join(['{}.{} {}'.format(db.name, x.name,
                             '\n'.join(textwrap.wrap(x.comment, initial_indent=' '*(27-len(db.name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
             elif args.type == 'annotation':
