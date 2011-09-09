@@ -28,7 +28,7 @@ import os
 import sys
 import gzip
 import re
-from .project import Project
+from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
 
@@ -661,17 +661,22 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, col, build, delimiter, zero, force):
+    def __init__(self, proj, files, build, format, force):
         Importer.__init__(self, proj, files, build, force)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
         #
-        self.col = [x - 1 for x in col]
-        if len(self.col) != 4:
-            raise ValueError('Four columns are required for each variant (chr, pos, ref, and alt)')
-        self.delimiter = delimiter
-        self.zero = zero
+        try:
+            fmt = fileFMT(format)
+        except Exception as e:
+            self.logger.debug(e)
+            raise IndexError('Input file format {} is not currently supported by variant tools'.format(item))
+        #
+        pos_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[1]][0]
+        ref_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[2]][0]
+        alt_idx = [i for i,x in enumerate(fmt.fields) if x.name == fmt.variant_fields[3]][0]
+        self.processor = TextProcessor(fmt.fields, [(pos_idx, ref_idx, alt_idx)], self.logger)
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
@@ -689,18 +694,10 @@ class txtImporter(Importer):
                 try:
                     if line.startswith('#'):
                         continue
-                    self.count[0] += 1
-                    # get data
-                    tokens = [x.strip() for x in line.split(self.delimiter)]
-                    chr, pos, ref, alt = [tokens[x] for x in self.col]
-                    if chr.startswith('chr'):
-                        chr = chr[3:]
-                    pos = int(pos) + 1 if self.zero else int(pos)
-                    if len(ref) != 1:
-                        raise ValueError('Incorrect reference allele: {}'.format(ref))
-                    if len(alt) != 1:
-                        raise ValueError('Incorrect alternative allele: {}'.format(alt))
-                    # variant
+                    for rec in processor.process(line):
+                        self.count[0] += 1
+                        cur.execute(insert_query, rec)
+                    #
                     variant_id = self.addVariant(cur, chr, pos, ref, alt)
                     # sample variant, the variant type is always hetero???
                     cur.execute(sample_variant_insert_query, (variant_id, 1))
@@ -772,13 +769,12 @@ def importTxtArguments(parser):
             project is specified, it will become the alternative referenge genome of the
             project. The UCSC liftover tool will be automatically called to map input
             coordinates to the primary reference genome.''')
-    grp.add_argument('-c', '--columns', default=[1,2,3,4], nargs='+', type=int,
-        help='Columns for chromosome, position, reference and alternative alleles.')
-    grp.add_argument('-d', '--delimiter', default='\t',
-        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
-    grp.add_argument('-z', '--zero', action='store_true',
-        help='''Whether or not specified file uses zero-based index. If unspecified, the
-            position column is assumed to be 1-based.''')
+    grp.add_argument('--format',
+        help='''Format of the input text file. It can be one of the variant tools
+            supported file types (use 'vtools show formats' to list them, or 
+            'vtools show format FMT' for details about a specific format), or a local
+            format specification file (with extension .fmt,
+            see http://varianttools.sourceforge.net/Format/New for details).''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
@@ -789,8 +785,7 @@ def importTxt(args):
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
-                col=args.columns, build=args.build,
-                delimiter=args.delimiter, zero=args.zero, force=args.force)
+                build=args.build, format=args.format, force=args.force)
             importer.importData()
         proj.close()
     except Exception as e:
