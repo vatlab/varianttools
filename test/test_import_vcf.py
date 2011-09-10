@@ -48,19 +48,24 @@ class TestImportVCF(ProcessTestCase):
         # specify build information
         self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(), 289)
         self.assertSucc('vtools import_vcf SAMP2.vcf')
         self.assertEqual(numOfSample(), 2)
+        self.assertEqual(numOfVariant(), 289+121)
         self.assertSucc('vtools import_vcf CEU.vcf.gz --variant_only')
         self.assertEqual(numOfSample(), 3)
+        self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
         self.assertSucc('vtools import_vcf SAMP1.vcf')
         self.assertEqual(numOfSample(), 3)
         # force re-import the same file with samples
         self.assertSucc('vtools import_vcf CEU.vcf.gz -f')
         self.assertEqual(numOfSample(), 62)
+        self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
         self.assertSucc('vtools import_vcf CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
+        self.assertEqual(numOfVariant(), 698)
 
     def testImportIndel(self):
         self.assertSucc('vtools import_vcf SAMP3_complex_variants.vcf')
@@ -78,6 +83,10 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf var_format.vcf --build hg19')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289 + 98)
+        # 19 out of 121 records failed to map.
+        self.assertSucc('vtools import_vcf SAMP2.vcf --build hg18')
+        self.assertEqual(numOfSample(), 3)
+        self.assertEqual(numOfVariant(), 289 + 98 + 121)
         #
         # this is a difficult test to pass, basically, we will create another project
         # in reverse order of reference genomes, using reversed liftover, and see
@@ -90,7 +99,11 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 2)
         # 101 cannot be mapped. damn.
-        self.assertEqual(numOfVariant(), 289 + 98)
+        self.assertEqual(numOfVariant(), 98 + 289)
+        self.assertSucc('vtools import_vcf SAMP2.vcf --build hg18')
+        # 19 out of 121 records failed to map.
+        self.assertEqual(numOfSample(), 3)
+        self.assertEqual(numOfVariant(), 98 + 289 + 121)
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
         #
         out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x])

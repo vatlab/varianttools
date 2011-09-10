@@ -144,7 +144,7 @@ class TestImportTXT(ProcessTestCase):
         input = open('Illumina_SNP.txt', 'w')
         input.write(Illumina_SNP_data)
         input.close()
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP Illumina_INDEL.txt')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP Illumina_SNP.txt')
         self.assertEqual(numOfVariant(), 12)
 
     def testIllumina_INDEL(self):
