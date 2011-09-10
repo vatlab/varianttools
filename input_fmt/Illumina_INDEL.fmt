@@ -1,0 +1,99 @@
+# $File: Illumina_INDEL.fmt $
+#
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
+#
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Input format illumina indels.txt file, called by CASAVA.
+variant_fields=seq_name, pos, ref
+
+[seq_name]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Reference sequence label
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=Start position of the indel event. Except for right-side breakpoints, the reported position is the first (left-most) reference position following the indel breakpoint. For right-side breakpoints the reported position is the right-most position preceding the breakpoint. Also note that wherever the same indel could be represented in a range of locations, the caller attempts to report it in the ‘left-most’ position possible.
+
+[type]
+index=3
+comment=String summarizing the indel type. One of: nI –insertion of length n (e.g. 10I is a 10 base insertion) nD – deletion of length n (e.g. 10D is a 10 base deletion) BP_LEFT – left-side breakpoint BP_RIGHT – right-side breakpoint
+
+[ref_upsream]
+index=4
+comment=Segment of the reference sequence 5’ of the indel event. For right- side breakpoints this field is set to the value ‘N/A’.
+
+[ref_indel]
+index=5
+comment=Equal length sequences corresponding to the reference and indel cases which span the indel event. The character ‘-‘ indicates a gap in the reference or indel sequence.
+
+[ref_downstream]
+index=6
+comment=Segment of the reference sequence 3’ of the indel event. For left-side breakpoints this field is set to the value ‘N/A’.
+
+[Q_indel]
+index=7
+comment=Phred scaled quality score of the indel1 By default the variant caller reports all indels with Q(indel) > 0.
+
+[max_g_type]
+index=8
+comment=Most probable indel genotype {het,hom,ref}
+
+[Q_max_gtype]
+index=9
+comment=Phred scaled quality score of the most probable indel genotype1
+
+[depth]
+index=10
+comment=Except for right-side breakpoints, this field reports the depth of the position preceding the left-most indel breakpoint. For right-side breakpoints this is the depth of the position following the breakpoint.
+
+[alt_reads]
+index=11
+comment=Number of reads strongly supporting either the reference path or an alternate indel path3
+
+[indel_reads]
+index=12
+comment=Number of reads strongly supporting the indel path3
+
+[other_reads]
+index=13
+comment=Number of reads intersecting the indel, but not strongly supporting either the reference or any one indel path3
+
+[repeat_unit]
+index=14
+comment=The smallest repeating sequence unit within the inserted or deleted sequence. For breakpoints this field is set to the value ‘N/A’.
+
+[ref_repeat_count]
+index=15
+comment=Number of times the repeat_unit sequence is contiguously repeated starting from the indel start position in the reference case. 
+
+[indel_repeat_count]
+index=16
+comment=Number of times the repeat_unit sequence is contiguously repeated starting from the indel start position in the indel case.
+
