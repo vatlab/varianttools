@@ -33,7 +33,7 @@ import random
 import textwrap
 import ConfigParser
 from collections import namedtuple, defaultdict
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL
+from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
 VTOOLS_VERSION = '1.0svn'
 VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)

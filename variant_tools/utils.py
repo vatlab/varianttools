@@ -815,6 +815,8 @@ def normalizeVariant(pos, ref, alt):
     #
     # ref or alt is something like '', '-', '.' or '*'
     if not alt.isalpha():
+        if not ref.isalpha():
+            raise ValueError('Invalid reference and alternative alleles: {}, {}'.format(ref, alt))
         alt = '-'
     elif not ref.isalpha():
         ref = '-'
