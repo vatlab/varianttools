@@ -27,9 +27,9 @@
 #
 
 [format description]
-description=Input format illumina indels.txt file, called by CASAVA.
+description=Input format illumina indels.txt file, created by CASAVA. This format imports chr, pos, ref, alt of most likely genotype, and a Q score for the most likely genotype.
 variant_fields=seq_name, pos, ref, alt
-genotype_fields=geno
+genotype_fields=max_gt, Q_max_gt
 
 [seq_name]
 index=1
@@ -64,12 +64,15 @@ comment=A Q-value expressing the probability of the homozygous reference genotyp
 
 [max_gt]
 index=7
-type=CHAR(2)
+adj=lambda x: 1 if x[0] != x[1] else 2
+type=CHAR(1)
 comment=The most likely genotype (subject to theta, as above)
 
 [alt]
-index=6, 7
-adj=lambda x: ; a function is needed
+index=5, 7
+# The input can be 'C\tAC', 'C\tCC' etc. We should get A for the first and None for the second
+# and the record with None will be discarded because valid alternative allele is required.
+adj=lambda x: None if (x[2] == x[0] and x[3] == x[0]) or (x[2] != x[0] and x[3] != x[0]) else (x[2] if x[0] == x[3] else x[3])
 type=CHAR(1)
 comment=Derived alternative allele
 

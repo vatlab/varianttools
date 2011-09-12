@@ -191,7 +191,7 @@ class TextProcessor:
                     e = SequentialExtractor(e)
                 if hasattr(e, '__call__'):
                     e = e.__call__
-                idx = [int(x) - 1 for x in field.index.split()]
+                idx = [int(x) - 1 for x in field.index.split(',')]
                 if len(idx) == 1:
                     self.fields.append((idx[0], e))
                 else:
@@ -265,7 +265,10 @@ class TextProcessor:
             #
             # We assume that the fields for ref and alt are the same for multiple reference genomes.
             # Otherwise we cannot do this.
-            all_alt = records[self.build[0][2]].split(',')
+            try:
+                all_alt = records[self.build[0][2]].split(',')
+            except Exception as e:
+                raise ValueError('Invalid alternative alleles: "{}"'.format(records[self.build[0][2]]))
             # support multiple alternative alleles
             for input_alt in all_alt:
                 bins = []
@@ -282,7 +285,10 @@ class TextProcessor:
                     rec[alt_idx] = alt
                 yield bins + rec
         else:
-            all_alt = records[self.build[0][2]].split(',')
+            try:
+                all_alt = records[self.build[0][2]].split(',')
+            except Exception as e:
+                raise ValueError('Invalid alternative alleles: "{}"'.format(records[self.build[0][2]]))
             for input_alt in all_alt:
                 for i in range(num_records):
                     bins = []
@@ -569,7 +575,7 @@ class vcfImporter(Importer):
         #
         cur = self.db.cursor()
         # sample variants are inserted into different tables in a separate database.
-        sample_variant_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
+        genotype_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
             .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         with self.openFile(input_filename) as input_file:
@@ -604,12 +610,12 @@ class vcfImporter(Importer):
                         variant_id = self.addVariant(cur, chr, pos, ref, alt)
                         #
                         if no_sample:
-                            cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id, 1] + DP)
+                            cur.execute(genotype_insert_query[sample_ids[0]], [variant_id, 1] + DP)
                         else:
                             variants = [x.split(':')[GT_idx].count('1') for x in tokens[-len(sample_ids):]]
                             for var_idx, var in enumerate(variants):
                                 if var != 0:  # genotype 0|0 are ignored
-                                    cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
+                                    cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
                     else:
                         # now, this is the common case with insertion, deletion, and multiple alternative variants
                         alts = tokens[4].split(',')
@@ -618,32 +624,32 @@ class vcfImporter(Importer):
                             variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
                         if no_sample:
                             for i in range(len(alts)):
-                                cur.execute(sample_variant_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
+                                cur.execute(genotype_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
                         else:
                             # process variants
                             for var_idx, var in enumerate([x.split(':')[GT_idx] for x in tokens[-len(sample_ids):]]):
                                 if len(var) == 3:  # regular
                                     gt = var[0] + var[2]  # GT can be separated by / or |
                                     if gt in ['01', '10']:
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
                                     elif gt in ['02', '20']:
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
                                     elif gt == '11':
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
                                     elif gt in ['12', '21']:
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
                                     elif gt == '22':
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
                                     elif gt == '00':
                                         pass
                                     else:
                                         raise ValueError('I do not know how to process genotype {}'.format(var))
                                 else: # should have length 1
                                     if var == '1':
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
                                     elif var == '2':
-                                        cur.execute(sample_variant_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
+                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
                                     elif var == '0':
                                         pass
                                     else:
@@ -676,8 +682,8 @@ class txtImporter(Importer):
         self.sample_name = sample_name
         #
         self.var_processor = TextProcessor(fmt.variant_fields, [(1, 2, 3)], fmt.delimiter, self.logger)
-        self.sample_var_processor = TextProcessor(fmt.sample_variant_fields, [], fmt.delimiter, self.logger) \
-            if fmt.sample_variant_fields else None
+        self.sample_var_processor = TextProcessor(fmt.genotype_fields, [], fmt.delimiter, self.logger) \
+            if fmt.genotype_fields else None
         #
         extra_fields = [x.name for x in fmt.variant_fields[4:]]
         if extra_fields:
@@ -689,6 +695,9 @@ class txtImporter(Importer):
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s
         #
+        self.genotype_fields = [] if fmt.genotype_fields is None or len(fmt.genotype_fields) <= 1 else [x.name for x in fmt.genotype_fields[1:]]
+        if self.genotype_fields:
+            self.logger.info('Additional genotype fields: {}'.format(', '.join(self.genotype_fields)))
         if self.import_alt_build:
             self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt {0}) VALUES ({1});'\
                 .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
@@ -728,12 +737,13 @@ class txtImporter(Importer):
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         filename = os.path.split(input_filename)[-1]
         # assuming one sample for each file
-        sample_id = self.recordFileAndSample(filename, [self.sample_name])[0]
+        sample_id = self.recordFileAndSample(filename, [self.sample_name],
+            [None] if not self.genotype_fields else self.genotype_fields)[0]
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        sample_variant_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2}, {2});'\
-            .format(self.proj.name, sample_id, self.db.PH)
+        genotype_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
+            .format(self.proj.name, sample_id, ','.join([self.db.PH] * (2 + len(self.genotype_fields))))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -745,9 +755,9 @@ class txtImporter(Importer):
                         variant_id = self.addVariant(cur, rec)
                         if self.sample_var_processor:
                             for sample_rec in self.sample_var_processor.process(line):
-                                cur.execute(sample_variant_insert_query, [variant_id] + sample_rec)
+                                cur.execute(genotype_insert_query, [variant_id] + sample_rec)
                         else:
-                            cur.execute(sample_variant_insert_query, [variant_id, None])
+                            cur.execute(genotype_insert_query, [variant_id] + [None]*len(self.genotype_fields))
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)

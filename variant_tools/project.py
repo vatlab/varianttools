@@ -212,7 +212,7 @@ class fileFMT:
         # locate a file format specification file
         self.description = None
         self.variant_fields = []
-        self.sample_variant_fields = []
+        self.genotype_fields = []
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -263,17 +263,18 @@ class fileFMT:
             if item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             if item[0] == 'variant_fields':
-                for name in item[1].split(','):
+                for name in map(str.strip, item[1].split(',')):
                     fld = [x for x in fields if x.name == name]
                     if len(fld) != 1:
-                        raise ValueError('Cannot find field {} in the format specification file'.format(name))
+                        raise ValueError('Cannot find field {} in the format specification file, which defines fields {}.'\
+                            .format(name, ', '.join([x.name for x in fields])))
                     self.variant_fields.append(fld[0])
-            if item[0] == 'sample_variant_fields':
-                for name in item[1].split(','):
+            if item[0] == 'genotype_fields':
+                for name in map(str.strip, item[1].split(',')):
                     fld = [x for x in fields if x.name == name]
                     if len(fld) != 1:
                         raise ValueError('Cannot find field {} in the format specification file'.format(name))
-                    self.sample_variant_fields.append(fld[0])
+                    self.genotype_fields.append(fld[0])
                 
 
     def describe(self):
@@ -286,9 +287,9 @@ class fileFMT:
         for fld in self.variant_fields:
             print '  {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                 subsequent_indent=' '*8)))
-        if len(self.sample_variant_fields) > 0:
-            print 'Sample variant fields:'
-            for fld in self.sample_variant_fields:
+        if len(self.genotype_fields) > 0:
+            print 'Genotype fields:'
+            for fld in self.genotype_fields:
                 print '   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*8)))
 
