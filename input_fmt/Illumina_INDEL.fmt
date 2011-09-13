@@ -82,9 +82,9 @@ comment=Phred scaled quality score of the indel1 By default the variant caller r
 
 [max_g_type]
 index=8
-adj=MapValue({'het': '1', 'hom': '2', 'ref': None})
+adj=MapValue({'het': '1', 'hom': '2', 'ref': '0'})
 type=INT
-comment=Most probable indel genotype {het,hom,ref}
+comment=Most probable indel genotype {het,hom,ref}. The genotype “hom” refers to a homozygous indel, “het” refers to a heterozygous indel and “ref” refers to no indel at this position. The “ref” state will only be observed in the indel output file as the second most probable genotype, were this state found to be the most probable genotype the candidate indel would not be reported.
 
 [Q_max_gtype]
 index=9

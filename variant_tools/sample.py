@@ -144,6 +144,8 @@ class Sample:
                     # type double heterozygote with two different alternative alleles
                     elif rec[1] == -1:
                         variants[rec[0]][2] += 1
+                    elif rec[1] is None:
+                        pass
                     else:
                         self.logger.warning('Invalid genotype type {}'.format(rec[1]))
                     if depth is not None and len(rec) > 2:
