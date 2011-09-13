@@ -34,10 +34,10 @@ class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
-        runCmd('vtools import_phenotype phenotype.txt')
-        runCmd('vtools import_vcf SAMP1.vcf')
+        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_txt txt/input.tsv -c 1 2 4 5 --zero')
+        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools import_vcf vcf/SAMP1.vcf')
         runCmd('vtools sample_stat variant --num num --freq freq --depth depth')
     def removeProj(self):
         runCmd('vtools remove project')

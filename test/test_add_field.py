@@ -34,10 +34,10 @@ class TestAddField(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
-        runCmd('vtools import_phenotype phenotype.txt')
-        runCmd('vtools import_vcf SAMP1.vcf')
+        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_txt txt/input.tsv -c 1 2 4 5 --zero')
+        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools import_vcf vcf/SAMP1.vcf')
     def removeProj(self):
         runCmd('vtools remove project')
     def testAddField(self):
@@ -45,18 +45,18 @@ class TestAddField(ProcessTestCase):
         self.assertFail('vtools add_field')
         self.assertSucc('vtools add_field -h')
         # object of type 'NoneType' has no len()
-        self.assertFail('vtools add_field variant mut_type -f annovar.txt.exonic_variant_function --columns 3')
+        self.assertFail('vtools add_field variant mut_type -f ann/annovar.txt.exonic_variant_function --columns 3')
         # argument -c/--columns is required
-        self.assertFail('vtools add_field variant mut_type -f annovar.txt.exonic_variant_function --variant_columns 4 5 7 8')
+        self.assertFail('vtools add_field variant mut_type -f ann/annovar.txt.exonic_variant_function --variant_columns 4 5 7 8')
         # No such file or directory: 'non_existing_file.txt'
         self.assertFail('vtools add_field variant mut_type -f non_existing_file.txt --variant_columns 4 5 7 8 --columns 3')
         # error: argument -f/--file is required
-        self.assertFail('vtools add_field variant mut_type annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 3')
+        self.assertFail('vtools add_field variant mut_type ann/annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 3')
         # WARNING: Nothing to update. Perhaps you have specified wrong chr, pos and alt columns?
-        self.assertFail('vtools add_field variant mut_type -f annovar.txt.exonic_variant_function --variant_columns 4 5 7 11 --columns 2')
+        self.assertFail('vtools add_field variant mut_type -f ann/annovar.txt.exonic_variant_function --variant_columns 4 5 7 11 --columns 2')
         # error: too few arguments
-        self.assertFail('vtools add_field variant -f annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 2')
-        self.assertSucc('vtools add_field variant mut_type -f annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 2')
+        self.assertFail('vtools add_field variant -f ann/annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 2')
+        self.assertSucc('vtools add_field variant mut_type -f ann/annovar.txt.exonic_variant_function --variant_columns 4 5 7 8 --columns 2')
 
 if __name__ == '__main__':
     unittest.main()

@@ -45,9 +45,9 @@ class TestImportTXT(ProcessTestCase):
         # help information
         self.assertSucc('vtools import_txt -h')
         # no format information, fail
-        self.assertFail('vtools import_txt input.tsv')
+        self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
-        self.assertFail('vtools import_txt --format ../input_fmt/ANNOVAR input.tsv')
+        self.assertFail('vtools import_txt --format ../input_fmt/ANNOVAR txt/input.tsv')
 
     def testANNOVAR(self):
         'Testing the annovar input format'
