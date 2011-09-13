@@ -1,30 +1,36 @@
-setup.py
-vtools
-vtools_report
-test/testUtils.py
-test/test_add_field.py
-test/test_asso.py
-test/test_avg_depth.py
-test/test_compare.py
-test/test_exclude.py
-test/test_execute.py
-test/test_import_phenotype.py
-test/test_import_txt.py
-test/test_import_vcf.py
-test/test_init.py
-test/test_liftover.py
-test/test_output.py
-test/test_remove.py
-test/test_sample_stat.py
-test/test_select.py
-test/test_show.py
-test/test_trans_ratio.py
-test/test_use.py
-variant_tools/__init__.py
-variant_tools/annotation.py
-variant_tools/importer.py
-variant_tools/liftOver.py
-variant_tools/project.py
-variant_tools/sample.py
-variant_tools/utils.py
-variant_tools/variant.py
+# $File: MANIFEST.in $
+# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
+# $Rev: 4234 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://variant_tools.sourceforge.net # for details.
+#
+# Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+include setup.py
+include vtools
+include vtools_report
+include test/*.py
+include variant_tools/__init__.py
+include variant_tools/annotation.py
+include variant_tools/importer.py
+include variant_tools/liftOver.py
+include variant_tools/project.py
+include variant_tools/sample.py
+include variant_tools/utils.py
+include variant_tools/variant.py
