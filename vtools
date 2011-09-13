@@ -33,7 +33,11 @@ from variant_tools import sample
 from variant_tools import liftOver
 from variant_tools import annotation
 from variant_tools import variant
-from variant_tools import association
+try:
+    from variant_tools import association
+    with_association = True
+except ImportError:
+    with_association = False
 
 def addVerbosityArg(parser):
     parser.add_argument('-v', '--verbosity', choices=['0','1','2'],
@@ -168,7 +172,7 @@ if __name__ == '__main__':
     # command associate
     #
     # This command is not ready and will not be displayed in a formal release
-    if project.VTOOLS_VERSION.endswith('svn'):
+    if with_association:
         parser = subparsers.add_parser('associate',
             #FIXME: more description for vtools commands
             help='''Test association between variants and phenotypes''',

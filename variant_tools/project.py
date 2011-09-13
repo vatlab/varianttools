@@ -278,20 +278,20 @@ class fileFMT:
                 
 
     def describe(self):
-        print 'Format:      {}'.format(self.name)
+        print('Format:      {}'.format(self.name))
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*4))))
         #
-        print 'Variant fields:'
+        print('Variant fields:')
         for fld in self.variant_fields:
-            print '  {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*8)))
+            print('  {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                subsequent_indent=' '*8))))
         if len(self.genotype_fields) > 0:
-            print 'Genotype fields:'
+            print('Genotype fields:')
             for fld in self.genotype_fields:
-                print '   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*8)))
+                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*8))))
 
 
 

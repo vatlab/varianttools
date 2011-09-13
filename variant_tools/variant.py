@@ -202,7 +202,7 @@ def select(args, reverse=False):
                     count = proj.db.numOfRows(args.from_table) - int(count)
                 proj.db.stopProgress()
                 #
-                print count
+                print(count)
             # case 2: to table
             elif args.to_table:
                 if proj.db.hasTable(args.to_table):
@@ -229,7 +229,7 @@ def select(args, reverse=False):
                 if args.output:
                     outputVariants(proj, args.to_table, args.output, args)
                 if args.count:
-                    print count
+                    print(count)
             # case 3: output, but do not write to table, and not count
             elif args.output: 
                 query = 'SELECT DISTINCT {}.variant_id {} {}'.format(args.from_table,
@@ -300,11 +300,11 @@ def compare(args):
             # output?
             if args.count:
                 proj.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
-                print '{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
+                print('{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
                     len(variant_B - variant_A),
                     len(variant_A & variant_B),
                     len(variant_A | variant_B)
-                    )
+                    ))
             #
             for var, table in [
                     (set() if args.A_diff_B is None else variant_A - variant_B, args.A_diff_B), 
