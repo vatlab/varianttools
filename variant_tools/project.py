@@ -233,7 +233,8 @@ class fileFMT:
             raise ValueError('There should be at least four variant fields for chr, pos, ref, and alt alleles')
 
     def parseFMT(self, filename):
-        parser = ConfigParser.SafeConfigParser()
+        # Python 3.2 by default disables inline comment prefixes
+        parser = ConfigParser.SafeConfigParser(inline_comment_prefixes=(';', '#'))
         parser.read(filename)
         # sections?
         sections = parser.sections()

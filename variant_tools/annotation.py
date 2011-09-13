@@ -101,7 +101,8 @@ class AnnoDBConfiger:
         if '-' in self.name:
             self.version = '-'.join(self.name.split('-')[1:])
             self.name = self.name.split('-')[0]
-        parser = ConfigParser.SafeConfigParser()
+        # Python 3.2 by default disables inline comment prefixes
+        parser = ConfigParser.SafeConfigParser(inline_comment_prefixes=(';', '#'))
         parser.read(filename)
         # sections?
         sections = parser.sections()
