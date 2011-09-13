@@ -566,7 +566,7 @@ class vcfImporter(Importer):
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         no_sample = self.variant_only or len(sampleNames) == 0
-        sample_ids = self.recordFileAndSample(os.path.split(input_filename)[-1], [None] if no_sample else sampleNames, 
+        sample_ids = self.recordFileAndSample(input_filename, [None] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
         nSample = len(sample_ids)
@@ -734,10 +734,8 @@ class txtImporter(Importer):
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
-        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        filename = os.path.split(input_filename)[-1]
         # assuming one sample for each file
-        sample_id = self.recordFileAndSample(filename, [self.sample_name],
+        sample_id = self.recordFileAndSample(input_filename, [self.sample_name],
             [None] if not self.genotype_fields else self.genotype_fields)[0]
         #
         cur = self.db.cursor()
