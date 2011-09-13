@@ -185,7 +185,7 @@ if __name__ == '__main__':
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
     args, argv = master_parser.parse_known_args()
-    if args.func == association.associate:
+    if with_association and args.func == association.associate:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

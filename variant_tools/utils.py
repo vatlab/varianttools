@@ -170,7 +170,7 @@ def filesInURL(URL, ext=''):
     fh = urllib.urlopen(URL)
     files = []
     for line in fh.readlines():
-        m = re.search('href="(.*){}"'.format(ext), line)
+        m = re.search('href="(.*){}"'.format(ext), line.decode())
         if m:
             files.append(m.group(1))
     return files
