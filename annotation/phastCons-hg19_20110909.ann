@@ -4,7 +4,7 @@ hg19=chr, start, end
 
 [data sources]
 anno_type=range
-description=UCSC Known Genes
+description=PhastCons Conservation Scores
 version=hg19_20110909
 direct_url=http://vtools.houstonbioinformatics.org/annoDB/phastCons-hg19_20110909.DB.gz
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/phastCons46way.txt.gz
@@ -26,8 +26,38 @@ index=4
 type=INTEGER
 comment=End position in chromosome
 
-[score]
-index=6
-type=INTEGER NULL
-comment=Phast cons score (range 1-1000, the higher the more conserved)
+[name]
+index=5
+type=VARCHAR(225)
+comment=Name of conserved region
+
+[count]
+index=7
+type=INTEGER
+comment=Number of values in this block
+
+[valid_count]
+index=12
+type=INTEGER
+comment=Number of valid values in this block
+
+[lower_limit]
+index=10
+type=DOUBLE
+comment=Lowest value in this block
+
+[data_range]
+index=11
+type=DOUBLE
+comment=Spread of values in this block.  lower_limit + data_range = upper_limit
+
+[sum_data]
+index=13
+type=DOUBLE
+comment=Sum of values in this block (can be used for calculate average and stddev of conservation scores)
+
+[sum_squares]
+index=14
+type=DOUBLE
+comment=Sum of values squared in this block (can be used for calculating stddev of conservation scores)
 
