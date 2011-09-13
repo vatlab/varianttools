@@ -1,4 +1,9 @@
-#Variant tools schema version 1.0
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+# 
 [linked fields]
 hg19=chr, start, end
 

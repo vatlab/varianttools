@@ -1,4 +1,8 @@
-#Variant tools schema version 1.0
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
 #
 # To retrieve the kegg pathway details, a database query was run using the 
 # "hg19" MySQL database from USCS.  We have a local copy of the database which can be
