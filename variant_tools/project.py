@@ -35,7 +35,7 @@ import ConfigParser
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
-VTOOLS_VERSION = '1.0svn'
+VTOOLS_VERSION = '1.0beta'
 VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
 VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
