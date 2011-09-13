@@ -34,3 +34,7 @@ include variant_tools/project.py
 include variant_tools/sample.py
 include variant_tools/utils.py
 include variant_tools/variant.py
+include test/vcf/*
+include test/txt/*
+include test/phenotype/*
+include test/ann/*
