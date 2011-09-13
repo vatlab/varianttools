@@ -65,6 +65,11 @@ else:
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
     description = "Variant tools: an integrated annotation and analysis package for next-gen sequencing data",
+    author = 'Bo Peng',
+    url = 'http://varianttools.sourceforge.net',
+    author_email = 'bpeng@mdanderson.org',
+    maintainer = 'Bo Peng',
+    maintainer_email = 'varianttools-devel@lists.sourceforge.net',
     py_modules = [
         'variant_tools.__init__',
         'variant_tools.utils',
