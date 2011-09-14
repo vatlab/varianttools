@@ -338,7 +338,7 @@ def downloadFile(URL, dest_dir = None):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     dest = filename if dest_dir is None else os.path.join(dest_dir, filename)
-     use libcurl? Recommended but not always available
+    # use libcurl? Recommended but not always available
     try:
         import pycurl
         prog = ProgressBar(filename)
