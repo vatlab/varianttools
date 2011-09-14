@@ -458,8 +458,9 @@ def useArguments(parser):
             source of the annotation database (or use source files provided by option --files).''')
     parser.add_argument('-f', '--files', nargs='*', default=[],
         help='''A list of source files. If specified, vtools will not try to
-            download and select source files. This is used only when no local
-            annotation database is located.''')
+            download and select source files. These source files will be
+            compiled into a local annotation database. This is used only
+            when no local annotation database is specified.''')
     parser.add_argument('-l', '--linked_by', nargs='*', default=[],
         help='''A list of fields that are used to link the annotation database to
             tables in the existing project. This parameter is required only for

@@ -61,14 +61,14 @@ class TestImportTXT(ProcessTestCase):
         # one of the variant cannot be imported.
         self.assertEqual(numOfVariant(), 11)
     
-    def testIllumina_SNP(self):
+    def testCASAVA18_SNP(self):
         'Testing the illumina SNP input format'
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP txt/Illumina_SNP.txt')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt')
         self.assertEqual(numOfVariant(), 20)
     
-    def testIllumina_INDEL(self):
+    def testCASAVA18_INDEL(self):
         'Testing the illumina INDEL input format'
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_INDEL txt/Illumina_INDEL.txt')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt')
         self.assertEqual(numOfVariant(), 25)
 
 if __name__ == '__main__':
