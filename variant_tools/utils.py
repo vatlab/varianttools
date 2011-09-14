@@ -113,7 +113,7 @@ def lineCount(filename):
         else:
             return len(open(filename).readlines())
     elif filename.endswith('.gz'):
-        input = gzip.open(filename, 'br')
+        input = gzip.open(filename, 'rb')
         input.seek(1000, 0)
         content = input.read(99000)
         input.close()
@@ -123,7 +123,7 @@ def lineCount(filename):
         return int(lineCount * (5 * totalSize / 99000.))
     else:
         # only binary mode can accomendate end-relative seeks in python 3.
-        input = open(filename, 'br')
+        input = open(filename, 'rb')
         # count from the back because they tend to be records
         # with consistent size
         input.seek(-99000, 2)
