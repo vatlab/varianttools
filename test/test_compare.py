@@ -28,23 +28,15 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd
+from testUtils import ProcessTestCase, runCmd, initTest
 
 class TestCompare(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
-        runCmd('vtools import_phenotype phenotype.txt')
-        runCmd('vtools import_vcf SAMP1.vcf')
-        runCmd('vtools use ./testNSFP.ann')
-        runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
-        runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
-        runCmd('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
-        runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+        initTest(10)
     def removeProj(self):
         runCmd('vtools remove project')
+        
     def testCompare(self):
         'Test command vtools compare'
         self.assertFail('vtools compare')

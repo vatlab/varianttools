@@ -41,13 +41,19 @@ class TestImportTXT(ProcessTestCase):
     def testImportTXT(self):
         'Test command import_txt'
         self.assertFail('vtools import_txt')
-        self.assertFail('vtools import_txt non_existing.txt')
+        self.assertFail('vtools import_txt txt/input.tsv')
         # help information
         self.assertSucc('vtools import_txt -h')
         # no format information, fail
         self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
-        self.assertFail('vtools import_txt --format ../input_fmt/variant txt/input.tsv')
+        self.assertFail('vtools import_txt --format ../input_fmt/basic txt/input.tsv')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/basic txt/input.tsv')
+        self.assertEqual(numOfVariant(), 338)
+        # test downloading fmt file from the website
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/variant txt/input.tsv')
+        self.assertEqual(numOfVariant(), 338)
+        self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
     
     def testANNOVAR(self):
         'Testing the annovar input format'
@@ -58,12 +64,12 @@ class TestImportTXT(ProcessTestCase):
     def testIllumina_SNP(self):
         'Testing the illumina SNP input format'
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP txt/Illumina_SNP.txt')
-        self.assertEqual(numOfVariant(), 12)
+        self.assertEqual(numOfVariant(), 20)
     
-    #def testIllumina_INDEL(self):
-    #    'Testing the illumina INDEL input format'
-    #    self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_INDEL txt/Illumina_INDEL.txt')
-    #    self.assertEqual(numOfVariant(), 12)
+    def testIllumina_INDEL(self):
+        'Testing the illumina INDEL input format'
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_INDEL txt/Illumina_INDEL.txt')
+        self.assertEqual(numOfVariant(), 25)
 
 if __name__ == '__main__':
     unittest.main()
