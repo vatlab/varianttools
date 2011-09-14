@@ -681,23 +681,45 @@ class txtImporter(Importer):
             cur = self.db.cursor()
             headers = self.db.getHeaders('variant')
             for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
+                # either insert or update, the fields must be in the master variant table
+                self.proj.checkFieldName(f.name, exclude='variant')
                 if f.name not in headers:
                     s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s
         #
+        self.update = update
         self.genotype_fields = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[4]]]
         # how to split processed records
         self.ranges = fmt.ranges
         if self.genotype_fields:
             self.logger.info('Additional genotype fields: {}'.format(', '.join(self.genotype_fields)))
-        extra_fields = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        #
+        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        if self.update and len(self.variant_info) == 0:
+            raise ValueError('No field could be updated using this input file')
+        #
+        self.input_type = fmt.input_type
+        if self.update != 'variant':
+            self.update_variant_query = 'UPDATE variant SET {} WHERE variant.variant_id = {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.update)
+            self.update_position_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos = {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.update)
+            self.update_range_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos >= {} AND variant.pos <= {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.db.PH, self.update)
+        else:
+            self.update_variant_query = 'UPDATE variant SET {} WHERE variant.variant_id = {};'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
+            self.update_position_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos = {};'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH)
+            self.update_range_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos >= {} AND variant.pos <= {};'\
+                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.db.PH)
         if self.import_alt_build:
             self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt {0}) VALUES ({1});'\
-                .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
+                .format(' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
         else:
             self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt {0}) VALUES ({1});'\
-                .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
+                .format(' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
 
     def addVariant(self, cur, rec):
         #
@@ -705,8 +727,7 @@ class txtImporter(Importer):
         if var_key in self.variantIndex:
             variant_id = self.variantIndex[var_key][0]
             if len(rec) > 5:
-                # need to update other fields
-                pass
+                cur.execute(self.update_variant_query, rec[5:] + [variant_id])
             return variant_id
         else:
             # new varaint!
@@ -725,6 +746,16 @@ class txtImporter(Importer):
             self.variantIndex[var_key] = (variant_id, 1)
             return variant_id
 
+    def updateVariant(self, cur, rec):
+        if self.input_type == 'variant':
+            var_key = tuple(rec[0:4])
+            if var_key in self.variantIndex:
+                variant_id = self.variantIndex[var_key][0]
+                cur.execute(self.update_variant_query, rec[4:] + [variant_id])
+        elif self.input_type == 'position':
+            cur.execute(self.update_position_query, rec[2:] + [rec[0], rec[1]])
+        else:  # range based
+            cur.execute(self.update_range_query, rec[3:] + [rec[0], rec[1], rec[2]])
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
@@ -744,9 +775,12 @@ class txtImporter(Importer):
                     for bins, rec in self.processor.process(line):
                         self.count[0] += 1
                         #
-                        variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                        if self.ranges[2] != self.ranges[4]:
-                            cur.execute(genotype_insert_query, [variant_id] + rec[self.ranges[2]: self.ranges[4]])
+                        if self.update:
+                            self.updateVariant(cur, rec[0:self.ranges[2]])
+                        else:
+                            variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+                            if self.ranges[2] != self.ranges[4]:
+                                cur.execute(genotype_insert_query, [variant_id] + rec[self.ranges[2]: self.ranges[4]])
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
