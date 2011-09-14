@@ -49,7 +49,7 @@ class TestLiftover(ProcessTestCase):
         self.assertFail('vtools liftover non_existing_build')
         # from hg18 to hg19
         self.assertSucc('vtools liftover hg19')
-        out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
+        out1 = outputOfCmd('vtools output variant bin chr "pos-1" alt_bin alt_chr "alt_pos-1"')
         out1 = '\n'.join([x for x in out1.split('\n') if 'NA' not in x])
         #
         # We write in hg19 to a datafile, create a new project, import the
