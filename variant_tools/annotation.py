@@ -507,7 +507,7 @@ def use(args):
                     del s
                 except Exception as e:
                     proj.logger.debug(e)
-                    proj.logger.info('Failed to download database.')
+                    raise ValueError('Failed to download database.')
             #
             # annDB is now a local file
             if annoDB.endswith('.ann'):
