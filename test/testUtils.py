@@ -84,36 +84,36 @@ def initTest(level):
     while True:
         runCmd('vtools init test -f') #1
         if i == level: break
-        else: ++i
+        else: i += 1
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
         if i == level: break
-        else: ++i
+        else: i += 1
         runCmd('vtools import_vcf vcf/SAMP1.vcf')
         if i == level: break
-        else: ++i
+        else: i += 1
         runCmd('vtools import_txt --build hg18 --format ../input_fmt/basic txt/input.tsv')
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools import_phenotype phenotype/phenotype.txt')
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools use ann/testNSFP.ann') #6
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
         if i == level: break
-        else: ++i        
+        else: i += 1        
         runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
         if i == level: break
-        else: ++i           
-        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')  #11
+        else: i += 1           
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')  #11
         if i == level: break
-        else: ++i
-        runCmd('vtools select variant --samples "filename like \'input.tsv\'" -t input_tsv')
+        else: i += 1
+        runCmd('vtools select variant --samples "filename like \'%input.tsv\'" -t input_tsv')
         break

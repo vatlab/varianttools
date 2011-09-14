@@ -28,13 +28,12 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, outputOfCmd, initTest
 
 class TestLiftover(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
+        initTest(2)
 
     def removeProj(self):
         runCmd('vtools remove project')
@@ -48,10 +47,7 @@ class TestLiftover(ProcessTestCase):
         self.assertFail('vtools liftover -v 0')
         # non_existing_build
         self.assertFail('vtools liftover non_existing_build')
-        self.assertSucc('vtools liftover hg19')
-
-    def testHg18Hg19(self):
-        'Lifting from hg18 to hg19, and vise vesa'
+        # from hg18 to hg19
         self.assertSucc('vtools liftover hg19')
         out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
         out1 = '\n'.join([x for x in out1.split('\n') if 'NA' not in x])
@@ -63,11 +59,11 @@ class TestLiftover(ProcessTestCase):
         data = outputOfCmd('vtools output variant chr "pos-1" ref alt --build hg19')
         with open('temp_input.txt', 'w') as output:
             output.write(data)
-        self.assertSucc('vtools init test -f')
-        self.assertSucc('vtools import_txt temp_input.txt --zero --build hg19')
+        runCmd('vtools init test -f')
+        self.assertSucc('vtools import_txt --build hg19 --format ../input_fmt/basic temp_input.txt')
         self.assertSucc('vtools liftover hg18')
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
-        out2 = '\n'.join([x for x in out1.split('\n') if 'NA' not in x])
+        out2 = '\n'.join([x for x in out2.split('\n') if 'NA' not in x])
         self.assertEqual(out1, out2)
         os.remove('temp_input.txt')
 

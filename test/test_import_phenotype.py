@@ -28,18 +28,13 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfSample
+from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, outputOfCmd
 
-def fileDiff(filename1, filename2):
-    return str(subprocess.check_output(['diff', filename1, filename2],
-        stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
-    
 class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
+        initTest(3)
+        runCmd('vtools import_vcf vcf/SAMP2.vcf')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportPhenotype(self):
@@ -48,10 +43,10 @@ class TestImportPhenotype(ProcessTestCase):
         self.assertFail('vtools import_phenotype')
         self.assertSucc('vtools import_phenotype -h')
         # opening project project_name. Importing phenotypes into table sample.
-        self.assertSucc('vtools import_phenotype phenotype.txt')
-        #runCmd('vtools show sample > phenotype1.txt')
-        #self.assertEqual(fileDiff('phenotype.txt', 'phenotype1.txt'), '')
-        #runCmd('rm phenotype1.txt')
+        self.assertSucc('vtools import_phenotype phenotype/phenotype.txt')
+        out1 = outputOfCmd('vtools show samples')
+        out2 = outputOfCmd('cat phenotype/phenotype.txt')        
+        self.assertEqual(out1, out2)
 
 if __name__ == '__main__':
     unittest.main()

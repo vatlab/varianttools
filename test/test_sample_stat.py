@@ -28,16 +28,12 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd
+from testUtils import ProcessTestCase, runCmd, initTest
 
 class TestSampleStat(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
-        runCmd('vtools import_phenotype phenotype.txt')
-        runCmd('vtools import_vcf SAMP1.vcf')
+        initTest(5)
         runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
     def removeProj(self):
         runCmd('vtools remove project')

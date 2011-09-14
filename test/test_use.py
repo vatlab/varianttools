@@ -70,7 +70,7 @@ class TestUse(ProcessTestCase):
         # Now, let us import vcf regularly.
         runCmd('vtools init test --force')
         self.assertSucc('vtools import_vcf ann/testThousandGenomes.vcf.head')
-        self.assertSucc('vtools use ann/testThousandGenomes')
+        self.assertSucc('vtools use ann/testThousandGenomes.ann')
         # do we have all the variants matched up?
         self.assertOutput('vtools select variant -c', '146\n')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')

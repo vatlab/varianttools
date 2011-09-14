@@ -28,20 +28,15 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd
+from testUtils import ProcessTestCase, runCmd, initTest
 
 class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
+        initTest(6)
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
-        runCmd('vtools import_phenotype phenotype.txt')
-        runCmd('vtools sample_stat CEU --samples "filename like \'CEU%\' and aff=\'2\'" --freq CEU_cases_freq --het CEU_cases_het')
-        runCmd('vtools import_vcf SAMP1.vcf')
-        runCmd('vtools use ./testNSFP.ann')
+        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --freq CEU_cases_freq --het CEU_cases_het')
     def removeProj(self):
         runCmd('vtools remove project')
     def testSelect(self):
@@ -69,7 +64,7 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
         self.assertSucc('vtools select -c variant')
-        self.assertSucc('vtools select variant --samples "filename like \'CEU%\'" "aff=\'2\'" --count -v0')
+        self.assertSucc('vtools select variant --samples "filename like \'%CEU%\'" "aff=\'2\'" --count -v0')
         self.assertSucc('vtools select variant "freq<0.01" --count -v0')
         self.assertSucc('vtools select CEU "CEU_cases_freq>0.5" --samples "sample_name like \'NA0%\'" --output variant_id CEU_cases_freq')
 

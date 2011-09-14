@@ -28,19 +28,16 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd
+from testUtils import ProcessTestCase, runCmd, initTest
 
 class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
-        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
-        runCmd('vtools import_txt input.tsv -c 1 2 4 5 --zero')
-        runCmd('vtools import_phenotype phenotype.txt')
+        initTest(5)
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools select variant aff=\'1\' -t unaffected')
         runCmd('vtools select CEU --samples "BMI<18.5" -t Underweight')
-        runCmd('vtools sample_stat CEU --samples "filename like \'CEU%\' and aff=\'2\'" --freq CEU_cases_freq')
+        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --freq CEU_cases_freq')
     def testRemove(self):
         'Test command vtools remove'
         self.assertFail('vtools remove')

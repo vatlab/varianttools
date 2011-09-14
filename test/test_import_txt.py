@@ -50,8 +50,10 @@ class TestImportTXT(ProcessTestCase):
         self.assertFail('vtools import_txt --format ../input_fmt/basic txt/input.tsv')
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/basic txt/input.tsv')
         self.assertEqual(numOfVariant(), 338)
+        self.assertSucc('vtools import_txt --build hg19 --format fmt/basic_hg19 txt/input.tsv')
+        self.assertEqual(numOfVariant(), 338)
         # test downloading fmt file from the website
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/variant txt/input.tsv')
+        self.assertSucc('vtools import_txt --build hg18 --format basic txt/input.tsv')
         self.assertEqual(numOfVariant(), 338)
         self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
     

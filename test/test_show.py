@@ -28,13 +28,12 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd
+from testUtils import ProcessTestCase, runCmd, initTest
 
 class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import_vcf CEU.vcf.gz --build hg18')
+        initTest(6)
     def removeProj(self):
         runCmd('vtools remove project')
     def testShow(self):
@@ -51,11 +50,10 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show table variant -l 20')
         self.assertSucc('vtools show table variant -l -1')
         self.assertSucc('vtools show samples')
-        # Save output to samples.txt
-        self.assertSucc('vtools show samples > samples.txt')
-        runCmd('vtools use testNSFP.ann')
         self.assertSucc('vtools show table testNSFP')
         self.assertSucc('vtools show fields')
+        self.assertSucc('vtools show formats')
+        self.assertSucc('vtools show annotations')
 
 if __name__ == '__main__':
     unittest.main()
