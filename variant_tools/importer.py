@@ -229,10 +229,10 @@ class TextProcessor:
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
             if num_records == 1:
-                yield records
+                yield [], records
             else:
                 for i in range(num_records):
-                    yield [x[i] if type(x) == list else x for x in records]
+                    yield [], [x[i] if type(x) == list else x for x in records]
         elif len(self.build[0]) == 1:
             if num_records == 1:
                 # there is no ref and alt, easy
@@ -247,7 +247,7 @@ class TextProcessor:
                         # but incomplete hg19 coordinates)
                         bin = None
                     bins.append(bin)
-                yield bins + records
+                yield bins, records
             else:
                 for i in range(num_records):
                     # get the i-th record 
@@ -259,7 +259,7 @@ class TextProcessor:
                         except:
                             bin = None
                         bins.append(bin)
-                    yield bins + rec
+                    yield bins, rec
         elif num_records == 1:
             # variant, single record, although alt can lead to multiple records
             #
@@ -283,7 +283,7 @@ class TextProcessor:
                     rec[pos_idx] = pos
                     rec[ref_idx] = ref
                     rec[alt_idx] = alt
-                yield bins + rec
+                yield bins, rec
         else:
             try:
                 all_alt = records[self.build[0][2]].split(',')
@@ -299,7 +299,7 @@ class TextProcessor:
                         rec[pos_idx] = pos
                         rec[ref_idx] = ref
                         rec[alt_idx] = alt
-                    yield bins + rec
+                    yield bins, rec
 
 
 
@@ -318,8 +318,7 @@ class Importer:
         cur = self.db.cursor()
         cur.execute('SELECT filename from filename;')
         existing_files = [x[0] for x in cur.fetchall()]
-        for f in files:
-            filename = os.path.split(f)[-1]
+        for filename in files:
             if filename in existing_files:
                 if force:
                     self.logger.info('Re-importing imported file {}'.format(filename))
@@ -330,11 +329,11 @@ class Importer:
                     cur = self.db.cursor()
                     cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
                     self.db.commit()
-                    self.files.append(f)
+                    self.files.append(filename)
                 else:
                     self.logger.info('Ignoring imported file {}'.format(filename))
             else:
-                self.files.append(f)
+                self.files.append(filename)
         # for all record, new SNV, insertion, deletion, complex variants, and invalid record
         self.count = [0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0]
@@ -566,7 +565,7 @@ class vcfImporter(Importer):
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         no_sample = self.variant_only or len(sampleNames) == 0
-        sample_ids = self.recordFileAndSample(input_filename, [None] if no_sample else sampleNames, 
+        sample_ids = self.recordFileAndSample(input_filename, [] if no_sample else sampleNames, 
             ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
         #
         nSample = len(sample_ids)
@@ -609,9 +608,7 @@ class vcfImporter(Importer):
                         alt = tokens[4][0]
                         variant_id = self.addVariant(cur, chr, pos, ref, alt)
                         #
-                        if no_sample:
-                            cur.execute(genotype_insert_query[sample_ids[0]], [variant_id, 1] + DP)
-                        else:
+                        if not no_sample:
                             variants = [x.split(':')[GT_idx].count('1') for x in tokens[-len(sample_ids):]]
                             for var_idx, var in enumerate(variants):
                                 if var != 0:  # genotype 0|0 are ignored
@@ -622,10 +619,7 @@ class vcfImporter(Importer):
                         variant_id = [0] * len(alts)
                         for altidx, alt in enumerate(alts):
                             variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
-                        if no_sample:
-                            for i in range(len(alts)):
-                                cur.execute(genotype_insert_query[sample_ids[0]], [variant_id[i], 1] + DP)
-                        else:
+                        if not no_sample:
                             # process variants
                             for var_idx, var in enumerate([x.split(':')[GT_idx] for x in tokens[-len(sample_ids):]]):
                                 if len(var) == 3:  # regular
@@ -667,7 +661,7 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, sample_name=None, force=False):
+    def __init__(self, proj, files, build, format, sample_name=None, update=None, force=False):
         Importer.__init__(self, proj, files, build, force)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
@@ -681,23 +675,23 @@ class txtImporter(Importer):
         #
         self.sample_name = sample_name
         #
-        self.var_processor = TextProcessor(fmt.variant_fields, [(1, 2, 3)], fmt.delimiter, self.logger)
-        self.sample_var_processor = TextProcessor(fmt.genotype_fields, [], fmt.delimiter, self.logger) \
-            if fmt.genotype_fields else None
+        self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
         #
-        extra_fields = [x.name for x in fmt.variant_fields[4:]]
-        if extra_fields:
+        if fmt.ranges[1] != fmt.ranges[2]:
             cur = self.db.cursor()
             headers = self.db.getHeaders('variant')
-            for f in fmt.variant_fields[4:]:
+            for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
                 if f.name not in headers:
                     s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s
         #
-        self.genotype_fields = [] if fmt.genotype_fields is None or len(fmt.genotype_fields) <= 1 else [x.name for x in fmt.genotype_fields[1:]]
+        self.genotype_fields = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[4]]]
+        # how to split processed records
+        self.ranges = fmt.ranges
         if self.genotype_fields:
             self.logger.info('Additional genotype fields: {}'.format(', '.join(self.genotype_fields)))
+        extra_fields = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
         if self.import_alt_build:
             self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt {0}) VALUES ({1});'\
                 .format(' '.join([', ' + x for x in extra_fields]), ', '.join([self.db.PH]*(len(extra_fields) + 5)))
@@ -736,26 +730,23 @@ class txtImporter(Importer):
         '''Import a TSV file to sample_variant'''
         # assuming one sample for each file
         sample_id = self.recordFileAndSample(input_filename, [self.sample_name],
-            [None] if not self.genotype_fields else self.genotype_fields)[0]
+            [] if not self.genotype_fields else self.genotype_fields[1:])[0]
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         genotype_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
-            .format(self.proj.name, sample_id, ','.join([self.db.PH] * (2 + len(self.genotype_fields))))
+            .format(self.proj.name, sample_id, ','.join([self.db.PH] * (1 + len(self.genotype_fields))))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
                     if line.startswith('#'):
                         continue
-                    for rec in self.var_processor.process(line):
+                    for bins, rec in self.processor.process(line):
                         self.count[0] += 1
                         #
-                        variant_id = self.addVariant(cur, rec)
-                        if self.sample_var_processor:
-                            for sample_rec in self.sample_var_processor.process(line):
-                                cur.execute(genotype_insert_query, [variant_id] + sample_rec)
-                        else:
-                            cur.execute(genotype_insert_query, [variant_id] + [None]*len(self.genotype_fields))
+                        variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+                        if self.ranges[2] != self.ranges[4]:
+                            cur.execute(genotype_insert_query, [variant_id] + rec[self.ranges[2]: self.ranges[4]])
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -786,8 +777,8 @@ def importVCFArguments(parser):
             tool will be automatically called to map input coordinates to the primary
             reference genome.''')
     parser.add_argument('--variant_only', action='store_true',
-        help='''Import only variants. Sample variants will be ignored but a sample with
-            NULL sample name will still be created to trace the source of variants.''')
+        help='''Import only variants. No sample will be created and all sample variants will
+            be ignored.''')
     parser.add_argument('--info', nargs='*', default=['DP'],
         help='''Variant information fields to import. This command only support
             'DP' (total depth). When 'DP' is listed (default), vtools will look
@@ -814,13 +805,12 @@ def importVCF(args):
 
 def importTxtArguments(parser):
     parser.add_argument('input_files', nargs='*',
-        help='''A list of files that will be imported. The file should be in 
-            tab or command separated value format. Gzipped files are acceptable.
-            If an input file specifies variants (with optional genotype) with fields
-            chr, pos, ref and alt, command import_txt will add these variants to
-            the master variant table unless parameter --update is specified. Otherwise,
-            the input files will be used to add or update fields of matching variants.
-            ''')
+        help='''A list of files that will be imported. The file should be delimiter
+            separated with format described by parameter --format. Gzipped files are
+            acceptable. If parameter --update is specified, the input files will be used
+            to update fields of existing variants. Otherwise, this command will import
+            variants and optional genotypes of one sample from input files with fields
+            chr, pos, ref and alt.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
@@ -835,16 +825,16 @@ def importTxtArguments(parser):
             format specification file (with extension .fmt,
             see http://varianttools.sourceforge.net/Format/New for details).
         ''')
-    parser.add_argument('--sample',
+    parser.add_argument('--sample_name',
         help='''Name of the sample imported by the text file. If a sample is specified
             for input files without genotype, a sample will be created with NULL genotype.
             If no sample name is specified for input files with genotype, a sample with
             NULL sample name will be created.''')
     parser.add_argument('--update', 
-        help='''Add or update fields of existing variants of specified variant table,
+        help='''Add or update fields of existing variants of specified variant table
             instead of adding new variants to the master variant table. This option
             is required for position, range or field input files because these input files
-            can only used to update existing variants.''')
+            can only be used to update existing variants.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
@@ -856,7 +846,7 @@ def importTxt(args):
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force)
+                update=args.update, force=args.force)
             importer.importData()
         proj.close()
     except Exception as e:

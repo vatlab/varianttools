@@ -101,8 +101,7 @@ class AnnoDBConfiger:
         if '-' in self.name:
             self.version = '-'.join(self.name.split('-')[1:])
             self.name = self.name.split('-')[0]
-        # Python 3.2 by default disables inline comment prefixes
-        parser = ConfigParser.SafeConfigParser(inline_comment_prefixes=(';', '#'))
+        parser = ConfigParser.SafeConfigParser()
         parser.read(filename)
         # sections?
         sections = parser.sections()
@@ -306,9 +305,9 @@ class AnnoDBConfiger:
                     try:
                         if line.startswith('#'):
                             continue
-                        for rec in processor.process(line):
+                        for bins,rec in processor.process(line):
                             all_records += 1
-                            cur.execute(insert_query, rec)
+                            cur.execute(insert_query, bins + rec)
                     except Exception as e:
                         # if any problem happens, just ignore
                         self.logger.debug(e)

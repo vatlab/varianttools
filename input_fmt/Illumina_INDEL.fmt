@@ -8,7 +8,8 @@
 [format description]
 description=Input format illumina indels.txt file, called by CASAVA. This format imports chr, pos, ref, alt of most likely genotype, and a Q score for the most likely genotype.
 variant_fields=seq_name, pos, ref, alt
-genotype_fields=max_g_type, Q_indel
+genotype_fields=max_g_type
+genotype_info=Q_indel
 
 [seq_name]
 index=1

@@ -115,15 +115,6 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=sample.importPhenotype)
     #
-    # command add_field
-    parser = subparsers.add_parser('add_field',
-        help='''Import property of variants from a comma or tab separated file, which
-            can be annotation for nucleotide locations or variants, or arbitrary fields
-            of a project (e.g. gene).''')
-    variant.addFieldArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=variant.addField)
-    #
     # command sample_stat
     parser = subparsers.add_parser('sample_stat',
         help='Calculate sample statistics (count, frequency etc) for all or selected samples.')
