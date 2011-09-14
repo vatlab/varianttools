@@ -49,14 +49,14 @@ class TestLiftover(ProcessTestCase):
         self.assertFail('vtools liftover non_existing_build')
         # from hg18 to hg19
         self.assertSucc('vtools liftover hg19')
-        out1 = outputOfCmd('vtools output variant bin chr "pos-1" alt_bin alt_chr "alt_pos-1"')
+        out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
         out1 = '\n'.join([x for x in out1.split('\n') if 'NA' not in x])
         #
         # We write in hg19 to a datafile, create a new project, import the
         # data and liftover to hg18, we then compare if coordinates in these
         # projects are the same.
         # 
-        data = outputOfCmd('vtools output variant chr "pos-1" ref alt --build hg19')
+        data = outputOfCmd('vtools output variant chr pos ref alt --build hg19')
         with open('temp_input.txt', 'w') as output:
             output.write(data)
         runCmd('vtools init test -f')
