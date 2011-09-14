@@ -47,23 +47,23 @@ class TestImportTXT(ProcessTestCase):
         # no format information, fail
         self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
-        self.assertFail('vtools import_txt --format ../input_fmt/ANNOVAR txt/input.tsv')
-
+        self.assertFail('vtools import_txt --format ../input_fmt/variant txt/input.tsv')
+    
     def testANNOVAR(self):
         'Testing the annovar input format'
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR ANNOVAR.txt')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt')
         # one of the variant cannot be imported.
         self.assertEqual(numOfVariant(), 11)
-
+    
     def testIllumina_SNP(self):
         'Testing the illumina SNP input format'
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP Illumina_SNP.txt')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_SNP txt/Illumina_SNP.txt')
         self.assertEqual(numOfVariant(), 12)
-
-    def testIllumina_INDEL(self):
-        'Testing the illumina INDEL input format'
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_INDEL Illumina_INDEL.txt')
-        self.assertEqual(numOfVariant(), 12)
+    
+    #def testIllumina_INDEL(self):
+    #    'Testing the illumina INDEL input format'
+    #    self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/Illumina_INDEL txt/Illumina_INDEL.txt')
+    #    self.assertEqual(numOfVariant(), 12)
 
 if __name__ == '__main__':
     unittest.main()
