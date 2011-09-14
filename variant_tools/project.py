@@ -212,7 +212,11 @@ class fileFMT:
         # locate a file format specification file
         self.description = None
         self.variant_fields = []
+        self.position_fields = []
+        self.range_fields = []
+        self.variant_info = []
         self.genotype_fields = []
+        self.genotype_info = []
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -231,6 +235,23 @@ class fileFMT:
         #
         if len(self.variant_fields) < 4:
             raise ValueError('There should be at least four variant fields for chr, pos, ref, and alt alleles')
+        #
+        if (len(self.variant_fields) != 0) + (len(self.position_fields) != 0) + (len(self.range_fields) != 0) != 1:
+            raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
+        if self.variant_fields:
+            self.input_type = 'variant'
+            self.linked_fields = self.variant_fields
+        elif self.position_fields:
+            self.input_type = 'position'
+            self.linked_fields = self.position_fields
+        elif self.range_fields:
+            self.input_type = 'range'
+            self.linked_fields = self.range_fields
+        #
+        if self.input_type != 'variant' and not self.variant_info:
+            raise ValueError('Input file with type position or range must specify variant_info')
+        if self.input_type != 'variant' and self.genotype_info:
+            raise ValueError('Input file with type position or range can not have any genotype information.')
 
     def parseFMT(self, filename):
         # Python 3.2 by default disables inline comment prefixes
@@ -263,19 +284,14 @@ class fileFMT:
                 self.description = item[1]
             if item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
-            if item[0] == 'variant_fields':
+            if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
+                myfield = eval('self.' + item[0])
                 for name in map(str.strip, item[1].split(',')):
                     fld = [x for x in fields if x.name == name]
                     if len(fld) != 1:
                         raise ValueError('Cannot find field {} in the format specification file, which defines fields {}.'\
                             .format(name, ', '.join([x.name for x in fields])))
-                    self.variant_fields.append(fld[0])
-            if item[0] == 'genotype_fields':
-                for name in map(str.strip, item[1].split(',')):
-                    fld = [x for x in fields if x.name == name]
-                    if len(fld) != 1:
-                        raise ValueError('Cannot find field {} in the format specification file'.format(name))
-                    self.genotype_fields.append(fld[0])
+                    myfield.append(fld[0])
                 
 
     def describe(self):

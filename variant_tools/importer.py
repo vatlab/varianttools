@@ -815,7 +815,12 @@ def importVCF(args):
 def importTxtArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be in 
-            tab or command separated value format. Gzipped files are acceptable.''')
+            tab or command separated value format. Gzipped files are acceptable.
+            If an input file specifies variants (with optional genotype) with fields
+            chr, pos, ref and alt, command import_txt will add these variants to
+            the master variant table unless parameter --update is specified. Otherwise,
+            the input files will be used to add or update fields of matching variants.
+            ''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
@@ -830,10 +835,16 @@ def importTxtArguments(parser):
             format specification file (with extension .fmt,
             see http://varianttools.sourceforge.net/Format/New for details).
         ''')
-    parser.add_argument('--sample_name',
-        help='''Name of the sample imported by the text file. If no sample name is
-            specified, a sample will have no name but can still be identify by its 
-            source filename in the sample table.''')
+    parser.add_argument('--sample',
+        help='''Name of the sample imported by the text file. If a sample is specified
+            for input files without genotype, a sample will be created with NULL genotype.
+            If no sample name is specified for input files with genotype, a sample with
+            NULL sample name will be created.''')
+    parser.add_argument('--update', 
+        help='''Add or update fields of existing variants of specified variant table,
+            instead of adding new variants to the master variant table. This option
+            is required for position, range or field input files because these input files
+            can only used to update existing variants.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will

@@ -100,10 +100,11 @@ if __name__ == '__main__':
     # 
     # command import_txt
     parser = subparsers.add_parser('import_txt',
-        help='Import variants from files in tab (or comma) separated value formats',
-        description='''Import variants from one or more tab or comma separated files.
-            This command can be used to import variants to a new project (without sample), or
-            create a variant table from a list of variants for further analysis. ''')
+        help='Import text files in delimiter separated formats',
+        description='''Import variants from one or more delimiter separated files.
+            This command can be used to import variants to a new project (without sample), 
+            adding fields to existing variants, or mark a list of variants for further
+            analysis. ''')
     importer.importTxtArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=importer.importTxt)
