@@ -103,7 +103,7 @@ comment=SNP Clinical Significance, 0 - unknown, 1 - untested, 2 - non-pathogenic
 
 [GMAF_INFO]
 index=8
-adj=ExtractValue('GMAF=', ':')
+adj=ExtractValue('GMAF=', ';')
 type=FLOAT
 comment=Global Minor Allele Frequency [0, 0.5_INFO]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset
 
