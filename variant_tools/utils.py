@@ -338,7 +338,7 @@ def downloadFile(URL, dest_dir = None):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     dest = filename if dest_dir is None else os.path.join(dest_dir, filename)
-    # use libcurl? Recommended but not always available
+     use libcurl? Recommended but not always available
     try:
         import pycurl
         prog = ProgressBar(filename)
@@ -351,6 +351,10 @@ def downloadFile(URL, dest_dir = None):
             c.perform()
         prog.done()
         if c.getinfo(pycurl.HTTP_CODE) == 404:
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
             raise RuntimeError('ERROR 404: Not Found.')
         if os.path.isfile(dest):
             return dest
@@ -366,6 +370,10 @@ def downloadFile(URL, dest_dir = None):
         if ret == 0 and os.path.isfile(dest):
             return dest
         else:
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
     except OSError:
         # no wget command
@@ -373,7 +381,15 @@ def downloadFile(URL, dest_dir = None):
     #
     # use python urllib?
     prog = ProgressBar(filename)
-    urllib.urlretrieve(URL, dest, reporthook=prog.urllibUpdate)
+    try:
+        urllib.URLopener().open(URL)
+    except IOError, error_code:
+        if error_code[1] == 404:
+            raise RuntimeError('ERROR 404: Not Found.')
+        else:
+            raise RuntimeError(':'.join(error_code[0], error_code[1]))
+    else:
+        urllib.urlretrieve(URL, dest, reporthook=prog.urllibUpdate)
     prog.done()
     # all methods failed.
     if os.path.isfile(dest):
@@ -823,5 +839,3 @@ def normalizeVariant(pos, ref, alt):
         ref = '-'
     bin = getMaxUcscBin(pos - 1, pos) if pos else None
     return bin, pos, ref, alt
-
-
