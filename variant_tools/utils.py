@@ -383,7 +383,7 @@ def downloadFile(URL, dest_dir = None):
     prog = ProgressBar(filename)
     try:
         urllib.URLopener().open(URL)
-    except IOError, error_code:
+    except IOError as error_code:
         if error_code[1] == 404:
             raise RuntimeError('ERROR 404: Not Found.')
         else:
@@ -470,10 +470,10 @@ class DatabaseEngine:
             return
         if db.endswith('.DB'):
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db, os.path.split(db)[-1].split('.')[0]))
+                db, os.path.split(db)[-1].split('.')[0].split('-')[0]))
         else:
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db + '.DB', os.path.split(db)[-1]))
+                db + '.DB', os.path.split(db)[-1].split('.')[0].split('-')[0]))
 
     def analyze(self):
         '''Analyze a database for better performance'''

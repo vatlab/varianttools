@@ -582,7 +582,7 @@ class Project:
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]')):
             try:
-                linked_by = eval(self.loadProperty('{}_linked_by'.format(os.path.split(db)[-1]), default='[]'))
+                linked_by = eval(self.loadProperty('{}_linked_by'.format(os.path.split(db)[-1].split('-')[0]), default='[]'))
                 self.annoDB.append(AnnoDB(self, db, linked_by))
                 self.db.attach(db)
             except Exception as e:
