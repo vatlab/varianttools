@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#/usr/bin/env python
 #
 # $File: test_import_txt.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
@@ -64,14 +64,18 @@ class TestImportTXT(ProcessTestCase):
         self.assertEqual(numOfVariant(), 11)
     
     def testCASAVA18_SNP(self):
-        'Testing the illumina SNP input format'
+        'Testing the CASAVA SNP input format'
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt')
         self.assertEqual(numOfVariant(), 20)
     
     def testCASAVA18_INDEL(self):
-        'Testing the illumina INDEL input format'
+        'Testing the CASAVA INDEL input format'
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt')
         self.assertEqual(numOfVariant(), 25)
 
+    def testPileup_INDEL(self):
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/pileup_indels txt/pileup.indel')
+        self.assertEqual(numOfVariant(), 30)
+        
 if __name__ == '__main__':
     unittest.main()
