@@ -71,7 +71,10 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf vcf/SAMP3_complex_variants.vcf')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
-
+        self.assertSucc('vtools import_vcf vcf/SAMP4_complex_variants.vcf')
+        self.assertEqual(numOfSample(), 0)
+        self.assertEqual(numOfVariant(), 137+12159)
+        
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'
         self.assertSucc('vtools import_vcf vcf/SAMP1.vcf --build hg18')
