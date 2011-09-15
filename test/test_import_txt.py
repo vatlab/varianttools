@@ -110,5 +110,11 @@ class TestImportTXT(ProcessTestCase):
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '54'+'\n')
         
+    def testUpdate(self):
+        runCmd('vtools import_vcf vcf/* --build hg18')
+        runCmd('vtools import_vcf liftover hg19')
+        runCmd('vtools import_txt --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '307'+'\n')
+        
 if __name__ == '__main__':
     unittest.main()
