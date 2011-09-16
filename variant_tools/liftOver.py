@@ -127,7 +127,7 @@ class LiftOverTool:
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env={'PATH':os.pathsep.join(['.', os.environ['PATH']])})
         proc.wait()
-        err = proc.stderr.read().strip()
+        err = proc.stderr.read().decode().strip()
         if err:
             self.logger.info(err)
 
