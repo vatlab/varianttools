@@ -454,6 +454,13 @@ class Importer:
                 self.logger.info('Mapping {} new variants from {} to {} reference genome'.format(self.total_count[0], self.proj.build, self.proj.alt_build))
                 coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
                 query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+                # this should not really happen, but people (like me) might manually mess up with the database
+                headers = self.db.getHeaders('variant')
+                if not 'alt_pos' in headers:
+                    self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
+                    self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
+                    self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
+                    self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
             # update records
             prog = ProgressBar('Updating coordinates', self.total_count[0])
             count = 0
