@@ -108,8 +108,13 @@ class LiftOverTool:
                 # NOTE: the change from 1-based index to 0-based (assumed by liftOver)
                 # NOTE: we add 'chr' to chromosome name (except for those long names) because
                 #       liftover uses chr1, chr2 etc
-                var_in.write('{0}\t{1}\t{2}\t{3}\n'.format(rec[1] if len(rec[1]) > 2 else 'chr' + rec[1],
-                    int(rec[2]) - 1, rec[2], rec[0]))
+                try:
+                    if rec[1]:   # chr and pos of the primary coordinates can be None if they are back lifted from alternative reference genome
+                        var_in.write('{0}\t{1}\t{2}\t{3}\n'.format(rec[1] if len(rec[1]) > 2 else 'chr' + rec[1],
+                            int(rec[2]) - 1, rec[2], rec[0]))
+                except Exception as e:
+                    self.logger.debug('Invalid record {}'.format(rec))
+                    self.logger.debug(e)
                 if count % self.db.batch == 0:
                     prog.update(count)
         prog.done()
