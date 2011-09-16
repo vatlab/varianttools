@@ -57,7 +57,7 @@ class Sample:
                 if len(fields) != nFields:
                     raise ValueError('Invalid phenotype file: number of fields mismatch.')
                 #
-                record[(fields[0], fields[1])] = fields[2:]
+                record[(fields[0], None if fields[1] == 'None' else fields[1])] = fields[2:]
         # now, try to guess the type
         types = []
         for i in range(nFields - 2):
