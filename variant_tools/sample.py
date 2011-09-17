@@ -96,16 +96,16 @@ class Sample:
         self.proj.db.renameTable(temp_table_name, 'sample')
         self.db.commit()
 
-    def calcSampleStat(self, IDs, variant_table, num, freq, hom, het, other, depth):
-        '''Count sample allele frequency etc for specified sample and variant table'''
+    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, depth):
+        '''Count sample allele count etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
             raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
         #
-        if num is None and freq is None and hom is None and het is None and other is None and depth is None:
+        if num is None and hom is None and het is None and other is None and depth is None:
             self.logger.warning('No statistics is specified')
             return
         #
-        for name in (num, freq, hom, het, other, depth):
+        for name in (num, hom, het, other, depth):
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
         #
@@ -158,13 +158,11 @@ class Sample:
         prog.done()
         #
         headers = self.db.getHeaders(variant_table)
-        for field, fldtype in [(num, 'INT'), (freq, 'FLOAT'), (hom, 'INT'),
+        for field, fldtype in [(num, 'INT'), (hom, 'INT'),
                 (het, 'INT'), (other, 'INT'), (depth, 'FLOAT')]:
             if field is None:
                 continue
             if field in headers:
-                # NOTE: there is a possible problem of type mismatch 
-                # e.g. saving frequency to an integer field
                 self.logger.info('Updating existing field {}'.format(field))
                 if fldtype == 'FLOAT':
                     self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
@@ -174,7 +172,7 @@ class Sample:
         #
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
-            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, freq, hom, het, other, depth] if x is not None]))
+            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, hom, het, other, depth] if x is not None]))
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -182,9 +180,6 @@ class Sample:
             if num is not None:
                 # het + hom * 2 + other
                 res.append(value[0] + value[1] * 2 + value[2])
-            if freq is not None:
-                # (het + hom * 2 + other) / (2N)
-                res.append((value[0] + value[1] * 2 + value[2])/(2. * numSample))
             if hom is not None:
                 res.append(value[1])
             if het is not None:
@@ -220,7 +215,7 @@ def importPhenotype(args):
                 
 
 def sampleStatArguments(parser):
-    '''Arguments to calculate sample statistics such as allele frequency'''
+    '''Arguments to calculate sample statistics such as allele count'''
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -229,8 +224,6 @@ def sampleStatArguments(parser):
         help='''Variant table for which the statistics will be calculated and updated.''')
     parser.add_argument('-n', '--num',
         help='''Name of the field to hold number of alternative alleles in the sample.''')
-    parser.add_argument('-f', '--freq',
-        help='''Name of the field to hold allele frequency, incorrect for variants on sex chromosomes.''')
     parser.add_argument('--hom',
         help='''Name of the field to hold number of samples with two identical alternative alleles.''')
     parser.add_argument('--het',
@@ -259,7 +252,7 @@ def sampleStat(args):
                     return
                 else:
                     p.logger.info('{} samples are selected'.format(len(IDs)))
-            p.calcSampleStat(IDs, variant_table, args.num, args.freq, args.hom,
+            p.calcSampleStat(IDs, variant_table, args.num, args.hom,
                 args.het, args.other, args.depth)
         # temporary tables will be removed
         proj.close()

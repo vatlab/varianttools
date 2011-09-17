@@ -41,13 +41,13 @@ class TestSampleStat(ProcessTestCase):
         'Test command vtools sample_stat'
         self.assertFail('vtools sample_stat')
         self.assertSucc('vtools sample_stat -h')
-        self.assertFail('vtools sample_stat --num --freq --hom --het --other --depth')
+        self.assertFail('vtools sample_stat --num --hom --het --other --depth')
         self.assertFail('vtools sample_stat --num select')
-        self.assertSucc('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
-        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\'" --freq CEU_freq')
+        self.assertSucc('vtools sample_stat variant --num num --hom hom --het het --other other --depth depth')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\'" --num CEU_num')
         self.assertSucc('vtools sample_stat CEU --samples "filename like \'CEU%\'" --num CEU_num --hom CEU_hom --het CEU_het --other CEU_other')
-        self.assertSucc('vtools sample_stat CEU --samples "filename like \'CEU%\' and aff=\'2\'" --freq CEU_cases_freq --het CEU_cases_het')
-        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\' and aff=\'1\'" --freq CEU_ctrls_freq --het CEU_ctrls_het')
+        self.assertSucc('vtools sample_stat CEU --samples "filename like \'CEU%\' and aff=\'2\'" --het CEU_cases_het')
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\' and aff=\'1\'" --het CEU_ctrls_het')
 
 if __name__ == '__main__':
     unittest.main()
