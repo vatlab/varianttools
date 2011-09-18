@@ -105,7 +105,7 @@ class Sample:
             self.logger.warning('No statistics is specified')
             return
         #
-        self.logger.info('OTHER STAT', other_stats)
+        self.logger.info('OTHER STAT PARAMETERS: {}'.format(other_stats))
         for name in (num, hom, het, other):
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)

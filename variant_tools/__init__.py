@@ -27,8 +27,8 @@
 import sys
 
 ver = sys.version_info
-if (ver.major, ver.minor) < (2, 7):
-    raise SystemError('variant_tools only supports Python 2.7 or higher.')
+if (ver.major, ver.minor, ver.micro) < (2, 7, 1):
+    raise SystemError('variant tools requires Python 2.7.1 or higher. Please upgrade your Python {}.{}.{}.'.format(ver.major, ver.minor, ver.micro))
 
 __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
