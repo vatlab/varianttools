@@ -96,17 +96,17 @@ class Sample:
         self.proj.db.renameTable(temp_table_name, 'sample')
         self.db.commit()
 
-    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, depth, other_stats):
+    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, other_stats):
         '''Count sample allele count etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
             raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
         #
-        if num is None and hom is None and het is None and other is None and depth is None and not other_stats:
+        if num is None and hom is None and het is None and other is None and not other_stats:
             self.logger.warning('No statistics is specified')
             return
         #
         self.logger.info('OTHER STAT', other_stats)
-        for name in (num, hom, het, other, depth):
+        for name in (num, hom, het, other):
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
         #
@@ -135,7 +135,7 @@ class Sample:
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
-                        variants[rec[0]] = [0, 0, 0, 0, 0] if depth is not None else [0, 0, 0]
+                        variants[rec[0]] = [0, 0, 0]
                     # type heterozygote
                     if rec[1] == 1:
                         variants[rec[0]][0] += 1
@@ -149,10 +149,6 @@ class Sample:
                         pass
                     else:
                         self.logger.warning('Invalid genotype type {}'.format(rec[1]))
-                    if depth is not None and len(rec) > 2:
-                        # some variant might not have depth information so we need to keep the count
-                        variants[rec[0]][3] += rec[2]
-                        variants[rec[0]][4] += 1
                 count += 1
                 if count % self.db.batch == 0:
                     prog.update(count)
@@ -160,7 +156,7 @@ class Sample:
         #
         headers = self.db.getHeaders(variant_table)
         for field, fldtype in [(num, 'INT'), (hom, 'INT'),
-                (het, 'INT'), (other, 'INT'), (depth, 'FLOAT')]:
+                (het, 'INT'), (other, 'INT')]:
             if field is None:
                 continue
             if field in headers:
@@ -173,7 +169,7 @@ class Sample:
         #
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
-            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, hom, het, other, depth] if x is not None]))
+            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, hom, het, other] if x is not None]))
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -187,11 +183,6 @@ class Sample:
                 res.append(value[0])
             if other is not None:
                 res.append(value[2])
-            if depth is not None:
-                if not warning and value[4] != value[0] + value[1] + value[2]:
-                    self.logger.warning('Some variants do not have depth information. Average depth are calculated based on known depth.')
-                    warning = True
-                res.append(None if value[4] == 0 else float(value[3]) / value[4])
             cur.execute(update_query, res + [id])
             if count % self.db.batch == 0:
                 self.db.commit()
@@ -250,7 +241,7 @@ def sampleStat(args):
                 else:
                     p.logger.info('{} samples are selected'.format(len(IDs)))
             p.calcSampleStat(IDs, variant_table, args.num, args.hom,
-                args.het, args.other, args.depth, args.unknown_args)
+                args.het, args.other, args.unknown_args)
         # temporary tables will be removed
         proj.close()
     except Exception as e:
