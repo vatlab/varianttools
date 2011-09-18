@@ -96,15 +96,16 @@ class Sample:
         self.proj.db.renameTable(temp_table_name, 'sample')
         self.db.commit()
 
-    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, depth):
+    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, depth, other_stats):
         '''Count sample allele count etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
             raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
         #
-        if num is None and hom is None and het is None and other is None and depth is None:
+        if num is None and hom is None and het is None and other is None and depth is None and not other_stats:
             self.logger.warning('No statistics is specified')
             return
         #
+        self.logger.info('OTHER STAT', other_stats)
         for name in (num, hom, het, other, depth):
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
@@ -230,10 +231,6 @@ def sampleStatArguments(parser):
         help='''Name of the field to hold number of samples with one reference and one alternative alleles.''')
     parser.add_argument('--other',
         help='''Name of the field to hold number of samples with two different alternative alleles.''')
-    parser.add_argument('--depth',
-        help='''Name of the field to hold mean depth across samples. Different genotype
-            types are given the same weight. To use this option, the vcf files must be
-            imported with option --import_depth turned on.''')
     
 def sampleStat(args):
     try:
@@ -253,7 +250,7 @@ def sampleStat(args):
                 else:
                     p.logger.info('{} samples are selected'.format(len(IDs)))
             p.calcSampleStat(IDs, variant_table, args.num, args.hom,
-                args.het, args.other, args.depth)
+                args.het, args.other, args.depth, args.unknown_args)
         # temporary tables will be removed
         proj.close()
     except Exception as e:

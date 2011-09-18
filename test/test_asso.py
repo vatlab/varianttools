@@ -16,11 +16,11 @@ if __name__ == '__main__':
     
         a = t.SumToX()
         a.apply(data)
-        print data.phenotype()
-        print data.genotype()
+        print(data.phenotype())
+        print(data.genotype())
     #
         p = t.PhenoPermutator(100, [t.SomeTest()])
-        print p.permute(data)
+        print(p.permute(data))
 
     except:
         pass
