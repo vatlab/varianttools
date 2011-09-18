@@ -35,8 +35,8 @@ class TestSelect(ProcessTestCase):
         'Create a project'
         initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
-        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --freq CEU_cases_freq --het CEU_cases_het')
+        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other --depth depth')
+        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --het CEU_cases_het')
     def removeProj(self):
         runCmd('vtools remove project')
     def testSelect(self):
@@ -65,8 +65,6 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
         self.assertSucc('vtools select -c variant')
         self.assertSucc('vtools select variant --samples "filename like \'%CEU%\'" "aff=\'2\'" --count -v0')
-        self.assertSucc('vtools select variant "freq<0.01" --count -v0')
-        self.assertSucc('vtools select CEU "CEU_cases_freq>0.5" --samples "sample_name like \'NA0%\'" --output variant_id CEU_cases_freq')
 
 if __name__ == '__main__':
     unittest.main()

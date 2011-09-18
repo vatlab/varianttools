@@ -42,7 +42,7 @@ class ProcessTestCase(unittest.TestCase):
     def assertOutput(self, cmd, output):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        with open(os.devnull, 'w') as fnull:
+        with open('run_tests.log', 'a') as fnull:
             self.assertEqual(
                 subprocess.check_output(cmd, stderr=fnull,
                     env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode(),
@@ -51,14 +51,14 @@ class ProcessTestCase(unittest.TestCase):
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        with open(os.devnull, 'w') as fnull:
+        with open('run_tests.log', 'a') as fnull:
             self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
                 env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
 
     def assertFail(self, cmd):
         cmd = shlex.split(cmd)
         try:
-            with open(os.devnull, 'w') as fnull:
+            with open('run_tests.log', 'a') as fnull:
                 subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
                     env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
         except subprocess.CalledProcessError:
@@ -66,23 +66,23 @@ class ProcessTestCase(unittest.TestCase):
 
 def outputOfCmd(cmd):
     cmd = shlex.split(cmd)
-    with open(os.devnull, 'w') as fnull:
+    with open('run_tests.log', 'a') as fnull:
         return subprocess.check_output(cmd, stderr=fnull,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode()
     
 def runCmd(cmd):
     cmd = shlex.split(cmd)
-    with open(os.devnull, 'w') as fnull:
+    with open('run_tests.log', 'a') as fnull:
         subprocess.call(cmd, stdout=fnull, stderr=fnull,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
 
 def numOfSample():
-    with open(os.devnull, 'w') as fnull:
+    with open('run_tests.log', 'a') as fnull:
         return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
             stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
 
 def numOfVariant(table='variant'):
-    with open(os.devnull, 'w') as fnull:
+    with open('run_tests.log', 'a') as fnull:
         return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
             stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
     

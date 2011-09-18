@@ -37,7 +37,7 @@ class TestRemove(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools select variant aff=\'1\' -t unaffected')
         runCmd('vtools select CEU --samples "BMI<18.5" -t Underweight')
-        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --freq CEU_cases_freq')
+        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --num CEU_cases_num')
     def testRemove(self):
         'Test command vtools remove'
         self.assertFail('vtools remove')
@@ -47,8 +47,8 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove table unaffected')
         # Removing table underweight
         self.assertSucc('vtools remove table underweight')
-        # Removing field CEU_freq from variant table CEU
-        self.assertSucc('vtools remove field CEU_cases_freq')
+        # Removing field CEU_num from variant table CEU
+        self.assertSucc('vtools remove field CEU_cases_num')
         self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':

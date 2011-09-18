@@ -35,7 +35,7 @@ class TestOutput(ProcessTestCase):
         'Create a project'
         initTest(5)
         runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
-        runCmd('vtools sample_stat variant --num num --freq freq --hom hom --het het --other other --depth depth')
+        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
     def testOutput(self):
         'Test command vtools output'
         self.assertFail('vtools output')
@@ -43,21 +43,19 @@ class TestOutput(ProcessTestCase):
         # too few arguments
         self.assertFail('vtools output variant')
         self.assertFail('vtools output variant non_existing_field')
-        self.assertSucc('vtools output variant freq chr pos ref alt')
-        self.assertSucc('vtools output variant freq num depth other -l 10')
+        self.assertSucc('vtools output variant chr pos ref alt')
+        self.assertSucc('vtools output variant num other -l 10')
         # too few arguments
         self.assertFail('vtools output variant > variant.txt')
-        self.assertSucc('vtools output variant variant_id freq num depth other')
+        self.assertSucc('vtools output variant variant_id num other')
         self.assertSucc('vtools output CEU chr pos ref alt -l -1')
-        self.assertFail('vtools output CEU and variant freq -l 10')
+        self.assertFail('vtools output CEU and variant -l 10')
         self.assertFail('vtools output variant sum(num)')
         self.assertSucc('vtools output variant "sum(num)" -v0')
         self.assertFail('vtools output variant count(1)')
         self.assertSucc('vtools output variant "count(1)"')
         self.assertSucc('vtools output variant "count(variant_id)"')
         self.assertSucc('vtools output variant "count(variant_id)" -v 0')
-        self.assertSucc('vtools output variant "avg(depth)"')
-        self.assertSucc('vtools output CEU "avg(freq)"')
         self.assertFail('vtools output CEU "avg(bin)"')
 
 if __name__ == '__main__':
