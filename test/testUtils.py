@@ -42,42 +42,49 @@ class ProcessTestCase(unittest.TestCase):
     def assertOutput(self, cmd, output):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        self.assertEqual(
-            subprocess.check_output(cmd, stderr=subprocess.PIPE,
-                env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}),
-            output)
+        with open(os.devnull, 'w') as fnull:
+            self.assertEqual(
+                subprocess.check_output(cmd, stderr=fnull,
+                    env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode(),
+                output)
 
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        self.assertEqual(subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
+        with open(os.devnull, 'w') as fnull:
+            self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
+                env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
 
     def assertFail(self, cmd):
         cmd = shlex.split(cmd)
         try:
-            subprocess.check_call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
+            with open(os.devnull, 'w') as fnull:
+                subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
+                    env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
         except subprocess.CalledProcessError:
             return
 
 def outputOfCmd(cmd):
     cmd = shlex.split(cmd)
-    return subprocess.check_output(cmd, stderr=subprocess.PIPE,
-            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
+    with open(os.devnull, 'w') as fnull:
+        return subprocess.check_output(cmd, stderr=fnull,
+            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode()
     
 def runCmd(cmd):
     cmd = shlex.split(cmd)
-    subprocess.call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    with open(os.devnull, 'w') as fnull:
+        subprocess.call(cmd, stdout=fnull, stderr=fnull,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
 
 def numOfSample():
-    return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
-        stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+    with open(os.devnull, 'w') as fnull:
+        return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
+            stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
 
 def numOfVariant(table='variant'):
-    return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
-        stderr=subprocess.PIPE,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+    with open(os.devnull, 'w') as fnull:
+        return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
+            stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
     
 def initTest(level):
     i = 1
