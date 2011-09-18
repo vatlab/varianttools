@@ -98,7 +98,7 @@ def initTest(level):
         runCmd('vtools import_vcf vcf/SAMP1.vcf')
         if i == level: break
         else: i += 1
-        runCmd('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
+        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         if i == level: break
         else: i += 1        
         runCmd('vtools import_phenotype phenotype/phenotype.txt')

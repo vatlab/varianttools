@@ -3,12 +3,10 @@
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
 # a description of the format of this file.
-#
 
 [format description]
-description=Input format of ANNOVAR. No genotype is defined.
+description=A basic variant input format with four columns: chr, pos, ref, alt.
 variant_fields=chr,pos,ref,alt
-delimiter=None
 
 [chr]
 index=1
@@ -17,9 +15,9 @@ adj=RemoveLeading('chr')
 comment=Chromosome
 
 [pos]
-index=3
+index=2
 type=INTEGER NOT NULL
-comment=1-based position, hg19
+comment=1-based position, hg18
 
 [ref]
 index=4

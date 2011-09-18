@@ -34,7 +34,7 @@ class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
+        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         
     def testOutputContents(self):
         'Test command vtools output'

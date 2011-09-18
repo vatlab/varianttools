@@ -47,14 +47,12 @@ class TestImportTXT(ProcessTestCase):
         # no format information, fail
         self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
-        self.assertFail('vtools import_txt --format ../input_fmt/ANNOVAR txt/input.tsv')
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
+        self.assertFail('vtools import_txt --format fmt/basic_hg18 txt/input.tsv')
+        self.assertSucc('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 338)
         # test downloading fmt file from the website
-        self.assertSucc('vtools import_txt --build hg18 --format ANNOVAR txt/input.tsv')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 338)
+        self.assertSucc('vtools import_txt --build hg18 --format ANNOVAR txt/ANNOVAR.txt')
         self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
     
     def testANNOVAR(self):
@@ -99,7 +97,7 @@ class TestImportTXT(ProcessTestCase):
     
     def testAddfield(self):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
+        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import_vcf vcf/SAMP1.vcf')
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 915)
