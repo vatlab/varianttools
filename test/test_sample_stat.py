@@ -28,13 +28,13 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
 
 class TestSampleStat(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(5)
-        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
     def removeProj(self):
         runCmd('vtools remove project')
     def testSampleStat(self):
@@ -44,10 +44,17 @@ class TestSampleStat(ProcessTestCase):
         self.assertFail('vtools sample_stat --num --hom --het --other ')
         self.assertFail('vtools sample_stat --num select')
         self.assertSucc('vtools sample_stat variant --num num --hom hom --het het --other other ')
-        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\'" --num CEU_num')
-        self.assertSucc('vtools sample_stat CEU --samples "filename like \'CEU%\'" --num CEU_num --hom CEU_hom --het CEU_het --other CEU_other')
-        self.assertSucc('vtools sample_stat CEU --samples "filename like \'CEU%\' and aff=\'2\'" --het CEU_cases_het')
-        self.assertSucc('vtools sample_stat CEU -s "filename like \'CEU%\' and aff=\'1\'" --het CEU_ctrls_het')
+        total = int(outputOfCmd("vtools execute 'select sum(num) from variant'").split('\n')[0])
+        hom = int(outputOfCmd("vtools execute 'select sum(hom) from variant'").split('\n')[0])
+        het = int(outputOfCmd("vtools execute 'select sum(het) from variant'").split('\n')[0])
+        other = int(outputOfCmd("vtools execute 'select sum(other) from variant'").split('\n')[0])
+        self.assertEqual(total, hom*2+het+other)
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'%CEU%\'" --num CEU_num')
+        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_num) from CEU'").split('\n')[0]), 6383)
+        self.assertSucc('vtools sample_stat CEU --samples "filename like \'%CEU%\'" --num CEU_num --hom CEU_hom --het CEU_het --other CEU_other')
+        self.assertSucc('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --het CEU_cases_het')
+        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from CEU'").split('\n')[0]), 1601)
+        self.assertSucc('vtools sample_stat CEU -s "filename like \'%CEU%\' and aff=\'1\'" --het CEU_ctrls_het')
 
 if __name__ == '__main__':
     unittest.main()

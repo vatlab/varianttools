@@ -28,15 +28,14 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
 
 class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
+        initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools select variant aff=\'1\' -t unaffected')
-        runCmd('vtools select CEU --samples "BMI<18.5" -t Underweight')
         runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --num CEU_cases_num')
     def testRemove(self):
         'Test command vtools remove'
@@ -45,10 +44,14 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools remove table')
         # Removing table unaffected
         self.assertSucc('vtools remove table unaffected')
-        # Removing table underweight
-        self.assertSucc('vtools remove table underweight')
+        self.assertFail('vtools show table unaffected')
         # Removing field CEU_num from variant table CEU
+        count1 = len(outputOfCmd('vtools show fields').split('\n'))
         self.assertSucc('vtools remove field CEU_cases_num')
+        count2 = len(outputOfCmd('vtools show fields').split('\n'))
+        self.assertEqual(count1-count2, 1)
+        self.assertSucc('vtools remove annotation testNSFP')
+        self.assertFail('vtools show annotation testNSFP')
         self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':
