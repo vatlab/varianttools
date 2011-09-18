@@ -111,9 +111,10 @@ class TestImportTXT(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '54'+'\n')
         
     def testUpdate(self):
-        runCmd('vtools import_vcf vcf/* --build hg18')
+        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import_vcf liftover hg19')
-        runCmd('vtools import_txt --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
+        runCmd('vtools import_vcf vcf/var_format.vcf --build hg19')
+        self.assertSucc('vtools import_txt --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '307'+'\n')
         
 if __name__ == '__main__':

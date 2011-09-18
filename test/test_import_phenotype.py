@@ -47,6 +47,9 @@ class TestImportPhenotype(ProcessTestCase):
         out1 = outputOfCmd('vtools show samples')
         out2 = outputOfCmd('cat phenotype/phenotype.txt')        
         self.assertEqual(out1, out2)
+        self.assertFail('vtools import_phenotype phenotype/badphenotype1.txt')
+        self.assertFail('vtools import_phenotype phenotype/badphenotype2.txt')
+        self.assertFail('vtools import_phenotype phenotype/badphenotype3.txt')
 
 if __name__ == '__main__':
     unittest.main()

@@ -80,10 +80,15 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf vcf/SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 289)
+        # 104 records in SAMP1.vcf failed to map to hg19
         self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19')
+        # all records in var_format.vcf are mapped to hg18
         self.assertEqual(numOfSample(), 1+1)
         self.assertEqual(numOfVariant(), 289 + 98)
         self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19')
+        self.assertEqual(numOfSample(), 2)
+        self.assertEqual(numOfVariant(), 289 + 98)
+        self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19 -f')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289 + 98)
         # 19 out of 121 records failed to map.

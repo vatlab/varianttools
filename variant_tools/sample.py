@@ -50,12 +50,12 @@ class Sample:
                 self.logger.warning('No phenotype is defined.')
                 return
             record = {}
-            for line in input.readlines():
+            for idx, line in enumerate(input.readlines()):
                 if line.startswith('#') or line.strip() == '':
                     continue
                 fields = line.rstrip().split('\t')
-                if len(fields) != nFields:
-                    raise ValueError('Invalid phenotype file: number of fields mismatch.')
+                if len(fields) != nFields or ('' in fields):
+                    raise ValueError('Invalid phenotype file: number of fields mismatch at line {}. Please use \'None\' for missing values.'.format(idx+2))
                 #
                 record[(fields[0], None if fields[1] == 'None' else fields[1])] = fields[2:]
         # now, try to guess the type
