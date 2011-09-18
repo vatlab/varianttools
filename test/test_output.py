@@ -28,15 +28,15 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
 
 class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
-        runCmd('vtools select variant --samples "filename like \'CEU%\'" -t CEU')
-        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
-    def testOutput(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
+        
+    def testOutputContents(self):
         'Test command vtools output'
         self.assertFail('vtools output')
         self.assertSucc('vtools output -h')
@@ -44,19 +44,24 @@ class TestOutput(ProcessTestCase):
         self.assertFail('vtools output variant')
         self.assertFail('vtools output variant non_existing_field')
         self.assertSucc('vtools output variant chr pos ref alt')
-        self.assertSucc('vtools output variant num other -l 10')
-        # too few arguments
-        self.assertFail('vtools output variant > variant.txt')
-        self.assertSucc('vtools output variant variant_id num other')
+        # this test now fails. Why?
+        runCmd('vtools liftover hg19')
+        out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt')
+        out2 = outputOfCmd('cat txt/input.tsv')
+        self.assertEqual(out1, out2)
+        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.assertSucc('vtools output CEU chr pos ref alt -l -1')
         self.assertFail('vtools output CEU and variant -l 10')
+        
+    def testOutputExpression(self):
+        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
         self.assertFail('vtools output variant sum(num)')
-        self.assertSucc('vtools output variant "sum(num)" -v0')
+        self.assertEqual(outputOfCmd('vtools output variant "sum(num)" -v0'), '6383'+'\n')
         self.assertFail('vtools output variant count(1)')
-        self.assertSucc('vtools output variant "count(1)"')
-        self.assertSucc('vtools output variant "count(variant_id)"')
-        self.assertSucc('vtools output variant "count(variant_id)" -v 0')
-        self.assertFail('vtools output CEU "avg(bin)"')
+        self.assertEqual(outputOfCmd('vtools output variant "count(1)"'), '626'+'\n')
+        
 
 if __name__ == '__main__':
     unittest.main()

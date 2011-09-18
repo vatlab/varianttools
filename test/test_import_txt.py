@@ -47,15 +47,12 @@ class TestImportTXT(ProcessTestCase):
         # no format information, fail
         self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
-        self.assertFail('vtools import_txt --format ../input_fmt/basic txt/input.tsv')
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/basic txt/input.tsv')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 338)
-        self.assertSucc('vtools import_txt --build hg19 --format fmt/basic_hg19 txt/input.tsv')
+        self.assertFail('vtools import_txt --format ../input_fmt/ANNOVAR txt/input.tsv')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 338)
         # test downloading fmt file from the website
-        self.assertSucc('vtools import_txt --build hg18 --format basic txt/input.tsv')
+        self.assertSucc('vtools import_txt --build hg18 --format ANNOVAR txt/input.tsv')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 338)
         self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
@@ -102,7 +99,7 @@ class TestImportTXT(ProcessTestCase):
     
     def testAddfield(self):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_txt --build hg18 --format ../input_fmt/basic txt/input.tsv')
+        runCmd('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/input.tsv')
         runCmd('vtools import_vcf vcf/SAMP1.vcf')
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 915)
@@ -113,7 +110,6 @@ class TestImportTXT(ProcessTestCase):
     def testUpdate(self):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import_vcf liftover hg19')
-        runCmd('vtools import_vcf vcf/var_format.vcf --build hg19')
         self.assertSucc('vtools import_txt --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '307'+'\n')
         
