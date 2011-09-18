@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
 
 class TestSelect(ProcessTestCase):
     def setUp(self):
@@ -47,24 +47,34 @@ class TestSelect(ProcessTestCase):
         self.assertFail('vtools select non_existing_variant')
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select variant \'testNSFP.non_existing_item is not null\'')
-        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
-        self.assertSucc('vtools select ns --samples "filename like \'input.tsv\'" -t ns_input')
-        # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
-        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'input.tsv\'" -t ns_input')
         # Neither --to_table and --output/--count is specified. Nothing to do.
-        self.assertFail('vtools select ns \'genename = "PLEKHN1"\'')
+        self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
+        self.assertEqual(int(outputOfCmd("vtools select variant -c").split('\n')[0]), 915)
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        self.assertEqual(int(outputOfCmd("vtools execute 'select count(*) from ns'").split('\n')[0]), 7)
+        self.assertEqual(int(outputOfCmd("vtools select ns -c").split('\n')[0]), 7)
+        self.assertEqual(int(outputOfCmd("vtools select variant --samples 'filename like \"%input.tsv\"' -c").split('\n')[0]), 338)
+        self.assertSucc('vtools select ns --samples "filename like \'%input.tsv\'" -t ns_input')
+        #FIXME: not working now
+        #self.assertEqual(int(outputOfCmd("vtools select ns_input -c").split('\n')[0]), ?)
+        # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
+        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
         self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
-        self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+        self.assertEqual(int(outputOfCmd("vtools select plekhn1 -c").split('\n')[0]), 6)
+        self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
+        self.assertEqual(int(outputOfCmd("vtools select d_plekhn1 -c").split('\n')[0]), 5)
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
+        #self.assertEqual(int(outputOfCmd("vtools select plekhn1_aff -c").split('\n')[0]), ?)
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' or BMI<20" -t plekhn2')
+        #self.assertEqual(int(outputOfCmd("vtools select plekhn2 -c").split('\n')[0]), ?)
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' and BMI<20" -t plekhn3')
+        #self.assertEqual(int(outputOfCmd("vtools select plekhn3 -c").split('\n')[0]), ?)
         self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\'" "BMI<20" -t plekhn4')
-        # Existing table d_plekhn1 is renamed to d_plekhn1_Aug06_152135.
+        #self.assertEqual(int(outputOfCmd("vtools select plekhn4 -c").split('\n')[0]), ?)
         self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
+        #self.assertEqual(int(outputOfCmd("vtools select NA0 -c").split('\n')[0]), ?)
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
-        self.assertSucc('vtools select -c variant')
-        self.assertSucc('vtools select variant --samples "filename like \'%CEU%\'" "aff=\'2\'" --count -v0')
 
 if __name__ == '__main__':
     unittest.main()
