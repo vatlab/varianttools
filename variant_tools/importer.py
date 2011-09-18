@@ -782,6 +782,7 @@ class txtImporter(Importer):
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
+                    line = line.decode()
                     if line.startswith('#'):
                         continue
                     for bins, rec in self.processor.process(line):
