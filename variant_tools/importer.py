@@ -367,7 +367,8 @@ class Importer:
             self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
             self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
             tool = LiftOverTool(self.proj)
-            tool.setAltRefGenome(self.build)
+            # we will drop indexes soon so do not build index
+            tool.setAltRefGenome(self.build, build_index=False)
             self.import_alt_build = True
         else:
             raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \

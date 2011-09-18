@@ -187,28 +187,9 @@ class LiftOverTool:
                     prog.update(count)
         self.db.commit()
         prog.done()
-        #
-        # Method 1
-        # create indexes separately
-        #for field in ['alt_bin', 'alt_chr', 'alt_pos']:
-        #    try:
-        #        cur.execute('CREATE INDEX variant_{0}_idx ON variant ({0} ASC);'.format(field))
-        #    except Exception as e:
-        #        # maybe the index already exists
-        #        self.logger.debug(e)
-        #
-        # Method 2
-        # Create combined index
-        try:
-            cur.execute('CREATE INDEX varaint_{}_idx ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, alt ASC);'.format(self.proj.alt_build))
-        except Exception as e:
-            # maybe the index already exists
-            self.logger.debug(e)
-        #
-        self.db.commit()
         shutil.rmtree(tdir)
                 
-    def setAltRefGenome(self, alt_build):
+    def setAltRefGenome(self, alt_build, build_index=True):
         if self.proj.build == alt_build:
             raise ValueError('Cannot set alternative build the same as primary build')
         if self.proj.alt_build is not None and self.proj.alt_build != alt_build:
@@ -217,6 +198,8 @@ class LiftOverTool:
         self.proj.alt_build = alt_build
         self.proj.saveProperty('alt_build', alt_build)
         self.updateAltCoordinates()
+        if build_index:
+            self.proj.createIndexOnMasterVariantTable()
 
     def mapCoordinates(self, coordinates, from_build, to_build):
         '''Given a set of coordinates (chr, pos) in build, from and to build of reference genome,

@@ -743,6 +743,13 @@ class Project:
             # the index might already exists
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
+        try:
+            if self.alt_build:
+                self.db.execute('''CREATE UNIQUE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
+        except Exception as e:
+            # the index might already exists
+            self.logger.debug(e)
+        # the message will not be displayed if index is created within 5 seconds
         del s
 
     def dropIndexOnMasterVariantTable(self):
@@ -750,7 +757,7 @@ class Project:
         #
         # NOTE: for mysql, it might be better to use alt index disable/rebuild
         #
-        s = delayedAction(self.logger.info, 'Dropping index of master variant table. This might take quite a while.')
+        s = delayedAction(self.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
         try:
             # drop index has different syntax for mysql/sqlite3.
             self.db.dropIndex('variant_index', 'variant')
@@ -758,6 +765,12 @@ class Project:
             # the index might not exist
             self.logger.debug(e)
         #
+        try:
+            if self.alt_build:
+                self.db.dropIndex('variant_alt_index', 'variant')
+        except Exception as e:
+            # the index might not exist
+            self.logger.debug(e)
         del s
 
     def createVariantTable(self, table, temporary=False):
