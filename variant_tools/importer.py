@@ -389,7 +389,10 @@ class Importer:
             return gzip.open(filename, 'rb')
         else:
             # text file
-            return open(filename, 'r')
+            # because readline() from gzip.open will be byte, not string, we should return
+            # binary here in order to process them equally in order for things to work
+            # correctly under python 3 
+            return open(filename, 'rb')
 
     def createLocalVariantIndex(self):
         '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
@@ -525,7 +528,7 @@ class vcfImporter(Importer):
         '''
         samples = []
         with self.openFile(filename) as input:
-            line = input.readline()
+            line = input.readline().decode()
             if not line.startswith('##fileformat=VCF'):
                 self.logger.error('Invalid vcf file. file not started with line ##fileformat')
                 raise ValueError('Invalid vcf file')
@@ -534,6 +537,7 @@ class vcfImporter(Importer):
                     Please use vcftools to convert your vcf file to a supported format')
             #
             for line in input:
+                line = line.decode()
                 if line.startswith('#CHR'):
                     samples = line.split()[9:]
                 if not line.startswith('#'):
@@ -587,6 +591,7 @@ class vcfImporter(Importer):
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
+                    line = line.decode()
                     if line.startswith('#'):
                         continue
                     self.count[0] += 1
