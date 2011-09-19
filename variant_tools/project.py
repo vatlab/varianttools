@@ -598,14 +598,13 @@ class Project:
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
         # DBs in different paths but with the same name are considered to be the same.
+        self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
+        self.logger.info(db.description)
         if db.name not in [x.name for x in self.annoDB]:
-            self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
-            self.logger.info(db.description)
             self.annoDB.append(db)
             self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
-            self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
-        else:
-            self.logger.info('Annotatin DB {} has already been used in this project.'.format(db.name))
+        # an annotation database might be re-used with a different linked_field
+        self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
 
     def close(self):
         '''Write everything to disk...'''
