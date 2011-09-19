@@ -104,7 +104,7 @@ class TestImportTXT(ProcessTestCase):
         self.assertEqual(numOfVariant(), 915)
         self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update')
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant -v2')
-        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '54'+'\n')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78'+'\n')
         
     def testUpdate(self):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')

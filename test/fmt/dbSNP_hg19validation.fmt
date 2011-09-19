@@ -7,6 +7,7 @@
 [format description]
 description=validation information from dbSNP. the input columns are: chr, pos. If the primary reference genome for the project is hg18 and it must have an alternative reference hg19.
 variant_fields=chr, pos
+variant_info=mut_type_dbSNP, validation
 
 [chr]
 index=1
