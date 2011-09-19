@@ -305,7 +305,7 @@ class TextProcessor:
 
 class Importer:
     '''A general class for importing variants'''
-    def __init__(self, proj, files, build, force):
+    def __init__(self, proj, files, build, force, recreateIndex=True):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
@@ -374,12 +374,15 @@ class Importer:
             raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
                 ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
         #
-        self.proj.dropIndexOnMasterVariantTable()
+        self.recreateIndex = recreateIndex
+        if self.recreateIndex:
+            self.proj.dropIndexOnMasterVariantTable()
         #
         self.createLocalVariantIndex()
 
     def __del__(self):
-        self.proj.createIndexOnMasterVariantTable()
+        if self.recreateIndex:
+            self.proj.createIndexOnMasterVariantTable()
 
     def guessBuild(self, file):
         # by default, reference genome cannot be determined from file
@@ -685,7 +688,8 @@ class vcfImporter(Importer):
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
     def __init__(self, proj, files, build, format, sample_name=None, update=None, force=False):
-        Importer.__init__(self, proj, files, build, force)
+        # if update is None, recreate index
+        Importer.__init__(self, proj, files, build, force, update is None)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
