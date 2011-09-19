@@ -6,7 +6,7 @@
 
 [format description]
 description=validation information from dbSNP. the input columns are: chr, pos. If the primary reference genome for the project is hg18 and it must have an alternative reference hg19.
-position_fields=chr, pos
+position_fields=chr, alt_pos
 variant_info=mut_type_dbSNP, validation
 
 [chr]
@@ -15,7 +15,7 @@ type=VARCHAR(20)
 adj=RemoveLeading('chr')
 comment=Chromosome
 
-[pos]
+[alt_pos]
 index=2
 type=INTEGER NOT NULL
 comment=1-based position, hg19
