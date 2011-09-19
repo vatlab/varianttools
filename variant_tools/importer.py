@@ -578,6 +578,10 @@ class vcfImporter(Importer):
         #
         # handle meta information and get sample names
         sampleNames = self.getMetaInfo(input_filename)
+        if len(sampleNames) == 0:
+            self.logger.warning('No sample is created for this file because it does not contain any genotype.')
+        elif self.variant_only:
+            self.logger.warning('No sample is created for this file because no genotype is imported.')
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         no_sample = self.variant_only or len(sampleNames) == 0
