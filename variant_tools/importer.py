@@ -705,7 +705,11 @@ class txtImporter(Importer):
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
         self.genotype_info = [x.name for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
-        self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        if fmt.input_type == 'variant':
+            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
+            self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        else:  # position or range type
+            self.processor = TextProcessor(fmt.fields, [(1,)], fmt.delimiter, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -719,6 +723,10 @@ class txtImporter(Importer):
                     del s
         #
         self.update = update
+        if fmt.input_type != 'variant':
+            if not self.update:
+                self.logger.info('Parameter --update variant is assumed for input file with type {}'.format(fmt.input_type))
+                self.update = 'variant'
         if self.update and len(self.variant_info) == 0:
             raise ValueError('No field could be updated using this input file')
         #
