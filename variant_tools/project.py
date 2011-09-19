@@ -136,6 +136,29 @@ class AnnoDB:
             raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
         if self.anno_type == 'attribute' and len(self.linked_by) != len(self.build):
             raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
+        if self.linked_by:
+            s = delayedAction(proj.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
+            self.indexLinkedField(proj, linked_by)
+            del s
+
+    def indexLinkedField(self, proj, linked_fields):
+        '''Create index for fields that are linked by'''
+        cur = proj.db.cursor()
+        for linked_field in linked_fields:
+            table, field = linked_field.split('.')
+            if proj.isVariantTable(table):
+                try:
+                    cur.execute('CREATE INDEX IF NOT EXISTS {0}_{1} ON {0} ({1} ASC);'.format(table, field))
+                except Exception as e:
+                    proj.logger.debug(e)
+            else:
+                # from an annotation database
+                try:
+                    # FIXME: this syntax is only valid for sqlite3, we will need to fix it for the mysql engine
+                    cur.execute('CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(table, field))
+                except Exception as e:
+                    proj.logger.debug(e)
+        
 
     def describe(self, verbose=False):
         '''Describe this annotation database'''
