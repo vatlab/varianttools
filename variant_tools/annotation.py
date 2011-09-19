@@ -422,7 +422,7 @@ class AnnoDBConfiger:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
             if os.path.isfile(dbFile):
                 try:
-                    return AnnoDB(self.proj, dbFile)
+                    return AnnoDB(self.proj, dbFile, linked_by)
                 except ValueError as e:
                     self.logger.debug(e)
                     self.logger.info('Existing database cannot be used.')
