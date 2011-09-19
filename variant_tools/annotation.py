@@ -268,7 +268,7 @@ class AnnoDBConfiger:
             return gzip.open(filename, 'rb')
         else:
             # text file
-            return open(filename, 'r')
+            return open(filename, 'rb')
 
     def importTxtRecords(self, db, source_files):
         #
@@ -301,6 +301,7 @@ class AnnoDBConfiger:
             prog = ProgressBar(os.path.split(f)[-1], lineCount(f))
             with self.openAnnoFile(f) as input_file:
                 for line in input_file:
+                    line = line.decode()
                     num_records = 1
                     try:
                         if line.startswith('#'):
