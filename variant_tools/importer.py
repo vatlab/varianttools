@@ -436,7 +436,7 @@ class Importer:
             self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
             self.importFromFile(f)
             self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                .format(sum(self.count[1:-1]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
+                .format(sum(self.count[1:5]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
                 ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
             if self.count[6] > 0:
                 self.logger.info('{:,} exiting variants are updated'.format(self.count[6]))
@@ -445,20 +445,20 @@ class Importer:
                 self.count[i] = 0
         if len(self.files) > 1:
             self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                .format(sum(self.total_count[1:-1]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
+                .format(sum(self.total_count[1:5]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
                 ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
             if self.total_count[6] > 0:
                 self.logger.info('{:,} exiting variants are updated'.format(self.total_count[6]))
-        if self.total_count[0] > 0 and self.proj.alt_build is not None:
+        if sum(self.total_count[1:5]) > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
             tool = LiftOverTool(self.proj)
             if self.import_alt_build:
-                self.logger.info('Mapping {} new variants from {} to {} reference genome'.format(self.total_count[0], self.proj.alt_build, self.proj.build))
+                self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.alt_build, self.proj.build))
                 coordinateMap = tool.mapCoordinates(coordinates, self.proj.alt_build, self.proj.build)
                 query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
             else:
-                self.logger.info('Mapping {} new variants from {} to {} reference genome'.format(self.total_count[0], self.proj.build, self.proj.alt_build))
+                self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.build, self.proj.alt_build))
                 coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
                 query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
                 # this should not really happen, but people (like me) might manually mess up with the database
