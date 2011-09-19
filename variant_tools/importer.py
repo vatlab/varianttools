@@ -334,9 +334,9 @@ class Importer:
                     self.logger.info('Ignoring imported file {}'.format(filename))
             else:
                 self.files.append(filename)
-        # for all record, new SNV, insertion, deletion, complex variants, and invalid record
-        self.count = [0, 0, 0, 0, 0, 0]
-        self.total_count = [0, 0, 0, 0, 0, 0]
+        # for all record, new SNV, insertion, deletion, complex variants, invalid record, and updated record
+        self.count = [0, 0, 0, 0, 0, 0, 0]
+        self.total_count = [0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
         if len(self.files) == 0:
             return
@@ -415,11 +415,10 @@ class Importer:
                 prog.update(count)
         prog.done()
 
-    def recordFileAndSample(self, filename, sampleNames, sampleFields = []):
+    def recordFileAndSample(self, filename, sampleNames, hasGenotype=True, sampleFields = []):
         cur = self.db.cursor()
         cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
         filenameID = cur.lastrowid
-        self.proj.createSampleTableIfNeeded()
         sample_ids = []
         s = delayedAction(self.logger.info, 'Creating {} sample variant tables'.format(len(sampleNames)))
         for samplename in sampleNames:
@@ -427,7 +426,7 @@ class Importer:
                 (filenameID, samplename))
             sample_ids.append(cur.lastrowid)
             self.proj.createNewSampleVariantTable('{0}_genotype.sample_variant_{1}'.format(self.proj.name, cur.lastrowid),
-                sampleFields)
+                hasGenotype, sampleFields)
         del s
         return sample_ids
         
@@ -439,6 +438,8 @@ class Importer:
             self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
                 .format(sum(self.count[1:-1]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
                 ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
+            if self.count[6] > 0:
+                self.logger.info('{:,} exiting variants are updated'.format(self.count[6]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
@@ -446,6 +447,8 @@ class Importer:
             self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
                 .format(sum(self.total_count[1:-1]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
                 ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
+            if self.total_count[6] > 0:
+                self.logger.info('{:,} exiting variants are updated'.format(self.total_count[6]))
         if self.total_count[0] > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
@@ -516,6 +519,7 @@ class vcfImporter(Importer):
         '''
         with self.openFile(filename) as input:
             for line in input:
+                line = line.decode()
                 if line.startswith('##reference'):
                     if 'NCBI36' in line.upper() or 'HG18' in line.upper() or 'HUMAN_B36' in line.upper():
                         return 'hg18'
@@ -577,17 +581,19 @@ class vcfImporter(Importer):
         #
         # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
         no_sample = self.variant_only or len(sampleNames) == 0
-        sample_ids = self.recordFileAndSample(input_filename, [] if no_sample else sampleNames, 
-            ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
-        #
-        nSample = len(sample_ids)
+        if not no_sample:
+            sample_ids = self.recordFileAndSample(input_filename, [] if no_sample else sampleNames, True,
+                ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
+            #
+            nSample = len(sample_ids)
         #
         DP_pattern = re.compile('.*DP=(\d+)')
         #
         cur = self.db.cursor()
         # sample variants are inserted into different tables in a separate database.
-        genotype_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
-            .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
+        if not no_sample:
+            genotype_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
+                .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
@@ -602,7 +608,7 @@ class vcfImporter(Importer):
                     pos = int(tokens[1])
                     ref = tokens[3]
                     # we only extract info get depth.
-                    if self.import_depth:
+                    if not no_sample and self.import_depth:
                         m = DP_pattern.match(tokens[7])
                         DP = [None if m is None else float(m.group(1))/nSample]
                     else:
@@ -688,9 +694,16 @@ class txtImporter(Importer):
         #
         self.sample_name = sample_name
         #
-        self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        # how to split processed records
+        self.ranges = fmt.ranges
+        self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
+        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
+        self.genotype_info = [x.name for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
-        if fmt.ranges[1] != fmt.ranges[2]:
+        self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        # there are variant_info
+        if self.variant_info:
             cur = self.db.cursor()
             headers = self.db.getHeaders('variant')
             for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
@@ -702,13 +715,6 @@ class txtImporter(Importer):
                     del s
         #
         self.update = update
-        self.genotype_fields = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[4]]]
-        # how to split processed records
-        self.ranges = fmt.ranges
-        if self.genotype_fields:
-            self.logger.info('Additional genotype fields: {}'.format(', '.join(self.genotype_fields)))
-        #
-        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
         if self.update and len(self.variant_info) == 0:
             raise ValueError('No field could be updated using this input file')
         #
@@ -740,6 +746,7 @@ class txtImporter(Importer):
         if var_key in self.variantIndex:
             variant_id = self.variantIndex[var_key][0]
             if len(rec) > 5:
+                self.count[6] += 1
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
             return variant_id
         else:
@@ -765,21 +772,41 @@ class txtImporter(Importer):
             if var_key in self.variantIndex:
                 variant_id = self.variantIndex[var_key][0]
                 cur.execute(self.update_variant_query, rec[4:] + [variant_id])
+                self.count[6] += cur.rowcount
         elif self.input_type == 'position':
             cur.execute(self.update_position_query, rec[2:] + [rec[0], rec[1]])
+            self.count[6] += cur.rowcount
         else:  # range based
             cur.execute(self.update_range_query, rec[3:] + [rec[0], rec[1], rec[2]])
+            self.count[6] += cur.rowcount
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
-        # assuming one sample for each file
-        sample_id = self.recordFileAndSample(input_filename, [self.sample_name],
-            [] if not self.genotype_fields else self.genotype_fields[1:])[0]
+        if self.update:
+            sample_id = None
+        else:
+            if self.sample_name is None:
+                # if no sample name is specified
+                if not self.genotype_field:
+                    self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
+                    sample_id = None
+                else:
+                    self.logger.warning('Missing sample name (a name None is used)')
+                    sample_id = self.recordFileAndSample(input_filename, [None], True,
+                        self.genotype_info)[0]
+            else:
+                if not self.genotype_field:
+                    # if no genotype, but a sample name is given
+                    self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
+                    sample_id = self.recordFileAndSample(input_filename, [self.sample_name], False, self.genotype_info)[0]
+                else:
+                    sample_id = self.recordFileAndSample(input_filename, [self.sample_name], True, self.genotype_info)[0]
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        genotype_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
-            .format(self.proj.name, sample_id, ','.join([self.db.PH] * (1 + len(self.genotype_fields))))
+        if sample_id:
+            genotype_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
+                .format(self.proj.name, sample_id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -787,14 +814,13 @@ class txtImporter(Importer):
                     if line.startswith('#'):
                         continue
                     for bins, rec in self.processor.process(line):
-                        self.count[0] += 1
-                        #
                         if self.update:
                             self.updateVariant(cur, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                            if self.ranges[2] != self.ranges[4]:
+                            if sample_id:
                                 cur.execute(genotype_insert_query, [variant_id] + rec[self.ranges[2]: self.ranges[4]])
+                            self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)

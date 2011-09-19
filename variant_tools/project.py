@@ -549,6 +549,7 @@ class Project:
         #
         self.createFilenameTable()
         self.createMasterVariantTable()
+        self.createSampleTableIfNeeded()
 
     def open(self):
         '''Open an existing project'''
@@ -800,7 +801,7 @@ class Project:
         cur.execute(query)
         self.db.commit()
 
-    def createNewSampleVariantTable(self, table, fields=[]):
+    def createNewSampleVariantTable(self, table, genotype=True, fields=[]):
         '''Create a table ``sample_variant`` to store vcf data'''
         if self.db.hasTable(table):
             self.logger.info('Removing existing table {}, which can be slow for sqlite databases'.format(table))
@@ -810,9 +811,9 @@ class Project:
         #
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
-                variant_id INT NOT NULL,
-                variant_type INT
+                variant_id INT NOT NULL
             '''.format(table) + 
+            (', variant_type INT' if genotype else '') + 
             ''.join([', {} FLOAT NULL'.format(f) for f in fields]) + ');'
          )
         #

@@ -48,8 +48,9 @@ class TestImportTXT(ProcessTestCase):
         self.assertFail('vtools import_txt txt/input.tsv')
         # no build information, fail
         self.assertFail('vtools import_txt --format fmt/basic_hg18 txt/input.tsv')
+        # no sample name, no sample is created
         self.assertSucc('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
-        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 338)
         # test downloading fmt file from the website
         self.assertSucc('vtools import_txt --build hg18 --format ANNOVAR txt/ANNOVAR.txt')
@@ -59,7 +60,7 @@ class TestImportTXT(ProcessTestCase):
         'Testing the annovar input format'
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt')
         # one of the variant cannot be imported.
-        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 11)
         self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
         self.assertEqual(numOfSample(), 1)
@@ -87,10 +88,10 @@ class TestImportTXT(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavaindel'+'\n')
 
     def testPileup_INDEL(self):
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/pileup_indels txt/pileup.indel')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 30)
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/pileup_indels txt/pileup.indel --force --sample_name pileupindel')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel --force --sample_name pileupindel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 30)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'pileupindel'+'\n')
@@ -99,15 +100,15 @@ class TestImportTXT(ProcessTestCase):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import_vcf vcf/SAMP1.vcf')
-        self.assertEqual(numOfSample(), 62)
+        self.assertEqual(numOfSample(), 61)
         self.assertEqual(numOfVariant(), 915)
         self.assertFail('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update')
-        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant')
+        self.assertSucc('vtools import_txt --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant -v2')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '54'+'\n')
         
     def testUpdate(self):
         runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_vcf liftover hg19')
+        runCmd('vtools liftover hg19')
         self.assertSucc('vtools import_txt --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '307'+'\n')
         
