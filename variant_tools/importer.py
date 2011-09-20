@@ -735,26 +735,16 @@ class txtImporter(Importer):
             raise ValueError('No field could be updated using this input file')
         #
         self.input_type = fmt.input_type
-        if self.update != 'variant':
-            self.update_variant_query = 'UPDATE variant SET {} WHERE variant.variant_id = {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.update)
-            self.update_position_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos = {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.update)
-            self.update_range_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos >= {} AND variant.pos <= {} AND variant.variant_id IN (SELECT variant_id FROM {});'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.db.PH, self.update)
-        else:
-            self.update_variant_query = 'UPDATE variant SET {} WHERE variant.variant_id = {};'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
-            self.update_position_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos = {};'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH)
-            self.update_range_query = 'UPDATE variant SET {} WHERE variant.chr = {} AND variant.pos >= {} AND variant.pos <= {};'\
-                .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, self.db.PH, self.db.PH)
-        if self.import_alt_build:
-            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt {0}) VALUES ({1});'\
-                .format(' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
-        else:
-            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt {0}) VALUES ({1});'\
-                .format(' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
+        fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
+        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(self.update) if self.update != 'variant' else ''
+        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
+            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
+        self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
+            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+        self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
+            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+        self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
+            .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
 
     def addVariant(self, cur, rec):
         #
@@ -782,18 +772,19 @@ class txtImporter(Importer):
             self.variantIndex[var_key] = (variant_id, 1)
             return variant_id
 
-    def updateVariant(self, cur, rec):
+    def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
             var_key = tuple(rec[0:4])
             if var_key in self.variantIndex:
                 variant_id = self.variantIndex[var_key][0]
+                # update by variant_id, do not need bins
                 cur.execute(self.update_variant_query, rec[4:] + [variant_id])
                 self.count[6] += cur.rowcount
         elif self.input_type == 'position':
-            cur.execute(self.update_position_query, rec[2:] + [rec[0], rec[1]])
+            cur.execute(self.update_position_query, rec[2:] + bins + [rec[0], rec[1]])
             self.count[6] += cur.rowcount
         else:  # range based
-            cur.execute(self.update_range_query, rec[3:] + [rec[0], rec[1], rec[2]])
+            cur.execute(self.update_range_query, rec[3:] + bins + [rec[0], rec[1], rec[2]])
             self.count[6] += cur.rowcount
 
     def importFromFile(self, input_filename):
@@ -831,7 +822,7 @@ class txtImporter(Importer):
                         continue
                     for bins, rec in self.processor.process(line):
                         if self.update:
-                            self.updateVariant(cur, rec[0:self.ranges[2]])
+                            self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                             if sample_id:
