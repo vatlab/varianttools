@@ -31,6 +31,8 @@ import logging
 import getpass
 import random
 import textwrap
+import tempfile
+import shutil
 import ConfigParser
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
@@ -520,6 +522,9 @@ class Project:
             self.create(**kwargs)
         else:
             self.open()
+        #
+        # create a temporary directory
+        self.temp_dir = tempfile.mkdtemp()
 
     def create(self, **kwargs):
         '''Create a new project'''
@@ -635,6 +640,8 @@ class Project:
         # of the project database
         #self.removeTempTables()
         self.db.commit()
+        if os.path.isdir(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
         
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''

@@ -29,8 +29,6 @@ import platform
 import os
 import stat
 import subprocess
-import tempfile
-import shutil
     
 from .project import Project
 from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin
@@ -146,15 +144,14 @@ class LiftOverTool:
         if not chainFile:
             return {}
         # export existing variants to a temporary file
-        tdir = tempfile.mkdtemp()
-        num_variants = self.exportVariantsInBedFormat(os.path.join(tdir, 'var_in.bed'))
+        num_variants = self.exportVariantsInBedFormat(os.path.join(self.proj.temp_dir, 'var_in.bed'))
         if num_variants == 0:
             return {}
-        self.runLiftOver(os.path.join(tdir, 'var_in.bed'), chainFile,
-            os.path.join(tdir, 'var_out.bed'), os.path.join(tdir, 'unmapped.bed'))           
+        self.runLiftOver(os.path.join(self.proj.temp_dir, 'var_in.bed'), chainFile,
+            os.path.join(self.proj.temp_dir, 'var_out.bed'), os.path.join(self.proj.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(tdir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(self.proj.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
@@ -175,7 +172,7 @@ class LiftOverTool:
             self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
             self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
         #
-        mapped_file = os.path.join(tdir, 'var_out.bed')
+        mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Updating table variant', lineCount(mapped_file))
         query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
         with open(mapped_file) as var_mapped:
@@ -187,7 +184,6 @@ class LiftOverTool:
                     prog.update(count)
         self.db.commit()
         prog.done()
-        shutil.rmtree(tdir)
                 
     def setAltRefGenome(self, alt_build, build_index=True):
         if self.proj.build == alt_build:
@@ -215,17 +211,16 @@ class LiftOverTool:
         if not chainFile:
             raise RuntimeError('Failed to obtain UCSC chain file {}'.format(chainFile))
         # export existing variants to a temporary file
-        tdir = tempfile.mkdtemp()
-        with open(os.path.join(tdir, 'var_in.bed'), 'w') as output:
+        with open(os.path.join(self.proj.temp_dir, 'var_in.bed'), 'w') as output:
             for cor in sorted(coordinates):
                 output.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format(cor[0] if len(cor[0]) > 2 else 'chr' + cor[0],
                    cor[1] - 1, cor[1], cor[0], cor[1]))
         #
-        self.runLiftOver(os.path.join(tdir, 'var_in.bed'), chainFile,
-            os.path.join(tdir, 'var_out.bed'), os.path.join(tdir, 'unmapped.bed'))           
+        self.runLiftOver(os.path.join(self.proj.temp_dir, 'var_in.bed'), chainFile,
+            os.path.join(self.proj.temp_dir, 'var_out.bed'), os.path.join(self.proj.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(tdir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(self.proj.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
@@ -239,7 +234,7 @@ class LiftOverTool:
         #
         # create a map
         coordinateMap = {}
-        mapped_file = os.path.join(tdir, 'var_out.bed')
+        mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Reading new coordinates', lineCount(mapped_file))
         with open(mapped_file) as var_mapped:
             for count, line in enumerate(var_mapped.readlines()):
