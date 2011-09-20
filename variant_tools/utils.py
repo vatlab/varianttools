@@ -46,7 +46,8 @@ import re
 
 
 runOptions = {
-    'verbosity': '1'
+    'verbosity': '1',
+    'temp_dir': None
 }
 
 SQL_KEYWORDS = set([
@@ -94,9 +95,11 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
-def setOptions(verbosity=None):
-    if verbosity is not None:
+def setOptions(verbosity=None, temp_dir=None):
+    if verbosity:
         runOptions['verbosity'] = verbosity
+    if temp_dir:
+        runOptions['temp_dir'] = temp_dir
 
 #
 # Utility functions
@@ -337,7 +340,7 @@ def decompressIfNeeded(filename, inplace=True):
 def downloadFile(URL, dest_dir = None):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
-    dest = filename if dest_dir is None else os.path.join(dest_dir, filename)
+    dest = os.path.join(dest_dir if dest_dir else runOptions['temp_dir'], filename)
     # use libcurl? Recommended but not always available
     try:
         import pycurl

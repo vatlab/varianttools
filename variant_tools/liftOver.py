@@ -66,8 +66,8 @@ class LiftOverTool:
             liftOverURL = 'http://hgdownload.cse.ucsc.edu/admin/exe/{0}/liftOver'.format(liftOverDir)
             try:
                 self.logger.info('Downloading liftOver tool from UCSC')
-                downloadFile(liftOverURL)
-                os.chmod('liftOver', stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
+                liftOverExe = downloadFile(liftOverURL)
+                os.chmod(liftOverExe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
             except Exception as e:
                 self.logger.warning('Failed to download UCSC liftOver tool from {0}'.format(liftOverURL))
                 self.logger.warning('Please check the URL or manually download the file.')
@@ -123,7 +123,7 @@ class LiftOverTool:
         self.logger.info('Running UCSC liftOver tool')
         proc = subprocess.Popen(['liftOver', input, chain, output, unmapped],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH':os.pathsep.join(['.', os.environ['PATH']])})
+                env={'PATH':os.pathsep.join([self.proj.temp_dir, os.environ['PATH']])})
         proc.wait()
         err = proc.stderr.read().decode().strip()
         if err:

@@ -86,7 +86,10 @@ if __name__ == '__main__':
     # command liftover
     parser = subparsers.add_parser('liftover',
         help='''Set alternative reference genome and update alternative coordinates
-            of all variant tables.''')
+            of all variant tables.''',
+        description='''Convert coordinates of existing variants to alternative 
+            coordinates in an alternative reference genome. The UCSC liftover
+            tool will be automatically downloaded if it is not available. ''')
     liftOver.liftOverArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=liftOver.liftOver)

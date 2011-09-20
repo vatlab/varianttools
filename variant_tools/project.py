@@ -246,7 +246,7 @@ class fileFMT:
         else:
             url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
             try:
-                fmt = downloadFile(url, '.')
+                fmt = downloadFile(url)
             except Exception as e:
                 raise ValueError('Failed to download format specification file {}.fmt'.format(name))
             self.name = name
@@ -483,8 +483,10 @@ class Project:
         # version of vtools.
         self.version = VTOOLS_VERSION
         #
-        # set global verbosity level
-        setOptions(verbosity=verbosity)
+        # create a temporary directory
+        self.temp_dir = tempfile.mkdtemp()
+        # set global verbosity level and temporary directory
+        setOptions(verbosity=verbosity, temp_dir=self.temp_dir)
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -522,9 +524,6 @@ class Project:
             self.create(**kwargs)
         else:
             self.open()
-        #
-        # create a temporary directory
-        self.temp_dir = tempfile.mkdtemp()
 
     def create(self, **kwargs):
         '''Create a new project'''

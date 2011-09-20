@@ -31,7 +31,6 @@ import shutil
 import urlparse
 import gzip
 import zipfile
-import tempfile
 
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
@@ -212,7 +211,7 @@ class AnnoDBConfiger:
             value VARCHAR(1024)
         )'''.format(self.name))
 
-    def getSourceFiles(self, tdir):
+    def getSourceFiles(self):
         '''Download a file from a URL and save to a directory. If it is a zip file,
         unzip it in the directory.'''
         # FIXME: if we detect a file in the local directory, we should not try to 
@@ -239,7 +238,7 @@ class AnnoDBConfiger:
                 db = DababaseEngine(engine='mysql', user=user, passwd=password)
                 cur = db.cursor()
                 res = db.execute(query)
-                filename = os.path.join(tdir, '{}_sql.txt'.format(self.name))
+                filename = os.path.join(self.proj.temp_dir, '{}_sql.txt'.format(self.name))
                 with open(filename, 'w') as output:
                     for rec in res:
                         output.write('{}\n'.format(','.join([str(x) for x in rec])))
@@ -247,7 +246,7 @@ class AnnoDBConfiger:
             else:
                 filename = os.path.split(self.source_url)[-1]
                 self.logger.info('Downloading {}'.format(filename))
-                tempFile = downloadFile(self.source_url, tdir)
+                tempFile = downloadFile(self.source_url)
         except Exception as e:
             self.logger.error(e)
             raise ValueError('Failed to download database source from {}'.format(self.source_url))
@@ -259,9 +258,8 @@ class AnnoDBConfiger:
             return [tempFile]
         # if zip file?
         bundle = zipfile.ZipFile(tempFile)
-        self.logger.info('Extracting zip file to a temporary directory {}'.format(tdir))
-        bundle.extractall(tdir)
-        return [os.path.join(tdir, name) for name in bundle.namelist()]
+        bundle.extractall(self.proj.temp_dir)
+        return [os.path.join(self.proj.temp_dir, name) for name in bundle.namelist()]
     
     def openAnnoFile(self, filename):
         if filename.lower().endswith('.gz'):
@@ -323,15 +321,12 @@ class AnnoDBConfiger:
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''
-        tdir = None
         if source_files == []:
-            tdir = tempfile.mkdtemp()
-            source_files = self.getSourceFiles(tdir)
+            source_files = self.getSourceFiles()
         elif len(source_files) == 1 and source_files[0].endswith('.zip'):
             # trick the program to handle the file as one that has been downloaded.
             self.source_url = source_files[0]
-            tdir = tempfile.mkdtemp()
-            source_files = self.getSourceFiles(tdir)
+            source_files = self.getSourceFiles()
         #
         self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
         # create database and import file
@@ -410,8 +405,6 @@ class AnnoDBConfiger:
                     self.name, db.PH), (res[0], field.name))
             del s
         db.commit()
-        if tdir is not None:
-            shutil.rmtree(tdir) 
         return db.dbName
 
     def prepareDB(self, source_files=[], linked_by=[], rebuild=False):
@@ -502,7 +495,7 @@ def use(args):
                 #
                 proj.logger.info('Downloading annotation database from {}'.format(args.source))
                 try:
-                    annoDB = downloadFile(args.source, '.')
+                    annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.')
                     s = delayedAction(proj.logger.info, 'Decompressing {}'.format(annoDB))
                     # for downloaded file, we decompress inplace
                     annoDB = decompressIfNeeded(annoDB, inplace=True)
