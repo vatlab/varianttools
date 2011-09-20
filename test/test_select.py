@@ -39,6 +39,7 @@ class TestSelect(ProcessTestCase):
         runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --het CEU_cases_het')
     def removeProj(self):
         runCmd('vtools remove project')
+    
     def testSelect(self):
         'Test command vtools select'
         self.assertFail('vtools select')
@@ -49,32 +50,43 @@ class TestSelect(ProcessTestCase):
         self.assertFail('vtools select variant \'testNSFP.non_existing_item is not null\'')
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
-        self.assertEqual(int(outputOfCmd("vtools select variant -c").split('\n')[0]), 915)
+        self.assertOutput("vtools select variant -c", '915\n')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
-        self.assertEqual(int(outputOfCmd("vtools execute 'select count(*) from ns'").split('\n')[0]), 7)
-        self.assertEqual(int(outputOfCmd("vtools select ns -c").split('\n')[0]), 7)
-        self.assertEqual(int(outputOfCmd("vtools select variant --samples 'filename like \"%input.tsv\"' -c").split('\n')[0]), 338)
+        self.assertOutput("vtools execute 'select count(*) from ns'", '7\n')
+        self.assertOutput("vtools select ns -c", '7\n')
+        
+    def testSelectSample(self):
+        self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '338\n')
         self.assertSucc('vtools select ns --samples "filename like \'%input.tsv\'" -t ns_input')
-        #FIXME: not working now
-        #self.assertEqual(int(outputOfCmd("vtools select ns_input -c").split('\n')[0]), ?)
+        self.assertOutput("vtools select ns_input -c", '7\n')
         # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
         self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
         self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
-        self.assertEqual(int(outputOfCmd("vtools select plekhn1 -c").split('\n')[0]), 6)
+        self.assertOutput("vtools select plekhn1 -c", '6\n')
         self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
-        self.assertEqual(int(outputOfCmd("vtools select d_plekhn1 -c").split('\n')[0]), 5)
-        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples \'aff=1\' -t plekhn1_aff')
-        #self.assertEqual(int(outputOfCmd("vtools select plekhn1_aff -c").split('\n')[0]), ?)
-        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' or BMI<20" -t plekhn2')
-        #self.assertEqual(int(outputOfCmd("vtools select plekhn2 -c").split('\n')[0]), ?)
-        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\' and BMI<20" -t plekhn3')
-        #self.assertEqual(int(outputOfCmd("vtools select plekhn3 -c").split('\n')[0]), ?)
-        self.assertSucc('vtools select variant "genename = \'PLEKHN1\'" --samples "aff=\'1\'" "BMI<20" -t plekhn4')
-        #self.assertEqual(int(outputOfCmd("vtools select plekhn4 -c").split('\n')[0]), ?)
+        self.assertOutput("vtools select d_plekhn1 -c", '5\n')
+        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "aff=1" -t ns_aff')
+        self.assertOutput("vtools select ns_aff -c", '0\n')
+        self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
+        self.assertOutput("vtools select ns2 -c", '563\n')
+        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 or BMI<20'", '41\n')
+        self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
+        self.assertOutput("vtools select ns3 -c", '217\n')
+        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
+        self.assertSucc('vtools select variant --samples "aff=\'1\'" "BMI<20" -t ns3')
+        self.assertOutput("vtools select ns3 -c", '217\n')
+        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
         self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
-        #self.assertEqual(int(outputOfCmd("vtools select NA0 -c").split('\n')[0]), ?)
+        self.assertOutput("vtools select NA0 -c", '223\n')
+        self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
-
+    
+    def testSelectFixme(self):
+        initTest(2)
+        # no sample name for input.tsv
+        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        self.assertOutput('vtools select variant --samples \'filename like "%CEU.vcf.gz" \' -c', '288\n')
+        
 if __name__ == '__main__':
     unittest.main()
