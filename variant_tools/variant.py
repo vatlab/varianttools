@@ -164,9 +164,12 @@ def select(args, reverse=False):
                     proj.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
                     # nothing will be selected
                     where_clause += ' AND 0'
-                elif len(IDs) == proj.db.numOfRows('sample'):
-                    proj.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
-                    # we do not have to add anything to where_clause
+                #
+                # This special case does not hold because sometimes variants are imported without sample information.
+                #
+                #elif len(IDs) == proj.db.numOfRows('sample'):
+                #    proj.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                #    # we do not have to add anything to where_clause
                 else:
                     proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
