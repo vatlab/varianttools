@@ -97,5 +97,3 @@ namespace std
 %include "action.h"
 %include "permutator.h"
 %include "assoTests.h"
-
-
