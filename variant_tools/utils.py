@@ -464,19 +464,23 @@ class DatabaseEngine:
             cur.execute('PRAGMA default_cache_size=2000;')
             self.database.commit()
 
-    def attach(self, db):
+    def attach(self, db, name=None):
         '''Attach another database to this one. Only needed by sqlite'''
         if self.engine == 'mysql':
             # create the database if needed
             if not self.hasDatabase(db):
                 self.execute('CREATE DATABASE {};'.format(db))
-            return
-        if db.endswith('.DB'):
+            return db
+        if db.endswith('.DB') or db.endswith('.proj'):
+            dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db, os.path.split(db)[-1].split('.')[0].split('-')[0]))
+                db, dbName))
+            return dbName
         else:
+            dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db + '.DB', os.path.split(db)[-1].split('.')[0].split('-')[0]))
+                db + '.DB', dbName))
+            return dbName
 
     def analyze(self):
         '''Analyze a database for better performance'''

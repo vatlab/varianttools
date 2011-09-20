@@ -56,7 +56,7 @@ if __name__ == '__main__':
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init
-    parser = subparsers.add_parser('init', help='Create a project',
+    parser = subparsers.add_parser('init', help='Create a new project or a subproject of a parent project',
         # FIXME: we should add descriptions to other commands as well.
         description='''Create an empty project in the current directory. This
         command will fail if another project already exists in this directory,
@@ -89,7 +89,7 @@ if __name__ == '__main__':
             of all variant tables.''',
         description='''Convert coordinates of existing variants to alternative 
             coordinates in an alternative reference genome. The UCSC liftover
-            tool will be automatically downloaded if it is not available. ''')
+            tool will be automatically downloaded if it is not available.''')
     liftOver.liftOverArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=liftOver.liftOver)
