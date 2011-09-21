@@ -191,11 +191,33 @@ class TextProcessor:
                     e = SequentialExtractor(e)
                 if hasattr(e, '__call__'):
                     e = e.__call__
-                idx = [int(x) - 1 for x in field.index.split(',')]
-                if len(idx) == 1:
-                    self.fields.append((idx[0], e))
+                indexes = []
+                for x in field.index.split(','):
+                    if ':' in x:
+                        # a slice
+                        if x.count(':') == 1:
+                            start,end = map(str.strip, x.split(':'))
+                            step = None
+                        else:
+                            start,end,step = map(str,strip, x.split(':'))
+                            step = int(step) if step else None
+                        start = int(start) - 1 if start else None
+                        end = int(end) - 1 if end else None
+                        indexes.append(slice(start, end, step))
+                    else:
+                        # easy, an integer
+                        indexes.append(int(x) - 1)
+                #
+                if ':' not in field.index:
+                    if len(indexes) == 1:
+                        # int
+                        self.fields.append((indexes[0], 0, e))
+                    else:
+                        # a tuple
+                        self.fields.append((tuple(indexes), 1, e))
                 else:
-                    self.fields.append((tuple(idx), e))
+                    # now slice
+                    self.fields.append((tuple(indexes), 2, e))
             except Exception as e:
                 self.logger.debug(e)
                 raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
@@ -205,26 +227,79 @@ class TextProcessor:
         records = []
         num_records = 1
         #
-        for col, adj in self.fields:
-            item = tokens[col] if type(col) == int else '\t'.join([tokens[x] for x in col])
-            if adj is not None:
-                try:
-                    item = adj(item)
-                    if type(item) == list:
-                        if len(item) == 1:
-                            # trivial case
-                            item = item[0]
-                        elif num_records == 1:
-                            # these records will be handled separately.
-                            num_records = len(item)
-                        elif num_records != len(item):
-                            raise ValueError('Fields in a record should generate the same number of annotations.')
-                except Exception as e:
-                    self.logger.debug(e)
-                    # missing ....
-                    item = None
-            #
-            records.append(item)
+        for col, t, adj in self.fields:
+            if t != 2:
+                item = tokens[col] if t == 0 else '\t'.join([tokens[x] for x in col])
+                if adj is not None:
+                    try:
+                        item = adj(item)
+                        if type(item) == list:
+                            if len(item) == 1:
+                                # trivial case
+                                item = item[0]
+                            elif num_records == 1:
+                                # these records will be handled separately.
+                                num_records = len(item)
+                            elif num_records != len(item):
+                                raise ValueError('Fields in a record should generate the same number of annotations.')
+                    except Exception as e:
+                        self.logger.debug(e)
+                        # missing ....
+                        item = None
+                #
+                records.append(item)
+            elif len(col) == 1:
+                # single slice col[0] is a slice
+                for item in tokens[col[0]]:
+                    if adj is not None:
+                        try:
+                            item = adj(item)
+                            if type(item) == list:
+                                if len(item) == 1:
+                                    # trivial case
+                                    item = item[0]
+                                elif num_records == 1:
+                                    # these records will be handled separately.
+                                    num_records = len(item)
+                                elif num_records != len(item):
+                                    raise ValueError('Fields in a record should generate the same number of annotations.')
+                        except Exception as e:
+                            self.logger.debug(e)
+                            # missing ....
+                            item = None
+                    #
+                    records.append(item)
+            else:
+                # multiple slice...
+                # we need to worry about mixing integer and slice
+                indexes = []
+                for s in col:
+                    if type(s) == int:
+                        # repeat 8 to 8, 8, 8, 8, ...
+                        indexes.append([s] * len(tokens))
+                    else:
+                        # slice
+                        indexes.append(range(len(tokens))[s])
+                for cols in zip(*indexes):
+                    item = '\t'.join([tokens[x] for x in cols])
+                    if adj is not None:
+                        try:
+                            item = adj(item)
+                            if type(item) == list:
+                                if len(item) == 1:
+                                    # trivial case
+                                    item = item[0]
+                                elif num_records == 1:
+                                    # these records will be handled separately.
+                                    num_records = len(item)
+                                elif num_records != len(item):
+                                    raise ValueError('Fields in a record should generate the same number of annotations.')
+                        except Exception as e:
+                            self.logger.debug(e)
+                            # missing ....
+                            item = None
+                    #
+                    records.append(item)
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
