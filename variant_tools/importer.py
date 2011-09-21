@@ -688,7 +688,8 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, sample_name=[], update=None, force=False):
+    def __init__(self, proj, files, build, format, sample_name=None, variant_info=None,
+        genotype_info=[], update=None, force=False):
         # if update is None, recreate index
         Importer.__init__(self, proj, files, build, force, update is None)
         # we cannot guess build information from txt files
@@ -696,7 +697,7 @@ class txtImporter(Importer):
             raise ValueError('Please specify the reference genome of the input data.')
         #
         try:
-            fmt = fileFMT(format)
+            fmt = fileFMT(format, variant_info=None, genotype_info=None)
         except Exception as e:
             self.logger.debug(e)
             raise IndexError('Input file format {} is not currently supported by variant tools'.format(format))
@@ -920,6 +921,14 @@ def importTxtArguments(parser):
             for input files without genotype, samples will be created with NULL genotype.
             If no sample name is specified for input files with genotype, a sample with
             NULL sample name will be created.''')
+    parser.add_argument('--variant_info', nargs='*', default=None,
+        help='''Variant information fields to be imported. This option overrides variant
+            info fields of the format used and can be used to import fewer or alternative
+            fields defined in a format.'''),
+    parser.add_argument('--genotype_info', nargs='*', default=None,
+        help='''Genotype information fields to be imported. This option overrides genotype
+            info fields of the format used and can be used to import fewer or alternative
+            fields defined in a format.'''),
     parser.add_argument('--update', 
         help='''Add or update fields of existing variants of specified variant table
             instead of adding new variants to the master variant table. This option
@@ -936,6 +945,7 @@ def importTxt(args):
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
+                variant_info=args.variant_info, genotype_info=args.genotype_info,
                 update=args.update, force=args.force)
             importer.importData()
         proj.close()

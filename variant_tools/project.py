@@ -232,10 +232,13 @@ class AnnoDB:
 
 
 class fileFMT:
-    def __init__(self, name):
+    def __init__(self, name, variant_info=None, genotype_info=None):
         '''Input file format'''
         # locate a file format specification file
         self.description = None
+        # these fields read from format files could be overriden
+        self.variant_info = variant_info
+        self.genotype_info = genotype_info
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -330,12 +333,18 @@ class fileFMT:
         if genotype_fields and len(genotype_fields) != 1:
             raise ValueError('Variant tools currently only support input file with at most one sample')
         # extend self.fields to include variant_info
+        if self.variant_info:
+            variant_info = self.variant_info
+        if self.genotype_info:
+            genotype_info = self.genotype_info
         self.fields.extend(variant_info)
         self.ranges.append(self.ranges[-1] + len(variant_info))
         self.fields.extend(genotype_fields)
         self.ranges.append(self.ranges[-1] + len(genotype_fields))
         self.fields.extend(genotype_info)
         self.ranges.append(self.ranges[-1] + len(genotype_info))
+        # other fields?
+        self.other_fields = [x for x in fields if x not in self.fields]
                 
 
     def describe(self):
@@ -363,6 +372,12 @@ class fileFMT:
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
                 print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*8))))
+        if self.other_fields:
+            print('\nOther usable fields:')
+            for fld in self.other_fields:
+                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*8))))
+
 
 
 
