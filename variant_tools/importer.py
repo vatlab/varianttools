@@ -866,7 +866,7 @@ def importVCFArguments(parser):
             fields specified in the header of VCF file, QUAL (the quality score listed in the
             sixth column of a VCF file), or FILTER (the seventh column). variant tools by default
             does not import any variant field. ''')
-    parser.add_argument('--genotype_info', nargs='*', default=[],
+    parser.add_argument('--info', nargs='*', default=['DP'],
         help='''Genotype information fields to import, which should be one or more of the FORMAT
             fields specified in the header of VCF file, QUAL (the quality score listed in the
             sixth column of a VCF file), or FILTER (the seventh column). If read depth (DP) is
