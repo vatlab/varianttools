@@ -66,6 +66,7 @@ class TestImportVCF(ProcessTestCase):
         self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 698)
+        self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz')
 
     def testImportIndel(self):
         self.assertSucc('vtools import_vcf vcf/SAMP3_complex_variants.vcf')

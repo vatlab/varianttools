@@ -52,16 +52,16 @@ class TestSelect(ProcessTestCase):
         self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
         self.assertOutput("vtools select variant -c", '915\n')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
         self.assertOutput("vtools execute 'select count(*) from ns'", '7\n')
         self.assertOutput("vtools select ns -c", '7\n')
         
     def testSelectSample(self):
         self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '338\n')
-        self.assertSucc('vtools select ns --samples "filename like \'%input.tsv\'" -t ns_input')
-        self.assertOutput("vtools select ns_input -c", '7\n')
-        # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
         self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
-        self.assertSucc('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
+        self.assertOutput("vtools select ns_input -c", '7\n')
+        self.assertSucc('vtools select ns_input \'genename = "PLEKHN1"\'  -t plekhn1')
         self.assertOutput("vtools select plekhn1 -c", '6\n')
         self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
         self.assertOutput("vtools select d_plekhn1 -c", '5\n')
