@@ -688,7 +688,7 @@ class vcfImporter(Importer):
 
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, sample_name=None, update=None, force=False):
+    def __init__(self, proj, files, build, format, sample_name=[], update=None, force=False):
         # if update is None, recreate index
         Importer.__init__(self, proj, files, build, force, update is None)
         # we cannot guess build information from txt files
@@ -791,30 +791,31 @@ class txtImporter(Importer):
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
         if self.update:
-            sample_id = None
+            sample_ids = []
         else:
-            if self.sample_name is None:
+            if not self.sample_name:
                 # if no sample name is specified
                 if not self.genotype_field:
                     self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
-                    sample_id = None
+                    sample_ids = []
                 else:
                     self.logger.warning('Missing sample name (a name None is used)')
-                    sample_id = self.recordFileAndSample(input_filename, [None], True,
-                        self.genotype_info)[0]
+                    sample_ids = self.recordFileAndSample(input_filename, [None], True,
+                        self.genotype_info)
             else:
                 if not self.genotype_field:
                     # if no genotype, but a sample name is given
                     self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
-                    sample_id = self.recordFileAndSample(input_filename, [self.sample_name], False, self.genotype_info)[0]
+                    sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
                 else:
-                    sample_id = self.recordFileAndSample(input_filename, [self.sample_name], True, self.genotype_info)[0]
+                    sample_ids = self.recordFileAndSample(input_filename, self.sample_name, True, self.genotype_info)
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        if sample_id:
-            genotype_insert_query = 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
-                .format(self.proj.name, sample_id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
+        if sample_ids:
+            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
+                .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
+                for id in sample_ids}
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -826,8 +827,8 @@ class txtImporter(Importer):
                             self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                            if sample_id:
-                                cur.execute(genotype_insert_query, [variant_id] + rec[self.ranges[2]: self.ranges[4]])
+                            for id in sample_ids:
+                                cur.execute(genotype_insert_query[id], [variant_id] + rec[self.ranges[2]: self.ranges[4]])
                             self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
@@ -914,9 +915,9 @@ def importTxtArguments(parser):
             format specification file (with extension .fmt,
             see http://varianttools.sourceforge.net/Format/New for details).
         ''')
-    parser.add_argument('--sample_name',
-        help='''Name of the sample imported by the text file. If a sample is specified
-            for input files without genotype, a sample will be created with NULL genotype.
+    parser.add_argument('--sample_name', nargs='*', default=[],
+        help='''Name of the samples imported by the text file. If samples are specified
+            for input files without genotype, samples will be created with NULL genotype.
             If no sample name is specified for input files with genotype, a sample with
             NULL sample name will be created.''')
     parser.add_argument('--update', 
