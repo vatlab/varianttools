@@ -338,6 +338,7 @@ class Importer:
         self.count = [0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
+        self.recreateIndex = False
         if len(self.files) == 0:
             return
         #
@@ -860,11 +861,18 @@ def importVCFArguments(parser):
     parser.add_argument('--variant_only', action='store_true',
         help='''Import only variants. No sample will be created and all sample variants will
             be ignored.''')
-    parser.add_argument('--info', nargs='*', default=['DP'],
-        help='''Variant information fields to import. This command only support
-            'DP' (total depth). When 'DP' is listed (default), vtools will look
-            for total depth (DP=) in the INFO field of each variant and set average
-            depth to each individual (DP/numSample in the vcf file) in field 'DP'.''')
+    parser.add_argument('--variant_info', nargs='*', default=[],
+        help='''Variant information fields to import, which should be one or more of the INFO
+            fields specified in the header of VCF file, QUAL (the quality score listed in the
+            sixth column of a VCF file), or FILTER (the seventh column). variant tools by default
+            does not import any variant field. ''')
+    parser.add_argument('--genotype_info', nargs='*', default=[],
+        help='''Genotype information fields to import, which should be one or more of the FORMAT
+            fields specified in the header of VCF file, QUAL (the quality score listed in the
+            sixth column of a VCF file), or FILTER (the seventh column). If read depth (DP) is
+            specified but no DP field is found in genotype FORMAT, the average variant depth
+            (variant info DP divided by the number of samples) will be used as individual read
+            depth. variant tools by default does not import any genotype field.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
