@@ -84,7 +84,7 @@ class LiftOverTool:
                 chainFileURL = 'http://hgdownload-test.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
                     from_build, chainFile)
                 self.logger.info('Downloading liftOver chain file from UCSC')
-                downloadFile(chainFileURL)
+                chainFile = downloadFile(chainFileURL)
             except Exception as e:
                 self.logger.warning('Failed to download chain file from {0}'.format(chainFileURL))
                 self.logger.warning('Please check the URL, change --build and/or --alt_build, and try again')
