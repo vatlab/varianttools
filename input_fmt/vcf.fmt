@@ -8,7 +8,7 @@
 description=Import vcf
 variant_fields=chr,pos,ref,alt
 genotype_fields=geno
-genotype_info=DP
+genotype_info=DP_FMT
 
 [chr]
 index=1
@@ -36,9 +36,16 @@ index=10:
 adj=ExtractField(1, ':'), Nullify('0|0'), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 type=INTEGER
 
-[DP]
+[DP_INFO]
 index=8
 adj=ExtractValue('DP=', ';')
 type=INTEGER
+comment=DP fiels in INFO. Total depth of samples in a vcf file.
 
+[DP_FMT]
+# Passing 'GT:DP\t0/0:64'
+index=9, 10:
+adj=FieldFromFormat('DP', ':')
+type=INTEGER
+comment=DP fiels in INFO. Total depth of samples in a vcf file.
 

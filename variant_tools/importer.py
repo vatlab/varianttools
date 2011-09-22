@@ -85,6 +85,33 @@ class ExtractFlag:
         else:
             return '0'
 
+class FieldFromFormat:
+    def __init__(self, name, sep=';', default=None):
+        '''Define an extractor that return the value of a field according 
+        to a format string. This is used to extract stuff from the format
+        string of vcf files.
+        '''
+        self.name = name
+        self.sep = sep
+        self.fmt = ''
+        self.idx = None
+        self.default = default
+
+
+    def __call__(self, item):
+        fmt,val = item.split('\t')
+        if not self.fmt == fmt:
+            self.fmt = item.split('\t')[0]
+            fields = self.fmt.split(self.sep)
+            if self.name in fields:
+                self.idx = fields.index(self.name)
+                return val.split(self.sep)[self.idx]
+            else:
+                self.idx = None
+                return self.default
+        else:
+            return val.split(self.sep)[self.idx] if self.idx else self.default
+
 class ExtractValue:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that returns the value after name in one of the fields,
