@@ -35,6 +35,14 @@ comment=Alternative allele, '-' for deletion.
 index=9, 10:
 adj=FieldFromFormat('GT', ':'), Nullify(['0|0', '0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 type=INTEGER
+comment=Gentoype, coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2)
+
+#
+# The vcf format specification says GT must be the first column, if so, the following
+# will be faster. Unfortunately, I have some vcf files that are not formatted this way.
+#
+#index=10:
+#adj=ExtractField(1, ':'), Nullify(['0|0', '0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 
 [DP_INFO]
 index=8

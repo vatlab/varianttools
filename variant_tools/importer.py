@@ -257,7 +257,7 @@ class TextProcessor:
                             self.fields.append((indexes[0], e))
                         else:
                             # a tuple
-                            self.raw_fields.append((tuple(indexes), e))
+                            self.fields.append((tuple(indexes), e))
                     elif len(indexes) == 1:
                         # single slice
                         cols = range(len(tokens))[indexes[0]]
@@ -283,7 +283,7 @@ class TextProcessor:
             if adj is not None:
                 try:
                     item = adj(item)
-                    if type(item) == list:
+                    if type(item) == tuple:
                         if len(item) == 1:
                             # trivial case
                             item = item[0]
@@ -827,6 +827,7 @@ class txtImporter(Importer):
     def getSampleName(self, filename):
         '''Prove text file for sample name'''
         header = None
+        count = 0
         with self.openFile(filename) as input:
             for line in input:
                 line = line.decode()
@@ -840,22 +841,25 @@ class txtImporter(Importer):
                                 return len(rec), []
                             else:
                                 cols = [x[0] for x in self.prober.fields]
-                                fixed = False
                                 if type(cols[0]) == tuple:
+                                    fixed = False
                                     # mutiple ones, need to figure out the moving one
                                     for i,idx in enumerate(self.prober.raw_fields[0].index.split(',')):
                                         if ':' in idx:
                                             cols = [x[i] for x in cols]
                                             fixed = True
                                             break
-                                if not fixed:
-                                    cols = [x[-1] for x in cols]
+                                    if not fixed:
+                                        cols = [x[-1] for x in cols]
                                 header = header.split(self.prober.delimiter)
                                 if max(cols) < len(header):
                                     return len(rec), [header[x] for x in cols]
                                 else:
                                     return len(rec), []
                     except Exception as e:
+                        count += 1
+                        if count == 100:
+                            raise ValueError('Cannot determine header of file')
                         self.logger.debug(e)
                     
 
