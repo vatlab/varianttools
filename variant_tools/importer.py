@@ -28,6 +28,7 @@ import os
 import sys
 import gzip
 import re
+from itertools import izip, repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
@@ -208,137 +209,95 @@ class TextProcessor:
         '''
         self.logger = logger
         self.build = build
+        self.raw_fields = fields
         self.fields = []
         self.delimiter = delimiter
-        for field in fields:
-            try:
-                # get an instance of an extractor, or a function
-                e = eval(field.adj) if field.adj else None
-                # 1. Not all passed object has __call__ (user can define a lambda function)
-                # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
-                #    e will improve performance because __call__ does not have to be looked up each time.
-                # 3. Passing object directly has an unexpected side effect on performance because comparing
-                #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
-                if hasattr(e, '__iter__'):
-                    # if there are multiple functors, use a sequential extractor to handle them
-                    e = SequentialExtractor(e)
-                if hasattr(e, '__call__'):
-                    e = e.__call__
-                indexes = []
-                for x in field.index.split(','):
-                    if ':' in x:
-                        # a slice
-                        if x.count(':') == 1:
-                            start,end = map(str.strip, x.split(':'))
-                            step = None
-                        else:
-                            start,end,step = map(str,strip, x.split(':'))
-                            step = int(step) if step else None
-                        start = int(start) - 1 if start else None
-                        end = int(end) - 1 if end else None
-                        indexes.append(slice(start, end, step))
-                    else:
-                        # easy, an integer
-                        indexes.append(int(x) - 1)
-                #
-                if ':' not in field.index:
-                    if len(indexes) == 1:
-                        # int
-                        self.fields.append((indexes[0], 0, e))
-                    else:
-                        # a tuple
-                        self.fields.append((tuple(indexes), 1, e))
-                else:
-                    # now slice
-                    self.fields.append((tuple(indexes), 2, e))
-            except Exception as e:
-                self.logger.debug(e)
-                raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
-        self.numColumns = [1] * len(self.fields)
+        self.numColumns = [1] * len(self.raw_fields)
+        self.first_time = True
 
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
-        records = []
         num_records = 1
         #
-        for fIdx, (col, t, adj) in enumerate(self.fields):
-            if t != 2:
-                item = tokens[col] if t == 0 else [tokens[x] for x in col]
-                if adj is not None:
-                    try:
-                        item = adj(item)
-                        if type(item) == list:
-                            if len(item) == 1:
-                                # trivial case
-                                item = item[0]
-                            elif num_records == 1:
-                                # these records will be handled separately.
-                                num_records = len(item)
-                            elif num_records != len(item):
-                                raise ValueError('Fields in a record should generate the same number of annotations.')
-                    except Exception as e:
-                        self.logger.debug(e)
-                        # missing ....
-                        item = None
-                #
-                records.append(item)
-            elif len(col) == 1:
-                # single slice col[0] is a slice
-                count = 0
-                for item in tokens[col[0]]:
-                    count += 1
-                    if adj is not None:
-                        try:
-                            item = adj(item)
-                            if type(item) == list:
-                                if len(item) == 1:
-                                    # trivial case
-                                    item = item[0]
-                                elif num_records == 1:
-                                    # these records will be handled separately.
-                                    num_records = len(item)
-                                elif num_records != len(item):
-                                    raise ValueError('Fields in a record should generate the same number of annotations.')
-                        except Exception as e:
-                            self.logger.debug(e)
-                            # missing ....
-                            item = None
-                    records.append(item)
-                self.numColumns[fIdx] = count
-            else:
-                # multiple slice...
-                # we need to worry about mixing integer and slice
-                indexes = []
-                for s in col:
-                    if type(s) == int:
-                        # repeat 8 to 8, 8, 8, 8, ...
-                        indexes.append([s] * len(tokens))
-                    else:
-                        # slice
-                        indexes.append(range(len(tokens))[s])
-                count = 0
-                for cols in zip(*indexes):
-                    count += 1
-                    item = [tokens[x] for x in cols]
-                    if adj is not None:
-                        try:
-                            item = adj(item)
-                            if type(item) == list:
-                                if len(item) == 1:
-                                    # trivial case
-                                    item = item[0]
-                                elif num_records == 1:
-                                    # these records will be handled separately.
-                                    num_records = len(item)
-                                elif num_records != len(item):
-                                    raise ValueError('Fields in a record should generate the same number of annotations.')
-                        except Exception as e:
-                            self.logger.debug(e)
-                            # missing ....
-                            item = None
+        if self.first_time:
+            for fIdx, field in enumerate(self.raw_fields):
+                try:
+                    # get an instance of an extractor, or a function
+                    e = eval(field.adj) if field.adj else None
+                    # 1. Not all passed object has __call__ (user can define a lambda function)
+                    # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
+                    #    e will improve performance because __call__ does not have to be looked up each time.
+                    # 3. Passing object directly has an unexpected side effect on performance because comparing
+                    #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
+                    if hasattr(e, '__iter__'):
+                        # if there are multiple functors, use a sequential extractor to handle them
+                        e = SequentialExtractor(e)
+                    if hasattr(e, '__call__'):
+                        e = e.__call__
+                    indexes = []
+                    for x in field.index.split(','):
+                        if ':' in x:
+                            # a slice
+                            if x.count(':') == 1:
+                                start,end = map(str.strip, x.split(':'))
+                                step = None
+                            else:
+                                start,end,step = map(str,strip, x.split(':'))
+                                step = int(step) if step else None
+                            start = int(start) - 1 if start else None
+                            end = int(end) - 1 if end else None
+                            indexes.append(slice(start, end, step))
+                        else:
+                            # easy, an integer
+                            indexes.append(int(x) - 1)
                     #
-                    records.append(item)
-                self.numColumns[fIdx] = count
+                    if ':' not in field.index:
+                        if len(indexes) == 1:
+                            # int
+                            self.fields.append((indexes[0], e))
+                        else:
+                            # a tuple
+                            self.raw_fields.append((tuple(indexes), e))
+                    elif len(indexes) == 1:
+                        # single slice
+                        cols = range(len(tokens))[indexes[0]]
+                        for c in cols:
+                            self.fields.append((c, e))
+                        self.numColumns[fIdx] = len(cols)
+                    else:
+                        # we need to worry about mixing integer and slice
+                        indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
+                        count = 0
+                        for c in izip(*indexes):
+                            count += 1
+                            self.fields.append((tuple(c), e))
+                        self.numColumns[fIdx] = count
+                except Exception as e:
+                    self.logger.debug(e)
+                    raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
+            self.first_time = False
+        #        
+        records = [None]*len(self.fields)
+        for idx, (col, adj) in enumerate(self.fields):
+            item = tokens[col] if type(col) == int else [tokens[x] for x in col]
+            if adj is not None:
+                try:
+                    item = adj(item)
+                    if type(item) == list:
+                        if len(item) == 1:
+                            # trivial case
+                            item = item[0]
+                        elif num_records == 1:
+                            # these records will be handled separately.
+                            num_records = len(item)
+                        elif num_records != len(item):
+                            raise ValueError('Fields in a record should generate the same number of annotations.')
+                except Exception as e:
+                    self.logger.debug(e)
+                    # missing ....
+                    item = None
+            #
+            records[idx] = item
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
@@ -867,25 +826,35 @@ class txtImporter(Importer):
 
     def getSampleName(self, filename):
         '''Prove text file for sample name'''
-        header = []
+        header = None
         with self.openFile(filename) as input:
             for line in input:
                 line = line.decode()
                 # the last # line
                 if line.startswith('#'):
-                    header = [x.strip() for x in line.split(self.prober.delimiter)]
-                    if self.prober.fields[0][1] == 0 and self.prober.fields[0][0] < len(header):
-                        header = [header[self.prober.fields[0][0]]]
-                    elif self.prober.fields[0][1] == 1 and self.prober.fields[0][0][0] < len(header):
-                        header = [header[self.prober.fields[0][0][0]]]
-                    else:
-                        for idx in self.prober.fields[0][0]:
-                            if type(idx) == slice:
-                                header = header[idx]
+                    header = line
                 else:
                     try:
                         for bins, rec in self.prober.process(line):
-                            return len(rec), header
+                            if header is None:
+                                return len(rec), []
+                            else:
+                                cols = [x[0] for x in self.prober.fields]
+                                fixed = False
+                                if type(cols[0]) == tuple:
+                                    # mutiple ones, need to figure out the moving one
+                                    for i,idx in enumerate(self.prober.raw_fields[0].index.split(',')):
+                                        if ':' in idx:
+                                            cols = [x[i] for x in cols]
+                                            fixed = True
+                                            break
+                                if not fixed:
+                                    cols = [x[-1] for x in cols]
+                                header = header.split(self.prober.delimiter)
+                                if max(cols) < len(header):
+                                    return len(rec), [header[x] for x in cols]
+                                else:
+                                    return len(rec), []
                     except Exception as e:
                         self.logger.debug(e)
                     
