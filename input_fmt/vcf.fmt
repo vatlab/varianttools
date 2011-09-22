@@ -8,7 +8,7 @@
 description=Import vcf
 variant_fields=chr,pos,ref,alt
 genotype_fields=geno
-genotype_info=DP_FMT
+genotype_info=DP_INFO
 
 [chr]
 index=1

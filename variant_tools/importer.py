@@ -48,7 +48,7 @@ class ExtractField:
             return self.default
 
 class SplitField:
-    def __init__(self, sep=',', default=[]):
+    def __init__(self, sep=',', default=()):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. Return default if unsuccessful. These items
         will lead to multiple records in the database.'''
@@ -57,7 +57,7 @@ class SplitField:
     
     def __call__(self, item):
         try:
-            return item.split(self.sep)
+            return tuple(item.split(self.sep))
         except:
             return self.default
 
@@ -98,22 +98,17 @@ class FieldFromFormat:
         self.default = default
 
     def __call__(self, item):
-        if not item.startswith(self.fmt):
-            fmt, val = item.split('\t')
-            self.fmt = fmt + '\t'
+        if not item[0] == self.fmt:
+            fmt, val = item
+            self.fmt = fmt
             fields = fmt.split(self.sep)
             if self.name in fields:
                 self.idx = fields.index(self.name)
-                if self.idx > 0:
-                    self.idx += len(fields) - 1
+                return val.split(self.sep)[self.idx]
             else:
                 self.idx = None
-        if self.idx > 0:
-            return item.split(self.sep)[self.idx]
-        elif self.idx == 0:
-            return item.split('\t')[1].split(self.sep)[0]
-        else:
-            return self.default
+                return self.default
+        return item[1].split(self.sep)[self.idx] if self.idx is not None else self.default
 
 class ExtractValue:
     def __init__(self, name, sep=';', default=None):
@@ -122,16 +117,21 @@ class ExtractValue:
         delimiter and the name.'''
         self.name = name
         self.sep = sep
-        self.pos = len(name)
+        #self.pos = len(name)
         self.default = default
 
     def __call__(self, item):
         if self.name not in item:
             return self.default
-        for field in item.split(self.sep):
-            if field.startswith(self.name):
-                return field[self.pos:]
-        return self.default
+        #
+        # Using two partisions seems to be a tiny bit faster than 
+        # split and startswith
+        #
+        #for field in item.split(self.sep):
+        #    if field.startswith(self.name):
+        #        return field[self.pos:]
+        ss = item.partition(self.name)
+        return ss[2].partition(self.sep)[0] if ss[2] is not None else self.default
 
 class IncreaseBy:
     def __init__(self, inc=1):
@@ -188,8 +188,8 @@ class SequentialExtractor:
             if not item:
                 return item
             # if multiple records are returned, apply to each of them
-            if type(item) == list:
-                if type(item[0]) == list:
+            if type(item) == tuple:
+                if type(item[0]) == tuple:
                     raise ValueError('Nested vector extracted is not allowed')
                 item = [e(x) for x in item]
             else:
@@ -263,7 +263,7 @@ class TextProcessor:
         #
         for fIdx, (col, t, adj) in enumerate(self.fields):
             if t != 2:
-                item = tokens[col] if t == 0 else '\t'.join([tokens[x] for x in col])
+                item = tokens[col] if t == 0 else [tokens[x] for x in col]
                 if adj is not None:
                     try:
                         item = adj(item)
@@ -319,7 +319,7 @@ class TextProcessor:
                 count = 0
                 for cols in zip(*indexes):
                     count += 1
-                    item = '\t'.join([tokens[x] for x in cols])
+                    item = [tokens[x] for x in cols]
                     if adj is not None:
                         try:
                             item = adj(item)
