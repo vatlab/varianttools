@@ -32,8 +32,8 @@ type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
 [geno]
-index=10:
-adj=ExtractField(1, ':'), Nullify('0|0'), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
+index=9, 10:
+adj=FieldFromFormat('GT', ':'), Nullify(['0|0','0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 type=INTEGER
 
 [DP_INFO]

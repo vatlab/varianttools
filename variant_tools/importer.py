@@ -97,7 +97,6 @@ class FieldFromFormat:
         self.idx = None
         self.default = default
 
-
     def __call__(self, item):
         fmt,val = item.split('\t')
         if not self.fmt == fmt:
@@ -163,7 +162,10 @@ class Nullify:
         self.val = val
 
     def __call__(self, item):
-        return None if item == self.val else item
+        if type(self.val) == str:
+            return None if item == self.val else item
+        else:
+            return None if item in self.val else item
 
 class SequentialExtractor:
     def __init__(self, extractors):
