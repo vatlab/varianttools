@@ -209,9 +209,7 @@ class ProgressBar:
             self.signal_set = True
         except:
             self.term_width = 79
-        # display initial output after 1 second, if self.done() is called 
-        # before 1 second, nothing will be displayed.
-        self.action = delayedAction(self.outputProgress, (), 1)
+        self.outputProgress()
 
     def empty(self, *args, **kwargs):
         return
@@ -252,9 +250,6 @@ class ProgressBar:
         # stop update progress bar more than once per second.
         if self.count > 0 and self.count != self.totalCount and cur_time - self.last_time < 1:
             return
-        #
-        self.action = False
-        #
         msg = ['', '', '', '', '', '']
         # message
         msg[0] = self.message + ':'
@@ -291,15 +286,6 @@ class ProgressBar:
 
     def done(self):
         '''Finish, output a new line'''
-        if self.action:
-            # do not a progress bar
-            del self.action
-            # but print title and total count
-            if self.totalCount:
-                sys.stderr.write('{}: {:,}\n'.format(self.message, self.totalCount))
-            else:
-                sys.stderr.write('{}\n'.format(self.message))
-            return
         if self.totalCount:
             self.count = self.totalCount
         self.outputProgress(done=True)
