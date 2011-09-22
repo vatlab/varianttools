@@ -93,23 +93,27 @@ class FieldFromFormat:
         '''
         self.name = name
         self.sep = sep
-        self.fmt = ''
+        self.fmt = '\t'
         self.idx = None
         self.default = default
 
     def __call__(self, item):
-        fmt,val = item.split('\t')
-        if not self.fmt == fmt:
-            self.fmt = item.split('\t')[0]
-            fields = self.fmt.split(self.sep)
+        if not item.startswith(self.fmt):
+            fmt, val = item.split('\t')
+            self.fmt = fmt + '\t'
+            fields = fmt.split(self.sep)
             if self.name in fields:
                 self.idx = fields.index(self.name)
-                return val.split(self.sep)[self.idx]
+                if self.idx > 0:
+                    self.idx += len(fields) - 1
             else:
                 self.idx = None
-                return self.default
+        if self.idx > 0:
+            return item.split(self.sep)[self.idx]
+        elif self.idx == 0:
+            return item.split('\t')[1].split(self.sep)[0]
         else:
-            return val.split(self.sep)[self.idx] if self.idx else self.default
+            return self.default
 
 class ExtractValue:
     def __init__(self, name, sep=';', default=None):

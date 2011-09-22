@@ -33,7 +33,7 @@ comment=Alternative allele, '-' for deletion.
 
 [geno]
 index=9, 10:
-adj=FieldFromFormat('GT', ':'), Nullify(['0|0','0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
+adj=FieldFromFormat('GT', ':'), Nullify(['0|0', '0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 type=INTEGER
 
 [DP_INFO]
