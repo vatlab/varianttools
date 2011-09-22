@@ -791,6 +791,9 @@ class txtImporter(Importer):
             self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
         else:  # position or range type
             self.processor = TextProcessor(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+        # probe number of sample
+        if self.genotype_field:
+            self.prober = TextProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -822,6 +825,31 @@ class txtImporter(Importer):
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
+
+    def getSampleName(self, filename):
+        '''Prove text file for sample name'''
+        header = []
+        with self.openFile(filename) as input:
+            for line in input:
+                line = line.decode()
+                # the last # line
+                if line.startswith('#'):
+                    header = [x.strip() for x in line.split(self.prober.delimiter)]
+                    if self.prober.fields[0][1] == 0 and self.prober.fields[0][0] < len(header):
+                        header = [header[self.prober.fields[0][0]]]
+                    elif self.prober.fields[0][1] == 1 and self.prober.fields[0][0][0] < len(header):
+                        header = [header[self.prober.fields[0][0][0]]]
+                    else:
+                        for idx in self.prober.fields[0][0]:
+                            if type(idx) == slice:
+                                header = header[idx]
+                else:
+                    try:
+                        for bins, rec in self.prober.process(line):
+                            return len(rec), header
+                    except Exception as e:
+                        self.logger.debug(e)
+                    
 
     def addVariant(self, cur, rec):
         #
@@ -875,15 +903,30 @@ class txtImporter(Importer):
                     self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
                     sample_ids = []
                 else:
-                    self.logger.warning('Missing sample name (a name None is used)')
-                    sample_ids = self.recordFileAndSample(input_filename, [None], True,
-                        self.genotype_info)
+                    numSample, names = self.getSampleName(input_filename)
+                    if not names:
+                        if numSample == 1:
+                            self.logger.warning('Missing sample name (name None is used)'.format(numSample))
+                            sample_ids = self.recordFileAndSample(input_filename, [None], True,
+                                self.genotype_info)
+                        elif numSample == 0:
+                            self.logger.info('No genotype column exists in the input file')
+                            sample_ids = []
+                        else:
+                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
+                    else:
+                        self.logger.info('Using sample name {}'.format(', '.join(names)))
+                        sample_ids = self.recordFileAndSample(input_filename, names, True,
+                            self.genotype_info)
             else:
                 if not self.genotype_field:
                     # if no genotype, but a sample name is given
                     self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
                     sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
                 else:
+                    numSample, names = self.getSampleName(input_filename)
+                    if len(self.sample_name) != numSample:
+                        raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
                     sample_ids = self.recordFileAndSample(input_filename, self.sample_name, True, self.genotype_info)
         #
         cur = self.db.cursor()

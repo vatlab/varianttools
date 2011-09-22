@@ -7,7 +7,7 @@
 [format description]
 description=Import vcf
 variant_fields=chr,pos,ref,alt
-genotype=geno
+genotype_fields=geno
 genotype_info=DP
 
 [chr]
@@ -32,12 +32,12 @@ type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
 [geno]
-index=10
+index=10:
 adj=MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1'})
 type=INTEGER
 
 [DP]
-index=8:
+index=8
 adj=ExtractValue('DP=', ';')
 type=INTEGER
 
