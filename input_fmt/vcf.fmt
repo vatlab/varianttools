@@ -1,5 +1,4 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
-# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
 # a description of the format of this file.
@@ -32,17 +31,15 @@ type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
 [geno]
+# This vcf genotype extractor uses format string and genotype to 
+# extract genotype. Although the format string should not be needed
+# because the genotype field should be the first one, one of my dataset
+# does not following this rule. The performance penalty is significant
+# 4.36 -> 3.03 for 50k records.
 index=9, 10:
-adj=FieldFromFormat('GT', ':'), Nullify(['0|0', '0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
+adj=VcfGenoFromFormat()
 type=INTEGER
 comment=Gentoype, coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2)
-
-#
-# The vcf format specification says GT must be the first column, if so, the following
-# will be faster. Unfortunately, I have some vcf files that are not formatted this way.
-#
-#index=10:
-#adj=ExtractField(1, ':'), Nullify(['0|0', '0/0']), MapValue({'0/1': '1', '1/1': '2', '1/2': '-1', '2/1': '-1', '0|0': '0', '0|1': '1', '1|0': '1', '1|1': '2', '1|2': '-1'})
 
 [DP_INFO]
 index=8

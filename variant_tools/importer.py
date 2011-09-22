@@ -111,6 +111,39 @@ class FieldFromFormat:
                 return self.default
         return item[1].split(self.sep)[self.idx] if self.idx is not None else self.default
 
+class VcfGenoFromFormat:
+    def __init__(self, default=None):
+        '''Define an extractor that return the value of a field according 
+        to a format string. This is used to extract stuff from the format
+        string of vcf files.
+        '''
+        self.fmt = '\t'
+        self.idx = None
+        self.default = default
+        self.map = {'0/0': default, '0|0': default, '0': default,
+            '0/1': '1', '1/0': '1', '0|1': '1', '1|0': '1',
+            '1/1': '2', '1|1': '2',
+            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
+            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
+            '2/2': ('0', '2'), '2|2': ('0', '2'),
+            '1': '1'}
+
+    def __call__(self, item):
+        # the most common and correct case...
+        if item[0][:2] == 'GT':
+            return self.map[item[1].partition(':')[0]]
+        elif item[0] != self.fmt:
+            fmt, val = item
+            self.fmt = fmt
+            fields = fmt.split(self.sep)
+            if self.name in fields:
+                self.idx = fields.index(self.name)
+                return self.map[val.split(self.sep)[self.idx]]
+            else:
+                self.idx = None
+                return self.default
+        return self.map[item[1].split(self.sep, self.idx + 1)[self.idx]] if self.idx is not None else self.default
+
 class ExtractValue:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that returns the value after name in one of the fields,
@@ -162,15 +195,33 @@ class RemoveLeading:
     def __call__(self, item):
         return item[self.vlen:] if item.startswith(self.val) else item
 
+class EncodeGenotype:
+    '''Encode 1/1, 1/2 etc to variant tools code'''
+    def __init__(self, default=None):
+        self.map = {'0/0': default, '0|0': default,
+            '0/1': '1', '1/0': '1', '0|1': '1', '1|0': '1',
+            '1/1': '2', '1|1': '2',
+            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
+            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
+            '2/2': ('0', '2'), '2|2': ('0', '2'),
+            '0': default, '1': '1'}
+
+    def __call__(self, item):
+        return self.map[item]
+        
 class Nullify:
     def __init__(self, val):
         self.val = val
-
-    def __call__(self, item):
         if type(self.val) == str:
-            return None if item == self.val else item
+            self.__call__ = self.nullify_single
         else:
-            return None if item in self.val else item
+            self.__call__ = self.nullify_multiple
+
+    def nullify_single(self, item):
+        return None if item == self.val else item
+
+    def nullify_multiple(self, item):
+        return None if item in self.val else item
 
 class SequentialExtractor:
     def __init__(self, extractors):
