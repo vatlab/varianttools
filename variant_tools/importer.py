@@ -425,7 +425,7 @@ class Importer:
         self.import_alt_build = False
         self.recreateIndex = False
         if len(self.files) == 0:
-            return
+            raise ValueError('No file to import')
         #
         if build is None:
             if self.proj.build is not None:
@@ -781,6 +781,13 @@ class txtImporter(Importer):
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
         #
+        # try to guess file type
+        if not format:
+            filename = self.files[0].lower()
+            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
+                format = 'vcf'
+            else:
+                raise ValueError('Cannot guess input file type from filename')
         try:
             fmt = fileFMT(format, variant_info=None, genotype_info=None)
         except Exception as e:
@@ -1056,12 +1063,13 @@ def importTxtArguments(parser):
             project is specified, it will become the alternative referenge genome of the
             project. The UCSC liftover tool will be automatically called to map input
             coordinates to the primary reference genome.''')
-    parser.add_argument('--format', required=True,
+    parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types (use 'vtools show formats' to list them, or 
             'vtools show format FMT' for details about a specific format), or a local
             format specification file (with extension .fmt,
-            see http://varianttools.sourceforge.net/Format/New for details).
+            see http://varianttools.sourceforge.net/Format/New for details). If
+            unspecified, variant tools will try to guess format from file extension.
         ''')
     parser.add_argument('--sample_name', nargs='*', default=[],
         help='''Name of the samples imported by the text file. If samples are specified
