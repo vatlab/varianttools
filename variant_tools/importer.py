@@ -946,8 +946,9 @@ class txtImporter(Importer):
                             self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                            for id in sample_ids:
-                                cur.execute(genotype_insert_query[id], [variant_id] + rec[self.ranges[2]: self.ranges[4]])
+                            for idx, id in enumerate(sample_ids):
+                                if rec[self.ranges[2] + idx]:
+                                    cur.execute(genotype_insert_query[id], [variant_id] + rec[self.ranges[2] + idx : self.ranges[4] +idx])
                             self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
