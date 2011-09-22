@@ -254,13 +254,14 @@ class TextProcessor:
             except Exception as e:
                 self.logger.debug(e)
                 raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
+        self.numColumns = [1] * len(self.fields)
 
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
         records = []
         num_records = 1
         #
-        for col, t, adj in self.fields:
+        for fIdx, (col, t, adj) in enumerate(self.fields):
             if t != 2:
                 item = tokens[col] if t == 0 else '\t'.join([tokens[x] for x in col])
                 if adj is not None:
@@ -283,7 +284,9 @@ class TextProcessor:
                 records.append(item)
             elif len(col) == 1:
                 # single slice col[0] is a slice
+                count = 0
                 for item in tokens[col[0]]:
+                    count += 1
                     if adj is not None:
                         try:
                             item = adj(item)
@@ -300,8 +303,8 @@ class TextProcessor:
                             self.logger.debug(e)
                             # missing ....
                             item = None
-                    #
                     records.append(item)
+                self.numColumns[fIdx] = count
             else:
                 # multiple slice...
                 # we need to worry about mixing integer and slice
@@ -313,7 +316,9 @@ class TextProcessor:
                     else:
                         # slice
                         indexes.append(range(len(tokens))[s])
+                count = 0
                 for cols in zip(*indexes):
+                    count += 1
                     item = '\t'.join([tokens[x] for x in cols])
                     if adj is not None:
                         try:
@@ -333,6 +338,7 @@ class TextProcessor:
                             item = None
                     #
                     records.append(item)
+                self.numColumns[fIdx] = count
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
@@ -979,9 +985,22 @@ class txtImporter(Importer):
                             self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+                            cnts = [self.processor.numColumns[x] for x in range(self.ranges[2], self.ranges[4])]
+                            #
+                            # number of columns:
+                            #    cnts = [60, 1]
+                            #
+                            start_col = [self.ranges[2]]
+                            for c in cnts[:-1]:
+                                start_col.append(start_col[-1] + c)
+                            #
+                            # starting columns:
+                            #   start_col 
+                            if cnts[0] != len(sample_ids):
+                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(cnts[0], len(sample_ids)))
                             for idx, id in enumerate(sample_ids):
                                 if rec[self.ranges[2] + idx]:
-                                    cur.execute(genotype_insert_query[id], [variant_id] + rec[self.ranges[2] + idx : self.ranges[4] +idx])
+                                    cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if cnt == 1 else idx)] for sc,cnt in zip(start_col, cnts)])
                             self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
