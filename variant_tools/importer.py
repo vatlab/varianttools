@@ -48,19 +48,27 @@ class ExtractField:
         except:
             return self.default
 
-class SplitField:
-    def __init__(self, sep=',', default=()):
+class CheckSplit:
+    def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
-        specified delimiter. Return default if unsuccessful. These items
-        will lead to multiple records in the database.'''
+        specified delimiter. Return default if unsuccessful. It differs from
+        SplitField in that it will return the item itself (instead of a tuple
+        of one element) when there is only one element. The item will then
+        will copy if multiple items exist.'''
         self.sep = sep
-        self.default = default
     
     def __call__(self, item):
-        try:
-            return tuple(item.split(self.sep))
-        except:
-            return self.default
+        return item if self.sep not in item else tuple(item.split(self.sep))
+    
+class SplitField:
+    def __init__(self, sep=','):
+        '''Define an extractor that returns all items in a field separated by
+        specified delimiter. These items will lead to multiple records in
+        the database.'''
+        self.sep = sep
+    
+    def __call__(self, item):
+        return tuple(item.split(self.sep))
 
 class ExtractFlag:
     def __init__(self, name, sep=';'):
@@ -121,12 +129,12 @@ class VcfGenoFromFormat:
         self.idx = None
         self.default = default
         self.map = {'0/0': default, '0|0': default, '0': default,
-            '0/1': '1', '1/0': '1', '0|1': '1', '1|0': '1',
-            '1/1': '2', '1|1': '2',
+            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
+            '1/1': ('2',), '1|1': ('2',),
             '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
             '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
             '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '1': '1'}
+            '0': default, '1': ('1',)}
 
     def __call__(self, item):
         # the most common and correct case...
@@ -199,12 +207,12 @@ class EncodeGenotype:
     '''Encode 1/1, 1/2 etc to variant tools code'''
     def __init__(self, default=None):
         self.map = {'0/0': default, '0|0': default,
-            '0/1': '1', '1/0': '1', '0|1': '1', '1|0': '1',
-            '1/1': '2', '1|1': '2',
+            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
+            '1/1': ('2',), '1|1': ('2',),
             '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
             '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
             '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '0': default, '1': '1'}
+            '0': default, '1': ('1',)}
 
     def __call__(self, item):
         return self.map[item]
@@ -263,14 +271,13 @@ class TextProcessor:
         self.raw_fields = fields
         self.fields = []
         self.delimiter = delimiter
-        self.numColumns = [1] * len(self.raw_fields)
+        self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
 
     def process(self, line):
-        tokens = [x.strip() for x in line.split(self.delimiter)]
-        num_records = 1
-        #
+        tokens = line.split(self.delimiter)
         if self.first_time:
+            cIdx = 0
             for fIdx, field in enumerate(self.raw_fields):
                 try:
                     # get an instance of an extractor, or a function
@@ -306,15 +313,20 @@ class TextProcessor:
                         if len(indexes) == 1:
                             # int
                             self.fields.append((indexes[0], e))
+                            self.columnRange[fIdx] = (cIdx, cIdx+1)
+                            cIdx += 1
                         else:
                             # a tuple
                             self.fields.append((tuple(indexes), e))
+                            self.columnRange[fIdx] = (cIdx, cIdx+1)
+                            cIdx += 1
                     elif len(indexes) == 1:
                         # single slice
                         cols = range(len(tokens))[indexes[0]]
                         for c in cols:
                             self.fields.append((c, e))
-                        self.numColumns[fIdx] = len(cols)
+                        self.columnRange[fIdx] = (cIdx, cIdx + len(cols))
+                        cIdx += len(cols)
                     else:
                         # we need to worry about mixing integer and slice
                         indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
@@ -322,108 +334,57 @@ class TextProcessor:
                         for c in izip(*indexes):
                             count += 1
                             self.fields.append((tuple(c), e))
-                        self.numColumns[fIdx] = count
+                        self.columnRange[fIdx] = (cIdx, cIdx + count)
+                        cIdx += count
                 except Exception as e:
                     self.logger.debug(e)
                     raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
             self.first_time = False
         #        
+        num_records = 1
         records = [None]*len(self.fields)
         for idx, (col, adj) in enumerate(self.fields):
             item = tokens[col] if type(col) == int else [tokens[x] for x in col]
             if adj is not None:
                 try:
                     item = adj(item)
-                    if type(item) == tuple:
-                        if len(item) == 1:
-                            # trivial case
-                            item = item[0]
-                        elif num_records == 1:
-                            # these records will be handled separately.
-                            num_records = len(item)
-                        elif num_records != len(item):
-                            raise ValueError('Fields in a record should generate the same number of annotations.')
+                    if type(item) == tuple and len(item) > num_records:
+                        num_records = len(item)
                 except Exception as e:
                     self.logger.debug(e)
                     # missing ....
                     item = None
-            #
             records[idx] = item
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
             if num_records == 1:
-                yield [], records
+                yield [], [x[0] if type(x) == tuple else x for x in records]
             else:
                 for i in range(num_records):
-                    yield [], [x[i] if type(x) == list else x for x in records]
+                    yield [], [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
         elif len(self.build[0]) == 1:
-            if num_records == 1:
-                # there is no ref and alt, easy
+            for i in range(num_records):
+                if i == 0:  # try to optimize a little bit because most of the time we only have one record
+                    rec = [x[0] if type(x) == tuple else x for x in records]
+                else:
+                    rec = [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
+                bins = [getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])) if rec[pos_idx] else None for pos_idx, in self.build]
+                yield bins, rec
+        else:
+            for i in range(num_records):
                 bins = []
-                for pos_idx, in self.build:
-                    try:
-                        # zero-based: v, v+1 (adj=1)
-                        # one-based:  v-1, v (adj=0)
-                        bin = getMaxUcscBin(int(records[pos_idx]) - 1, int(records[pos_idx]))
-                    except:
-                        # position might be None (e.g. dbNSFP has complete hg18 coordinates,
-                        # but incomplete hg19 coordinates)
-                        bin = None
-                    bins.append(bin)
-                yield bins, records
-            else:
-                for i in range(num_records):
-                    # get the i-th record 
-                    rec = [x[i] if type(x) == list else x for x in records]
-                    bins = []
-                    for pos_idx, in self.build:
-                        try:
-                            bin = getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx]))
-                        except:
-                            bin = None
-                        bins.append(bin)
-                    yield bins, rec
-        elif num_records == 1:
-            # variant, single record, although alt can lead to multiple records
-            #
-            # We assume that the fields for ref and alt are the same for multiple reference genomes.
-            # Otherwise we cannot do this.
-            try:
-                all_alt = records[self.build[0][2]].split(',')
-            except Exception as e:
-                raise ValueError('Invalid alternative alleles: "{}"'.format(records[self.build[0][2]]))
-            # support multiple alternative alleles
-            for input_alt in all_alt:
-                bins = []
-                # if there are multiple alternative alleles, we need to use a copy of records because
-                # some of them will be adjusted. Otherwise, we can change the record itself. Note that
-                # rec = records does not cost much in Python.
-                rec = [x for x in records] if len(all_alt) > 0 else records
+                if i == 0:  # try to optimize a little bit because most of the time we only have one record
+                    rec = [x[0] if type(x) == tuple else x for x in records]
+                else:
+                    rec = [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
                 for pos_idx, ref_idx, alt_idx in self.build:
-                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
-                    # these differ build by build
+                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
                     bins.append(bin)
                     rec[pos_idx] = pos
                     rec[ref_idx] = ref
                     rec[alt_idx] = alt
                 yield bins, rec
-        else:
-            try:
-                all_alt = records[self.build[0][2]].split(',')
-            except Exception as e:
-                raise ValueError('Invalid alternative alleles: "{}"'.format(records[self.build[0][2]]))
-            for input_alt in all_alt:
-                for i in range(num_records):
-                    bins = []
-                    rec = [x[i] if type(x) == list else x for x in records]
-                    for pos_idx, ref_idx, alt_idx in self.build:
-                        bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], input_alt)
-                        bins.append(bin)
-                        rec[pos_idx] = pos
-                        rec[ref_idx] = ref
-                        rec[alt_idx] = alt
-                    yield bins, rec
 
 
 
@@ -913,7 +874,6 @@ class txtImporter(Importer):
                             raise ValueError('Cannot determine header of file')
                         self.logger.debug(e)
                     
-
     def addVariant(self, cur, rec):
         #
         var_key = tuple(rec[1:5])
@@ -998,6 +958,7 @@ class txtImporter(Importer):
             genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
                 .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
                 for id in sample_ids}
+        rngs = None
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -1009,22 +970,13 @@ class txtImporter(Importer):
                             self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                         else:
                             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                            cnts = [self.processor.numColumns[x] for x in range(self.ranges[2], self.ranges[4])]
-                            #
-                            # number of columns:
-                            #    cnts = [60, 1]
-                            #
-                            start_col = [self.ranges[2]]
-                            for c in cnts[:-1]:
-                                start_col.append(start_col[-1] + c)
-                            #
-                            # starting columns:
-                            #   start_col 
-                            if cnts[0] != len(sample_ids):
-                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(cnts[0], len(sample_ids)))
+                            if not rngs:
+                                rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                                if rngs[0][1] - rngs[0][0] != len(sample_ids):
+                                    raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][1] - rngs[0][0], len(sample_ids)))
                             for idx, id in enumerate(sample_ids):
                                 if rec[self.ranges[2] + idx]:
-                                    cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if cnt == 1 else idx)] for sc,cnt in zip(start_col, cnts)])
+                                    cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
                             self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())

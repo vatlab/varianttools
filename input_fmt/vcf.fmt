@@ -27,6 +27,7 @@ comment=Reference allele, '-' for insertion.
 
 [alt]
 index=5
+adj=CheckSplit()
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
