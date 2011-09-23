@@ -407,44 +407,45 @@ class TextProcessor:
                     rec[alt_idx] = alt
                 yield bins, rec
 
-
-
 class Importer:
     '''A general class for importing variants'''
-    def __init__(self, proj, files, build, force, recreateIndex=True):
+    def __init__(self, proj, files, build, force, mode='insert'):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
+        self.mode = mode
         #
         if len(files) == 0:
             raise IOError('Please specify the filename of the input data.')
             sys.exit(1)
         #
-        self.files = []
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        for filename in files:
-            if filename in existing_files:
-                if force:
-                    self.logger.info('Re-importing imported file {}'.format(filename))
-                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                    for ID in IDs:
-                        proj.removeSample(ID)
-                    # remove file record
-                    cur = self.db.cursor()
-                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
-                    self.db.commit()
-                    self.files.append(filename)
+        if mode == 'insert':
+            self.files = []
+            cur = self.db.cursor()
+            cur.execute('SELECT filename from filename;')
+            existing_files = [x[0] for x in cur.fetchall()]
+            for filename in files:
+                if filename in existing_files:
+                    if force:
+                        self.logger.info('Re-importing imported file {}'.format(filename))
+                        IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                        for ID in IDs:
+                            proj.removeSample(ID)
+                        # remove file record
+                        cur = self.db.cursor()
+                        cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
+                        self.db.commit()
+                        self.files.append(filename)
+                    else:
+                        self.logger.info('Ignoring imported file {}'.format(filename))
                 else:
-                    self.logger.info('Ignoring imported file {}'.format(filename))
-            else:
-                self.files.append(filename)
+                    self.files.append(filename)
+        else:
+            self.files = files
         # for all record, new SNV, insertion, deletion, complex variants, invalid record, and updated record
         self.count = [0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
-        self.recreateIndex = False
         if len(self.files) == 0:
             raise ValueError('No file to import')
         #
@@ -461,34 +462,40 @@ class Importer:
         else:
             self.build = build
         #
-        if self.proj.build is None:
-            self.proj.setRefGenome(self.build)
-        elif self.build == self.proj.build:
-            # perfect case
-            pass
-        elif self.build == self.proj.alt_build:
-            # troublesome
-            self.import_alt_build = True
-        elif self.proj.alt_build is None:
-            # even more troublesome
-            self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
-            self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
-            tool = LiftOverTool(self.proj)
-            # we will drop indexes soon so do not build index
-            tool.setAltRefGenome(self.build, build_index=False)
-            self.import_alt_build = True
-        else:
-            raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
-                ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
-        #
-        self.recreateIndex = recreateIndex
-        if self.recreateIndex:
+        if mode == 'insert':
+            if self.proj.build is None:
+                self.proj.setRefGenome(self.build)
+            elif self.build == self.proj.build:
+                # perfect case
+                pass
+            elif self.build == self.proj.alt_build:
+                # troublesome
+                self.import_alt_build = True
+            elif self.proj.alt_build is None:
+                # even more troublesome
+                self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
+                self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
+                tool = LiftOverTool(self.proj)
+                # we will drop indexes soon so do not build index
+                tool.setAltRefGenome(self.build, build_index=False)
+                self.import_alt_build = True
+            else:
+                raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
+                    ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
+            #
             self.proj.dropIndexOnMasterVariantTable()
+        else:
+            if self.proj.build is None:
+                raise ValueError('Cannot update variants of a project without variants.')
+            self.import_alt_build = self.build == self.proj.alt_build
+            if (not self.import_alt_build) and (self.build != self.proj.build):
+                raise ValueError('Input data uses reference genome ({}), wich is either the primary ({}) or the alternative ({}) reference genome of the project'.\
+                    format(self.build, self.proj.build, self.proj.alt_build))
         #
         self.createLocalVariantIndex()
 
     def __del__(self):
-        if self.recreateIndex:
+        if self.mode == 'insert':
             self.proj.createIndexOnMasterVariantTable()
 
     def guessBuild(self, file):
@@ -543,23 +550,25 @@ class Importer:
     def importData(self):
         '''Start importing'''
         for count,f in enumerate(self.files):
-            self.logger.info('Importing genotype from {} ({}/{})'.format(f, count + 1, len(self.files)))
+            self.logger.info('{} variants from {} ({}/{})'.format('Importing' if self.mode == 'insert' else 'Updating', f, count + 1, len(self.files)))
             self.importFromFile(f)
-            self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                .format(sum(self.count[1:5]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
-                ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
-            if self.count[6] > 0:
+            if self.mode == 'insert':
+                self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                    .format(sum(self.count[1:5]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
+                    ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
+            else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.count[6]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
         if len(self.files) > 1:
-            self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                .format(sum(self.total_count[1:5]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
-                ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
-            if self.total_count[6] > 0:
+            if self.mode == 'insert':
+                self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
+                    .format(sum(self.total_count[1:5]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
+                    ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
+            else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.total_count[6]))
-        if sum(self.total_count[1:5]) > 0 and self.proj.alt_build is not None:
+        if self.mode == 'insert' and sum(self.total_count[1:5]) > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
             tool = LiftOverTool(self.proj)
@@ -599,205 +608,11 @@ class Importer:
             prog.done()
             
 
-
-class vcfImporter(Importer):
-    '''A vcf importer to import genotype from one or more vcf files.
-    In case of vcf file, it records the type of variant for this sample, 
-    which can be 1 for genotype 0/1, heterozygous, 2 for genotype 1/1,
-    homozygous of alternative alleles, and -1 for gentoype 1/2, which 
-    consists of two different alternative alleles. In the last case,
-    an individual will have two variants with different alternative
-    alleles, each with a type -1. That it to say, allele frequency should
-    be calculated as sum (abs(type))/ (2*num_of_sample). '''
-    def __init__(self, proj, files, build=None, variant_only=False, info=[], force=False):
-        '''see importVariant.py -h for details about parameters. Additional
-        keyword paramters such as user, passwd and host are passed to
-        MySQLdb.connect.
-        '''
-        Importer.__init__(self, proj, files, build, force)
-        # vcf tools only support DP for now
-        self.variant_only = variant_only
-        self.import_depth = 'DP' in info
-        # importing data to alternative reference genome
-        if self.import_alt_build:
-            self.variant_insert_query = 'INSERT INTO variant (alt_bin, alt_chr, alt_pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
-        else:
-            self.variant_insert_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
-
-    def guessBuild(self, filename):
-        '''Called by the initializer to determine reference genome
-        '''
-        with self.openFile(filename) as input:
-            for line in input:
-                line = line.decode()
-                if line.startswith('##reference'):
-                    if 'NCBI36' in line.upper() or 'HG18' in line.upper() or 'HUMAN_B36' in line.upper():
-                        return 'hg18'
-                    elif 'GRCH37' in line.upper() or 'HG19' in line.upper() or 'HUMAN_B37' in line.upper():
-                        return 'hg19'
-                if not line.startswith('#'):
-                    return None
-
-    def getMetaInfo(self, filename):
-        '''Probe vcf files for additional information to be put to the variant_meta table.
-        '''
-        samples = []
-        with self.openFile(filename) as input:
-            line = input.readline().decode()
-            if not line.startswith('##fileformat=VCF'):
-                self.logger.error('Invalid vcf file. file not started with line ##fileformat')
-                raise ValueError('Invalid vcf file')
-            if not line.strip().endswith('4.0') and not line.strip().endswith('4.1'):
-                raise ValueError('This importer tool only supports VCF format v4.0 and v4.1. \
-                    Please use vcftools to convert your vcf file to a supported format')
-            #
-            for line in input:
-                line = line.decode()
-                if line.startswith('#CHR'):
-                    samples = line.split()[9:]
-                if not line.startswith('#'):
-                    break
-        return samples
-
-    def addVariant(self, cur, chr, pos, ref, alt):
-        # if chr, pos are from alternative reference genome
-        bin, pos, ref, alt = normalizeVariant(pos, ref, alt)
-        var_key = (chr, pos, ref, alt)
-        #
-        try:
-            return self.variantIndex[var_key][0]
-        except:
-            # new varaint!
-            if alt == '-':
-                self.count[3] += 1
-            elif ref == '-':
-                self.count[2] += 1
-            elif len(alt) == 1 and len(ref) == 1:
-                self.count[1] += 1
-            else:
-                self.count[4] += 1
-            # alt_chr and alt_pos are updated if adding by alternative reference genome
-            cur.execute(self.variant_insert_query, (bin, chr, pos, ref, alt))
-            variant_id = cur.lastrowid
-            # one for new variant
-            self.variantIndex[var_key] = (variant_id, 1)
-            return variant_id
-
-    def importFromFile(self, input_filename):
-        '''Import a VCF file to sample_variant'''
-        #
-        # handle meta information and get sample names
-        sampleNames = self.getMetaInfo(input_filename)
-        if len(sampleNames) == 0:
-            self.logger.warning('No sample is created for this file because it does not contain any genotype.')
-        elif self.variant_only:
-            self.logger.warning('No sample is created for this file because no genotype is imported.')
-        #
-        # record filename after getMeta because getMeta might fail (e.g. cannot recognize reference genome)
-        no_sample = self.variant_only or len(sampleNames) == 0
-        if not no_sample:
-            sample_ids = self.recordFileAndSample(input_filename, [] if no_sample else sampleNames, True,
-                ['DP'] if self.import_depth else [])   # record individual depth, total depth is divided by number of sample in a file
-            #
-            nSample = len(sample_ids)
-        #
-        DP_pattern = re.compile('.*DP=(\d+)')
-        #
-        cur = self.db.cursor()
-        # sample variants are inserted into different tables in a separate database.
-        if not no_sample:
-            genotype_insert_query = {x: 'INSERT INTO {1}_genotype.sample_variant_{3} VALUES ({0}, {0} {2});'\
-                .format(self.db.PH, self.proj.name, ',' + self.db.PH if self.import_depth else '', x) for x in sample_ids}
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        with self.openFile(input_filename) as input_file:
-            for line in input_file:
-                try:
-                    line = line.decode()
-                    if line.startswith('#'):
-                        continue
-                    self.count[0] += 1
-                    # get data
-                    tokens = [x.strip() for x in line.split('\t')]
-                    chr = tokens[0][3:] if tokens[0].startswith('chr') else tokens[0]
-                    pos = int(tokens[1])
-                    ref = tokens[3]
-                    # we only extract info get depth.
-                    if not no_sample and self.import_depth:
-                        m = DP_pattern.match(tokens[7])
-                        DP = [None if m is None else float(m.group(1))/nSample]
-                    else:
-                        DP = []
-                    # is GT the first field?
-                    try:
-                        # the format field of a vcf can be empty ('.', does not contain GT) if there is no sample
-                        GT_idx = 0 if no_sample or tokens[8].startswith('GT') else tokens[8].split(':').index('GT')
-                    except Exception as e:
-                        self.logger.debug(e)
-                        raise ValueError('The genotype format field does not have GT')
-                    # for efficiency, we separte out this most common case ...
-                    if len(ref) == 1 and len(tokens[4]) == 1:   
-                        # the easy case: there is only one alternative allele,
-                        # all genotypes should be 0/0, 0/1, 1/0, or 1/1.
-                        alt = tokens[4][0]
-                        variant_id = self.addVariant(cur, chr, pos, ref, alt)
-                        #
-                        if not no_sample:
-                            variants = [x.split(':')[GT_idx].count('1') for x in tokens[-len(sample_ids):]]
-                            for var_idx, var in enumerate(variants):
-                                if var != 0:  # genotype 0|0 are ignored
-                                    cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id, var] + DP)
-                    else:
-                        # now, this is the common case with insertion, deletion, and multiple alternative variants
-                        alts = tokens[4].split(',')
-                        variant_id = [0] * len(alts)
-                        for altidx, alt in enumerate(alts):
-                            variant_id[altidx] = self.addVariant(cur, chr, pos, ref, alt)
-                        if not no_sample:
-                            # process variants
-                            for var_idx, var in enumerate([x.split(':')[GT_idx] for x in tokens[-len(sample_ids):]]):
-                                if len(var) == 3:  # regular
-                                    gt = var[0] + var[2]  # GT can be separated by / or |
-                                    if gt in ['01', '10']:
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                    elif gt in ['02', '20']:
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                    elif gt == '11':
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 2] + DP)
-                                    elif gt in ['12', '21']:
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], -1] + DP)
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], -1] + DP)
-                                    elif gt == '22':
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 2] + DP)
-                                    elif gt == '00':
-                                        pass
-                                    else:
-                                        raise ValueError('I do not know how to process genotype {}'.format(var))
-                                else: # should have length 1
-                                    if var == '1':
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[0], 1] + DP)
-                                    elif var == '2':
-                                        cur.execute(genotype_insert_query[sample_ids[var_idx]], [variant_id[1], 1] + DP)
-                                    elif var == '0':
-                                        pass
-                                    else:
-                                        raise ValueError('I do not know how to process genotype {}'.format(var))
-                except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
-                    self.count[5] += 1
-                if self.count[0] % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(self.count[0])
-            self.db.commit()
-            prog.done()
-
-
 class txtImporter(Importer):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, sample_name=None, update=None,
+    def __init__(self, proj, files, build, format, sample_name=None, 
         force=False, fmt_args=[]):
-        # if update is None, recreate index
-        Importer.__init__(self, proj, files, build, force, update is None)
+        Importer.__init__(self, proj, files, build, force, mode='insert')
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
@@ -844,23 +659,13 @@ class txtImporter(Importer):
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s
         #
-        self.update = update
         if fmt.input_type != 'variant':
-            if not self.update:
-                self.logger.info('Parameter --update variant is assumed for input file with type {}'.format(fmt.input_type))
-                self.update = 'variant'
-        if self.update and len(self.variant_info) == 0:
-            raise ValueError('No field could be updated using this input file')
+            self.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
         #
         self.input_type = fmt.input_type
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
-        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(self.update) if self.update != 'variant' else ''
-        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
-            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
-        self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
-            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
-        self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
-            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
+            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
         self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
 
@@ -931,6 +736,132 @@ class txtImporter(Importer):
             self.variantIndex[var_key] = (variant_id, 1)
             return variant_id
 
+    def importFromFile(self, input_filename):
+        '''Import a TSV file to sample_variant'''
+        if not self.sample_name:
+            # if no sample name is specified
+            if not self.genotype_field:
+                self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
+                sample_ids = []
+            else:
+                numSample, names = self.getSampleName(input_filename)
+                if not names:
+                    if numSample == 1:
+                        self.logger.warning('Missing sample name (name None is used)'.format(numSample))
+                        sample_ids = self.recordFileAndSample(input_filename, [None], True,
+                            self.genotype_info)
+                    elif numSample == 0:
+                        self.logger.info('No genotype column exists in the input file so no sample will be recorded.')
+                        sample_ids = []
+                    else:
+                        raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
+                else:
+                    self.logger.info('Using sample name {}'.format(', '.join(names)))
+                    sample_ids = self.recordFileAndSample(input_filename, names, True,
+                        self.genotype_info)
+        else:
+            if not self.genotype_field:
+                # if no genotype, but a sample name is given
+                self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
+                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
+            else:
+                numSample, names = self.getSampleName(input_filename)
+                if len(self.sample_name) != numSample:
+                    raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
+                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, True, self.genotype_info)
+        #
+        cur = self.db.cursor()
+        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
+        if sample_ids:
+            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
+                .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
+                for id in sample_ids}
+        rngs = None
+        with self.openFile(input_filename) as input_file:
+            for line in input_file:
+                try:
+                    line = line.decode()
+                    if line.startswith('#'):
+                        continue
+                    for bins, rec in self.processor.process(line):
+                        variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+                        if not rngs:
+                            rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                            if rngs[0][1] - rngs[0][0] != len(sample_ids):
+                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][1] - rngs[0][0], len(sample_ids)))
+                        for idx, id in enumerate(sample_ids):
+                            if rec[self.ranges[2] + idx]:
+                                cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
+                        self.count[0] += 1
+                except Exception as e:
+                    self.logger.debug('Failed to process line: ' + line.strip())
+                    self.logger.debug(e)
+                    self.count[5] += 1
+                if self.count[0] % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(self.count[0])
+            self.db.commit()
+            prog.done()
+
+class txtUpdater(Importer):
+    '''Import variants from one or more tab or comma separated files.'''
+    def __init__(self, proj, table, files, build, format, fmt_args=[]):
+        # if update is None, recreate index
+        Importer.__init__(self, proj, files, build, force, mode='update')
+        #
+        if not proj.isVariantTable(table):
+            raise ValueError('Variant table {} does not exist.'.format(table))
+        # we cannot guess build information from txt files
+        if build is None and self.proj.build is None:
+            raise ValueError('Please specify the reference genome of the input data.')
+        #
+        # try to guess file type
+        if not format:
+            filename = self.files[0].lower()
+            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
+                format = 'vcf'
+            else:
+                raise ValueError('Cannot guess input file type from filename')
+        try:
+            fmt = fileFMT(format, fmt_args)
+        except Exception as e:
+            self.logger.debug(e)
+            raise IndexError('Input file format {} is not currently supported by variant tools'.format(format))
+        #
+        # how to split processed records
+        self.ranges = fmt.ranges
+        self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
+        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        #
+        if fmt.input_type == 'variant':
+            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
+            self.processor = TextProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        else:  # position or range type
+            self.processor = TextProcessor(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+        # there are variant_info
+        if self.variant_info:
+            cur = self.db.cursor()
+            headers = self.db.getHeaders('variant')
+            for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
+                # either insert or update, the fields must be in the master variant table
+                self.proj.checkFieldName(f.name, exclude='variant')
+                if f.name not in headers:
+                    s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
+                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
+                    del s
+        if len(self.variant_info) == 0:
+            raise ValueError('No field could be updated using this input file')
+        #
+        self.input_type = fmt.input_type
+        fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
+        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(self.table) if self.table != 'variant' else ''
+        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
+            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
+        self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
+            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+        self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
+            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
             var_key = tuple(rec[0:4])
@@ -948,47 +879,9 @@ class txtImporter(Importer):
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
-        if self.update:
-            sample_ids = []
-        else:
-            if not self.sample_name:
-                # if no sample name is specified
-                if not self.genotype_field:
-                    self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
-                    sample_ids = []
-                else:
-                    numSample, names = self.getSampleName(input_filename)
-                    if not names:
-                        if numSample == 1:
-                            self.logger.warning('Missing sample name (name None is used)'.format(numSample))
-                            sample_ids = self.recordFileAndSample(input_filename, [None], True,
-                                self.genotype_info)
-                        elif numSample == 0:
-                            self.logger.info('No genotype column exists in the input file so no sample will be recorded.')
-                            sample_ids = []
-                        else:
-                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
-                    else:
-                        self.logger.info('Using sample name {}'.format(', '.join(names)))
-                        sample_ids = self.recordFileAndSample(input_filename, names, True,
-                            self.genotype_info)
-            else:
-                if not self.genotype_field:
-                    # if no genotype, but a sample name is given
-                    self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
-                    sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
-                else:
-                    numSample, names = self.getSampleName(input_filename)
-                    if len(self.sample_name) != numSample:
-                        raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
-                    sample_ids = self.recordFileAndSample(input_filename, self.sample_name, True, self.genotype_info)
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        if sample_ids:
-            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
-                .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
-                for id in sample_ids}
         rngs = None
         with self.openFile(input_filename) as input_file:
             for line in input_file:
@@ -997,18 +890,7 @@ class txtImporter(Importer):
                     if line.startswith('#'):
                         continue
                     for bins, rec in self.processor.process(line):
-                        if self.update:
-                            self.updateVariant(cur, bins, rec[0:self.ranges[2]])
-                        else:
-                            variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                            if not rngs:
-                                rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                                if rngs[0][1] - rngs[0][0] != len(sample_ids):
-                                    raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][1] - rngs[0][0], len(sample_ids)))
-                            for idx, id in enumerate(sample_ids):
-                                if rec[self.ranges[2] + idx]:
-                                    cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
-                            self.count[0] += 1
+                        self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -1025,61 +907,11 @@ class txtImporter(Importer):
 #
 #
 
-def importVCFArguments(parser):
-    parser.add_argument('input_files', nargs='*',
-        help='''A list of files that will be imported. The file should be in 
-            VCF 4.0 format and can be compressed in gzip format.''')
-    parser.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18) of the input data. If
-            unspecified, variant tools will try to determine the reference genome from the
-            header of VCF files, and use the primary reference genome of the project if a
-            reference genome cannot be determined. If a reference genome that is different
-            from the primary reference genome of the project is determined or specified, it
-            will become the alternative referenge genome of the project. The UCSC liftover
-            tool will be automatically called to map input coordinates to the primary
-            reference genome.''')
-    parser.add_argument('--variant_only', action='store_true',
-        help='''Import only variants. No sample will be created and all sample variants will
-            be ignored.''')
-    parser.add_argument('--variant_info', nargs='*', default=[],
-        help='''Variant information fields to import, which should be one or more of the INFO
-            fields specified in the header of VCF file, QUAL (the quality score listed in the
-            sixth column of a VCF file), or FILTER (the seventh column). variant tools by default
-            does not import any variant field. ''')
-    parser.add_argument('--info', nargs='*', default=['DP'],
-        help='''Genotype information fields to import, which should be one or more of the FORMAT
-            fields specified in the header of VCF file, QUAL (the quality score listed in the
-            sixth column of a VCF file), or FILTER (the seventh column). If read depth (DP) is
-            specified but no DP field is found in genotype FORMAT, the average variant depth
-            (variant info DP divided by the number of samples) will be used as individual read
-            depth. variant tools by default does not import any genotype field.''')
-    parser.add_argument('-f', '--force', action='store_true',
-        help='''Import files even if the files have been imported before. This option
-            can be used to import from updated file or continue disrupted import, but will
-            not remove wrongfully imported variants from the master variant table.''')
-
-
-def importVCF(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            proj.db.attach(proj.name + '_genotype')
-            importer = vcfImporter(proj=proj, files=args.input_files, build=args.build,
-                variant_only=args.variant_only, info=[] if args.variant_only else args.info,
-                force=args.force)
-            importer.importData()
-        proj.close()
-    except Exception as e:
-        sys.exit(e)
-
-
-def importTxtArguments(parser):
+def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='*',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable. If parameter --update is specified, the input files will be used
-            to update fields of existing variants. Otherwise, this command will import
-            variants and optional genotypes of one or more samples from input files with
-            fields defined for chr, pos, ref and alt.''')
+            acceptable.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
@@ -1089,15 +921,13 @@ def importTxtArguments(parser):
             coordinates between the primary and alternative reference genomes.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as VCF (use 'vtools show formats' to list them,
-            or 'vtools show format FMT' for details about a specific format), or a local
-            format specification file (with extension .fmt,
-            see http://varianttools.sourceforge.net/Format/New for details). If
-            unspecified, variant tools will try to guess format from file extension.
-            Fields specified in a format could be overridden by optional parameters
-            --variant_fields, --position_fields, --range_fields, --variant_info,
-            --genotype_fields, and --genotype_info, which allows you to import additional
-            or alternative fields defined for the format. ''')
+            supported file types such as VCF (c.f. 'vtools show formats' and 
+            'vtools show format FMT'), or a local format specification file (with
+            extension .fmt). If unspecified, variant tools will try to guess format from
+            file extension. Fields specified in a format could be overridden by optional
+            parameters --variant_fields, --variant_info, --genotype_fields, and
+            --genotype_info, which allows you to import additional or alternative fields
+            defined for the format. ''')
     parser.add_argument('--sample_name', nargs='*', default=[],
         help='''Name of the samples imported by the input files. The same names will be
             used for all files if multiple files are imported. If unspecified, headers
@@ -1107,22 +937,47 @@ def importTxtArguments(parser):
             will be created without genotype. If sample names cannot be determined from
             input file and their is no ambiguity (only one sample is imported), a sample
             with NULL sample name will be created.''')
-    parser.add_argument('--update', 
-        help='''Add or update fields of existing variants of specified variant table
-            instead of adding new variants to the master variant table. This option
-            is the default for position or range input files.'''),
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
             not remove wrongfully imported variants from the master variant table.''')
 
-def importTxt(args):
+def importVariants(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             importer = txtImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
-                update=args.update, force=args.force, fmt_args=args.unknown_args)
+                force=args.force, fmt_args=args.unknown_args)
+            importer.importData()
+        proj.close()
+    except Exception as e:
+        sys.exit(e)
+
+
+def updateArguments(parser):
+    parser.add_argument('table', help='''variants to be updated.''')
+    parser.add_argument('input_files', nargs='*',
+        help='''A list of files that will be used to add or update existing fields of
+            variants. The file should be delimiter separated with format described by
+            parameter --format. Gzipped files are acceptable.''')
+    parser.add_argument('--build',
+        help='''Build version of the reference genome (e.g. hg18) of the files. If
+            unspecified, it is assumed to be the primary reference genome of the project.'''),
+    parser.add_argument('--format',
+        help='''Format of the input text file. It can be one of the variant tools
+            supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats' and 
+            'vtools show format FMT'), or a local format specification file (with
+            extension .fmt). Fields specified in a format could be overridden by optional
+            parameters --variant_fields, --position_fields, --range_fields, and 
+            --variant_info which allows you to update additional fields from the input
+            files''')
+
+def update(args):
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            importer = txtUpdater(proj=proj, table=args.table, files=args.input_files,
+                build=args.build, format=args.format, fmt_args=args.unknown_args)
             importer.importData()
         proj.close()
     except Exception as e:

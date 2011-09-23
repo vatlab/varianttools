@@ -65,23 +65,26 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=project.init)
     #
-    # command remove
-    parser = subparsers.add_parser('remove', help='Remove project or its contents.')
-    project.removeArguments(parser)
+    # command import_variants
+    parser = subparsers.add_parser('import_variants',
+        help='Import variants and related sample genotype from files in specified formats',
+        description='''Import variants and related sample genotype from one or more
+            delimiter separated files (e.g. VCF and a number of indel formats).''')
+    importer.importVariantsArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=project.remove)
+    parser.set_defaults(func=importer.importVariants)
+    # 
+    # command import_phenotype
+    parser = subparsers.add_parser('import_phenotype', help='Import sample phenotype')
+    sample.importPhenotypeArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=sample.importPhenotype)
     #
     # command info
     parser = subparsers.add_parser('show', help='Display content of a project')
     project.showArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=project.show)
-    #
-    # command run
-    parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement.')
-    project.executeArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=project.execute)
     #
     # command liftover
     parser = subparsers.add_parser('liftover',
@@ -93,30 +96,6 @@ if __name__ == '__main__':
     liftOver.liftOverArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=liftOver.liftOver)
-    #
-    # command import_vcf
-    #parser = subparsers.add_parser('import_vcf',
-    #    help='Import regular or compressed vcf (version 4.0) files')
-    #importer.importVCFArguments(parser)
-    #addVerbosityArg(parser)
-    #parser.set_defaults(func=importer.importVCF)
-    # 
-    # command import_txt
-    parser = subparsers.add_parser('import_txt',
-        help='Import variants and related sample genotype from files in specified formats',
-        description='''Import variants and related sample genotype from one or more
-            delimiter separated files (e.g. VCF, ANNOVAR and a number of indel formats).
-            This command can be used to import variants to a project (with or without
-            genotype), or adding or update fields of existing variants. ''')
-    importer.importTxtArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=importer.importTxt)
-    # 
-    # command import_phenotype
-    parser = subparsers.add_parser('import_phenotype', help='Import sample phenotype')
-    sample.importPhenotypeArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=sample.importPhenotype)
     #
     # command sample_stat
     parser = subparsers.add_parser('sample_stat',
@@ -137,13 +116,14 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=annotation.use)
     #
-    # command exclude
-    parser = subparsers.add_parser('exclude',
-        help='''Output or save variants after excluding variants that match specified conditions''')
-    variant.excludeArguments(parser)
-    variant.generalOutputArguments(parser)
+    # command update_variants
+    parser = subparsers.add_parser('update',
+        help='Add or update fields of existing variants using information from specified files',
+        description='''Add or update fields of existing variants from files that annotate
+            variants or their locations (e.g. Read annotation from ANNOVAR output files).''')
+    importer.updateArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=variant.exclude)
+    parser.set_defaults(func=importer.update)
     #
     # command select
     parser = subparsers.add_parser('select',
@@ -153,13 +133,13 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.select)
     #
-    # command output
-    parser = subparsers.add_parser('output',
-        help='Output variants in tab or comma separated format.')
-    variant.outputArguments(parser)
+    # command exclude
+    parser = subparsers.add_parser('exclude',
+        help='''Output or save variants after excluding variants that match specified conditions''')
+    variant.excludeArguments(parser)
     variant.generalOutputArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=variant.output)
+    parser.set_defaults(func=variant.exclude)
     #
     # command compare
     parser = subparsers.add_parser('compare',
@@ -168,6 +148,20 @@ if __name__ == '__main__':
     variant.compareArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.compare)
+    #
+    # command output
+    parser = subparsers.add_parser('output',
+        help='Output variants in tab or comma separated format.')
+    variant.outputArguments(parser)
+    variant.generalOutputArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=variant.output)
+    #
+    # command remove
+    parser = subparsers.add_parser('remove', help='Remove project or its contents.')
+    project.removeArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=project.remove)
     #
     # command associate
     #
@@ -182,12 +176,18 @@ if __name__ == '__main__':
         addVerbosityArg(parser)
         parser.set_defaults(func=association.associate)
     #
+    # command execute
+    parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement.')
+    project.executeArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=project.execute)
+    #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
     args, argv = master_parser.parse_known_args()
     # only command associate and sample_stat accept arbitrary parameter
     if (with_association and args.func == association.associate) or \
-        (args.func in [importer.importTxt, sample.sampleStat]):
+        (args.func in [importer.importVariants, importer.update, sample.sampleStat]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)
