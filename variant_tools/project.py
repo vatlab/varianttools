@@ -314,7 +314,6 @@ class fileFMT:
         #
         # Post process all fields
         if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
-            print self.variant_fields
             raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
         #
         if self.variant_fields:
