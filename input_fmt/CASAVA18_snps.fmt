@@ -50,9 +50,9 @@ comment=The most likely genotype (subject to theta, as above)
 
 [alt]
 index=5, 7
-# The input can be 'C\tAC', 'C\tCC' etc. We should get A for the first and None for the second
+# The input can be 'C, AC', 'C, CC' etc. We should get A for the first and None for the second
 # and the record with None will be discarded because valid alternative allele is required.
-adj=lambda x: None if (x[2] == x[0] and x[3] == x[0]) or (x[2] != x[0] and x[3] != x[0]) else (x[2] if x[0] == x[3] else x[3])
+adj=lambda x: None if (x[1][0] == x[0][0] and x[1][1] == x[0][0]) or (x[1][0] != x[0][0] and x[1][1] != x[0][0]) else (x[1][0] if x[0][0] == x[1][1] else x[1][1])
 type=CHAR(1)
 comment=Derived alternative allele
 

@@ -44,6 +44,7 @@ comment=Reference allele (as on the + strand)
 
 [alt]
 index=5
+adj=CheckSplit(',')
 type=VARCHAR(48) NOT NULL
 comment=Alternative allele (as on the + strand)
 

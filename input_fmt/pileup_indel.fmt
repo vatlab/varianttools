@@ -29,15 +29,15 @@ comment=String summarizing the indel type, one of Dn (deletion of length n) and 
 [ref]
 index=3,4
 type=VARCHAR(255)
-# send in I4\tAAAA or D1\tA. If this is an insertion, ref is -, otherwise ref is the genotype
-adj=lambda x: '-' if x.startswith('I') else x.split('\t')[1]
+# send in I4, AAAA or D1, A. If this is an insertion, ref is -, otherwise ref is the genotype
+adj=lambda x: '-' if x[0].startswith('I') else x[1]
 comment=reference allele, '-' for insertion
 
 [alt]
 index=3,4
 type=VARCHAR(255)
-# send in I4\tAAAA or D1\tA. If this is an insertion, alt is genotype, otherwise alt is '-'
-adj=lambda x: '-' if x.startswith('D') else x.split('\t')[1]
+# send in I4, AAAA or D1, A. If this is an insertion, alt is genotype, otherwise alt is '-'
+adj=lambda x: '-' if x[0].startswith('D') else x[1]
 comment=alternative allele, '-' for deletion
 
 [genotype]
