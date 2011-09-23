@@ -1099,9 +1099,11 @@ def importTxtArguments(parser):
             --genotype_fields, and --genotype_info, which allows you to import additional
             or alternative fields defined for the format. ''')
     parser.add_argument('--sample_name', nargs='*', default=[],
-        help='''Name of the samples imported by the text file, with default values being
-            the column header of the last comment line (line starts with #) of the input
-            file. If sample names are specified for input files without genotype, samples
+        help='''Name of the samples imported by the input files. The same names will be
+            used for all files if multiple files are imported. If unspecified, headers
+            of the genotype columns of the last comment line (line starts with #) of the
+            input files will be used (and thus allow different sample names for input files).
+            If sample names are specified for input files without genotype, samples
             will be created without genotype. If sample names cannot be determined from
             input file and their is no ambiguity (only one sample is imported), a sample
             with NULL sample name will be created.''')
