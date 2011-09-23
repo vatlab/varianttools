@@ -60,8 +60,14 @@ class TestImportVariants(ProcessTestCase):
     
     def testGenotypes(self):
         'Testing the import of genotypes'
-    
-    
+        self.assertSucc('vtools import_variants --format fmt/genotypes.fmt txt/genotypes.txt --build hg18')
+        nsamples = numOfSample()
+        nvar = numOfVariant()
+        self.assertEqual(nsamples, 244)
+        self.assertEqual(nvar, 198)
+        genotypes = getGenotypes()
+#        samplenames = outputOfCmd('vtools show samples')        
+
     def testANNOVAR(self):
         'Testing the annovar input format'
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt')
