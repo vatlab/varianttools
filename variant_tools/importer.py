@@ -687,7 +687,6 @@ class txtImporter(Importer):
                             elif len(rec) == 0:
                                 return 0, []
                             else:
-                                self.logger.info('HERE')
                                 cols = [x[0] for x in self.prober.fields]
                                 if type(cols[0]) == tuple:
                                     fixed = False
