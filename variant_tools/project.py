@@ -1509,19 +1509,25 @@ def show(args):
 
 
 def executeArguments(parser):
-    parser.add_argument('query', nargs='*', help='A SQL query to execute')
-
+    parser.add_argument('query', nargs='*',
+        help='''A SQL query to be executed. The project genotype database is
+        attached as $name_genotype. Annotation databases used in the project
+        are attached and are available by thire rnames.''')
+    parser.add_argument('-d', '--delimiter', default='\t',
+        help='Delimiter used to output results, default to tab.')
 
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            proj.db.attach('{}_genotype'.format(proj.name))
             cur = proj.db.cursor()
             query = ' '.join(args.query)
             proj.logger.debug('Executing SQL statement: "{}"'.format(query))
             cur.execute(query)
             proj.db.commit()
+            sep = args.delimiter
             for rec in cur:
-                print(', '.join(['{}'.format(x) for x in rec]))
+                print(sep.join(['{}'.format(x) for x in rec]))
     except Exception as e:
         sys.exit(e)
 
