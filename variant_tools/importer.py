@@ -275,7 +275,7 @@ class TextProcessor:
         self.first_time = True
 
     def process(self, line):
-        tokens = line.split(self.delimiter)
+        tokens = [x.strip() for x in line.split(self.delimiter)]
         if self.first_time:
             cIdx = 0
             for fIdx, field in enumerate(self.raw_fields):
