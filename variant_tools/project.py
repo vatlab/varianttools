@@ -516,7 +516,12 @@ class Project:
         self.version = VTOOLS_VERSION
         #
         # create a temporary directory
-        self.temp_dir = tempfile.mkdtemp()
+        try:
+            if not os.path.isdir('cache'):
+                os.mkdir('cache')
+            self.temp_dir = 'cache'
+        except:
+            self.temp_dir = tempfile.mkdtemp()
         # set global verbosity level and temporary directory
         setOptions(verbosity=verbosity, temp_dir=self.temp_dir)
         #
@@ -671,7 +676,7 @@ class Project:
         # of the project database
         #self.removeTempTables()
         self.db.commit()
-        if os.path.isdir(self.temp_dir):
+        if self.temp_dir != 'cache' and os.path.isdir(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         
     def loadProperty(self, key, default=None):
