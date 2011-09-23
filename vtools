@@ -95,19 +95,19 @@ if __name__ == '__main__':
     parser.set_defaults(func=liftOver.liftOver)
     #
     # command import_vcf
-    parser = subparsers.add_parser('import_vcf',
-        help='Import regular or compressed vcf (version 4.0) files')
-    importer.importVCFArguments(parser)
-    addVerbosityArg(parser)
-    parser.set_defaults(func=importer.importVCF)
+    #parser = subparsers.add_parser('import_vcf',
+    #    help='Import regular or compressed vcf (version 4.0) files')
+    #importer.importVCFArguments(parser)
+    #addVerbosityArg(parser)
+    #parser.set_defaults(func=importer.importVCF)
     # 
     # command import_txt
     parser = subparsers.add_parser('import_txt',
-        help='Import text files in delimiter separated formats',
-        description='''Import variants from one or more delimiter separated files.
-            This command can be used to import variants to a new project (without sample), 
-            adding fields to existing variants, or mark a list of variants for further
-            analysis. ''')
+        help='Import variants and related sample genotype from files in specified formats',
+        description='''Import variants and related sample genotype from one or more
+            delimiter separated files (e.g. VCF, ANNOVAR and a number of indel formats).
+            This command can be used to import variants to a project (with or without
+            genotype), or adding or update fields of existing variants. ''')
     importer.importTxtArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=importer.importTxt)
@@ -186,7 +186,8 @@ if __name__ == '__main__':
     # separate them into argv
     args, argv = master_parser.parse_known_args()
     # only command associate and sample_stat accept arbitrary parameter
-    if (with_association and args.func == association.associate) or (args.func == sample.sampleStat):
+    if (with_association and args.func == association.associate) or \
+        (args.func in [importer.importTxt, sample.sampleStat]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

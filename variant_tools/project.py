@@ -34,6 +34,7 @@ import textwrap
 import tempfile
 import shutil
 import ConfigParser
+import argparse
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
@@ -232,13 +233,19 @@ class AnnoDB:
 
 
 class fileFMT:
-    def __init__(self, name, variant_info=None, genotype_info=None):
+    def __init__(self, name, fmt_args=[]):
         '''Input file format'''
         # locate a file format specification file
         self.description = None
-        # these fields read from format files could be overriden
-        self.variant_info = variant_info
-        self.genotype_info = genotype_info
+        # these fields read from format files could be overriden by fmt_args
+        # They will be None or values specified from fmt_args.
+        args = self.parseArgs(fmt_args)
+        self.variant_fields = args.variant_fields
+        self.position_fields = args.position_fields
+        self.range_fields = args.range_fields
+        self.variant_info = args.variant_info
+        self.genotype_fields = args.genotype_info
+        self.genotype_info = args.genotype_info
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -254,6 +261,17 @@ class fileFMT:
                 raise ValueError('Failed to download format specification file {}.fmt'.format(name))
             self.name = name
             self.parseFMT(fmt)
+
+    def parseArgs(self, fmt_args):
+        parser = argparse.ArgumentParser(description='''Parameters to override fields of
+            existing format.''')
+        parser.add_argument('--variant_fields', nargs='*')
+        parser.add_argument('--position_fields', nargs='*')
+        parser.add_argument('--range_fields', nargs='*')
+        parser.add_argument('--variant_info', nargs='*')
+        parser.add_argument('--genotype_fields', nargs='*')
+        parser.add_argument('--genotype_info', nargs='*')
+        return parser.parse_args(fmt_args)
 
     def parseFMT(self, filename):
         parser = ConfigParser.SafeConfigParser()
@@ -283,66 +301,65 @@ class fileFMT:
             raise ValueError('No valid field is defined in format specification file {}'.format(self.name))
         #
         self.delimiter = '\t'
-        variant_fields = []
-        position_fields = []
-        range_fields = []
-        variant_info = []
-        genotype_fields = []
-        genotype_info = []
+        #
         for item in parser.items('format description'):
             if item[0] == 'description':
                 self.description = item[1]
             if item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
-                linked_fields = eval(item[0])
-                for name in map(str.strip, item[1].split(',')):
-                    fld = [x for x in fields if x.name == name]
-                    if len(fld) != 1:
-                        raise ValueError('Cannot find field "{}" in the format specification file, which defines fields {}.'\
-                            .format(name, ', '.join([x.name for x in fields])))
-                    linked_fields.append(fld[0])
+                if getattr(self, item[0]) is None:
+                    # value was not overriden
+                    setattr(self, item[0], [x.strip() for x in item[1].split(',')])
         #
         # Post process all fields
-        if (len(variant_fields) != 0) + (len(position_fields) != 0) + (len(range_fields) != 0) != 1:
+        if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
+            print self.variant_fields
             raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
         #
-        if variant_fields:
+        if self.variant_fields:
             self.input_type = 'variant'
             self.ranges = [0, 4]
-            self.fields = variant_fields
+            self.fields = self.variant_fields
             if len(self.fields) != 4:
                 raise ValueError('variant_fields should have four fields for chr, pos, ref, and alt alleles')
-        elif position_fields:
+        elif self.position_fields:
             self.input_type = 'position'
             self.ranges = [0, 2]
-            self.fields = position_fields
+            self.fields = self.position_fields
             if len(self.fields) != 2:
                 raise ValueError('position_fields should have two fields for chr and pos')
-        elif range_fields:
+        elif self.range_fields:
             self.input_type = 'range'
             self.ranges = [0, 3]
-            self.fields = range_fields
+            self.fields = self.range_fields
             if len(self.fields) != 3:
                 raise ValueError('range_fields should have three fields for chr and starting and ending position')
         #
-        if self.input_type != 'variant' and not variant_info:
+        if self.input_type != 'variant' and not self.variant_info:
             raise ValueError('Input file with type position or range must specify variant_info')
-        if self.input_type != 'variant' and genotype_info:
+        if self.input_type != 'variant' and self.genotype_info:
             raise ValueError('Input file with type position or range can not have any genotype information.')
-        if genotype_fields and len(genotype_fields) != 1:
+        if self.genotype_fields and len(self.genotype_fields) != 1:
             raise ValueError('Variant tools currently only support input file with at most one sample')
-        # extend self.fields to include variant_info
+        #
         if self.variant_info:
-            variant_info = self.variant_info
+            self.fields.extend(self.variant_info)
+        self.ranges.append(self.ranges[-1] + (len(self.variant_info) if self.variant_info else 0))
+        if self.genotype_fields:
+            self.fields.extend(self.genotype_fields)
+        self.ranges.append(self.ranges[-1] + (len(self.genotype_fields) if self.genotype_fields else 0))
         if self.genotype_info:
-            genotype_info = self.genotype_info
-        self.fields.extend(variant_info)
-        self.ranges.append(self.ranges[-1] + len(variant_info))
-        self.fields.extend(genotype_fields)
-        self.ranges.append(self.ranges[-1] + len(genotype_fields))
-        self.fields.extend(genotype_info)
-        self.ranges.append(self.ranges[-1] + len(genotype_info))
+            self.fields.extend(self.genotype_info)
+        self.ranges.append(self.ranges[-1] + (len(self.genotype_info) if self.genotype_info else 0))
+        #
+        # now, change to real fields
+        for i in range(len(self.fields)):
+            fld = [x for x in fields if x.name == self.fields[i]]
+            if len(fld) != 1:
+                raise ValueError('Cannot find field "{}" in the format specification file, which defines fields {}.'\
+                    .format(self.fields[i], ', '.join([x.name for x in fields])))
+            self.fields[i] = fld[0]
         # other fields?
         self.other_fields = [x for x in fields if x not in self.fields]
                 
@@ -353,30 +370,31 @@ class fileFMT:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*4))))
         #
-        print('\n{} fields:'.format(self.input_type))
+        if self.input_type == 'variant':
+            print('\n{0} fields:'.format(self.input_type))
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
-            print('  {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*8))))
+            print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                subsequent_indent=' '*14))))
         if self.ranges[1] != self.ranges[2]:
             print('\nVariant information fields:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
-                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*8))))
+                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*14))))
         if self.ranges[2] != self.ranges[3]:
             print('\nGenotype field:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
-                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*8))))
+                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*14))))
         if self.ranges[3] != self.ranges[4]:
             print('\nGenotype information fields:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
-                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*8))))
+                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*14))))
         if self.other_fields:
-            print('\nOther usable fields:')
+            print('\nOther fields (usable through parameters such as --variant_fields):')
             for fld in self.other_fields:
-                print('   {}:    {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*8))))
+                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*14))))
 
 
 
