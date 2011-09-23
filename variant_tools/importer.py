@@ -123,7 +123,7 @@ class VcfGenotype:
     def __init__(self, default=None):
         '''Define an extractor that extract genotype from a .vcf file'''
         self.default = default
-        self.map = {'0/0': default, '0|0': default, '0': default,
+        self.map = {'0/0': default, '0|0': default,
             '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
             '1/1': ('2',), '1|1': ('2',),
             '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
@@ -133,7 +133,10 @@ class VcfGenotype:
 
     def __call__(self, item):
         # the most common and correct case...
-        return self.map[item.partition(':')[0]]
+        try:
+            return self.map[item.partition(':')[0]]
+        except KeyError:
+            return None
 
 class VcfGenoFromFormat:
     def __init__(self, default=None):
@@ -143,7 +146,7 @@ class VcfGenoFromFormat:
         self.fmt = '\t'
         self.idx = None
         self.default = default
-        self.map = {'0/0': default, '0|0': default, '0': default,
+        self.map = {'0/0': default, '0|0': default,
             '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
             '1/1': ('2',), '1|1': ('2',),
             '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
@@ -153,20 +156,23 @@ class VcfGenoFromFormat:
 
     def __call__(self, item):
         # the most common and correct case...
-        if item[0][:2] == 'GT':
-            return self.map[item[1].partition(':')[0]]
-        elif item[0] != self.fmt:
-            fmt, val = item
-            self.fmt = fmt
-            fields = fmt.split(self.sep)
-            if self.name in fields:
-                self.idx = fields.index(self.name)
-                return self.map[val.split(self.sep)[self.idx]]
-            else:
-                self.idx = None
-                return self.default
-        return self.map[item[1].split(self.sep, self.idx + 1)[self.idx]] if self.idx is not None else self.default
-
+        try:
+            if item[0][:2] == 'GT':
+                return self.map[item[1].partition(':')[0]]
+            elif item[0] != self.fmt:
+                fmt, val = item
+                self.fmt = fmt
+                fields = fmt.split(self.sep)
+                if self.name in fields:
+                    self.idx = fields.index(self.name)
+                    return self.map[val.split(self.sep)[self.idx]]
+                else:
+                    self.idx = None
+                    return self.default
+            return self.map[item[1].split(self.sep, self.idx + 1)[self.idx]] if self.idx is not None else self.default
+        except KeyError:
+            return None
+        
 class ExtractValue:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that returns the value after name in one of the fields,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_import_variants.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -37,88 +37,27 @@ class TestImportVCF(ProcessTestCase):
     def removeProj(self):
         runCmd('vtools remove project')
 
-    def testImportVCF(self):
-        'Test command vtools import_vcf'
-        self.assertFail('vtools import_vcf')
-        self.assertFail('vtools import_vcf non_existing.vcf')
-        # help information
-        self.assertSucc('vtools import_vcf -h')
-        # no build information, fail
-        self.assertFail('vtools import_vcf vcf/SAMP1.vcf')
-        # specify build information
-        self.assertSucc('vtools import_vcf vcf/SAMP1.vcf --build hg18')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 289)
-        self.assertSucc('vtools import_vcf vcf/SAMP2.vcf')
-        self.assertEqual(numOfSample(), 2)
-        self.assertEqual(numOfVariant(), 289+121)
-        self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz --variant_only')
-        self.assertEqual(numOfSample(), 2)
-        self.assertEqual(numOfVariant(), 698)
-        # file will be ignored if re-imported
-        self.assertSucc('vtools import_vcf vcf/SAMP1.vcf')
-        self.assertEqual(numOfSample(), 2)
-        # force re-import the same file with samples
-        self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz -f')
-        self.assertEqual(numOfSample(), 62)
-        self.assertEqual(numOfVariant(), 698)
-        # file will be ignored if re-imported
-        self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz')
-        self.assertEqual(numOfSample(), 62)
-        self.assertEqual(numOfVariant(), 698)
-        self.assertSucc('vtools import_vcf vcf/CEU.vcf.gz')
-
-    def testImportIndel(self):
-        self.assertSucc('vtools import_vcf vcf/SAMP3_complex_variants.vcf')
-        self.assertEqual(numOfSample(), 0)
-        self.assertEqual(numOfVariant(), 137)
-        self.assertSucc('vtools import_vcf vcf/SAMP4_complex_variants.vcf')
-        self.assertEqual(numOfSample(), 0)
-        self.assertEqual(numOfVariant(), 137+12159)
+    def testAddfield(self):
+        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import_variants vcf/SAMP1.vcf')
+        self.assertEqual(numOfSample(), 61)
+        self.assertEqual(numOfVariant(), 915)
+        self.assertFail('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update')
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant -v2')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78'+'\n')
         
-    def testMixedBuild(self):
-        'Test importing vcf files with different reference genomes'
-        self.assertSucc('vtools import_vcf vcf/SAMP1.vcf --build hg18')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 289)
-        # 104 records in SAMP1.vcf failed to map to hg19
-        self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19')
-        # all records in var_format.vcf are mapped to hg18
-        self.assertEqual(numOfSample(), 1+1)
-        self.assertEqual(numOfVariant(), 289 + 98)
-        self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19')
-        self.assertEqual(numOfSample(), 2)
-        self.assertEqual(numOfVariant(), 289 + 98)
-        self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19 -f')
-        self.assertEqual(numOfSample(), 2)
-        self.assertEqual(numOfVariant(), 289 + 98)
-        # 19 out of 121 records failed to map.
-        self.assertSucc('vtools import_vcf vcf/SAMP2.vcf --build hg18')
-        self.assertEqual(numOfSample(), 3)
-        self.assertEqual(numOfVariant(), 289 + 98 + 121)
-        #
-        # this is a difficult test to pass, basically, we will create another project
-        # in reverse order of reference genomes, using reversed liftover, and see
-        # it the output is the same
-        out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
-        self.assertSucc('vtools init test -f')
-        self.assertSucc('vtools import_vcf vcf/var_format.vcf --build hg19')
-        self.assertEqual(numOfVariant(), 98)
-        self.assertEqual(numOfSample(), 1)
-        self.assertSucc('vtools import_vcf vcf/SAMP1.vcf --build hg18')
-        self.assertEqual(numOfSample(), 2)
-        # 101 cannot be mapped. damn.
-        self.assertEqual(numOfVariant(), 98 + 289)
-        self.assertSucc('vtools import_vcf vcf/SAMP2.vcf --build hg18')
-        # 19 out of 121 records failed to map.
-        self.assertEqual(numOfSample(), 3)
-        self.assertEqual(numOfVariant(), 98 + 289 + 121)
-        out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
-        #
-        out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x])
-        out2 = '\n'.join([x for x in sorted(out2.split('\n')) if 'NA' not in x])
-        self.assertEqual(out1, out2)
-        # 
-
+    def testUpdate(self):
+        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_variants vcf/SAMP1.vcf --build hg18')
+        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        # no hg19
+        self.assertFail('vtools import_variants --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
+        runCmd('vtools liftover hg19')
+        # a variant can have multiple entries -- thus 175 variants in variant table are updated from the 198 imported records
+        self.assertSucc('vtools import_variants --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175'+'\n')
+        self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n") 
+        
 if __name__ == '__main__':
     unittest.main()
