@@ -858,6 +858,8 @@ class txtImporter(Importer):
                         for bins, rec in self.prober.process(line):
                             if header is None:
                                 return len(rec), []
+                            elif len(rec) == 0:
+                                return 0, []
                             else:
                                 cols = [x[0] for x in self.prober.fields]
                                 if type(cols[0]) == tuple:
@@ -940,7 +942,7 @@ class txtImporter(Importer):
                             sample_ids = self.recordFileAndSample(input_filename, [None], True,
                                 self.genotype_info)
                         elif numSample == 0:
-                            self.logger.info('No genotype column exists in the input file')
+                            self.logger.info('No genotype column exists in the input file so no sample will be recorded.')
                             sample_ids = []
                         else:
                             raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
