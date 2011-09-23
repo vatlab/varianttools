@@ -295,6 +295,10 @@ class TextProcessor:
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
 
+    def reset(self):
+        self.first_time = True
+        self.fields = []
+
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
         if self.first_time:
@@ -559,9 +563,13 @@ class Importer:
             self.logger.info('{} variants from {} ({}/{})'.format('Importing' if self.mode == 'insert' else 'Updating', f, count + 1, len(self.files)))
             self.importFromFile(f)
             if self.mode == 'insert':
-                self.logger.info('{:,} new variants from {:,} records are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                    .format(sum(self.count[1:5]), self.count[0], self.count[1], self.count[2], self.count[3], self.count[4],
-                    ' {} invalid records are ignored'.format(self.count[5]) if self.count[5] > 0 else ''))
+                new_var = sum(self.count[1:5])
+                if new_var == 0:
+                    self.logger.info('No new variants from {:,} records are imported.'.format(self.count[0]))
+                else:
+                    self.logger.info('{:,} new variants ({}) from {:,} records are imported.'\
+                        .format(new_var, ', '.join(['{}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                            zip(self.count[1:6], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.count[0]))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.count[6]))
             for i in range(len(self.count)):
@@ -569,9 +577,13 @@ class Importer:
                 self.count[i] = 0
         if len(self.files) > 1:
             if self.mode == 'insert':
-                self.logger.info('{:,} new variants from {:,} records in {} files are imported, with {:,} SNVs, {:,} insertions, {:,} deletions, and {:,} complex variants.{}'\
-                    .format(sum(self.total_count[1:5]), self.total_count[0], len(self.files), self.total_count[1], self.total_count[2], self.total_count[3], self.total_count[4],
-                    ' {} invalid records are ignored'.format(self.total_count[5]) if self.total_count[5] > 0 else ''))
+                new_var = sum(self.total_count[1:5])
+                if new_var == 0:
+                    self.logger.info('No new variants from {:,} records are imported.'.format(self.total_count[0]))
+                else:
+                    self.logger.info('{:,} new variants ({}) from {:,} records are imported.'\
+                        .format(new_var, ', '.join(['{}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                            zip(self.total_count[1:6], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.total_count[0]))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.total_count[6]))
         if self.mode == 'insert' and sum(self.total_count[1:5]) > 0 and self.proj.alt_build is not None:
@@ -704,7 +716,7 @@ class txtImporter(Importer):
                                             break
                                     if not fixed:
                                         cols = [x[-1] for x in cols]
-                                header = header.split(self.prober.delimiter)
+                                header = [x.strip() for x in header.split(self.prober.delimiter)]
                                 if max(cols) < len(header):
                                     return len(rec), [header[x] for x in cols]
                                 else:
@@ -743,6 +755,11 @@ class txtImporter(Importer):
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
+        # reset text processor to allow the input of files with different number of columns
+        self.processor.reset()
+        if self.genotype_field:
+            self.prober.reset()
+        #
         if not self.sample_name:
             # if no sample name is specified
             if not self.genotype_field:
