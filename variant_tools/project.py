@@ -249,7 +249,7 @@ class fileFMT:
         else:
             url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
             try:
-                fmt = downloadFile(url)
+                fmt = downloadFile(url, quiet=True)
             except Exception as e:
                 raise ValueError('Failed to download format specification file {}.fmt'.format(name))
             self.name = name

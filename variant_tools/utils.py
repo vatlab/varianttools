@@ -323,22 +323,25 @@ def decompressIfNeeded(filename, inplace=True):
 #
 # Well, it is not easy to do reliable download
 # 
-def downloadFile(URL, dest_dir = None):
+def downloadFile(URL, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     dest = os.path.join(dest_dir if dest_dir else runOptions['temp_dir'], filename)
     # use libcurl? Recommended but not always available
     try:
         import pycurl
-        prog = ProgressBar(filename)
+        if not quiet:
+            prog = ProgressBar(filename)
         with open(dest, 'wb') as f:
             c = pycurl.Curl()
             c.setopt(pycurl.URL, URL)
             c.setopt(pycurl.WRITEFUNCTION, f.write)
-            c.setopt(pycurl.NOPROGRESS, False)
-            c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
+            if not quiet:
+                c.setopt(pycurl.NOPROGRESS, False)
+                c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
             c.perform()
-        prog.done()
+        if not quiet:
+            prog.done()
         if c.getinfo(pycurl.HTTP_CODE) == 404:
             try:
                 os.remove(dest)
@@ -354,7 +357,7 @@ def downloadFile(URL, dest_dir = None):
         pass
     # use wget? Almost universally available under linux
     try:
-        p = subprocess.Popen(['wget', '-O', dest, URL])
+        p = subprocess.Popen(['wget', '-q' if quiet else '', '-O', dest, URL])
         ret = p.wait()
         if ret == 0 and os.path.isfile(dest):
             return dest
@@ -369,7 +372,8 @@ def downloadFile(URL, dest_dir = None):
         pass
     #
     # use python urllib?
-    prog = ProgressBar(filename)
+    if not quiet:
+        prog = ProgressBar(filename)
     try:
         urllib.URLopener().open(URL)
     except IOError as error_code:
@@ -378,8 +382,9 @@ def downloadFile(URL, dest_dir = None):
         else:
             raise RuntimeError(':'.join(error_code[0], error_code[1]))
     else:
-        urllib.urlretrieve(URL, dest, reporthook=prog.urllibUpdate)
-    prog.done()
+        urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+    if not quiet:
+        prog.done()
     # all methods failed.
     if os.path.isfile(dest):
         return dest

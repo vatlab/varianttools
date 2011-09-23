@@ -495,7 +495,7 @@ def use(args):
                 #
                 proj.logger.info('Downloading annotation database from {}'.format(args.source))
                 try:
-                    annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.')
+                    annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.', quiet=args.source.endswith('.ann'))
                     s = delayedAction(proj.logger.info, 'Decompressing {}'.format(annoDB))
                     # for downloaded file, we decompress inplace
                     annoDB = decompressIfNeeded(annoDB, inplace=True)
