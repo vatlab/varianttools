@@ -303,7 +303,11 @@ class TextProcessor:
                                 start,end,step = map(str,strip, x.split(':'))
                                 step = int(step) if step else None
                             start = int(start) - 1 if start else None
-                            end = int(end) - 1 if end else None
+                            if end is not None:
+                                if int(end) >= 0:   # position index, shift by 1
+                                    end = int(end) - 1
+                                else:               # relative to the back, do not move
+                                    end = int(end)
                             indexes.append(slice(start, end, step))
                         else:
                             # easy, an integer
