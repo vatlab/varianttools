@@ -618,7 +618,7 @@ class Project:
     def open(self):
         '''Open an existing project'''
         # open the project file
-        self.logger.info('Opening project {}'.format(self.proj_file))
+        self.logger.debug('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
@@ -1233,7 +1233,7 @@ def initArguments(parser):
     parser.add_argument('project',
         help='''Name of a new project. This will create a new file $project.proj under
             the current directory. Only one project is allowed in a directory.''')
-    parser.add_argument('--parent', nargs='*', 
+    parser.add_argument('--parent', nargs=2, 
         help='''Directory and variant table of a parent project (e.g. --from .. chr1) from
             which variants in specified variant table will be copied to the new project. This
             option is often used to split a project into several subprojects that will be

@@ -755,7 +755,6 @@ class txtImporter(Importer):
                     else:
                         raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
                 else:
-                    self.logger.info('Using sample name {}'.format(', '.join(names)))
                     sample_ids = self.recordFileAndSample(input_filename, names, True,
                         self.genotype_info)
         else:
