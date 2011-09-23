@@ -119,11 +119,26 @@ class FieldFromFormat:
                 return self.default
         return item[1].split(self.sep)[self.idx] if self.idx is not None else self.default
 
+class VcfGenotype:
+    def __init__(self, default=None):
+        '''Define an extractor that extract genotype from a .vcf file'''
+        self.default = default
+        self.map = {'0/0': default, '0|0': default, '0': default,
+            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
+            '1/1': ('2',), '1|1': ('2',),
+            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
+            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
+            '2/2': ('0', '2'), '2|2': ('0', '2'),
+            '0': default, '1': ('1',)}
+
+    def __call__(self, item):
+        # the most common and correct case...
+        return self.map[item.partition(':')[0]]
+
 class VcfGenoFromFormat:
     def __init__(self, default=None):
-        '''Define an extractor that return the value of a field according 
-        to a format string. This is used to extract stuff from the format
-        string of vcf files.
+        '''Define an extractor that return genotype according to a format string.
+        This is used to extract genotype from the format string of vcf files.
         '''
         self.fmt = '\t'
         self.idx = None
@@ -303,11 +318,13 @@ class TextProcessor:
                                 start,end,step = map(str,strip, x.split(':'))
                                 step = int(step) if step else None
                             start = int(start) - 1 if start else None
-                            if end is not None:
+                            if end.strip():
                                 if int(end) >= 0:   # position index, shift by 1
                                     end = int(end) - 1
                                 else:               # relative to the back, do not move
                                     end = int(end)
+                            else:
+                                end = None
                             indexes.append(slice(start, end, step))
                         else:
                             # easy, an integer
@@ -865,6 +882,7 @@ class txtImporter(Importer):
                             elif len(rec) == 0:
                                 return 0, []
                             else:
+                                self.logger.info('HERE')
                                 cols = [x[0] for x in self.prober.fields]
                                 if type(cols[0]) == tuple:
                                     fixed = False

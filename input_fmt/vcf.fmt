@@ -32,6 +32,12 @@ type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
 [geno]
+index=10:
+type=INTEGER
+adj=VcfGenotype()
+comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file.
+
+[safe_geno]
 # This vcf genotype extractor uses format string and genotype to 
 # extract genotype. Although the format string should not be needed
 # because the genotype field should be the first one, one of my dataset
@@ -40,7 +46,7 @@ comment=Alternative allele, '-' for deletion.
 index=9, 10:
 adj=VcfGenoFromFormat()
 type=INTEGER
-comment=Gentoype, coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2)
+comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly.
 
 [DP_INFO]
 index=8
