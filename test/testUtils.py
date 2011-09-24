@@ -86,13 +86,15 @@ def numOfVariant(table='variant'):
         return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
             stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
     
-    
-def getGenotypes():
-    nsamples = numOfSamples()
+def getGenotypes(projname='test'):
+    nsamples = numOfSample()
     genotypes = []
     for i in range(nsamples):
-        genotypes.append(str(''.join(outputOfCmd('vtools execute "select variant_type from sample_variant_{}"'.format(i+1))).split('\n')[:-1]))
-    return genotypes  
+        genotypes.append(map(str, ''.join(outputOfCmd('vtools execute "select variant_type from {}_genotype.sample_variant_{}"'.format(projname, i+1))).split('\n')[:-1]))
+    return map(list, zip(*genotypes))
+    
+def getSamplenames():
+    return map(str, ''.join(outputOfCmd('vtools execute "select sample_name from sample"')).split('\n')[:-1])
         
 def initTest(level):
     i = 1

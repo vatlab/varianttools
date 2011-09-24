@@ -38,5 +38,5 @@ comment=Alternative allele
 [geno]
 index=7:
 type=INTEGER 
-adj=lambda x: None if x == '.' else x
+#adj=lambda x: None if x == '.' else x
 comment=Gentoype coded as 0 (ref ref) 1 (ref alt) and 2 (alt alt)
