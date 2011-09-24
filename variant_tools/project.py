@@ -1414,7 +1414,7 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'fields', 'annotations', 'annotation', 'formats', 'format'],
+        'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format'],
         nargs='?', default='project',
         help='''Type of information to display, which can be project (summary
             of a project, tables (all variant tables, or all tables if
@@ -1509,6 +1509,42 @@ def show(args):
                         proj.logger.debug(e)
                         raise IndexError('Input file format {} is not currently supported by variant tools'.format(item))
                     fmt.describe()
+            elif args.type == 'genotypes':
+                
+                # get sample ids and attach the genotypes database
+                if not proj.db.hasTable('sample'):
+                    proj.logger.warning('Project does not have a sample table.')
+                    return
+                cur = proj.db.cursor()
+                try:
+                    proj.db.attach(proj.name + '_genotype') 
+                except Exception as e:
+                    # either the database doesn't exist or it's already been attached (should we add a method proj.db.isAttached(...)? and embedding this in the attach() method?
+                    if not proj.db.hasDatabase(proj.name + '_genotype'):
+                        proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
+                                
+                # sample headers are ID, file, sample, FIELDS
+                fields = proj.db.getHeaders('sample')
+                print('filename\tsample_name{}\tnum_genotypes\tsample_specific_info_fields'.format(''.join(['\t'+x for x in fields[3:]])))
+                cur.execute('SELECT sample.sample_id, filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id;'
+                    .format(', '.join(fields[2:])))
+                records = cur.fetchall()
+                for rec in records:
+                    
+                    # sample fields
+                    sampleFields = '\t'.join(['{}'.format(x) for x in rec[1:]])
+                    
+                    # now get sample genotype counts and sample specific fields
+                    sampleId = rec[0]
+                    cur.execute('SELECT count(*) FROM {}_genotype.sample_variant_{};'.format(proj.name, sampleId))
+                    numGenotypes = cur.fetchone()[0]
+                    
+                    # get fields for each genotype table
+                    sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
+                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id
+                    
+                    print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
+ 
     except Exception as e:
         sys.exit(e)
 
