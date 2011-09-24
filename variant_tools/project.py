@@ -244,7 +244,7 @@ class fileFMT:
         self.position_fields = args.position_fields
         self.range_fields = args.range_fields
         self.variant_info = args.variant_info
-        self.genotype_fields = args.genotype_info
+        self.genotype_fields = args.genotype_fields
         self.genotype_info = args.genotype_info
         #
         if os.path.isfile(name + '.fmt'):

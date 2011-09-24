@@ -162,14 +162,14 @@ class VcfGenoFromFormat:
             elif item[0] != self.fmt:
                 fmt, val = item
                 self.fmt = fmt
-                fields = fmt.split(self.sep)
-                if self.name in fields:
-                    self.idx = fields.index(self.name)
-                    return self.map[val.split(self.sep)[self.idx]]
+                fields = fmt.split(':')
+                if 'GT' in fields:
+                    self.idx = fields.index('GT')
+                    return self.map[val.split(':')[self.idx]]
                 else:
                     self.idx = None
                     return self.default
-            return self.map[item[1].split(self.sep, self.idx + 1)[self.idx]] if self.idx is not None else self.default
+            return self.map[item[1].split(':', self.idx + 1)[self.idx]] if self.idx is not None else self.default
         except KeyError:
             return None
         
@@ -452,9 +452,9 @@ class Importer:
                     self.files.append(filename)
         else:
             self.files = files
-        # for all record, new SNV, insertion, deletion, complex variants, invalid record, and updated record
-        self.count = [0, 0, 0, 0, 0, 0, 0]
-        self.total_count = [0, 0, 0, 0, 0, 0, 0]
+        # for #record, #sample variant, #variant, new SNV, insertion, deletion, complex variants, invalid record, updated record
+        self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.total_count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
         if len(self.files) == 0:
             raise ValueError('No file to import')
@@ -563,30 +563,24 @@ class Importer:
             self.logger.info('{} variants from {} ({}/{})'.format('Importing' if self.mode == 'insert' else 'Updating', f, count + 1, len(self.files)))
             self.importFromFile(f)
             if self.mode == 'insert':
-                new_var = sum(self.count[1:5])
-                if new_var == 0:
-                    self.logger.info('No new variants from {:,} records are imported.'.format(self.count[0]))
-                else:
-                    self.logger.info('{:,} new variants ({}) from {:,} records are imported.'\
-                        .format(new_var, ', '.join(['{}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
-                            zip(self.count[1:6], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.count[0]))
+                new_var = sum(self.count[3:7])
+                self.logger.info('{:,} instances of {:,} variants ({:,} new{}) from {:,} records are imported.'\
+                    .format(self.count[1], self.count[2], new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.count[0]))
             else:
-                self.logger.info('{:,} exiting variants are updated'.format(self.count[6]))
+                self.logger.info('{:,} exiting variants are updated'.format(self.count[8]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
         if len(self.files) > 1:
             if self.mode == 'insert':
-                new_var = sum(self.total_count[1:5])
-                if new_var == 0:
-                    self.logger.info('No new variants from {:,} records are imported.'.format(self.total_count[0]))
-                else:
-                    self.logger.info('{:,} new variants ({}) from {:,} records are imported.'\
-                        .format(new_var, ', '.join(['{}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
-                            zip(self.total_count[1:6], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.total_count[0]))
+                new_var = sum(self.total_count[3:7])
+                self.logger.info('{:,} instances of {:,} variants ({:,} new{}) from {:,} records are imported.'\
+                    .format(self.total_count[1], self.total_count[2], new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.total_count[0]))
             else:
-                self.logger.info('{:,} exiting variants are updated'.format(self.total_count[6]))
-        if self.mode == 'insert' and sum(self.total_count[1:5]) > 0 and self.proj.alt_build is not None:
+                self.logger.info('{:,} exiting variants are updated'.format(self.total_count[8]))
+        if self.mode == 'insert' and sum(self.total_count[3:7]) > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
             tool = LiftOverTool(self.proj)
@@ -606,7 +600,7 @@ class Importer:
                     self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
                     self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
             # update records
-            prog = ProgressBar('Updating coordinates', self.total_count[0])
+            prog = ProgressBar('Updating coordinates', len(self.variantIndex))
             count = 0
             cur = self.db.cursor()
             for k,v in self.variantIndex.iteritems():
@@ -733,19 +727,19 @@ class txtImporter(Importer):
         if var_key in self.variantIndex:
             variant_id = self.variantIndex[var_key][0]
             if len(rec) > 5:
-                self.count[6] += 1
+                self.count[8] += 1
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
             return variant_id
         else:
             # new varaint!
             if rec[4] == '-':
-                self.count[3] += 1
+                self.count[5] += 1
             elif rec[3] == '-':
-                self.count[2] += 1
-            elif len(rec[4]) == 1 and len(rec[3]) == 1:
-                self.count[1] += 1
-            else:
                 self.count[4] += 1
+            elif len(rec[4]) == 1 and len(rec[3]) == 1:
+                self.count[3] += 1
+            else:
+                self.count[6] += 1
             # alt_chr and alt_pos are updated if adding by alternative reference genome
             cur.execute(self.variant_insert_query, rec)
             variant_id = cur.lastrowid
@@ -805,6 +799,7 @@ class txtImporter(Importer):
                     if line.startswith('#'):
                         continue
                     for bins, rec in self.processor.process(line):
+                        self.count[2] += 1
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                         if not rngs:
                             rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
@@ -812,12 +807,13 @@ class txtImporter(Importer):
                                 raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][1] - rngs[0][0], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
                             if rec[self.ranges[2] + idx]:
+                                self.count[1] += 1
                                 cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
                         self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    self.count[5] += 1
+                    self.count[7] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(self.count[0])
@@ -890,13 +886,13 @@ class txtUpdater(Importer):
                 variant_id = self.variantIndex[var_key][0]
                 # update by variant_id, do not need bins
                 cur.execute(self.update_variant_query, rec[4:] + [variant_id])
-                self.count[6] += cur.rowcount
+                self.count[8] += cur.rowcount
         elif self.input_type == 'position':
             cur.execute(self.update_position_query, rec[2:] + bins + [rec[0], rec[1]])
-            self.count[6] += cur.rowcount
+            self.count[8] += cur.rowcount
         else:  # range based
             cur.execute(self.update_range_query, rec[3:] + bins + [rec[0], rec[1], rec[2]])
-            self.count[6] += cur.rowcount
+            self.count[8] += cur.rowcount
 
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
@@ -915,7 +911,7 @@ class txtUpdater(Importer):
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
-                    self.count[5] += 1
+                    self.count[7] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(self.count[0])
