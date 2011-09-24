@@ -448,9 +448,14 @@ class Importer:
                         self.files.append(filename)
                     else:
                         self.logger.info('Ignoring imported file {}'.format(filename))
+                elif not os.path.isfile(filename):
+                    raise ValueError('File {} does not exist'.format(filename))
                 else:
                     self.files.append(filename)
         else:
+            for filename in files:
+                if not os.path.isfile(filename):
+                    raise ValueError('File {} does not exist'.format(filename))
             self.files = files
         # for #record, #sample variant, #variant, new SNV, insertion, deletion, complex variants, invalid record, updated record
         self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -564,8 +569,9 @@ class Importer:
             self.importFromFile(f)
             if self.mode == 'insert':
                 new_var = sum(self.count[3:7])
-                self.logger.info('{:,} instances of {:,} variants ({:,} new{}) from {:,} records are imported.'\
-                    .format(self.count[1], self.count[2], new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                self.logger.info('{} ({:,} new{}) from {:,} records are imported.'\
+                    .format('{:,} instances of {:,} variants'.format(self.count[1], self.count[2]) if self.count[1] != self.count[2] else '{:,} variants'.format(self.count[1]),
+                        new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
                         zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.count[0]))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.count[8]))
@@ -575,8 +581,9 @@ class Importer:
         if len(self.files) > 1:
             if self.mode == 'insert':
                 new_var = sum(self.total_count[3:7])
-                self.logger.info('{:,} instances of {:,} variants ({:,} new{}) from {:,} records are imported.'\
-                    .format(self.total_count[1], self.total_count[2], new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                self.logger.info('{} ({:,} new{}) from {:,} records are imported.'\
+                    .format('{:,} instances of {:,} variants'.format(self.total_count[1], self.total_count[2]) if self.total_count[1] != self.total_count[2] else '{:,} variants'.format(self.total_count[1]),
+                        new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.total_count[0]))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.total_count[8]))
@@ -809,7 +816,7 @@ class txtImporter(Importer):
                             if rec[self.ranges[2] + idx]:
                                 self.count[1] += 1
                                 cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
-                        self.count[0] += 1
+                    self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
