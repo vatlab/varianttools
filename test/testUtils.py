@@ -69,6 +69,9 @@ def outputOfCmd(cmd):
     with open('run_tests.log', 'a') as fnull:
         return subprocess.check_output(cmd, stderr=fnull,
             env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode()
+        
+def output2list(cmd):
+    return map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1])
     
 def runCmd(cmd):
     cmd = shlex.split(cmd)
@@ -90,11 +93,11 @@ def getGenotypes(projname='test'):
     nsamples = numOfSample()
     genotypes = []
     for i in range(nsamples):
-        genotypes.append(map(str, ''.join(outputOfCmd('vtools execute "select variant_type from {}_genotype.sample_variant_{}"'.format(projname, i+1))).split('\n')[:-1]))
+        genotypes.append(output2list('vtools execute "select variant_type from {}_genotype.sample_variant_{}"'.format(projname, i+1)))
     return map(list, zip(*genotypes))
     
 def getSamplenames():
-    return map(str, ''.join(outputOfCmd('vtools execute "select sample_name from sample"')).split('\n')[:-1])
+    return output2list('vtools execute "select sample_name from sample"')
         
 def initTest(level):
     i = 1
