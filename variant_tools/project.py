@@ -1442,6 +1442,7 @@ def show(args):
                 for table in proj.db.tables() if args.verbosity=='2' else proj.getVariantTables():
                     print('{:<20} {:,}'.format(table, proj.db.numOfRows(table)))
             elif args.type == 'table':
+                proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
                     raise ValueError('Please specify a table to display')
                 table = args.items[0]
