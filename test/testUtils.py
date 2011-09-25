@@ -92,9 +92,10 @@ def numOfVariant(table='variant'):
 def getGenotypes(projname='test'):
     nsamples = numOfSample()
     genotypes = []
-    for i in range(nsamples):
+    # getGenotypes for 8 samples
+    for i in range(8):
         genotypes.append(output2list('vtools execute "select variant_type from {}_genotype.sample_variant_{}"'.format(projname, i+1)))
-    return map(list, zip(*genotypes))
+    return genotypes
     
 def getSamplenames():
     return output2list('vtools execute "select sample_name from sample"')

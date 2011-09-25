@@ -65,14 +65,22 @@ class TestImportVariants(ProcessTestCase):
         nvar = numOfVariant()
         self.assertEqual(nsamples, 244)
         self.assertEqual(nvar, 198)
+        # get genotypes for 8 samples
         genotypes = getGenotypes()
+        # get samplenames
         samplenames = getSamplenames()
         head = ['#chr','rs','distance','pos','ref','alt'] + samplenames
         variants = [x.split() for x in output2list('vtools output variant chr snp_id genet_dist pos ref alt')]
-        out1 = [x+y for x, y in zip(variants, genotypes)]
-        out1.insert(0, head)
-        out2 = [x.replace('.', '0').split() for x in file('txt/genotypes.txt')]
-        self.assertEqual(out1, out2)
+        input = [x.split() for x in file('txt/genotypes.txt')]
+        # test --sample_names
+        self.assertEqual(input[0], head)
+        input_variants = [x[:6] for x in input[1:]]
+        input_genotypes = map(list, zip(*[x[6:] for x in input[1:]]))[:8]
+        input_genotypes = [filter(lambda item: item != '0' and item != '.', item) for item in input_genotypes]
+        # test importing variants 
+        self.assertEqual(input_variants, variants)
+        # test importing genotypes
+        self.assertEqual(input_genotypes, genotypes)
 
     def testANNOVAR(self):
         'Testing the annovar input format'
