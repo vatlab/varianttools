@@ -343,7 +343,7 @@ class fileFMT:
         if self.input_type != 'variant' and self.genotype_info:
             raise ValueError('Input file with type position or range can not have any genotype information.')
         if self.genotype_fields and len(self.genotype_fields) != 1:
-            raise ValueError('Variant tools currently only support input file with at most one sample')
+            raise ValueError('Only one genotype field is allowed to input genotype for one or more samples.')
         #
         if self.variant_info:
             self.fields.extend(self.variant_info)
