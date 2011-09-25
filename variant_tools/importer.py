@@ -564,27 +564,35 @@ class Importer:
         
     def importData(self):
         '''Start importing'''
+        sample_in_files = []
         for count,f in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing' if self.mode == 'insert' else 'Updating', f, count + 1, len(self.files)))
             self.importFromFile(f)
             if self.mode == 'insert':
                 new_var = sum(self.count[3:7])
-                self.logger.info('{} ({:,} new{}) from {:,} records are imported.'\
-                    .format('{:,} instances of {:,} variants'.format(self.count[1], self.count[2]) if self.count[1] != self.count[2] else '{:,} variants'.format(self.count[1]),
-                        new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
-                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.count[0]))
+                self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
+                    .format(self.count[2], new_var, 
+                        ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                            zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        self.count[0],
+                        'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
+                            self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.count[8]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
+            sample_in_files.extend(self.sample_in_file)
         if len(self.files) > 1:
             if self.mode == 'insert':
                 new_var = sum(self.total_count[3:7])
-                self.logger.info('{} ({:,} new{}) from {:,} records are imported.'\
-                    .format('{:,} instances of {:,} variants'.format(self.total_count[1], self.total_count[2]) if self.total_count[1] != self.total_count[2] else '{:,} variants'.format(self.total_count[1]),
-                        new_var, ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]), self.total_count[0]))
+                self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
+                    .format(self.total_count[2], new_var, 
+                        ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                            zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        self.total_count[0],
+                        'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
+                            self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
             else:
                 self.logger.info('{:,} exiting variants are updated'.format(self.total_count[8]))
         if self.mode == 'insert' and sum(self.total_count[3:7]) > 0 and self.proj.alt_build is not None:
@@ -766,25 +774,30 @@ class txtImporter(Importer):
             if not self.genotype_field:
                 self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
                 sample_ids = []
+                self.sample_in_file = []
             else:
                 numSample, names = self.getSampleName(input_filename)
                 if not names:
                     if numSample == 1:
-                        self.logger.warning('Missing sample name (name None is used)'.format(numSample))
+                        self.logger.debug('Missing sample name (name None is used)'.format(numSample))
                         sample_ids = self.recordFileAndSample(input_filename, [None], True,
                             self.genotype_info)
+                        self.sample_in_file = [None]
                     elif numSample == 0:
-                        self.logger.info('No genotype column exists in the input file so no sample will be recorded.')
+                        self.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
                         sample_ids = []
+                        self.sample_in_file = []
                     else:
                         raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
                 else:
                     sample_ids = self.recordFileAndSample(input_filename, names, True,
                         self.genotype_info)
+                    self.sample_in_file = [x for x in names]
         else:
+            self.sample_in_file = [x for x in self.sample_names]
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
-                self.logger.info('Input file does not contain any genotype. Only the variant ownership information is recorded.')
+                self.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
             else:
                 numSample, names = self.getSampleName(input_filename)
