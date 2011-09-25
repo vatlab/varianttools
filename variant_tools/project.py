@@ -287,6 +287,9 @@ class fileFMT:
                 continue
             try:
                 items = [x[0] for x in parser.items(section, raw=True)]
+                for item in items:
+                    if item not in ['index', 'type', 'adj', 'comment']:
+                        raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                 fields.append(
                     Field(name=section,
                         index=parser.get(section, 'index', raw=True),
@@ -295,7 +298,7 @@ class fileFMT:
                         comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                     )
             except Exception as e:
-                raise ValueError('Invalid section {} in configuration file {}'.format(section, self.name))
+                raise ValueError('Invalid section {} in configuration file {}: {}'.format(section, self.name, e))
         #
         if len(fields) == 0:
             raise ValueError('No valid field is defined in format specification file {}'.format(self.name))

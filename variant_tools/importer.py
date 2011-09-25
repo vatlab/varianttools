@@ -953,7 +953,7 @@ def importVariantsArguments(parser):
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
             If a reference genome that is different from the primary reference genome of the
-            project is specified, it will become the alternative referenge genome of the
+            project is specified, it will become the alternative reference genome of the
             project. The UCSC liftover tool will be automatically called to map input
             coordinates between the primary and alternative reference genomes.''')
     parser.add_argument('--format',

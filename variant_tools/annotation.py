@@ -157,6 +157,9 @@ class AnnoDBConfiger:
                 continue
             try:
                 items = [x[0] for x in parser.items(section, raw=True)]
+                for item in items:
+                    if item not in ['index', 'type', 'adj', 'comment']:
+                        raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                 # 'index' - 1 because the input is in 1-based index
                 self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
                     type=parser.get(section, 'type', raw=True),
