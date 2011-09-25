@@ -822,8 +822,8 @@ class txtImporter(Importer):
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                         if not rngs:
                             rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                            if rngs[0][2] - rngs[0][1] != len(sample_ids):
-                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][2] - rngs[0][1], len(sample_ids)))
+                            if self.ranges[3] - self.ranges[2] != len(sample_ids):
+                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(self.ranges[3] - self.ranges[2], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
                             if rec[self.ranges[2] + idx]:
                                 self.count[1] += 1

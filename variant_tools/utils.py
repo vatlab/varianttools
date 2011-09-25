@@ -776,8 +776,11 @@ def normalizeVariant(pos, ref, alt):
     '''
     # this is usually the case but some badly formatted
     # vcf file use small case for variants
-    ref = ref.upper()
-    alt = alt.upper()
+    try:
+        ref = ref.upper()
+        alt = alt.upper()
+    except Exception as e:
+        raise ValueError('Invalid reference ({}) or alternative ({}) allele.'.format(ref, alt))
     # different types of variants
     # 1. C -> G  (SNV)  
     #    TC-> TG  
