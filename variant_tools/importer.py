@@ -788,7 +788,7 @@ class txtImporter(Importer):
                         sample_ids = []
                         self.sample_in_file = []
                     else:
-                        raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name'.format(numSample))
+                        raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
                 else:
                     sample_ids = self.recordFileAndSample(input_filename, names, True,
                         self.genotype_info)
