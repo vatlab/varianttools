@@ -980,15 +980,20 @@ class Project:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
-    def removeSample(self, ID):
+    def removeSamples(self, IDs):
         '''Remove sample and their genotype, but not variants'''
         cur = self.db.cursor()
-        cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = {};'.format(self.db.PH), (ID,))
-        res = cur.fetchone()
-        self.logger.info('Removing sample {} from file {}'.format(res[1], res[0]))
-        cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
+        samples = defaultdict(list)
+        for id in IDs:
+            cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = {};'.format(self.db.PH), (ID,))
+            res = cur.fetchone()
+            samples[res[0]].append(res[1])
+        for f in samples:
+            self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+        for id in IDs:
+            cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
+            self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
         self.db.commit()
-        self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
         
     def summarize(self):
         '''Summarize key features of the project
@@ -1380,8 +1385,7 @@ def remove(args):
                 IDs = proj.selectSampleByPhenotype(' AND '.join(args.items))
                 if len(IDs) == 0:
                     proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(args.items)))
-                for ID in IDs:
-                    proj.removeSample(ID)
+                proj.removeSamples(IDs)
             elif args.type == 'field':
                 from_table = defaultdict(list)
                 for item in args.items:

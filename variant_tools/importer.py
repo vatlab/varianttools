@@ -439,8 +439,7 @@ class Importer:
                     if force:
                         self.logger.info('Re-importing imported file {}'.format(filename))
                         IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                        for ID in IDs:
-                            proj.removeSample(ID)
+                        proj.removeSample(IDs)
                         # remove file record
                         cur = self.db.cursor()
                         cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
