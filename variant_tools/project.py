@@ -1510,7 +1510,7 @@ def show(args):
                         fmt = fileFMT(item)
                     except Exception as e:
                         proj.logger.debug(e)
-                        raise IndexError('Unrecognized input format: {}.\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+                        raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
                     fmt.describe()
             elif args.type == 'genotypes':
                 

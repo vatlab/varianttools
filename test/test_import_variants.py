@@ -56,9 +56,14 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfVariant(), 338)
         self.assertFail('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos ref not_defined_field --force')
         self.assertFail('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos --force')
+        variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
+        input = [x.split() for x in file('txt/input.tsv')]
+        input = [x[:2] + x[3:] for x in input]
+        self.assertEqual(variants, input)
         # test downloading fmt file from the website
         self.assertSucc('vtools import_variants --build hg18 --format ANNOVAR txt/ANNOVAR.txt')
         self.assertFail('vtools import_variants --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
+        
     
     def testGenotypes(self):
         'Testing the import of genotypes'
