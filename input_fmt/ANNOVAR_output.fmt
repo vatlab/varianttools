@@ -6,9 +6,9 @@
 #
 
 [format description]
-description=Output from ANNOVAR, generated from command "path/to/annovar/annotate_variation.pl annovar.txt path/to/annovar/humandb/". This format imports chr, pos, ref, alt and a mutation type field annotated via ANNOVAR.
+description=Output from ANNOVAR, generated from command "path/to/annovar/annotate_variation.pl annovar.txt path/to/annovar/humandb/". This format imports chr, pos, ref, alt and a mutation type field annotated via ANNOVAR. For details please refer to http://www.openbioinformatics.org/annovar/annovar_gene.html
 variant_fields=chr, pos, ref, alt
-variant_info=mut_type
+variant_info=mut_type, function
 
 [chr]
 index=4
@@ -34,4 +34,9 @@ comment=Alternative allele, '-' for deletion.
 [mut_type]
 index=2
 type=VARCHAR(255)
-comment=Mutation types of variants in exonic regions.
+comment=the functional consequences of the variant.
+
+[function]
+index=3
+type=VARCHAR(255)
+comment=the gene name, the transcript identifier and the sequence change in the corresponding transcript

@@ -99,7 +99,11 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 11)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'kaiw'+'\n')
-    
+        # test for importing user specified variant_info
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function --force' )
+        self.assertEqual(outputOfCmd('vtools output variant function | wc -l'), '78\n')
+        self.assertFail('vtools output variant mut_type')
+        
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt')
