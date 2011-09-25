@@ -439,7 +439,7 @@ class Importer:
                     if force:
                         self.logger.info('Re-importing imported file {}'.format(filename))
                         IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                        proj.removeSample(IDs)
+                        proj.removeSamples(IDs)
                         # remove file record
                         cur = self.db.cursor()
                         cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
@@ -793,7 +793,7 @@ class txtImporter(Importer):
                         self.genotype_info)
                     self.sample_in_file = [x for x in names]
         else:
-            self.sample_in_file = [x for x in self.sample_names]
+            self.sample_in_file = [x for x in self.sample_name]
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 self.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
@@ -822,11 +822,8 @@ class txtImporter(Importer):
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                         if not rngs:
                             rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                            try:
-                                if rngs[0][1] - rngs[0][0] != len(sample_ids):
-                                    raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][1] - rngs[0][0], len(sample_ids)))
-                            except Exception:
-                                pass
+                            if rngs[0][2] - rngs[0][1] != len(sample_ids):
+                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(rngs[0][2] - rngs[0][1], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
                             if rec[self.ranges[2] + idx]:
                                 self.count[1] += 1

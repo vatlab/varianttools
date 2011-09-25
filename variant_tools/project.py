@@ -984,13 +984,13 @@ class Project:
         '''Remove sample and their genotype, but not variants'''
         cur = self.db.cursor()
         samples = defaultdict(list)
-        for id in IDs:
+        for ID in IDs:
             cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = {};'.format(self.db.PH), (ID,))
             res = cur.fetchone()
             samples[res[0]].append(res[1])
         for f in samples:
             self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
-        for id in IDs:
+        for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
             self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
         self.db.commit()
