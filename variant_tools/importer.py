@@ -655,7 +655,7 @@ class txtImporter(Importer):
             fmt = fileFMT(format, fmt_args)
         except Exception as e:
             self.logger.debug(e)
-            raise IndexError('Input file format {} is not currently supported by variant tools'.format(format))
+            raise IndexError('Unrecognized input format: {}.\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         self.sample_name = sample_name
         #
@@ -863,7 +863,7 @@ class txtUpdater(Importer):
             fmt = fileFMT(format, fmt_args)
         except Exception as e:
             self.logger.debug(e)
-            raise IndexError('Input file format {} is not currently supported by variant tools'.format(format))
+            raise IndexError('Unrecognized input format: {}.\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         # how to split processed records
         self.ranges = fmt.ranges
