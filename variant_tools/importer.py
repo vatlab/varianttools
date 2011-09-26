@@ -821,7 +821,7 @@ class txtImporter(Importer):
             genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
                 .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
                 for id in sample_ids}
-        rngs = None
+        fld_cols = None
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -831,14 +831,18 @@ class txtImporter(Importer):
                     for bins, rec in self.processor.process(line):
                         self.count[2] += 1
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                        if not rngs:
-                            rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                        if not fld_cols:
+                            col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                            fld_cols = []
+                            for idx in range(len(sample_ids)):
+                                fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
                             if self.ranges[3] - self.ranges[2] != len(sample_ids):
                                 raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(self.ranges[3] - self.ranges[2], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
                             if rec[self.ranges[2] + idx]:
                                 self.count[1] += 1
-                                cur.execute(genotype_insert_query[id], [variant_id] + [rec[sc + (0 if sc + 1 == ec else idx)] for sc,ec in rngs])
+                                #re = [variant_id] + [rec[sc] for sc in rngs[idx]]
+                                cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
                     self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
