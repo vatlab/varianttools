@@ -90,7 +90,6 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     # if output to a file
     cur = proj.db.cursor()
     cur.execute(query)
-    proj.logger.info('Writing output')
     for count, rec in enumerate(cur):
         out.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
 
