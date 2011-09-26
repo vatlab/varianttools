@@ -384,7 +384,7 @@ class TextProcessor:
                     if type(item) == tuple and len(item) > num_records:
                         num_records = len(item)
                 except Exception as e:
-                    self.logger.debug(e)
+                    self.logger.debug('Failed to process field {}: {}'.format(item, e))
                     # missing ....
                     item = None
             records[idx] = item
