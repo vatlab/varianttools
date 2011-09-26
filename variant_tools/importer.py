@@ -376,7 +376,7 @@ class TextProcessor:
         #        
         try:
             # we first trust that nothing can go wrong and use a quicker method
-            records = [(to=ons[col] if t else [tokens[x] for x in col]) if adj is None else \
+            records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
