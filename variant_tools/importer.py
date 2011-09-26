@@ -424,6 +424,7 @@ class Importer:
         self.db = proj.db
         self.logger = proj.logger
         self.mode = mode
+        self.sample_in_file = []
         #
         if len(files) == 0:
             raise IOError('Please specify the filename of the input data.')
@@ -577,7 +578,7 @@ class Importer:
                         'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
                             self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
             else:
-                self.logger.info('{:,} exiting variants are updated'.format(self.count[8]))
+                self.logger.info('{:,} variants are updated'.format(self.count[8]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
@@ -593,7 +594,7 @@ class Importer:
                         'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                             self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
             else:
-                self.logger.info('{:,} exiting variants are updated'.format(self.total_count[8]))
+                self.logger.info('{:,} variants are updated'.format(self.total_count[8]))
         if self.mode == 'insert' and sum(self.total_count[3:7]) > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
@@ -890,7 +891,7 @@ class txtUpdater(Importer):
         #
         self.input_type = fmt.input_type
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
-        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(self.table) if self.table != 'variant' else ''
+        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
             .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
         self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
@@ -944,7 +945,7 @@ class txtUpdater(Importer):
 #
 
 def importVariantsArguments(parser):
-    parser.add_argument('input_files', nargs='*',
+    parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
             acceptable.''')
@@ -993,7 +994,7 @@ def importVariants(args):
 
 def updateArguments(parser):
     parser.add_argument('table', help='''variants to be updated.''')
-    parser.add_argument('input_files', nargs='*',
+    parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be used to add or update existing fields of
             variants. The file should be delimiter separated with format described by
             parameter --format. Gzipped files are acceptable.''')
