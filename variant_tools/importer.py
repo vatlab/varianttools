@@ -843,7 +843,7 @@ class txtUpdater(Importer):
     '''Import variants from one or more tab or comma separated files.'''
     def __init__(self, proj, table, files, build, format, fmt_args=[]):
         # if update is None, recreate index
-        Importer.__init__(self, proj, files, build, force, mode='update')
+        Importer.__init__(self, proj, files, build, True, mode='update')
         #
         if not proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
