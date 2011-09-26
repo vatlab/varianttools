@@ -344,20 +344,20 @@ class TextProcessor:
                     #
                     if ':' not in field.index:
                         if len(indexes) == 1:
-                            # int
-                            self.fields.append((indexes[0], e))
+                            # int, True means 'not a tuple'
+                            self.fields.append((indexes[0], True, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
                             cIdx += 1
                         else:
                             # a tuple
-                            self.fields.append((tuple(indexes), e))
+                            self.fields.append((tuple(indexes), False, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
                             cIdx += 1
                     elif len(indexes) == 1:
                         # single slice
                         cols = range(len(tokens))[indexes[0]]
                         for c in cols:
-                            self.fields.append((c, e))
+                            self.fields.append((c, True, e))
                         self.columnRange[fIdx] = (cIdx, cIdx + len(cols))
                         cIdx += len(cols)
                     else:
@@ -366,7 +366,7 @@ class TextProcessor:
                         count = 0
                         for c in izip(*indexes):
                             count += 1
-                            self.fields.append((tuple(c), e))
+                            self.fields.append((tuple(c), False, e))
                         self.columnRange[fIdx] = (cIdx, cIdx + count)
                         cIdx += count
                 except Exception as e:
@@ -374,20 +374,25 @@ class TextProcessor:
                     raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
             self.first_time = False
         #        
-        num_records = 1
-        records = [None]*len(self.fields)
-        for idx, (col, adj) in enumerate(self.fields):
-            item = tokens[col] if type(col) == int else [tokens[x] for x in col]
-            if adj is not None:
-                try:
-                    item = adj(item)
-                    if type(item) == tuple and len(item) > num_records:
-                        num_records = len(item)
-                except Exception as e:
-                    self.logger.debug('Failed to process field {}: {}'.format(item, e))
-                    # missing ....
-                    item = None
-            records[idx] = item
+        try:
+            # we first trust that nothing can go wrong and use a quicker method
+            records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
+                (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
+        except Exception:
+            # If anything wrong happends, process one by one to get a more proper error message (and None values)
+            records = []
+            for col, t, adj in self.fields:
+                item = tokens[col] if t else [tokens[x] for x in col]
+                if adj is not None:
+                    try:
+                        item = adj(item)
+                    except Exception as e:
+                        self.logger.debug('Failed to process field {}: {}'.format(records[idx], e))
+                        # missing ....
+                        item = None
+            records.append(item)
+        #
+        num_records = max([len(item) if type(item) == tuple else 1 for item in records])
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
