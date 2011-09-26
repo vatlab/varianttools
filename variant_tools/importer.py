@@ -831,7 +831,7 @@ class txtImporter(Importer):
                     for bins, rec in self.processor.process(line):
                         self.count[2] += 1
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                        if not fld_cols:
+                        if fld_cols is None:
                             col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                             fld_cols = []
                             for idx in range(len(sample_ids)):
@@ -839,7 +839,7 @@ class txtImporter(Importer):
                             if self.ranges[3] - self.ranges[2] != len(sample_ids):
                                 raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(self.ranges[3] - self.ranges[2], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
-                            if rec[self.ranges[2] + idx]:
+                            if rec[self.ranges[2] + idx] is not None:
                                 self.count[1] += 1
                                 #re = [variant_id] + [rec[sc] for sc in rngs[idx]]
                                 cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
