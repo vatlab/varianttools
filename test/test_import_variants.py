@@ -100,8 +100,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfVariant(), 11)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'kaiw'+'\n')
         # test for importing user specified variant_info
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function --force' )
-        self.assertEqual(outputOfCmd('vtools output variant function | wc -l'), '78\n')
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function' )
+        self.assertEqual(len(output2list('vtools select variant "function is not NULL" -o function')), 78)
         self.assertFail('vtools output variant mut_type')
         
     def testCASAVA18_SNP(self):
@@ -109,69 +109,59 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 20)
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), '')
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 20)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp'+'\n')
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --force --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        runCmd('vtools init test -f')
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
         genotypes = getGenotypes('test', 1)[0]
-        print genotypes
-        #self.assertEqual(len(genotypes), )
+        self.assertEqual(genotypes, ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1'])
         
     def testCASAVA18_INDEL(self):
         'Testing the CASAVA INDEL input format'
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 25)
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt --force --sample_name casavaindel')
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt --sample_name casavaindel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 25)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavaindel'+'\n')
-        self.assertEqual(getGenotypes('test', 1)[0], ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '2', '1', '1', '1', '1', '2', '1', '1'])
+        self.assertEqual(getGenotypes('test', 1)[0], ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '2', '1', '1', '1', '1', '2', '1', '1'])
         
     def testPileup_INDEL(self):
+        # this file has one genotype. Named as "None" when no sample name is specified anywhere
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 30)
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel --force --sample_name pileupindel')
-        self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 30)
-        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'pileupindel'+'\n')
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'None\n')
     
     def testImportVCF(self):
-        'Test command vtools import_variants'
-        self.assertFail('vtools import_variants')
-        self.assertFail('vtools import_variants non_existing.vcf')
-        # help information
-        self.assertSucc('vtools import_variants -h')
-        # no build information, fail
-        self.assertFail('vtools import_variants vcf/SAMP1.vcf')
-        # specify build information
-        self.assertSucc('vtools import_variants vcf/SAMP1.vcf --build hg18')
+        'Test command vtools import_variants --format vcf'
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP1.vcf --build hg18')
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'SAMP1\n')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 289)
-        self.assertSucc('vtools import_variants vcf/SAMP2.vcf')
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP2.vcf')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289+121)
-        self.assertSucc('vtools import_variants vcf/CEU.vcf.gz --variant_only')
+        # genotype_fields is empty, i.e, no sample is imported
+        self.assertSucc('vtools import_variants --format vcf vcf/CEU.vcf.gz --genotype_fields')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
-        self.assertSucc('vtools import_variants vcf/SAMP1.vcf')
+        self.assertFail('vtools import_variants --format vcf vcf/SAMP1.vcf')
         self.assertEqual(numOfSample(), 2)
         # force re-import the same file with samples
-        self.assertSucc('vtools import_variants vcf/CEU.vcf.gz -f')
+        self.assertSucc('vtools import_variants --format vcf vcf/CEU.vcf.gz -f')
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
-        self.assertSucc('vtools import_variants vcf/CEU.vcf.gz')
+        self.assertFail('vtools import_variants --format vcf vcf/CEU.vcf.gz')
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 698)
-        self.assertSucc('vtools import_variants vcf/CEU.vcf.gz')
 
-    def testImportIndel(self):
-        self.assertSucc('vtools import_variants vcf/SAMP3_complex_variants.vcf')
+    def testImportVCFIndel(self):
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
         #self.assertSucc('vtools import_variants vcf/SAMP4_complex_variants.vcf')
@@ -180,22 +170,19 @@ class TestImportVariants(ProcessTestCase):
         
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'
-        self.assertSucc('vtools import_variants vcf/SAMP1.vcf --build hg18')
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 289)
         # 104 records in SAMP1.vcf failed to map to hg19
-        self.assertSucc('vtools import_variants vcf/var_format.vcf --build hg19')
+        self.assertSucc('vtools import_variants --format vcf vcf/var_format.vcf --build hg19')
         # all records in var_format.vcf are mapped to hg18
         self.assertEqual(numOfSample(), 1+1)
-        self.assertEqual(numOfVariant(), 289 + 98)
-        self.assertSucc('vtools import_variants vcf/var_format.vcf --build hg19')
-        self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289 + 98)
         self.assertSucc('vtools import_variants vcf/var_format.vcf --build hg19 -f')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289 + 98)
         # 19 out of 121 records failed to map.
-        self.assertSucc('vtools import_variants vcf/SAMP2.vcf --build hg18')
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP2.vcf --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.assertEqual(numOfVariant(), 289 + 98 + 121)
         #
@@ -204,14 +191,14 @@ class TestImportVariants(ProcessTestCase):
         # it the output is the same
         out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
         self.assertSucc('vtools init test -f')
-        self.assertSucc('vtools import_variants vcf/var_format.vcf --build hg19')
+        self.assertSucc('vtools import_variants --format vcf vcf/var_format.vcf --build hg19')
         self.assertEqual(numOfVariant(), 98)
         self.assertEqual(numOfSample(), 1)
-        self.assertSucc('vtools import_variants vcf/SAMP1.vcf --build hg18')
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP1.vcf --build hg18')
         self.assertEqual(numOfSample(), 2)
         # 101 cannot be mapped. damn.
         self.assertEqual(numOfVariant(), 98 + 289)
-        self.assertSucc('vtools import_variants vcf/SAMP2.vcf --build hg18')
+        self.assertSucc('vtools import_variants --format vcf vcf/SAMP2.vcf --build hg18')
         # 19 out of 121 records failed to map.
         self.assertEqual(numOfSample(), 3)
         self.assertEqual(numOfVariant(), 98 + 289 + 121)
