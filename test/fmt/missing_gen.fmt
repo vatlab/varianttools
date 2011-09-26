@@ -1,0 +1,275 @@
+# http://varianttools.sourceforge.net/Format/New 
+[format description]
+description=a customized import vcf configuration 
+variant_fields=chr,pos,ref,alt
+variant_info=DP_INFO,MQ_INFO,NS_INFO,AN_INFO,AC_INFO,AF_INFO,AB_INFO,LBS_INFO,OBS_INFO,STR_INFO,STZ_INFO,CBR_INFO,CBZ_INFO,QBR_INFO,QBZ_INFO,MBR_INFO,MSR_INFO,MBZ_INFO,IOR_INFO,IOZ_INFO,IOH_INFO,IOD_INFO,AOI_INFO,AOZ_INFO,ABE_INFO,ABZ_INFO,BCS_INFO,FIC_INFO,LQR_INFO,MQ0_INFO,MQ10_INFO,MQ20_INFO,MQ30_INFO,ANNO_INFO,SVM
+genotype_fields=geno
+genotype_info=GT_INFO,GQ_INFO,GD_INFO,PL_INFO,PL3
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=4
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=5
+adj=CheckSplit()
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
+
+[geno]
+index=10:
+type=INTEGER
+adj=VcfGenotype()
+comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file.
+[DP_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('DP=', ';')
+comment=Total Depth at Site
+
+[MQ_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('MQ=', ';')
+comment=Root Mean Squared Mapping Quality
+
+[NS_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('NS=', ';')
+comment=Number of Samples With Coverage
+
+[AN_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('AN=', ';')
+comment=Number of Alleles in Samples with Coverage
+
+[AC_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('AC=', ';')
+comment=Alternate Allele Counts in Samples with Coverage
+
+[AF_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('AF=', ';')
+comment=Alternate Allele Frequencies
+
+[AB_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('AB=', ';')
+comment=Allele Balance in Heterozygotes
+
+[LBS_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'),lambda x: sum(map(int, x.split(,)))
+comment=Number of low-quality (q<13) A,C,G,T bases per strand
+
+[OBS_INFO]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'),lambda x: sum(map(int, x.split(,)))
+comment=Number of good quality (q>13) A,C,G,T bases per strand
+
+[STR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('STR=', ';')
+comment=Strand Bias Pearson's Correlation
+
+[STZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('STZ=', ';')
+comment=Strand Bias z-score
+
+[CBR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('CBR=', ';')
+comment=Cycle Bias Peason's correlation
+
+[CBZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('CBZ=', ';')
+comment=Cycle Bias z-score
+
+[QBR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('QBR=', ';')
+comment=Base quality bias Pearson's correlation
+
+[QBZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('QBZ=', ';')
+comment=Base quality bias z-score
+
+[MBR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MBR=', ';')
+comment=Mapping quality bias Pearson's coreelation
+
+[MSR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MSR=', ';')
+comment=Mapping quality - strand bias Pearson's coreelation
+
+[MBZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MBZ=', ';')
+comment=Mapping quality bias z-score
+
+[IOR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('IOR=', ';')
+comment=Ratio of base-quality inflation
+
+[IOZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('IOZ=', ';')
+comment=Base quality inflation z-score
+
+[IOH_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('IOH=', ';')
+comment=Ratio of base-quality inflation at HETs
+
+[IOD_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('IOD=', ';')
+comment=Ratio of base-quality inflation difference between HETs and others
+
+[AOI_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('AOI=', ';')
+comment=Alternate allele inflation score
+
+[AOZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('AOZ=', ';')
+comment=Alternate allele quality z-score
+
+[ABE_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('ABE=', ';')
+comment=Exact allele balance score from base quality
+
+[ABZ_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('ABZ=', ';')
+comment=Exact allele balance z-score from base and quality
+
+[BCS_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('BCS=', ';')
+comment=Bayesian SNP call score
+
+[FIC_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('FIC=', ';')
+comment=Inbreeding coefficient
+
+[LQR_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('LQR=', ';')
+comment=Fraction of low quality (q<13) bases
+
+[MQ0_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ0=', ';')
+comment=Fraction of bases with mapQ=0
+
+[MQ10_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ10=', ';')
+comment=Fraction of bases with mapQ<=10
+
+[MQ20_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ20=', ';')
+comment=Fraction of bases with mapQ<=20
+
+[MQ30_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ30=', ';')
+comment=Fraction of bases with mapQ<=30
+
+[ANNO_INFO]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('ANNO=', ';')
+comment=Functional annotation from ANNOVAR software
+
+[SVM_INFO]
+index=8
+type=FLOAT
+adj=ExtractValue('SVM=', ';')
+comment=SVM-based variant quality score
+
+[GT_INFO]
+index=9
+type=VARCHAR(255)
+adj=ExtractValue('GT=', ';')
+comment=Most Likely Genotype
+
+[GQ_INFO]
+index=9
+type=INTEGER
+adj=ExtractValue('GQ=', ';')
+comment=Genotype Call Quality
+
+[GD_INFO]
+index=9
+type=INTEGER
+adj=ExtractValue('GD=', ';')
+comment=Genotype Read Depth
+
+[PL_INFO]
+index=9
+type=INTEGER
+adj=ExtractValue('PL=', ';')
+comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
+
+[PL3_INFO]
+index=9
+type=INTEGER
+adj=ExtractValue('PL3=', ';')
+comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+

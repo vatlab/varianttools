@@ -113,6 +113,11 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 20)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp'+'\n')
+        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --force --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
+        genotypes = getGenotypes('test', 1)[0]
+        print genotypes
+        #self.assertEqual(len(genotypes), )
         
     def testCASAVA18_INDEL(self):
         'Testing the CASAVA INDEL input format'
@@ -123,7 +128,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 25)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavaindel'+'\n')
-
+        self.assertEqual(getGenotypes('test', 1)[0], ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '2', '1', '1', '1', '1', '2', '1', '1'])
+        
     def testPileup_INDEL(self):
         self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel')
         self.assertEqual(numOfSample(), 1)
