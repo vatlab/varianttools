@@ -269,8 +269,8 @@ class SequentialExtractor:
             if not item:
                 return item
             # if multiple records are returned, apply to each of them
-            if type(item) == tuple:
-                if type(item[0]) == tuple:
+            if type(item) is tuple:
+                if type(item[0]) is tuple:
                     raise ValueError('Nested vector extracted is not allowed')
                 item = [e(x) for x in item]
             else:
@@ -376,7 +376,7 @@ class TextProcessor:
         #        
         try:
             # we first trust that nothing can go wrong and use a quicker method
-            records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
+            records = [(to=ons[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
@@ -392,30 +392,30 @@ class TextProcessor:
                         item = None
             records.append(item)
         #
-        num_records = max([len(item) if type(item) == tuple else 1 for item in records])
+        num_records = max([len(item) if type(item) is tuple else 1 for item in records])
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
             if num_records == 1:
-                yield [], [x[0] if type(x) == tuple else x for x in records]
+                yield [], [x[0] if type(x) is tuple else x for x in records]
             else:
                 for i in range(num_records):
-                    yield [], [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
+                    yield [], [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
         elif len(self.build[0]) == 1:
             for i in range(num_records):
                 if i == 0:  # try to optimize a little bit because most of the time we only have one record
-                    rec = [x[0] if type(x) == tuple else x for x in records]
+                    rec = [x[0] if type(x) is tuple else x for x in records]
                 else:
-                    rec = [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
+                    rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
                 bins = [getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])) if rec[pos_idx] else None for pos_idx, in self.build]
                 yield bins, rec
         else:
             for i in range(num_records):
                 bins = []
                 if i == 0:  # try to optimize a little bit because most of the time we only have one record
-                    rec = [x[0] if type(x) == tuple else x for x in records]
+                    rec = [x[0] if type(x) is tuple else x for x in records]
                 else:
-                    rec = [(x[i] if i < len(x) else None) if type(x) == tuple else x for x in records]
+                    rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
                 for pos_idx, ref_idx, alt_idx in self.build:
                     bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
                     bins.append(bin)
@@ -722,7 +722,7 @@ class txtImporter(Importer):
                                 return 0, []
                             else:
                                 cols = [x[0] for x in self.prober.fields]
-                                if type(cols[0]) == tuple:
+                                if type(cols[0]) is tuple:
                                     fixed = False
                                     # mutiple ones, need to figure out the moving one
                                     for i,idx in enumerate(self.prober.raw_fields[0].index.split(',')):
