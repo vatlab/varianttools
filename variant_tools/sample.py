@@ -96,16 +96,22 @@ class Sample:
         self.proj.db.renameTable(temp_table_name, 'sample')
         self.db.commit()
 
-    def calcSampleStat(self, IDs, variant_table, num, hom, het, other, other_stats):
+    def calcSampleStat(self, IDs, variant_table, genotypes, num, hom, het, other, other_stats):
         '''Count sample allele count etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
             raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
-        #
+        
         if num is None and hom is None and het is None and other is None and not other_stats:
             self.logger.warning('No statistics is specified')
             return
-        #
+        
         self.logger.info('OTHER STAT PARAMETERS: {}'.format(other_stats))
+
+# TODO
+#        Loop through other_stats
+#            Split operation_FIELD
+#            execute
+#            save in dest_field
         for name in (num, hom, het, other):
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
@@ -131,7 +137,11 @@ class Sample:
             sum([self.db.numOfRows('{}_genotype.sample_variant_{}'.format(self.proj.name, id)) for id in IDs]))
         count = 0
         for id in IDs:
-            cur.execute('SELECT * FROM {}_genotype.sample_variant_{};'.format(self.proj.name, id))
+            where_clause = ''
+            if genotypes is not None and len(genotypes) != 0:
+                where_clause = 'where ' + ' AND '.join(genotypes)
+            print('SELECT * FROM {}_genotype.sample_variant_{} {};'.format(self.proj.name, id, where_clause))
+            cur.execute('SELECT * FROM {}_genotype.sample_variant_{} {};'.format(self.proj.name, id, where_clause))
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
@@ -212,6 +222,9 @@ def sampleStatArguments(parser):
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
+    parser.add_argument('--genotypes', nargs='*', default=[],
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show genotypes' (e.g. 'DP_INFO>20').''')
     parser.add_argument('table',
         help='''Variant table for which the statistics will be calculated and updated.''')
     parser.add_argument('-n', '--num',
@@ -240,7 +253,7 @@ def sampleStat(args):
                     return
                 else:
                     p.logger.info('{} samples are selected'.format(len(IDs)))
-            p.calcSampleStat(IDs, variant_table, args.num, args.hom,
+            p.calcSampleStat(IDs, variant_table, args.genotypes, args.num, args.hom,
                 args.het, args.other, args.unknown_args)
         # temporary tables will be removed
         proj.close()

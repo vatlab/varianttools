@@ -1548,7 +1548,7 @@ def show(args):
                     
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
-                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id
+                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[2:]])  # the first field is variant id, second is variant_type
                     
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
  
