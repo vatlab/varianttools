@@ -79,14 +79,18 @@ comment=Allele Balance in Heterozygotes
 [LBS_INFO]
 index=8
 type=INTEGER
-adj=ExtractValue('LBS=', ';'),lambda x: sum(map(int, x.split(',')))
-comment=Number of low-quality (q<13) sum(A,C,G,T bases per strand)
+adj=ExtractValue('LBS=', ';'),CheckSplit(sep=',')
+#adj=ExtractValue('LBS=', ';'),lambda x: sum(map(int, x.split(',')))
+comment=Number of low-quality (q<13) A,C,G,T bases per strand
+#comment=Number of low-quality (q<13) sum(A,C,G,T bases per strand)
 
 [OBS_INFO]
 index=8
 type=INTEGER
-adj=ExtractValue('OBS=', ';'),lambda x: sum(map(int, x.split(',')))
-comment=Number of good quality (q>13) sum(A,C,G,T bases per strand)
+adj=ExtractValue('OBS=', ';'),CheckSplit(sep=',')
+#adj=ExtractValue('OBS=', ';'),lambda x: sum(map(int, x.split(',')))
+comment=Number of good quality (q>13) A,C,G,T bases per strand
+#comment=Number of good quality (q>13) sum(A,C,G,T bases per strand)
 
 [STR_INFO]
 index=8
@@ -247,29 +251,29 @@ comment=SVM-based variant quality score
 [GT_INFO]
 index=9
 type=VARCHAR(255)
-adj=ExtractValue('GT=', ';')
+adj=ExtractValue('GT', ':')
 comment=Most Likely Genotype
 
 [GQ_INFO]
 index=9
 type=INTEGER
-adj=ExtractValue('GQ=', ';')
+adj=FieldFromFormat('GQ', ':')
 comment=Genotype Call Quality
 
 [GD_INFO]
 index=9
 type=INTEGER
-adj=ExtractValue('GD=', ';')
+adj=FieldFromFormat('GD', ':')
 comment=Genotype Read Depth
 
 [PL_INFO]
 index=9
 type=INTEGER
-adj=ExtractValue('PL=', ';')
+adj=FieldFromFormat('PL', ':'),CheckSplit(sep=',')
 comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
 
 [PL3_INFO]
 index=9
 type=INTEGER
-adj=ExtractValue('PL3=', ';')
+adj=FieldFromFormat('PL3', ':'),CheckSplit(sep=',')
 comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2

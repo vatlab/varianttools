@@ -52,12 +52,12 @@ comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This fiel
 index=8
 adj=ExtractValue('DP=', ';')
 type=INTEGER
-comment=DP fiels in INFO. Total depth of samples in a vcf file.
+comment=DP fields in INFO. Total depth of samples in a vcf file.
 
 [DP_FMT]
 # Passing 'GT:DP\t0/0:64'
 index=9, 10:
 adj=FieldFromFormat('DP', ':')
 type=INTEGER
-comment=DP fiels in INFO. Total depth of samples in a vcf file.
+comment=DP fields in INFO. Total depth of samples in a vcf file.
 

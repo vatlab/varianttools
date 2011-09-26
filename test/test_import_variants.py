@@ -208,5 +208,19 @@ class TestImportVariants(ProcessTestCase):
         out2 = '\n'.join([x for x in sorted(out2.split('\n')) if 'NA' not in x])
         self.assertEqual(out1, out2)
     
+    def testImportMyVCF(self):
+        'Test a customized vcf import'
+        self.assertSucc('vtools import_variants --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+        self.assertEqual(output2list('vtools output variant DP_INFO MQ_INFO NS_INFO AN_INFO \
+                        AC_INFO AF_INFO AB_INFO LBS_INFO OBS_INFO STR_INFO STZ_INFO CBR_INFO \
+                        CBZ_INFO QBR_INFO QBZ_INFO MBR_INFO MSR_INFO MBZ_INFO IOR_INFO IOZ_INFO \
+                        IOH_INFO IOD_INFO AOI_INFO AOZ_INFO ABE_INFO ABZ_INFO BCS_INFO FIC_INFO LQR_INFO \
+                        MQ0_INFO MQ10_INFO MQ20_INFO MQ30_INFO ANNO_INFO SVM_INFO \
+                        -l 1')[0].split('\t'),
+                         ['472', '28', '308', '616', '1', '0.002774', '0.2738', '8452', '735013', '-0.001', '-1.004', '0.002', 
+                        '1.354', '-0.032', '-27.065', '0.007', '-0.029', '6.137', '0.52', '-17.939', '0.0', '0.0', '-21.32', '-3.382', 
+                        '0.901', '29.686', '-2003.904', '0.948', '0.011', '0.997', '0.997', '1.0', '1.0',
+                        'nonsynonymous:OR4F5:NM_001005484:exon1:c.G26A:p.G9D,', '-1.4352462'])     
+    
 if __name__ == '__main__':
     unittest.main()
