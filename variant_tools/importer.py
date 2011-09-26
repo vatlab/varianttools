@@ -298,10 +298,12 @@ class TextProcessor:
     def reset(self):
         self.first_time = True
         self.fields = []
+        self.nColumns = 0
 
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
         if self.first_time:
+            self.nColumns = len(tokens)
             cIdx = 0
             for fIdx, field in enumerate(self.raw_fields):
                 try:
@@ -726,11 +728,14 @@ class txtImporter(Importer):
                                     if not fixed:
                                         cols = [x[-1] for x in cols]
                                 header = [x.strip() for x in header.split(self.prober.delimiter)]
-                                if max(cols) < len(header):
-                                    return len(rec), [header[x] for x in cols]
+                                if max(cols) - min(cols)  < len(header):
+                                    return len(rec), [header[len(header) - self.prober.nColumns + x] for x in cols]
                                 else:
                                     return len(rec), []
                     except Exception as e:
+                        # perhaps not start with #, if we have no header, use it anyway
+                        if header is None:
+                            header = line
                         count += 1
                         if count == 100:
                             raise ValueError('Cannot determine header of file')
