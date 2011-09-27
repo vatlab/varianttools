@@ -107,12 +107,26 @@ class Sample:
         
         self.logger.info('OTHER STAT PARAMETERS: {}'.format(other_stats))
 
-# TODO
-#        Loop through other_stats
-#            Split operation_FIELD
-#            execute
-#            save in dest_field
-        for name in (num, hom, het, other):
+        core_operations = [num, hom, het, other]  
+        possible_operations = ['mean','sum','min','max']
+        operations = []
+        genotype_fields = []
+        destinations = []
+        field_calcs = []   
+        for index in range(0,len(other_stats)):
+            if other_stats[index][0:2] == '--':
+                argument = other_stats[index][2:]
+                underscore = argument.find('_')
+                operation = argument[0:underscore]
+                if operation not in possible_operations:
+                    raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possible_operations)))
+                operations.append(operation)
+                genotype_fields.append(argument[underscore + 1:])
+                field_calcs.append(None)
+                index += 1
+                destinations.append(other_stats[index])
+          
+        for name in core_operations:
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
         #
@@ -140,12 +154,17 @@ class Sample:
             where_clause = ''
             if genotypes is not None and len(genotypes) != 0:
                 where_clause = 'where ' + ' AND '.join(genotypes)
-            print('SELECT * FROM {}_genotype.sample_variant_{} {};'.format(self.proj.name, id, where_clause))
-            cur.execute('SELECT * FROM {}_genotype.sample_variant_{} {};'.format(self.proj.name, id, where_clause))
+            
+            field_select = ''
+            if genotype_fields is not None and len(genotype_fields) != 0:
+                field_select = ', ' + ', '.join(genotype_fields)
+                
+            cur.execute('SELECT variant_id, variant_type{} FROM {}_genotype.sample_variant_{} {};'.format(field_select, self.proj.name, id, where_clause))
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
                         variants[rec[0]] = [0, 0, 0]
+                        variants[rec[0]].extend(list(field_calcs))
                     # type heterozygote
                     if rec[1] == 1:
                         variants[rec[0]][0] += 1
@@ -159,14 +178,38 @@ class Sample:
                         pass
                     else:
                         self.logger.warning('Invalid genotype type {}'.format(rec[1]))
+                
+                    # this collects genotype_field information
+                    if len(genotype_fields) > 0:
+                        for index in range(0,len(genotype_fields)):
+                            query_index = index + 2     # to move beyond the variant_id and variant_type fields in the select statement
+                            rec_index = index + 3       # first 3 attributes of variants are het, hom and double_het
+                            operation = operations[index]
+                            field = genotype_fields[index]
+                            if operation in ['sum','mean']:
+                                if variants[rec[0]][rec_index] is None:
+                                    variants[rec[0]][rec_index] = rec[query_index]
+                                else:
+                                    variants[rec[0]][rec_index] += rec[query_index]
+                            if operation == 'min':
+                                if variants[rec[0]][rec_index] is None or rec[query_index] < variants[rec[0]][rec_index]:
+                                    variants[rec[0]][rec_index] = rec[query_index]
+                            if operation == 'max':
+                                if variants[rec[0]][rec_index] is None or rec[query_index] > variants[rec[0]][rec_index]:
+                                    variants[rec[0]][rec_index] = rec[query_index]  
+                    
                 count += 1
                 if count % self.db.batch == 0:
                     prog.update(count)
         prog.done()
         #
         headers = self.db.getHeaders(variant_table)
-        for field, fldtype in [(num, 'INT'), (hom, 'INT'),
-                (het, 'INT'), (other, 'INT')]:
+        [num, hom, het, other]
+        table_attributes = [(num, 'INT'), (hom, 'INT'),
+                (het, 'INT'), (other, 'INT')]
+        for destination in destinations:
+            table_attributes.append((destination, 'INT'))
+        for field, fldtype in table_attributes:
             if field is None:
                 continue
             if field in headers:
@@ -175,11 +218,12 @@ class Sample:
                     self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
             else:
                 self.logger.info('Adding field {}'.format(field))
-                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
+                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))               
         #
+        query_operations = core_operations + destinations
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
-            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in [num, hom, het, other] if x is not None]))
+            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in query_operations if x is not None]))
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -193,10 +237,21 @@ class Sample:
                 res.append(value[0])
             if other is not None:
                 res.append(value[2])
+                
+            # for genotype_field operations, the value[operation_index] holds the result of the operation
+            # except for the "mean" operation which needs to be divided by num_samples that have that variant
+            for index in range(0,len(genotype_fields)):
+                operation_index = index + 3     # the first 3 indices hold the values for hom, het and other
+                operation_calculation = value[operation_index]
+                if operations[index] == 'mean':
+                    num_samples = value[0] + value[1] + value[2]
+                    operation_calculation /= num_samples
+                res.append(operation_calculation)
             cur.execute(update_query, res + [id])
             if count % self.db.batch == 0:
                 self.db.commit()
                 prog.update(count)
+            
         self.db.commit()
         prog.done()
                 
