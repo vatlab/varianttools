@@ -830,6 +830,16 @@ class txtImporter(Importer):
                 .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
                 for id in sample_ids}
         fld_cols = None
+        # cache genotype status
+        if len(self.genotype_field) > 0:
+            # has genotype
+            genotype_status = 1
+        elif len(sample_ids) > 0:
+            # no genotype but with sample
+            genotype_status = 2
+        else:
+            # no genotype no sample
+            genotype_status = 0
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -839,19 +849,22 @@ class txtImporter(Importer):
                     for bins, rec in self.processor.process(line):
                         self.count[2] += 1
                         variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-                        if fld_cols is None:
-                            col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                            fld_cols = []
-                            for idx in range(len(sample_ids)):
-                                fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-                            if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
-                                self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
-                                    col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
-                        for idx, id in enumerate(sample_ids):
-                            if rec[self.ranges[2] + idx] is not None:
-                                self.count[1] += 1
-                                #re = [variant_id] + [rec[sc] for sc in rngs[idx]]
-                                cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
+                        if genotype_status == 1:
+                            if fld_cols is None:
+                                col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                                fld_cols = []
+                                for idx in range(len(sample_ids)):
+                                    fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+                                if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                                    self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                                        col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
+                            for idx, id in enumerate(sample_ids):
+                                if rec[self.ranges[2] + idx] is not None:
+                                    self.count[1] += 1
+                                    cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
+                        elif genotype_status == 2:
+                            # should have only one sample
+                            cur.execute(genotype_insert_query[sample_ids[0]], [variant_id])
                     self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
