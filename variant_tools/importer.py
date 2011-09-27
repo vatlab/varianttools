@@ -373,7 +373,7 @@ class TextProcessor:
                     self.logger.debug(e)
                     raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
             self.first_time = False
-        #        
+        #
         try:
             # we first trust that nothing can go wrong and use a quicker method
             records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
@@ -382,7 +382,11 @@ class TextProcessor:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
             records = []
             for col, t, adj in self.fields:
-                item = tokens[col] if t else [tokens[x] for x in col]
+                try:
+                    item = tokens[col] if t else [tokens[x] for x in col]
+                except IndexError:
+                    raise ValueError('Cannot get column {} of the input line, which has only {} columns (others have {} columns).'.format(\
+                        col + 1 if type(col) is int else [x+1 for x in col], len(tokens), self.nColumns))
                 if adj is not None:
                     try:
                         item = adj(item)
