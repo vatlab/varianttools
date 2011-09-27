@@ -387,10 +387,10 @@ class TextProcessor:
                     try:
                         item = adj(item)
                     except Exception as e:
-                        self.logger.debug('Failed to process field {}: {}'.format(records[idx], e))
+                        self.logger.debug('Failed to process field {}: {}'.format(item, e))
                         # missing ....
                         item = None
-            records.append(item)
+                records.append(item)
         #
         num_records = max([len(item) if type(item) is tuple else 1 for item in records])
         # handle records
@@ -846,8 +846,7 @@ class txtImporter(Importer):
                                 cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
                     self.count[0] += 1
                 except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
                     self.count[7] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
