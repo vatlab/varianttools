@@ -4,7 +4,7 @@ description=a customized import vcf configuration
 variant_fields=chr,pos,ref,alt
 #variant_info=DP_INFO,MQ_INFO,NS_INFO,AN_INFO,AC_INFO,AF_INFO,AB_INFO,LBS_INFO,OBS_INFO,STR_INFO,STZ_INFO,CBR_INFO,CBZ_INFO,QBR_INFO,QBZ_INFO,MBR_INFO,MSR_INFO,MBZ_INFO,IOR_INFO,IOZ_INFO,IOH_INFO,IOD_INFO,AOI_INFO,AOZ_INFO,ABE_INFO,ABZ_INFO,BCS_INFO,FIC_INFO,LQR_INFO,MQ0_INFO,MQ10_INFO,MQ20_INFO,MQ30_INFO,ANNO_INFO,SVM_INFO
 genotype_fields=geno
-genotype_info=GT_INFO,GQ_INFO,GD_INFO,PL_INFO1,PL_INFO2,PL_INFO3,PL3_INFO
+genotype_info=GT_INFO,GQ_INFO,GD_INFO,PL_INFO1,PL_INFO2,PL_INFO3,PL3_INFO1,PL3_INFO2,PL3_INFO3
 
 [chr]
 index=1
@@ -284,8 +284,20 @@ type=INTEGER
 adj=FieldFromFormat('PL', ':'), ExtractField(3, ',')
 comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
 
-[PL3_INFO]
+[PL3_INFO1]
 index=9,10:
 type=INTEGER
-adj=FieldFromFormat('PL3', ':')
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[0], x.split(',')[3]])
+comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+
+[PL3_INFO2]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[1], x.split(',')[4]])
+comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+
+[PL3_INFO3]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[2], x.split(',')[5]])
 comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
