@@ -131,6 +131,8 @@ class Sample:
                 operations.append(operation_keys[operation])
                 genotype_fields.append(field)
                 field_calcs.append(None)
+                if index + 1 >= len(other_stats) or other_stats[index + 1].startswith('--'):
+                    raise ValueError('Missing or invalid field name following parameter {}'.format(other_stats[index]))
                 destinations.append(other_stats[index + 1])
             else:
                 raise ValueError('Expected to see an argument (e.g., --mean_FIELD) here, but found {} instead.'.format(other_stats[index]))

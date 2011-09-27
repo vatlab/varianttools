@@ -117,7 +117,11 @@ class FieldFromFormat:
             else:
                 self.idx = None
                 return self.default
-        return item[1].split(self.sep)[self.idx] if self.idx is not None else self.default
+        try:
+            return item[1].split(self.sep)[self.idx]
+        except:
+            # in the case that self.idx is None, or if item[1].split(self.sep) does not have enough items
+            return self.default
 
 class VcfGenotype:
     def __init__(self, default=None):
