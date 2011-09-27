@@ -836,8 +836,9 @@ class txtImporter(Importer):
                             fld_cols = []
                             for idx in range(len(sample_ids)):
                                 fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-                            if self.ranges[3] - self.ranges[2] != len(sample_ids):
-                                raise ValueError('Number of genotypes ({}) does not match number of samples ({})'.format(self.ranges[3] - self.ranges[2], len(sample_ids)))
+                            if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                                self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                                    col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
                         for idx, id in enumerate(sample_ids):
                             if rec[self.ranges[2] + idx] is not None:
                                 self.count[1] += 1
