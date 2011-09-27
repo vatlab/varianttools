@@ -298,11 +298,13 @@ class TextProcessor:
         self.delimiter = delimiter
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
+        self.valid_till = None  # genotype fields might be disabled
 
-    def reset(self):
+    def reset(self, validTill=None):
         self.first_time = True
         self.fields = []
         self.nColumns = 0
+        self.valid_till = validTill
 
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
@@ -310,6 +312,8 @@ class TextProcessor:
             self.nColumns = len(tokens)
             cIdx = 0
             for fIdx, field in enumerate(self.raw_fields):
+                if self.valid_till is not None and fIdx >= self.valid_till:
+                    continue
                 try:
                     # get an instance of an extractor, or a function
                     e = eval(field.adj) if field.adj else None
@@ -400,7 +404,7 @@ class TextProcessor:
                         item = None
                 records.append(item)
         #
-        num_records = max([len(item) if type(item) is tuple else 1 for item in records])
+        num_records = max([len(item) if type(item) is tuple else 1 for item in records]) if records else 1
         # handle records
         if not self.build:
             # there is no build information, this is 'field' annotation, nothing to worry about
@@ -751,7 +755,7 @@ class txtImporter(Importer):
                             header = line
                         count += 1
                         if count == 100:
-                            raise ValueError('Cannot determine header of file')
+                            raise ValueError('No genotype column could be determined after 1000 lines.')
                         self.logger.debug(e)
                     
     def addVariant(self, cur, rec):
@@ -794,23 +798,30 @@ class txtImporter(Importer):
                 sample_ids = []
                 self.sample_in_file = []
             else:
-                numSample, names = self.getSampleName(input_filename)
-                if not names:
-                    if numSample == 1:
-                        self.logger.debug('Missing sample name (name None is used)'.format(numSample))
-                        sample_ids = self.recordFileAndSample(input_filename, [None], True,
-                            self.genotype_info)
-                        self.sample_in_file = [None]
-                    elif numSample == 0:
-                        self.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
-                        sample_ids = []
-                        self.sample_in_file = []
+                try:
+                    numSample, names = self.getSampleName(input_filename)
+                    if not names:
+                        if numSample == 1:
+                            self.logger.debug('Missing sample name (name None is used)'.format(numSample))
+                            sample_ids = self.recordFileAndSample(input_filename, [None], True,
+                                self.genotype_info)
+                            self.sample_in_file = [None]
+                        elif numSample == 0:
+                            self.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
+                            sample_ids = []
+                            self.sample_in_file = []
+                        else:
+                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
                     else:
-                        raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
-                else:
-                    sample_ids = self.recordFileAndSample(input_filename, names, True,
-                        self.genotype_info)
-                    self.sample_in_file = [x for x in names]
+                        sample_ids = self.recordFileAndSample(input_filename, names, True,
+                            self.genotype_info)
+                        self.sample_in_file = [x for x in names]
+                except ValueError:
+                    # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
+                    self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
+                    self.genotype_field = []
+                    sample_ids = []
+                    self.sample_in_file = []
         else:
             self.sample_in_file = [x for x in self.sample_name]
             if not self.genotype_field:
@@ -818,10 +829,17 @@ class txtImporter(Importer):
                 self.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
             else:
-                numSample, names = self.getSampleName(input_filename)
-                if len(self.sample_name) != numSample:
-                    raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
-                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, True, self.genotype_info)
+                try:
+                    numSample, names = self.getSampleName(input_filename)
+                    if len(self.sample_name) != numSample:
+                        raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
+                except ValueError:
+                    self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
+                    self.genotype_field = []
+                    self.genotype_info = []
+                    # remove genotype field from processor
+                    self.processor.reset(validTill=self.ranges[2])
+                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, len(self.genotype_field) > 0, self.genotype_info)
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
@@ -864,7 +882,8 @@ class txtImporter(Importer):
                                     cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
                         elif genotype_status == 2:
                             # should have only one sample
-                            cur.execute(genotype_insert_query[sample_ids[0]], [variant_id])
+                            for id in sample_ids:
+                                cur.execute(genotype_insert_query[id], [variant_id])
                     self.count[0] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
