@@ -104,29 +104,39 @@ class Sample:
         if num is None and hom is None and het is None and other is None and not other_stats:
             self.logger.warning('No statistics is specified')
             return
-        
-        self.logger.info('OTHER STAT PARAMETERS: {}'.format(other_stats))
 
-        core_operations = [num, hom, het, other]  
-        possible_operations = ['mean','sum','min','max']
+        core_destinations = [num, hom, het, other]  
+
+        # keys to speed up some operations
+        MEAN = 0
+        SUM = 1
+        MIN = 2
+        MAX = 3
+        operation_keys = {}
+        operation_keys['mean'] = MEAN
+        operation_keys['sum'] = SUM
+        operation_keys['min'] = MIN
+        operation_keys['max'] = MAX
+        possible_operations = operation_keys.keys()
+        
         operations = []
         genotype_fields = []
         destinations = []
         field_calcs = []   
-        for index in range(0,len(other_stats)):
-            if other_stats[index][0:2] == '--':
-                argument = other_stats[index][2:]
-                underscore = argument.find('_')
-                operation = argument[0:underscore]
+        for index in range(0, len(other_stats), 2):
+            if other_stats[index].startswith('--'):
+                operation, field = other_stats[index][2:].split('_',1)
                 if operation not in possible_operations:
                     raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possible_operations)))
-                operations.append(operation)
-                genotype_fields.append(argument[underscore + 1:])
+                operations.append(operation_keys[operation])
+                genotype_fields.append(field)
                 field_calcs.append(None)
-                index += 1
-                destinations.append(other_stats[index])
+                destinations.append(other_stats[index + 1])
+            else:
+                raise ValueError('Expected to see an argument (e.g., --mean_FIELD) here, but found {} instead.'.format(other_stats[index]))
           
-        for name in core_operations:
+        query_destinations = core_destinations + destinations  
+        for name in query_destinations:
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
         #
@@ -158,8 +168,13 @@ class Sample:
             field_select = ''
             if genotype_fields is not None and len(genotype_fields) != 0:
                 field_select = ', ' + ', '.join(genotype_fields)
+            
+            try:    
+                query = 'SELECT variant_id, variant_type{} FROM {}_genotype.sample_variant_{} {};'.format(field_select, self.proj.name, id, where_clause)
+                cur.execute(query)
+            except:
+                self.logger.warning('Problem executing query on sample with ID = {} using query: {}.'.format(id, query))
                 
-            cur.execute('SELECT variant_id, variant_type{} FROM {}_genotype.sample_variant_{} {};'.format(field_select, self.proj.name, id, where_clause))
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
@@ -186,15 +201,15 @@ class Sample:
                             rec_index = index + 3       # first 3 attributes of variants are het, hom and double_het
                             operation = operations[index]
                             field = genotype_fields[index]
-                            if operation in ['sum','mean']:
+                            if operation in [MEAN, SUM]:
                                 if variants[rec[0]][rec_index] is None:
                                     variants[rec[0]][rec_index] = rec[query_index]
                                 else:
                                     variants[rec[0]][rec_index] += rec[query_index]
-                            if operation == 'min':
+                            if operation == MIN:
                                 if variants[rec[0]][rec_index] is None or rec[query_index] < variants[rec[0]][rec_index]:
                                     variants[rec[0]][rec_index] = rec[query_index]
-                            if operation == 'max':
+                            if operation == MAX:
                                 if variants[rec[0]][rec_index] is None or rec[query_index] > variants[rec[0]][rec_index]:
                                     variants[rec[0]][rec_index] = rec[query_index]  
                     
@@ -220,10 +235,10 @@ class Sample:
                 self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))               
         #
-        query_operations = core_operations + destinations
+
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
-            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in query_operations if x is not None]))
+            ' ,'.join(['{}={}'.format(x, self.db.PH) for x in query_destinations if x is not None]))
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -243,7 +258,7 @@ class Sample:
             for index in range(0,len(genotype_fields)):
                 operation_index = index + 3     # the first 3 indices hold the values for hom, het and other
                 operation_calculation = value[operation_index]
-                if operations[index] == 'mean':
+                if operations[index] == MEAN:
                     num_samples = value[0] + value[1] + value[2]
                     operation_calculation /= num_samples
                 res.append(operation_calculation)
