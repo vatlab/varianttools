@@ -287,5 +287,5 @@ comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
 [PL3_INFO]
 index=9,10:
 type=INTEGER
-adj=FieldFromFormat('PL3', ':'),CheckSplit(sep=',')
+adj=FieldFromFormat('PL3', ':')
 comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
