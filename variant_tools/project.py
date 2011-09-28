@@ -1517,7 +1517,6 @@ def show(args):
                         raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
                     fmt.describe()
             elif args.type == 'genotypes':
-                
                 # get sample ids and attach the genotypes database
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
@@ -1529,7 +1528,6 @@ def show(args):
                     # either the database doesn't exist or it's already been attached (should we add a method proj.db.isAttached(...)? and embedding this in the attach() method?
                     if not proj.db.hasDatabase(proj.name + '_genotype'):
                         proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
-                                
                 # sample headers are ID, file, sample, FIELDS
                 fields = proj.db.getHeaders('sample')
                 print('filename\tsample_name{}\tnum_genotypes\tsample_specific_info_fields'.format(''.join(['\t'+x for x in fields[3:]])))
@@ -1537,19 +1535,15 @@ def show(args):
                     .format(', '.join(fields[2:])))
                 records = cur.fetchall()
                 for rec in records:
-                    
                     # sample fields
                     sampleFields = '\t'.join(['{}'.format(x) for x in rec[1:]])
-                    
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
                     cur.execute('SELECT count(*) FROM {}_genotype.sample_variant_{};'.format(proj.name, sampleId))
                     numGenotypes = cur.fetchone()[0]
-                    
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
-                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[2:]])  # the first field is variant id, second is variant_type
-                    
+                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is variant_type
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
  
     except Exception as e:
