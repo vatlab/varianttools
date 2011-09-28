@@ -129,7 +129,7 @@ def initTest(level):
         runCmd('vtools import_variants vcf/SAMP1.vcf')
         if i == level: break
         else: i += 1
-        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv  --build hg18 --sample_name input.tsv')
+        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         if i == level: break
         else: i += 1        
         runCmd('vtools import_phenotype phenotype/phenotype.txt')
@@ -144,7 +144,7 @@ def initTest(level):
         runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
         if i == level: break
         else: i += 1        
-        runCmd('vtools select ns \'genename = "PLEKHN1"\'  -t plekhn1')
+        runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
         if i == level: break
         else: i += 1        
         runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')

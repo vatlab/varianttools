@@ -28,14 +28,14 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
 
 class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other --depth depth')
+        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
         runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --het CEU_cases_het')
     def removeProj(self):
         runCmd('vtools remove project')
@@ -59,7 +59,11 @@ class TestSelect(ProcessTestCase):
         
     def testSelectSample(self):
         self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '338\n')
+        self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
         self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
+        #nsfp = output2list('vtools execute "select chr, hg18pos, ref, alt from testNSFP"')
+        #variantid = [output2list('vtools execute "select variant_id from variant where chr={0} and pos={1} and ref={2} and alt={3}"'.format(x.split()[0], x.split()[1], repr(x.split()[2]), repr(x.split()[3]))) for x in nsfp]
+        #print variantid
         self.assertOutput("vtools select ns_input -c", '7\n')
         self.assertSucc('vtools select ns_input \'genename = "PLEKHN1"\'  -t plekhn1')
         self.assertOutput("vtools select plekhn1 -c", '6\n')
@@ -67,26 +71,35 @@ class TestSelect(ProcessTestCase):
         self.assertOutput("vtools select d_plekhn1 -c", '5\n')
         self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "aff=1" -t ns_aff')
         self.assertOutput("vtools select ns_aff -c", '0\n')
-        self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
-        self.assertOutput("vtools select ns2 -c", '563\n')
-        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 or BMI<20'", '41\n')
+        #
         self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
-        self.assertOutput("vtools select ns3 -c", '217\n')
+        namelist = output2list('vtools execute "select sample_id from sample where aff=1 and BMI<20"')
+        variantlist = [output2list('vtools execute "select variant_id from sample_variant_{}"'.format(x)) for x in namelist]
+        variantlist = [x for y in variantlist for x in y]
+        lv = str(len(set(variantlist)))        
+        self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
         self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
         self.assertSucc('vtools select variant --samples "aff=\'1\'" "BMI<20" -t ns3')
-        self.assertOutput("vtools select ns3 -c", '217\n')
-        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
+        self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
+        #
+        self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
+        namelist = output2list('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
+        variantlist = [output2list('vtools execute "select variant_id from sample_variant_{}"'.format(x)) for x in namelist]
+        variantlist = [x for y in variantlist for x in y]
+        lv = str(len(set(variantlist)))
+        self.assertOutput("vtools select ns2 -c", '{}\n'.format(lv))
+        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 or BMI<20'", '41\n')
+        #
         self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+        #
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
-        self.assertOutput("vtools select NA0 -c", '223\n')
+        namelist = output2list('vtools execute "select sample_id from sample where sample_name like \'NA0%\'"')
+        variantlist = [output2list('vtools execute "select variant_id from sample_variant_{}"'.format(x)) for x in namelist]
+        variantlist = [x for y in variantlist for x in y]
+        lv = str(len(set(variantlist)))
+        self.assertOutput("vtools select NA0 -c", '{}\n'.format(lv))
         self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
     
-    def testSelectFixme(self):
-        initTest(2)
-        # no sample name for input.tsv
-        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18')
-        self.assertOutput('vtools select variant --samples \'filename like "%CEU.vcf.gz" \' -c', '288\n')
-        
 if __name__ == '__main__':
     unittest.main()
