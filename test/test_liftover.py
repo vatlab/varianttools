@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_init.py $
+# $File: test_liftover.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -60,7 +60,7 @@ class TestLiftover(ProcessTestCase):
         with open('temp_input.txt', 'w') as output:
             output.write(data)
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import_txt --build hg19 --format ../input_fmt/basic temp_input.txt')
+        self.assertSucc('vtools import_variants --build hg19 --format ../input_fmt/basic temp_input.txt')
         self.assertSucc('vtools liftover hg18')
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
         out2 = '\n'.join([x for x in out2.split('\n') if 'NA' not in x])

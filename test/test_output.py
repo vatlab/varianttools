@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_output.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -34,7 +34,7 @@ class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         
     def testOutputContents(self):
         'Test command vtools output'
@@ -49,13 +49,13 @@ class TestOutput(ProcessTestCase):
         out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt')
         out2 = outputOfCmd('cat txt/input.tsv')
         self.assertEqual(out1, out2)
-        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.assertSucc('vtools output CEU chr pos ref alt -l -1')
         self.assertFail('vtools output CEU and variant -l 10')
         
     def testOutputExpression(self):
-        runCmd('vtools import_vcf vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
         self.assertFail('vtools output variant sum(num)')
         self.assertEqual(outputOfCmd('vtools output variant "sum(num)" -v0'), '6383'+'\n')
