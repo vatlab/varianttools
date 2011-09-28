@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_use.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -60,16 +60,16 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools execute "SELECT COUNT(1) FROM testThousandGenomes.testThousandGenomes;"', '146\n')
         # test the handling of 10327   CT   C,CA
         self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=10328;"',
-            '1, 10328, T, -\n1, 10328, T, A\n')
+            '1\t10328\tT\t-\n1\t10328\tT\tA\n')
         # test the handling of 83934	rs59235392	AG	A,AGAAA	.
         self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=83935;"',
-            '1, 83935, G, -\n')
+            '1\t83935\tG\t-\n')
         self.assertOutput('vtools execute "SELECT chr, pos, ref, alt FROM testThousandGenomes.testThousandGenomes WHERE pos=83936;"',
-            '1, 83936, -, AAA\n')
+            '1\t83936\t-\tAAA\n')
         #
         # Now, let us import vcf regularly.
         runCmd('vtools init test --force')
-        self.assertSucc('vtools import_vcf ann/testThousandGenomes.vcf.head')
+        self.assertSucc('vtools import_variants --format vcf ann/testThousandGenomes.vcf.head --build hg19')
         self.assertSucc('vtools use ann/testThousandGenomes.ann')
         # do we have all the variants matched up?
         self.assertOutput('vtools select variant -c', '146\n')
@@ -79,8 +79,8 @@ class TestUse(ProcessTestCase):
         'Test variants in dbNSFP'
         self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')
         # see if YRI=10/118 is correctly extracted
-        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '10, 118\n')
-        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9, 118\n')
+        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '10\t118\n')
+        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9\t118\n')
         
 if __name__ == '__main__':
     unittest.main()
