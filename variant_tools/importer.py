@@ -523,7 +523,7 @@ class Importer:
                 raise ValueError('Cannot update variants of a project without variants.')
             self.import_alt_build = self.build == self.proj.alt_build
             if (not self.import_alt_build) and (self.build != self.proj.build):
-                raise ValueError('Input data uses reference genome ({}), wich is either the primary ({}) or the alternative ({}) reference genome of the project'.\
+                raise ValueError('Input data uses reference genome ({}), which is either the primary ({}) or the alternative ({}) reference genome of the project'.\
                     format(self.build, self.proj.build, self.proj.alt_build))
         #
         self.createLocalVariantIndex()

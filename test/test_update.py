@@ -41,22 +41,21 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import_variants vcf/SAMP1.vcf')
-        self.assertEqual(numOfSample(), 61)
-        self.assertEqual(numOfVariant(), 915)
-        self.assertFail('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update')
-        self.assertSucc('vtools import_variants --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --update variant -v2')
-        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78'+'\n')
+        # no table specified
+        self.assertFail('vtools update --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
+        self.assertSucc('vtools update variant --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
         
     def testUpdate(self):
         runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import_variants vcf/SAMP1.vcf --build hg18')
         runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         # no hg19
-        self.assertFail('vtools import_variants --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
+        self.assertFail('vtools update variant --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --build hg19')
         runCmd('vtools liftover hg19')
         # a variant can have multiple entries -- thus 175 variants in variant table are updated from the 198 imported records
-        self.assertSucc('vtools import_variants --build hg19 --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --update variant')
-        self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175'+'\n')
+        self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --build hg19')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175\n')
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n") 
         
 if __name__ == '__main__':

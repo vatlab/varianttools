@@ -186,14 +186,13 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools output variant DP_INFO')
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 3)
         # the DP for each genotype is stored as FLOAT in the database.
-        self.assertEqual(output2list('vtools execute "select DP_FMT from sample_variant_1"'), ['0.0', '2.0', '7.0', '1.0', '2.0', '7.0', \
-        '1.0', '0.0', '0.0', '0.0', '0.0', '4.0', '2.0', '2.0', '0.0', '0.0', '6.0', '1.0', '2.0', '6.0', '3.0', '3.0', '1.0', '5.0', '1.0', \
-        '0.0', '0.0', '1.0', '3.0', '2.0', '1.0', '2.0', '7.0', '1.0', '1.0', '1.0', '1.0', '5.0', '2.0', '3.0', '3.0', '6.0', '2.0', '4.0', '2.0', \
-        '7.0', '3.0', '3.0', '7.0', '3.0', '4.0', '2.0', '1.0', '2.0', '7.0', '2.0', '0.0', '0.0', '4.0', '3.0', '5.0', '2.0', '7.0', '1.0', '2.0', \
-        '0.0', '5.0', '1.0', '1.0', '0.0'])
+        self.assertEqual(output2list('vtools execute "select DP_FMT from sample_variant_1"'), ['0', '2', '7', '1', '2', '7', \
+        '1', '0', '0', '0', '0', '4', '2', '2', '0', '0', '6', '1', '2', '6', '3', '3', '1', '5', '1', '0', '0', '1', '3', '2',\
+         '1', '2', '7', '1', '1', '1', '1', '5', '2', '3', '3', '6', '2', '4', '2', '7', '3', '3', '7', '3', '4', '2', '1', '2', \
+         '7', '2', '0', '0', '4', '3', '5', '2', '7', '1', '2', '0', '5', '1', '1', '0'])
 
     def testImportVCFIndel(self):
-        self.assertSucc('vtools import_variants vcf/SAMP3_complex_variants.vcf --build hg18 --genotype_fields')
+        self.assertSucc('vtools import_variants vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
         #self.assertSucc('vtools import_variants vcf/SAMP4_complex_variants.vcf --genotype_fields')
@@ -263,16 +262,16 @@ class TestImportVariants(ProcessTestCase):
         genotypeInfo = getGenotypeInfo(num=4, info=['GT_INFO', 'GQ_INFO', 'GD_INFO', 'PL_INFO1', 'PL_INFO2', 'PL_INFO3', 'PL3_INFO1', 'PL3_INFO2', 'PL3_INFO3'])
         genotypeInfo = ['\t'.join(x) for x in genotypeInfo]
         genotypeInfo = [x.split('\t') for x in genotypeInfo]
-        self.assertEqual(genotypeInfo, [['None', '3.0', '1.0', 'None', 'None', 'None', '0.0', \
-                                         '3.0', '4.0', 'None', '3.0', '1.0', 'None', 'None', 'None', \
-                                         '3.0', '4.0', '4.0'], ['None', '93.0', '27.0', '0.0', '81.0', \
-                                        '218.0', 'None', 'None', 'None', 'None', '6.0', '3.0', 'None', 'None', \
-                                        'None', '43.0', '6.0', '0.0'], ['None', '15.0', '1.0', '0.0', '3.0', '20.0', 'None', \
-                                        'None', 'None', 'None', '4.0', '1.0', 'None', 'None', 'None', '24.0', '24.0', '24.0', \
-                                        'None', '4.0', '1.0', 'None', 'None', 'None', '3.0', '3.0', '0.0'], ['None', '100.0', \
-                                        '32.0', '0.0', '96.0', '255.0', 'None', 'None', 'None', 'None', '3.0', '2.0', 'None', \
-                                        'None', 'None', '0.0', '6.0', '54.0', 'None', '3.0', '2.0', 'None', 'None', 'None', '6.0', \
-                                        '54.0', '54.0']])
+        self.assertEqual(genotypeInfo, [['None', '3', '1', 'None', 'None', 'None', '0', \
+                                         '3', '4', 'None', '3', '1', 'None', 'None', 'None', \
+                                         '3', '4', '4'], ['None', '93', '27', '0', '81', \
+                                        '218', 'None', 'None', 'None', 'None', '6', '3', 'None', 'None', \
+                                        'None', '43', '6', '0'], ['None', '15', '1', '0', '3', '20', 'None', \
+                                        'None', 'None', 'None', '4', '1', 'None', 'None', 'None', '24', '24', '24', \
+                                        'None', '4', '1', 'None', 'None', 'None', '3', '3', '0'], ['None', '100', \
+                                        '32', '0', '96', '255', 'None', 'None', 'None', 'None', '3', '2', 'None', \
+                                        'None', 'None', '0', '6', '54', 'None', '3', '2', 'None', 'None', 'None', '6', \
+                                        '54', '54']])
         
 if __name__ == '__main__':
     unittest.main()
