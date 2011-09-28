@@ -27,6 +27,15 @@
 import os
 import unittest
 import shlex, subprocess
+import sys
+
+if sys.version_info.major == 2:
+    # for python2, we execute ../vtools directly
+    test_env = {'PATH': os.pathsep.join(['..', os.environ['PATH']])}
+else:
+    # for python3, we will need to install vtools first, and we put /usr/local/bin
+    # before any system path that might have path to local vtools ...
+    test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']])}
 
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
@@ -45,7 +54,7 @@ class ProcessTestCase(unittest.TestCase):
         with open('run_tests.log', 'a') as fnull:
             self.assertEqual(
                 subprocess.check_output(cmd, stderr=fnull,
-                    env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode(),
+                    env=test_env).decode(),
                 output)
 
     def assertSucc(self, cmd):
@@ -53,14 +62,14 @@ class ProcessTestCase(unittest.TestCase):
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         with open('run_tests.log', 'a') as fnull:
             self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
-                env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}), 0)
+                env=test_env), 0)
 
     def assertFail(self, cmd):
         cmd = shlex.split(cmd)
         try:
             with open('run_tests.log', 'a') as fnull:
                 subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
-                    env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
+                    env=test_env)
         except subprocess.CalledProcessError:
             return
 
@@ -68,7 +77,7 @@ def outputOfCmd(cmd):
     cmd = shlex.split(cmd)
     with open('run_tests.log', 'a') as fnull:
         return subprocess.check_output(cmd, stderr=fnull,
-            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}).decode()
+            env=test_env).decode()
         
 def output2list(cmd):
     return map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1])
@@ -77,17 +86,17 @@ def runCmd(cmd):
     cmd = shlex.split(cmd)
     with open('run_tests.log', 'a') as fnull:
         subprocess.call(cmd, stdout=fnull, stderr=fnull,
-            env={'PATH': os.pathsep.join(['..', os.environ['PATH']])})
+            env=test_env)
 
 def numOfSample():
     with open('run_tests.log', 'a') as fnull:
         return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
-            stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+            stderr=fnull,  env=test_env))
 
 def numOfVariant(table='variant'):
     with open('run_tests.log', 'a') as fnull:
         return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
-            stderr=fnull,  env={'PATH': os.pathsep.join(['..', os.environ['PATH']])}))
+            stderr=fnull,  env=test_env))
     
 def getGenotypes(projname='test', num=8):
     nsamples = numOfSample()
