@@ -100,10 +100,10 @@ if __name__ == '__main__':
     # command sample_stat
     parser = subparsers.add_parser('sample_stat',
         help='Calculate sample statistics (allele count etc) for all or selected samples.',
-        description='''Calculate count of alleles, homozygotes, heterozygotes, and mean,
-            sum, min, max of genotype information fields in all or selected samples. The
-            fields of genotype information fields FIELD are specified through parameters
-            mean_FIELD, sum_FIELD, min_FIELD and max_FIELD.
+        description='''Calculate count of alleles, homozygotes, heterozygotes, and summary
+            statistics for genotype information fields in all or selected samples. Statistics for a
+            genotype information field FIELD include mean_FIELD, sum_FIELD, min_FIELD and
+            max_FIELD (e.g. --mean_GQ_INFO for the average genotype call quality across all samples).
         ''')
     sample.sampleStatArguments(parser)
     addVerbosityArg(parser)

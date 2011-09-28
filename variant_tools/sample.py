@@ -296,7 +296,7 @@ def sampleStatArguments(parser):
             'filename like "MG%%"').''')
     parser.add_argument('--genotypes', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
-            use columns shown in command 'vtools show genotypes' (e.g. 'DP_INFO>20').''')
+            use columns shown in command 'vtools show genotypes' (e.g. 'GQ_INFO>15').''')
     parser.add_argument('table',
         help='''Variant table for which the statistics will be calculated and updated.''')
     parser.add_argument('-n', '--num',

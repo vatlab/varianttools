@@ -37,6 +37,7 @@ class TestSampleStat(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
     def removeProj(self):
         runCmd('vtools remove project')
+        
     def testSampleStat(self):
         'Test command vtools sample_stat'
         self.assertFail('vtools sample_stat')
