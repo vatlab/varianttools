@@ -1529,10 +1529,8 @@ def show(args):
                     if not proj.db.hasDatabase(proj.name + '_genotype'):
                         proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
-                fields = proj.db.getHeaders('sample')
-                print('filename\tsample_name{}\tnum_genotypes\tsample_specific_info_fields'.format(''.join(['\t'+x for x in fields[3:]])))
-                cur.execute('SELECT sample.sample_id, filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id;'
-                    .format(', '.join(fields[2:])))
+                print('filename\tsample_name\tnum_genotypes\tsample_genotype_fields')
+                cur.execute('SELECT sample.sample_id, filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id;')
                 records = cur.fetchall()
                 for rec in records:
                     # sample fields
@@ -1543,7 +1541,7 @@ def show(args):
                     numGenotypes = cur.fetchone()[0]
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
-                    sampleGenotypeFields = ', '.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is variant_type
+                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is variant_type
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
  
     except Exception as e:
