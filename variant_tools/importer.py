@@ -683,7 +683,7 @@ class txtImporter(Importer):
         self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
         self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
-        self.genotype_info = [x.name for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
+        self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.

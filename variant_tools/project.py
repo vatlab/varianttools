@@ -882,7 +882,7 @@ class Project:
                 variant_id INT NOT NULL
             '''.format(table) + 
             (', variant_type INT' if genotype else '') + 
-            ''.join([', {} FLOAT NULL'.format(f) for f in fields]) + ');'
+            ''.join([', {} {}'.format(f.name, f.type) for f in fields]) + ');'
          )
         #
         # NOTE
