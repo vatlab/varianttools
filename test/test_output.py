@@ -34,7 +34,7 @@ class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18')
         
     def testOutputContents(self):
         'Test command vtools output'
@@ -44,7 +44,6 @@ class TestOutput(ProcessTestCase):
         self.assertFail('vtools output variant')
         self.assertFail('vtools output variant non_existing_field')
         self.assertSucc('vtools output variant chr pos ref alt')
-        # this test now fails. Why?
         runCmd('vtools liftover hg19')
         out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt')
         out2 = outputOfCmd('cat txt/input.tsv')

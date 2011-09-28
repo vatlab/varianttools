@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_exclude.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #

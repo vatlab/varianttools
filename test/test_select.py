@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_select.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -85,7 +85,7 @@ class TestSelect(ProcessTestCase):
     def testSelectFixme(self):
         initTest(2)
         # no sample name for input.tsv
-        runCmd('vtools import_txt --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18')
         self.assertOutput('vtools select variant --samples \'filename like "%CEU.vcf.gz" \' -c', '288\n')
         
 if __name__ == '__main__':

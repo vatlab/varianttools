@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_import_phenotype.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -34,7 +34,7 @@ class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
-        runCmd('vtools import_vcf vcf/SAMP2.vcf')
+        runCmd('vtools import_variants vcf/SAMP2.vcf')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportPhenotype(self):

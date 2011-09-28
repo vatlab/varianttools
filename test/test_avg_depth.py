@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: test_import_vcf.py $
+# $File: test_avg_depth.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -34,7 +34,7 @@ class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(5)
-        runCmd('vtools sample_stat variant --num num --freq freq --depth depth')
+        runCmd('vtools sample_stat variant --num num --freq freq --sum_DP_FMT depth')
     def removeProj(self):
         runCmd('vtools remove project')
     def testAvgDepth(self):
