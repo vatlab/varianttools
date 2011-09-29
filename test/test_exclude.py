@@ -33,9 +33,16 @@ from testUtils import ProcessTestCase, runCmd, initTest
 class TestExclude(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(12)
+        runCmd('vtools init test -f')
+        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools use ann/testNSFP.ann')
+        runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        
     def removeProj(self):
         runCmd('vtools remove project')
+        
     def testExclude(self):
         'Test command vtools exclude'
         self.assertFail('vtools exclude')

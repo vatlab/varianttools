@@ -34,8 +34,14 @@ comment=Alternative allele, '-' for deletion.
 [geno]
 index=10:
 type=INTEGER
+adj=VcfGenotype(default=('0',))
+comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
+
+[geno_alt]
+index=10:
+type=INTEGER
 adj=VcfGenotype()
-comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file.
+comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Both the wildtype and missing genotype will be dropped.
 
 [safe_geno]
 # This vcf genotype extractor uses format string and genotype to 
@@ -44,9 +50,15 @@ comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming 
 # does not following this rule. The performance penalty is significant
 # 4.36 -> 3.03 for 50k records.
 index=9, 10:
+adj=VcfGenoFromFormat(default=('0',))
+type=INTEGER
+comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Missing genotype will be dropped.
+
+[safe_geno_alt]
+index=9, 10:
 adj=VcfGenoFromFormat()
 type=INTEGER
-comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly.
+comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Both the wildtype and missing genotype will be dropped.
 
 [DP_INFO]
 index=8
