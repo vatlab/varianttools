@@ -126,7 +126,10 @@ class Sample:
         fieldCalcs = []   
         for index in range(0, len(other_stats), 2):
             if other_stats[index].startswith('--'):
+                if other_stats[index].find('_') == -1:
+                    raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(other_stats[index][2:], ', '.join(possibleOperations)))
                 operation, field = other_stats[index][2:].split('_',1)
+                print(operation + "\t" + field)
                 if operation not in possibleOperations:
                     raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
                 operations.append(operationKeys[operation])
@@ -153,7 +156,9 @@ class Sample:
         # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
         # 3) if no fields are valid and no core stats were requested (i.e., num, het, hom, other), then sample_stat is exited
         genotypeHeaders = set()
+        genotypeHeaderTypes = {}
         for id in IDs:
+            # are there any new headers?  if so, get their type and add them to genotypeHeaders and genotypeHeaderTypes
             genotypeHeaders = genotypeHeaders.union(self.proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))) 
             
         validGenotypeIndices = []
