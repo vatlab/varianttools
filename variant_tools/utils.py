@@ -620,6 +620,36 @@ class DatabaseEngine:
             # remove old table
             cur.execute('DROP TABLE _{}_tmp_;'.format(table))
 
+    def typeOfFields(self, table, col):
+        '''Return type of col in table'''
+        cur = self.database.cursor()
+        if self.engine == 'mysql':
+            # not tested
+            cur.execute('SHOW COLUMNS FROM {};'.format(table))
+            for rec in cur:
+                if rec[0].lower() == col.lower():
+                    return rec[1]
+            raise ValueError('There is no column named {} in table {}'.format(col, table))
+        else:
+            if '.' in table:
+                db, tbl = table.split('.', 1)
+                cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}";'.format(db, tbl))
+            else:
+                cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
+            try:
+                schema = cur.fetchone()[0]
+            except:
+                raise ValueError('Could not find table {}'.format(table))
+            fields = [x.strip() for x in schema.split(',')]
+            fields[0] = fields[0].split('(')[1].strip()
+            fields[-1] = (')'.join(fields[-1].split(')')[:-1])).strip()
+            for field in fields:
+                n, t = field.split(None, 1)
+                if n.lower() == col.lower():
+                    return t
+            raise ValueError('No column called {} in table {}'.format(col, table))
+
+
     def numOfRows(self, table):
         '''FIXME: We need a fast way to get number of rows...
         '''
