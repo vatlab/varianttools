@@ -608,7 +608,7 @@ class DatabaseEngine:
             schema = cur.fetchone()[0]
             fields = [x.strip() for x in schema.split(',')]
             fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = (')'.join(fields[-1].split(')')[:-1])).strip()
+            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
             new_fields = [x for x in fields if x.split()[0].lower() not in [y.lower() for y in cols]]
             # rename existing table
             cur.execute('ALTER TABLE {0} RENAME TO _{0}_tmp_;'.format(table))
@@ -642,7 +642,7 @@ class DatabaseEngine:
                 raise ValueError('Could not find table {}'.format(table))
             fields = [x.strip() for x in schema.split(',')]
             fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = (')'.join(fields[-1].split(')')[:-1])).strip()
+            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
             for field in fields:
                 n, t = field.split(None, 1)
                 if n.lower() == col.lower():

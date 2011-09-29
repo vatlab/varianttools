@@ -71,7 +71,7 @@ class AnnoDB:
         self.dir = os.path.split(annoDB)[0]
         self.filename = os.path.splitext(os.path.split(annoDB)[-1])[0]
         if '-' in self.filename:
-            self.version = '-'.join(self.filename.split('-')[1:])
+            self.version = self.filename.split('-', 1)[1]
             self.name = self.filename.split('-')[0]
         else:
             self.name = os.path.splitext(self.filename)[0]
@@ -1078,7 +1078,7 @@ class Project:
         # if field is specified by table.field, good
         if '.' in field:
             # possibly two dots (db.table.field), but never seen them.
-            table, field = '.'.join(field.split('.')[:-1]).lower(), field.split('.')[-1].lower()
+            table, field = [x.lower() for x in field.rsplit('.', 1)]
             if self.db.hasTable(table):
                 if variant_table.lower() == table.lower():
                     # [] connection

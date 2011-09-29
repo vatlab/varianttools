@@ -98,7 +98,7 @@ class AnnoDBConfiger:
         self.name = os.path.splitext(os.path.split(filename)[-1])[0]
         self.version = None
         if '-' in self.name:
-            self.version = '-'.join(self.name.split('-')[1:])
+            self.version = self.name.split('-', 1)[1]
             self.name = self.name.split('-')[0]
         parser = ConfigParser.SafeConfigParser()
         parser.read(filename)
