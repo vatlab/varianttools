@@ -129,7 +129,6 @@ class Sample:
                 if other_stats[index].find('_') == -1:
                     raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(other_stats[index][2:], ', '.join(possibleOperations)))
                 operation, field = other_stats[index][2:].split('_',1)
-                print(operation + "\t" + field)
                 if operation not in possibleOperations:
                     raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
                 operations.append(operationKeys[operation])
