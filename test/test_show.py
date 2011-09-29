@@ -28,12 +28,16 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, output2list
 
 class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(6)
+        runCmd('vtools init test -f')
+        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools use ann/testNSFP.ann')
+        
     def removeProj(self):
         runCmd('vtools remove project')
     def testShow(self):
@@ -46,13 +50,24 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show')
         # show project
         self.assertSucc('vtools show project')
-        self.assertSucc('vtools show table variant')
+        self.assertEqual(output2list('vtools show table variant'), ['variant_id, bin, chr, pos, ref, alt', \
+                                                         '1, 585, 1, 75927, G, C', \
+                                                         '2, 585, 1, 76193, A, G', \
+                                                         '3, 585, 1, 77052, G, A', \
+                                                         '4, 585, 1, 78178, G, A', \
+                                                         '5, 585, 1, 78200, G, A', \
+                                                         '6, 585, 1, 81398, G, T', \
+                                                         '7, 585, 1, 98172, T, C', \
+                                                         '8, 586, 1, 223335, C, G', \
+                                                         '9, 586, 1, 224622, A, T', \
+                                                         '10, 586, 1, 225791, G, A'])
         self.assertSucc('vtools show table variant -l 20')
         self.assertSucc('vtools show table variant -l -1')
         self.assertSucc('vtools show samples')
         self.assertSucc('vtools show table testNSFP')
         self.assertSucc('vtools show fields')
         self.assertSucc('vtools show formats')
+        self.assertSucc('vtools show genotypes')
         self.assertSucc('vtools show annotations')
 
 if __name__ == '__main__':

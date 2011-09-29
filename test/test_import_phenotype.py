@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, output2list
 
 class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
@@ -44,8 +44,8 @@ class TestImportPhenotype(ProcessTestCase):
         self.assertSucc('vtools import_phenotype -h')
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools import_phenotype phenotype/phenotype.txt')
-        out1 = outputOfCmd('vtools show samples')
-        out2 = outputOfCmd('cat phenotype/phenotype.txt')        
+        out1 = output2list('vtools show samples')
+        out2 = [x.split() for x in file('phenotype/phenotype.txt')]
         self.assertEqual(out1, out2)
         self.assertFail('vtools import_phenotype phenotype/badphenotype1.txt')
         self.assertFail('vtools import_phenotype phenotype/badphenotype2.txt')

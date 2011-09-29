@@ -35,22 +35,22 @@ class TestRemove(ProcessTestCase):
         'Create a project'
         initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools select variant aff=\'1\' -t unaffected')
+        runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
         runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --num CEU_cases_num')
     def testRemove(self):
         'Test command vtools remove'
         self.assertFail('vtools remove')
         self.assertSucc('vtools remove -h')
-        self.assertFail('vtools remove table')
+        self.assertFail('vtools remove tables')
         # Removing table unaffected
-        self.assertSucc('vtools remove table unaffected')
+        self.assertSucc('vtools remove tables unaffected')
         self.assertFail('vtools show table unaffected')
         # Removing field CEU_num from variant table CEU
         count1 = len(outputOfCmd('vtools show fields').split('\n'))
-        self.assertSucc('vtools remove field CEU_cases_num')
+        self.assertSucc('vtools remove fields CEU_cases_num')
         count2 = len(outputOfCmd('vtools show fields').split('\n'))
         self.assertEqual(count1-count2, 1)
-        self.assertSucc('vtools remove annotation testNSFP')
+        self.assertSucc('vtools remove annotations testNSFP')
         self.assertFail('vtools show annotation testNSFP')
         self.assertSucc('vtools remove project')
 
