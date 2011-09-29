@@ -620,7 +620,7 @@ class DatabaseEngine:
             # remove old table
             cur.execute('DROP TABLE _{}_tmp_;'.format(table))
 
-    def typeOfFields(self, table, col):
+    def typeOfColumn(self, table, col):
         '''Return type of col in table'''
         cur = self.database.cursor()
         if self.engine == 'mysql':

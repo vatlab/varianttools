@@ -154,17 +154,23 @@ class Sample:
         # 1) if a field does not exist within one of the sample genotype tables a warning is issued
         # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
         # 3) if no fields are valid and no core stats were requested (i.e., num, het, hom, other), then sample_stat is exited
-        genotypeHeaders = set()
-        genotypeHeaderTypes = {}
+        genotypeFieldTypes = {}
         for id in IDs:
-            # are there any new headers?  if so, get their type and add them to genotypeHeaders and genotypeHeaderTypes
-            genotypeHeaders = genotypeHeaders.union(self.proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))) 
+            fields = self.proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))
+            for field in fields:
+                if genotypeFieldTypes.get(field) is None:
+                    genotypeFieldTypes[field] = 'INT'
+                    fieldType = self.db.typeOfColumn('{}_genotype.sample_variant_{}'.format(self.proj.name, id), field) 
+                    if fieldType.upper().startswith('FLOAT'):
+                        genotypeFieldTypes[field] = 'FLOAT'
+                    elif fieldType.upper().startswith('VARCHAR'):
+                        raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
             
         validGenotypeIndices = []
         for index in range(0,len(genotypeFields)):
             field = genotypeFields[index]
-            if field not in genotypeHeaders:
-                self.logger.warning("Field {} is not an existing genotype field within your samples: {}".format(field, str(genotypeHeaders)))
+            if field not in genotypeFieldTypes.keys():
+                self.logger.warning("Field {} is not an existing genotype field within your samples: {}".format(field, str(genotypeFieldTypes.keys())))
             else:
                 validGenotypeIndices.append(index)
                 validGenotypeFields.append(field)
@@ -211,6 +217,7 @@ class Sample:
                     if rec[0] not in variants:
                         variants[rec[0]] = [0, 0, 0, 0]
                         variants[rec[0]].extend(list(fieldCalcs))
+
                     # type heterozygote
                     if rec[1] == 1:
                         variants[rec[0]][0] += 1
@@ -260,13 +267,13 @@ class Sample:
             if operations[index] == MEAN:
                 table_attributes.append((destinations[index], 'FLOAT'))
             else:
-                table_attributes.append((destinations[index], 'INT'))
+                table_attributes.append((destinations[index], genotypeFieldTypes.get(genotypeFields[index])))
         for field, fldtype in table_attributes:
             if field is None:
                 continue
             if field in headers:
                 self.logger.info('Updating existing field {}'.format(field))
-                if fldtype == 'FLOAT':
+                if fldtype == 'FLOAT' and operations[index] != MEAN:
                     self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
             else:
                 self.logger.info('Adding field {}'.format(field))
