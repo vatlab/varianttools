@@ -995,6 +995,41 @@ class Project:
             self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
         self.db.commit()
         
+    def removeVariants(self, table):
+        '''Remove variants from a project belong to table'''
+        if table == 'variant':
+            raise ValueError('Cannot remove variants from table variant because it will remove all variants')
+        if not self.isVariantTable(table):
+            raise ValueError('{} is not found or is not a variant table.'.format(table))
+        cur = self.db.cursor()
+        for t in self.getVariantTables():
+            if t.lower() == table.lower():
+                continue
+            cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
+            self.logger.info('Removing {} variants from table {}'.format(cur.rowcount, t))
+        # get sample_ids
+        cur.execute('SELECT sample_id FROM sample;')
+        IDs = [x[0] for x in cur.fetchall()]
+        for ID in IDs:
+            cur.execute('DELETE FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(self.name, ID, table))
+            self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
+        # remove the table itself
+        self.logger.info('Removing table {} itself'.format(table))
+        self.db.removeTable(table)
+
+    def removeGenotypes(self, cond):
+        '''Remove genotype according to certain conditions'''
+        # get sample_ids
+        cur = self.db.cursor()
+        cur.execute('SELECT sample_id FROM sample;')
+        IDs = [x[0] for x in cur.fetchall()]
+        self.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(IDs), cond))
+        for ID in IDs:
+            cur.execute('DELETE FROM {}_genotype.sample_variant_{} WHERE {};'\
+                .format(self.name, ID, cond))
+            self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
+
     def summarize(self):
         '''Summarize key features of the project
         '''
@@ -1356,17 +1391,19 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'table', 'samples', 'field', 'annotation'],
+    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'annotations', 'variants', 'genotypes'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
-        help='''Items to be removed. It can be the name of project for type
-            project (optional), names of one or more variant tables for
-            type table, a pattern for type 'samples', name of fields or annotation
-            databases. Note that removal of samples will only remove sample information
+        help='''Items to be removed, which should be, for 'project' the name of project to 
+            be removed (optional), for 'tables' names of one or more variant tables,
+            for 'samples' patterns using which matching samples are removed, for 'fields'
+            name of fields to be removed, for "annotations" names of annotation databases,
+            for 'variants' variant tables whose variants will be removed from all variant
+            tables and genotypes, and for 'genotypes' conditions using which matching genotypes
+            are removed. Note that removal of samples will only remove sample information
             related to variants, not variants themselves; removal of annotation databases
             will stop using these databases in the project, but will not removing them
             from disk.''')
-    
 
 def remove(args):
     try:
@@ -1375,7 +1412,7 @@ def remove(args):
                 if len(args.items) > 0 and args.items[0] != proj.name:
                     raise ValueError('Cannot remove project: Incorrect project name')
                 proj.remove()
-            elif args.type == 'table':
+            elif args.type == 'tables':
                 for table in args.items:
                     proj.removeVariantTable(table)
             elif args.type == 'samples':
@@ -1386,7 +1423,7 @@ def remove(args):
                 if len(IDs) == 0:
                     proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(args.items)))
                 proj.removeSamples(IDs)
-            elif args.type == 'field':
+            elif args.type == 'fields':
                 from_table = defaultdict(list)
                 for item in args.items:
                     if item.lower() in ['variant_id', 'chr', 'pos', 'alt']:
@@ -1403,7 +1440,7 @@ def remove(args):
                 for table, items in from_table.items():
                     proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
                     proj.db.removeFields(table, items)
-            elif args.type == 'annotation':
+            elif args.type == 'annotations':
                 for item in args.items:
                     removed = False
                     for i in range(len(proj.annoDB)):
@@ -1415,6 +1452,17 @@ def remove(args):
                     if not removed:
                         proj.logger.warning('Cannot remove annotation database {} from the project'.format(item))
                 proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in proj.annoDB]))
+            elif args.type == 'variants':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify variant tables that contain variants to be removed')
+                proj.db.attach(proj.name + '_genotype')
+                for table in args.items:
+                    proj.removeVariants(table)
+            elif args.type == 'genotypes':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify conditions to select genotypes to be removed')
+                proj.db.attach(proj.name + '_genotype')
+                proj.removeGenotypes(' AND '.join(args.items))
     except Exception as e:
         sys.exit(e)
 
