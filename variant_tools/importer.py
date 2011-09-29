@@ -496,35 +496,26 @@ class Importer:
         else:
             self.build = build
         #
-        if mode == 'insert':
-            if self.proj.build is None:
+        if self.proj.build is None:
+            if mode == 'insert':
                 self.proj.setRefGenome(self.build)
-            elif self.build == self.proj.build:
-                # perfect case
-                pass
-            elif self.build == self.proj.alt_build:
-                # troublesome
-                self.import_alt_build = True
-            elif self.proj.alt_build is None:
-                # even more troublesome
-                self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
-                self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
-                tool = LiftOverTool(self.proj)
-                # we will drop indexes soon so do not build index
-                tool.setAltRefGenome(self.build, build_index=False)
-                self.import_alt_build = True
             else:
-                raise ValueError('Specified build {} does not match either the primary '.format(self.build) + \
-                    ' {} or the alternative reference genome of the project.'.format(self.proj.build, self.proj.alt_build))
-            #
-            self.proj.dropIndexOnMasterVariantTable()
-        else:
-            if self.proj.build is None:
                 raise ValueError('Cannot update variants of a project without variants.')
-            self.import_alt_build = self.build == self.proj.alt_build
-            if (not self.import_alt_build) and (self.build != self.proj.build):
-                raise ValueError('Input data uses reference genome ({}), which is either the primary ({}) or the alternative ({}) reference genome of the project'.\
-                    format(self.build, self.proj.build, self.proj.alt_build))
+        elif self.build == self.proj.build:
+            # perfect case
+            pass
+        elif self.build == self.proj.alt_build:
+            # troublesome
+            self.import_alt_build = True
+        elif self.proj.alt_build is None:
+            # even more troublesome
+            self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
+            self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
+            tool = LiftOverTool(self.proj)
+            tool.setAltRefGenome(self.build, build_index= (mode == 'insert'))
+            self.import_alt_build = True
+        if mode == 'insert':
+            self.proj.dropIndexOnMasterVariantTable()
         #
         self.createLocalVariantIndex()
 
@@ -1053,8 +1044,10 @@ def updateArguments(parser):
             variants. The file should be delimiter separated with format described by
             parameter --format. Gzipped files are acceptable.''')
     parser.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18) of the files. If
-            unspecified, it is assumed to be the primary reference genome of the project.'''),
+        help='''Build version of the reference genome (e.g. hg18) of the input files,
+            which should be the primary (used by default) or alternative (if available)
+            reference genome of the project. An alternative reference genome will be
+            added to the project if needed.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats' and 
