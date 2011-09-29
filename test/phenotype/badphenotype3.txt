@@ -61,4 +61,4 @@ vcf/CEU.vcf.gz	NA12872	2	M	21.15
 vcf/CEU.vcf.gz	NA12873	2	F	20.32
 vcf/CEU.vcf.gz	NA12874	1	M	19.41
 vcf/SAMP1.vcf	SAMP1	1	M	22.78
-vcf/SAMP2.vcf	SAMP1	2	F	24.43
+vcf/SAMP2.vcf	SAMP2	2	F	24.43

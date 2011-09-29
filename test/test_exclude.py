@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, assertOutput, outputOfCmd
 
 class TestExclude(ProcessTestCase):
     def setUp(self):
@@ -50,10 +50,12 @@ class TestExclude(ProcessTestCase):
         # Variant table non_existing_table does not exist.
         self.assertFail('vtools exclude non_existing_table "aff=\'1\'" -t aff')
         # Cannot overwrite master variant table. Please choose another name for the variant table.
-        self.assertFail('vtools exclude ns "sift_score<=0.95" -t variant')
-        self.assertSucc('vtools exclude ns "sift_score <= 0.95" -t ns_non_damaging')
-        self.assertSucc('vtools exclude input_tsv "variant_id<708" -t id708')
-        self.assertSucc('vtools exclude ns "sift_score <= 0.95" -c')
+        self.assertFail('vtools exclude ns "sift_score<=0.94" -t variant')
+        self.assertSucc('vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
+        # should have 5 variants
+        # select "sift_score >= 0.94" will result in 6 variants
+        self.assertOutput('vtools select ns "sift_score > 0.94" -c', 'vtools exclude ns "sift_score <= 0.94" -c')
+        self.assertEqual(outputOfCmd('vtools exclude ns "variant_id=604" -c'), '6\n')
 
 if __name__ == '__main__':
     unittest.main()

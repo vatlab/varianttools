@@ -7,7 +7,8 @@
 description=Import vcf
 variant_fields=chr,pos,ref,alt
 genotype_fields=geno
-genotype_info=DP_INFO
+variant_info=DP_INFO
+genotype_info=DP_FMT
 
 [chr]
 index=1
@@ -71,5 +72,4 @@ comment=DP fields in INFO. Total depth of samples in a vcf file.
 index=9, 10:
 adj=FieldFromFormat('DP', ':')
 type=INTEGER
-comment=DP fields in INFO. Total depth of samples in a vcf file.
-
+comment=DP fields in INFO. Depth for each sample in a vcf file.

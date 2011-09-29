@@ -33,8 +33,8 @@ from testUtils import ProcessTestCase, runCmd, initTest
 class TestTransRatio(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
-        runCmd('vtools sample_stat variant --num num --freq freq --depth depth')
+        initTest(2)
+        runCmd('vtools sample_stat variant --num num --sum_DP_FMT depth')
     def removeProj(self):
         runCmd('vtools remove project')
     def testTransRatio(self):
@@ -42,10 +42,10 @@ class TestTransRatio(ProcessTestCase):
         self.assertFail('vtools_report trans_ratio')
         self.assertSucc('vtools_report trans_ratio -h')
         # no such column: non_existing_column
-        self.assertFail('vtools_report trans_ratio varuabt -n non_existing_column')
+        self.assertFail('vtools_report trans_ratio non_existing -n non_existing_column')
         self.assertSucc('vtools_report trans_ratio variant -n num')
         # ValueError: invalid literal for int() with base 10: '6292.38333333\n'
-        self.assertFail('vtools_report trans_ratio variant -n depth')
+        #self.assertFail('vtools_report trans_ratio variant -n depth')
         self.assertSucc('vtools_report trans_ratio variant -n num --by_count')
 
 if __name__ == '__main__':
