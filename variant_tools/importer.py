@@ -708,18 +708,18 @@ class txtImporter(Importer):
 
     def getSampleName(self, filename):
         '''Prove text file for sample name'''
-        header = None
+        header_line = None
         count = 0
         with self.openFile(filename) as input:
             for line in input:
                 line = line.decode()
                 # the last # line
                 if line.startswith('#'):
-                    header = line
+                    header_line = line
                 else:
                     try:
                         for bins, rec in self.prober.process(line):
-                            if header is None:
+                            if header_line is None:
                                 return len(rec), []
                             elif len(rec) == 0:
                                 return 0, []
@@ -735,7 +735,7 @@ class txtImporter(Importer):
                                             break
                                     if not fixed:
                                         cols = [x[-1] for x in cols]
-                                header = [x.strip() for x in header.split(self.prober.delimiter)]
+                                header = [x.strip() for x in header_line.split()] # #self.prober.delimiter)]
                                 if max(cols) - min(cols)  < len(header):
                                     return len(rec), [header[len(header) - self.prober.nColumns + x] for x in cols]
                                 else:
