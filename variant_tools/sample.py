@@ -253,7 +253,10 @@ class Sample:
         table_attributes = [(num, 'INT'), (hom, 'INT'),
                 (het, 'INT'), (other, 'INT')]
         for index in validGenotypeIndices:
-            table_attributes.append((destinations[index], 'INT'))
+            if operations[index] == MEAN:
+                table_attributes.append((destinations[index], 'FLOAT'))
+            else:
+                table_attributes.append((destinations[index], 'INT'))
         for field, fldtype in table_attributes:
             if field is None:
                 continue
