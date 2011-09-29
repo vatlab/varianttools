@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, assertOutput, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
 
 class TestExclude(ProcessTestCase):
     def setUp(self):

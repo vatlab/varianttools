@@ -582,7 +582,7 @@ class Importer:
                 new_var = sum(self.count[3:7])
                 self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
                     .format(self.count[2], new_var, 
-                        ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                        ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                         self.count[0],
                         'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
@@ -598,7 +598,7 @@ class Importer:
                 new_var = sum(self.total_count[3:7])
                 self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
                     .format(self.total_count[2], new_var, 
-                        ''.join([', {}{}'.format('{:,} '.format(x) if x < new_var else '', y) for x, y in \
+                        ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                         self.total_count[0],
                         'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
