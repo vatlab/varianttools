@@ -20,7 +20,7 @@ comment=Reference sequence label
 [pos]
 index=2
 type=INTEGER NOT NULL
-comment=Start position of the indel event. Except for right-side breakpoints, the reported position is the first (left-most) reference position following the indel breakpoint. For right-side breakpoints the reported position is the right-most position preceding the breakpoint. Also note that wherever the same indel could be represented in a range of locations, the caller attempts to report it in the ‘left-most’ position possible.
+comment=Start position of the indel event. Except for right-side breakpoints, the reported position is the first (left-most) reference position following the indel breakpoint. For right-side breakpoints the reported position is the right-most position preceding the breakpoint. Also note that wherever the same indel could be represented in a range of locations, the caller attempts to report it in the 'left-most' position possible.
 
 [type]
 index=3
@@ -30,12 +30,12 @@ comment=String summarizing the indel type. One of: nI - insertion of length n (e
 [ref_upsream]
 index=4
 type=VARCHAR(255)
-comment=Segment of the reference sequence 5’ of the indel event. For right- side breakpoints this field is set to the value ‘N/A’.
+comment=Segment of the reference sequence 5' of the indel event. For right- side breakpoints this field is set to the value 'N/A'.
 
 [ref_indel]
 index=5
 type=VARCHAR(255)
-comment=Equal length sequences corresponding to the reference and indel cases which span the indel event. The character ‘-‘ indicates a gap in the reference or indel sequence.
+comment=Equal length sequences corresponding to the reference and indel cases which span the indel event. The character '-' indicates a gap in the reference or indel sequence.
 
 [ref]
 index=5
@@ -53,7 +53,7 @@ comment=Alternative allele, '-' for deletion
 [ref_downstream]
 index=6
 type=VARCHAR(255)
-comment=Segment of the reference sequence 3’ of the indel event. For left-side breakpoints this field is set to the value ‘N/A’.
+comment=Segment of the reference sequence 3' of the indel event. For left-side breakpoints this field is set to the value 'N/A'.
 
 [Q_indel]
 index=7
@@ -64,7 +64,7 @@ comment=Phred scaled quality score of the indel1 By default the variant caller r
 index=8
 adj=MapValue({'het': '1', 'hom': '2', 'ref': '0'})
 type=INT
-comment=Most probable indel genotype {het,hom,ref}. The genotype “hom” refers to a homozygous indel, “het” refers to a heterozygous indel and “ref” refers to no indel at this position. The “ref” state will only be observed in the indel output file as the second most probable genotype, were this state found to be the most probable genotype the candidate indel would not be reported.
+comment=Most probable indel genotype {het,hom,ref}. The genotype 'hom' refers to a homozygous indel, 'het' refers to a heterozygous indel and 'ref' refers to no indel at this position. The 'ref' state will only be observed in the indel output file as the second most probable genotype, were this state found to be the most probable genotype the candidate indel would not be reported.
 
 [Q_max_gtype]
 index=9
@@ -94,7 +94,7 @@ comment=Number of reads intersecting the indel, but not strongly supporting eith
 [repeat_unit]
 index=14
 type=VARCHAR(255)
-comment=The smallest repeating sequence unit within the inserted or deleted sequence. For breakpoints this field is set to the value ‘N/A’.
+comment=The smallest repeating sequence unit within the inserted or deleted sequence. For breakpoints this field is set to the value 'N/A'.
 
 [ref_repeat_count]
 index=15
