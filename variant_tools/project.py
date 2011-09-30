@@ -1337,7 +1337,7 @@ def init(args):
                 # get schema
                 cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(dbName, proj.db.PH),
                     (table,))
-                sql = cur.fetchone()[0].decode()
+                sql = cur.fetchone()[0]
                 if proj.db.hasTable(table):
                     proj.db.removeTable(table)
                 try:
@@ -1366,14 +1366,14 @@ def init(args):
             files = glob.glob('{}/*_genotype.DB'.format(args.parent[0]))
             if len(files) == 0:
                 return
-            myDB = proj.db.attach('{}_genotype'.format(dbName), '__toDB')
+            myDB = proj.db.attach('{}_genotype'.format(proj.name), '__toDB')
             genoDB = proj.db.attach(files[0], '__fromDB')
             tables = proj.db.tables(genoDB)
             for count,table in enumerate(tables):
                 # get schema
                 cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, proj.db.PH),
                     (table,))
-                sql = cur.fetchone()[0].decode().replace('sample_variant_', '__toDB.sample_variant_')
+                sql = cur.fetchone()[0].replace('sample_variant_', '__toDB.sample_variant_')
                 if proj.db.hasTable('__toDB.{}'.format(table)):
                     proj.db.removeTable('__toDB.{}'.format(table))
                 try:
