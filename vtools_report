@@ -131,10 +131,10 @@ def transRatio(args):
         nSample = getNumOfSamples()
         for i in range(1, 2 * nSample + 1):
             transition = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
-            	"((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))",
+                "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))",
                 '-c']))
             transversion = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
-            	"((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+                "((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
                 " (ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
                 " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))",
                 '-c']))
@@ -200,29 +200,29 @@ def variantStat(args):
         if len(sample_ids) == 0:
             sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
         #
-    	# 2a) Get the counts for snps and substitutions:
-    	#     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
-    	num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 or length(alt) = 1)",
+        # 2a) Get the counts for snps and substitutions:
+        #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
+        num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 or length(alt) = 1)",
             '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
-       	num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
+        num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
             '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
-    	#
-    	# 2b) Get the metrics to characterize the insertions
-    	#     command: vtools select variant "ref = '-'" --samples 'sample_id IN $sample_ids' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
-    	num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
+        #
+        # 2b) Get the metrics to characterize the insertions
+        #     command: vtools select variant "ref = '-'" --samples 'sample_id IN $sample_ids' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
+        num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
             ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
             '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
-        #    	
-    	# 2c) Get the metrics to characterize the deletions
-    	#     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'   	
-    	num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
+        #        
+        # 2c) Get the metrics to characterize the deletions
+        #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'       
+        num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
             ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
-            '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t') 	
-    	#
-    	print('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
-			num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
-			min_deletion_size, avg_deletion_size, max_deletion_size]))
-	
+            '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
+        #
+        print('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
+            num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
+            min_deletion_size, avg_deletion_size, max_deletion_size]))
+    
 
 if __name__ == '__main__':
     #
@@ -269,7 +269,7 @@ if __name__ == '__main__':
         help='''Reports number of snps, insertions, deletions and substitutions for
             groups of samples with some size metrics to characterize the indels''',
         description='''Command 'vtools variant_stat' calculates the number of 
-        	snps, insertions, deletions and substitutions for groups of samples
+            snps, insertions, deletions and substitutions for groups of samples
             with some size metrics to characterize the indels. The statistics can
             be calculated for all samples (effectively for the master variant table
             when parameters --samples and --group_by are ignored), a subset of samples

@@ -1117,7 +1117,7 @@ class Project:
                             link= ' AND '.join(['{}.{}={}'.format(table, x, y) for x,y in zip(db.build, db.linked_by)]))]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
-                        return self.linkFieldToTable('{}.variant_id'.format(varinat_table), 'variant') + [
+                        return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
