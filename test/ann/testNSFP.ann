@@ -11,8 +11,8 @@ description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH. Please ci
 version=1.1_0
 source_type=txt         
 anno_type=variant
-source_url=testNSFP.zip             ; download source?
-source_pattern=testNSFP.ch             ; something that identifies db files in a directory or a zip file
+source_url=testNSFP.zip
+source_pattern=testNSFP.ch
 
 [chr]
 index=1
