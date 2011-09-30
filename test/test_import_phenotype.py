@@ -45,7 +45,8 @@ class TestImportPhenotype(ProcessTestCase):
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools import_phenotype phenotype/phenotype.txt')
         out1 = output2list('vtools show samples')
-        out2 = [x[:-1] for x in file('phenotype/phenotype.txt')]
+        with open('phenotype/phenotype.txt') as inputfile:
+            out2 = [x[:-1] for x in inputfile]
         self.assertEqual(out1, out2)
         self.assertFail('vtools import_phenotype phenotype/badphenotype1.txt')
         self.assertFail('vtools import_phenotype phenotype/badphenotype2.txt')
