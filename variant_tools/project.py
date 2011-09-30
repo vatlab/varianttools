@@ -275,7 +275,8 @@ class fileFMT:
 
     def parseFMT(self, filename):
         parser = ConfigParser.SafeConfigParser()
-        parser.read(filename)
+        with open(filename, 'r', encoding='UTF-8') as inputfile:
+            parser.readfp(inputfile)
         # sections?
         sections = parser.sections()
         if 'format description' not in sections:

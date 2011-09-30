@@ -101,7 +101,8 @@ class AnnoDBConfiger:
             self.version = self.name.split('-', 1)[1]
             self.name = self.name.split('-')[0]
         parser = ConfigParser.SafeConfigParser()
-        parser.read(filename)
+        with open(filename, 'r', encoding='UTF-8') as inputfile:
+            parser.readfp(inputfile)
         # sections?
         sections = parser.sections()
         if 'linked fields' not in sections:
