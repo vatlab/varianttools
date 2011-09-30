@@ -273,6 +273,7 @@ class Sample:
                 continue
             if field in headers:
                 self.logger.info('Updating existing field {}'.format(field))
+                self.db.execute('Update {} SET {} = 0;'.format(variant_table, field))
                 if fldtype == 'FLOAT' and operations[index] != MEAN:
                     self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
             else:
