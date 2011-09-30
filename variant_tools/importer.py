@@ -742,8 +742,8 @@ class txtImporter(Importer):
                                     return len(rec), []
                     except Exception as e:
                         # perhaps not start with #, if we have no header, use it anyway
-                        if header is None:
-                            header = line
+                        if header_line is None:
+                            header_line = line
                         count += 1
                         if count == 100:
                             raise ValueError('No genotype column could be determined after 1000 lines.')

@@ -25,7 +25,7 @@ comment=Start position of the indel event. Except for right-side breakpoints, th
 [type]
 index=3
 type=VARCHAR(255)
-comment=String summarizing the indel type. One of: nI –insertion of length n (e.g. 10I is a 10 base insertion) nD – deletion of length n (e.g. 10D is a 10 base deletion) BP_LEFT – left-side breakpoint BP_RIGHT – right-side breakpoint
+comment=String summarizing the indel type. One of: nI - insertion of length n (e.g. 10I is a 10 base insertion) nD - deletion of length n (e.g. 10D is a 10 base deletion) BP_LEFT - left-side breakpoint BP_RIGHT - right-side breakpoint
 
 [ref_upsream]
 index=4

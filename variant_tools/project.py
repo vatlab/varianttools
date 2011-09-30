@@ -275,8 +275,11 @@ class fileFMT:
 
     def parseFMT(self, filename):
         parser = ConfigParser.SafeConfigParser()
-        with open(filename, 'r', encoding='UTF-8') as inputfile:
-            parser.readfp(inputfile)
+        # this allows python3 to read .fmt file with non-ascii characters, but there is no
+        # simple way to make it python2 compatible.
+        #with open(filename, 'r', encoding='UTF-8') as inputfile:
+        #    parser.readfp(inputfile)
+        parser.read(filename)
         # sections?
         sections = parser.sections()
         if 'format description' not in sections:
