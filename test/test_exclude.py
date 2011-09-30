@@ -54,7 +54,7 @@ class TestExclude(ProcessTestCase):
         self.assertSucc('vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
         # should have 5 variants
         # select "sift_score >= 0.94" will result in 6 variants
-        self.assertOutput('vtools select ns "sift_score > 0.94" -c', 'vtools exclude ns "sift_score <= 0.94" -c')
+        self.assertEqual(outputOfCmd('vtools select ns "sift_score > 0.94" -c'), outputOfCmd('vtools exclude ns "sift_score <= 0.94" -c'))
         self.assertEqual(outputOfCmd('vtools exclude ns "variant_id=604" -c'), '6\n')
 
 if __name__ == '__main__':

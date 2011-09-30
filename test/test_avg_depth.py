@@ -35,6 +35,7 @@ class TestAvgDepth(ProcessTestCase):
         'Create a project'
         initTest(5)
         runCmd('vtools sample_stat variant --num num --mean_DP_FMT depth')
+        
     def removeProj(self):
         runCmd('vtools remove project')
     def testAvgDepth(self):
