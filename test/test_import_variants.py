@@ -57,7 +57,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertFail('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos ref not_defined_field --force')
         self.assertFail('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos --force')
         variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
-        input = [x.split() for x in file('txt/input.tsv')]
+        with open('txt/input.tsv') as inputfile:
+            input = [x.split() for x in inputfile.readlines()]
         input = [x[:2] + x[3:] for x in input]
         self.assertEqual(variants, input)
         # test downloading fmt file from the website
@@ -83,12 +84,13 @@ class TestImportVariants(ProcessTestCase):
         samplenames = getSamplenames()
         head = ['#chr','rs','distance','pos','ref','alt'] + samplenames
         variants = [x.split() for x in output2list('vtools output variant chr snp_id genet_dist pos ref alt')]
-        input = [x.split() for x in file('txt/genotypes.txt')]
+        with open('txt/genotypes.txt') as inputfile:
+            input = [x.split() for x in inputfile.readlines()]
         # test --sample_names
         self.assertEqual(input[0], head)
         input_variants = [x[:6] for x in input[1:]]
-        input_genotypes = map(list, zip(*[x[6:] for x in input[1:]]))[:8]
-        input_genotypes = [filter(lambda item: item != '0' and item != '.', item) for item in input_genotypes]
+        input_genotypes = list(map(list, zip(*[x[6:] for x in input[1:]])))[:8]
+        input_genotypes = [list(filter(lambda item: item != '0' and item != '.', item)) for item in input_genotypes]
         # test importing variants 
         self.assertEqual(input_variants, variants)
         # test importing genotypes

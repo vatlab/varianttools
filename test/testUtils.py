@@ -80,7 +80,7 @@ def outputOfCmd(cmd):
             env=test_env).decode()
         
 def output2list(cmd):
-    return map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1])
+    return list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
     
 def runCmd(cmd):
     cmd = shlex.split(cmd)
