@@ -1395,7 +1395,7 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'annotations', 'variants', 'genotypes'],
+    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed, which should be, for 'project' the name of project to 
@@ -1403,11 +1403,11 @@ def removeArguments(parser):
             for 'samples' patterns using which matching samples are removed, for 'fields'
             name of fields to be removed, for "annotations" names of annotation databases,
             for 'variants' variant tables whose variants will be removed from all variant
-            tables and genotypes, and for 'genotypes' conditions using which matching genotypes
-            are removed. Note that removal of samples will only remove sample information
-            related to variants, not variants themselves; removal of annotation databases
-            will stop using these databases in the project, but will not removing them
-            from disk.''')
+            tables and genotypes, for 'genotypes' conditions using which matching genotypes
+            are removed, and for 'phenotypes' columns in the output of 'vtools show samples'.
+            Note that removal of samples will only remove sample information related to
+            variants, not variants themselves; removal of annotation databases will stop
+            using these databases in the project, but will not removing them from disk.''')
 
 def remove(args):
     try:
@@ -1467,6 +1467,21 @@ def remove(args):
                     raise ValueError('Please specify conditions to select genotypes to be removed')
                 proj.db.attach(proj.name + '_genotype')
                 proj.removeGenotypes(' AND '.join(args.items))
+            elif args.type == 'phenotypes':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify one or more phenotypes (columns in the output of "vtools show samples") to be removed')
+                phenos = [x.lower() for x in proj.db.getHeaders('sample')]
+                toBeRemoved = []
+                for item in args.items:
+                    if item.lower() in ['filename', 'sample_name']:
+                        raise ValueError('Cannot remove filename or sample_name from the sample table')
+                    if item.lower() not in phenos:
+                        raise ValueError('No phenotype {} exists in the sample table.'.format(item))
+                    toBeRemoved.append(item)
+                if len(toBeRemoved) == 0:
+                    raise ValueError('No valid phenotype to be removed.')
+                # remove
+                proj.db.removeFields('sample', toBeRemoved)
     except Exception as e:
         sys.exit(e)
 
