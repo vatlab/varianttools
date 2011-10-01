@@ -40,8 +40,8 @@ class TestSampleStat(ProcessTestCase):
         
     def testSampleStat(self):
         'Test command vtools sample_stat'
-        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.assertFail('vtools sample_stat')
         self.assertSucc('vtools sample_stat -h')
@@ -62,7 +62,7 @@ class TestSampleStat(ProcessTestCase):
         
     def testGenotypeSumstats(self):
         'Test command vtools sample_stat SUMMARYSTATISTIC_FIELD'
-        runCmd('vtools import_variants --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+        runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # non-existing field, should fail
         self.assertFail('vtools sample_stat variant --max_GQ max_gq --min_GQ min_gq')
         self.assertSucc('vtools sample_stat variant --max_GQ_INFO max_gq --min_GQ_INFO min_gq --mean_GQ_INFO mean_gq')

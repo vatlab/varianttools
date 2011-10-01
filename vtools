@@ -65,8 +65,8 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=project.init)
     #
-    # command import_variants
-    parser = subparsers.add_parser('import_variants',
+    # command import
+    parser = subparsers.add_parser('import',
         help='Import variants and related sample genotype from files in specified formats',
         description='''Import variants and related sample genotype from one or more
             delimiter separated files (e.g. VCF and a number of indel formats).''')

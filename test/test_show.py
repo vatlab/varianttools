@@ -34,8 +34,8 @@ class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
-        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
-        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         runCmd('vtools use ann/testNSFP.ann')
         
     def removeProj(self):

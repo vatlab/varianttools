@@ -60,7 +60,7 @@ class TestLiftover(ProcessTestCase):
         with open('temp_input.txt', 'w') as output:
             output.write(data)
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import_variants --build hg19 --format ../input_fmt/basic temp_input.txt')
+        self.assertSucc('vtools import --build hg19 --format ../input_fmt/basic temp_input.txt')
         self.assertSucc('vtools liftover hg18')
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
         out2 = '\n'.join([x for x in out2.split('\n') if 'NA' not in x])

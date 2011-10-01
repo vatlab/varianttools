@@ -123,16 +123,16 @@ def initTest(level):
         runCmd('vtools init test -f') #1
         if i == level: break
         else: i += 1
-        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         if i == level: break
         else: i += 1
-        runCmd('vtools import_variants vcf/SAMP1.vcf')
+        runCmd('vtools import vcf/SAMP1.vcf')
         if i == level: break
         else: i += 1
-        runCmd('vtools import_variants --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         if i == level: break
         else: i += 1        
-        runCmd('vtools import_phenotype phenotype/phenotype.txt')
+        runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         if i == level: break
         else: i += 1        
         runCmd('vtools use ann/testNSFP.ann') #6

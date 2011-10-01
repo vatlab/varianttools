@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 #
-# $File: test_import_phenotype.py $
+# $File: test_phenotype --from_file.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -34,23 +34,23 @@ class TestImportPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
-        runCmd('vtools import_variants vcf/SAMP2.vcf')
+        runCmd('vtools import vcf/SAMP2.vcf')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportPhenotype(self):
-        'Test command import_phenotype'
+        'Test command phenotype --from_file'
         # too few arguments
-        self.assertFail('vtools import_phenotype')
-        self.assertSucc('vtools import_phenotype -h')
+        self.assertFail('vtools phenotype --from_file')
+        self.assertSucc('vtools phenotype --from_file -h')
         # opening project project_name. Importing phenotypes into table sample.
-        self.assertSucc('vtools import_phenotype phenotype/phenotype.txt')
+        self.assertSucc('vtools phenotype --from_file phenotype/phenotype.txt')
         out1 = output2list('vtools show samples')
         with open('phenotype/phenotype.txt') as inputfile:
             out2 = [x[:-1] for x in inputfile]
         self.assertEqual(out1, out2)
-        self.assertFail('vtools import_phenotype phenotype/badphenotype1.txt')
-        self.assertFail('vtools import_phenotype phenotype/badphenotype2.txt')
-        self.assertFail('vtools import_phenotype phenotype/badphenotype3.txt')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype3.txt')
 
 if __name__ == '__main__':
     unittest.main()

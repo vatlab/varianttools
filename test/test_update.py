@@ -38,18 +38,18 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools remove project')
 
     def testAddfield(self):
-        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
-        runCmd('vtools import_variants vcf/SAMP1.vcf')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
         self.assertFail('vtools update --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
         self.assertSucc('vtools update variant --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
         
     def testUpdate(self):
-        runCmd('vtools import_variants vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import_variants vcf/SAMP1.vcf --build hg18')
-        runCmd('vtools import_variants --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import vcf/SAMP1.vcf --build hg18')
+        runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         # no hg19
         self.assertFail('vtools update variant --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --build hg19')
         runCmd('vtools liftover hg19')
