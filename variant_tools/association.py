@@ -160,7 +160,7 @@ class AssociationTester(Sample):
         genotype = {}
         cur = self.db.cursor()
         for ID in self.IDs:
-            query = 'SELECT variant_id, variant_type FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+            query = 'SELECT variant_id, GT FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.proj.name, ID, vtable)
             self.logger.debug('Running query {}'.format(query))
             cur.execute(query)

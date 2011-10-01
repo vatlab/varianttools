@@ -280,7 +280,7 @@ class Sample:
                 fieldSelect = ', ' + ', '.join(validGenotypeFields)
             
             try:    
-                query = 'SELECT variant_id, variant_type{} FROM {}_genotype.sample_variant_{} {};'.format(fieldSelect, self.proj.name, id, whereClause)
+                query = 'SELECT variant_id, GT{} FROM {}_genotype.sample_variant_{} {};'.format(fieldSelect, self.proj.name, id, whereClause)
                 cur.execute(query)
             except:
                 self.logger.warning('Sample {} does not have all the requested genotype fields [{}].'.format(id, ', '.join(set(validGenotypeFields))))
@@ -311,7 +311,7 @@ class Sample:
                     # this collects genotype_field information
                     if len(validGenotypeFields) > 0:
                         for index in validGenotypeIndices:
-                            queryIndex = index + 2     # to move beyond the variant_id and variant_type fields in the select statement
+                            queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
                             recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
                             operation = operations[index]
                             field = genotypeFields[index]

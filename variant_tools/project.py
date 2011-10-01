@@ -885,7 +885,7 @@ class Project:
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
             '''.format(table) + 
-            (', variant_type INT' if genotype else '') + 
+            (', GT INT' if genotype else '') + 
             ''.join([', {} {}'.format(f.name, f.type) for f in fields]) + ');'
          )
         #
@@ -1608,7 +1608,7 @@ def show(args):
                     numGenotypes = cur.fetchone()[0]
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
-                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is variant_type
+                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
  
     except Exception as e:
