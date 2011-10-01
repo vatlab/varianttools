@@ -32,6 +32,17 @@ adj=CheckSplit()
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
+[raw_ref]
+index=4
+type=VARCHAR(255)
+comment=Raw reference allele in the vcf file
+
+[raw_alt]
+index=5
+adj=CheckSplit()
+type=VARCHAR(255)
+comment=Raw alternative allele in the vcf file
+
 [geno]
 index=10:
 type=INTEGER
@@ -60,6 +71,11 @@ index=9, 10:
 adj=VcfGenoFromFormat()
 type=INTEGER
 comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Both the wildtype and missing genotype will be dropped.
+
+[raw_info]
+index=8
+type=VARCHAR(255)
+comment=Raw INFO column in the vcf file.
 
 [DP_INFO]
 index=8
