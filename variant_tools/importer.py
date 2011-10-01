@@ -559,7 +559,16 @@ class Importer:
 
     def recordFileAndSample(self, filename, sampleNames, hasGenotype=True, sampleFields = []):
         cur = self.db.cursor()
-        cur.execute("INSERT INTO filename (filename) VALUES ({});".format(self.db.PH), (filename,))
+        # get header of file
+        header = ''
+        with self.openFile(filename) as input:
+            for line in input:
+                line = line.decode()
+                if line.startswith('#'):
+                    header += line
+                else:
+                    break
+        cur.execute("INSERT INTO filename (filename, header) VALUES ({0}, {0});".format(self.db.PH), (filename, header))
         filenameID = cur.lastrowid
         sample_ids = []
         s = delayedAction(self.logger.info, 'Creating {} sample variant tables'.format(len(sampleNames)))
@@ -571,7 +580,7 @@ class Importer:
                 hasGenotype, sampleFields)
         del s
         return sample_ids
-        
+
     def importData(self):
         '''Start importing'''
         sample_in_files = []

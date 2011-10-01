@@ -779,7 +779,8 @@ class Project:
         cur.execute('''\
             CREATE TABLE filename (
                 file_id INTEGER PRIMARY KEY {0},
-                filename VARCHAR(256) NOT NULL
+                filename VARCHAR(256) NOT NULL,
+                header BLOB NULL
             )'''.format(self.db.AI))
         # create index
         try:
