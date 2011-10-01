@@ -315,13 +315,31 @@ class Sample:
         self.db.commit()
         prog.done()
                 
-def importPhenotypeArguments(parser):
+def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
-    parser.add_argument('filename', 
+    parser.add_argument('-f', '--from_file', nargs='*',
         help='''Import phenotype from a tab delimited file. The file should have
-            a header, and filename and sample_name as the first two columns.''')
+            a header, and filename and sample_name as the first two columns. If 
+            a list of phenotypes (columns of the file) is specified after filename,
+            only the specified phenotypes will be imported. Parameter --samples
+            could be used to limit the samples for which phenotypes are imported.'''),
+    parser.add_argument('--set', nargs='*', default=[],
+        help='''Set a phenotype to a summary statistics of a genotype field. For 
+            example, '--set num "count(*)"' sets phenotype num to be the number of
+            genotypes of a sample, '--set DP "avg(DP)"' sets phenotype DP to be the 
+            average depth (if DP is one of the genotype fields) of the sample. Multiple
+            fields (e.g. '--set num "count(*)" DP "avg(DP)"') and constant expressions
+            (e.g. '--set aff 1') are also allowed. Parameters --genotypes and --samples
+            could be used to limit the genotypes to be considered and the samples for
+            which genotypes will be set.'''),
+    parser.add_argument('-g', '--genotypes', nargs='*', default=[],
+        help='''Limit the operation to genotypes that match specified conditions.
+            Use 'vtools show genotypes' to list usable fields for each sample.'''),
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
+        help='''Update phenotype for samples that match specified conditions.
+            Use 'vtools show samples' to list usable fields in the sample table.''')
 
-def importPhenotype(args):
+def phenotype(args):
     try:
         with Project() as proj:
             p = Sample(proj)

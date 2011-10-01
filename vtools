@@ -74,11 +74,13 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=importer.importVariants)
     # 
-    # command import_phenotype
-    parser = subparsers.add_parser('import_phenotype', help='Import sample phenotype')
-    sample.importPhenotypeArguments(parser)
+    # command phenotype
+    parser = subparsers.add_parser('phenotype', help='Manage sample phenotypes',
+        description='''Import phenotypes from a file or set phenotype according
+            to summary statistics of sample genotype.''')
+    sample.phenotypeArguments(parser)
     addVerbosityArg(parser)
-    parser.set_defaults(func=sample.importPhenotype)
+    parser.set_defaults(func=sample.phenotype)
     #
     # command info
     parser = subparsers.add_parser('show', help='Display content of a project')
