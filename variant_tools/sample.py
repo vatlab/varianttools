@@ -34,66 +34,103 @@ class Sample:
         self.logger = proj.logger
         self.db = proj.db
 
-    def load(self, filename):
+    def load(self, filename, allowed_fields, conditions):
         '''Load phenotype informaiton from a file'''
         if not self.db.hasTable('sample'):
             self.logger.warning('Project does not have a sample table.')
             return
+        # num sample, num new field, num update field
+        count = [0, 0, 0]
         with open(filename) as input:
             headers = input.readline().rstrip().split('\t')
-            if len(headers) < 2 or headers[0] != 'filename' or headers[1] != 'sample_name':
-                raise ValueError('The phenotype file must start with a header line with first two fields being filename and sample')
-            # FIXME: check if headers are allowed because they will be names of tables.
+            if len(headers) == 0:
+                raise ValueError('Empty header line. No phenotype will be imported.')
+            if headers[0] == 'sample_name':
+                by_sample = True
+                if len(headers) == 1:
+                    raise ValueError('No phenotype to be imported')
+            elif len(headers) >= 2 and headers[0] == 'filename' and headers[1] == 'sample_name':
+                by_sample = False
+                if len(headers) == 2:
+                    raise ValueError('No phenotype to be imported')
+            else:
+                raise ValueError('The phenotype file must start with a header line with the first '
+                    'column sample_name, or first two fields being filename and sample_name.')
             #
-            nFields = len(headers)
-            if nFields == 2:
-                self.logger.warning('No phenotype is defined.')
-                return
-            record = {}
+            records = {}
+            nCol = len(headers)
             for idx, line in enumerate(input.readlines()):
                 if line.startswith('#') or line.strip() == '':
                     continue
-                fields = line.rstrip().split('\t')
-                if len(fields) != nFields or ('' in fields):
+                fields = [x.strip() for x in line.split('\t')]
+                if len(fields) != nCol or ('' in fields):
                     raise ValueError('Invalid phenotype file: number of fields mismatch at line {}. Please use \'None\' for missing values.'.format(idx+2))
                 #
-                record[(fields[0], None if fields[1] == 'None' else fields[1])] = fields[2:]
-        # now, try to guess the type
-        types = []
-        for i in range(nFields - 2):
-            types.append(typeOfValues([x[i] for x in record.values()]))
-        #
-        # get existing table
+                if by_sample:
+                    key = (None if fields[0] == 'None' else fields[0],)
+                    if key in records:
+                        raise ValueError('Duplicate sample name ({}). Only the last record will be used'.format(key))
+                    records[key] = fields[1:]
+                else:
+                    key = (fields[0], None if fields[1] == 'None' else fields[1])
+                    if key in records:
+                        raise ValueError('Duplicate filename and sample name ({},{}). Only the last record will be used'.format(key[0], key[1]))
+                    records[key] = fields[2:]
+            #
+            new_fields = headers[(1 if by_sample else 2):]
+            if allowed_fields:
+                for f in allowed_fields:
+                    if f.lower() not in [x.lower() for x in new_fields]:
+                        raise ValueError('Field {} is not in specified input file {}'.format(f, filename))
+        # 
+        # get allowed samples
         cur = self.db.cursor()
-        cur.execute('SELECT sample.sample_id, filename.filename, sample.file_id,\
-            sample.sample_name FROM sample, filename WHERE sample.file_id = filename.file_id;')
-        table = []
-        for rec in cur:
-            if (rec[1], rec[3]) not in record:
-                self.logger.warning('No phenotype is defined for sample: filename={}\tsample_name={}'.format(rec[1], rec[3]))
-                table.append([rec[0], rec[2], rec[3]] + [None]*(nFields-2))
+        cur.execute('SELECT sample.sample_id FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {};'\
+                .format('WHERE {}'.format(conditions) if conditions.strip() else ''))
+        allowed_samples = [x[0] for x in cur.fetchall()]
+        if not allowed_samples:
+            raise ValueError('No sample is selected using condition "{}"'.format(conditions))
+        #
+        # get existing fields
+        cur_fields = self.db.getHeaders('sample')[3:]
+        # handle each field one by one
+        for idx, field in enumerate(new_fields):
+            if allowed_fields and field.lower() not in [x.lower() for x in allowed_fields]:
+                self.logger.debug('Ignoring field {}'.format(field))
+                continue
+            # if adding a new field
+            if field.lower() not in [x.lower() for x in cur_fields]:
+                self.proj.checkFieldName(field, exclude='sample')
+                fldtype = typeOfValues([x[idx] for x in records.values()])
+                self.logger.info('Adding field {}'.format(field))
+                self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
+                count[1] += 1  # new
             else:
-                table.append([rec[0], rec[2], rec[3]] + record[(rec[1], rec[3])])
-        self.logger.info('Importing phenotypes into table sample')
-        # check field names
-        for name in headers[2:]:
-            self.proj.checkFieldName(name, exclude='sample')
-        # create a new table
-        temp_table_name = '_tmp_sample'
-        try:
-            self.proj.createSampleTableIfNeeded(zip(headers[2:], types), table=temp_table_name)
-            # insert rows
-            query = 'INSERT INTO {} VALUES ({});'.format(temp_table_name, ','.join([self.db.PH]*(nFields+1)))
-            for line in table:
-                cur.execute(query, line)
-        except Exception as e:
-            self.proj.db.removeTable(temp_table_name)
-            self.logger.error('Failed to create sample table. Perhaps an invalid field name is specified.')
-            self.logger.debug(e)
-            raise e
-        # everything is OK.
-        self.proj.db.removeTable('sample')
-        self.proj.db.renameTable(temp_table_name, 'sample')
+                count[2] += 1  # updated
+            for key, rec in records.iteritems():
+                # get matching sample
+                if by_sample:
+                    cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
+                    ids = [x[0] for x in cur.fetchall()]
+                    if len(ids) == 0:
+                        self.logger.warning('Sample name {} does not match any sample'.format(key[0]))
+                        continue
+                    for id in [x for x in ids if x in allowed_samples]:
+                        count[0] += 1
+                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
+                else:
+                    cur.execute('SELECT sample.sample_id FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id WHERE filename.filename = {0} AND sample.sample_name = {0}'.format(self.db.PH), key)
+                    ids = [x[0] for x in cur.fetchall()]
+                    if len(ids) == 0:
+                        self.logger.warning('Filename {} and sample name {} does not match any sample'.format(key[0], key[1]))
+                        continue
+                    if len(ids) != 1:
+                        raise ValueError('Filename and sample should unqiuely determine a sample')
+                    for id in [x for x in ids if x in allowed_samples]:
+                        count[0] += 1
+                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
+        self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
+            count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
         self.db.commit()
 
     def calcSampleStat(self, IDs, variant_table, genotypes, num, hom, het, other, other_stats):
@@ -319,7 +356,9 @@ def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('-f', '--from_file', nargs='*',
         help='''Import phenotype from a tab delimited file. The file should have
-            a header, and filename and sample_name as the first two columns. If 
+            a header, with either 'sample_name' as the first column, or 'filename'
+            and 'sample_name' as the first two columns. In the former case, samples
+            with the same 'sample_name' will share the imported phenotypes. If 
             a list of phenotypes (columns of the file) is specified after filename,
             only the specified phenotypes will be imported. Parameter --samples
             could be used to limit the samples for which phenotypes are imported.'''),
@@ -343,7 +382,15 @@ def phenotype(args):
     try:
         with Project() as proj:
             p = Sample(proj)
-            p.load(args.filename)
+            if args.from_file:
+                filename = args.from_file[0]
+                fields = args.from_file[1:]
+                p.load(filename, fields, ' AND '.join(args.samples))
+            if args.set:
+                for idx in range(0, len(args.set), 2):
+                    if idx + 1 >= len(args.set):
+                        raise ValueError('Missing expression for field {}'.format(args.set[idx]))
+                    p.set(args.set[idx], args.set[idx+1])
         proj.close()
     except Exception as e:
         sys.exit(e)
