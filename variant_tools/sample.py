@@ -34,7 +34,7 @@ class Sample:
         self.logger = proj.logger
         self.db = proj.db
 
-    def load(self, filename, allowed_fields, conditions):
+    def load(self, filename, allowed_fields, samples):
         '''Load phenotype informaiton from a file'''
         if not self.db.hasTable('sample'):
             self.logger.warning('Project does not have a sample table.')
@@ -85,11 +85,9 @@ class Sample:
         # 
         # get allowed samples
         cur = self.db.cursor()
-        cur.execute('SELECT sample.sample_id FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {};'\
-                .format('WHERE {}'.format(conditions) if conditions.strip() else ''))
-        allowed_samples = [x[0] for x in cur.fetchall()]
+        allowed_samples = self.proj.selectSampleByPhenotype(samples)
         if not allowed_samples:
-            raise ValueError('No sample is selected using condition "{}"'.format(conditions))
+            raise ValueError('No sample is selected using condition "{}"'.format(samples))
         #
         # get existing fields
         cur_fields = self.db.getHeaders('sample')[3:]
@@ -132,6 +130,44 @@ class Sample:
         self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
             count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
         self.db.commit()
+
+    def setField(self, field, expression, genotypes, samples):
+        '''Add a field using expression calculated from sample variant table'''
+        IDs = self.proj.selectSampleByPhenotype(samples)
+        if not IDs:
+            raise ValueError('No sample is selected using condition "{}"'.format(samples))
+        #
+        count = [0, 0, 0]
+        # if adding a new field
+        cur_fields = self.db.getHeaders('sample')[3:]
+        if field.lower() not in [x.lower() for x in cur_fields]:
+            self.proj.checkFieldName(field, exclude='sample')
+            self.logger.info('Adding field {}'.format(field))
+            if expression.isdigit():  # all digit 
+                fldtype = 'INT'
+            elif (expression.startswith('"') and expression.endswith('"')) or \
+                (expression.startswith("'") and expression.endswith("'")):
+                fldtype = 'VARCHAR({})'.format(len(expression))
+            else:
+                fldtype = 'FLOAT'
+            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
+            count[1] += 1  # new
+        else:
+            count[2] += 1  # updated
+        #
+        cur = self.db.cursor()
+        for ID in IDs:
+            cur.execute('SELECT {} FROM {}_genotype.sample_variant_{} {};'\
+                .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else ''))
+            res = cur.fetchone()
+            if len(res) == 0:
+                raise ValueError('No statistics are calculated from expression {}'.format(expression))
+            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
+            count[0] += 1
+        self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
+            count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
+        self.db.commit()
+
 
     def calcSampleStat(self, IDs, variant_table, genotypes, num, hom, het, other, other_stats):
         '''Count sample allele count etc for specified sample and variant table'''
@@ -364,11 +400,11 @@ def phenotypeArguments(parser):
             could be used to limit the samples for which phenotypes are imported.'''),
     parser.add_argument('--set', nargs='*', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
-            example, '--set num "count(*)"' sets phenotype num to be the number of
-            genotypes of a sample, '--set DP "avg(DP)"' sets phenotype DP to be the 
+            example, '--set "num=count(*)"' sets phenotype num to be the number of
+            genotypes of a sample, '--set "DP=avg(DP)"' sets phenotype DP to be the 
             average depth (if DP is one of the genotype fields) of the sample. Multiple
-            fields (e.g. '--set num "count(*)" DP "avg(DP)"') and constant expressions
-            (e.g. '--set aff 1') are also allowed. Parameters --genotypes and --samples
+            fields (e.g. '--set "num=count(*)" "DP=avg(DP)"') and constant expressions
+            (e.g. '--set aff=1') are also allowed. Parameters --genotypes and --samples
             could be used to limit the genotypes to be considered and the samples for
             which genotypes will be set.'''),
     parser.add_argument('-g', '--genotypes', nargs='*', default=[],
@@ -387,10 +423,12 @@ def phenotype(args):
                 fields = args.from_file[1:]
                 p.load(filename, fields, ' AND '.join(args.samples))
             if args.set:
-                for idx in range(0, len(args.set), 2):
-                    if idx + 1 >= len(args.set):
-                        raise ValueError('Missing expression for field {}'.format(args.set[idx]))
-                    p.set(args.set[idx], args.set[idx+1])
+                proj.db.attach('{}_genotype'.format(proj.name))
+                for item in args.set:
+                    field, expr = [x.strip() for x in item.split('=', 1)]
+                    if not expr:
+                        raise ValueError('Invalid parameter {}, which should have format field=expression'.format(item))
+                    p.setField(field, expr, ' AND '.join(args.genotypes), ' AND '.join(args.samples))
         proj.close()
     except Exception as e:
         sys.exit(e)

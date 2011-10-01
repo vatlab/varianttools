@@ -975,7 +975,7 @@ class Project:
         '''Select samples by conditions such as "aff=1"'''
         cur = self.db.cursor()
         try:
-            query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE {};'.format(cond)
+            query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {};'.format(' WHERE {}'.format(cond) if cond.strip() else '')
             self.logger.debug('Select samples using query')
             self.logger.debug(query)
             cur.execute(query)
