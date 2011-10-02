@@ -33,6 +33,7 @@ from variant_tools import sample
 from variant_tools import liftOver
 from variant_tools import annotation
 from variant_tools import variant
+from variant_tools import exporter
 try:
     from variant_tools import association
     with_association = True
@@ -158,6 +159,13 @@ if __name__ == '__main__':
     variant.generalOutputArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variant.output)
+    #
+    # command export
+    parser = subparsers.add_parser('export',
+        help='Export samples (variants and genotypes) in specified format.')
+    exporter.exportArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=exporter.export)
     #
     # command remove
     parser = subparsers.add_parser('remove', help='Remove project or its contents.')

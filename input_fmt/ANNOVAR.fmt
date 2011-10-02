@@ -10,6 +10,14 @@ description=Input format of ANNOVAR. No genotype is defined.
 variant_fields=chr,pos,ref,alt
 delimiter=None
 
+[columns]
+col1=chr
+col2=pos
+col3=pos,ref
+col3_adj=lambda x: int(x[0])-1+len(ref)
+col4=ref
+col5=alt
+
 [chr]
 index=1
 type=VARCHAR(20)

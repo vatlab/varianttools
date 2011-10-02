@@ -35,7 +35,7 @@ import zipfile
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
-from .importer import TextProcessor
+from .importer import LineImporter
   
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -294,7 +294,7 @@ class AnnoDBConfiger:
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
-        processor = TextProcessor(self.fields, build_info, self.delimiter, self.logger)
+        processor = LineImporter(self.fields, build_info, self.delimiter, self.logger)
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \

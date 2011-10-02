@@ -9,6 +9,23 @@ variant_fields=chr,pos,ref,alt
 genotype_fields=geno
 variant_info=DP_INFO
 genotype_info=DP_FMT
+# variants with identical chr,pos,ref will be collapsed.
+output_by_fields=chr,pos,ref
+
+[columns]
+col1=chr
+col2=pos
+col3=id
+col3_adj=ValueOfNull('.')
+col4=raw_ref
+col5=raw_alt
+col6=qual
+col7=filter
+col8=info
+col8_adj=Join(';')
+col9=format
+col10=genotype_fields, genotype_info
+col10_adj=Join(':')
 
 [chr]
 index=1
@@ -20,6 +37,12 @@ comment=Chromosome
 index=2
 type=INTEGER NOT NULL
 comment=1-based position
+
+[id]
+index=3
+type=VARCHAR(48)
+adj=Nullify('.')
+comment=variant id (rs number or other IDs)
 
 [ref]
 index=4

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: importer.py $
+# $File: exporter.py $
 # $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
 # $Rev: 4234 $
 #
@@ -33,256 +33,8 @@ from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
 
-# Extractors to extract value from a field
-class ExtractField:
-    def __init__(self, index, sep=';', default=None):
-        '''Define an extractor that returns the index-th (1-based) field of the fields
-        separated by specified delimiter. Return default if unsuccessful.'''
-        self.index = index - 1
-        self.sep = sep
-        self.default = default
-    
-    def __call__(self, item):
-        try:
-            return item.split(self.sep)[self.index]
-        except:
-            return self.default
 
-class CheckSplit:
-    def __init__(self, sep=','):
-        '''Define an extractor that returns all items in a field separated by
-        specified delimiter. Return default if unsuccessful. It differs from
-        SplitField in that it will return the item itself (instead of a tuple
-        of one element) when there is only one element. The item will then
-        will copy if multiple items exist.'''
-        self.sep = sep
-    
-    def __call__(self, item):
-        return item if self.sep not in item else tuple(item.split(self.sep))
-    
-class SplitField:
-    def __init__(self, sep=','):
-        '''Define an extractor that returns all items in a field separated by
-        specified delimiter. These items will lead to multiple records in
-        the database.'''
-        self.sep = sep
-    
-    def __call__(self, item):
-        return tuple(item.split(self.sep))
-
-class ExtractFlag:
-    def __init__(self, name, sep=';'):
-        '''Define an extractor that returns 1 is item contains name as one of the fields,
-        and 0 otherwise. No space is allowed between delimiter and flag.'''
-        self.n = name
-        self.s = name + sep
-        self.e = sep + name
-        self.m = sep + name + sep
-    
-    def __call__(self, item):
-        # this should be faster than
-        #
-        #     if self.name in item.split(self.sep):
-        # 
-        # because we do not have to split the whole string.
-        #
-        if self.n not in item:
-            return '0'
-        # put the most common case first
-        if self.m in item or item.startswith(self.s) or item.endswith(self.e) or item == self.n:
-            return '1'
-        else:
-            return '0'
-
-class FieldFromFormat:
-    def __init__(self, name, sep=';', default=None):
-        '''Define an extractor that return the value of a field according 
-        to a format string. This is used to extract stuff from the format
-        string of vcf files.
-        '''
-        self.name = name
-        self.sep = sep
-        self.fmt = '\t'
-        self.idx = None
-        self.default = default
-
-    def __call__(self, item):
-        if not item[0] == self.fmt:
-            fmt, val = item
-            self.fmt = fmt
-            fields = fmt.split(self.sep)
-            if self.name in fields:
-                self.idx = fields.index(self.name)
-                return val.split(self.sep)[self.idx]
-            else:
-                self.idx = None
-                return self.default
-        try:
-            return item[1].split(self.sep)[self.idx]
-        except:
-            # in the case that self.idx is None, or if item[1].split(self.sep) does not have enough items
-            return self.default
-
-class VcfGenotype:
-    def __init__(self, default=None):
-        '''Define an extractor that extract genotype from a .vcf file'''
-        self.default = default
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '0': default, '1': ('1',)}
-
-    def __call__(self, item):
-        # the most common and correct case...
-        try:
-            return self.map[item.partition(':')[0]]
-        except KeyError:
-            return None
-
-class VcfGenoFromFormat:
-    def __init__(self, default=None):
-        '''Define an extractor that return genotype according to a format string.
-        This is used to extract genotype from the format string of vcf files.
-        '''
-        self.fmt = '\t'
-        self.idx = None
-        self.default = default
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '0': default, '1': ('1',)}
-
-    def __call__(self, item):
-        # the most common and correct case...
-        try:
-            if item[0][:2] == 'GT':
-                return self.map[item[1].partition(':')[0]]
-            elif item[0] != self.fmt:
-                fmt, val = item
-                self.fmt = fmt
-                fields = fmt.split(':')
-                if 'GT' in fields:
-                    self.idx = fields.index('GT')
-                    return self.map[val.split(':')[self.idx]]
-                else:
-                    self.idx = None
-                    return self.default
-            return self.map[item[1].split(':', self.idx + 1)[self.idx]] if self.idx is not None else self.default
-        except KeyError:
-            return None
-        
-class ExtractValue:
-    def __init__(self, name, sep=';', default=None):
-        '''Define an extractor that returns the value after name in one of the fields,
-        and a default value if no such field is found. No space is allowed between 
-        delimiter and the name.'''
-        self.name = name
-        self.sep = sep
-        #self.pos = len(name)
-        self.default = default
-
-    def __call__(self, item):
-        if self.name not in item:
-            return self.default
-        #
-        # Using two partisions seems to be a tiny bit faster than 
-        # split and startswith
-        #
-        #for field in item.split(self.sep):
-        #    if field.startswith(self.name):
-        #        return field[self.pos:]
-        ss = item.partition(self.name)
-        return ss[2].partition(self.sep)[0] if ss[2] is not None else self.default
-
-class IncreaseBy:
-    def __init__(self, inc=1):
-        '''Adjust position'''
-        self.inc = inc
-
-    def __call__(self, item):
-        return str(int(item) + self.inc) if item.isdigit() else None
-
-class MapValue:
-    '''Map value to another one, return default if unmapped'''
-    def __init__(self, map, default=None):
-        self.map = map
-        self.default = default
-
-    def __call__(self, item):
-        try:
-            return self.map[item]
-        except:
-            return self.default
-        
-class RemoveLeading:
-    def __init__(self, val):
-        self.val = val
-        self.vlen = len(val)
-
-    def __call__(self, item):
-        return item[self.vlen:] if item.startswith(self.val) else item
-
-class EncodeGenotype:
-    '''Encode 1/1, 1/2 etc to variant tools code'''
-    def __init__(self, default=None):
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '0': default, '1': ('1',)}
-
-    def __call__(self, item):
-        return self.map[item]
-        
-class Nullify:
-    def __init__(self, val):
-        self.val = val
-        if type(self.val) == str:
-            self.__call__ = self.nullify_single
-        else:
-            self.__call__ = self.nullify_multiple
-
-    def nullify_single(self, item):
-        return None if item == self.val else item
-
-    def nullify_multiple(self, item):
-        return None if item in self.val else item
-
-class SequentialExtractor:
-    def __init__(self, extractors):
-        '''Define an extractor that calls a list of extractors. The string extracted from
-        the first extractor will be passed to the second, and so on.'''
-        self.extractors = []
-        for e in extractors:
-            if hasattr(e, '__call__'):
-                self.extractors.append(e.__call__)
-            else:
-                self.extractors.append(e)
-
-    def __call__(self, item):
-        for e in self.extractors:
-            # if item is None or ''
-            if not item:
-                return item
-            # if multiple records are returned, apply to each of them
-            if type(item) is tuple:
-                if type(item[0]) is tuple:
-                    raise ValueError('Nested vector extracted is not allowed')
-                item = [e(x) for x in item]
-            else:
-                item = e(item)
-        return item
-
-
-class LineImporter:
+class TextExporter:
     '''An intepreter that read a record, process it and return processed records.'''
     def __init__(self, fields, build, delimiter, logger):
         '''Fields: a list of fields with index, adj (other items are not used)
@@ -436,7 +188,7 @@ class LineImporter:
                     rec[alt_idx] = alt
                 yield bins, rec
 
-class BaseImporter:
+class Exporter:
     '''A general class for importing variants'''
     def __init__(self, proj, files, build, force, mode='insert'):
         self.proj = proj
@@ -518,6 +270,65 @@ class BaseImporter:
             self.proj.dropIndexOnMasterVariantTable()
         #
         self.createLocalVariantIndex()
+
+        #Importer.__init__(self, proj, files, build, force, mode='insert')
+        # we cannot guess build information from txt files
+        if build is None and self.proj.build is None:
+            raise ValueError('Please specify the reference genome of the input data.')
+        #
+        # try to guess file type
+        if not format:
+            filename = self.files[0].lower()
+            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
+                format = 'vcf'
+            else:
+                raise ValueError('Cannot guess input file type from filename')
+        try:
+            fmt = fileFMT(format, fmt_args)
+        except Exception as e:
+            self.logger.debug(e)
+            raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+        #
+        self.sample_name = sample_name
+        #
+        # how to split processed records
+        self.ranges = fmt.ranges
+        self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
+        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
+        self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
+        #
+        if fmt.input_type == 'variant':
+            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
+            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+        else:  # position or range type
+            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+        # probe number of sample
+        if self.genotype_field:
+            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
+        # there are variant_info
+        if self.variant_info:
+            cur = self.db.cursor()
+            headers = self.db.getHeaders('variant')
+            for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
+                # either insert or update, the fields must be in the master variant table
+                self.proj.checkFieldName(f.name, exclude='variant')
+                if f.name not in headers:
+                    s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
+                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
+                    del s
+        #
+        if fmt.input_type != 'variant':
+            self.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
+        #
+        self.input_type = fmt.input_type
+        fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
+        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
+            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
+        self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
+            .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
+
+
 
     def __del__(self):
         if self.mode == 'insert':
@@ -653,68 +464,6 @@ class BaseImporter:
             self.db.commit()
             prog.done()
             
-
-class TextImporter(BaseImporter):
-    '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, files, build, format, sample_name=None, 
-        force=False, fmt_args=[]):
-        BaseImporter.__init__(self, proj, files, build, force, mode='insert')
-        # we cannot guess build information from txt files
-        if build is None and self.proj.build is None:
-            raise ValueError('Please specify the reference genome of the input data.')
-        #
-        # try to guess file type
-        if not format:
-            filename = self.files[0].lower()
-            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
-                format = 'vcf'
-            else:
-                raise ValueError('Cannot guess input file type from filename')
-        try:
-            fmt = fileFMT(format, fmt_args)
-        except Exception as e:
-            self.logger.debug(e)
-            raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
-        #
-        self.sample_name = sample_name
-        #
-        # how to split processed records
-        self.ranges = fmt.ranges
-        self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
-        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
-        self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
-        self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
-        #
-        if fmt.input_type == 'variant':
-            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
-        else:  # position or range type
-            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
-        # probe number of sample
-        if self.genotype_field:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
-        # there are variant_info
-        if self.variant_info:
-            cur = self.db.cursor()
-            headers = self.db.getHeaders('variant')
-            for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
-                # either insert or update, the fields must be in the master variant table
-                self.proj.checkFieldName(f.name, exclude='variant')
-                if f.name not in headers:
-                    s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
-                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
-                    del s
-        #
-        if fmt.input_type != 'variant':
-            self.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
-        #
-        self.input_type = fmt.input_type
-        fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
-        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
-            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
-        self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
-            .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
-
     def getSampleName(self, filename):
         '''Prove text file for sample name'''
         header_line = None
@@ -894,185 +643,42 @@ class TextImporter(BaseImporter):
             self.db.commit()
             prog.done()
 
-class TextUpdater(BaseImporter):
-    '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, table, files, build, format, fmt_args=[]):
-        # if update is None, recreate index
-        BaseImporter.__init__(self, proj, files, build, True, mode='update')
-        #
-        if not proj.isVariantTable(table):
-            raise ValueError('Variant table {} does not exist.'.format(table))
-        # we cannot guess build information from txt files
-        if build is None and self.proj.build is None:
-            raise ValueError('Please specify the reference genome of the input data.')
-        #
-        # try to guess file type
-        if not format:
-            filename = self.files[0].lower()
-            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
-                format = 'vcf'
-            else:
-                raise ValueError('Cannot guess input file type from filename')
-        try:
-            fmt = fileFMT(format, fmt_args)
-        except Exception as e:
-            self.logger.debug(e)
-            raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
-        #
-        # how to split processed records
-        self.ranges = fmt.ranges
-        self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
-        self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
-        #
-        if fmt.input_type == 'variant':
-            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
-        else:  # position or range type
-            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
-        # there are variant_info
-        if self.variant_info:
-            cur = self.db.cursor()
-            headers = self.db.getHeaders('variant')
-            for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
-                # either insert or update, the fields must be in the master variant table
-                self.proj.checkFieldName(f.name, exclude='variant')
-                if f.name not in headers:
-                    s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
-                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
-                    del s
-        if len(self.variant_info) == 0:
-            raise ValueError('No field could be updated using this input file')
-        #
-        self.input_type = fmt.input_type
-        fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
-        from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
-        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
-            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
-        self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
-            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
-        self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
-            .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
-
-    def updateVariant(self, cur, bins, rec):
-        if self.input_type == 'variant':
-            var_key = tuple(rec[0:4])
-            if var_key in self.variantIndex:
-                variant_id = self.variantIndex[var_key][0]
-                # update by variant_id, do not need bins
-                cur.execute(self.update_variant_query, rec[4:] + [variant_id])
-                self.count[8] += cur.rowcount
-        elif self.input_type == 'position':
-            cur.execute(self.update_position_query, rec[2:] + bins + [rec[0], rec[1]])
-            self.count[8] += cur.rowcount
-        else:  # range based
-            cur.execute(self.update_range_query, rec[3:] + bins + [rec[0], rec[1], rec[2]])
-            self.count[8] += cur.rowcount
-
-    def importFromFile(self, input_filename):
-        '''Import a TSV file to sample_variant'''
-        #
-        cur = self.db.cursor()
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        rngs = None
-        with self.openFile(input_filename) as input_file:
-            for line in input_file:
-                try:
-                    line = line.decode()
-                    if line.startswith('#'):
-                        continue
-                    for bins, rec in self.processor.process(line):
-                        self.updateVariant(cur, bins, rec[0:self.ranges[2]])
-                except Exception as e:
-                    self.logger.debug('Failed to process line: ' + line.strip())
-                    self.logger.debug(e)
-                    self.count[7] += 1
-                if self.count[0] % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(self.count[0])
-            self.db.commit()
-            prog.done()
-
-#
-#
 # Functions provided by this script
 #
 #
 
-def importVariantsArguments(parser):
-    parser.add_argument('input_files', nargs='+',
-        help='''A list of files that will be imported. The file should be delimiter
-            separated with format described by parameter --format. Gzipped files are
-            acceptable.''')
-    parser.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18) of the input data. If
-            unspecified, it is assumed to be the primary reference genome of the project.
-            If a reference genome that is different from the primary reference genome of the
-            project is specified, it will become the alternative reference genome of the
-            project. The UCSC liftover tool will be automatically called to map input
-            coordinates between the primary and alternative reference genomes.''')
+def exportArguments(parser):
+    parser.add_argument('table', help='''A variant table whose variants will be exported.'''),
+    parser.add_argument('filename', help='''Name of output file.'''),
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
+        help='''Samples that will be exported, specified by conditions such as 'aff=1'
+            and 'filename like "MG%%"'. Multiple samples could be exported to a
+            file if the output format allows. No sample will be outputted if this
+            parameter is ignored.''')
     parser.add_argument('--format',
-        help='''Format of the input text file. It can be one of the variant tools
+        help='''Format of the exported file. It can be one of the variant tools
             supported file types such as VCF (c.f. 'vtools show formats' and 
             'vtools show format FMT'), or a local format specification file (with
             extension .fmt). If unspecified, variant tools will try to guess format from
             file extension. Fields specified in a format could be overridden by optional
             parameters --variant_fields, --variant_info, --genotype_fields, and
-            --genotype_info, which allows you to import additional or alternative fields
+            --genotype_info, which allows you to export additional or alternative fields
             defined for the format. ''')
-    parser.add_argument('--sample_name', nargs='*', default=[],
-        help='''Name of the samples imported by the input files. The same names will be
-            used for all files if multiple files are imported. If unspecified, headers
-            of the genotype columns of the last comment line (line starts with #) of the
-            input files will be used (and thus allow different sample names for input files).
-            If sample names are specified for input files without genotype, samples
-            will be created without genotype. If sample names cannot be determined from
-            input file and their is no ambiguity (only one sample is imported), a sample
-            with NULL sample name will be created.''')
-    parser.add_argument('-f', '--force', action='store_true',
-        help='''Import files even if the files have been imported before. This option
-            can be used to import from updated file or continue disrupted import, but will
-            not remove wrongfully imported variants from the master variant table.''')
+    parser.add_argument('--build',
+        help='''Build version of the reference genome (e.g. hg18) of the exported data. It
+            can only be one of the primary (default) of alternative (if exists) reference
+            genome of the project.'''),
 
-def importVariants(args):
+def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
-            importer = TextImporter(proj=proj, files=args.input_files,
-                build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force, fmt_args=args.unknown_args)
-            importer.importData()
+            exporter = txtExporter(proj=proj, table=args.table, filename=args.filename,
+                samples=args.samples, format=args.format, build=args.build, 
+                fmt_args=args.unknown_args)
+            exporter.exportData()
         proj.close()
     except Exception as e:
         sys.exit(e)
 
-
-def updateArguments(parser):
-    parser.add_argument('table', help='''variants to be updated.''')
-    parser.add_argument('input_files', nargs='+',
-        help='''A list of files that will be used to add or update existing fields of
-            variants. The file should be delimiter separated with format described by
-            parameter --format. Gzipped files are acceptable.''')
-    parser.add_argument('--build',
-        help='''Build version of the reference genome (e.g. hg18) of the input files,
-            which should be the primary (used by default) or alternative (if available)
-            reference genome of the project. An alternative reference genome will be
-            added to the project if needed.''')
-    parser.add_argument('--format',
-        help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats' and 
-            'vtools show format FMT'), or a local format specification file (with
-            extension .fmt). Fields specified in a format could be overridden by optional
-            parameters --variant_fields, --position_fields, --range_fields, and 
-            --variant_info which allows you to update additional fields from the input
-            files''')
-
-def update(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
-                build=args.build, format=args.format, fmt_args=args.unknown_args)
-            importer.importData()
-        proj.close()
-    except Exception as e:
-        sys.exit(e)
 
