@@ -73,7 +73,7 @@ class TestSampleStat(ProcessTestCase):
         # ffilter out variants having GQ less than 4,
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools sample_stat variant --genotype "GQ_INFO >= 4" --num gq_ge_4')
-        self.assertEqual(output2list('vtools output variant gq_ge_4'), ['NA', 'NA', 'NA', '0', '3', '1'])
+        self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
         
 if __name__ == '__main__':
     unittest.main()

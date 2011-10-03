@@ -237,7 +237,11 @@ class Sample:
                     if fieldType.upper().startswith('FLOAT'):
                         genotypeFieldTypes[field] = 'FLOAT'
                     elif fieldType.upper().startswith('VARCHAR'):
-                        raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
+                        genotypeFieldTypes[field] = 'VARCHAR'
+                        # We had been throwing an error here if a genotype field is a VARCHAR, but I think we should allow
+                        # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
+                        # further down in the code.
+                        # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
             
         validGenotypeIndices = []
         for index in range(0,len(genotypeFields)):
@@ -341,9 +345,12 @@ class Sample:
             if operations[index] == MEAN:
                 table_attributes.append((destinations[index], 'FLOAT'))
             else:
-                table_attributes.append((destinations[index], genotypeFieldTypes.get(genotypeFields[index])))
+                genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index])
+                if genotypeFieldType == 'VARCHAR':
+                    raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
+                table_attributes.append((destinations[index], genotypeFieldType))
         for field, fldtype in table_attributes:
-            defaultValue = None
+            defaultValue = 'NULL'
             # We are setting default values on the count fields to 0.  The genotype stat fields are set to NULL by default.
             if field in fieldsDefaultZero: defaultValue = 0
             if field is None:
@@ -359,7 +366,6 @@ class Sample:
                 if defaultValue == 0:
                     self.db.execute ('UPDATE {} SET {} = 0'.format(variant_table, field))              
         #
-
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
             ' ,'.join(['{}={}'.format(x, self.db.PH) for x in queryDestinations if x is not None]))
