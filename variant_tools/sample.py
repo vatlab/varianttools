@@ -333,25 +333,31 @@ class Sample:
         prog.done()
         #
         headers = self.db.getHeaders(variant_table)
-        [num, hom, het, other]
         table_attributes = [(num, 'INT'), (hom, 'INT'),
                 (het, 'INT'), (other, 'INT')]
+        fieldsDefaultZero = [num, hom, het, other]
+        
         for index in validGenotypeIndices:
             if operations[index] == MEAN:
                 table_attributes.append((destinations[index], 'FLOAT'))
             else:
                 table_attributes.append((destinations[index], genotypeFieldTypes.get(genotypeFields[index])))
         for field, fldtype in table_attributes:
+            defaultValue = None
+            # We are setting default values on the count fields to 0.  The genotype stat fields are set to NULL by default.
+            if field in fieldsDefaultZero: defaultValue = 0
             if field is None:
                 continue
             if field in headers:
                 self.logger.info('Updating existing field {}'.format(field))
-                self.db.execute('Update {} SET {} = 0;'.format(variant_table, field))
+                self.db.execute('Update {} SET {} = {};'.format(variant_table, field, defaultValue))
                 if fldtype == 'FLOAT' and operations[index] != MEAN:
                     self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
             else:
                 self.logger.info('Adding field {}'.format(field))
-                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))               
+                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
+                if defaultValue == 0:
+                    self.db.execute ('UPDATE {} SET {} = 0'.format(variant_table, field))              
         #
 
         prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
@@ -376,7 +382,7 @@ class Sample:
             for index in validGenotypeIndices:
                 operationIndex = index + 4     # the first 3 indices hold the values for hom, het, double het and wildtype
                 operationCalculation = value[operationIndex]
-                if operations[index] == MEAN:
+                if operations[index] == MEAN and operationCalculation is not None:
                     numSamples = value[0] + value[1] + value[2] + value[3]
                     operationCalculation /= float(numSamples)
                 res.append(operationCalculation)
