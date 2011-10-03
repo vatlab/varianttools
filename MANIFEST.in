@@ -29,6 +29,7 @@ include test/*.py
 include variant_tools/__init__.py
 include variant_tools/annotation.py
 include variant_tools/importer.py
+include variant_tools/exporter.py
 include variant_tools/liftOver.py
 include variant_tools/project.py
 include variant_tools/sample.py
