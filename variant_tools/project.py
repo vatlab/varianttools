@@ -1438,7 +1438,7 @@ def init(args):
                 except Exception as e:
                     proj.logger.debug(e)
                 # copying data over
-                proj.logger.info('Copying genotypes for sample {}...'.format(count))
+                proj.logger.debug('Copying genotypes for sample {}...'.format(count))
                 if vtable == 'variant':
                     # copy all variants
                     cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0};'.format(table))
