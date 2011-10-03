@@ -10,7 +10,7 @@ genotype_fields=geno
 variant_info=DP_INFO
 genotype_info=DP_FMT
 # variants with identical chr,pos,ref will be collapsed.
-output_by_fields=chr,pos,ref
+export_by_fields=chr,pos,ref
 
 [columns]
 col1=chr

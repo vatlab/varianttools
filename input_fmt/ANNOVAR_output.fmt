@@ -40,6 +40,6 @@ type=VARCHAR(255)
 comment=the functional consequences of the variant.
 
 [function]
-indexs=3
+index=3
 type=VARCHAR(255)
 comment=the gene name, the transcript identifier and the sequence change in the corresponding transcript
