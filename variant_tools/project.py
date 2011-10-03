@@ -397,10 +397,6 @@ class fileFMT:
                 col = [x for x in columns if x.index == idx + 1][0]
             except Exception as e:
                 raise ValueError('Cannot find column {} from format specification: {}'.format(idx + 1, e))
-            col_fields = [] if not col.field else [x.strip() for x in col.field.split(',')]
-            for fld in col_fields:
-                if len([x for x in fields if x.name == fld]) != 1:
-                    raise ValueError('Cannot find field "{}" for column {}.'.format(fld, idx+1))
             self.columns.append(col)
 
     def describe(self):
