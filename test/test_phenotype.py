@@ -30,7 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, output2list
 
-class TestImportPhenotype(ProcessTestCase):
+class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
@@ -51,6 +51,30 @@ class TestImportPhenotype(ProcessTestCase):
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype3.txt')
+        
+    def testImportFields(self):
+        'Test command phenotype --from_file FIELD'
+        # importing only a few fields, not all fields
+        runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
+        out3 = output2list('vtools show samples')
+        with open('phenotype/phenotype.txt') as inputfile:
+            out4 = ['\t'.join((x.split('\t')[:3])) for x in inputfile]
+        self.assertEqual(out3, out4)
+        
+    def testSetPhenotype(self):
+        'Test commandn phenotype --set'
+        self.assertFail('vtools phenotype --set')
+        self.assertSucc('vtools phenotype --set race=1 --samples \'filename like "%CEU%"\'')
+        self.assertFail('vtools phenotype --set race="white" --samples \'filename like "%CEU%"\'')
+        # have to use quote to pass the test
+        self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
+        # FIXME the following tests pass but have to varify the output. Will do that manually and add assertEqual
+        # total genotypes per individual. apply "count" on sample variant tables
+        self.assertSucc('vtools phenotype --set "numGeno=count(*)"')
+        self.assertSucc("vtools phenotype --set 'validGeno=count(*)' --genotypes 'DP_FMT>10'")
+        # apply some sqlite functions on sample variant tables to provide useful information for genotype qualities
+        self.assertSucc('vtools phenotype --set "meanDP=avg(DP_FMT)" "minDP=min(DP_FMT)" "maxDP=max(DP_FMT)"')
+        
 
 if __name__ == '__main__':
     unittest.main()
