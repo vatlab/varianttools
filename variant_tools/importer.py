@@ -597,7 +597,7 @@ class BaseImporter:
                         'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
                             self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
             else:
-                self.logger.info('{:,} variants are updated'.format(self.count[8]))
+                self.logger.info('Field{} {} of {:,} variants are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
