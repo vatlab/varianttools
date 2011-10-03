@@ -14,12 +14,32 @@ export_by_fields=chr,pos,ref
 
 [DEFAULT]
 format_string='GT'
-geno_info=DP_FMT
-geno_fields=geno
+format_string_comment=FORMAT string that is outputted in the 9th column of
+    exported vcf file. Please specified an appropriate value corresponding to the
+    parameter --geno_info because this column cannot be automatically determined.
+
+geno_info=
+geno_info_comment=Genotype information fields. No genotype field is imported by
+    default. Please check the FORMAT string of your .vcf file to determine
+    available fields to be imported.
+
+geno_fields=GT
+geno_fields_comment=Field to extract genotype from .vcf file. You can set it to
+    safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
+
 var_info=DP_INFO
-# assuming unphased
+var_info_comment=Variant information fields to be imported. Please check the
+    INFO column of your vcf file for available fields.
+
 phase_sep='/'
-phase_sep_comment=Seperator used to output genotype, / for unphased and | for phased.'
+phase_sep_comment=Seperator used to output genotype, / for unphased and | for
+    phased. This parameter is needed because 'vtools import' does not save phase
+    information for each genotype.
+
+wildtype_code=('0',)
+wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
+    by default imported as GT=0. They will be discarded if you set this parameter
+    to None.
 
 [col_1]
 field=chr
@@ -61,8 +81,8 @@ export_adj=Value(%(format_string)s)
 comment=genotype format
 
 [col_10]
-field=%(geno_info)s
-export_adj=Join(':')
+field=%(geno_fields)s,%(geno_info)s
+export_adj=JoinFields(':')
 comment=genotype
 
 [chr]
@@ -114,34 +134,24 @@ index=7
 type=VARCHAR(255)
 comment=PASS if this position has passed all filters, i.e. a call is made at this position. Otherwise, if the site has not passed all filters, a semicolon-separated list of codes for filters that fail. 
 
-[geno]
+[GT]
 index=10:
 type=INTEGER
-adj=VcfGenotype(default=('0',))
+adj=VcfGenotype(default=%(wildtype_code)s)
+export_adj=DecodeGenotype(phase=%(phase_sep)s)
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
 
-[geno_alt]
-index=10:
-type=INTEGER
-adj=VcfGenotype()
-comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Both the wildtype and missing genotype will be dropped.
-
-[safe_geno]
+[safe_GT]
 # This vcf genotype extractor uses format string and genotype to 
 # extract genotype. Although the format string should not be needed
 # because the genotype field should be the first one, one of my dataset
 # does not following this rule. The performance penalty is significant
 # 4.36 -> 3.03 for 50k records.
 index=9, 10:
-adj=VcfGenoFromFormat(default=('0',))
+adj=VcfGenoFromFormat(default=%(wildtype_code)s)
+export_adj=DecodeGenotype(phase=%(phase_sep)s)
 type=INTEGER
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Missing genotype will be dropped.
-
-[safe_geno_alt]
-index=9, 10:
-adj=VcfGenoFromFormat()
-type=INTEGER
-comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Both the wildtype and missing genotype will be dropped.
 
 [raw_info]
 index=8
