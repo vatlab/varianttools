@@ -191,7 +191,7 @@ class TextExporter:
 
 class Exporter:
     '''A general class for importing variants'''
-    def __init__(self, proj, table, filename, samples, format, build, fmt_args):
+    def __init__(self, proj, table, filename, samples, format, build, header, fmt_args):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
@@ -238,7 +238,37 @@ class Exporter:
         #
         if not self.format.columns:
             raise ValueError('Cannot output in format {} because no output column is defined for this format.'.format(format)) 
-        
+        #
+        # header
+        self.header = self.getHeader(header)
+    
+    def getHeader(self, filename):
+        if not filename:
+            return ''
+        #
+        if os.path.isfile(filename):
+            if filename.lower().endswith('.gz'):
+                input = gzip.open(filename, 'rb')
+            else:
+                input = open(filename, 'rb')
+            header = ''
+            for line in input:
+                line = line.decode()
+                if line.startswith('#'):
+                    header += line
+                else:
+                    return header
+        # if file does not exist, try the filename table
+        cur = self.db.cursor()
+        try:
+            cur.execute('SELECT header from filename WHERE filename = {};'.format(self.db.PH), (filename,))
+            return cur.fetchone()[0]
+        except Exception as e:
+            self.logger.debug(e)
+            return ''
+        # nothing works
+        self.logger.warning('Cannot get header from filename {}. Please check if this file exists in disk or in the sample table (vtools show samples)'.format(filename))
+        return ''
 
     def exportData(self):
         '''Export data in specified format'''
@@ -281,9 +311,13 @@ class Exporter:
         # get variant and their info
         cur = self.db.cursor()
         cur.execute(query)
-        for rec in cur:
-            print(','.join([' '.join([str(rec[x]) for x in col]) for col in col_fields]))
-        return
+        with open(self.filename, 'w') as output:
+            # write header
+            if self.header:
+                print >> output, self.header.rstrip()
+            for rec in cur:
+                print>> output, ','.join([' '.join([str(rec[x]) for x in col]) for col in col_fields])
+            return
 
 
 # Functions provided by this script
@@ -311,13 +345,18 @@ def exportArguments(parser):
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
             genome of the project.'''),
+    parser.add_argument('--header',
+        help='''If specified, the header (leading comment lines starting with #) of this
+            file will become the header of the exported file. Because vtools saves header
+            of imported files, the original header will be used even if the input files
+            have been removed or renamed.''')
 
 def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
-                samples=args.samples, format=args.format, build=args.build, 
+                samples=args.samples, format=args.format, build=args.build, header=args.header,
                 fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()

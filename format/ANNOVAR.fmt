@@ -10,6 +10,10 @@ description=Input format of ANNOVAR. No genotype is defined.
 variant_fields=chr,pos,ref,alt
 delimiter=None
 
+[DEFAULT]
+# one or more fields that will be outputted in the comment field, if specified.
+output_comment=
+
 [chr]
 index=1
 type=VARCHAR(20)
@@ -51,3 +55,8 @@ comment=reference allele
 [col_5]
 field=alt
 comment=alternative allele
+
+[col_6]
+field=%(output_comment)s
+export_adj=JoinFields(',')
+comment=optional column
