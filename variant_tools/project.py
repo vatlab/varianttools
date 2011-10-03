@@ -237,22 +237,21 @@ class fileFMT:
         '''Input file format'''
         # locate a file format specification file
         self.description = None
+        self.variant_fields = None
+        self.position_fields = None
+        self.range_fields = None
+        self.variant_info = None
+        self.genotype_fields = None
+        self.genotype_info = None
         # these fields read from format files could be overriden by fmt_args
-        # They will be None or values specified from fmt_args.
-        args = self.parseArgs(fmt_args)
-        self.variant_fields = args.variant_fields
-        self.position_fields = args.position_fields
-        self.range_fields = args.range_fields
-        self.variant_info = args.variant_info
-        self.genotype_fields = args.genotype_fields
-        self.genotype_info = args.genotype_info
+        args = self.parseArgs(name, fmt_args)
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
-            self.parseFMT(name + '.fmt') 
+            self.parseFMT(name + '.fmt', defaults=args) 
         elif name.endswith('.fmt') and os.path.isfile(name):
             self.name = os.path.split(name)[-1][:-4]
-            self.parseFMT(name) 
+            self.parseFMT(name, defaults=args) 
         else:
             url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
             try:
@@ -260,20 +259,23 @@ class fileFMT:
             except Exception as e:
                 raise ValueError('Failed to download format specification file {}.fmt'.format(name))
             self.name = name
-            self.parseFMT(fmt)
+            self.parseFMT(fmt, defaults=args)
 
-    def parseArgs(self, fmt_args):
-        parser = argparse.ArgumentParser(description='''Parameters to override fields of
+    def parseArgs(self, filename, fmt_args):
+        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser.read(filename)
+        parameters = fmt_parser.items('DEFAULT')
+        parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
             existing format.''')
-        parser.add_argument('--variant_fields', nargs='*')
-        parser.add_argument('--position_fields', nargs='*')
-        parser.add_argument('--range_fields', nargs='*')
-        parser.add_argument('--variant_info', nargs='*')
-        parser.add_argument('--genotype_fields', nargs='*')
-        parser.add_argument('--genotype_info', nargs='*')
-        return parser.parse_args(fmt_args)
+        for par in parameters:
+            parser.add_argument('--{}'.format(par[0]), nargs='*', default=par[1])
+        args = vars(parser.parse_args(fmt_args))
+        for key in args:
+            if type(args[key]) == list:
+                args[key] = ','.join(args[key])
+        return args
 
-    def parseFMT(self, filename):
+    def parseFMT(self, filename, defaults):
         parser = ConfigParser.SafeConfigParser()
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
@@ -292,33 +294,32 @@ class fileFMT:
             try:
                 items = [x[0] for x in parser.items(section, raw=True)]
                 for item in items:
-                    if item not in ['index', 'type', 'adj', 'comment']:
+                    if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
                         raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                 fields.append(
                     Field(name=section,
-                        index=parser.get(section, 'index', raw=True),
-                        type=parser.get(section, 'type', raw=True),
-                        adj=parser.get(section, 'adj', raw=True) if 'adj' in items else None,
+                        index=parser.get(section, 'index', vars=defaults),
+                        type=parser.get(section, 'type', vars=defaults),
+                        adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
                         comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                     )
             except Exception as e:
-                raise ValueError('Invalid section {} in configuration file {}: {}'.format(section, self.name, e))
+                raise ValueError('Invalid section {}: {}'.format(section, e))
         #
         if len(fields) == 0:
             raise ValueError('No valid field is defined in format specification file {}'.format(self.name))
         #
         self.delimiter = '\t'
         #
-        for item in parser.items('format description'):
+        for item in parser.items('format description', vars=defaults):
             if item[0] == 'description':
                 self.description = item[1]
             if item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
-                if getattr(self, item[0]) is None:
-                    # value was not overriden
-                    setattr(self, item[0], [x.strip() for x in item[1].split(',')])
+                setattr(self, item[0], [x.strip() for x in item[1].split(',')])
         #
+        self.parameters = parser.items('DEFAULT')
         # Post process all fields
         if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
             raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
@@ -374,33 +375,39 @@ class fileFMT:
         print('Format:      {}'.format(self.name))
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*4))))
+                initial_indent='', subsequent_indent=' '*2))))
         #
         if self.input_type == 'variant':
             print('\n{0} fields:'.format(self.input_type))
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
-            print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*14))))
+            print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                subsequent_indent=' '*15))))
         if self.ranges[1] != self.ranges[2]:
             print('\nVariant information fields:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
-                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*14))))
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
         if self.ranges[2] != self.ranges[3]:
             print('\nGenotype field:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
-                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*14))))
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
         if self.ranges[3] != self.ranges[4]:
             print('\nGenotype information fields:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
-                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*14))))
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
         if self.other_fields:
-            print('\nOther fields (usable through parameters such as --variant_fields):')
+            print('\nOther fields (usable through parameters):')
             for fld in self.other_fields:
-                print('   {:10} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*14))))
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
+        if self.parameters:
+            print('\nConfigurable parameters with default value:')
+            for item in self.parameters:
+                print('  {:12} {}'.format(item[0], item[1]))
+        else:
+            print('\nNo configurable parameter is defined for this format.\n')
 
 
 
@@ -1582,7 +1589,7 @@ def show(args):
                         fmt = fileFMT(item)
                     except Exception as e:
                         proj.logger.debug(e)
-                        raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+                        raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file "{}"'.format(e, item))
                     fmt.describe()
             elif args.type == 'genotypes':
                 # get sample ids and attach the genotypes database
