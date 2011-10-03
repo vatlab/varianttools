@@ -44,7 +44,8 @@ VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
 # define a field type
-Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
+Field = namedtuple('Field', ['name', 'index', 'adj', 'export_adj', 'type', 'comment'])
+Column = namedtuple('Column', ['index', 'field', 'export_adj', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -288,23 +289,40 @@ class fileFMT:
             raise ValueError("Missing section 'format description'")
         #
         fields = []
+        columns = []
         for section in sections:
             if section == 'format description':
                 continue
-            try:
-                items = [x[0] for x in parser.items(section, raw=True)]
-                for item in items:
-                    if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
-                        raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
-                fields.append(
-                    Field(name=section,
-                        index=parser.get(section, 'index', vars=defaults),
-                        type=parser.get(section, 'type', vars=defaults),
-                        adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
-                        comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    )
-            except Exception as e:
-                raise ValueError('Invalid section {}: {}'.format(section, e))
+            if section.startswith('col_'):
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    for item in items:
+                        if item not in ['field', 'export_adj', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only field, export_adj and comment are allowed.'.format(item, section))
+                    columns.append(
+                        Column(index=int(section.split('_', 1)[1]),
+                            field=parser.get(section, 'field', vars=defaults) if 'field' in items else '',
+                            export_adj=parser.get(section, 'export_adj', vars=defaults) if 'export_adj' in items else None,
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                        )
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
+            else:
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    for item in items:
+                        if item not in ['index', 'type', 'adj', 'export_adj', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
+                    fields.append(
+                        Field(name=section,
+                            index=parser.get(section, 'index', vars=defaults),
+                            type=parser.get(section, 'type', vars=defaults),
+                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
+                            export_adj=parser.get(section, 'export_adj', vars=defaults) if 'export_adj' in items else None,
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                        )
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
         #
         if len(fields) == 0:
             raise ValueError('No valid field is defined in format specification file {}'.format(self.name))
@@ -369,13 +387,34 @@ class fileFMT:
             self.fields[i] = fld[0]
         # other fields?
         self.other_fields = [x for x in fields if x not in self.fields]
-                
+        #
+        # columns definition
+        self.columns = []
+        for idx in range(len(columns)):
+            # find column
+            try:
+                col = [x for x in columns if x.index == idx + 1][0]
+            except Exception as e:
+                raise ValueError('Cannot find column {} from format specification: {}'.format(idx + 1, e))
+            col_fields = [] if not col.field else [x.strip() for x in col.field.split(',')]
+            for fld in col_fields:
+                if len([x for x in fields if x.name == fld]) != 1:
+                    raise ValueError('Cannot find field "{}" for column {}.'.format(fld, idx+1))
+            self.columns.append(col)
 
     def describe(self):
         print('Format:      {}'.format(self.name))
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
+        #
+        print('\nColumns:')
+        if self.columns:
+            for col in self.columns:
+                print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
+                    subsequent_indent=' '*15))))
+        else:
+            print('  None defined, export is not allowed for this format')
         #
         if self.input_type == 'variant':
             print('\n{0} fields:'.format(self.input_type))

@@ -33,16 +33,21 @@ comment=Alternative allele, '-' for deletion.
 
 [col_1]
 field=chr
+comment=chromosome
 
 [col_2]
 field=pos
+comment=position (1-based)
 
 [col_3]
 field=pos,ref
-adj=lambda x: int(x[0])-1+len(ref)
+export_adj=lambda x: int(x[0])-1+len(ref)
+comment=end position
 
 [col_4]
 field=ref
+comment=reference allele
 
 [col_5]
 field=alt
+comment=alternative allele
