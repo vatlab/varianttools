@@ -1336,8 +1336,8 @@ def initArguments(parser):
     parser.add_argument('project',
         help='''Name of a new project. This will create a new file $project.proj under
             the current directory. Only one project is allowed in a directory.''')
-    parser.add_argument('--parent', nargs=2, 
-        help='''Directory and variant table of a parent project (e.g. --from .. chr1) from
+    parser.add_argument('--parent', nargs=2, metavar=('DIR','TABLE'),
+        help='''Directory and variant table of a parent project (e.g. --parent ../ chr1) from
             which variants in specified variant table will be copied to the new project. This
             option is often used to split a project into several subprojects that will be
             processed in parallel.''')
@@ -1372,7 +1372,7 @@ def init(args):
             if not args.parent:
                 return
             if len(args.parent) != 2:
-                raise ValueError('Option --from must be followed by path to a parent project and name of a variant table in that project.')
+                raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
             files = glob.glob('{}/*.proj'.format(args.parent[0]))
             if len(files) != 1:
                 raise ValueError('Directory {} does not contain a valid variant tools project'.format(args.parent[0]))
