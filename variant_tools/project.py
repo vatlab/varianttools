@@ -254,7 +254,7 @@ class fileFMT:
             self.name = os.path.split(name)[-1][:-4]
             self.parseFMT(name, defaults=args) 
         else:
-            url = 'http://vtools.houstonbioinformatics.org/input_fmt/{}.fmt'.format(name)
+            url = 'http://vtools.houstonbioinformatics.org/format/{}.fmt'.format(name)
             try:
                 fmt = downloadFile(url, quiet=True)
             except Exception as e:
@@ -1619,7 +1619,7 @@ def show(args):
                 for db in DBs:
                     print(db)
             elif args.type == 'formats':
-                FMTs = filesInURL('http://vtools.houstonbioinformatics.org/input_fmt', ext='.fmt')
+                FMTs = filesInURL('http://vtools.houstonbioinformatics.org/format', ext='.fmt')
                 for fmt in FMTs:
                     print(fmt)
             elif args.type == 'format':

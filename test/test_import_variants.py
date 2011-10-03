@@ -63,7 +63,7 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(variants, input)
         # test downloading fmt file from the website
         self.assertSucc('vtools import --build hg18 --format ANNOVAR txt/ANNOVAR.txt')
-        self.assertFail('vtools import --build hg18 --format ../input_fmt/non_existing_fmt txt/input.tsv')
+        self.assertFail('vtools import --build hg18 --format ../format/non_existing_fmt txt/input.tsv')
         
     
     def testGenotypes(self):
@@ -98,38 +98,38 @@ class TestImportVariants(ProcessTestCase):
 
     def testANNOVAR(self):
         'Testing the annovar input format'
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt')
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt')
         # one of the variant cannot be imported.
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 11)
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 11)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'kaiw\n')
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function' )
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function' )
         self.assertSucc('vtools output variant mut_type')
         # test for importing user specified variant_info
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function --force' )
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function --force' )
         self.assertEqual(len(output2list('vtools select variant "function is not NULL" -o function')), 78)
         # mut_type should not be imported because it is not specified
         self.assertFail('vtools output variant mut_type')
         
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
         # 20 new, SNVs, 5 invalid
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 20)
         # sample name should have been scanned from the last line starting with "#"
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'max_gt\n')
         # test for re-naming the sample
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 20)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp\n')
         runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/CASAVA18_snps txt/CASAVA18_SNP.txt --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the sample_variant_x table
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
         # only 1 sample here. Set num=1
@@ -137,7 +137,7 @@ class TestImportVariants(ProcessTestCase):
         
     def testCASAVA18_INDEL(self):
         'Testing the CASAVA INDEL input format'
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/CASAVA18_indels txt/CASAVA18_INDEL.txt')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
         # (25 new, 7 insertions, 18 deletions)
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 25)
@@ -146,7 +146,7 @@ class TestImportVariants(ProcessTestCase):
         
     def testPileup_INDEL(self):
         # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
-        self.assertSucc('vtools import --build hg18 --format ../input_fmt/pileup_indel txt/pileup.indel')
+        self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 30)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'None\n')

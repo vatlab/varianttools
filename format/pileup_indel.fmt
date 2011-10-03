@@ -1,0 +1,48 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Input format for samtools pileup indel caller. This format imports chr, pos, ref, alt and genotype.
+variant_fields=chr, pos, ref, alt
+genotype_fields=genotype
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome name
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=Start position of the indel event. 
+
+[type]
+index=3
+type=VARCHAR(255)
+comment=String summarizing the indel type, one of Dn (deletion of length n) and In (insertion of length n)
+
+[ref]
+index=3,4
+type=VARCHAR(255)
+# send in I4, AAAA or D1, A. If this is an insertion, ref is -, otherwise ref is the genotype
+adj=lambda x: '-' if x[0].startswith('I') else x[1]
+comment=reference allele, '-' for insertion
+
+[alt]
+index=3,4
+type=VARCHAR(255)
+# send in I4, AAAA or D1, A. If this is an insertion, alt is genotype, otherwise alt is '-'
+adj=lambda x: '-' if x[0].startswith('D') else x[1]
+comment=alternative allele, '-' for deletion
+
+[genotype]
+index=6
+type=INT
+adj=MapValue({'homo': '2', 'hete': '1'})
+comment=type of indel (homozygote or heterozygote)
+

@@ -42,8 +42,8 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
-        self.assertFail('vtools update --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
-        self.assertSucc('vtools update variant --format ../input_fmt/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
         
     def testUpdate(self):

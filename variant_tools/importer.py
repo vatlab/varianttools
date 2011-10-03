@@ -1012,13 +1012,11 @@ def importVariantsArguments(parser):
             coordinates between the primary and alternative reference genomes.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as VCF (c.f. 'vtools show formats' and 
-            'vtools show format FMT'), or a local format specification file (with
-            extension .fmt). If unspecified, variant tools will try to guess format from
-            file extension. Fields specified in a format could be overridden by optional
-            parameters --variant_fields, --variant_info, --genotype_fields, and
-            --genotype_info, which allows you to import additional or alternative fields
-            defined for the format. ''')
+            supported file types such as VCF (c.f. 'vtools show formats'), or a 
+            local format specification file (with extension .fmt). If unspecified,
+            variant tools will try to guess format from file extension. Some file
+            formats accept parameters (c.f. 'vtools show format FMT') and allow you
+            to import additional or alternative fields defined for the format. ''')
     parser.add_argument('--sample_name', nargs='*', default=[],
         help='''Name of the samples imported by the input files. The same names will be
             used for all files if multiple files are imported. If unspecified, headers
@@ -1059,12 +1057,10 @@ def updateArguments(parser):
             added to the project if needed.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats' and 
-            'vtools show format FMT'), or a local format specification file (with
-            extension .fmt). Fields specified in a format could be overridden by optional
-            parameters --variant_fields, --position_fields, --range_fields, and 
-            --variant_info which allows you to update additional fields from the input
-            files''')
+            supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats'),
+            or a local format specification file (with extension .fmt). Some formats 
+            accept parameters (c.f. 'vtools show format FMT') and allow you to update
+            additional or alternative fields from the input file.''')
 
 def update(args):
     try:

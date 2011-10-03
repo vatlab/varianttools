@@ -657,13 +657,11 @@ def exportArguments(parser):
             parameter is ignored.''')
     parser.add_argument('--format',
         help='''Format of the exported file. It can be one of the variant tools
-            supported file types such as VCF (c.f. 'vtools show formats' and 
-            'vtools show format FMT'), or a local format specification file (with
-            extension .fmt). If unspecified, variant tools will try to guess format from
-            file extension. Fields specified in a format could be overridden by optional
-            parameters --variant_fields, --variant_info, --genotype_fields, and
-            --genotype_info, which allows you to export additional or alternative fields
-            defined for the format. ''')
+            supported file types such as VCF (c.f. 'vtools show formats') or a local
+            format specification file (with extension .fmt). If unspecified, variant
+            tools will try to guess format from file extension. Some formats accept
+            additional parameters (c.f. 'vtools show format FMT') and allows you to
+            export additional or alternative fields.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
