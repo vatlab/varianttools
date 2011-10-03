@@ -10,14 +10,6 @@ description=Input format of ANNOVAR. No genotype is defined.
 variant_fields=chr,pos,ref,alt
 delimiter=None
 
-[columns]
-col1=chr
-col2=pos
-col3=pos,ref
-col3_adj=lambda x: int(x[0])-1+len(ref)
-col4=ref
-col5=alt
-
 [chr]
 index=1
 type=VARCHAR(20)
@@ -38,3 +30,19 @@ comment=Reference allele, '-' for insertion.
 index=5
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
+
+[col_1]
+field=chr
+
+[col_2]
+field=pos
+
+[col_3]
+field=pos,ref
+adj=lambda x: int(x[0])-1+len(ref)
+
+[col_4]
+field=ref
+
+[col_5]
+field=alt
