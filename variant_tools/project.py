@@ -83,7 +83,7 @@ class AnnoDB:
         # read fields from DB
         self.fields = []
         cur = self.db.cursor()
-        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
+        cur.execute('SELECT name, field, "", "", type, comment from {}_field;'.format(self.name))
         for rec in cur:
             self.fields.append(Field(*rec))
             # FIXME: We should enforce comment for all fields.
