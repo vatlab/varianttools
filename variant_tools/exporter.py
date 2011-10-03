@@ -34,160 +34,20 @@ from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
     consolidateFieldName
 
-
-class TextExporter:
-    '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, logger):
-        '''Fields: a list of fields with index, adj (other items are not used)
-        builds: index(es) of position, reference allele and alternative alleles. If 
-            positions are available, UCSC bins are prepended to the records. If reference
-            and alternative alleles are available, the records are processed for correct
-            format of ref and alt alleles.
-        '''
-        self.logger = logger
-        self.build = build
-        self.raw_fields = fields
-        self.fields = []
-        self.delimiter = delimiter
-        self.columnRange = [None] * len(self.raw_fields)
-        self.first_time = True
-        self.valid_till = None  # genotype fields might be disabled
-
-    def reset(self, validTill=None):
-        self.first_time = True
-        self.fields = []
-        self.nColumns = 0
-        self.valid_till = validTill
-
-    def process(self, line):
-        tokens = [x.strip() for x in line.split(self.delimiter)]
-        if self.first_time:
-            self.nColumns = len(tokens)
-            cIdx = 0
-            for fIdx, field in enumerate(self.raw_fields):
-                if self.valid_till is not None and fIdx >= self.valid_till:
-                    continue
-                try:
-                    # get an instance of an extractor, or a function
-                    e = eval(field.adj) if field.adj else None
-                    # 1. Not all passed object has __call__ (user can define a lambda function)
-                    # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
-                    #    e will improve performance because __call__ does not have to be looked up each time.
-                    # 3. Passing object directly has an unexpected side effect on performance because comparing
-                    #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
-                    if hasattr(e, '__iter__'):
-                        # if there are multiple functors, use a sequential extractor to handle them
-                        e = SequentialExtractor(e)
-                    if hasattr(e, '__call__'):
-                        e = e.__call__
-                    indexes = []
-                    for x in field.index.split(','):
-                        if ':' in x:
-                            # a slice
-                            if x.count(':') == 1:
-                                start,end = map(str.strip, x.split(':'))
-                                step = None
-                            else:
-                                start,end,step = map(str,strip, x.split(':'))
-                                step = int(step) if step else None
-                            start = int(start) - 1 if start else None
-                            if end.strip():
-                                if int(end) >= 0:   # position index, shift by 1
-                                    end = int(end) - 1
-                                else:               # relative to the back, do not move
-                                    end = int(end)
-                            else:
-                                end = None
-                            indexes.append(slice(start, end, step))
-                        else:
-                            # easy, an integer
-                            indexes.append(int(x) - 1)
-                    #
-                    if ':' not in field.index:
-                        if len(indexes) == 1:
-                            # int, True means 'not a tuple'
-                            self.fields.append((indexes[0], True, e))
-                            self.columnRange[fIdx] = (cIdx, cIdx+1)
-                            cIdx += 1
-                        else:
-                            # a tuple
-                            self.fields.append((tuple(indexes), False, e))
-                            self.columnRange[fIdx] = (cIdx, cIdx+1)
-                            cIdx += 1
-                    elif len(indexes) == 1:
-                        # single slice
-                        cols = range(len(tokens))[indexes[0]]
-                        for c in cols:
-                            self.fields.append((c, True, e))
-                        self.columnRange[fIdx] = (cIdx, cIdx + len(cols))
-                        cIdx += len(cols)
-                    else:
-                        # we need to worry about mixing integer and slice
-                        indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
-                        count = 0
-                        for c in izip(*indexes):
-                            count += 1
-                            self.fields.append((tuple(c), False, e))
-                        self.columnRange[fIdx] = (cIdx, cIdx + count)
-                        cIdx += count
-                except Exception as e:
-                    self.logger.debug(e)
-                    raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
-            self.first_time = False
-        #
+ 
+class JoinFields:
+    def __init__(self, sep=','):
+        '''Define an extractor that returns all items in a field separated by
+        specified delimiter. These items will lead to multiple records in
+        the database.'''
+        self.sep = sep
+    
+    def __call__(self, item):
         try:
-            # we first trust that nothing can go wrong and use a quicker method
-            records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
-                (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
-        except Exception:
-            # If anything wrong happends, process one by one to get a more proper error message (and None values)
-            records = []
-            for col, t, adj in self.fields:
-                try:
-                    item = tokens[col] if t else [tokens[x] for x in col]
-                except IndexError:
-                    raise ValueError('Cannot get column {} of the input line, which has only {} columns (others have {} columns).'.format(\
-                        col + 1 if type(col) is int else [x+1 for x in col], len(tokens), self.nColumns))
-                if adj is not None:
-                    try:
-                        item = adj(item)
-                    except Exception as e:
-                        self.logger.debug('Failed to process field {}: {}'.format(item, e))
-                        # missing ....
-                        item = None
-                records.append(item)
-        #
-        num_records = max([len(item) if type(item) is tuple else 1 for item in records]) if records else 1
-        # handle records
-        if not self.build:
-            # there is no build information, this is 'field' annotation, nothing to worry about
-            if num_records == 1:
-                yield [], [x[0] if type(x) is tuple else x for x in records]
-            else:
-                for i in range(num_records):
-                    yield [], [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-        elif len(self.build[0]) == 1:
-            for i in range(num_records):
-                if i == 0:  # try to optimize a little bit because most of the time we only have one record
-                    rec = [x[0] if type(x) is tuple else x for x in records]
-                else:
-                    rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-                bins = [getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])) if rec[pos_idx] else None for pos_idx, in self.build]
-                yield bins, rec
-        else:
-            for i in range(num_records):
-                bins = []
-                if i == 0:  # try to optimize a little bit because most of the time we only have one record
-                    rec = [x[0] if type(x) is tuple else x for x in records]
-                else:
-                    rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-                for pos_idx, ref_idx, alt_idx in self.build:
-                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
-                    bins.append(bin)
-                    rec[pos_idx] = pos
-                    rec[ref_idx] = ref
-                    rec[alt_idx] = alt
-                yield bins, rec
+            return self.sep.join(item)
+        except:
+            return str(item)
+
 
 class Exporter:
     '''A general class for importing variants'''
@@ -279,11 +139,18 @@ class Exporter:
             fields.extend([x.strip() for x in col.field.split(',')] if col.field else [])
         output_fields = list(set(fields))
         #
-        # fields for each column
+        # how to process each column
+        sep = '\t' if self.format.delimiter is None else self.format.delimiter
         col_fields = []
         for col in self.format.columns:
             f = [x.strip() for x in col.field.split(',')] if col.field else []
-            col_fields.append([output_fields.index(x) for x in f])
+            e = eval(col.export_adj) if col.export_adj else None
+            if hasattr(e, '__iter__'):
+                # if there are multiple functors, use a sequence functor
+                e = SequentialCollector(e)
+            if hasattr(e, '__call__'):
+                e = e.__call__
+            col_fields.append((tuple([output_fields.index(x) for x in f]), e))
         #
         # fields
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -311,13 +178,21 @@ class Exporter:
         # get variant and their info
         cur = self.db.cursor()
         cur.execute(query)
+        prog = ProgressBar(self.filename, cur.rowcount)
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
                 print >> output, self.header.rstrip()
-            for rec in cur:
-                print>> output, ','.join([' '.join([str(rec[x]) for x in col]) for col in col_fields])
-            return
+            for idx, rec in enumerate(cur):
+                try:
+                    print >> output, sep.join([str(adj([str(rec[x]) for x in col])) if adj else ''.join([str(rec[x]) for x in col]) \
+                        for col,adj in col_fields])
+                except Exception as e:
+                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                if idx % 10000 == 0:
+                    prog.update(idx)
+        prog.done()
+
 
 
 # Functions provided by this script
