@@ -178,7 +178,7 @@ class Exporter:
         # get variant and their info
         cur = self.db.cursor()
         cur.execute(query)
-        prog = ProgressBar(self.filename, cur.rowcount)
+        prog = ProgressBar(self.filename)
         with open(self.filename, 'w') as output:
             # write header
             if self.header:

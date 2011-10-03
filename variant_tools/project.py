@@ -269,8 +269,15 @@ class fileFMT:
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
             existing format.''')
+        self.parameters = []
         for par in parameters:
-            parser.add_argument('--{}'.format(par[0]), nargs='*', default=par[1])
+            # $NAME_comment is used for documentation only
+            if par[0].endswith('_comment'):
+                continue
+            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
+            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
+            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
+                nargs='*', default=par[1])
         args = vars(parser.parse_args(fmt_args))
         for key in args:
             if type(args[key]) == list:
@@ -298,6 +305,8 @@ class fileFMT:
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     for item in items:
+                        if item.endswith('_comment'):
+                            continue
                         if item not in ['field', 'export_adj', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. Only field, export_adj and comment are allowed.'.format(item, section))
                     columns.append(
@@ -312,6 +321,8 @@ class fileFMT:
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     for item in items:
+                        if item.endswith('_comment'):
+                            continue
                         if item not in ['index', 'type', 'adj', 'export_adj', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                     fields.append(
@@ -338,7 +349,6 @@ class fileFMT:
             if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
                 setattr(self, item[0], [x.strip() for x in item[1].split(',') if x.strip()])
         #
-        self.parameters = parser.items('DEFAULT')
         # Post process all fields
         if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
             raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
@@ -439,9 +449,11 @@ class fileFMT:
                 print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*15))))
         if self.parameters:
-            print('\nConfigurable parameters with default value:')
+            print('\nFormat parameters:')
             for item in self.parameters:
-                print('  {:12} {}'.format(item[0], item[1]))
+                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
+                    '{} (default: {})'.format(item[2], item[1]),
+                    subsequent_indent=' '*15))))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 

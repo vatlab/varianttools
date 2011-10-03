@@ -17,6 +17,9 @@ format_string='GT'
 geno_info=DP_FMT
 geno_fields=geno
 var_info=DP_INFO
+# assuming unphased
+phase_sep='/'
+phase_sep_comment=Seperator used to output genotype, / for unphased and | for phased.'
 
 [col_1]
 field=chr
