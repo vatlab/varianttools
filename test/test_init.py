@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase
+from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample
 
 class TestInit(ProcessTestCase):
     def testInit(self):
@@ -37,6 +37,30 @@ class TestInit(ProcessTestCase):
         self.assertSucc('vtools init test')
         self.assertFail('vtools init test')
         self.assertSucc('vtools init test -f')
+    
+    def testParent(self):
+        'Test command init --parent'
+        try:
+            os.mkdir('parent')
+        except OSError:
+            pass
+        
+        os.chdir('parent')
+        runCmd('vtools init test')
+        runCmd('vtools import ../vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import ../vcf/SAMP1.vcf')
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
+        os.chdir('..')
+        self.assertSucc('vtools init test --parent parent ceu')
+        self.assertEqual(numOfVariant(), 288)
+        self.assertEqual(numOfSample(), 61)
+        for fn in os.listdir('parent'):
+            if fn != 'cache': os.remove('parent/{}'.format(fn))
+            else:
+                os.remove('parent/cache/vcf.fmt')
+                os.rmdir('parent/cache')
+        os.rmdir('parent')
+        
 
 
 if __name__ == '__main__':

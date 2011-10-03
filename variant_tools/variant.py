@@ -266,14 +266,14 @@ def exclude(args):
 def compareArguments(parser):
     parser.add_argument('table_A', help='''variant table A.''')
     parser.add_argument('table_B', help='''variant table B.''')
-    parser.add_argument('--A_diff_B',  
-        help='''Save variants in A but not in B to a table''')
-    parser.add_argument('--B_diff_A',  
-        help='''Save variants in B but not in A to a table''')
-    parser.add_argument('--A_and_B',  
-        help='''Save variants in both tables A and B.''')
-    parser.add_argument('--A_or_B',  
-        help='''Save variants in both tables A or B.''')
+    parser.add_argument('--A_diff_B', metavar= 'TABLE',  
+        help='''Save variants in A but not in B to TABLE.''')
+    parser.add_argument('--B_diff_A', metavar= 'TABLE', 
+        help='''Save variants in B but not in A to TABLE.''')
+    parser.add_argument('--A_and_B', metavar= 'TABLE',
+        help='''Save variants in both tables A and B to TABLE.''')
+    parser.add_argument('--A_or_B', metavar= 'TABLE',
+        help='''Save variants in both tables A or B to TABLE.''')
     parser.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant that are only in A, only in B, in both A and B, and in A or B.''')
 
