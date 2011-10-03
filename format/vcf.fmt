@@ -103,15 +103,13 @@ comment=Raw alternative allele in the vcf file
 
 [qual]
 index=6
-type=VARCHAR(255)
+type=FLOAT
+comment=phred-scaled quality score for the assertion made in ALT. High QUAL scores indicate high confidence calls.
 
 [filter]
 index=7
 type=VARCHAR(255)
-
-[info]
-index=8
-type=VARCHAR(255)
+comment=PASS if this position has passed all filters, i.e. a call is made at this position. Otherwise, if the site has not passed all filters, a semicolon-separated list of codes for filters that fail. 
 
 [geno]
 index=10:
@@ -145,7 +143,7 @@ comment=Gentoype coded as 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This fiel
 [raw_info]
 index=8
 type=VARCHAR(255)
-comment=Raw INFO column in the vcf file.
+comment=Raw INFO column in the vcf file. This may be further splitted into various specified _INFO fields, such as DP_INFO, etc. 
 
 [DP_INFO]
 index=8

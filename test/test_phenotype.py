@@ -62,7 +62,7 @@ class TestPhenotype(ProcessTestCase):
         self.assertEqual(out3, out4)
         
     def testSetPhenotype(self):
-        'Test commandn phenotype --set'
+        'Test command phenotype --set'
         self.assertFail('vtools phenotype --set')
         self.assertSucc('vtools phenotype --set race=1 --samples \'filename like "%CEU%"\'')
         self.assertFail('vtools phenotype --set race="white" --samples \'filename like "%CEU%"\'')

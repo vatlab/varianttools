@@ -39,6 +39,12 @@ index=2
 type=VARCHAR(255)
 comment=the functional consequences of the variant.
 
+[genename]
+index=3
+type=VARCHAR(255)
+adj=ExtractField(1, sep=':')
+comment=Gene name (for the first exon if the variant is in more than one exons, but usually the names for all exons are the same). 
+
 [function]
 index=3
 type=VARCHAR(255)
