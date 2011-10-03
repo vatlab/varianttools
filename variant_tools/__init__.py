@@ -6,7 +6,7 @@
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://variant_tools.sourceforge.net # for details.
+# Please visit http://varianttools.sourceforge.net for details.
 #
 # Copyright (C) 2011 - 2011 Bo Peng (bpeng@mdanderson.org)
 #
