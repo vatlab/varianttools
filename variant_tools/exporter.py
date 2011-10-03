@@ -100,11 +100,20 @@ class Exporter:
             raise ValueError('Cannot output in format {} because no output column is defined for this format.'.format(format)) 
         #
         # header
-        self.header = self.getHeader(header)
+        self.header = self.getHeader(header, self.IDs)
     
-    def getHeader(self, filename):
-        if not filename:
+    def getHeader(self, filename, IDs):
+        if filename is None:
             return ''
+        elif filename == []:
+            if IDs:
+                # try to get filename for the sample
+                cur = self.db.cursor()
+                cur.execute('SELECT filename.header FROM filename LEFT JOIN sample ON filename.file_id = sample.file_id WHERE sample.sample_id = {};'.format(self.db.PH),
+                    (list(IDs)[0],))
+                return cur.fetchone()[0]
+            else:
+                return ''
         #
         if os.path.isfile(filename):
             if filename.lower().endswith('.gz'):
@@ -220,18 +229,20 @@ def exportArguments(parser):
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
             genome of the project.'''),
-    parser.add_argument('--header',
-        help='''If specified, the header (leading comment lines starting with #) of this
-            file will become the header of the exported file. Because vtools saves header
-            of imported files, the original header will be used even if the input files
-            have been removed or renamed.''')
+    parser.add_argument('--header', nargs='*', default='',
+        help='''If a valid file is specified, the header (leading comment lines starting with
+            #) of this file will become the header of the exported file. If the file does not
+            exist, variant tools will retrieve saved header of this file (if filename exists
+            in the sample table) or the file from which the first sample is imported (if
+            filename is empty and --samples are specified). No header will be used for
+            the exported file is this parameter is left unspecified.''')
 
 def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
-                samples=args.samples, format=args.format, build=args.build, header=args.header,
+                samples=' AND '.join(args.samples), format=args.format, build=args.build, header=args.header,
                 fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()
