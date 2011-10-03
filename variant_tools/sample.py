@@ -342,12 +342,15 @@ class Sample:
         fieldsDefaultZero = [num, hom, het, other]
         
         for index in validGenotypeIndices:
+            field = genotypeFields[index]
+            genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
+            
+            if genotypeFieldType == 'VARCHAR':
+                raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
+            
             if operations[index] == MEAN:
                 table_attributes.append((destinations[index], 'FLOAT'))
-            else:
-                genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index])
-                if genotypeFieldType == 'VARCHAR':
-                    raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
+            else:                
                 table_attributes.append((destinations[index], genotypeFieldType))
         for field, fldtype in table_attributes:
             defaultValue = 'NULL'
