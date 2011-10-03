@@ -6,8 +6,8 @@
 [format description]
 description=Import vcf
 variant_fields=chr,pos,ref,alt
-genotype_fields=geno
-variant_info=DP_INFO
+genotype_fields=%(geno_fields)s
+variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
 export_by_fields=chr,pos,ref
@@ -15,6 +15,8 @@ export_by_fields=chr,pos,ref
 [DEFAULT]
 format_string='GT'
 geno_info=DP_FMT
+geno_fields=geno
+var_info=DP_INFO
 
 [col_1]
 field=chr

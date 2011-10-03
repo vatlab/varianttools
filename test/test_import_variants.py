@@ -68,9 +68,9 @@ class TestImportVariants(ProcessTestCase):
     
     def testGenotypes(self):
         'Testing the import of genotypes'
-        # use an empty variant_info option. The program should not import any variant_info for now
+        # use an empty var_info option. The program should not import any var_info for now
         # the following 2 commands are commented out due to running time: very slow to remove the existing sample tables
-        #self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --variant_info --build hg18')
+        #self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --var_info --build hg18')
         #self.assertFail('vtools output variant chr pos snp_id genet_dist')
         # force re-import the variants using the default info fields now: snp_id and genet_dist are imported 
         self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --build hg18 --force')
@@ -108,8 +108,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'kaiw\n')
         self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function' )
         self.assertSucc('vtools output variant mut_type')
-        # test for importing user specified variant_info
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function --variant_info function --force' )
+        # test for importing user specified var_info
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function --var_info function --force' )
         self.assertEqual(len(output2list('vtools select variant "function is not NULL" -o function')), 78)
         # mut_type should not be imported because it is not specified
         self.assertFail('vtools output variant mut_type')
@@ -129,7 +129,7 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp\n')
         runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --genotype_fields max_gt --genotype_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno_fields max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the sample_variant_x table
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
         # only 1 sample here. Set num=1
@@ -168,8 +168,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289+121)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'SAMP1\nSAMP2\n')
-        # genotype_fields is empty, i.e, no sample is imported
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --genotype_fields')
+        # geno_fields is empty, i.e, no sample is imported
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --geno_fields')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
@@ -182,7 +182,7 @@ class TestImportVariants(ProcessTestCase):
         # import additional information on variants and on genotypes.
         # DP_INFO and DP_FMT are fields provided in the default vcf.fmt
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --variant_info DP_INFO --genotype_info DP_FMT --build hg18')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP_INFO --geno_info DP_FMT --build hg18')
         self.assertEqual(numOfSample(), 60)
         self.assertEqual(numOfVariant(), 288)
         self.assertSucc('vtools output variant DP_INFO')
@@ -197,7 +197,7 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
-        #self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --genotype_fields')
+        #self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_fields')
         #self.assertEqual(numOfSample(), 0)
         #self.assertEqual(numOfVariant(), 137+12159)
         
@@ -241,7 +241,7 @@ class TestImportVariants(ProcessTestCase):
     def testImportMyVCF(self):
         'Test a customized vcf import'
         self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
-        # test importing self defined variant_info
+        # test importing self defined var_info
         self.assertEqual(output2list('vtools output variant \
                                      DP_INFO MQ_INFO NS_INFO AN_INFO AC_INFO AF_INFO AB_INFO LBS_INFO_A1 LBS_INFO_A2 \
                                      LBS_INFO_C1 LBS_INFO_C2 LBS_INFO_G1 LBS_INFO_G2 LBS_INFO_T1 LBS_INFO_T2 OBS_INFO_A1 \
@@ -258,7 +258,7 @@ class TestImportVariants(ProcessTestCase):
         # test importing self-defined genotypes with VcfGenotype(default=('0',))
         # code missing genotypes as None and wild-type as '0'
         self.assertEqual(getGenotypes(num=4), [['-1', '-1'], ['0', '2'], ['0', '-1', '-1'], ['0', '-1', '-1']])
-        # test importing self-defined genotype_info.
+        # test importing self-defined geno_info.
         # PL3* are passed into database as a 2X1 "transposed tuple" -- works here.
         # See 'missing_gen.fmt'
         genotypeInfo = getGenotypeInfo(num=4, info=['GT_INFO', 'GQ_INFO', 'GD_INFO', 'PL_INFO1', 'PL_INFO2', 'PL_INFO3', 'PL3_INFO1', 'PL3_INFO2', 'PL3_INFO3'])

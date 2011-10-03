@@ -244,14 +244,14 @@ class fileFMT:
         self.variant_info = None
         self.genotype_fields = None
         self.genotype_info = None
-        # these fields read from format files could be overriden by fmt_args
-        args = self.parseArgs(name, fmt_args)
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
+            args = self.parseArgs(name + '.fmt', fmt_args)
             self.parseFMT(name + '.fmt', defaults=args) 
         elif name.endswith('.fmt') and os.path.isfile(name):
             self.name = os.path.split(name)[-1][:-4]
+            args = self.parseArgs(name, fmt_args)
             self.parseFMT(name, defaults=args) 
         else:
             url = 'http://vtools.houstonbioinformatics.org/format/{}.fmt'.format(name)
@@ -260,6 +260,7 @@ class fileFMT:
             except Exception as e:
                 raise ValueError('Failed to download format specification file {}.fmt'.format(name))
             self.name = name
+            args = self.parseArgs(fmt, fmt_args)
             self.parseFMT(fmt, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
@@ -335,7 +336,7 @@ class fileFMT:
             if item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
-                setattr(self, item[0], [x.strip() for x in item[1].split(',')])
+                setattr(self, item[0], [x.strip() for x in item[1].split(',') if x.strip()])
         #
         self.parameters = parser.items('DEFAULT')
         # Post process all fields
