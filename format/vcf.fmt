@@ -72,12 +72,12 @@ comment=filter
 
 [col_8]
 field=info
-export_adj=Join(';')
+export_adj=JoinFields(';')
 comment=variant info
 
 [col_9]
 field=
-export_adj=Value(%(format_string)s)
+export_adj=Constant(%(format_string)s)
 comment=genotype format
 
 [col_10]

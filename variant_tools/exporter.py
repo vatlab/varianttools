@@ -48,6 +48,20 @@ class JoinFields:
         except:
             return str(item)
 
+class ValueOfNull:
+    def __init__(self, val):
+        self.val = val
+
+    def __call__(self, item):
+        return self.val if item is None else item
+
+
+class Constant:
+    def __init__(self, val):
+        self.val = val
+
+    def __call__(self, item):
+        return self.val
 
 class Exporter:
     '''A general class for importing variants'''
@@ -66,6 +80,10 @@ class Exporter:
         #
         # samples
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
+        if samples:
+            self.logger.info('{} samples are selected'.format(len(self.IDs)))
+        else:
+            self.logger.info('No sample is selected to output')
         # 
         # build
         if build is None:
@@ -85,7 +103,7 @@ class Exporter:
         #
         # format
         if not format:
-            filename = self.files[0].lower()
+            filename = self.filename.lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
             else:
@@ -127,13 +145,14 @@ class Exporter:
                     header += line
                 else:
                     return header
+        #
         # if file does not exist, try the filename table
         cur = self.db.cursor()
         try:
             cur.execute('SELECT header from filename WHERE filename = {};'.format(self.db.PH), (filename,))
             return cur.fetchone()[0]
         except Exception as e:
-            self.logger.debug(e)
+            self.logger.debug('Failed to get header: {}'.format(e))
             return ''
         # nothing works
         self.logger.warning('Cannot get header from filename {}. Please check if this file exists in disk or in the sample table (vtools show samples)'.format(filename))
@@ -143,28 +162,42 @@ class Exporter:
         '''Export data in specified format'''
         #
         # get all fields
-        fields = []
+        var_fields = []
+        geno_fields = []
         for col in self.format.columns:
-            fields.extend([x.strip() for x in col.field.split(',')] if col.field else [])
-        output_fields = list(set(fields))
+            col_fields = [x.strip() for x in col.field.split(',') if x] if col.field.strip() else []
+            if 'GT' in col_fields:
+                for fld in col_fields:
+                    if fld not in geno_fields:
+                        geno_fields.append(fld)
+            else:
+                for fld in col_fields:
+                    if fld not in var_fields:
+                        var_fields.append(fld)
         #
-        # how to process each column
-        sep = '\t' if self.format.delimiter is None else self.format.delimiter
-        col_fields = []
-        for col in self.format.columns:
-            f = [x.strip() for x in col.field.split(',')] if col.field else []
-            e = eval(col.export_adj) if col.export_adj else None
-            if hasattr(e, '__iter__'):
-                # if there are multiple functors, use a sequence functor
-                e = SequentialCollector(e)
-            if hasattr(e, '__call__'):
-                e = e.__call__
-            col_fields.append((tuple([output_fields.index(x) for x in f]), e))
+        # We are going to query:
         #
-        # fields
+        #    var_fields   geno_fields * IDs (only if sample_variant has the geno_field)
+        #
+        field_indexes = {}
+        for idx,fld in enumerate(var_fields):
+            # var_info, field = idx
+            field_indexes[(-1, fld.lower())] = idx
+        #
         select_clause, fields = consolidateFieldName(self.proj, self.table,
-            ','.join(output_fields), self.export_alt_build)
+            ','.join(var_fields), self.export_alt_build)
         #
+        idx = len(var_fields)
+        if geno_fields:
+            for id in self.IDs:
+                header = [x.lower() for x in self.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))]
+                for fld in geno_fields:
+                    if fld.lower() in header:
+                        select_clause += ', {}_genotype.sample_variant_{}.{}'.format(self.proj.name, id, fld)
+                    else:
+                        select_clause += ', NULL'
+                    field_indexes[(id, fld.lower())] = idx
+                    idx += 1
         # FROM clause
         from_clause = 'FROM {} '.format(self.table)
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
@@ -174,6 +207,10 @@ class Exporter:
             if (tbl.lower(), conn.lower()) not in processed:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
+        if geno_fields:
+            for id in self.IDs:
+                from_clause += ' LEFT OUTER JOIN {0}_genotype.sample_variant_{1} ON {0}_genotype.sample_variant_{1}.variant_id = {2}.variant_id '\
+                    .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
@@ -184,9 +221,29 @@ class Exporter:
         query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause)
         self.logger.debug('Running query {}'.format(query))
         #
+        # how to process each column
+        sep = '\t' if self.format.delimiter is None else self.format.delimiter
+        col_fields = []
+        for col in self.format.columns:
+            e = eval(col.export_adj) if col.export_adj else None
+            if hasattr(e, '__iter__'):
+                # if there are multiple functors, use a sequence functor
+                e = SequentialCollector(e)
+            if hasattr(e, '__call__'):
+                e = e.__call__
+            fields = [x.strip() for x in col.field.split(',') if x] if col.field else []
+            if 'GT' in fields:
+                for id in self.IDs:
+                    col_fields.append((tuple([field_indexes[(id, x.lower())] for x in fields]), e))
+            else:
+                col_fields.append((tuple([field_indexes[(-1, x.lower())] for x in fields]), e))
         # get variant and their info
         cur = self.db.cursor()
-        cur.execute(query)
+        try:
+            cur.execute(query)
+        except Exception as e:
+            raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
+                .format(e, ', '.join(var_fields)))
         prog = ProgressBar(self.filename)
         with open(self.filename, 'w') as output:
             # write header
