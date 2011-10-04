@@ -167,6 +167,44 @@ class Exporter:
             e = e.__call__
         return e
 
+    def getFormatters(self, indexes, fields):
+        #
+        # indexes: indexes of data from the input data (returned by sql)
+        # fields: field names
+        #
+        # formatter... : key: value on how to format field(s)
+        #
+        # Return:
+        #    formatters to process all values
+        #
+        # get first keys for self.formatter
+        fmt_first_keys = [x.lower() if ',' in x else x.split(',')[0].lower() for x in self.format.formatter.keys()]
+        fmt_keys = [x.lower() for x in self.format.formatter.keys()]
+        #
+        formatters = []
+        i = 0
+        while i < len(indexes):
+            if fields[i].lower() in fmt_keys:
+                # use adj to handle value at index[i]
+                formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), [indexes[i]]))
+                i += 1
+            elif fields[i].lower() in fmt_first_keys:
+                # start of a multi-field entry
+                found = False
+                for key,length in [(x,len(x)) for x in fmt_keys if type(x) != str]:
+                    if ','.join(fields[i:i+length]).lower() == key.lower():
+                        found = True
+                        formatters.append(self.getAdjFunc(self.format.formatter[fields[i]]),
+                            [indexes[j] for j in range(i, i+length)])
+                        i += length
+                if not found:
+                    formatters.append((None, [indexes[i]]))
+                    i += 1
+            else:
+                formatters.append((None, [indexes[i]]))
+                i += 1
+        return formatters
+
     def exportData(self):
         '''Export data in specified format'''
         #
@@ -235,9 +273,6 @@ class Exporter:
         col_formatters = [] # formatters that will be used to produce strings from values
         col_adj = []        # adjust functions to combine values to one column.
         #
-        # get first keys for self.formatter
-        fmt_first_keys = [x.lower() if ',' in x else x.split(',')[0].lower() for x in self.format.formatter.keys()]
-        fmt_keys = [x.lower() for x in self.format.formatter.keys()]
         #
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
@@ -248,71 +283,16 @@ class Exporter:
                 for id in self.IDs:
                     col_indexes = []
                     indexes = [field_indexes[(id, x.lower())] for x in fields]
-                    i = 0
-                    while i < len(indexes):
-                        if fields[i].lower() in fmt_keys:
-                            # use adj to handle value at index[i]
-                            col_formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), [indexes[i]]))
-                            col_indexes.append(col_idx)
-                            col_idx += 1
-                            i += 1
-                        elif fields[i].lower() in fmt_first_keys:
-                            # start of a multi-field entry
-                            found = False
-                            for key,length in [(x,len(x)) for x in fmt_keys if type(x) != str]:
-                                if ','.join(fields[i:i+length]).lower() == key.lower():
-                                    found = True
-                                    col_formatters.append(self.getAdjFunc(self.format.formatter[fields[i]]),
-                                        [indexes[j] for j in range(i, i+length)])
-                                    i += length
-                                    col_idx += 1
-                                    col_indexes.append(col_idx)
-                            if not found:
-                                col_formatters.append((None, [indexes[i]]))
-                                col_indexes.append(col_idx)
-                                col_idx += 1
-                                i += 1
-                        else:
-                            col_formatters.append((None, [indexes[i]]))
-                            col_indexes.append(col_idx)
-                            col_idx += 1
-                            i += 1
-                    # adjust function/functors
-                    col_adj.append([self.getAdjFunc(col.adj), col_indexes])
+                    formatters = self.getFormatters(indexes, fields)
+                    col_formatters.extend(formatters)
+                    col_adj.append([self.getAdjFunc(col.adj), range(col_idx, col_idx + len(formatters))])
+                    col_idx += len(formatters)
             else:
                 indexes = [field_indexes[(-1, x.lower())] for x in fields]
-                col_indexes = []
-                i = 0
-                while i < len(indexes):
-                    if fields[i].lower() in self.format.formatter:
-                        # use adj to handle value at index[i]
-                        col_formatters.append((self.getAdjFunc(self.format.formatter[fields[i]]), [indexes[i]]))
-                        col_indexes.append(col_idx)
-                        col_idx += 1
-                        i += 1
-                    elif fields[i].lower() in fmt_keys:
-                        # start of a multi-field entry
-                        found = False
-                        for key,length in [(x,len(x)) for x in fmt_keys if type(x) != str]:
-                            if ','.join(fields[i:i+length]).lower() == key.lower():
-                                found = True
-                                col_formatters.append(self.getAdjFunc(self.format.formatter[fields[i]]),
-                                    [indexes[j] for j in range(i, i+length)])
-                                i += length
-                                col_idx += 1
-                                col_indexes.append(col_idx)
-                        if not found:
-                            col_formatters.append((None, [indexes[i]]))
-                            col_indexes.append(col_idx)
-                            col_idx += 1
-                            i += 1
-                    else:
-                        col_formatters.append((None, [indexes[i]]))
-                        col_indexes.append(col_idx)
-                        col_idx += 1
-                        i += 1
-                # adjust function/functors
-                col_adj.append([self.getAdjFunc(col.adj), col_indexes])
+                formatters = self.getFormatters(indexes, fields)
+                col_formatters.extend(formatters)
+                col_adj.append([self.getAdjFunc(col.adj), range(col_idx, col_idx + len(formatters))])
+                col_idx += len(formatters)
         #print 'FORMA' , [x[1] for x in col_formatters]
         #print 'COL  ' , [x[1] for x in col_adj]
         #
