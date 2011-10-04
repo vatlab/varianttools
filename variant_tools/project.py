@@ -298,8 +298,13 @@ class fileFMT:
         #
         fields = []
         columns = []
+        self.formatter = {}
         for section in sections:
             if section == 'format description':
+                continue
+            if section == 'Field formatter':
+                for item in parser.items(section, vars=defaults):
+                    self.formatter[item[0]] = item[1]
                 continue
             if section.startswith('col_'):
                 try:
@@ -419,6 +424,8 @@ class fileFMT:
             for col in self.columns:
                 print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
                     subsequent_indent=' '*15))))
+            if self.formatter:
+                print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
         else:
             print('  None defined, export is not allowed for this format')
         #

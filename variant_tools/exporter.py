@@ -156,6 +156,17 @@ class Exporter:
         self.logger.warning('Cannot get header from filename {}. Please check if this file exists in disk or in the sample table (vtools show samples)'.format(filename))
         return ''
 
+    def getAdjFunc(self, code):
+        if not code:
+            return None
+        e = eval(code)
+        if hasattr(e, '__iter__'):
+            # if there are multiple functors, use a sequence functor
+            e = SequentialCollector(e)
+        if hasattr(e, '__call__'):
+            e = e.__call__
+        return e
+
     def exportData(self):
         '''Export data in specified format'''
         #
@@ -221,20 +232,90 @@ class Exporter:
         #
         # how to process each column
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
-        col_fields = []
+        col_formatters = [] # formatters that will be used to produce strings from values
+        col_adj = []        # adjust functions to combine values to one column.
+        #
+        # get first keys for self.formatter
+        fmt_first_keys = [x.lower() if ',' in x else x.split(',')[0].lower() for x in self.format.formatter.keys()]
+        fmt_keys = [x.lower() for x in self.format.formatter.keys()]
+        #
+        col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
-            e = eval(col.adj) if col.adj else None
-            if hasattr(e, '__iter__'):
-                # if there are multiple functors, use a sequence functor
-                e = SequentialCollector(e)
-            if hasattr(e, '__call__'):
-                e = e.__call__
+            #
+            # indexes to get values for each column
             fields = [x.strip() for x in col.field.split(',') if x] if col.field else []
             if 'GT' in fields:
                 for id in self.IDs:
-                    col_fields.append((tuple([field_indexes[(id, x.lower())] for x in fields]), e))
+                    col_indexes = []
+                    indexes = [field_indexes[(id, x.lower())] for x in fields]
+                    i = 0
+                    while i < len(indexes):
+                        if fields[i].lower() in fmt_keys:
+                            # use adj to handle value at index[i]
+                            col_formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), [indexes[i]]))
+                            col_indexes.append(col_idx)
+                            col_idx += 1
+                            i += 1
+                        elif fields[i].lower() in fmt_first_keys:
+                            # start of a multi-field entry
+                            found = False
+                            for key,length in [(x,len(x)) for x in fmt_keys if type(x) != str]:
+                                if ','.join(fields[i:i+length]).lower() == key.lower():
+                                    found = True
+                                    col_formatters.append(self.getAdjFunc(self.format.formatter[fields[i]]),
+                                        [indexes[j] for j in range(i, i+length)])
+                                    i += length
+                                    col_idx += 1
+                                    col_indexes.append(col_idx)
+                            if not found:
+                                col_formatters.append((None, [indexes[i]]))
+                                col_indexes.append(col_idx)
+                                col_idx += 1
+                                i += 1
+                        else:
+                            col_formatters.append((None, [indexes[i]]))
+                            col_indexes.append(col_idx)
+                            col_idx += 1
+                            i += 1
+                    # adjust function/functors
+                    col_adj.append([self.getAdjFunc(col.adj), col_indexes])
             else:
-                col_fields.append((tuple([field_indexes[(-1, x.lower())] for x in fields]), e))
+                indexes = [field_indexes[(-1, x.lower())] for x in fields]
+                col_indexes = []
+                i = 0
+                while i < len(indexes):
+                    if fields[i].lower() in self.format.formatter:
+                        # use adj to handle value at index[i]
+                        col_formatters.append((self.getAdjFunc(self.format.formatter[fields[i]]), [indexes[i]]))
+                        col_indexes.append(col_idx)
+                        col_idx += 1
+                        i += 1
+                    elif fields[i].lower() in fmt_keys:
+                        # start of a multi-field entry
+                        found = False
+                        for key,length in [(x,len(x)) for x in fmt_keys if type(x) != str]:
+                            if ','.join(fields[i:i+length]).lower() == key.lower():
+                                found = True
+                                col_formatters.append(self.getAdjFunc(self.format.formatter[fields[i]]),
+                                    [indexes[j] for j in range(i, i+length)])
+                                i += length
+                                col_idx += 1
+                                col_indexes.append(col_idx)
+                        if not found:
+                            col_formatters.append((None, [indexes[i]]))
+                            col_indexes.append(col_idx)
+                            col_idx += 1
+                            i += 1
+                    else:
+                        col_formatters.append((None, [indexes[i]]))
+                        col_indexes.append(col_idx)
+                        col_idx += 1
+                        i += 1
+                # adjust function/functors
+                col_adj.append([self.getAdjFunc(col.adj), col_indexes])
+        #print 'FORMA' , [x[1] for x in col_formatters]
+        #print 'COL  ' , [x[1] for x in col_adj]
+        #
         # get variant and their info
         cur = self.db.cursor()
         try:
@@ -249,8 +330,12 @@ class Exporter:
                 print >> output, self.header.rstrip()
             for idx, rec in enumerate(cur):
                 try:
-                    print >> output, sep.join([str(adj([str(rec[x]) for x in col])) if adj else ''.join([str(rec[x]) for x in col]) \
-                        for col,adj in col_fields])
+                    # step one: apply formatters
+                    fields = [fmt([rec[x] for x in col]) if fmt else str(rec[col[0]]) for fmt, col in col_formatters]
+                    # step two: apply adjusters
+                    columns = [adj([fields[x] for x in col]) if adj else fields[col[0]] for adj, col in col_adj]
+                    # step three: output columns
+                    print >> output, sep.join(columns)
                 except Exception as e:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 if idx % 10000 == 0:

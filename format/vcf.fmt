@@ -41,6 +41,10 @@ wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
     to None.
 
+[Field formatter]
+GT=lambda x: str(x[0])
+adj=ValueOfNull('.')
+
 [col_1]
 field=chr
 comment=chromosome
@@ -70,7 +74,7 @@ field=filter
 comment=filter
 
 [col_8]
-field=info
+field=raw_info
 adj=JoinFields(';')
 comment=variant info
 
@@ -84,9 +88,6 @@ field=%(geno_fields)s,%(geno_info)s
 adj=JoinFields(':')
 comment=genotype
 
-[col_format]
-GT=DecodeGenotype(phase=%(phase_sep)s)
-adj=ValueOfNull('.')
 
 
 [chr]
