@@ -324,6 +324,7 @@ class Exporter:
             raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
                 .format(e, ', '.join(var_fields)))
         prog = ProgressBar(self.filename)
+        count = 0
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
@@ -336,11 +337,13 @@ class Exporter:
                     columns = [adj([fields[x] for x in col]) if adj else fields[col[0]] for adj, col in col_adj]
                     # step three: output columns
                     print >> output, sep.join(columns)
+                    count += 1
                 except Exception as e:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 if idx % 10000 == 0:
                     prog.update(idx)
         prog.done()
+        self.logger.info('{} lines are exported'.format(count))
 
 
 

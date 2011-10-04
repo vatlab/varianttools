@@ -46,7 +46,7 @@ comment=position (1-based)
 
 [col_3]
 field=pos,ref
-adj=lambda x: int(x[0])-1+len(x[1])
+adj=lambda x: str(int(x[0])-1+len(x[1]))
 comment=end position
 
 [col_4]
