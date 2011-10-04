@@ -32,7 +32,7 @@ comment=Alternative allele, '-' for deletion.
 index=10:
 type=INTEGER
 adj=VcfGenotype(default=('0',))
-comment=Gentoype coded as 0, (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotypes are skipped
+comment=Most Likely gentoype coded as 0, (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotypes are skipped
 
 [DP_INFO]
 index=8
@@ -328,12 +328,6 @@ type=FLOAT
 adj=ExtractValue('SVM=', ';')
 comment=SVM-based variant quality score
 
-[GT_INFO]
-index=9,10:
-type=VARCHAR(255)
-adj=ExtractValue('GT', ':')
-comment=Most Likely Genotype
-
 [GQ_INFO]
 index=9,10:
 type=INTEGER
@@ -346,38 +340,42 @@ type=INTEGER
 adj=FieldFromFormat('GD', ':')
 comment=Genotype Read Depth
 
+# genotypes 0/0,0/1,1/1
+
 [PL_INFO1]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL', ':'), ExtractField(1, ',')
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
+comment=Genotype Likelihoods for Genotypes 0/0
 
 [PL_INFO2]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL', ':'), ExtractField(2, ',')
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
+comment=Genotype Likelihoods for Genotypes 0/1
 
 [PL_INFO3]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL', ':'), ExtractField(3, ',')
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1
+comment=Genotype Likelihoods for Genotypes 1/1
+
+# genotypes 0/0,0/1,1/1,0/2,1/2,2/2
 
 [PL3_INFO1]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[0], x.split(',')[3]])
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+comment=Genotype Likelihoods for Genotypes 0/0,0/2
 
 [PL3_INFO2]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[1], x.split(',')[4]])
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+comment=Genotype Likelihoods for Genotypes 0/1,1/2
 
 [PL3_INFO3]
 index=9,10:
 type=INTEGER
 adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[2], x.split(',')[5]])
-comment=Genotype Likelihoods for Genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+comment=Genotype Likelihoods for Genotypes 1/1,2/2
