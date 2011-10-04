@@ -244,6 +244,8 @@ class fileFMT:
         self.variant_info = None
         self.genotype_fields = None
         self.genotype_info = None
+        # for export only
+        self.export_by_fields = 0
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -348,9 +350,11 @@ class fileFMT:
         for item in parser.items('format description', vars=defaults):
             if item[0] == 'description':
                 self.description = item[1]
-            if item[0] == 'delimiter':
+            elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
-            if item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
+            elif item[0] == 'export_by_fields':
+                self.export_by_fields = item[1]
+            elif item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
                 setattr(self, item[0], [x.strip() for x in item[1].split(',') if x.strip()])
         #
         # Post process all fields

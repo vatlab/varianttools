@@ -9,6 +9,7 @@
 description=Input format of ANNOVAR. No genotype is defined.
 variant_fields=chr,pos,ref,alt
 delimiter=None
+export_by_fields=chr,pos,ref,alt
 
 [DEFAULT]
 # one or more fields that will be outputted in the comment field, if specified.

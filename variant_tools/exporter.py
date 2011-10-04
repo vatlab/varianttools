@@ -209,7 +209,7 @@ class Exporter:
         '''Export data in specified format'''
         #
         # get all fields
-        var_fields = []
+        var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
         geno_fields = []
         for col in self.format.columns:
             col_fields = [x.strip() for x in col.field.split(',') if x] if col.field.strip() else []
@@ -261,11 +261,15 @@ class Exporter:
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
-        group_clause = ''
+        if self.format.export_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.format.export_by_fields)
+            order_clause = ' ORDER BY {}'.format(order_fields)
+        else:
+            order_clause = ''
         #if args.group_by:
         #    group_fields, tmp = consolidateFieldName(proj, table, ','.join(args.group_by))
         #    group_clause = ' GROUP BY {}'.format(group_fields)
-        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause)
+        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
         self.logger.debug('Running query {}'.format(query))
         #
         # how to process each column
@@ -305,12 +309,33 @@ class Exporter:
                 .format(e, ', '.join(var_fields)))
         prog = ProgressBar(self.filename)
         count = 0
+        #
+        rec_stack = []
+        nFieldBy = len(self.format.export_by_fields.split(','))
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
                 print >> output, self.header.rstrip()
-            for idx, rec in enumerate(cur):
+            for idx, raw_rec in enumerate(cur):
                 try:
+                    if nFieldBy != 4:
+                        if not rec_stack:
+                            rec_stack.append(raw_rec)
+                            continue
+                        else:
+                            # if the same, wait for the next record
+                            if rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
+                                rec_stack.append(raw_rec)
+                                continue
+                            elif len(rec_stack) == 1:
+                                rec = rec_stack[0]
+                                rec_stack = []
+                            else:
+                                n = len(rec_stack)
+                                rec = [[rec_statck[i][x] for i in range(n)] for x in range(len(raw_rec))]
+                                rec_stack = []
+                    else:
+                        rec = raw_rec
                     # step one: apply formatters
                     fields = [fmt([rec[x] for x in col]) if fmt else str(rec[col[0]]) for fmt, col in col_formatters]
                     # step two: apply adjusters
@@ -322,6 +347,20 @@ class Exporter:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 if idx % 10000 == 0:
                     prog.update(idx)
+            # the last block
+            if rec_stack:
+                try:
+                    n = len(rec_stack)
+                    rec = [[rec_statck[i][x] for i in range(n)] for x in range(len(rec))]
+                    # step one: apply formatters
+                    fields = [fmt([rec[x] for x in col]) if fmt else str(rec[col[0]]) for fmt, col in col_formatters]
+                    # step two: apply adjusters
+                    columns = [adj([fields[x] for x in col]) if adj else fields[col[0]] for adj, col in col_adj]
+                    # step three: output columns
+                    print >> output, sep.join(columns)
+                    count += 1
+                except Exception as e:
+                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
         prog.done()
         self.logger.info('{} lines are exported'.format(count))
 

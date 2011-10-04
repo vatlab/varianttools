@@ -10,7 +10,7 @@ genotype_fields=%(geno_fields)s
 variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
-export_by_fields=chr,pos,ref
+export_by_fields=chr,raw_pos,raw_ref
 
 [DEFAULT]
 format_string='GT'
@@ -50,7 +50,7 @@ field=chr
 comment=chromosome
 
 [col_2]
-field=pos
+field=raw_pos
 comment=position
 
 [col_3]
@@ -99,6 +99,11 @@ comment=Chromosome
 [pos]
 index=2
 type=INTEGER NOT NULL
+comment=1-based position
+
+[raw_pos]
+index=2
+type=INTEGER
 comment=1-based position
 
 [id]
