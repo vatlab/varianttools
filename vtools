@@ -83,7 +83,7 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=sample.phenotype)
     #
-    # command info
+    # command show
     parser = subparsers.add_parser('show', help='Display content of a project')
     project.showArguments(parser)
     addVerbosityArg(parser)
@@ -119,11 +119,12 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=annotation.use)
     #
-    # command update_variants
+    # command update
     parser = subparsers.add_parser('update',
-        help='Add or update fields of existing variants using information from specified files',
-        description='''Add or update fields of existing variants from files that annotate
-            variants or their locations (e.g. Read annotation from ANNOVAR output files).''')
+        help='Add or update fields of existing variants and genotype using information from specified files',
+        description='''Add or update fields of existing variants and genotype from files that annotate
+            variants or their locations (e.g. Read annotation from ANNOVAR output files, import additional
+            variant or genotype fields from .vcf files).''')
     importer.updateArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=importer.update)

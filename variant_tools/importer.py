@@ -476,7 +476,7 @@ class BaseImporter:
                 if not os.path.isfile(filename):
                     raise ValueError('File {} does not exist'.format(filename))
             self.files = files
-        # for #record, #sample variant, #variant, new SNV, insertion, deletion, complex variants, invalid record, updated record
+        # for #record, #sample variant (new or updated), #variant, new SNV, insertion, deletion, complex variants, invalid record, updated record
         self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
@@ -557,6 +557,49 @@ class BaseImporter:
                 prog.update(count)
         prog.done()
 
+    def getSampleName(self, filename, prober):
+        '''Prove text file for sample name'''
+        header_line = None
+        count = 0
+        with self.openFile(filename) as input:
+            for line in input:
+                line = line.decode()
+                # the last # line
+                if line.startswith('#'):
+                    header_line = line
+                else:
+                    try:
+                        for bins, rec in prober.process(line):
+                            if header_line is None:
+                                return len(rec), []
+                            elif len(rec) == 0:
+                                return 0, []
+                            else:
+                                cols = [x[0] for x in prober.fields]
+                                if type(cols[0]) is tuple:
+                                    fixed = False
+                                    # mutiple ones, need to figure out the moving one
+                                    for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
+                                        if ':' in idx:
+                                            cols = [x[i] for x in cols]
+                                            fixed = True
+                                            break
+                                    if not fixed:
+                                        cols = [x[-1] for x in cols]
+                                header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
+                                if max(cols) - min(cols)  < len(header):
+                                    return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+                                else:
+                                    return len(rec), []
+                    except Exception as e:
+                        # perhaps not start with #, if we have no header, use it anyway
+                        if header_line is None:
+                            header_line = line
+                        count += 1
+                        if count == 100:
+                            raise ValueError('No genotype column could be determined after 1000 lines.')
+                        self.logger.debug(e)
+
     def recordFileAndSample(self, filename, sampleNames, hasGenotype=True, sampleFields = []):
         cur = self.db.cursor()
         # get header of file
@@ -597,7 +640,8 @@ class BaseImporter:
                         'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
                             self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
             else:
-                self.logger.info('Field{} {} of {:,} variants are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8]))
+                self.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
+                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
@@ -613,7 +657,8 @@ class BaseImporter:
                         'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                             self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
             else:
-                self.logger.info('{:,} variants are updated'.format(self.total_count[8]))
+                self.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
+                    '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
         if self.mode == 'insert' and sum(self.total_count[3:7]) > 0 and self.proj.alt_build is not None:
             coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
             # we need to run lift over to convert coordinates before importing data.
@@ -689,7 +734,7 @@ class TextImporter(BaseImporter):
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
             self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
         else:  # position or range type
-            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+            raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of sample
         if self.genotype_field:
             self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
@@ -714,49 +759,6 @@ class TextImporter(BaseImporter):
             .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
         self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
-
-    def getSampleName(self, filename):
-        '''Prove text file for sample name'''
-        header_line = None
-        count = 0
-        with self.openFile(filename) as input:
-            for line in input:
-                line = line.decode()
-                # the last # line
-                if line.startswith('#'):
-                    header_line = line
-                else:
-                    try:
-                        for bins, rec in self.prober.process(line):
-                            if header_line is None:
-                                return len(rec), []
-                            elif len(rec) == 0:
-                                return 0, []
-                            else:
-                                cols = [x[0] for x in self.prober.fields]
-                                if type(cols[0]) is tuple:
-                                    fixed = False
-                                    # mutiple ones, need to figure out the moving one
-                                    for i,idx in enumerate(self.prober.raw_fields[0].index.split(',')):
-                                        if ':' in idx:
-                                            cols = [x[i] for x in cols]
-                                            fixed = True
-                                            break
-                                    if not fixed:
-                                        cols = [x[-1] for x in cols]
-                                header = [x.strip() for x in header_line.split()] # #self.prober.delimiter)]
-                                if max(cols) - min(cols)  < len(header):
-                                    return len(rec), [header[len(header) - self.prober.nColumns + x] for x in cols]
-                                else:
-                                    return len(rec), []
-                    except Exception as e:
-                        # perhaps not start with #, if we have no header, use it anyway
-                        if header_line is None:
-                            header_line = line
-                        count += 1
-                        if count == 100:
-                            raise ValueError('No genotype column could be determined after 1000 lines.')
-                        self.logger.debug(e)
                     
     def addVariant(self, cur, rec):
         #
@@ -799,7 +801,7 @@ class TextImporter(BaseImporter):
                 self.sample_in_file = []
             else:
                 try:
-                    numSample, names = self.getSampleName(input_filename)
+                    numSample, names = self.getSampleName(input_filename, self.prober)
                     if not names:
                         if numSample == 1:
                             self.logger.debug('Missing sample name (name None is used)'.format(numSample))
@@ -830,7 +832,7 @@ class TextImporter(BaseImporter):
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
             else:
                 try:
-                    numSample, names = self.getSampleName(input_filename)
+                    numSample, names = self.getSampleName(input_filename, self.prober)
                     if len(self.sample_name) != numSample:
                         raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
                 except ValueError:
@@ -923,12 +925,17 @@ class TextUpdater(BaseImporter):
         self.ranges = fmt.ranges
         self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
         self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
+        self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
             self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
         else:  # position or range type
             self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+        # probe number of sample
+        if self.genotype_field:
+            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -968,12 +975,76 @@ class TextUpdater(BaseImporter):
             cur.execute(self.update_range_query, rec[3:] + bins + [rec[0], rec[1], rec[2]])
             self.count[8] += cur.rowcount
 
+    def getSampleIDs(self, filename):
+        if not self.genotype_field:
+            # no genotype_field, good, do not have to worry about genotype
+            return []
+        # has the file been imported before?
+        cur = self.db.cursor()
+        cur.execute('SELECT filename from filename;')
+        existing_files = [x[0] for x in cur.fetchall()]
+        if filename not in existing_files:
+            return []
+        #
+        # what are the samples related to this file?
+        cur.execute('SELECT sample_id, sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE filename.filename = {}'\
+            .format(self.db.PH), (filename,))
+        sample_ids = []
+        sample_names = []
+        for rec in cur:
+            sample_ids.append(rec[0])
+            sample_names.append(rec[1])
+        # what is the sample names get from this file?
+        nSample, names = self.getSampleName(filename, self.prober)
+        if nSample != len(sample_ids):
+            self.logger.warning('Number of samples mismatch. Cannot update genotype')
+            return []
+        if nSample == 1:
+            # if only one sample, update it regardless of sample name.
+            return sample_ids
+        if sample_names == names:
+            # if sample name matches, get sample_ids
+            return sample_ids
+        else:
+            self.logger.warning('Sample names mismatch. Cannot update genotype.')
+            return []
+        
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
+        self.processor.reset()
+        if self.genotype_field:
+            self.prober.reset()
+        #
+        # do we handle genotype as well?
+        sample_ids = self.getSampleIDs(input_filename)
+        #
+        # do we need to add extra columns to the genotype tables
+        if sample_ids:
+            s = delayedAction(self.logger.info, 'Preparing genotype tables (adding needed fields)...')
+            cur = self.db.cursor()
+            for id in sample_ids:
+                headers = [x.upper() for x in self.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))]
+                if 'GT' not in headers:  # for genotype
+                    cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
+                for field in self.genotype_info:
+                    if field.name.upper() not in headers:
+                        cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
+            del s
+        else:
+            # do not import genotype even if the input file has them
+            self.genotype_field = []
+            self.genotype_info = []
+            self.processor.reset(validTill=self.range[2])
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
-        rngs = None
+        if sample_ids:
+            genotype_update_query = {id: 'UPDATE {0}_genotype.sample_variant_{1} SET ({2}) WHERE variant_id = {3};'\
+                .format(self.proj.name, id,
+                ','.join(['{}={}'.format(x, self.db.PH) for x in self.genotype_field + [y.name for y in self.genotype_info]]),
+                self.db.PH)
+                for id in sample_ids}
+        fld_cols = None
         with self.openFile(input_filename) as input_file:
             for line in input_file:
                 try:
@@ -982,6 +1053,19 @@ class TextUpdater(BaseImporter):
                         continue
                     for bins, rec in self.processor.process(line):
                         self.updateVariant(cur, bins, rec[0:self.ranges[2]])
+                        if sample_ids:
+                            if fld_cols is None:
+                                col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                                fld_cols = []
+                                for idx in range(len(sample_ids)):
+                                    fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+                                if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                                    self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                                        col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
+                            for idx, id in enumerate(sample_ids):
+                                if rec[self.ranges[2] + idx] is not None:
+                                    self.count[1] += 1
+                                    cur.execute(genotype_update_query[id], [rec[c] for c in fld_cols[idx]] + [variant_id])
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
@@ -1049,7 +1133,11 @@ def updateArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be used to add or update existing fields of
             variants. The file should be delimiter separated with format described by
-            parameter --format. Gzipped files are acceptable.''')
+            parameter --format. Gzipped files are acceptable. If input files contains
+            genotype information, have been inputted before, and can be linked to the
+            samples they created without ambiguity (e.g. single sample, or samples with
+            detectable sample names), genotypes and their information will also be
+            updated.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input files,
             which should be the primary (used by default) or alternative (if available)
@@ -1065,6 +1153,7 @@ def updateArguments(parser):
 def update(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            proj.db.attach(proj.name + '_genotype')
             importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
                 build=args.build, format=args.format, fmt_args=args.unknown_args)
             importer.importData()
