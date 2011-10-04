@@ -82,8 +82,6 @@ class Exporter:
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
         if samples:
             self.logger.info('{} samples are selected'.format(len(self.IDs)))
-        else:
-            self.logger.info('No sample is selected to output')
         # 
         # build
         if build is None:
@@ -225,7 +223,7 @@ class Exporter:
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
         col_fields = []
         for col in self.format.columns:
-            e = eval(col.export_adj) if col.export_adj else None
+            e = eval(col.adj) if col.adj else None
             if hasattr(e, '__iter__'):
                 # if there are multiple functors, use a sequence functor
                 e = SequentialCollector(e)

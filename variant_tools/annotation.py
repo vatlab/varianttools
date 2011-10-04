@@ -168,7 +168,6 @@ class AnnoDBConfiger:
                 self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
                     type=parser.get(section, 'type', raw=True),
                     adj=parser.get(section, 'adj', raw=True) if 'adj' in items else None,
-                    export_adj=None,
                     comment=parser.get(section, 'comment', raw=True) if 'comment' in items else ''))
             except Exception as e:
                 self.logger.debug(e)

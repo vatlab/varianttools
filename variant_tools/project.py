@@ -44,8 +44,8 @@ VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
 # define a field type
-Field = namedtuple('Field', ['name', 'index', 'adj', 'export_adj', 'type', 'comment'])
-Column = namedtuple('Column', ['index', 'field', 'export_adj', 'comment'])
+Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
+Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -83,7 +83,7 @@ class AnnoDB:
         # read fields from DB
         self.fields = []
         cur = self.db.cursor()
-        cur.execute('SELECT name, field, "", "", type, comment from {}_field;'.format(self.name))
+        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
         for rec in cur:
             self.fields.append(Field(*rec))
             # FIXME: We should enforce comment for all fields.
@@ -307,12 +307,12 @@ class fileFMT:
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['field', 'export_adj', 'comment'] + defaults.keys():
-                            raise ValueError('Incorrect key {} in section {}. Only field, export_adj and comment are allowed.'.format(item, section))
+                        if item not in ['field', 'adj', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only field, adj and comment are allowed.'.format(item, section))
                     columns.append(
                         Column(index=int(section.split('_', 1)[1]),
                             field=parser.get(section, 'field', vars=defaults) if 'field' in items else '',
-                            export_adj=parser.get(section, 'export_adj', vars=defaults) if 'export_adj' in items else None,
+                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                         )
                 except Exception as e:
@@ -323,14 +323,13 @@ class fileFMT:
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['index', 'type', 'adj', 'export_adj', 'comment'] + defaults.keys():
+                        if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                     fields.append(
                         Field(name=section,
                             index=parser.get(section, 'index', vars=defaults),
                             type=parser.get(section, 'type', vars=defaults),
                             adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
-                            export_adj=parser.get(section, 'export_adj', vars=defaults) if 'export_adj' in items else None,
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                         )
                 except Exception as e:

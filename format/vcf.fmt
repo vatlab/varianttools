@@ -51,7 +51,6 @@ comment=position
 
 [col_3]
 field=id
-export_adj=ValueOfNull('.')
 comment=id
 
 [col_4]
@@ -72,18 +71,23 @@ comment=filter
 
 [col_8]
 field=info
-export_adj=JoinFields(';')
+adj=JoinFields(';')
 comment=variant info
 
 [col_9]
 field=
-export_adj=Constant(%(format_string)s)
+adj=Constant(%(format_string)s)
 comment=genotype format
 
 [col_10]
 field=%(geno_fields)s,%(geno_info)s
-export_adj=JoinFields(':')
+adj=JoinFields(':')
 comment=genotype
+
+[col_format]
+GT=DecodeGenotype(phase=%(phase_sep)s)
+adj=ValueOfNull('.')
+
 
 [chr]
 index=1
@@ -138,7 +142,6 @@ comment=PASS if this position has passed all filters, i.e. a call is made at thi
 index=10:
 type=INTEGER
 adj=VcfGenotype(default=%(wildtype_code)s)
-export_adj=DecodeGenotype(phase=%(phase_sep)s)
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
 
 [safe_GT]
@@ -149,7 +152,6 @@ comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt
 # 4.36 -> 3.03 for 50k records.
 index=9, 10:
 adj=VcfGenoFromFormat(default=%(wildtype_code)s)
-export_adj=DecodeGenotype(phase=%(phase_sep)s)
 type=INTEGER
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Missing genotype will be dropped.
 
