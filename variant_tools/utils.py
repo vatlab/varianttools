@@ -602,7 +602,7 @@ class DatabaseEngine:
         if self.engine == 'mysql':
             cur.execute('ALTER TABLE {} {};'.format(table,
                 ', '.join(['DROP COLUMN {}'.format(x) for x in cols])))
-        else:
+        elif '.' not in table:
             # for my sqlite, we have to create a new table
             cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
             schema = cur.fetchone()[0]
@@ -619,6 +619,24 @@ class DatabaseEngine:
                 ','.join([x.split()[0] for x in new_fields])))
             # remove old table
             cur.execute('DROP TABLE _{}_tmp_;'.format(table))
+        else:
+            db, tbl = table.rsplit('.', 1)
+            # for my sqlite, we have to create a new table
+            cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}";'.format(db, tbl))
+            schema = cur.fetchone()[0]
+            fields = [x.strip() for x in schema.split(',')]
+            fields[0] = fields[0].split('(')[1].strip()
+            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
+            new_fields = [x for x in fields if x.split()[0].lower() not in [y.lower() for y in cols]]
+            # rename existing table
+            cur.execute('ALTER TABLE {1}.{0} RENAME TO _{0}_tmp_;'.format(tbl, db))
+            # create a new table
+            cur.execute('CREATE TABLE {1}.{0} ('.format(tbl, db) + ',\n'.join(new_fields) + ');')
+            # insert data back
+            cur.execute('INSERT INTO {2}.{0} SELECT {1} FROM _{0}_tmp_;'.format(tbl, 
+                ','.join([x.split()[0] for x in new_fields]), db))
+            # remove old table
+            cur.execute('DROP TABLE {1}._{0}_tmp_;'.format(tbl, db))
 
     def typeOfColumn(self, table, col):
         '''Return type of col in table'''

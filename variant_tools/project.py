@@ -1451,13 +1451,14 @@ def init(args):
 
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
+    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'geno_fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed, which should be, for 'project' the name of project to 
             be removed (optional), for 'tables' names of one or more variant tables,
             for 'samples' patterns using which matching samples are removed, for 'fields'
-            name of fields to be removed, for "annotations" names of annotation databases,
+            name of fields to be removed, for 'geno_fields' name of genotype fields to 
+            be removed (c.f. show genotypes), for "annotations" names of annotation databases,
             for 'variants' variant tables whose variants will be removed from all variant
             tables and genotypes, for 'genotypes' conditions using which matching genotypes
             are removed, and for 'phenotypes' columns in the output of 'vtools show samples'.
@@ -1500,6 +1501,23 @@ def remove(args):
                 for table, items in from_table.items():
                     proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
                     proj.db.removeFields(table, items)
+            elif args.type == 'geno_fields':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify name of genotype fields to be removed')
+                if 'variant_id' in [x.lower() for x in args.items]:
+                    proj.logger.warning('Genotype id variant_id cannot be removed')
+                if 'gt' in [x.lower() for x in args.items]:
+                    proj.logger.warning('Genotype field GT cannot be removed')
+                proj.db.attach(proj.name + '_genotype')
+                cur = proj.db.cursor()
+                cur.execute('SELECT sample_id FROM sample;')
+                IDs = [x[0] for x in cur.fetchall()]
+                for table in ['{}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs]:
+                    header = [x.lower() for x in proj.db.getHeaders(table)]
+                    items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
+                    if items:
+                        proj.logger.info('Removing fields {} from genotype table {}'.format(', '.join(items), table.split('_')[-1]))
+                        proj.db.removeFields(table, items)
             elif args.type == 'annotations':
                 for item in args.items:
                     removed = False
