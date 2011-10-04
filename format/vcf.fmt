@@ -5,12 +5,12 @@
 
 [format description]
 description=Import vcf
-variant_fields=chr,pos,ref,alt
+variant_fields=%(var_fields)s
 genotype_fields=%(geno_fields)s
 variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
-export_by_fields=chr,raw_pos,raw_ref
+export_by_fields=%(export_by)s
 
 [DEFAULT]
 format_string='GT'
@@ -27,7 +27,17 @@ geno_fields=GT
 geno_fields_comment=Field to extract genotype from .vcf file. You can set it to
     safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
 
-var_info=DP_INFO
+var_fields=chr,pos,ref,alt
+var_fields_comment=Fields to identify variants. If you need to export indels and you
+    have raw pos, ref and alt fields imported as raw_pos raw_ref and raw_alt, you
+    should set this parameter to '--var_fields chr raw_pos raw_ref raw_alt' and
+    parameter --export_by to '--export_by chr raw_pos raw_ref'.
+
+export_by=chr,pos,ref
+export_by_comment=Names of fields chr, pos and ref. If you are exporting indels using
+    raw_pos, raw_ref and raw_alt, you should set this parameter to '--export_by chr raw_pos raw_ref'
+
+var_info=
 var_info_comment=Variant information fields to be imported. Please check the
     INFO column of your vcf file for available fields.
 
@@ -41,12 +51,19 @@ wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
     to None.
 
+id_field=id
+id_field_comment=The field to output to the third (ID) column of the vcf file. You
+    can use a id field (if you imported or updated it from a vcf file), another ID field
+    (e.g. rsname) if available, or '' to output all missing values.
+
+
 [Field formatter]
 GT=lambda x: str(x[0])
 adj=ValueOfNull('.')
 
 [col_1]
 field=chr
+adj=ValueOfNull('.')
 comment=chromosome
 
 [col_2]
@@ -54,7 +71,7 @@ field=raw_pos
 comment=position
 
 [col_3]
-field=id
+field=%(id)s
 comment=id
 
 [col_4]
