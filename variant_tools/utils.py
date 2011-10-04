@@ -633,7 +633,7 @@ class DatabaseEngine:
             # create a new table
             cur.execute('CREATE TABLE {1}.{0} ('.format(tbl, db) + ',\n'.join(new_fields) + ');')
             # insert data back
-            cur.execute('INSERT INTO {2}.{0} SELECT {1} FROM _{0}_tmp_;'.format(tbl, 
+            cur.execute('INSERT INTO {2}.{0} SELECT {1} FROM {2}._{0}_tmp_;'.format(tbl, 
                 ','.join([x.split()[0] for x in new_fields]), db))
             # remove old table
             cur.execute('DROP TABLE {1}._{0}_tmp_;'.format(tbl, db))
