@@ -1028,9 +1028,11 @@ class TextUpdater(BaseImporter):
             for id in sample_ids:
                 headers = [x.upper() for x in self.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))]
                 if 'GT' not in headers:  # for genotype
+                    self.logger.debug('Adding column GT to table sample_variant_{}'.format(id))
                     cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
                 for field in self.genotype_info:
                     if field.name.upper() not in headers:
+                        self.logger.debug('Adding column {} to table sample_variant_{}'.format(field, id))
                         cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
             del s
         else:
