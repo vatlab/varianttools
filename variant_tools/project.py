@@ -1608,7 +1608,10 @@ def show(args):
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
                 if not proj.db.hasTable(table):
-                    raise ValueError('Table {} does not exist'.format(table))
+                    if table.startswith('sample_variant_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, table)):
+                        table = '{}_genotype.{}'.format(proj.name, table)
+                    else:
+                        raise ValueError('Table {} does not exist'.format(table))
                 # print content of table
                 headers = proj.db.getHeaders(table)
                 print(', '.join(headers))
