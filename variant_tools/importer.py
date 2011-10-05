@@ -947,8 +947,8 @@ class TextUpdater(BaseImporter):
                     s = delayedAction(self.logger.info, 'Adding column {}'.format(f.name))
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s
-        if len(self.variant_info) == 0:
-            raise ValueError('No field could be updated using this input file')
+        #if len(self.variant_info) == 0 and len(self.genotype_info == 0:
+        #    raise ValueError('No field could be updated using this input file')
         #
         self.input_type = fmt.input_type
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
@@ -966,14 +966,17 @@ class TextUpdater(BaseImporter):
             if var_key in self.variantIndex:
                 variant_id = self.variantIndex[var_key][0]
                 # update by variant_id, do not need bins
-                cur.execute(self.update_variant_query, rec[4:] + [variant_id])
-                self.count[8] += cur.rowcount
+                if len(rec) > 4:
+                    cur.execute(self.update_variant_query, rec[4:] + [variant_id])
+                    self.count[8] += cur.rowcount
+                return variant_id
         elif self.input_type == 'position':
             cur.execute(self.update_position_query, rec[2:] + bins + [rec[0], rec[1]])
             self.count[8] += cur.rowcount
         else:  # range based
             cur.execute(self.update_range_query, rec[3:] + bins + [rec[0], rec[1], rec[2]])
             self.count[8] += cur.rowcount
+        return None
 
     def getSampleIDs(self, filename):
         if not self.genotype_field:
@@ -1039,9 +1042,9 @@ class TextUpdater(BaseImporter):
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         if sample_ids:
-            genotype_update_query = {id: 'UPDATE {0}_genotype.sample_variant_{1} SET ({2}) WHERE variant_id = {3};'\
+            genotype_update_query = {id: 'UPDATE {0}_genotype.sample_variant_{1} SET {2} WHERE variant_id = {3};'\
                 .format(self.proj.name, id,
-                ','.join(['{}={}'.format(x, self.db.PH) for x in self.genotype_field + [y.name for y in self.genotype_info]]),
+                ', '.join(['{}={}'.format(x, self.db.PH) for x in self.genotype_field + [y.name for y in self.genotype_info]]),
                 self.db.PH)
                 for id in sample_ids}
         fld_cols = None
@@ -1052,8 +1055,9 @@ class TextUpdater(BaseImporter):
                     if line.startswith('#'):
                         continue
                     for bins, rec in self.processor.process(line):
-                        self.updateVariant(cur, bins, rec[0:self.ranges[2]])
-                        if sample_ids:
+                        variant_id = self.updateVariant(cur, bins, rec[0:self.ranges[2]])
+                        # variant might not exist
+                        if variant_id is not None and sample_ids:
                             if fld_cols is None:
                                 col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                                 fld_cols = []
@@ -1064,8 +1068,8 @@ class TextUpdater(BaseImporter):
                                         col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
                             for idx, id in enumerate(sample_ids):
                                 if rec[self.ranges[2] + idx] is not None:
-                                    self.count[1] += 1
                                     cur.execute(genotype_update_query[id], [rec[c] for c in fld_cols[idx]] + [variant_id])
+                                    self.count[1] += 1
                 except Exception as e:
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
