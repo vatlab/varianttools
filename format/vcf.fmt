@@ -58,12 +58,11 @@ qual_field_comment=Field for quality score
 filter_field=
 filter_field_comment=Field for filter status
 
-info_field=
-info_field_comment=Field for info status
+info_fields=
+info_fields_comment=Field for info status
 
 [Field formatter]
-GT=lambda x: str(x[0])
-adj=ValueOfNull('.')
+GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: ''}[x]
 
 [col_1]
 field=chr
@@ -99,13 +98,13 @@ adj=ValueOfNull('PASS')
 comment=filter
 
 [col_8]
-field=%(info_field)s
-adj=JoinFields(';'), ValueOfNull('.')
+field=%(info_fields)s
+adj=ValueOfNull('.'), JoinFields(';')
 comment=variant info
 
 [col_9]
 field=
-adj=Constant(%(format_string)s)
+adj=Constant("%(format_string)s")
 comment=genotype format
 
 [col_10]
@@ -185,7 +184,7 @@ adj=VcfGenoFromFormat(default=%(wildtype_code)s)
 type=INTEGER
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Missing genotype will be dropped.
 
-[raw_info]
+[info]
 index=8
 type=VARCHAR(255)
 comment=Raw INFO column in the vcf file. This may be further splitted into various specified _INFO fields, such as DP_INFO, etc. 

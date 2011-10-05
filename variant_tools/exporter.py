@@ -44,7 +44,10 @@ class JoinFields:
     
     def __call__(self, item):
         try:
-            return self.sep.join(item)
+            if type(item) == str:
+                return item
+            else:
+                return self.sep.join(item)
         except:
             return str(item)
 
@@ -76,9 +79,6 @@ class SequentialCollector:
 
     def __call__(self, item):
         for e in self.extractors:
-            # if item is None or ''
-            if not item:
-                return item
             # if multiple records are returned, apply to each of them
             if type(item) is tuple:
                 if type(item[0]) is tuple:
@@ -144,7 +144,7 @@ class Exporter:
         self.header = self.getHeader(header, self.IDs)
     
     def getHeader(self, filename, IDs):
-        if filename is None:
+        if filename is '':
             return ''
         elif filename == []:
             if IDs:
@@ -156,6 +156,7 @@ class Exporter:
             else:
                 return ''
         #
+        filename = filename[0]
         if os.path.isfile(filename):
             if filename.lower().endswith('.gz'):
                 input = gzip.open(filename, 'rb')
@@ -369,7 +370,8 @@ class Exporter:
                     # fmt: single or list
                     # no fmt: single or None
                     #
-                    fields = [fmt(rec[col] if type(col) is int else [rec[x] for x in col]) if fmt else ('' if col is None else str(rec[col])) for fmt, col in formatters]
+                    # this is extremely ugly but are we getting any performance gain?
+                    fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
                     # step two: apply adjusters
                     #
                     # adj: single or list
