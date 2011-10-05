@@ -5,15 +5,15 @@
 
 [format description]
 description=Import vcf
-variant_fields=%(var_fields)s
+variant_fields=chr,pos,ref,alt
 genotype_fields=%(geno_fields)s
 variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
-export_by_fields=%(export_by)s
+export_by_fields=chr,pos,ref
 
 [DEFAULT]
-format_string='GT'
+format_string=
 format_string_comment=FORMAT string that is outputted in the 9th column of
     exported vcf file. Please specified an appropriate value corresponding to the
     parameter --geno_info because this column cannot be automatically determined.
@@ -26,16 +26,6 @@ geno_info_comment=Genotype information fields. No genotype field is imported by
 geno_fields=GT
 geno_fields_comment=Field to extract genotype from .vcf file. You can set it to
     safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
-
-var_fields=chr,pos,ref,alt
-var_fields_comment=Fields to identify variants. If you need to export indels and you
-    have raw pos, ref and alt fields imported as raw_pos raw_ref and raw_alt, you
-    should set this parameter to '--var_fields chr raw_pos raw_ref raw_alt' and
-    parameter --export_by to '--export_by chr raw_pos raw_ref'.
-
-export_by=chr,pos,ref
-export_by_comment=Names of fields chr, pos and ref. If you are exporting indels using
-    raw_pos, raw_ref and raw_alt, you should set this parameter to '--export_by chr raw_pos raw_ref'
 
 var_info=
 var_info_comment=Variant information fields to be imported. Please check the
@@ -51,11 +41,25 @@ wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
     to None.
 
-id_field=id
+id_field=
 id_field_comment=The field to output to the third (ID) column of the vcf file. You
     can use a id field (if you imported or updated it from a vcf file), another ID field
     (e.g. rsname) if available, or '' to output all missing values.
 
+ref_field=ref
+ref_field_comment=Field for reference allele
+
+alt_field=alt
+alt_field_comment=Field for alternative allele
+
+qual_field=
+qual_field_comment=Field for quality score
+
+filter_field=
+filter_field_comment=Field for filter status
+
+info_field=
+info_field_comment=Field for info status
 
 [Field formatter]
 GT=lambda x: str(x[0])
@@ -63,36 +67,40 @@ adj=ValueOfNull('.')
 
 [col_1]
 field=chr
-adj=ValueOfNull('.')
+# remove fields with empty chromosome
+adj=ValueOfNull(None)
 comment=chromosome
 
 [col_2]
-field=raw_pos
+field=pos
 comment=position
 
 [col_3]
-field=%(id)s
+field=%(id_field)s
+adj=ValueOfNull('.')
 comment=id
 
 [col_4]
-field=raw_ref
+field=%(ref_field)s
 comment=reference allele
 
 [col_5]
-field=raw_alt
+field=%(alt_field)s
 comment=alternative alleles
 
 [col_6]
-field=qual
+field=%(qual_field)s
+adj=ValueOfNull('0')
 comment=quality
 
 [col_7]
-field=filter
+field=%(filter_field)s
+adj=ValueOfNull('PASS')
 comment=filter
 
 [col_8]
-field=raw_info
-adj=JoinFields(';')
+field=%(info_field)s
+adj=JoinFields(';'), ValueOfNull('.')
 comment=variant info
 
 [col_9]
@@ -104,7 +112,6 @@ comment=genotype format
 field=%(geno_fields)s,%(geno_info)s
 adj=JoinFields(':')
 comment=genotype
-
 
 
 [chr]

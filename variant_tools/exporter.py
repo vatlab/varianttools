@@ -53,15 +53,40 @@ class ValueOfNull:
         self.val = val
 
     def __call__(self, item):
-        return self.val if item is None else item
+        return self.val if item in ('', None) else item
 
 
 class Constant:
-    def __init__(self, val):
+    def __init__(self, val=''):
         self.val = val
 
     def __call__(self, item):
         return self.val
+
+class SequentialCollector:
+    def __init__(self, extractors):
+        '''Define an extractor that calls a list of extractors. The string extracted from
+        the first extractor will be passed to the second, and so on.'''
+        self.extractors = []
+        for e in extractors:
+            if hasattr(e, '__call__'):
+                self.extractors.append(e.__call__)
+            else:
+                self.extractors.append(e)
+
+    def __call__(self, item):
+        for e in self.extractors:
+            # if item is None or ''
+            if not item:
+                return item
+            # if multiple records are returned, apply to each of them
+            if type(item) is tuple:
+                if type(item[0]) is tuple:
+                    raise ValueError('Nested vector extracted is not allowed')
+                item = [e(x) for x in item]
+            else:
+                item = e(item)
+        return item
 
 class Exporter:
     '''A general class for importing variants'''
@@ -186,7 +211,7 @@ class Exporter:
         while i < len(indexes):
             if fields[i].lower() in fmt_keys:
                 # use adj to handle value at index[i]
-                formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), [indexes[i]]))
+                formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), indexes[i]))
                 i += 1
             elif fields[i].lower() in fmt_first_keys:
                 # start of a multi-field entry
@@ -198,10 +223,10 @@ class Exporter:
                             [indexes[j] for j in range(i, i+length)])
                         i += length
                 if not found:
-                    formatters.append((None, [indexes[i]]))
+                    formatters.append((None, indexes[i]))
                     i += 1
             else:
-                formatters.append((None, [indexes[i]]))
+                formatters.append((None, indexes[i]))
                 i += 1
         return formatters
 
@@ -274,30 +299,32 @@ class Exporter:
         #
         # how to process each column
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
-        col_formatters = [] # formatters that will be used to produce strings from values
+        formatters = [] # formatters that will be used to produce strings from values
         col_adj = []        # adjust functions to combine values to one column.
-        #
         #
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
-            #
             # indexes to get values for each column
             fields = [x.strip() for x in col.field.split(',') if x] if col.field else []
             if 'GT' in fields:
                 for id in self.IDs:
                     col_indexes = []
                     indexes = [field_indexes[(id, x.lower())] for x in fields]
-                    formatters = self.getFormatters(indexes, fields)
-                    col_formatters.extend(formatters)
-                    col_adj.append([self.getAdjFunc(col.adj), range(col_idx, col_idx + len(formatters))])
-                    col_idx += len(formatters)
+                    fmt = self.getFormatters(indexes, fields)
+                    formatters.extend(fmt if fmt else [(None, None)])
+                    col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else range(col_idx, col_idx +  len(fmt))])
+                    col_idx += max(1, len(fmt))
+                    if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
+                        raise ValueError('Columns with multiple fields must have an adjust function to merge values')
             else:
                 indexes = [field_indexes[(-1, x.lower())] for x in fields]
-                formatters = self.getFormatters(indexes, fields)
-                col_formatters.extend(formatters)
-                col_adj.append([self.getAdjFunc(col.adj), range(col_idx, col_idx + len(formatters))])
-                col_idx += len(formatters)
-        #print 'FORMA' , [x[1] for x in col_formatters]
+                fmt = self.getFormatters(indexes, fields)
+                formatters.extend(fmt if fmt else [(None, None)])
+                col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else range(col_idx, col_idx + len(fmt))])
+                col_idx += max(1, len(fmt))
+                if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
+                    raise ValueError('Columns with multiple fields must have an adjust function to merge values')
+        #print 'FORMA' , [x[1] for x in formatters]
         #print 'COL  ' , [x[1] for x in col_adj]
         #
         # get variant and their info
@@ -336,10 +363,18 @@ class Exporter:
                                 rec_stack = []
                     else:
                         rec = raw_rec
-                    # step one: apply formatters
-                    fields = [fmt([rec[x] for x in col]) if fmt else str(rec[col[0]]) for fmt, col in col_formatters]
+                    # step one: apply formatters 
+                    # if there is no fmt, the item must be either empty or a single item
+                    #
+                    # fmt: single or list
+                    # no fmt: single or None
+                    #
+                    fields = [fmt(rec[col] if type(col) is int else [rec[x] for x in col]) if fmt else ('' if col is None else str(rec[col])) for fmt, col in formatters]
                     # step two: apply adjusters
-                    columns = [adj([fields[x] for x in col]) if adj else fields[col[0]] for adj, col in col_adj]
+                    #
+                    # adj: single or list
+                    # no adj: must be single
+                    columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
                     # step three: output columns
                     print >> output, sep.join(columns)
                     count += 1
