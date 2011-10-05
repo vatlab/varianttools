@@ -94,6 +94,53 @@ class ExtractFlag:
         else:
             return '0'
 
+class CommonLeading:
+    def __init__(self):
+        pass
+
+    def _commonLeading(self, ref, alt):
+        common_leading = 0
+        for i in range(min(len(ref), len(alt))):
+            if ref[i] == alt[i]:
+                common_leading += 1
+        return ref[:common_leading]
+
+    def __call__(self, item):
+        if ',' in item[1]:
+            return tuple([self._commonLeading(item[0], alt) for alt in item[1].split(',')])
+        else:
+            return self._commonLeading(item[0], item[1])
+
+class CommonEnding:
+    def __init__(self):
+        pass
+    
+    def _commonEnding(self, ref, alt):
+        common_leading = 0
+        for i in range(min(len(ref), len(alt))):
+            if ref[i] == alt[i]:
+                common_leading += 1
+        if common_leading > 0:
+            ref = ref[common_leading:]
+            alt = alt[common_leading:]
+        common_ending = 0
+        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
+            if ref[i] == alt[i]:
+                common_ending -= 1
+            else:
+                break
+        if common_ending < 0:
+            return ref[common_ending:]
+        else:
+            return ''
+    
+    def __call__(self, item):
+        if ',' in item[1]:
+            return tuple([self._commonEnding(item[0], alt) for alt in item[1].split(',')])
+        else:
+            return self._commonEnding(item[0], item[1])
+
+
 class FieldFromFormat:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that return the value of a field according 
@@ -1039,7 +1086,7 @@ class TextUpdater(BaseImporter):
             # do not import genotype even if the input file has them
             self.genotype_field = []
             self.genotype_info = []
-            self.processor.reset(validTill=self.range[2])
+            self.processor.reset(validTill=self.ranges[2])
         #
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))

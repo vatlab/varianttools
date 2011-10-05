@@ -5,12 +5,12 @@
 
 [format description]
 description=Import vcf
-variant_fields=chr,pos,ref,alt
+variant_fields=chr,%(pos_field)s,%(ref_field)s,%(alt_field)s
 genotype_fields=%(geno_fields)s
 variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
-export_by_fields=chr,pos,ref
+export_by_fields=chr,%(pos_field)s,%(ref_field)s
 
 [DEFAULT]
 format_string=
@@ -46,8 +46,11 @@ id_field_comment=The field to output to the third (ID) column of the vcf file. Y
     can use a id field (if you imported or updated it from a vcf file), another ID field
     (e.g. rsname) if available, or '' to output all missing values.
 
+pos_field=pos
+pos_field_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
 ref_field=ref
-ref_field_comment=Field for reference allele
+ref_field_comment=Field for reference allele. 
 
 alt_field=alt
 alt_field_comment=Field for alternative allele
@@ -72,6 +75,7 @@ DP_INFO=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
 #
 # not sure if we need to keep both JoinRecords and JoinFields
 alt=JoinRecords(',')
+raw_alt=JoinRecords(',')
 
 [col_1]
 field=chr
@@ -158,13 +162,28 @@ comment=Alternative allele, '-' for deletion.
 [raw_ref]
 index=4
 type=VARCHAR(255)
-comment=Raw reference allele in the vcf file
+comment=Reference allele, without remove common leading and ending nucleotide.
 
 [raw_alt]
 index=5
 adj=CheckSplit()
 type=VARCHAR(255)
-comment=Raw alternative allele in the vcf file
+comment=Alternative allele, without remove common leading and ending nucleotide.
+
+[upstream]
+index=4,5
+adj=CommonLeading()
+type=VARCHAR(255)
+comment=Common leading alleles of ref and alt alleles stored in .vcf
+    file. This field is only available for indels.
+
+[downstream]
+index=4,5
+adj=CommonEnding()
+type=VARCHAR(255)
+comment=Common ending alleles of ref and alt alleles stored in .vcf 
+    file, common leading is extracted before common ending. This field
+    is only available for indels.
 
 [qual]
 index=6
