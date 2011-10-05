@@ -51,6 +51,39 @@ class JoinFields:
         except:
             return str(item)
 
+class IfMulti:
+    def __init__(self, ifFunc=None, elseFunc=None):
+        if hasattr(ifFunc, '__call__'):
+            self.ifFunc = ifFunc.__call__
+        else:
+            self.ifFunc = ifFunc
+        if hasattr(elseFunc, '__call__'):
+            self.elseFunc = elseFunc.__call__
+        else:
+            self.elseFunc = elseFunc
+
+    def __call__(self, item):
+        if type(item) == tuple:
+            return item[0] if self.ifFunc is None else self.ifFunc(item)
+        else:
+            return item if self.elseFunc is None else self.elseFunc(item)
+        
+class JoinRecords:
+    def __init__(self, sep=','):
+        '''Define an extractor that returns all items in a field separated by
+        specified delimiter. These items will lead to multiple records in
+        the database.'''
+        self.sep = sep
+    
+    def __call__(self, item):
+        try:
+            if type(item) == str:
+                return item
+            else:
+                return self.sep.join([str(x) for x in item])
+        except:
+            return str(item)
+
 class ValueOfNull:
     def __init__(self, val):
         self.val = val
@@ -58,6 +91,16 @@ class ValueOfNull:
     def __call__(self, item):
         return self.val if item in ('', None) else item
 
+
+class Formatter:
+    def __init__(self, fmt):
+        self.fmt = fmt
+
+    def __call__(self, item):
+        try:
+            return self.fmt.format(item)
+        except:
+            return str(item)
 
 class Constant:
     def __init__(self, val=''):
@@ -345,23 +388,24 @@ class Exporter:
             if self.header:
                 print >> output, self.header.rstrip()
             for idx, raw_rec in enumerate(cur):
+                multi_records = False
                 try:
                     if nFieldBy != 4:
                         if not rec_stack:
                             rec_stack.append(raw_rec)
                             continue
+                        # if the same, wait for the next record
+                        elif rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
+                            rec_stack.append(raw_rec)
+                            continue
+                        elif len(rec_stack) == 1:
+                            rec = rec_stack[0]
+                            rec_stack = [raw_rec]
                         else:
-                            # if the same, wait for the next record
-                            if rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
-                                rec_stack.append(raw_rec)
-                                continue
-                            elif len(rec_stack) == 1:
-                                rec = rec_stack[0]
-                                rec_stack = []
-                            else:
-                                n = len(rec_stack)
-                                rec = [[rec_statck[i][x] for i in range(n)] for x in range(len(raw_rec))]
-                                rec_stack = []
+                            n = len(rec_stack)
+                            rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(len(raw_rec))]
+                            multi_records = True
+                            rec_stack = [raw_rec]
                     else:
                         rec = raw_rec
                     # step one: apply formatters 
@@ -371,7 +415,12 @@ class Exporter:
                     # no fmt: single or None
                     #
                     # this is extremely ugly but are we getting any performance gain?
-                    fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                    if multi_records:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col][0] is None) else str(rec[col][0])) for fmt, col in formatters]
+                    else:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
                     # step two: apply adjusters
                     #
                     # adj: single or list
@@ -388,11 +437,14 @@ class Exporter:
             if rec_stack:
                 try:
                     n = len(rec_stack)
-                    rec = [[rec_statck[i][x] for i in range(n)] for x in range(len(rec))]
+                    if n == 1:
+                        rec = rec_stack[0]
+                    else:
+                        rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
                     # step one: apply formatters
-                    fields = [fmt([rec[x] for x in col]) if fmt else str(rec[col[0]]) for fmt, col in col_formatters]
+                    fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
                     # step two: apply adjusters
-                    columns = [adj([fields[x] for x in col]) if adj else fields[col[0]] for adj, col in col_adj]
+                    columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
                     # step three: output columns
                     print >> output, sep.join(columns)
                     count += 1
