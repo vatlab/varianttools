@@ -401,9 +401,12 @@ class fileFMT:
         for i in range(len(self.fields)):
             fld = [x for x in fields if x.name == self.fields[i]]
             if len(fld) != 1:
-                raise ValueError('Cannot find field "{}" in the format specification file, which defines fields {}.'\
-                    .format(self.fields[i], ', '.join([x.name for x in fields])))
-            self.fields[i] = fld[0]
+                #
+                # This is a special case that allows users to use expressions as field....
+                #
+                self.fields[i] = Field(name=fld, index=None, adj=None, type=None, comment='')
+            else:
+                self.fields[i] = fld[0]
         # other fields?
         self.other_fields = [x for x in fields if x not in self.fields]
         #
