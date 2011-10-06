@@ -173,7 +173,7 @@ def select(args, reverse=False):
                     proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         args.from_table, 
-                        '\nUNION '.join(['SELECT variant_id FROM {}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs])) 
+                        '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in IDs])) 
             #
             # we are treating different outcomes different, for better performance
             #

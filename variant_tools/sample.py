@@ -157,7 +157,7 @@ class Sample:
         #
         cur = self.db.cursor()
         for ID in IDs:
-            cur.execute('SELECT {} FROM {}_genotype.sample_variant_{} {};'\
+            cur.execute('SELECT {} FROM {}_genotype.genotype_{} {};'\
                 .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else ''))
             res = cur.fetchone()
             if len(res) == 0:
@@ -229,11 +229,11 @@ class Sample:
         # 3) if no fields are valid and no core stats were requested (i.e., num, het, hom, other), then sample_stat is exited
         genotypeFieldTypes = {}
         for id in IDs:
-            fields = self.proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))
+            fields = self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))
             for field in fields:
                 if genotypeFieldTypes.get(field) is None:
                     genotypeFieldTypes[field] = 'INT'
-                    fieldType = self.db.typeOfColumn('{}_genotype.sample_variant_{}'.format(self.proj.name, id), field) 
+                    fieldType = self.db.typeOfColumn('{}_genotype.genotype_{}'.format(self.proj.name, id), field) 
                     if fieldType.upper().startswith('FLOAT'):
                         genotypeFieldTypes[field] = 'FLOAT'
                     elif fieldType.upper().startswith('VARCHAR'):
@@ -272,7 +272,7 @@ class Sample:
         # too bad that I can not use a default dict...
         variants = dict()
         prog = ProgressBar('Counting variants',
-            sum([self.db.numOfRows('{}_genotype.sample_variant_{}'.format(self.proj.name, id)) for id in IDs]))
+            sum([self.db.numOfRows('{}_genotype.genotype_{}'.format(self.proj.name, id)) for id in IDs]))
         count = 0
         for id in IDs:
             whereClause = ''
@@ -284,7 +284,7 @@ class Sample:
                 fieldSelect = ', ' + ', '.join(validGenotypeFields)
             
             try:    
-                query = 'SELECT variant_id, GT{} FROM {}_genotype.sample_variant_{} {};'.format(fieldSelect, self.proj.name, id, whereClause)
+                query = 'SELECT variant_id, GT{} FROM {}_genotype.genotype_{} {};'.format(fieldSelect, self.proj.name, id, whereClause)
                 cur.execute(query)
             except:
                 self.logger.warning('Sample {} does not have all the requested genotype fields [{}].'.format(id, ', '.join(set(validGenotypeFields))))

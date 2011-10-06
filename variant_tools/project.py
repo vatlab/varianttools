@@ -524,7 +524,7 @@ class Project:
                          is provided).
             PHENOTYPE    phenotype might be added by command 'import_phenotype'
 
-    2. Table "sample_variant_$sample_id" stores variants of each sample
+    2. Table "genotype_$sample_id" stores variants of each sample
             variant_id:  ID of variant
             type:       A numeric (categorical) value
 
@@ -1065,7 +1065,7 @@ class Project:
             self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
-            self.db.removeTable('{}_genotype.sample_variant_{}'.format(self.name, ID))        
+            self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
         self.db.commit()
         
     def removeVariants(self, table):
@@ -1084,7 +1084,7 @@ class Project:
         cur.execute('SELECT sample_id FROM sample;')
         IDs = [x[0] for x in cur.fetchall()]
         for ID in IDs:
-            cur.execute('DELETE FROM {}_genotype.sample_variant_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+            cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.name, ID, table))
             self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
         # remove the table itself
@@ -1099,7 +1099,7 @@ class Project:
         IDs = [x[0] for x in cur.fetchall()]
         self.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(IDs), cond))
         for ID in IDs:
-            cur.execute('DELETE FROM {}_genotype.sample_variant_{} WHERE {};'\
+            cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
                 .format(self.name, ID, cond))
             self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
 
@@ -1442,7 +1442,7 @@ def init(args):
                 # get schema
                 cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, proj.db.PH),
                     (table,))
-                sql = cur.fetchone()[0].replace('sample_variant_', '__toDB.sample_variant_')
+                sql = cur.fetchone()[0].replace('genotype_', '__toDB.genotype_')
                 if proj.db.hasTable('__toDB.{}'.format(table)):
                     proj.db.removeTable('__toDB.{}'.format(table))
                 try:
@@ -1525,7 +1525,7 @@ def remove(args):
                 cur = proj.db.cursor()
                 cur.execute('SELECT sample_id FROM sample;')
                 IDs = [x[0] for x in cur.fetchall()]
-                for table in ['{}_genotype.sample_variant_{}'.format(proj.name, id) for id in IDs]:
+                for table in ['{}_genotype.genotype_{}'.format(proj.name, id) for id in IDs]:
                     header = [x.lower() for x in proj.db.getHeaders(table)]
                     items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
                     if items:
@@ -1611,7 +1611,7 @@ def show(args):
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
                 if not proj.db.hasTable(table):
-                    if table.startswith('sample_variant_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, table)):
+                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, table)):
                         table = '{}_genotype.{}'.format(proj.name, table)
                     else:
                         raise ValueError('Table {} does not exist'.format(table))
@@ -1694,10 +1694,10 @@ def show(args):
                     sampleFields = '\t'.join(['{}'.format(x) for x in rec[1:]])
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
-                    cur.execute('SELECT count(*) FROM {}_genotype.sample_variant_{};'.format(proj.name, sampleId))
+                    cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, sampleId))
                     numGenotypes = cur.fetchone()[0]
                     # get fields for each genotype table
-                    sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.sample_variant_{}'.format(proj.name, sampleId))
+                    sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
  

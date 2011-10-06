@@ -306,10 +306,10 @@ class Exporter:
         idx = len(var_fields)
         if geno_fields:
             for id in self.IDs:
-                header = [x.lower() for x in self.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))]
+                header = [x.lower() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 for fld in geno_fields:
                     if fld.lower() in header:
-                        select_clause += ', {}_genotype.sample_variant_{}.{}'.format(self.proj.name, id, fld)
+                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
                     else:
                         select_clause += ', NULL'
                     field_indexes[(id, fld.lower())] = idx
@@ -325,7 +325,7 @@ class Exporter:
                 processed.add((tbl.lower(), conn.lower()))
         if geno_fields:
             for id in self.IDs:
-                from_clause += ' LEFT OUTER JOIN {0}_genotype.sample_variant_{1} ON {0}_genotype.sample_variant_{1}.variant_id = {2}.variant_id '\
+                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
                     .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = ''

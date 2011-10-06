@@ -665,7 +665,7 @@ class BaseImporter:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                 (filenameID, samplename))
             sample_ids.append(cur.lastrowid)
-            self.proj.createNewSampleVariantTable('{0}_genotype.sample_variant_{1}'.format(self.proj.name, cur.lastrowid),
+            self.proj.createNewSampleVariantTable('{0}_genotype.genotype_{1}'.format(self.proj.name, cur.lastrowid),
                 hasGenotype, sampleFields)
         del s
         return sample_ids
@@ -894,7 +894,7 @@ class TextImporter(BaseImporter):
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         if sample_ids:
-            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.sample_variant_{1} VALUES ({2});'\
+            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.genotype_{1} VALUES ({2});'\
                 .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
                 for id in sample_ids}
         fld_cols = None
@@ -1079,14 +1079,14 @@ class TextUpdater(BaseImporter):
             s = delayedAction(self.logger.info, 'Preparing genotype tables (adding needed fields)...')
             cur = self.db.cursor()
             for id in sample_ids:
-                headers = [x.upper() for x in self.db.getHeaders('{}_genotype.sample_variant_{}'.format(self.proj.name, id))]
+                headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 if 'GT' not in headers:  # for genotype
-                    self.logger.debug('Adding column GT to table sample_variant_{}'.format(id))
-                    cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
+                    self.logger.debug('Adding column GT to table genotype_{}'.format(id))
+                    cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
                 for field in self.genotype_info:
                     if field.name.upper() not in headers:
-                        self.logger.debug('Adding column {} to table sample_variant_{}'.format(field, id))
-                        cur.execute('ALTER TABLE {}_genotype.sample_variant_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
+                        self.logger.debug('Adding column {} to table genotype_{}'.format(field, id))
+                        cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
             del s
         else:
             # do not import genotype even if the input file has them
@@ -1097,7 +1097,7 @@ class TextUpdater(BaseImporter):
         cur = self.db.cursor()
         prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         if sample_ids:
-            genotype_update_query = {id: 'UPDATE {0}_genotype.sample_variant_{1} SET {2} WHERE variant_id = {3};'\
+            genotype_update_query = {id: 'UPDATE {0}_genotype.genotype_{1} SET {2} WHERE variant_id = {3};'\
                 .format(self.proj.name, id,
                 ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
                 self.db.PH)
