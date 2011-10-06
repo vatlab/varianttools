@@ -564,7 +564,6 @@ class BaseImporter:
         if mode == 'insert':
             self.proj.dropIndexOnMasterVariantTable()
         #
-        self.createLocalVariantIndex()
 
     def __del__(self):
         if self.mode == 'insert':
@@ -806,6 +805,8 @@ class TextImporter(BaseImporter):
             .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
         self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
+        #
+        self.createLocalVariantIndex()
                     
     def addVariant(self, cur, rec):
         #
@@ -975,13 +976,16 @@ class TextUpdater(BaseImporter):
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
         self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
+        if not self.variant_info and not self.genotype_info:
+            raise ValueError('No variant or genotype info needs to be updated')
+        #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
             self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
         else:  # position or range type
             self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
         # probe number of sample
-        if self.genotype_field:
+        if self.genotype_field and self.genotype_info:
             self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
         # there are variant_info
         if self.variant_info:
@@ -1006,6 +1010,8 @@ class TextUpdater(BaseImporter):
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
+        #
+        self.createLocalVariantIndex()
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
@@ -1062,11 +1068,11 @@ class TextUpdater(BaseImporter):
     def importFromFile(self, input_filename):
         '''Import a TSV file to sample_variant'''
         self.processor.reset()
-        if self.genotype_field:
+        if self.genotype_field and self.genotype_info:
             self.prober.reset()
         #
-        # do we handle genotype as well?
-        sample_ids = self.getSampleIDs(input_filename)
+        # do we handle genotype info as well?
+        sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:
@@ -1093,7 +1099,7 @@ class TextUpdater(BaseImporter):
         if sample_ids:
             genotype_update_query = {id: 'UPDATE {0}_genotype.sample_variant_{1} SET {2} WHERE variant_id = {3};'\
                 .format(self.proj.name, id,
-                ', '.join(['{}={}'.format(x, self.db.PH) for x in self.genotype_field + [y.name for y in self.genotype_info]]),
+                ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
                 self.db.PH)
                 for id in sample_ids}
         fld_cols = None
@@ -1108,7 +1114,7 @@ class TextUpdater(BaseImporter):
                         # variant might not exist
                         if variant_id is not None and sample_ids:
                             if fld_cols is None:
-                                col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                                col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[3], self.ranges[4])]
                                 fld_cols = []
                                 for idx in range(len(sample_ids)):
                                     fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
