@@ -6,8 +6,15 @@
 
 [format description]
 description=validation information from dbSNP. the input columns are: chr, pos. If the primary reference genome for the project is hg18 and it must have an alternative reference hg19.
-position=chr, alt_pos
-variant_info=mut_type_dbSNP, validation
+position=chr, %(pos)s
+variant_info=%(var_info)s
+
+[DEFAULT]
+pos=alt_pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
+var_info=mut_type_dbSNP, validation
+var_info_comment=Variant information fields to be imported.
 
 [chr]
 index=1

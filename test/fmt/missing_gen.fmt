@@ -1,10 +1,37 @@
 # http://varianttools.sourceforge.net/Format/New 
 [format description]
 description=a customized import vcf configuration 
-variant=chr,pos,ref,alt
-variant_info=DP_INFO,MQ_INFO,NS_INFO,AN_INFO,AC_INFO,AF_INFO,AB_INFO,LBS_INFO_A1,LBS_INFO_A2,LBS_INFO_C1,LBS_INFO_C2,LBS_INFO_G1,LBS_INFO_G2,LBS_INFO_T1,LBS_INFO_T2,OBS_INFO_A1,OBS_INFO_A2,OBS_INFO_C1,OBS_INFO_C2,OBS_INFO_G1,OBS_INFO_G2,OBS_INFO_T1,OBS_INFO_T2,STR_INFO,STZ_INFO,CBR_INFO,CBZ_INFO,QBR_INFO,QBZ_INFO,MBR_INFO,MSR_INFO,MBZ_INFO,IOR_INFO,IOZ_INFO,IOH_INFO,IOD_INFO,AOI_INFO,AOZ_INFO,ABE_INFO,ABZ_INFO,BCS_INFO,FIC_INFO,LQR_INFO,MQ0_INFO,MQ10_INFO,MQ20_INFO,MQ30_INFO,ANNO_INFO,SVM_INFO
-genotype=geno
-genotype_info=GT_INFO,GQ_INFO,GD_INFO,PL_INFO1,PL_INFO2,PL_INFO3,PL3_INFO1,PL3_INFO2,PL3_INFO3
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
+variant_info=%(var_info)s
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+pos=pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
+ref=ref
+ref_comment=Field for reference allele. 
+
+alt=alt
+alt_comment=Field for alternative allele.
+
+var_info=DP_INFO,MQ_INFO,NS_INFO,AN_INFO,AC_INFO,AF_INFO,AB_INFO,LBS_INFO_A1,LBS_INFO_A2,LBS_INFO_C1,LBS_INFO_C2,LBS_INFO_G1,LBS_INFO_G2,LBS_INFO_T1,LBS_INFO_T2,OBS_INFO_A1,OBS_INFO_A2,OBS_INFO_C1,OBS_INFO_C2,OBS_INFO_G1,OBS_INFO_G2,OBS_INFO_T1,OBS_INFO_T2,STR_INFO,STZ_INFO,CBR_INFO,CBZ_INFO,QBR_INFO,QBZ_INFO,MBR_INFO,MSR_INFO,MBZ_INFO,IOR_INFO,IOZ_INFO,IOH_INFO,IOD_INFO,AOI_INFO,AOZ_INFO,ABE_INFO,ABZ_INFO,BCS_INFO,FIC_INFO,LQR_INFO,MQ0_INFO,MQ10_INFO,MQ20_INFO,MQ30_INFO,ANNO_INFO,SVM_INFO
+var_info_comment=Variant information fields to be imported. Please check the
+    INFO column of your vcf file for available fields.
+
+geno=GT
+geno_comment=Field to extract genotype from .vcf file.
+
+geno_info=GT_INFO,GQ_INFO,GD_INFO,PL_INFO1,PL_INFO2,PL_INFO3,PL3_INFO1,PL3_INFO2,PL3_INFO3
+geno_info_comment=Genotype information fields. No genotype field is imported by
+    default. Please check the FORMAT string of your .vcf file to determine
+    available fields to be imported.
+
+wildtype_code=('0',)
+wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
+    by default imported as GT=0. They will be discarded if you set this parameter
+    to None.
 
 [chr]
 index=1
@@ -28,7 +55,7 @@ adj=CheckSplit()
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
 
-[geno]
+[GT]
 index=10:
 type=INTEGER
 adj=VcfGenotype(default=('0',))

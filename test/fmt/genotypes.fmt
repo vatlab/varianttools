@@ -1,8 +1,29 @@
 [format description]
 description=Input format for variants with multiple sample genotypes. The input file genotypes.txt is prepared by transposing and combining fields from some Hapmap data file in PED/MAP format. 
-variant=chr, pos, ref, alt
-variant_info=snp_id, genet_dist
-genotype=geno
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
+variant_info=%(var_info)s
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+pos=pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
+ref=ref
+ref_comment=Field for reference allele. 
+
+alt=alt
+alt_comment=Field for alternative allele.
+
+geno=GT
+geno_comment=Field to extract genotype from .vcf file. You can set it to
+    safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
+
+var_info=snp_id, genet_dist
+var_info_comment=Variant information fields to be imported. 
+
+geno=GT
+geno_comment=Field to extract genotype
 
 [chr]
 index=1
@@ -35,7 +56,7 @@ index=6
 type=VARCHAR(255)
 comment=Alternative allele
 
-[geno]
+[GT]
 index=7:
 type=INTEGER 
 adj=Nullify(['.', '0'])
