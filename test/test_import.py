@@ -54,8 +54,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 338)
-        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos ref not_defined_field --force')
-        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant_fields chr pos --force')
+        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos ref not_defined_field --force')
+        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos --force')
         variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
         with open('txt/input.tsv') as inputfile:
             input = [x.split() for x in inputfile.readlines()]
@@ -129,7 +129,7 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp\n')
         runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno_fields max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the sample_variant_x table
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
         # only 1 sample here. Set num=1
@@ -168,8 +168,8 @@ class TestImportVariants(ProcessTestCase):
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 289+121)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'SAMP1\nSAMP2\n')
-        # geno_fields is empty, i.e, no sample is imported
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --geno_fields')
+        # geno is empty, i.e, no sample is imported
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --geno')
         self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 698)
         # file will be ignored if re-imported
@@ -197,7 +197,7 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
-        #self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_fields')
+        #self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno')
         #self.assertEqual(numOfSample(), 0)
         #self.assertEqual(numOfVariant(), 137+12159)
         

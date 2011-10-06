@@ -5,12 +5,12 @@
 
 [format description]
 description=Import vcf
-variant_fields=chr,%(pos_field)s,%(ref_field)s,%(alt_field)s
-genotype_fields=%(geno_fields)s
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
 variant_info=%(var_info)s
 genotype_info=%(geno_info)s
 # variants with identical chr,pos,ref will be collapsed.
-export_by_fields=chr,%(pos_field)s,%(ref_field)s
+export_by=chr,%(pos)s,%(ref)s
 
 [DEFAULT]
 format_string=
@@ -23,8 +23,8 @@ geno_info_comment=Genotype information fields. No genotype field is imported by
     default. Please check the FORMAT string of your .vcf file to determine
     available fields to be imported.
 
-geno_fields=GT
-geno_fields_comment=Field to extract genotype from .vcf file. You can set it to
+geno=GT
+geno_comment=Field to extract genotype from .vcf file. You can set it to
     safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
 
 var_info=
@@ -41,28 +41,28 @@ wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
     to None.
 
-id_field=
-id_field_comment=The field to output to the third (ID) column of the vcf file. You
+id=
+id_comment=The field to output to the third (ID) column of the vcf file. You
     can use a id field (if you imported or updated it from a vcf file), another ID field
     (e.g. rsname) if available, or '' to output all missing values.
 
-pos_field=pos
-pos_field_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+pos=pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
 
-ref_field=ref
-ref_field_comment=Field for reference allele. 
+ref=ref
+ref_comment=Field for reference allele. 
 
-alt_field=alt
-alt_field_comment=Field for alternative allele
+alt=alt
+alt_comment=Field for alternative allele
 
-qual_field=
-qual_field_comment=Field for quality score
+qual=
+qual_comment=Field for quality score
 
-filter_field=
-filter_field_comment=Field for filter status
+filter=
+filter_comment=Field for filter status
 
-info_fields=
-info_fields_comment=Field for info status
+info=
+info_comment=Field for info status
 
 [Field formatter]
 #
@@ -88,30 +88,30 @@ field=pos
 comment=position
 
 [col_3]
-field=%(id_field)s
+field=%(id)s
 adj=ValueOfNull('.')
 comment=id
 
 [col_4]
-field=%(ref_field)s
+field=%(ref)s
 comment=reference allele
 
 [col_5]
-field=%(alt_field)s
+field=%(alt)s
 comment=alternative alleles
 
 [col_6]
-field=%(qual_field)s
+field=%(qual)s
 adj=ValueOfNull('0')
 comment=quality
 
 [col_7]
-field=%(filter_field)s
+field=%(filter)s
 adj=ValueOfNull('PASS')
 comment=filter
 
 [col_8]
-field=%(info_fields)s
+field=%(info)s
 adj=ValueOfNull('.'), JoinFields(';')
 comment=variant info
 
@@ -121,7 +121,7 @@ adj=Constant("%(format_string)s")
 comment=genotype format
 
 [col_10]
-field=%(geno_fields)s,%(geno_info)s
+field=%(geno)s,%(geno_info)s
 adj=JoinFields(':')
 comment=genotype
 

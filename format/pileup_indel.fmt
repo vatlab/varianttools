@@ -7,8 +7,11 @@
 
 [format description]
 description=Input format for samtools pileup indel caller. This format imports chr, pos, ref, alt and genotype.
-variant_fields=chr, pos, ref, alt
-genotype_fields=genotype
+variant=chr, pos, ref, alt
+genotype=%(geno)s
+
+[DEFAULT]
+geno=GT
 
 [chr]
 index=1
@@ -40,9 +43,8 @@ type=VARCHAR(255)
 adj=lambda x: '-' if x[0].startswith('D') else x[1]
 comment=alternative allele, '-' for deletion
 
-[genotype]
+[GT]
 index=6
 type=INT
 adj=MapValue({'homo': '2', 'hete': '1'})
 comment=type of indel (homozygote or heterozygote)
-

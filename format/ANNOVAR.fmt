@@ -7,14 +7,14 @@
 
 [format description]
 description=Input format of ANNOVAR. No genotype is defined.
-variant_fields=chr,pos,ref,alt
+variant=chr,pos,ref,alt
 delimiter=None
-export_by_fields=chr,pos,ref,alt
+export_by=chr,pos,ref,alt
 
 [DEFAULT]
 # one or more fields that will be outputted in the comment field, if specified.
-comment_fields=
-comment_fields_comment=Output one or more fields to the optional comment column of this format.
+comment_string=
+comment_string_comment=Output one or more fields to the optional comment column of this format.
 
 [chr]
 index=1
@@ -59,6 +59,6 @@ field=alt
 comment=alternative allele
 
 [col_6]
-field=%(comment_fields)s
+field=%(comment_string)s
 adj=JoinFields(',')
 comment=optional column

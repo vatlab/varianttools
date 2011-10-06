@@ -7,7 +7,7 @@
 
 [format description]
 description=Output from ANNOVAR, generated from command "path/to/annovar/annotate_variation.pl annovar.txt path/to/annovar/humandb/". This format imports chr, pos, ref, alt and ANNOVAR annotations. For details please refer to http://www.openbioinformatics.org/annovar/annovar_gene.html
-variant_fields=chr, pos, ref, alt
+variant=chr, pos, ref, alt
 variant_info=%(var_info)s
 
 [DEFAULT]

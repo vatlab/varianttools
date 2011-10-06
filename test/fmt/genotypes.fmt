@@ -1,8 +1,8 @@
 [format description]
 description=Input format for variants with multiple sample genotypes. The input file genotypes.txt is prepared by transposing and combining fields from some Hapmap data file in PED/MAP format. 
-variant_fields=chr, pos, ref, alt
+variant=chr, pos, ref, alt
 variant_info=snp_id, genet_dist
-genotype_fields=geno
+genotype=geno
 
 [chr]
 index=1
