@@ -352,33 +352,33 @@ class fileFMT:
                 self.description = item[1]
             elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
-            elif item[0] == 'export_by_fields':
+            elif item[0] == 'export_by':
                 self.export_by_fields = item[1]
-            elif item[0] in ['variant_fields', 'position_fields', 'range_fields', 'genotype_fields', 'variant_info', 'genotype_info']:
-                setattr(self, item[0], [x.strip() for x in item[1].split(',') if x.strip()])
+            elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
+                setattr(self, item[0] if item[0].endswith('_info') else item[0]+'_fields', [x.strip() for x in item[1].split(',') if x.strip()])
         #
         # Post process all fields
         if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
-            raise ValueError('Please specify one and only one of variant_fields, position_fields and range_fields')
+            raise ValueError('Please specify one and only one of "variant=?", "position=?" or "range=?"')
         #
         if self.variant_fields:
             self.input_type = 'variant'
             self.ranges = [0, 4]
             self.fields = self.variant_fields
             if len(self.fields) != 4:
-                raise ValueError('variant_fields should have four fields for chr, pos, ref, and alt alleles')
+                raise ValueError('"variant" fields should have four fields for chr, pos, ref, and alt alleles')
         elif self.position_fields:
             self.input_type = 'position'
             self.ranges = [0, 2]
             self.fields = self.position_fields
             if len(self.fields) != 2:
-                raise ValueError('position_fields should have two fields for chr and pos')
+                raise ValueError('"position" fields should have two fields for chr and pos')
         elif self.range_fields:
             self.input_type = 'range'
             self.ranges = [0, 3]
             self.fields = self.range_fields
             if len(self.fields) != 3:
-                raise ValueError('range_fields should have three fields for chr and starting and ending position')
+                raise ValueError('"range" fields should have three fields for chr and starting and ending position')
         #
         if self.input_type != 'variant' and not self.variant_info:
             raise ValueError('Input file with type position or range must specify variant_info')
