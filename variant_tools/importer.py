@@ -561,8 +561,6 @@ class BaseImporter:
             tool = LiftOverTool(self.proj)
             tool.setAltRefGenome(self.build, build_index= (mode == 'insert'))
             self.import_alt_build = True
-        if mode == 'insert':
-            self.proj.dropIndexOnMasterVariantTable()
         #
 
     def __del__(self):
@@ -807,6 +805,8 @@ class TextImporter(BaseImporter):
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
         #
         self.createLocalVariantIndex()
+        # drop index here after all possible exceptions have been raised.
+        self.proj.dropIndexOnMasterVariantTable()
                     
     def addVariant(self, cur, rec):
         #
