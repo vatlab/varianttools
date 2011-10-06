@@ -157,15 +157,24 @@ class Sample:
         #
         cur = self.db.cursor()
         for ID in IDs:
-            cur.execute('SELECT {} FROM {}_genotype.genotype_{} {};'\
-                .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else ''))
-            res = cur.fetchone()
-            if len(res) == 0:
-                raise ValueError('No statistics are calculated from expression {}'.format(expression))
-            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
-            count[0] += 1
-        self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
-            count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
+            # if it is a constant, ...
+            if '(' not in expression:
+                cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH),
+                    [None if expression == 'NULL' else expression, ID])
+                count[0] += 1
+            else:
+                query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
+                    .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
+                self.logger.debug('Running query: {}'.format(query))
+                cur.execute(query)
+                res = cur.fetchone()
+                if res is None:
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
+                else:
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
+                    count[0] += 1
+        self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
+            count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
 
 
