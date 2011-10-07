@@ -25,6 +25,7 @@
 #
 
 import sys
+from collections import defaultdict
 from .project import Project
 from .utils import ProgressBar, typeOfValues
 
@@ -194,11 +195,7 @@ class Sample:
         SUM = 1
         MIN = 2
         MAX = 3
-        operationKeys = {}
-        operationKeys['mean'] = MEAN
-        operationKeys['sum'] = SUM
-        operationKeys['min'] = MIN
-        operationKeys['max'] = MAX
+        operationKeys = {'mean': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
         possibleOperations = operationKeys.keys()
         
         operations = []
@@ -237,10 +234,12 @@ class Sample:
         # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
         # 3) if no fields are valid and no core stats were requested (i.e., num, het, hom, other), then sample_stat is exited
         genotypeFieldTypes = {}
+        genotypeFieldCount = defaultdict(int)
         for id in IDs:
             fields = self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))
             for field in fields:
-                if genotypeFieldTypes.get(field) is None:
+                genotypeFieldCount[field] += 1
+                if field not in genotypeFieldTypes:
                     genotypeFieldTypes[field] = 'INT'
                     fieldType = self.db.typeOfColumn('{}_genotype.genotype_{}'.format(self.proj.name, id), field) 
                     if fieldType.upper().startswith('FLOAT'):
@@ -251,15 +250,17 @@ class Sample:
                         # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
                         # further down in the code.
                         # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
-            
+
         validGenotypeIndices = []
-        for index in range(0,len(genotypeFields)):
-            field = genotypeFields[index]
-            if field not in genotypeFieldTypes.keys():
+        for index, field in enumerate(genotypeFields):
+            if field.lower() not in [x.lower() for x in genotypeFieldTypes.keys()]:
                 self.logger.warning("Field {} is not an existing genotype field within your samples: {}".format(field, str(genotypeFieldTypes.keys())))
             else:
+                if genotypeFieldCount[field] < len(IDs):
+                    self.logger.warning('Field {} exists in {} of {} selected samples'.format(field, genotypeFieldCount[field], len(IDs))) 
                 validGenotypeIndices.append(index)
                 validGenotypeFields.append(field)
+
         if num is None and het is None and hom is None and other is None and len(validGenotypeFields) == 0:
             self.logger.warning("No valid sample statistics operation has been specified.")
             return
@@ -292,12 +293,6 @@ class Sample:
             if validGenotypeFields is not None and len(validGenotypeFields) != 0:
                 fieldSelect = ', ' + ', '.join(validGenotypeFields)
             
-            try:    
-                query = 'SELECT variant_id, GT{} FROM {}_genotype.genotype_{} {};'.format(fieldSelect, self.proj.name, id, whereClause)
-                cur.execute(query)
-            except:
-                self.logger.warning('Sample {} does not have all the requested genotype fields [{}].'.format(id, ', '.join(set(validGenotypeFields))))
-                
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
