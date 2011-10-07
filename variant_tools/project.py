@@ -437,25 +437,25 @@ class fileFMT:
             if self.formatter:
                 print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
         else:
-            print('  None defined, export is not allowed for this format')
+            print('  None defined, cannot export to this format')
         #
         if self.input_type == 'variant':
-            print('\n{0} fields:'.format(self.input_type))
+            print('\n{0}:'.format(self.input_type))
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
             print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                 subsequent_indent=' '*15))))
         if self.ranges[1] != self.ranges[2]:
-            print('\nVariant information fields:')
+            print('\nVariant info:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
                 print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*15))))
         if self.ranges[2] != self.ranges[3]:
-            print('\nGenotype field:')
+            print('\nGenotype:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
                 print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*15))))
         if self.ranges[3] != self.ranges[4]:
-            print('\nGenotype information fields:')
+            print('\nGenotype info:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
                 print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
                     subsequent_indent=' '*15))))
