@@ -340,7 +340,7 @@ class Sample:
                     prog.update(count)
         prog.done()
         #
-        headers = self.db.getHeaders(variant_table)
+        headers = [x.lower() for x in self.db.getHeaders(variant_table)]
         table_attributes = [(num, 'INT'), (hom, 'INT'),
                 (het, 'INT'), (other, 'INT')]
         fieldsDefaultZero = [num, hom, het, other]
@@ -357,25 +357,26 @@ class Sample:
             else:                
                 table_attributes.append((destinations[index], genotypeFieldType))
         for field, fldtype in table_attributes:
-            defaultValue = 'NULL'
-            # We are setting default values on the count fields to 0.  The genotype stat fields are set to NULL by default.
-            if field in fieldsDefaultZero: defaultValue = 0
             if field is None:
                 continue
-            if field in headers:
-                self.logger.info('Updating existing field {}'.format(field))
-                self.db.execute('Update {} SET {} = {};'.format(variant_table, field, defaultValue))
-                if fldtype == 'FLOAT' and operations[index] != MEAN:
-                    self.logger.warning('Result will be wrong if field \'{}\' was created to hold integer values'.format(field))
+            # We are setting default values on the count fields to 0.  The genotype stat fields are set to NULL by default.
+            defaultValue = 0 if field in fieldsDefaultZero else None
+            if field.lower() in headers:
+                if self.proj.db.typeOfColumn(variant_table, field) != (fldtype + ' NULL'):
+                    self.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
+                        .format(self.proj.db.typeOfColumn(variant_table, field), fldtype, field))
+                self.logger.info('Resetting values at existing field {}'.format(field))
+                self.db.execute('Update {} SET {} = {};'.format(variant_table, field, self.db.PH), (defaultValue, ))
             else:
                 self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
                 if defaultValue == 0:
                     self.db.execute ('UPDATE {} SET {} = 0'.format(variant_table, field))              
         #
-        prog = ProgressBar('Updating table {}'.format(variant_table), len(variants))
+        prog = ProgressBar('Updating {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
             ' ,'.join(['{}={}'.format(x, self.db.PH) for x in queryDestinations if x is not None]))
+        print update_query, len(variants)
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -392,20 +393,23 @@ class Sample:
                 
             # for genotype_field operations, the value[operation_index] holds the result of the operation
             # except for the "mean" operation which needs to be divided by num_samples that have that variant
-            for index in validGenotypeIndices:
-                operationIndex = index + 4     # the first 3 indices hold the values for hom, het, double het and wildtype
-                operationCalculation = value[operationIndex]
-                if operations[index] == MEAN and operationCalculation is not None:
-                    numSamples = value[0] + value[1] + value[2] + value[3]
-                    operationCalculation /= float(numSamples)
-                res.append(operationCalculation)
-            cur.execute(update_query, res + [id])
+            try:
+                for index in validGenotypeIndices:
+                    operationIndex = index + 4     # the first 3 indices hold the values for hom, het, double het and wildtype
+                    operationCalculation = value[operationIndex]
+                    if operations[index] == MEAN and operationCalculation is not None:
+                        numSamples = value[0] + value[1] + value[2] + value[3]
+                        operationCalculation /= float(numSamples)
+                    res.append(operationCalculation)
+                cur.execute(update_query, res + [id])
+            except Exception as e:
+                self.logger.debug(e)
             if count % self.db.batch == 0:
                 self.db.commit()
                 prog.update(count)
-            
         self.db.commit()
         prog.done()
+        self.logger.info('{} records are updated'.format(count))
                 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
