@@ -234,11 +234,11 @@ class Sample:
         # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
         # 3) if no fields are valid and no core stats were requested (i.e., num, het, hom, other), then sample_stat is exited
         genotypeFieldTypes = {}
-        genotypeFieldCount = defaultdict(int)
+        fieldInTable = defaultdict(list)
         for id in IDs:
-            fields = self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))
+            fields = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
             for field in fields:
-                genotypeFieldCount[field] += 1
+                fieldInTable[field].append(id)
                 if field not in genotypeFieldTypes:
                     genotypeFieldTypes[field] = 'INT'
                     fieldType = self.db.typeOfColumn('{}_genotype.genotype_{}'.format(self.proj.name, id), field) 
@@ -256,8 +256,8 @@ class Sample:
             if field.lower() not in [x.lower() for x in genotypeFieldTypes.keys()]:
                 self.logger.warning("Field {} is not an existing genotype field within your samples: {}".format(field, str(genotypeFieldTypes.keys())))
             else:
-                if genotypeFieldCount[field] < len(IDs):
-                    self.logger.warning('Field {} exists in {} of {} selected samples'.format(field, genotypeFieldCount[field], len(IDs))) 
+                if len(fieldInTable[field.lower()]) < len(IDs):
+                    self.logger.warning('Field {} exists in {} of {} selected samples'.format(field, len(fieldInTable[field.lower()]), len(IDs))) 
                 validGenotypeIndices.append(index)
                 validGenotypeFields.append(field)
 
@@ -271,7 +271,6 @@ class Sample:
         for name in queryDestinations:
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
-                
         #
         from_variants = set()
         if variant_table != 'variant':
@@ -291,8 +290,12 @@ class Sample:
             
             fieldSelect = ''
             if validGenotypeFields is not None and len(validGenotypeFields) != 0:
-                fieldSelect = ', ' + ', '.join(validGenotypeFields)
+                fieldSelect = ' '.join([', ' + x if id in fieldInTable[x.lower()] else ', NULL' for x in validGenotypeFields])
             
+            query = 'SELECT variant_id, GT{} FROM {}_genotype.genotype_{} {};'.format(fieldSelect,
+                self.proj.name, id, whereClause)
+            cur.execute(query)
+
             for rec in cur:
                 if len(from_variants) == 0 or rec[0] in from_variants:
                     if rec[0] not in variants:
@@ -308,10 +311,7 @@ class Sample:
                     # type double heterozygote with two different alternative alleles
                     elif rec[1] == -1:
                         variants[rec[0]][2] += 1
-                    # type wildtype
-                    elif rec[1] == 0:
-                        variants[rec[0]][3] += 1
-                    elif rec[1] is None:
+                    elif rec[1] in [0, None]:
                         pass
                     else:
                         self.logger.warning('Invalid genotype type {}'.format(rec[1]))
@@ -321,24 +321,30 @@ class Sample:
                         for index in validGenotypeIndices:
                             queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
                             recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
+                            # ignore missing (NULL) values
+                            if rec[queryIndex] is None:
+                                continue
                             operation = operations[index]
                             field = genotypeFields[index]
                             if operation in [MEAN, SUM]:
                                 if variants[rec[0]][recIndex] is None:
-                                    variants[rec[0]][recIndex] = rec[queryIndex]
+                                    # we need to track the number of valid records
+                                    variants[rec[0]][recIndex] = [rec[queryIndex], 1]
                                 else:
-                                    variants[rec[0]][recIndex] += rec[queryIndex]
+                                    variants[rec[0]][recIndex][0] += rec[queryIndex]
+                                    variants[rec[0]][recIndex][1] += 1
                             if operation == MIN:
                                 if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
                                     variants[rec[0]][recIndex] = rec[queryIndex]
                             if operation == MAX:
                                 if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
                                     variants[rec[0]][recIndex] = rec[queryIndex]  
-                    
                 count += 1
                 if count % self.db.batch == 0:
                     prog.update(count)
         prog.done()
+        if len(variants) == 0:
+            raise ValueError('No variant is updated')
         #
         headers = [x.lower() for x in self.db.getHeaders(variant_table)]
         table_attributes = [(num, 'INT'), (hom, 'INT'),
@@ -376,7 +382,6 @@ class Sample:
         prog = ProgressBar('Updating {}'.format(variant_table), len(variants))
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, self.db.PH,
             ' ,'.join(['{}={}'.format(x, self.db.PH) for x in queryDestinations if x is not None]))
-        print update_query, len(variants)
         warning = False
         for count,id in enumerate(variants):
             value = variants[id]
@@ -398,9 +403,9 @@ class Sample:
                     operationIndex = index + 4     # the first 3 indices hold the values for hom, het, double het and wildtype
                     operationCalculation = value[operationIndex]
                     if operations[index] == MEAN and operationCalculation is not None:
-                        numSamples = value[0] + value[1] + value[2] + value[3]
-                        operationCalculation /= float(numSamples)
-                    res.append(operationCalculation)
+                        res.append(float(operationCalculation[0]) / operationCalculation[1])
+                    else:
+                        res.append(operationCalculation)
                 cur.execute(update_query, res + [id])
             except Exception as e:
                 self.logger.debug(e)
