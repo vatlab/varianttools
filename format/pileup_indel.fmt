@@ -8,10 +8,7 @@
 [format description]
 description=Input format for samtools pileup indel caller. This format imports chr, pos, ref, alt and genotype.
 variant=chr, pos, ref, alt
-genotype=%(geno)s
-
-[DEFAULT]
-geno=GT
+genotype=GT
 
 [chr]
 index=1
