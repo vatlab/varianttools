@@ -54,6 +54,7 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
         # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        self.assertSucc('vtools select variant \'max(testNSFP.polyphen2_score)\' -o')
         self.assertOutput("vtools execute 'select count(*) from ns'", '7\n')
         self.assertOutput("vtools select ns -c", '7\n')
         
