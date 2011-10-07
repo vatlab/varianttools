@@ -234,7 +234,7 @@ class AnnoDB:
 
 
 class fileFMT:
-    def __init__(self, name, fmt_args=[]):
+    def __init__(self, name, fmt_args=[], logger=None):
         '''Input file format'''
         # locate a file format specification file
         self.description = None
@@ -244,6 +244,7 @@ class fileFMT:
         self.variant_info = None
         self.genotype_fields = None
         self.genotype_info = None
+        self.logger = logger
         # for export only
         self.export_by_fields = 0
         #
@@ -404,7 +405,9 @@ class fileFMT:
                 #
                 # This is a special case that allows users to use expressions as field....
                 #
-                self.fields[i] = Field(name=fld, index=None, adj=None, type=None, comment='')
+                if self.logger:
+                    self.logger.warning('Field {} is not defined in format {}, some or all variants might fail to import.'.format(self.fields[i], filename))
+                self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
             else:
                 self.fields[i] = fld[0]
         # other fields?

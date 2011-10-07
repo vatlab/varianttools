@@ -760,7 +760,7 @@ class TextImporter(BaseImporter):
             else:
                 raise ValueError('Cannot guess input file type from filename')
         try:
-            fmt = fileFMT(format, fmt_args)
+            fmt = fileFMT(format, fmt_args, logger=self.logger)
         except Exception as e:
             self.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
@@ -964,7 +964,7 @@ class TextUpdater(BaseImporter):
             else:
                 raise ValueError('Cannot guess input file type from filename')
         try:
-            fmt = fileFMT(format, fmt_args)
+            fmt = fileFMT(format, fmt_args, logger=self.logger)
         except Exception as e:
             self.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
