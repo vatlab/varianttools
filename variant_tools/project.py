@@ -883,21 +883,27 @@ class Project:
         #
         s = delayedAction(self.logger.info, 'Creating index on master variant table. This might take quite a while.')
         try:
+            #
+            # Index on the primary reference genome is required to be unique because we identify
+            # variants by their coordinates in the primary reference genome. If multiple variants
+            # from the alterantive reference genome are mapped to the same coordinates in the primary
+            # reference genome, only the first one will be mapped, and others will have NULL primary
+            # coordinates, which are stilled considered as 'UNIQUE' by sqlite (and other database 
+            # engines).
+            #
             self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
-            if 'not unique' in str(e):
-                # this indicates system error...
-                raise SystemError('Non-unique index on primary reference genome: {e}'.format())
             # the index might already exists, this does not really matter
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         try:
             if self.alt_build:
-                self.db.execute('''CREATE UNIQUE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
+                #
+                # Index on alternative reference genome is not unique because several variants might
+                # be mapped to the same coordinates in the alternative reference genome. 
+                #
+                self.db.execute('''CREATE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
-            if 'not unique' in str(e):
-                # this indicates system error...
-                raise SystemError('Non-unique index on secondary reference genome: {e}'.format())
             # the index might already exists, this does not really matter
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds

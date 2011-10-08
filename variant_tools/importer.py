@@ -563,10 +563,6 @@ class BaseImporter:
             self.import_alt_build = True
         #
 
-    def __del__(self):
-        if self.mode == 'insert':
-            self.proj.createIndexOnMasterVariantTable()
-
     def guessBuild(self, file):
         # by default, reference genome cannot be determined from file
         return None
@@ -703,44 +699,66 @@ class BaseImporter:
             else:
                 self.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
                     '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
-        if self.mode == 'insert' and sum(self.total_count[3:7]) > 0 and self.proj.alt_build is not None:
-            coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
-            # we need to run lift over to convert coordinates before importing data.
-            tool = LiftOverTool(self.proj)
-            if self.import_alt_build:
-                self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.alt_build, self.proj.build))
-                coordinateMap = tool.mapCoordinates(coordinates, self.proj.alt_build, self.proj.build)
-                query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
-            else:
-                self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.build, self.proj.alt_build))
-                coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
-                query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
-                # this should not really happen, but people (like me) might manually mess up with the database
-                headers = self.db.getHeaders('variant')
-                if not 'alt_pos' in headers:
-                    self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
-                    self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
-                    self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
-                    self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
-            # update records
-            prog = ProgressBar('Updating coordinates', len(self.variantIndex))
-            count = 0
-            cur = self.db.cursor()
-            for k,v in self.variantIndex.iteritems():
-                if v[1] == 1:
-                    count += 1
-                    try:
-                        (chr, pos) = coordinateMap[(k[0], k[1])]
-                    except Exception as e:
-                        self.logger.debug(e)
-                        # unmapped
-                        continue
+
+    def finalize(self):
+        # this function will only be called from import
+        #
+        # This step is important because the primary reference genome should be unique
+        # and we should create index to set NULL primary reference genome for variants that
+        # map to the same variant...
+        self.proj.createIndexOnMasterVariantTable()
+        #
+        if sum(self.total_count[3:7]) == 0 or self.proj.alt_build is None:
+            # if no new variant, or no alternative reference genome, do nothing
+            return
+        coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
+        # we need to run lift over to convert coordinates before importing data.
+        tool = LiftOverTool(self.proj)
+        if self.import_alt_build:
+            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.alt_build, self.proj.build))
+            coordinateMap = tool.mapCoordinates(coordinates, self.proj.alt_build, self.proj.build)
+            query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
+        else:
+            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(len(coordinates), self.proj.build, self.proj.alt_build))
+            coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
+            query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            # this should not really happen, but people (like me) might manually mess up with the database
+            headers = self.db.getHeaders('variant')
+            if not 'alt_pos' in headers:
+                self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
+                self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
+                self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
+                self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
+        # update records
+        prog = ProgressBar('Updating coordinates', len(self.variantIndex))
+        # 0: new variant
+        # 1: succ mapped
+        # 2: unmapped
+        # 3: failed to set
+        count = [0, 0, 0, 0]
+        cur = self.db.cursor()
+        for k,v in self.variantIndex.iteritems():
+            if v[1] == 1:
+                count[0] += 1
+                try:
+                    (chr, pos) = coordinateMap[(k[0], k[1])]
+                except:
+                    count[2] += 1
+                    # unmapped
+                    continue
+                try:
                     cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, v[0]))
-                    if count % self.db.batch == 0:
-                        self.db.commit()
-                        prog.update(count)
-            self.db.commit()
-            prog.done()
+                    count[1] += 1
+                except:
+                    count[3] += 1
+                if count[1] % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(count)
+        self.db.commit()
+        prog.done()
+        self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
+            .format(count[1], count[0], count[2],
+                ', {} ignored because mapped to existing coordinates'.format(count[3]) if count[3] > 0 else ''))
             
 
 class TextImporter(BaseImporter):
@@ -1182,6 +1200,7 @@ def importVariants(args):
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, fmt_args=args.unknown_args)
             importer.importData()
+            importer.finalize()
         proj.close()
     except Exception as e:
         sys.exit(e)
@@ -1216,6 +1235,7 @@ def update(args):
             importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
                 build=args.build, format=args.format, fmt_args=args.unknown_args)
             importer.importData()
+            # no need to finalize
         proj.close()
     except Exception as e:
         sys.exit(e)
