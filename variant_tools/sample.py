@@ -164,16 +164,19 @@ class Sample:
                     [None if expression == 'NULL' else expression, ID])
                 count[0] += 1
             else:
-                query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
-                    .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
-                self.logger.debug('Running query: {}'.format(query))
-                cur.execute(query)
-                res = cur.fetchone()
-                if res is None:
+                try:
+                    query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
+                        .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
+                    cur.execute(query)
+                    res = cur.fetchone()
+                    if res is None:
+                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
+                    else:
+                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
+                        count[0] += 1
+                except Exception as e:
+                    self.logger.debug('Failed query: {}, setting value to None'.format(query))
                     cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
-                else:
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
-                    count[0] += 1
         self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()

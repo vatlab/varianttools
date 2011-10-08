@@ -34,7 +34,7 @@ class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
-        runCmd('vtools import vcf/SAMP2.vcf')
+        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_FMT')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportPhenotype(self):
@@ -68,7 +68,7 @@ class TestPhenotype(ProcessTestCase):
         self.assertFail('vtools phenotype --set race="white" --samples \'filename like "%CEU%"\'')
         # have to use quote to pass the test
         self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
-        # FIXME the following tests pass but have to varify the output. Will do that manually and add assertEqual
+        # FIXME the following tests pass but have to verify the output. Will do that manually and add assertEqual
         # total genotypes per individual. apply "count" on sample variant tables
         self.assertSucc('vtools phenotype --set "numGeno=count(*)"')
         self.assertSucc("vtools phenotype --set 'validGeno=count(*)' --genotypes 'DP_FMT>10'")
