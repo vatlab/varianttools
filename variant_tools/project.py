@@ -1077,7 +1077,14 @@ class Project:
             res = cur.fetchone()
             samples[res[0]].append(res[1])
         for f in samples:
-            self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+            cur.execute('SELECT filename.filename, count(sample.sample_id) FROM filename LEFT OUTER JOIN sample on sample.file_id = filename.file_id WHERE filename.filename = {};'.format(self.db.PH),
+                (f,))
+            rec = cur.fetchone()
+            if rec[1] == len(samples[f]):
+                self.logger.info('Removing {1} and all its samples ({0})'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+                cur.execute('DELETE FROM filename WHERE filename = {}'.format(self.db.PH), (f,))
+            else:
+                self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
             self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
@@ -1490,9 +1497,10 @@ def removeArguments(parser):
             for 'variants' variant tables whose variants will be removed from all variant
             tables and genotypes, for 'genotypes' conditions using which matching genotypes
             are removed, and for 'phenotypes' columns in the output of 'vtools show samples'.
-            Note that removal of samples will only remove sample information related to
-            variants, not variants themselves; removal of annotation databases will stop
-            using these databases in the project, but will not removing them from disk.''')
+            Note that removal of samples will only remove sample name, filename (if all related
+            samples are removed), and related genotypes, but not variants themselves; removal
+            of annotation databases will stop using these databases in the project, but will
+            not removing them from disk.''')
 
 def remove(args):
     try:
