@@ -166,11 +166,13 @@ class LiftOverTool:
         # Update the master variant table.
         cur = self.db.cursor()
         headers = self.db.getHeaders('variant')
-        if not 'alt_pos' in headers:
-            self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
-            self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
-            self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
-            self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
+        for fldName, fldType in [('alt_bin', 'INT'), 
+                                 ('alt_chr', 'VARCHAR(20)'),
+                                 ('alt_pos', 'INT')]:
+            if fldName in headers:
+                continue
+            self.logger.info('Adding field {} to table variant'.format(fldName))
+            self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
         #
         mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Updating table variant', lineCount(mapped_file))

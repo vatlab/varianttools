@@ -1537,6 +1537,10 @@ def remove(args):
                 for table, items in from_table.items():
                     proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
                     proj.db.removeFields(table, items)
+                    if 'alt_bin' in items or 'alt_chr' in items or 'alt_pos' in items:
+                        proj.logger.info('Removing alternative reference genome because of removal of related fields')
+                        proj.alt_build = None
+                        proj.saveProperty('alt_build', None)
             elif args.type == 'geno_fields':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of genotype fields to be removed')
