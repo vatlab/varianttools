@@ -31,7 +31,7 @@ import stat
 import subprocess
     
 from .project import Project
-from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin
+from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction
 
 #
 class LiftOverTool:
@@ -164,15 +164,14 @@ class LiftOverTool:
             self.logger.info('{0} records failed to map.'.format(err_count))
         #
         # Update the master variant table.
+        s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
         cur = self.db.cursor()
         headers = self.db.getHeaders('variant')
-        for fldName, fldType in [('alt_bin', 'INT'), 
-                                 ('alt_chr', 'VARCHAR(20)'),
-                                 ('alt_pos', 'INT')]:
+        for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
             if fldName in headers:
                 continue
-            self.logger.info('Adding field {} to table variant'.format(fldName))
             self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+        del s
         #
         mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Updating table variant', lineCount(mapped_file))

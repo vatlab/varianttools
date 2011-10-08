@@ -708,6 +708,7 @@ class BaseImporter:
         # map to the same variant...
         self.proj.createIndexOnMasterVariantTable()
         #
+        cur = self.db.cursor()
         if sum(self.total_count[3:7]) == 0 or self.proj.alt_build is None:
             # if no new variant, or no alternative reference genome, do nothing
             return
@@ -723,12 +724,13 @@ class BaseImporter:
             coordinateMap = tool.mapCoordinates(coordinates, self.proj.build, self.proj.alt_build)
             query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
             # this should not really happen, but people (like me) might manually mess up with the database
+            s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
             headers = self.db.getHeaders('variant')
-            if not 'alt_pos' in headers:
-                self.logger.info('Adding fields alt_bin, alt_chr and alt_pos to table variant')
-                self.db.execute('ALTER TABLE variant ADD alt_bin INT NULL;')
-                self.db.execute('ALTER TABLE variant ADD alt_chr VARCHAR(20) NULL;')
-                self.db.execute('ALTER TABLE variant ADD alt_pos INT NULL;')
+            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                if fldName in headers:
+                    continue
+                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+            del s
         # update records
         prog = ProgressBar('Updating coordinates', len(self.variantIndex))
         # 0: new variant
@@ -736,7 +738,6 @@ class BaseImporter:
         # 2: unmapped
         # 3: failed to set
         count = [0, 0, 0, 0]
-        cur = self.db.cursor()
         for k,v in self.variantIndex.iteritems():
             if v[1] == 1:
                 count[0] += 1
@@ -1204,7 +1205,6 @@ def importVariants(args):
         proj.close()
     except Exception as e:
         sys.exit(e)
-
 
 def updateArguments(parser):
     parser.add_argument('table', help='''variants to be updated.''')

@@ -736,7 +736,31 @@ class Project:
         # FIXME: these are not handled correctly for now
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
+        #
+        self.checkIntegrity()
 
+    def checkIntegrity(self):
+        '''Check if the project is ok...(and try to fix it if possible)'''
+        for table in ['project', 'filename', 'sample', 'variant']:
+            if not self.db.hasTable(table):
+                raise RuntimeError('Corrupted project: missing table {}'.format(table))
+        #
+        headers = self.db.getHeaders('variant')
+        if self.alt_build is not None:
+            if not ('alt_bin' in headers and 'alt_chr' in headers and 'alt_pos' in headers):
+                self.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
+                    ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in header])))
+                self.alt_build = None
+                proj.saveProperty('alt_build', None)
+        #
+        # missing index on master variant table
+        if not self.db.hasIndex('variant_index'):
+            self.logger.warning('Missing index on master variant table. Trying to rebuild it.')
+            self.createIndexOnMasterVariantTable()
+            if not self.db.hasIndex('variant_index'):
+                raise RuntimeError('Corrupted project: failed to create index on master variant table.')
+
+    
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
         # DBs in different paths but with the same name are considered to be the same.
@@ -881,7 +905,7 @@ class Project:
     def createIndexOnMasterVariantTable(self):
         # create indexes
         #
-        s = delayedAction(self.logger.info, 'Creating index on master variant table. This might take quite a while.')
+        s = delayedAction(self.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
         try:
             #
             # Index on the primary reference genome is required to be unique because we identify
