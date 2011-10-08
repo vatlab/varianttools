@@ -885,14 +885,20 @@ class Project:
         try:
             self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
-            # the index might already exists
+            if 'not unique' in str(e):
+                # this indicates system error...
+                raise SystemError('Non-unique index on primary reference genome: {e}'.format())
+            # the index might already exists, this does not really matter
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         try:
             if self.alt_build:
                 self.db.execute('''CREATE UNIQUE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
-            # the index might already exists
+            if 'not unique' in str(e):
+                # this indicates system error...
+                raise SystemError('Non-unique index on secondary reference genome: {e}'.format())
+            # the index might already exists, this does not really matter
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         del s
