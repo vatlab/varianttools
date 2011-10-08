@@ -25,6 +25,9 @@ var_info_comment=Variant information fields to be imported.
 geno=GT
 geno_comment=Field to extract genotype
 
+geno_info=
+geno_info_comment=Optional genotype info
+
 [chr]
 index=1
 type=VARCHAR(20)

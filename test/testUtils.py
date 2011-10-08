@@ -103,7 +103,7 @@ def getGenotypes(projname='test', num=8):
     genotypes = []
     # getGenotypes for 8 samples
     for i in range(num):
-        genotypes.append(output2list('vtools execute "select GT from {}_genotype.sample_variant_{}"'.format(projname, i+1)))
+        genotypes.append(output2list('vtools execute "select GT from {}_genotype.genotype_{}"'.format(projname, i+1)))
     return genotypes
 
 def getGenotypeInfo(projname='test', num=8, info=['DP_FMT']):
@@ -111,7 +111,7 @@ def getGenotypeInfo(projname='test', num=8, info=['DP_FMT']):
     genotypeInfo = []
     # getGenotypeInfo for 8 samples
     for i in range(num):
-        genotypeInfo.append(output2list('vtools execute "select {} from {}_genotype.sample_variant_{}"'.format(','.join(info), projname, i+1)))
+        genotypeInfo.append(output2list('vtools execute "select {} from {}_genotype.genotype_{}"'.format(','.join(info), projname, i+1)))
     return genotypeInfo
 
 def getSamplenames():

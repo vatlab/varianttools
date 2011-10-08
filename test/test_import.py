@@ -30,7 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd, getGenotypes, getSamplenames, output2list, getGenotypeInfo
 
-class TestImportVariants(ProcessTestCase):
+class TestImport(ProcessTestCase):
     
     def setUp(self):
         'Create a project'
@@ -130,8 +130,8 @@ class TestImportVariants(ProcessTestCase):
         runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
         self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
-        # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the sample_variant_x table
-        self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 5)
+        # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
+        self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(genotype_1)"')), 5)
         # only 1 sample here. Set num=1
         self.assertEqual(getGenotypes(num=1)[0], ['1']*20)
         
@@ -182,13 +182,12 @@ class TestImportVariants(ProcessTestCase):
         # import additional information on variants and on genotypes.
         # DP_INFO and DP_FMT are fields provided in the default vcf.fmt
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP_INFO --geno_info DP_FMT --build hg18')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_FMT --build hg18')
         self.assertEqual(numOfSample(), 60)
         self.assertEqual(numOfVariant(), 288)
         self.assertSucc('vtools output variant DP_INFO')
-        self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(sample_variant_1)"')), 3)
-        # the DP for each genotype is stored as FLOAT in the database.
-        self.assertEqual(output2list('vtools execute "select DP_FMT from sample_variant_1"'), ['0', '2', '7', '1', '2', '7', \
+        self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(genotype_1)"')), 3)
+        self.assertEqual(output2list('vtools execute "select DP_FMT from genotype_1"'), [ '0', '2', '7', '1', '2', '7', \
         '1', '0', '0', '0', '0', '4', '2', '2', '0', '0', '6', '1', '2', '6', '3', '3', '1', '5', '1', '0', '0', '1', '3', '2',\
          '1', '2', '7', '1', '1', '1', '1', '5', '2', '3', '3', '6', '2', '4', '2', '7', '3', '3', '7', '3', '4', '2', '1', '2', \
          '7', '2', '0', '0', '4', '3', '5', '2', '7', '1', '2', '0', '5', '1', '1', '0'])
@@ -243,12 +242,12 @@ class TestImportVariants(ProcessTestCase):
         self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # test importing self defined var_info
         self.assertEqual(output2list('vtools output variant \
-                                     DP_INFO MQ_INFO NS_INFO AN_INFO AC_INFO AF_INFO AB_INFO LBS_INFO_A1 LBS_INFO_A2 \
-                                     LBS_INFO_C1 LBS_INFO_C2 LBS_INFO_G1 LBS_INFO_G2 LBS_INFO_T1 LBS_INFO_T2 OBS_INFO_A1 \
-                                     OBS_INFO_A2 OBS_INFO_C1 OBS_INFO_C2 OBS_INFO_G1 OBS_INFO_G2 OBS_INFO_T1 OBS_INFO_T2 \
-                                     STR_INFO STZ_INFO CBR_INFO CBZ_INFO QBR_INFO QBZ_INFO MBR_INFO MSR_INFO MBZ_INFO \
-                                     IOR_INFO IOZ_INFO IOH_INFO IOD_INFO AOI_INFO AOZ_INFO ABE_INFO ABZ_INFO BCS_INFO \
-                                     FIC_INFO LQR_INFO MQ0_INFO MQ10_INFO MQ20_INFO MQ30_INFO ANNO_INFO SVM_INFO \
+                                     DP MQ NS AN AC AF AB LBS_A1 LBS_A2 \
+                                     LBS_C1 LBS_C2 LBS_G1 LBS_G2 LBS_T1 LBS_T2 OBS_A1 \
+                                     OBS_A2 OBS_C1 OBS_C2 OBS_G1 OBS_G2 OBS_T1 OBS_T2 \
+                                     STR STZ CBR CBZ QBR QBZ MBR MSR MBZ \
+                                     IOR IOZ IOH IOD AOI AOZ ABE ABZ BCS \
+                                     FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM \
                                      -l 1')[0].split('\t'),
                          ['472', '28', '308', '616', '1', '0.002774', '0.2738', '64', '27', '63', '37', '6558', '1508', \
                           '93', '102', '166', '63', '60', '37', '509234', '225198', '163', '92', '-0.001', '-1.004', '0.002', \
@@ -261,7 +260,7 @@ class TestImportVariants(ProcessTestCase):
         # test importing self-defined geno_info.
         # PL3* are passed into database as a 2X1 "transposed tuple" -- works here.
         # See 'missing_gen.fmt'
-        genotypeInfo = getGenotypeInfo(num=4, info=['GT_INFO', 'GQ_INFO', 'GD_INFO', 'PL_INFO1', 'PL_INFO2', 'PL_INFO3', 'PL3_INFO1', 'PL3_INFO2', 'PL3_INFO3'])
+        genotypeInfo = getGenotypeInfo(num=4, info=['GT', 'GQ', 'GD', 'PL_1', 'PL_2', 'PL_3', 'PL3_1', 'PL3_2', 'PL3_3'])
         genotypeInfo = ['\t'.join(x) for x in genotypeInfo]
         genotypeInfo = [x.split('\t') for x in genotypeInfo]
         self.assertEqual(genotypeInfo, [['None', '3', '1', 'None', 'None', 'None', '0', \
