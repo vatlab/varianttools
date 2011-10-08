@@ -329,17 +329,22 @@ class Sample:
                                 continue
                             operation = operations[index]
                             field = genotypeFields[index]
-                            if operation in [MEAN, SUM]:
+                            if operation == MEAN:
                                 if variants[rec[0]][recIndex] is None:
                                     # we need to track the number of valid records
                                     variants[rec[0]][recIndex] = [rec[queryIndex], 1]
                                 else:
                                     variants[rec[0]][recIndex][0] += rec[queryIndex]
                                     variants[rec[0]][recIndex][1] += 1
-                            if operation == MIN:
+                            elif operation == SUM:
+                                if variants[rec[0]][recIndex] is None:
+                                    variants[rec[0]][recIndex] = rec[queryIndex]
+                                else:
+                                    variants[rec[0]][recIndex] += rec[queryIndex]
+                            elif operation == MIN:
                                 if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
                                     variants[rec[0]][recIndex] = rec[queryIndex]
-                            if operation == MAX:
+                            elif operation == MAX:
                                 if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
                                     variants[rec[0]][recIndex] = rec[queryIndex]  
                 count += 1

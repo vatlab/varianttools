@@ -60,19 +60,19 @@ class TestSampleStat(ProcessTestCase):
         self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from CEU'").split('\n')[0]), 1601)
         self.assertSucc('vtools sample_stat CEU -s "filename like \'%CEU%\' and aff=\'1\'" --het CEU_ctrls_het')
         
-    def testGenotypeSumstats(self):
-        'Test command vtools sample_stat SUMMARYSTATISTIC_FIELD'
+    def testGenotypeSumStats(self):
+        'Test command vtools sample_stat min/max/sum/mean_FIELD'
         runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # non-existing field, should fail
-        self.assertFail('vtools sample_stat variant --max_GQ max_gq --min_GQ min_gq')
-        self.assertSucc('vtools sample_stat variant --max_GQ_INFO max_gq --min_GQ_INFO min_gq --mean_GQ_INFO mean_gq')
+        self.assertFail('vtools sample_stat variant --max_GQ1 max_gq --min_GQ min_gq')
+        self.assertSucc('vtools sample_stat variant --max_GQ max_gq --min_GQ min_gq --mean_GQ mean_gq')
         self.assertEqual(output2list('vtools output variant max_gq min_gq mean_gq'), \
             ['NA\tNA\tNA', 'NA\tNA\tNA',  'NA\tNA\tNA', '100\t15\t69.3333333333', '6\t3\t4.0', '4\t3\t3.33333333333'])
-        self.assertSucc('vtools sample_stat variant --sum_GD_INFO total_dp')
+        self.assertSucc('vtools sample_stat variant --sum_GD total_dp')
         self.assertEqual(output2list('vtools output variant total_dp'), ['NA', 'NA', 'NA', '60', '7', '4'])
         # ffilter out variants having GQ less than 4,
         # then for each remining variant count the total number of alt genotypes across all samples
-        self.assertSucc('vtools sample_stat variant --genotype "GQ_INFO >= 4" --num gq_ge_4')
+        self.assertSucc('vtools sample_stat variant --genotype "GQ >= 4" --num gq_ge_4')
         self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
         
 if __name__ == '__main__':
