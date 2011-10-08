@@ -70,7 +70,7 @@ info_comment=Field for info status
 # If no formatter is defined, the first value will be used in output.
 #
 GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: '', (-1,-1): '1/2'}[x]
-DP_INFO=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
+DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
 # if there are multiple alternative alleles, join them by ','
 #
 # not sure if we need to keep both JoinRecords and JoinFields
@@ -215,15 +215,15 @@ comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt
 [info]
 index=8
 type=VARCHAR(255)
-comment=Raw INFO column in the vcf file. This may be further splitted into various specified _INFO fields, such as DP_INFO, etc. 
+comment=Raw INFO column in the vcf file. This may be further splitted into various specified info fields, such as DP, etc. 
 
-[DP_INFO]
+[DP]
 index=8
 adj=ExtractValue('DP=', ';')
 type=INTEGER
 comment=DP fields in INFO. Total depth of samples in a vcf file.
 
-[DP_FMT]
+[DP_geno]
 # Passing 'GT:DP\t0/0:64'
 index=9, 10:
 adj=FieldFromFormat('DP', ':')
