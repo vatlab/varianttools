@@ -22,9 +22,6 @@ geno_comment=Field to extract genotype from .vcf file. You can set it to
 var_info=snp_id, genet_dist
 var_info_comment=Variant information fields to be imported. 
 
-geno=GT
-geno_comment=Field to extract genotype
-
 geno_info=
 geno_info_comment=Optional genotype info
 

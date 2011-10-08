@@ -33,11 +33,14 @@ from testUtils import ProcessTestCase, runCmd, initTest
 class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
+        runCmd('vtools init test  -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_FMT')
+        runCmd('vtools import vcf/SAMP1.vcf --geno_info DP_FMT')
         runCmd('vtools sample_stat variant --num num --mean_DP_FMT depth')
         
     def removeProj(self):
         runCmd('vtools remove project')
+
     def testAvgDepth(self):
         'Test command vtools_report avg_depth'
         self.assertFail('vtools_report avg_depth')
