@@ -66,8 +66,11 @@ class TestSampleStat(ProcessTestCase):
         # non-existing field, should fail
         self.assertFail('vtools sample_stat variant --max_GQ1 max_gq --min_GQ min_gq')
         self.assertSucc('vtools sample_stat variant --max_GQ max_gq --min_GQ min_gq --mean_GQ mean_gq')
-        self.assertEqual(output2list('vtools output variant max_gq min_gq mean_gq'), \
-            ['NA\tNA\tNA', 'NA\tNA\tNA',  'NA\tNA\tNA', '100\t15\t69.3333333333', '6\t3\t4.0', '4\t3\t3.33333333333'])
+        out = output2list('vtools output variant max_gq min_gq mean_gq')
+        self.assertEqual(out[0], 'NA\tNA\tNA')
+        self.assertTrue(out[3].startswith('100\t15\t69.3333'))
+        self.assertTrue(out[4].startswith('6\t3\t4.0'))
+        self.assertTrue(out[5].startswith('4\t3\t3.33333'))
         self.assertSucc('vtools sample_stat variant --sum_GD total_dp')
         self.assertEqual(output2list('vtools output variant total_dp'), ['NA', 'NA', 'NA', '60', '7', '4'])
         # ffilter out variants having GQ less than 4,
