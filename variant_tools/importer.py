@@ -754,7 +754,7 @@ class BaseImporter:
                     count[3] += 1
                 if count[1] % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(count)
+                    prog.update(count[1])
         self.db.commit()
         prog.done()
         self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
