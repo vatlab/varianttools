@@ -28,6 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
+import shutil
 from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample
 
 class TestInit(ProcessTestCase):
@@ -44,24 +45,16 @@ class TestInit(ProcessTestCase):
             os.mkdir('parent')
         except OSError:
             pass
-        
-        os.chdir('parent')
-        runCmd('vtools init test')
-        runCmd('vtools import ../vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools import ../vcf/SAMP1.vcf')
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import vcf/SAMP1.vcf')
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        os.chdir('..')
+        shutil.move('test.proj', 'parent/test.proj')
+        shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         self.assertSucc('vtools init test --parent parent ceu')
         self.assertEqual(numOfVariant(), 288)
         self.assertEqual(numOfSample(), 61)
-        for fn in os.listdir('parent'):
-            if fn != 'cache': os.remove('parent/{}'.format(fn))
-            else:
-                os.remove('parent/cache/vcf.fmt')
-                os.rmdir('parent/cache')
-        os.rmdir('parent')
-        
-
+        shutil.rmtree('parent')
 
 if __name__ == '__main__':
     unittest.main()
