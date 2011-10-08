@@ -32,8 +32,9 @@ except ImportError:
 
 import sys
 
-#
-VTOOLS_VERSION = '1.0beta'
+# We cannot import variant_tools/project.py because that file is not 
+# python3 compatible before 2to3
+VTOOLS_VERSION = '1.0rc1'
 #
 # the association module is not ready for prime time...
 # 
