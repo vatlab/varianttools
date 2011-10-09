@@ -560,7 +560,7 @@ class Project:
             INFO2:       ..
 
     '''
-    def __init__(self, name=None, new=False, verbosity=None, **kwargs):
+    def __init__(self, name=None, new=False, verbosity=None, verify=True, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
         if new: # new project
@@ -638,7 +638,7 @@ class Project:
         if new:
             self.create(**kwargs)
         else:
-            self.open()
+            self.open(verify)
 
     def create(self, **kwargs):
         '''Create a new project'''
@@ -693,7 +693,7 @@ class Project:
         self.createMasterVariantTable()
         self.createSampleTableIfNeeded()
 
-    def open(self):
+    def open(self, verify=True):
         '''Open an existing project'''
         # open the project file
         self.logger.debug('Opening project {}'.format(self.proj_file))
@@ -737,7 +737,8 @@ class Project:
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
         #
-        self.checkIntegrity()
+        if verify:
+            self.checkIntegrity()
 
     def checkIntegrity(self):
         '''Check if the project is ok...(and try to fix it if possible)'''
@@ -749,9 +750,9 @@ class Project:
         if self.alt_build is not None:
             if not ('alt_bin' in headers and 'alt_chr' in headers and 'alt_pos' in headers):
                 self.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
-                    ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in header])))
+                    ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in headers])))
                 self.alt_build = None
-                proj.saveProperty('alt_build', None)
+                self.saveProperty('alt_build', None)
         #
         # missing index on master variant table
         if not self.db.hasIndex('variant_index'):
@@ -1420,10 +1421,10 @@ def init(args):
         if args.force:
             # silently remove all exiting project.
             try:
-                proj = Project(verbosity='0')
+                proj = Project(verbosity='0', verify=False)
                 proj.remove()
-            except:
-                pass
+            except Excption as e:
+                sys.exit("Failed to remove project, please remove *.proj and *.DB manually and try agin.\n{}".format(e))
         # create a new project
         with Project(name=args.project, new=True, verbosity=args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
