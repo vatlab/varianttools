@@ -593,7 +593,12 @@ class BaseImporter:
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
             # zero for existing loci
-            self.variantIndex[(rec[1], rec[2], rec[3], rec[4])] = (rec[0], 0)
+            key = (rec[1], rec[3], rec[4])
+            if key in self.variantIndex:
+                self.variantIndex[key][rec[2]] = (rec[0], 0)
+            else:
+                self.variantIndex[key] = {rec[2]: (rec[0], 0)}
+            #self.variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
@@ -714,7 +719,9 @@ class BaseImporter:
         if total_new == 0 or self.proj.alt_build is None:
             # if no new variant, or no alternative reference genome, do nothing
             return
-        coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
+        coordinates = set()
+        for key in self.variantIndex:
+            coordinates |= set([(key[0], x) for x,y in self.variantIndex[key].iteritems() if y[1] == 1])
         # we need to run lift over to convert coordinates before importing data.
         tool = LiftOverTool(self.proj)
         if self.import_alt_build:
@@ -739,10 +746,12 @@ class BaseImporter:
         # 2: unmapped
         # 3: failed to set
         count = [0, 0, 0]
-        for k,v in self.variantIndex.iteritems():
-            if v[1] == 1:
+        for key in self.variantIndex:
+            for k,v in self.variantIndex[key].iteritems():
+                if v[1] == 0:
+                    continue
                 try:
-                    (chr, pos) = coordinateMap[(k[0], k[1])]
+                    (chr, pos) = coordinateMap[(key[0], k)]
                 except:
                     count[1] += 1
                     # unmapped
@@ -750,7 +759,8 @@ class BaseImporter:
                 try:
                     cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, v[0]))
                     count[0] += 1
-                except:
+                except Exception as e:
+                    self.logger.debug('Failed to update coordinate {}:{} due to: {}'.format(chr, pos, e))
                     count[2] += 1
                 if count[0] % self.db.batch == 0:
                     self.db.commit()
@@ -829,9 +839,9 @@ class TextImporter(BaseImporter):
                     
     def addVariant(self, cur, rec):
         #
-        var_key = tuple(rec[1:5])
-        if var_key in self.variantIndex:
-            variant_id = self.variantIndex[var_key][0]
+        var_key = tuple((rec[1], rec[3], rec[4]))
+        if var_key in self.variantIndex and rec[2] in self.variantIndex[var_key]:
+            variant_id = self.variantIndex[var_key][rec[2]][0]
             if len(rec) > 5:
                 self.count[8] += 1
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
@@ -850,7 +860,10 @@ class TextImporter(BaseImporter):
             cur.execute(self.variant_insert_query, rec)
             variant_id = cur.lastrowid
             # one for new variant
-            self.variantIndex[var_key] = (variant_id, 1)
+            if var_key in self.variantIndex:
+                self.variantIndex[var_key][rec[2]] = (variant_id, 1)
+            else:
+                self.variantIndex[var_key] = {rec[2]: (variant_id, 1)}
             return variant_id
 
     def importFromFile(self, input_filename):
@@ -1034,9 +1047,9 @@ class TextUpdater(BaseImporter):
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
-            var_key = tuple(rec[0:4])
-            if var_key in self.variantIndex:
-                variant_id = self.variantIndex[var_key][0]
+            var_key = (rec[0], rec[2], rec[3])
+            if var_key in self.variantIndex and rec[1] in self.variantIndex[var_key]:
+                variant_id = self.variantIndex[var_key][rec[1]][0]
                 # update by variant_id, do not need bins
                 if len(rec) > 4:
                     cur.execute(self.update_variant_query, rec[4:] + [variant_id])

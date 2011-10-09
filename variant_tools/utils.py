@@ -262,7 +262,7 @@ class ProgressBar:
         elif cps > 1000:
             msg[4] = ' {:.1f}K/s'.format(cps/1000)
         else:
-            msg[4] = ' {:.1f}/s'.format(cps/1000)
+            msg[4] = ' {:.1f}/s'.format(cps)
         # estimated time left
         if done:
             msg[5] = time.strftime(' in %H:%M:%S', time.gmtime(second_elapsed))
