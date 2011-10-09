@@ -559,9 +559,10 @@ class BaseImporter:
             self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
             self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
             tool = LiftOverTool(self.proj)
-            tool.setAltRefGenome(self.build, build_index= (mode == 'insert'))
+            # in case of insert, the indexes will be dropped soon so do not build
+            # index now
+            tool.setAltRefGenome(self.build, build_index= (mode != 'insert'))
             self.import_alt_build = True
-        #
 
     def guessBuild(self, file):
         # by default, reference genome cannot be determined from file
@@ -709,7 +710,8 @@ class BaseImporter:
         self.proj.createIndexOnMasterVariantTable()
         #
         cur = self.db.cursor()
-        if sum(self.total_count[3:7]) == 0 or self.proj.alt_build is None:
+        total_new = sum(self.total_count[3:7])
+        if total_new == 0 or self.proj.alt_build is None:
             # if no new variant, or no alternative reference genome, do nothing
             return
         coordinates = set([(x[0], x[1]) for x,y in self.variantIndex.iteritems() if y[1] == 1])
@@ -732,34 +734,32 @@ class BaseImporter:
                 self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
             del s
         # update records
-        prog = ProgressBar('Updating coordinates', len(self.variantIndex))
-        # 0: new variant
+        prog = ProgressBar('Updating coordinates', total_new)
         # 1: succ mapped
         # 2: unmapped
         # 3: failed to set
-        count = [0, 0, 0, 0]
+        count = [0, 0, 0]
         for k,v in self.variantIndex.iteritems():
             if v[1] == 1:
-                count[0] += 1
                 try:
                     (chr, pos) = coordinateMap[(k[0], k[1])]
                 except:
-                    count[2] += 1
+                    count[1] += 1
                     # unmapped
                     continue
                 try:
                     cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, v[0]))
-                    count[1] += 1
+                    count[0] += 1
                 except:
-                    count[3] += 1
-                if count[1] % self.db.batch == 0:
+                    count[2] += 1
+                if count[0] % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(count[1])
+                    prog.update(count[0])
         self.db.commit()
         prog.done()
         self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
-            .format(count[1], count[0], count[2],
-                ', {} ignored because mapped to existing coordinates'.format(count[3]) if count[3] > 0 else ''))
+            .format(count[0], total_new, count[1],
+                ', {} ignored because mapped to existing coordinates'.format(count[2]) if count[2] > 0 else ''))
             
 
 class TextImporter(BaseImporter):
