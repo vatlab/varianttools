@@ -198,12 +198,9 @@ class LiftOverTool:
         if build_index:
             self.proj.createIndexOnMasterVariantTable()
 
-    def mapCoordinates(self, coordinates, from_build, to_build):
-        '''Given a set of coordinates (chr, pos) in build, from and to build of reference genome,
-        return a dictionary that maps (chr, pos) -> (alt_chr, alt_pos)
+    def mapCoordinates(self, map_in, from_build, to_build):
+        '''Given a input file, run liftover and return output file.
         '''
-        if len(coordinates) == 0:
-            return {}
         # download liftover 
         if not self.obtainLiftOverTool():
             raise RuntimeError('Failed to obtain UCSC LiftOver tool')
@@ -212,11 +209,6 @@ class LiftOverTool:
         if not chainFile:
             raise RuntimeError('Failed to obtain UCSC chain file {}'.format(chainFile))
         # export existing variants to a temporary file
-        with open(os.path.join(self.proj.temp_dir, 'var_in.bed'), 'w') as output:
-            for cor in sorted(coordinates):
-                output.write('{0}\t{1}\t{2}\t{3}\t{4}\n'.format(cor[0] if len(cor[0]) > 2 else 'chr' + cor[0],
-                   cor[1] - 1, cor[1], cor[0], cor[1]))
-        #
         self.runLiftOver(os.path.join(self.proj.temp_dir, 'var_in.bed'), chainFile,
             os.path.join(self.proj.temp_dir, 'var_out.bed'), os.path.join(self.proj.temp_dir, 'unmapped.bed'))           
         #
@@ -230,24 +222,8 @@ class LiftOverTool:
                 if err_count < 100:
                     self.logger.debug(line.rstrip())
                 err_count += 1
-        if err_count != 0:
-            self.logger.info('{0} out of {1} records failed to map.'.format(err_count, len(coordinates)))
         #
-        # create a map
-        coordinateMap = {}
-        mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
-        prog = ProgressBar('Reading new coordinates', lineCount(mapped_file))
-        with open(mapped_file) as var_mapped:
-            for count, line in enumerate(var_mapped.readlines()):
-                try:
-                    alt_chr, alt_start, alt_end, chr, pos = line.strip().split()
-                    coordinateMap[(chr, int(pos))] = (alt_chr[3:] if alt_chr.startswith('chr') else alt_chr, int(alt_start) + 1)
-                except Exception as e:
-                    self.logger.debug(e)
-                if count % self.db.batch == 0:
-                    prog.update(count)
-        prog.done()
-        return coordinateMap
+        return os.path.join(self.proj.temp_dir, 'var_out.bed'), err_count
     
 #
 #
