@@ -564,6 +564,10 @@ class BaseImporter:
             tool.setAltRefGenome(self.build, build_index= (mode != 'insert'))
             self.import_alt_build = True
 
+    def __del__(self):
+        if self.mode == 'insert':
+            self.proj.createIndexOnMasterVariantTable()
+
     def guessBuild(self, file):
         # by default, reference genome cannot be determined from file
         return None
@@ -782,7 +786,6 @@ class BaseImporter:
         self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
             .format(count[0], total_new, err_count,
                 ', {} ignored because mapped to existing coordinates'.format(count[1]) if count[1] > 0 else ''))
-        self.proj.createIndexOnMasterVariantTable()
             
 
 class TextImporter(BaseImporter):
