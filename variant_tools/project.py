@@ -1423,8 +1423,8 @@ def init(args):
             try:
                 proj = Project(verbosity='0', verify=False)
                 proj.remove()
-            except Excption as e:
-                sys.exit("Failed to remove project, please remove *.proj and *.DB manually and try agin.\n{}".format(e))
+            except:
+                pass
         # create a new project
         with Project(name=args.project, new=True, verbosity=args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
