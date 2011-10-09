@@ -708,12 +708,6 @@ class BaseImporter:
 
     def finalize(self):
         # this function will only be called from import
-        #
-        # This step is important because the primary reference genome should be unique
-        # and we should create index to set NULL primary reference genome for variants that
-        # map to the same variant...
-        self.proj.createIndexOnMasterVariantTable()
-        #
         cur = self.db.cursor()
         total_new = sum(self.total_count[3:7])
         if total_new == 0 or self.proj.alt_build is None:
@@ -736,6 +730,13 @@ class BaseImporter:
         if self.import_alt_build:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            allele_query = 'SELECT ref, alt FROM variant WHERE variant_id = {};'.format(self.db.PH)
+            s = delayedAction(self.logger.info, 'Collecting coordinates of existing variants')
+            cur.execute('SELECT chr, pos, variant_id FROM variant;')
+            current_loci = {}
+            for chr,pos,id in cur:
+                current_loci[(chr, pos)] = id
+            del s
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
         else:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
@@ -763,12 +764,16 @@ class BaseImporter:
                     pos = int(start) + 1
                 except:
                     continue
-                try:
-                    cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, int(var_id)))
-                    count[0] += 1
-                except Exception as e:
-                    self.logger.debug('Failed to update coordinate {}:{} due to: {}'.format(chr, pos, e))
-                    count[1] += 1
+                if self.import_alt_build and (chr, pos) in current_loci:
+                    cur.execute(allele_query, (current_loci[(chr, pos)],))
+                    existing = cur.fetchone()
+                    cur.execute(allele_query, (int(var_id),))
+                    new = cur.fetchone()
+                    if existing == new:
+                        count[1] += 1
+                        continue
+                cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, int(var_id)))
+                count[0] += 1
                 if count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(count[0])
@@ -777,6 +782,7 @@ class BaseImporter:
         self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
             .format(count[0], total_new, err_count,
                 ', {} ignored because mapped to existing coordinates'.format(count[1]) if count[1] > 0 else ''))
+        self.proj.createIndexOnMasterVariantTable()
             
 
 class TextImporter(BaseImporter):
