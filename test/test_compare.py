@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, output2list
 
 class TestCompare(ProcessTestCase):
     def setUp(self):
@@ -44,15 +44,22 @@ class TestCompare(ProcessTestCase):
         # WARNING: No action parameter is specified. Nothing to do.
         self.assertFail('vtools compare plekhn1 d_plekhn1')
         self.assertSucc('vtools compare plekhn1 d_plekhn1 -c')
+        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 -c'), ['0\t0\t6\t6'])
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --A_and_B')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --A_and_B common')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --A_and_B common')
-        self.assertSucc('vtools compare d_plekhn1 plekhn1 --A_or_B AorB')
-        self.assertSucc('vtools compare d_plekhn1 plekhn1 --A_and_B AandB')
-        self.assertSucc('vtools compare d_plekhn1 plekhn1 --A_diff_B AdiffB')
-        self.assertSucc('vtools compare d_plekhn1 plekhn1 --B_diff_A BdiffA')
+        self.assertEqual(output2list('vtools show table common')[1:], ['880', '881', '882', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --A_or_B AorB')
+        self.assertEqual(output2list('vtools show table AorB')[1:], ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --A_and_B AandB')
+        self.assertEqual(output2list('vtools show table AandB')[1:], ['869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --A_diff_B AdiffB')
+        self.assertEqual(output2list('vtools show table AdiffB')[1:], [])
+        self.assertSucc('vtools compare d_plekhn1 ns --B_diff_A BdiffA')
+        self.assertEqual(output2list('vtools show table BdiffA')[1:], ['714'])
+        # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1 -c --A_or_B A_OR_B')
 
 if __name__ == '__main__':
