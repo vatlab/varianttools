@@ -766,17 +766,20 @@ class BaseImporter:
                     if chr.startswith('chr'):
                         chr = chr[3:]
                     pos = int(start) + 1
+                    var_id = int(var_id)
                 except:
                     continue
                 if self.import_alt_build and (chr, pos) in current_loci:
                     cur.execute(allele_query, (current_loci[(chr, pos)],))
                     existing = cur.fetchone()
-                    cur.execute(allele_query, (int(var_id),))
+                    cur.execute(allele_query, (var_id,))
                     new = cur.fetchone()
                     if existing == new:
                         count[1] += 1
                         continue
-                cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, int(var_id)))
+                cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
+                if self.import_alt_build:
+                    current_loci[(chr, pos)] = var_id
                 count[0] += 1
                 if count[0] % self.db.batch == 0:
                     self.db.commit()
