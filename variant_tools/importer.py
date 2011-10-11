@@ -725,7 +725,7 @@ class BaseImporter:
             for key in self.variantIndex:
                 for pos, status in self.variantIndex[key].iteritems():
                     if status[1] == 1:
-                        output.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
+                        output.write('{0}\t{1}\t{2}\t{3}/{4}/{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
                            pos - 1, pos, key[1], key[2], status[0]))
                         loci_count += 1
         # free some RAM
@@ -735,13 +735,13 @@ class BaseImporter:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
             s = delayedAction(self.logger.info, 'Collecting coordinates of existing variants')
-            cur.execute('SELECT chr, pos, ref, alt variant_id FROM variant;')
             current_loci = {}
+            cur.execute('SELECT chr, pos, ref, alt, variant_id FROM variant;')
             for chr, pos, ref, alt, id in cur:
-                if (chr,ref,alt) in current_loci:
-                    current_loci[(chr, ref, alt)] = set([pos])
-                else:
+                if (chr, ref, alt) in current_loci:
                     current_loci[(chr, ref, alt)].add(pos)
+                else:
+                    current_loci[(chr, ref, alt)] = set([pos])
             del s
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
         else:
@@ -764,22 +764,24 @@ class BaseImporter:
         with open(mapped_file) as var_mapped:
             for line in var_mapped.readlines():
                 try:
-                    chr, start, end, ref, alt, var_id = line.strip().split()
+                    chr, start, end, name = line.strip().split()
+                    ref, alt, var_id = name.split('/')
                     if chr.startswith('chr'):
                         chr = chr[3:]
                     pos = int(start) + 1
                     var_id = int(var_id)
                 except:
                     continue
-                if self.import_alt_build and (chr, ref, alt) in current_loci and pos in current_loci[pos]:
+                key = (chr, ref, alt)
+                if self.import_alt_build and key in current_loci and pos in current_loci[key]:
                     count[1] += 1
                     continue
                 cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
                 if self.import_alt_build:
-                    if (chr, ref, alt) in current_loci:
-                        current_loci[(chr, ref, alt)].add(pos)
+                    if key in current_loci:
+                        current_loci[key].add(pos)
                     else:
-                        current_loci[(chr, ref, alt)] = set([pos])
+                        current_loci[key] = set([pos])
                 count[0] += 1
                 if count[0] % self.db.batch == 0:
                     self.db.commit()
