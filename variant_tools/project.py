@@ -828,7 +828,7 @@ class Project:
         self.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
-    def copyFrom(self, dir, vtable):
+    def copyFrom(self, dir, vtable, createIndex=True):
         # copy from another project
         files = glob.glob('{}/*.proj'.format(dir))
         if len(files) != 1:
@@ -873,7 +873,10 @@ class Project:
         self.logger.info('Creating indexes...')
         for sql in sqls:
             # creating indexes
+            if not createIndex and 'INDEX variant_index ON' in sql[0] or 'INDEX variant_alt_index ON' in sql[0]:
+                continue
             cur.execute(sql[0])
+        self.db.detach(dbName)
         # copy genotype table
         files = glob.glob('{}/*_genotype.DB'.format(dir))
         if len(files) == 0:
@@ -902,9 +905,21 @@ class Project:
                 cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
         # remove all annotations
         self.saveProperty('annoDB', '[]')
+        self.db.detach('__toDB')
+        self.db.detach('__fromDB')
         
     def merge(self, dirs):
         # merge from other projects
+        numVariants = self.db.numOfRows('variant')
+        if numVariants == 0:
+            # if the current project is empty, copy from the first available project
+            self.copyFrom(dirs[0], 'variant', createIndex=False)
+            if len(dirs) == 1:
+                return
+            dirs = dirs[1:]
+            # re-open the project
+            self.open(False)
+        #
         projects = []
         for dir in dirs:
             files = glob.glob('{}/*.proj'.format(dir))
@@ -921,7 +936,8 @@ class Project:
             if build is None:
                 raise ValueError('{} is not a valid variant tools project.'.format(proj_file))
             elif build[0] != self.build:
-                raise ValueError('Cannot merge from a project with different primary reference genome.')
+                raise ValueError('Primary reference genome of project ({} of {}) does not match that of the current project ({}).'\
+                    .format(build[0], proj_file, self.build))
             #
             cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
                 ('alt_build',))
@@ -937,14 +953,10 @@ class Project:
         if len(projects) == 0:
             return
         #
-        numVariants = self.db.numOfRows('variant')
-        if numVariants == 0:
-            # if the current project is empty, copy from the first available project
-            self.copyFrom(projects[0], 'variant')
-            if len(projects) == 1:
-                return
-            projects = projects[1:]
+        # 
+        # Real merge starts here
         #
+        # 1. variantIndex
         numVariants = self.db.numOfRows('variant')
         variantIndex = {}
         cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
@@ -961,28 +973,100 @@ class Project:
                 prog.update(count)
         prog.done()
         #
+        # 2. filenames
+        cur.execute('SELECT filename FROM filename;')
+        filenames = [x[0] for x in cur.fetchall()]
+        #
+        # 3. sample (phenotypes)
+        phenotypes = self.db.getHeaders('sample')[3:]
+        #
+        # statistics
+        #
+        # 0 number of variants
+        # 1 number of new variants
+        # 2 number of samples
+        # 3 number of genotypes
+        count = [0, 0, 0, 0]
+        total_count = [0, 0, 0, 0]
+        #
         add_variant_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
+        myDB = self.db.attach('{}_genotype'.format(self.name), '__toDB')
         for proj in projects:
             dbName = self.db.attach(files[0], '__fromDB')
-            variantMap = {}
+            _variantMap = {}
+            _numVariants = self.db.numOfRows('__fromDB.variant')
+            prog = ProgressBar('Merging variants from {}'.format(files[0]), _numVariants)
             cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
-            numVariants = self.db.numOfRows('__fromDB.variant')
-            prog = ProgressBar('Merging variants from {}'.format(files[0]), numVariants)
-            count = 0
-            for var_id, bin, chr, pos, ref, alt in cur:
+            _variants = cur.fetchall()
+            for var_id, bin, chr, pos, ref, alt in _variants:
                 key = (chr, ref, alt)
                 try:
-                    variantMap[var_id] = variantIndex[key][pos]
+                    _variantMap[var_id] = variantIndex[key][pos]
                 except:
                     # insert new variant
                     cur.execute(add_variant_query, (bin, chr, pos, ref, alt))
-                    variantMap[var_id] = cur.lastrowid
-                count += 1
-                if count % self.db.batch == 0:
-                    prog.update(count)
+                    _variantMap[var_id] = cur.lastrowid
+                    count[1] += 1
+                count[0] += 1
+                if count[0] % self.db.batch == 0:
+                    prog.update(count[0])
             prog.done()
-            # handling samples
+            # handline sample
+            _phenotype = self.db.getHeaders('__fromDB.sample')[3:]
+
+            # handling filename
+            cur.execute('SELECT file_id, filename, header FROM __fromDB.filename;')
+            _ignored = 0
+            _filename_records = cur.fetchall()
+            for rec in _filename_records:
+                if rec[1] in filenames:
+                    _ignored += 1
+                else:
+                    filenames.append(rec[1])
+                #
+                cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(self.db.PH),
+                    (rec[1], rec[2]))
+                _new_file_id = cur.lastrowid
+                # get samples
+                cur.execute('SELECT sample_id FROM __fromDB.sample WHERE file_id={};'.format(self.db.PH),
+                    (rec[0],))
+                _old_sample_id = [x[0] for x in cur.fetchall()]
+                _new_sample_id = []
+                for _id in _old_sample_id:
+                    cur.execute('SELECT sample_name FROM __fromDB.sample WHERE sample_id = {};'.format(self.db.PH),
+                        (_id,))
+                    _sample_name = cur.fetchone()[0]
+                    cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
+                        (_new_file_id, _sample_name))
+                    _new_sample_id.append(cur.lastrowid)
+                #
+                self.db.detach('__fromDB')
+                # copy genotype
+                if len(_old_sample_id) == 0:
+                    continue
+                _from_geno = self.db.attach(files[0].replace('.proj', '_genotype.DB'), '__fromDB')
+                for _old_id, _new_id in zip(_old_sample_id, _new_sample_id):
+                    self.logger.info('Copying sample {} from {} to sample {}'.format(_old_id, files[0], _new_id))
+                    # 
+                    # create genotype table
+                    cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
+                        ('genotype_{}'.format(_old_id), ))
+                    sql = cur.fetchone()[0].replace('genotype_{}'.format(_old_id), '__toDB.genotype_{}'.format(_new_id))
+                    try:
+                        self.logger.debug(sql)
+                        cur.execute(sql)
+                    except Exception as e:
+                        self.logger.debug(e)
+                    #
+                    # copy data over
+                    cur.execute('SELECT * FROM __fromDB.genotype_{};'.format(_old_id))
+                    genotypes = cur.fetchall()
+                    insert_genotype_query = 'INSERT INTO __toDB.genotype_{} VALUES ({})'.format(_new_id, ', '.join([self.db.PH]*len(genotypes[0])))
+                    for rec in genotypes:
+                        cur.execute(insert_genotype_query, [_variantMap[rec[0]]] + list(rec[1:]))
+            if _ignored > 0:
+                self.logger.info('{} existing files are ignored'.format(_ignored))
             #
 
 
