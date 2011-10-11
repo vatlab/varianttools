@@ -1180,6 +1180,7 @@ class TextUpdater(BaseImporter):
                     self.logger.debug('Failed to process line: ' + line.strip())
                     self.logger.debug(e)
                     self.count[7] += 1
+                count[0] += 1
                 if self.count[0] % self.db.batch == 0:
                     self.db.commit()
                     prog.update(self.count[0])
