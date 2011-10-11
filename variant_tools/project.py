@@ -609,7 +609,6 @@ class Project:
         # output to standard output
         cout = logging.StreamHandler()
         levels = {
-            None: logging.INFO,
             '0': logging.ERROR,
             '1': logging.INFO,
             '2': logging.DEBUG
@@ -626,13 +625,13 @@ class Project:
         else:
             self.verbosity = verbosity
         #
-        cout.setLevel(levels[self.verbosity])
+        cout.setLevel(logging.INFO if self.verbosity is None else levels[self.verbosity[0]])
         cout.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
         self.logger.addHandler(cout)
         # output to a log file
         ch = logging.FileHandler(self.name + '.log', mode='w' if new else 'a')
         # NOTE: debug informaiton is always written to the log file
-        ch.setLevel(logging.DEBUG)
+        ch.setLevel(logging.DEBUG if self.verbosity is None or len(self.verbosity) == 1 else levels[self.verbosity[1]])
         ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
         self.logger.addHandler(ch)
         if new:
@@ -832,7 +831,7 @@ class Project:
     def merge(self, dirs):
         # merge from other projects
         for dir in dirs:
-            files = glob.glob('{}/*.proj'.format(dir)
+            files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
                 raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
             proj_file = files[0]

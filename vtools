@@ -41,8 +41,9 @@ except ImportError:
     with_association = False
 
 def addVerbosityArg(parser):
-    parser.add_argument('-v', '--verbosity', choices=['0','1','2'],
-        help='Output error and warning (0), info (1) and debug (2) information.')
+    parser.add_argument('-v', '--verbosity', metavar='STD[LOG]',
+        help='''Output error and warning (0), info (1) and debug (2) information
+            to standard output (default to 1), and to a logfile (default to 2).''')
 
 if __name__ == '__main__':
     #

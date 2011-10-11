@@ -97,7 +97,7 @@ SQL_KEYWORDS = set([
 
 def setOptions(verbosity=None, temp_dir=None):
     if verbosity:
-        runOptions['verbosity'] = verbosity
+        runOptions['verbosity'] = verbosity[0]
     if temp_dir:
         runOptions['temp_dir'] = temp_dir
 
