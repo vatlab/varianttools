@@ -725,8 +725,8 @@ class BaseImporter:
             for key in self.variantIndex:
                 for pos, status in self.variantIndex[key].iteritems():
                     if status[1] == 1:
-                        output.write('{0}\t{1}\t{2}\t{3}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
-                           pos - 1, pos, status[0]))
+                        output.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
+                           pos - 1, pos, key[1], key[2], status[0]))
                         loci_count += 1
         # free some RAM
         self.variantIndex.clear()
@@ -734,12 +734,14 @@ class BaseImporter:
         if self.import_alt_build:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
-            allele_query = 'SELECT ref, alt FROM variant WHERE variant_id = {};'.format(self.db.PH)
             s = delayedAction(self.logger.info, 'Collecting coordinates of existing variants')
-            cur.execute('SELECT chr, pos, variant_id FROM variant;')
+            cur.execute('SELECT chr, pos, ref, alt variant_id FROM variant;')
             current_loci = {}
-            for chr,pos,id in cur:
-                current_loci[(chr, pos)] = id
+            for chr, pos, ref, alt, id in cur:
+                if (chr,ref,alt) in current_loci:
+                    current_loci[(chr, ref, alt)] = set([pos])
+                else:
+                    current_loci[(chr, ref, alt)].add(pos)
             del s
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
         else:
@@ -762,24 +764,22 @@ class BaseImporter:
         with open(mapped_file) as var_mapped:
             for line in var_mapped.readlines():
                 try:
-                    chr, start, end, var_id = line.strip().split()
+                    chr, start, end, ref, alt, var_id = line.strip().split()
                     if chr.startswith('chr'):
                         chr = chr[3:]
                     pos = int(start) + 1
                     var_id = int(var_id)
                 except:
                     continue
-                if self.import_alt_build and (chr, pos) in current_loci:
-                    cur.execute(allele_query, (current_loci[(chr, pos)],))
-                    existing = cur.fetchone()
-                    cur.execute(allele_query, (var_id,))
-                    new = cur.fetchone()
-                    if existing == new:
-                        count[1] += 1
-                        continue
+                if self.import_alt_build and (chr, ref, alt) in current_loci and pos in current_loci[pos]:
+                    count[1] += 1
+                    continue
                 cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
                 if self.import_alt_build:
-                    current_loci[(chr, pos)] = var_id
+                    if (chr, ref, alt) in current_loci:
+                        current_loci[(chr, ref, alt)].add(pos)
+                    else:
+                        current_loci[(chr, ref, alt)] = set([pos])
                 count[0] += 1
                 if count[0] % self.db.batch == 0:
                     self.db.commit()
