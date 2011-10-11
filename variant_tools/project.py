@@ -36,7 +36,7 @@ import shutil
 import ConfigParser
 import argparse
 from collections import namedtuple, defaultdict
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
+from .utils import DatabaseEngine, ProgressBar, StatusBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
 VTOOLS_VERSION = '1.0rc1'
 VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
@@ -837,6 +837,7 @@ class Project:
         self.logger.info('Importing data from parental project {}'.format(proj_file))
         dbName = self.db.attach(files[0])
         #
+        status = StatusBar('Copying project {}:'.format(dbName))
         tables = self.db.tables(dbName)
         if vtable not in tables:
             raise ValueError('Table {} does not exist in project {}'.format(vtable, dbName))
@@ -853,13 +854,17 @@ class Project:
             if self.db.hasTable(table):
                 self.db.removeTable(table)
             try:
-                self.logger.debug(sql)
+                #self.logger.debug(sql)
                 cur.execute(sql)
             except Exception as e:
                 self.logger.debug(e)
             # copying data over
-            self.logger.info('Copying table {}...'.format(table))
-            if self.isVariantTable(table):
+            #self.logger.info('Copying table {}...'.format(table))
+            status.update('copying {}'.format(table))
+            if vtable == table:
+                # the table will be empty...
+                pass
+            elif self.isVariantTable(table):
                 if vtable == 'variant':
                     # copy all variants
                     cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
@@ -870,13 +875,11 @@ class Project:
         # creating indexes
         cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="index";'.format(dbName))
         sqls = cur.fetchall()
-        self.logger.info('Creating indexes...')
         for sql in sqls:
             # creating indexes
             if not createIndex and 'INDEX variant_index ON' in sql[0] or 'INDEX variant_alt_index ON' in sql[0]:
                 continue
             cur.execute(sql[0])
-        self.db.detach(dbName)
         # copy genotype table
         files = glob.glob('{}/*_genotype.DB'.format(dir))
         if len(files) == 0:
@@ -892,12 +895,11 @@ class Project:
             if self.db.hasTable('__toDB.{}'.format(table)):
                 self.db.removeTable('__toDB.{}'.format(table))
             try:
-                self.logger.debug(sql)
+                # self.logger.debug(sql)
                 cur.execute(sql)
             except Exception as e:
                 self.logger.debug(e)
             # copying data over
-            self.logger.debug('Copying genotypes for sample {}...'.format(count))
             if vtable == 'variant':
                 # copy all variants
                 cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0};'.format(table))
@@ -905,8 +907,10 @@ class Project:
                 cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
         # remove all annotations
         self.saveProperty('annoDB', '[]')
+        self.db.detach(dbName)
         self.db.detach('__toDB')
         self.db.detach('__fromDB')
+        status.done()
         
     def merge(self, dirs):
         # merge from other projects
@@ -917,7 +921,7 @@ class Project:
             if len(dirs) == 1:
                 return
             dirs = dirs[1:]
-            # re-open the project
+            # re-open the project, do not check the availability of the 
             self.open(False)
         #
         projects = []
@@ -994,11 +998,12 @@ class Project:
         myDB = self.db.attach('{}_genotype'.format(self.name), '__toDB')
         for proj in projects:
             dbName = self.db.attach(files[0], '__fromDB')
+            status = StatusBar('Merge {}'.format(files[0]))
             _variantMap = {}
             _numVariants = self.db.numOfRows('__fromDB.variant')
-            prog = ProgressBar('Merging variants from {}'.format(files[0]), _numVariants)
             cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
             _variants = cur.fetchall()
+            status.update('mapping variants')
             for var_id, bin, chr, pos, ref, alt in _variants:
                 key = (chr, ref, alt)
                 try:
@@ -1009,9 +1014,6 @@ class Project:
                     _variantMap[var_id] = cur.lastrowid
                     count[1] += 1
                 count[0] += 1
-                if count[0] % self.db.batch == 0:
-                    prog.update(count[0])
-            prog.done()
             # handline sample
             _phenotype = self.db.getHeaders('__fromDB.sample')[3:]
 
@@ -1047,7 +1049,7 @@ class Project:
                     continue
                 _from_geno = self.db.attach(files[0].replace('.proj', '_genotype.DB'), '__fromDB')
                 for _old_id, _new_id in zip(_old_sample_id, _new_sample_id):
-                    self.logger.info('Copying sample {} from {} to sample {}'.format(_old_id, files[0], _new_id))
+                    status.update('Copying sample {} from {} to sample {}'.format(_old_id, files[0], _new_id))
                     # 
                     # create genotype table
                     cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
@@ -1065,9 +1067,10 @@ class Project:
                     insert_genotype_query = 'INSERT INTO __toDB.genotype_{} VALUES ({})'.format(_new_id, ', '.join([self.db.PH]*len(genotypes[0])))
                     for rec in genotypes:
                         cur.execute(insert_genotype_query, [_variantMap[rec[0]]] + list(rec[1:]))
-            if _ignored > 0:
-                self.logger.info('{} existing files are ignored'.format(_ignored))
+            #if _ignored > 0:
+            #    self.logger.info('{} existing files are ignored'.format(_ignored))
             #
+            status.done()
 
 
     #
@@ -1675,7 +1678,8 @@ def init(args):
             except:
                 pass
         # create a new project
-        with Project(name=args.project, build=args.build, new=True, verbosity=args.verbosity,
+        with Project(name=args.project, build=args.build, new=True, 
+            verbosity='1' if args.verbosity is None else args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
             batch=args.batch) as proj:
             if args.parent:
