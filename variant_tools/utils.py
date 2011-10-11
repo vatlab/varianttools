@@ -475,6 +475,13 @@ class DatabaseEngine:
                 db + '.DB', dbName))
             return dbName
 
+    def detach(self, db):
+        '''Detach a database'''
+        if self.engine == 'mysql':
+            return
+        else:
+            self.execute('''DETACH {}'''.format(db))
+
     def analyze(self):
         '''Analyze a database for better performance'''
         if self.engine == 'mysql':

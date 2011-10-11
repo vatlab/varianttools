@@ -828,15 +828,163 @@ class Project:
         self.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
+    def copyFrom(self, dir, vtable):
+        # copy from another project
+        files = glob.glob('{}/*.proj'.format(dir))
+        if len(files) != 1:
+            raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
+        proj_file = files[0]
+        self.logger.info('Importing data from parental project {}'.format(proj_file))
+        dbName = self.db.attach(files[0])
+        #
+        tables = self.db.tables(dbName)
+        if vtable not in tables:
+            raise ValueError('Table {} does not exist in project {}'.format(vtable, dbName))
+        headers = self.db.getHeaders('{}.{}'.format(dbName, vtable))
+        if headers[0] != 'variant_id':
+            raise ValueError('Table {} is not a variant table'.format(args.table[1]))
+        #
+        cur = self.db.cursor()
+        for table in tables:
+            # get schema
+            cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(dbName, self.db.PH),
+                (table,))
+            sql = cur.fetchone()[0]
+            if self.db.hasTable(table):
+                self.db.removeTable(table)
+            try:
+                self.logger.debug(sql)
+                cur.execute(sql)
+            except Exception as e:
+                self.logger.debug(e)
+            # copying data over
+            self.logger.info('Copying table {}...'.format(table))
+            if self.isVariantTable(table):
+                if vtable == 'variant':
+                    # copy all variants
+                    cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
+                else:
+                    cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0} WHERE {1}.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
+            else:
+                cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
+        # creating indexes
+        cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="index";'.format(dbName))
+        sqls = cur.fetchall()
+        self.logger.info('Creating indexes...')
+        for sql in sqls:
+            # creating indexes
+            cur.execute(sql[0])
+        # copy genotype table
+        files = glob.glob('{}/*_genotype.DB'.format(dir))
+        if len(files) == 0:
+            return
+        myDB = self.db.attach('{}_genotype'.format(self.name), '__toDB')
+        genoDB = self.db.attach(files[0], '__fromDB')
+        tables = self.db.tables(genoDB)
+        for count,table in enumerate(tables):
+            # get schema
+            cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, self.db.PH),
+                (table,))
+            sql = cur.fetchone()[0].replace('genotype_', '__toDB.genotype_')
+            if self.db.hasTable('__toDB.{}'.format(table)):
+                self.db.removeTable('__toDB.{}'.format(table))
+            try:
+                self.logger.debug(sql)
+                cur.execute(sql)
+            except Exception as e:
+                self.logger.debug(e)
+            # copying data over
+            self.logger.debug('Copying genotypes for sample {}...'.format(count))
+            if vtable == 'variant':
+                # copy all variants
+                cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0};'.format(table))
+            else:
+                cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
+        # remove all annotations
+        self.saveProperty('annoDB', '[]')
+        
     def merge(self, dirs):
         # merge from other projects
+        projects = []
         for dir in dirs:
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
                 raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
             proj_file = files[0]
-            proj.logger.info('Merging project {}'.format(proj_file))
-            dbName = self.db.attach(files[0])
+            dbName = self.db.attach(files[0], '__fromDB')
+            #
+            cur = self.db.cursor()
+            # primary reference genome
+            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
+                ('build',))
+            build = cur.fetchone()
+            if build is None:
+                raise ValueError('{} is not a valid variant tools project.'.format(proj_file))
+            elif build[0] != self.build:
+                raise ValueError('Cannot merge from a project with different primary reference genome.')
+            #
+            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
+                ('alt_build',))
+            alt_build = cur.fetchone()
+            if alt_build is None:
+                raise ValueError('{} is not a valid variant tools project.'.format(proj_file))
+            elif alt_build[0] != self.alt_build:
+                raise ValueError('Cannot merge from a project with different primary reference genome.')
+            #
+            projects.append(files[0])
+            self.db.detach('__fromDB')
+        #
+        if len(projects) == 0:
+            return
+        #
+        numVariants = self.db.numOfRows('variant')
+        if numVariants == 0:
+            # if the current project is empty, copy from the first available project
+            self.copyFrom(projects[0], 'variant')
+            if len(projects) == 1:
+                return
+            projects = projects[1:]
+        #
+        numVariants = self.db.numOfRows('variant')
+        variantIndex = {}
+        cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
+        prog = ProgressBar('Getting existing variants', numVariants)
+        for count, rec in enumerate(cur):
+            # zero for existing loci
+            key = (rec[1], rec[3], rec[4])
+            if key in variantIndex:
+                variantIndex[key][rec[2]] = rec[0]
+            else:
+                variantIndex[key] = {rec[2]: rec[0]}
+            #self.variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
+            if count % self.db.batch == 0:
+                prog.update(count)
+        prog.done()
+        #
+        add_variant_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
+        #
+        for proj in projects:
+            dbName = self.db.attach(files[0], '__fromDB')
+            variantMap = {}
+            cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
+            numVariants = self.db.numOfRows('__fromDB.variant')
+            prog = ProgressBar('Merging variants from {}'.format(files[0]), numVariants)
+            count = 0
+            for var_id, bin, chr, pos, ref, alt in cur:
+                key = (chr, ref, alt)
+                try:
+                    variantMap[var_id] = variantIndex[key][pos]
+                except:
+                    # insert new variant
+                    cur.execute(add_variant_query, (bin, chr, pos, ref, alt))
+                    variantMap[var_id] = cur.lastrowid
+                count += 1
+                if count % self.db.batch == 0:
+                    prog.update(count)
+            prog.done()
+            # handling samples
+            #
+
 
     #
     # Support for python with statement
@@ -1405,21 +1553,27 @@ def initArguments(parser):
     parser.add_argument('project',
         help='''Name of a new project. This will create a new file $project.proj under
             the current directory. Only one project is allowed in a directory.''')
-    parser.add_argument('--parent', nargs=2, metavar=('DIR','TABLE'),
+    sub = parser.add_argument_group('Subprojects')
+    subproj = sub.add_mutually_exclusive_group()
+    subproj.add_argument('--parent', nargs=2, metavar=('DIR','TABLE'),
         help='''Directory and variant table of a parent project (e.g. --parent ../ chr1) from
             which variants in specified variant table will be copied to the new project. This
             option is often used to split a project into several subprojects that will be
             processed in parallel.''')
+    subproj.add_argument('--children', nargs='+', metavar='DIR',
+        help='''A list of a subprojects (directories) that will be merged to create
+            this new project.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
-    parser.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
+    engine = parser.add_argument_group('Database connection')
+    engine.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
         help='''Database engine to use, can be mysql or sqlite3. Parameters --host, --user
             and --passwd will be needed for the creation of a new mysql project.''')
-    parser.add_argument('--host', default='localhost', 
+    engine.add_argument('--host', default='localhost', 
         help='The MySQL server that hosts the project databases.')
-    parser.add_argument('--user', default=getpass.getuser(),
+    engine.add_argument('--user', default=getpass.getuser(),
         help='User name to the MySQL server. Default to current username.')
-    parser.add_argument('--passwd',
+    engine.add_argument('--passwd',
         help='Password to the MySQL server.')
     parser.add_argument('--batch', default=10000, 
         help='Number of query per transaction. Larger number leads to better performance but requires more ram.')
@@ -1438,83 +1592,12 @@ def init(args):
         with Project(name=args.project, new=True, verbosity=args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
             batch=args.batch) as proj:
-            if not args.parent:
-                return
-            if len(args.parent) != 2:
-                raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
-            files = glob.glob('{}/*.proj'.format(args.parent[0]))
-            if len(files) != 1:
-                raise ValueError('Directory {} does not contain a valid variant tools project'.format(args.parent[0]))
-            proj_file = files[0]
-            proj.logger.info('Importing data from parental project {}'.format(proj_file))
-            dbName = proj.db.attach(files[0])
-            vtable = args.parent[1]
-            #
-            tables = proj.db.tables(dbName)
-            if vtable not in tables:
-                raise ValueError('Table {} does not exist in project {}'.format(vtable, dbName))
-            headers = proj.db.getHeaders('{}.{}'.format(dbName, vtable))
-            if headers[0] != 'variant_id':
-                raise ValueError('Table {} is not a variant table'.format(args.table[1]))
-            #
-            cur = proj.db.cursor()
-            for table in tables:
-                # get schema
-                cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(dbName, proj.db.PH),
-                    (table,))
-                sql = cur.fetchone()[0]
-                if proj.db.hasTable(table):
-                    proj.db.removeTable(table)
-                try:
-                    proj.logger.debug(sql)
-                    cur.execute(sql)
-                except Exception as e:
-                    proj.logger.debug(e)
-                # copying data over
-                proj.logger.info('Copying table {}...'.format(table))
-                if proj.isVariantTable(table):
-                    if vtable == 'variant':
-                        # copy all variants
-                        cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
-                    else:
-                        cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0} WHERE {1}.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
-                else:
-                    cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
-            # creating indexes
-            cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="index";'.format(dbName))
-            sqls = cur.fetchall()
-            proj.logger.info('Creating indexes...')
-            for sql in sqls:
-                # creating indexes
-                cur.execute(sql[0])
-            # copy genotype table
-            files = glob.glob('{}/*_genotype.DB'.format(args.parent[0]))
-            if len(files) == 0:
-                return
-            myDB = proj.db.attach('{}_genotype'.format(proj.name), '__toDB')
-            genoDB = proj.db.attach(files[0], '__fromDB')
-            tables = proj.db.tables(genoDB)
-            for count,table in enumerate(tables):
-                # get schema
-                cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, proj.db.PH),
-                    (table,))
-                sql = cur.fetchone()[0].replace('genotype_', '__toDB.genotype_')
-                if proj.db.hasTable('__toDB.{}'.format(table)):
-                    proj.db.removeTable('__toDB.{}'.format(table))
-                try:
-                    proj.logger.debug(sql)
-                    cur.execute(sql)
-                except Exception as e:
-                    proj.logger.debug(e)
-                # copying data over
-                proj.logger.debug('Copying genotypes for sample {}...'.format(count))
-                if vtable == 'variant':
-                    # copy all variants
-                    cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0};'.format(table))
-                else:
-                    cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
-            # remove all annotations
-            proj.saveProperty('annoDB', '[]')
+            if args.parent:
+                if len(args.parent) != 2:
+                    raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
+                proj.copyFrom(args.parent[0], args.parent[1])
+            elif args.children:
+                proj.merge(args.children)
     except Exception as e:
         sys.exit(e)
 
