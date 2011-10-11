@@ -143,6 +143,15 @@ class LiftOverTool:
         chainFile = self.obtainLiftOverChainFile(self.proj.build, self.proj.alt_build)
         if not chainFile:
             return {}
+        # Update the master variant table.
+        s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
+        cur = self.db.cursor()
+        headers = self.db.getHeaders('variant')
+        for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+            if fldName in headers:
+                continue
+            self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+        del s
         # export existing variants to a temporary file
         num_variants = self.exportVariantsInBedFormat(os.path.join(self.proj.temp_dir, 'var_in.bed'))
         if num_variants == 0:
@@ -163,15 +172,6 @@ class LiftOverTool:
         if err_count != 0:
             self.logger.info('{0} records failed to map.'.format(err_count))
         #
-        # Update the master variant table.
-        s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
-        cur = self.db.cursor()
-        headers = self.db.getHeaders('variant')
-        for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-            if fldName in headers:
-                continue
-            self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
-        del s
         #
         mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Updating table variant', lineCount(mapped_file))

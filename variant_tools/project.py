@@ -560,7 +560,7 @@ class Project:
             INFO2:       ..
 
     '''
-    def __init__(self, name=None, new=False, verbosity=None, verify=True, **kwargs):
+    def __init__(self, name=None, build=None, new=False, verbosity=None, verify=True, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
         if new: # new project
@@ -635,11 +635,11 @@ class Project:
         ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
         self.logger.addHandler(ch)
         if new:
-            self.create(**kwargs)
+            self.create(build=build, **kwargs)
         else:
             self.open(verify)
 
-    def create(self, **kwargs):
+    def create(self, build, **kwargs):
         '''Create a new project'''
         # open the project file
         self.logger.info(VTOOLS_COPYRIGHT)
@@ -669,7 +669,7 @@ class Project:
             else:
                 self.db.connect(self.name)
         #
-        self.build = None
+        self.build = build
         self.alt_build = None
         # no meta information for now
         self.variant_meta = None
@@ -1647,6 +1647,8 @@ def initArguments(parser):
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project.''')
+    parser.add_argument('--build',
+        help='''Build of the primary reference genome of the project.'''),
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
     engine = parser.add_argument_group('Database connection')
@@ -1673,7 +1675,7 @@ def init(args):
             except:
                 pass
         # create a new project
-        with Project(name=args.project, new=True, verbosity=args.verbosity,
+        with Project(name=args.project, build=args.build, new=True, verbosity=args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
             batch=args.batch) as proj:
             if args.parent:
