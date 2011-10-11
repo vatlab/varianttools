@@ -174,12 +174,21 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=project.remove)
     #
+    # command merge
+    parser = subparsers.add_parser('merge',
+        help='Merge variants and genotypes from other projects',
+        description='''Merge variants and samples from specified projects that use the
+        same reference genomes. Variant info fields that do not exist in the current
+        project and samples that already exist in the project will be ignored.''')
+    project.mergeArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=project.merge)
+    #
     # command associate
     #
     # This command is not ready and will not be displayed in a formal release
     if with_association:
         parser = subparsers.add_parser('associate',
-            #FIXME: more description for vtools commands
             help='''Test association between variants and phenotypes''',
             description='''Call one or more statistical association tests and
             return test results as fields to variants tested.''')

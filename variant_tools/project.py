@@ -829,6 +829,16 @@ class Project:
         self.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
+    def merge(self, dirs):
+        # merge from other projects
+        for dir in dirs:
+            files = glob.glob('{}/*.proj'.format(dir)
+            if len(files) != 1:
+                raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
+            proj_file = files[0]
+            proj.logger.info('Merging project {}'.format(proj_file))
+            dbName = self.db.attach(files[0])
+
     #
     # Support for python with statement
     #
@@ -1509,6 +1519,18 @@ def init(args):
     except Exception as e:
         sys.exit(e)
 
+
+def mergeArguments(parser):
+    parser.add_argument('projects', nargs='+', metavar='DIR',
+        help='''Directories to a list of projects that will be merged''')
+
+def merge(args):
+    try:
+        # create a new project
+        with Project(verbosity=args.verbosity) as proj:
+            proj.merge(args.projects)
+    except Exception as e:
+        sys.exit(e)
 
 def removeArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'geno_fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
