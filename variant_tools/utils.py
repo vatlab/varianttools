@@ -295,7 +295,7 @@ class ProgressBar:
 
 class StatusBar:
     '''A text-based status bar'''
-    def __init__(self, message):
+    def __init__(self, message, total_count=None):
         if runOptions['verbosity'] == '0':
             self.update = self.empty
             self.outputProgress = self.empty
@@ -310,6 +310,7 @@ class StatusBar:
             self.term_width = 79
         self.start_time = time.time()
         self.count = 0
+        self.total_count = total_count
         self.update()
 
     def empty(self, *args, **kwargs):
@@ -323,19 +324,22 @@ class StatusBar:
     def update(self, job='', done=False):
         # use stderr to avoid messing up process output
         msg = ['']*4
-        msg[0] = self.message + ' '
-        msg[1] = '.'*self.count
-        if done:
-            msg[2] = time.strftime(' in %H:%M:%S', time.gmtime(time.time() - self.start_time))
+        msg[0] = self.message + ': '
+        if done is not False:
+            msg[2] = time.strftime('{} in %H:%M:%S'.format(done if done else 'done'), time.gmtime(time.time() - self.start_time))
         else:
+            if self.total_count:
+                msg[1] = 'step {} of {} '.format(self.count + 1, self.total_count)
+            else:
+                msg[1] = 'step {} '.format(self.count + 1)
             msg[2] = job
         self.count += 1
         msg[3] = ' '*(self.term_width - len(''.join(msg[:3])))
         sys.stderr.write('\r' + ''.join(msg))
 
-    def done(self):
+    def done(self, msg=''):
         '''Finish, output a new line'''
-        self.update(done=True)
+        self.update(done=msg)
         sys.stderr.write('\n')
         sys.stderr.flush()
 
