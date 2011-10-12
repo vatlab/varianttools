@@ -734,15 +734,6 @@ class BaseImporter:
         if self.import_alt_build:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
-            s = delayedAction(self.logger.info, 'Collecting coordinates of existing variants')
-            current_loci = {}
-            cur.execute('SELECT chr, pos, ref, alt, variant_id FROM variant;')
-            for chr, pos, ref, alt, id in cur:
-                if (chr, ref, alt) in current_loci:
-                    current_loci[(chr, ref, alt)].add(pos)
-                else:
-                    current_loci[(chr, ref, alt)] = set([pos])
-            del s
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
         else:
             self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
@@ -759,8 +750,7 @@ class BaseImporter:
         # update records
         prog = ProgressBar('Updating coordinates', total_new)
         # 1: succ mapped
-        # 2: failed to set
-        count = [0, 0]
+        count = 0
         with open(mapped_file) as var_mapped:
             for line in var_mapped.readlines():
                 try:
@@ -773,24 +763,15 @@ class BaseImporter:
                 except:
                     continue
                 key = (chr, ref, alt)
-                if self.import_alt_build and key in current_loci and pos in current_loci[key]:
-                    count[1] += 1
-                    continue
                 cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
-                if self.import_alt_build:
-                    if key in current_loci:
-                        current_loci[key].add(pos)
-                    else:
-                        current_loci[key] = set([pos])
-                count[0] += 1
-                if count[0] % self.db.batch == 0:
+                count += 1
+                if count % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(count[0])
+                    prog.update(count)
         self.db.commit()
         prog.done()
-        self.logger.info('Coordinates of {} ({} total, {} failed to map{}) new variants are updated.'\
-            .format(count[0], total_new, err_count,
-                ', {} ignored because mapped to existing coordinates'.format(count[1]) if count[1] > 0 else ''))
+        self.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
+            .format(count, total_new, err_count))
             
 
 class TextImporter(BaseImporter):

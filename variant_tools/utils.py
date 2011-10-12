@@ -311,7 +311,6 @@ class StatusBar:
         self.start_time = time.time()
         self.count = 0
         self.total_count = total_count
-        self.update()
 
     def empty(self, *args, **kwargs):
         return

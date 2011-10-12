@@ -910,8 +910,15 @@ class Project:
     def merge(self, dirs):
         # merge from other projects
         numVariants = self.db.numOfRows('variant')
+        numSample = self.db.numOfRows('filename')
+        from_empty = numVariants == 0 and numSample == 0
+        #
+        #
+        # Go through projects and see if there is any problem
+        #
         projects = []
-        for idx, dir in enumerate(dirs):
+        first = True
+        for dir in dirs:
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
                 raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
@@ -923,76 +930,57 @@ class Project:
             cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
                 ('build',))
             build = cur.fetchone()
-            if build is None:
-                raise ValueError('{} is not a valid variant tools project.'.format(proj_file))
-            elif self.build is None:  # idx must be 0
-                self.build = build[0]
-                self.saveProperty('build', self.build)
-            elif build[0] != self.build:
-                raise ValueError('Primary reference genome of project ({} of {}) does not match that of the current project ({}).'\
-                    .format(build[0], proj_file, self.build))
-            #
+            # alternative reference genome
             cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
                 ('alt_build',))
             alt_build = cur.fetchone()
-            if alt_build is not None:
-                # empty project
-                if idx == 0 and numVariants == 0:
-                    self.alt_build = alt_build[0]
-                    self.saveProperty('alt_build', self.alt_build)
-                if alt_build[0] != self.alt_build:
-                    raise ValueError('Alternative reference genome of project ({} of {}) does not match that of the current project ({})'\
-                        .format(alt_build[0], proj_file, self.alt_build))
-            else:
-                # if none
+            #
+            if build is None or alt_build is None:
+                self.logger.warning('Ignoring invalid or empty project.'.format(proj_file))
+                continue
+            #
+            # if merging from an empty project, use the primary and alterantive reference genome of the first one
+            if from_empty and first:
+                first = False
+                self.build = build[0]
+                self.saveProperty('build', self.build)
+                self.alt_build = alt_build[0]
+                self.saveProperty('alt_build', self.alt_build)
+                #
                 if self.alt_build is not None:
-                    raise ValueError('Alternative reference genome of project ({} of {}) does not match that of the current project ({})'\
-                        .format(alt_build, proj_file, self.alt_build))
+                    s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.alt_build))
+                    cur = self.db.cursor()
+                    headers = self.db.getHeaders('variant')
+                    for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                        if fldName in headers:
+                            continue
+                        self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+                    del s
+            elif build[0] != self.build:
+                raise ValueError('Primary reference genome of project ({} of {}) does not match that of the current project ({}).'\
+                    .format(build[0], proj_file, self.build))
+            elif alt_build[0] != self.alt_build:
+                raise ValueError('Alternative reference genome of project ({} of {}) does not match that of the current project ({})'\
+                    .format(alt_build[0], proj_file, self.alt_build))
             #
             projects.append(files[0])
             self.db.detach('__fromDB')
         #
         if len(projects) == 0:
             return
-        #
         # 
         # Real merge starts here
         #
-        variantIndex = {}
         filenames = []
         phenotypes = []
         #
         if numVariants > 0:
-            status = StatusBar('Prepare for merging')
-            status.update('Getting existing variants')
-            if self.alt_build is None:
-                cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
-                for id, chr, pos, ref, alt in cur:
-                    # zero for existing loci
-                    key = (chr, ref, alt)
-                    if key in variantIndex:
-                        variantIndex[key][pos] = id
-                    else:
-                        variantIndex[key] = {pos: id}
-                    numVariants += 1
-            else:
-                cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
-                for id, chr, pos, ref, alt, alt_chr, alt_pos in cur:
-                    # zero for existing loci
-                    key = (chr, ref, alt)
-                    if key in variantIndex:
-                        variantIndex[key][pos][(alt_chr, alt_pos)] = id
-                    else:
-                        variantIndex[key] = {pos: {(alt_chr, alt_pos): id}}
-                    numVariants += 1
-            #
-            # 2. filenames
+            # 1. filenames
             cur.execute('SELECT filename FROM filename;')
             filenames = [x[0] for x in cur.fetchall()]
             #
-            # 3. sample (phenotypes)
+            # 2. sample (phenotypes)
             phenotypes = self.db.getHeaders('sample')[3:]
-            status.done('{} variants are loaded'.format(numVariants))
             #
         # statistics
         # 0 number of variants
@@ -1003,12 +991,22 @@ class Project:
         count = [0, 0, 0, 0, 0]
         total_count = [0, 0, 0, 0, 0]
         #
+        # FIXME: this does not copy other fields from the variant table
         if self.alt_build is None:
             add_variant_query = 'INSERT INTO variant (bin, chr, pos, ref, alt) VALUES ({0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         else:
             add_variant_query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({0}, {0}, {0}, {0}, {0}, {0}, {0}, {0});'.format(self.db.PH)
         #
         self.db.attach('{}_genotype'.format(self.name), '__myGeno')
+        #
+        #
+        # the first project, if from empty, can be copied in a much faster way...
+        first = from_empty
+        #
+        self.dropIndexOnMasterVariantTable()
+        # this helps the performance of map creation, but reduces the speed of inserting new variants
+        self.createIndexOnMasterVariantTable()
+        #
         for proj in projects:
             dbName = self.db.attach(proj, '__proj')
             _from_geno = self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
@@ -1017,54 +1015,66 @@ class Project:
             # Mapping and adding variants
             #
             _variantMap = {}
-            _numVariants = self.db.numOfRows('__proj.variant')
-            status.update('mapping variants')
+            cur.execute('DROP TABLE IF EXISTS __id_map')
+            cur.execute('CREATE TEMP table __id_map (old_id INTEGER PRIMARY KEY, new_id INTEGER);')
+            status.update('merging variants')
             if self.alt_build is None:
-                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __proj.variant;')
-                _variants = cur.fetchall()
-                for var_id, bin, chr, pos, ref, alt in _variants:
-                    key = (chr, ref, alt)
-                    try:
-                        _variantMap[var_id] = variantIndex[key][pos]
-                    except:
-                        # insert new variant
-                        cur.execute(add_variant_query, (bin, chr, pos, ref, alt))
-                        _new_id = cur.lastrowid
-                        _variantMap[var_id] = _new_id
-                        if key in variantIndex:
-                            variantIndex[key][pos] = _new_id
-                        else:
-                            variantIndex[key] = {pos: _new_id}
-                        count[1] += 1
-                    count[0] += 1
+                count[0] += self.db.numOfRows('__proj.variant')
+                status.update('inserting new variants')
+                query = 'INSERT INTO variant (bin, chr, pos, ref, alt) \
+                    SELECT bin, chr, pos, ref, alt FROM __proj.variant WHERE \
+                    NOT EXISTS (SELECT bin, chr, pos, ref, alt FROM variant);'
+                self.logger.debug(query)
+                cur.execute(query)
+                self.db.commit()
+                count[1] += cur.rowcount
+                status.update('Create variant map')
+                query = 'INSERT INTO __id_map SELECT t1.variant_id, t2.variant_id FROM __proj.variant t1 \
+                    LEFT OUTER JOIN variant t2 ON t2.bin = t1.bin AND t2.chr = t1.chr AND t2.pos = t1.pos \
+                    AND t2.ref = t1.ref AND t2.alt = t1.alt;'
+                self.logger.debug(query)
+                cur.execute(query)
+                #
             else:
-                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __proj.variant;')
-                _variants = cur.fetchall()
-                for var_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in _variants:
-                    key = (chr, ref, alt)
-                    try:
-                        _variantMap[var_id] = variantIndex[key][pos][(alt_chr, alt_pos)]
-                    except:
-                        # insert new variant
-                        if key in variantIndex and pos in variantIndex:
-                            # duplicate...
-                            cur.execute(add_variant_query, (None, None, None, ref, alt, alt_chr, alt_pos))
-                            key = (None, ref, alt)
-                            pos = None
-                        else:
-                            cur.execute(add_variant_query, (bin, chr, pos, ref, alt, alt_chr, alt_pos))
-                        _new_id = cur.lastrowid
-                        _variantMap[var_id] = _new_id
-                        # add variant in...
-                        if key not in variantIndex:
-                            variantIndex[key] = {pos: {(alt_chr, alt_pos): _new_id}}
-                        elif pos not in variantIndex[key]:
-                            variantIndex[key][pos] = {(alt_chr, alt_pos): _new_id}
-                        else:
-                            variantIndex[key][pos][(alt_chr, alt_pos)] = _new_id
-                        count[1] += 1
-                    count[0] += 1
-            #
+                # step 1, insert new variants
+                count[0] += self.db.numOfRows('__proj.variant')
+                status.update('inserting new variants')
+                query = 'INSERT INTO variant (bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) \
+                    SELECT s.bin, s.chr, s.pos, s.ref, s.alt, s.alt_bin, s.alt_chr, s.alt_pos FROM __proj.variant s WHERE \
+                    NOT EXISTS (SELECT t.bin, t.chr, t.pos, t.ref, t.alt, t.alt_bin, t.alt_chr, t.alt_pos FROM variant t \
+                    WHERE s.bin=t.bin AND s.chr=t.chr AND s.pos=t.pos AND s.ref=t.ref AND s.alt=t.alt AND s.alt_bin=t.alt_bin);'
+                self.logger.debug(query)
+                cur.execute(query)
+                self.db.commit()
+                count[1] += cur.rowcount
+                status.update('creating variant map')
+                query = 'INSERT INTO __id_map SELECT t1.variant_id, t2.variant_id FROM __proj.variant t1 \
+                    LEFT OUTER JOIN variant t2 ON t2.bin = t1.bin AND t2.chr = t1.chr AND t2.pos = t1.pos \
+                    AND t2.ref = t1.ref AND t2.alt = t1.alt AND t2.alt_bin = t1.alt_bin \
+                    AND t2.alt_chr = t1.alt_chr AND t2.alt_pos = t1.alt_pos;'
+                self.logger.debug(query)
+                cur.execute(query)
+                #
+                # The previous query cannot handle NULL, but if we add NULL treatment, it will be VERY slow
+                # we therefore let it produce incorrect result and handle the NULL cases separately here
+                query = 'SELECT t1.variant_id, t2.variant_id FROM __proj.variant t1 LEFT OUTER JOIN variant t2 ON \
+                    ((t1.bin is NULL and t1.bin is NULL) OR (t2.bin = t1.bin AND t2.chr = t1.chr AND t2.pos = t1.pos)) \
+                    AND t2.ref = t1.ref AND t2.alt = t1.alt AND ((t1.bin is NULL and t2.bin is NULL) OR (t2.alt_bin = t1.alt_bin \
+                    AND t2.alt_chr = t1.alt_chr AND t2.alt_pos = t1.alt_pos)) WHERE \
+                    t1.variant_id IN (SELECT m.new_id FROM __id_map m WHERE m.new_id IS NULL);'
+                self.logger.debug(query)
+                cur.execute(query)
+                for item in cur:
+                    print 'Fixing ', item
+                    cur.execute('UPDATE __id_map SET new_id = {0} WHERE old_id = {0};'.format(self.db.PH), item)
+                #
+            cur.execute('SELECT old_id, new_id FROM __id_map;')
+            all_the_same = True
+            for item in cur:
+                if item[0] != item[1]:
+                    all_the_same = False
+                    break
+                #
             # handline sample
             #
             _phenotype = self.db.getHeaders('__proj.sample')[3:]
@@ -1094,6 +1104,7 @@ class Project:
                         (_new_file_id, _sample_name))
                     _new_sample_id.append(cur.lastrowid)
                 #
+                # create a table for mapping variants
                 # copy genotype
                 if len(_new_sample_id) == 0:
                     continue
@@ -1115,25 +1126,35 @@ class Project:
                         self.logger.debug(e)
                     #
                     # copy data over
-                    cur.execute('SELECT * FROM __geno.genotype_{};'.format(_old_id))
-                    genotypes = cur.fetchall()
-                    insert_genotype_query = 'INSERT INTO __myGeno.genotype_{} VALUES ({})'.format(_new_id, ', '.join([self.db.PH]*len(genotypes[0])))
-                    for rec in genotypes:
-                        cur.execute(insert_genotype_query, [_variantMap[rec[0]]] + list(rec[1:]))
-                        count[3] += 1
+                    if all_the_same:
+                        query = 'INSERT INTO __myGeno.genotype_{} SELECT * FROM __geno.genotype_{};'\
+                            .format(_new_id, _old_id)
+                        self.logger.debug(query)
+                        cur.execute(query)
+                    else:
+                        headers = self.db.getHeaders('__myGeno.genotype_{}'.format(_new_id))
+                        query = 'INSERT INTO __myGeno.genotype_{} SELECT new_id {} FROM __geno.genotype_{} LEFT JOIN __id_map ON __id_map.old_id = __geno.genotype_{}.variant_id;'\
+                            .format(_new_id, ''.join([', {}'.format(x) for x in headers[1:]]), _old_id, _old_id)
+                        self.logger.debug(query)
+                        cur.execute(query)
+                    count[3] += cur.rowcount
             # clean up
             self.db.detach('__proj')
             self.db.detach('__geno')
             #if _ignored > 0:
             #    self.logger.info('{} existing files are ignored'.format(_ignored))
             status.done()
-            self.logger.info('{} variants ({} new), and {} genotypes in {} sample{}{} are merged'.format(count[0], count[1], count[3], count[2],
+            first = False
+            self.logger.info('{:,} variants ({:,} new), and {:,} genotypes in {} sample{}{} are merged'.format(count[0], count[1], count[3], count[2],
                 's' if count[2] > 1 else '', ' ({} ignored)'.format(count[4]) if count[4] > 0 else ''))
             for idx in range(len(count)):
                 total_count[idx] += count[idx]
                 count[idx] = 0
-        self.logger.info('{} variants ({} new), and {} genotypes in {} sample{}{} are merged'.format(total_count[0], total_count[1], total_count[3], total_count[2],
+        self.logger.info('{:,} variants ({:,} new), and {:,} genotypes in {} sample{}{} are merged'.format(total_count[0], total_count[1], total_count[3], total_count[2],
             's' if count[2] > 1 else '', ' ({} ignored)'.format(count[4]) if count[4] > 0 else ''))
+        s = delayedAction(self.logger.info, 'Creating indexes on the master variant table. This might take quite a while')
+        self.createIndexOnMasterVariantTable()
+        del s
 
 
     #
@@ -1216,14 +1237,32 @@ class Project:
         s = delayedAction(self.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
         try:
             #
-            # Index on the primary reference genome is required to be unique because we identify
-            # variants by their coordinates in the primary reference genome. If multiple variants
-            # from the alterantive reference genome are mapped to the same coordinates in the primary
-            # reference genome, only the first one will be mapped, and others will have NULL primary
-            # coordinates, which are stilled considered as 'UNIQUE' by sqlite (and other database 
-            # engines).
+            # Index on the primary reference genome is UNIQUE when there is no alternative reference
+            # genome. If there is, multiple variants from the alternative reference genome might
+            # be mapped to the same coordinates on the primary reference genome. I have tried to 
+            # set some of the coordinates to NULL, but the unqiueness problem becomes a problem
+            # across projects. For example, 
             #
-            self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+            # If c_19 and c_19a both map to c_18 in one project
+            #
+            #   c_18   c_19
+            #   None   c_19a
+            #
+            # another project might have
+            #
+            #   c_18  c_19a
+            #
+            # although they are the same variant. A better solution is therefore to keep
+            #
+            #   c_18   c_19
+            #   c_18   c_19a
+            #
+            # in both projects.
+            #
+            if self.alt_build is not None:
+                self.db.execute('''CREATE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+            else:
+                self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists, this does not really matter
             self.logger.debug(e)
