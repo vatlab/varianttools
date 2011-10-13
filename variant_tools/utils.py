@@ -662,7 +662,28 @@ class DatabaseEngine:
                 self.renameTable(table, new_table)
                 return new_table
             time.sleep(1)
-        
+
+    def fieldsOfTable(self, table):
+        '''Get the name and type of fields in a table'''
+        cur = self.database.cursor()
+        if self.engine == 'mysql':
+            # FIXME: not tested
+            cur.execute('SHOW COLUMNS FROM {};'.format(table))
+            return cur.fetchall()
+        else:
+            if '.' not in table:
+                cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
+            else:
+                db, tbl = table.rsplit('.', 1)
+                cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}";'.format(db, tbl))
+            try:
+                schema = cur.fetchone()[0]
+            except:
+                raise ValueError('Could not get schema of table {}'.format(table))
+            fields = [x.strip() for x in schema.split(',')]
+            fields[0] = fields[0].split('(')[1].strip()
+            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
+            return [x.split(None, 1) for x in fields]
 
     def removeFields(self, table, cols):
         '''Remove fields from a table'''
@@ -672,12 +693,8 @@ class DatabaseEngine:
                 ', '.join(['DROP COLUMN {}'.format(x) for x in cols])))
         elif '.' not in table:
             # for my sqlite, we have to create a new table
-            cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
-            schema = cur.fetchone()[0]
-            fields = [x.strip() for x in schema.split(',')]
-            fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-            new_fields = [x for x in fields if x.split()[0].lower() not in [y.lower() for y in cols]]
+            fields = self.fieldsOfTable(table)
+            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [y.lower() for y in cols]]
             # rename existing table
             cur.execute('ALTER TABLE {0} RENAME TO _{0}_tmp_;'.format(table))
             # create a new table
@@ -689,13 +706,8 @@ class DatabaseEngine:
             cur.execute('DROP TABLE _{}_tmp_;'.format(table))
         else:
             db, tbl = table.rsplit('.', 1)
-            # for my sqlite, we have to create a new table
-            cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}";'.format(db, tbl))
-            schema = cur.fetchone()[0]
-            fields = [x.strip() for x in schema.split(',')]
-            fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-            new_fields = [x for x in fields if x.split()[0].lower() not in [y.lower() for y in cols]]
+            fields = self.fieldsOfTable(table)
+            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [y.lower() for y in cols]]
             # rename existing table
             cur.execute('ALTER TABLE {1}.{0} RENAME TO _{0}_tmp_;'.format(tbl, db))
             # create a new table
@@ -708,32 +720,11 @@ class DatabaseEngine:
 
     def typeOfColumn(self, table, col):
         '''Return type of col in table'''
-        cur = self.database.cursor()
-        if self.engine == 'mysql':
-            # not tested
-            cur.execute('SHOW COLUMNS FROM {};'.format(table))
-            for rec in cur:
-                if rec[0].lower() == col.lower():
-                    return rec[1]
-            raise ValueError('There is no column named {} in table {}'.format(col, table))
-        else:
-            if '.' in table:
-                db, tbl = table.split('.', 1)
-                cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}";'.format(db, tbl))
-            else:
-                cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
-            try:
-                schema = cur.fetchone()[0]
-            except:
-                raise ValueError('Could not find table {}'.format(table))
-            fields = [x.strip() for x in schema.split(',')]
-            fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-            for field in fields:
-                n, t = field.split(None, 1)
-                if n.lower() == col.lower():
-                    return t
-            raise ValueError('No column called {} in table {}'.format(col, table))
+        fields = self.fieldsOfTable(table)
+        for n, t in fields:
+            if n.lower() == col.lower():
+                return t
+        raise ValueError('No column called {} in table {}'.format(col, table))
 
 
     def numOfRows(self, table):
