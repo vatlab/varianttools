@@ -523,7 +523,7 @@ class DatabaseEngine:
         else:
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
-                db + '.DB', dbName))
+                db + '.DB' if db != ':memory:' else db, dbName))
             return dbName
 
     def detach(self, db):

@@ -987,8 +987,9 @@ class Project:
         # Step 1: loading variants
         status = StatusBar('reading variants')
         #
+        self.db.attach(':memory:', '__temp')
         # source, id_from_source, OTHER FIELDS
-        query = '''CREATE TEMP TABLE __variant (
+        query = '''CREATE TABLE __temp.__variant (
             __source INT,
             __old_id INT,
             __new_id INT,
@@ -998,7 +999,8 @@ class Project:
         for proj, idx, fields in projects:
             dbName = self.db.attach(proj, '__fromDB')
             status.update(proj)
-            query = 'INSERT INTO __variant (__source, __old_id, {}) SELECT {}, * FROM __fromDB.variant;'.format(
+            # reading in an ordered status might help later sorting
+            query = 'INSERT INTO __temp.__variant (__source, __old_id, {}) SELECT {}, * FROM __fromDB.variant;'.format(
                 ', '.join(fields[1:]), idx)
             self.logger.debug(query)
             cur.execute(query)
@@ -1008,15 +1010,23 @@ class Project:
         # step 2: remove duplicates and create a new master variant table
         #
         status = StatusBar('create master variant table')
-        status.update('mapping variants')
+        status.update('create index')
         if self.alt_build:
-            query = 'SELECT __source, __old_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __variant ORDER BY chr, pos, ref, alt, alt_chr, alt_pos;'
+            query = 'CREATE INDEX __temp.__variant_idx ON __variant (chr ASC, pos ASC, ref ASC, alt ASC, alt_chr ASC, alt_pos ASC);'
         else:
-            query = 'SELECT __source, __old_id, chr, pos, ref, alt FROM __variant ORDER BY chr, pos, ref, alt;'
+            query = 'CREATE INDEX __temp.__variant_idx ON __variant (chr ASC, pos ASC, ref ASC, alt ASC);'
+        self.logger.debug(query)
+        cur.execute(query)
+        status.update('sorting variants')
+        if self.alt_build:
+            query = 'SELECT __source, __old_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __temp.__variant ORDER BY chr, pos, ref, alt, alt_chr, alt_pos;'
+        else:
+            query = 'SELECT __source, __old_id, chr, pos, ref, alt FROM __temp.__variant ORDER BY chr, pos, ref, alt;'
+        self.logger.debug(query)
         cur.execute(query)
         #
+        status.update('mapping variants')
         idMaps = {x[1]:{} for x in projects}
-        #
         last_rec = None
         new_id = 1
         for rec in cur:
@@ -1028,7 +1038,7 @@ class Project:
                 new_id += 1
             else:
                 # last_rec[2:] == rec[2:]
-                # we use 0 to mark a duplicated entry
+                # we use 1 to mark a duplicated entry
                 idMaps[rec[0]][rec[1]] = (new_id, 1)
         #
         all_the_same = {}
@@ -1036,17 +1046,20 @@ class Project:
             status.update('create mapping table {}'.format(source + 1))
             cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT, is_dup INT);'.format(source))
             insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
+            update_query = 'UPDATE __temp.__variant SET __new_id = {0} WHERE __source={1} AND __old_id={0};'.format(self.db.PH, source)
             the_same = True
             for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
+                if not is_duplicate:
+                    cur.execute(update_query, (new_id, old_id))
                 cur.execute(insert_query, (old_id, new_id, is_duplicate))
                 if the_same and old_id != new_id:
                     the_same = False
             all_the_same[source] = the_same
-            update_query = '''UPDATE __variant SET __new_id = (SELECT __id_map_{0}.new_id FROM __id_map_{0}
-                WHERE __variant.__old_id = __id_map_{0}.old_id AND __id_map_{0}.is_dup=0) 
-                WHERE __variant.__source = {0};'''.format(source)
-            self.logger.debug(update_query)
-            cur.execute(update_query)
+            #update_query = '''UPDATE __temp.__variant SET __new_id = (SELECT __id_map_{0}.new_id FROM __id_map_{0}
+            #    WHERE __variant.__old_id = __id_map_{0}.old_id AND __id_map_{0}.is_dup=0) 
+            #    WHERE __variant.__source = {0};'''.format(source)
+            #self.logger.debug(update_query)
+            #cur.execute(update_query)
         #
         # free some RAM
         idMaps.clear()
@@ -1054,11 +1067,14 @@ class Project:
         #
         status.update('writing variant table')
         self.dropIndexOnMasterVariantTable()
-        query = 'INSERT INTO variant (variant_id, {0}) SELECT __new_id, {0} FROM __variant WHERE __variant.__new_id IS NOT NULL ORDER BY __variant.__new_id;'.format(
+        cur.execute('DROP INDEX __temp.__variant_idx;')
+        cur.execute('CREATE INDEX __temp.__old_id_idx ON __variant (__new_id ASC);')
+        query = 'INSERT INTO variant (variant_id, {0}) SELECT __new_id, {0} FROM __temp.__variant WHERE __variant.__new_id IS NOT NULL ORDER BY __variant.__new_id;'.format(
             ', '.join([x[0] for x in info_fields[1:]]))
         self.logger.debug(query)
         cur.execute(query)
         status.done()
+        self.db.detach('__temp')
         #
         # merging files
         #
