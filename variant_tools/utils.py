@@ -198,17 +198,26 @@ class ProgressBar:
             self.outputProgress = self.empty
             self.done = self.empty
             return
-        self.message = message
-        self.count = 0
-        self.totalCount = totalCount
-        self.start_time = None
-        self.last_time = None
+        self.main = message
+        self.main_start_time = time.time()
+        self.message = self.main
         try:
             self.handle_resize(None,None)
             signal.signal(signal.SIGWINCH, self.handle_resize)
             self.signal_set = True
         except:
             self.term_width = 79
+        self.reset_count = 1
+        self.reset(totalCount)
+
+    def reset(self, msg='', totalCount = None):
+        if msg:
+            self.message = '{} - {} ({})'.format(self.main, msg, self.reset_count)
+            self.reset_count += 1
+        self.count = 0
+        self.totalCount = totalCount
+        self.start_time = None
+        self.last_time = None
         self.outputProgress()
 
     def empty(self, *args, **kwargs):
@@ -254,7 +263,7 @@ class ProgressBar:
         # message
         msg[0] = self.message + ':'
         self.last_time = cur_time
-        second_elapsed = cur_time - self.start_time
+        second_elapsed = cur_time - (self.main_start_time if done else self.start_time)
         cps = 0 if second_elapsed < 0.0001 else self.count / second_elapsed
         # speed
         if cps > 1000000:
@@ -289,56 +298,6 @@ class ProgressBar:
         if self.totalCount:
             self.count = self.totalCount
         self.outputProgress(done=True)
-        sys.stderr.write('\n')
-        sys.stderr.flush()
-
-
-class StatusBar:
-    '''A text-based status bar'''
-    def __init__(self, message, total_count=None):
-        if runOptions['verbosity'] == '0':
-            self.update = self.empty
-            self.outputProgress = self.empty
-            self.done = self.empty
-            return
-        self.message = message
-        try:
-            self.handle_resize(None,None)
-            signal.signal(signal.SIGWINCH, self.handle_resize)
-            self.signal_set = True
-        except:
-            self.term_width = 79
-        self.start_time = time.time()
-        self.count = 0
-        self.total_count = total_count
-
-    def empty(self, *args, **kwargs):
-        return
-
-    def handle_resize(self, signum, frame):
-        # this is borrowed from python progressbar module
-        h,w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0'*8))[:2]
-        self.term_width = w
-
-    def update(self, job='', done=False):
-        # use stderr to avoid messing up process output
-        msg = ['']*4
-        msg[0] = self.message + ': '
-        if done is not False:
-            msg[2] = time.strftime('{} in %H:%M:%S'.format(done if done else 'done'), time.gmtime(time.time() - self.start_time))
-        else:
-            if self.total_count:
-                msg[1] = 'step {} of {} '.format(self.count + 1, self.total_count)
-            else:
-                msg[1] = 'step {} '.format(self.count + 1)
-            msg[2] = job
-        self.count += 1
-        msg[3] = ' '*(self.term_width - len(''.join(msg[:3])))
-        sys.stderr.write('\r' + ''.join(msg))
-
-    def done(self, msg=''):
-        '''Finish, output a new line'''
-        self.update(done=msg)
         sys.stderr.write('\n')
         sys.stderr.flush()
 

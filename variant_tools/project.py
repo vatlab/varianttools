@@ -37,7 +37,7 @@ import ConfigParser
 import argparse
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
-from .utils import DatabaseEngine, ProgressBar, StatusBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
+from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
 VTOOLS_VERSION = '1.0rc1'
 VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
@@ -838,7 +838,7 @@ class Project:
         #self.logger.info('Importing data from parental project {}'.format(proj_file))
         dbName = self.db.attach(files[0])
         #
-        status = StatusBar('Copying project {}'.format(dbName))
+        prog = ProgressBar('Copying project {}'.format(dbName))
         tables = self.db.tables(dbName)
         if vtable not in tables:
             raise ValueError('Table {} does not exist in project {}'.format(vtable, dbName))
@@ -861,7 +861,7 @@ class Project:
                 self.logger.debug(e)
             # copying data over
             #self.logger.info('Copying table {}...'.format(table))
-            status.update('copying {}'.format(table))
+            prog.reset('copying {}'.format(table))
             if self.isVariantTable(table):
                 if vtable == 'variant':
                     # copy all variants
@@ -903,7 +903,7 @@ class Project:
                 cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
         # remove all annotations
         self.saveProperty('annoDB', '[]')
-        status.done('{} variants and {} samples are copied'.format(self.db.numOfRows('variant'), len(tables)))
+        prog.done('{} variants and {} samples are copied'.format(self.db.numOfRows('variant'), len(tables)))
         self.db.detach(dbName)
         self.db.detach('__toDB')
         self.db.detach('__fromDB')
@@ -994,7 +994,7 @@ class Project:
             return
         #
         # Step 1: loading variants
-        status = StatusBar('reading variants')
+        prog = ProgressBar('reading variants')
         #
         # 
         # method 1: use external sort
@@ -1006,7 +1006,7 @@ class Project:
             psort = Popen(['sort', '-k4,4', '-k5,5n', '-k6,7'], stdin=PIPE, stdout=PIPE)
             for proj, idx, fields in projects:
                 dbName = self.db.attach(proj, '__fromDB')
-                status.update(proj)
+                prog.reset('reading variants: {}'.format(proj))
                 if self.alt_build:
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
                     for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
@@ -1018,7 +1018,7 @@ class Project:
                 self.db.detach('__fromDB')
             psort.stdin.close()
             #
-            status.update('creating master variant table')
+            prog.reset('creating master variant table')
             self.dropIndexOnMasterVariantTable()
             if self.alt_build:
                 query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
@@ -1027,7 +1027,7 @@ class Project:
             idMaps = {x[1]:{} for x in projects}
             last_rec = None
             new_id = 1
-            for line in psort.stdout:
+            for count, line in enumerate(psort.stdout):
                 rec = line.decode().rstrip().split('\t')
                 # rec[0] is source, rec[1] is source_id
                 if last_rec is None or last_rec != rec[2:]:
@@ -1040,10 +1040,12 @@ class Project:
                     # last_rec[2:] == rec[2:]
                     # we use 1 to mark a duplicated entry
                     idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
+                if count % 10000 == 0:
+                    prog.update(count)
             #
             all_the_same = {}
             for source in idMaps.keys():
-                status.update('create mapping table {}'.format(source + 1))
+                prog.reset('create mapping table {}'.format(source + 1))
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT);'.format(source))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(source, self.db.PH);
                 the_same = True
@@ -1061,21 +1063,47 @@ class Project:
             for proj, idx, fields in projects:
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
-                status.update(proj)
+                prog.reset(proj)
                 if self.alt_build:
+                    count = 0
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
+                    for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
+                        if (chr, ref, alt) in existing:
+                            if (pos, alt_chr, alt_pos) in existing[(chr, ref, alt)]:
+                                idMaps[id] = existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)][0]
+                            else:
+                                existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)] = (new_id, bin, alt_bin)
+                                idMaps[id] = new_id
+                                new_id += 1
+                        else:
+                            existing[(chr, ref, alt)] = {(pos, alt_chr, alt_pos): (new_id, bin, alt_bin)}
+                            idMaps[id] = new_id
+                            new_id += 1
+                        count += 1
+                        if count % 10000 == 0:
+                            prog.update(count)
+                    self.db.detach('__fromDB')
                 else:
+                    count = 0
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
-                #
-                for rec in cur:
-                    try:
-                        idMaps[rec[0]] = existing[rec[1:]]
-                    except:
+                    #
+                    for id, bin, chr, pos, ref, alt in cur:
                         # a new record
-                        idMaps[rec[0]] = new_id
-                        existing[rec[1:]] = new_id
-                        new_id += 1
-                self.db.detach('__fromDB')
+                        if (chr, ref, alt) in existing:
+                            if pos in existing[(chr, ref, alt)]:
+                                idMaps[id] = existing[(chr, ref, alt)][pos][0]
+                            else:
+                                existing[(chr, ref, alt)][pos] = (new_id, bin)
+                                idMaps[id] = new_id
+                                new_id += 1
+                        else:
+                            existing[(chr, ref, alt)] = {pos: (new_id, bin)}
+                            idMaps[id] = new_id
+                            new_id += 1
+                        count += 1
+                        if count % 10000 == 0:
+                            prog.update(count)
+                    self.db.detach('__fromDB')
                 #
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT);'.format(idx))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(idx, self.db.PH);
@@ -1091,7 +1119,7 @@ class Project:
                 self.db.commit()
                 idMaps.clear()
             #
-            status.update('creating master variant table')
+            prog.reset('creating master variant table')
             # write ...
             self.dropIndexOnMasterVariantTable()
             if self.alt_build:
@@ -1101,9 +1129,24 @@ class Project:
             # use a generator form ....
             #if len(set(existing.values())) != len(existing):
             #    raise ValueError('Non-unique ID: all {}, unique {}'.format(len(existing), len(set(existing.values()))))
-            cur.executemany(query, ([id] + list(rec) for rec, id in existing.iteritems()))
+            if self.alt_build:
+                count = 0
+                for (chr, ref, alt), rec in existing.iteritems():
+                    for (pos, alt_chr, alt_pos), (new_id, bin, alt_bin) in rec.iteritems():
+                        count += 1
+                        cur.execute(query, [new_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos])
+                        if count % 10000 == 0:
+                            proj.update(count)
+            else:
+                count = 0
+                for (chr, ref, alt), rec in existing.iteritems():
+                    for pos, (new_id, bin) in rec.iteritems():
+                        count += 1
+                        cur.execute(query, [new_id, bin, chr, pos, ref, alt])
+                        if count % 10000 == 0:
+                            proj.update(count)
         #
-        status.done()
+        prog.done()
         #
         # merging files
         #
@@ -1129,7 +1172,7 @@ class Project:
         for proj, idx, tmp in projects:
             dbName = self.db.attach(proj, '__proj')
             _from_geno = self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
-            status = StatusBar('Merge {}'.format(proj))
+            prog = ProgressBar('Merge {}'.format(proj))
             #
             # handline sample
             #
@@ -1166,7 +1209,7 @@ class Project:
                     continue
                 for _old_id, _new_id in zip(_old_sample_id, _new_sample_id):
                     count[0] += 1
-                    status.update('copying sample {}'.format(_old_id))
+                    prog.reset('copying sample {}'.format(_old_id))
                     # 
                     # create genotype table
                     cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
@@ -1199,7 +1242,7 @@ class Project:
             self.db.detach('__geno')
             #if _ignored > 0:
             #    self.logger.info('{} existing files are ignored'.format(_ignored))
-            status.done()
+            prog.done()
             first = False
             self.logger.info('{:,} genotypes in {} sample{}{} are merged'.format(count[1], count[0],
                 's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
@@ -1800,7 +1843,7 @@ def initArguments(parser):
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project.''')
-    subproj.add_argument('--sort', action='store_true',
+    sub.add_argument('--sort', action='store_true',
         help='''Sort variants read from subprojects, which takes less RAM but longer time. If
             unset, all variants will be read to RAM and perform a faster merge at a clost of
             high memory usage'''),
