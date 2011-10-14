@@ -41,7 +41,7 @@ namespace vtools {
 class AssoData
 {
 public:
-	AssoData() : m_phenotype(0), m_genotype(0), m_X(0)
+	AssoData() : m_phenotype(0), m_genotype(0), m_maf(0), m_X(0)
 	{
 	}
 
@@ -56,6 +56,7 @@ public:
 	// set data
 	void setGenotype(const matrixi & g)
 	{
+		//FIXME: these genotypes should all be non-wildtype. Missing values are ok
 		m_genotype = g;
 	}
 
@@ -63,6 +64,13 @@ public:
 	void setPhenotype(const vectorf & p)
 	{
 		m_phenotype = p;
+	}
+
+	void setMaf(const vectori & num, const vectori & het, const vectori & hom)
+	{
+		//FIXME: will get the info directly via sqlite
+		// Or, alternatively, may want to get the freq info from external sources rather than sample-based
+		m_maf = het;
 	}
 
 
@@ -82,6 +90,7 @@ public:
 public:
 	void permuteY()
 	{
+		random.shuffle(m_phenotype.begin(), m_phenotype.end());
 	}
 
 
@@ -94,6 +103,54 @@ public:
 		}
 	}
 
+	void binToX()
+	{
+		// binning the data with proper handling of missing genotype
+		m_X.resize(m_genotype.size());
+		for (size_t i = 0; i < m_genotype.size(); ++i) {
+			m_X[i] = 0.0;
+			double pnovar = 1.0;
+			for (size_t j = 0; j != m_genotype[i].size(); ++j) {  
+				if (m_genotype[i][j] >= 1.0) {  
+					m_X[i] = 1.0;
+					break;
+				}
+				else if (m_genotype[i][j] > 0.0) {
+					pnovar *= m_genotype[i][j];
+				} 
+				else;
+			}
+			if (pnovar < 1.0 && m_X[i] < 1.0) {
+				m_X[i] = 1.0 - pnovar;
+			}
+		}
+	}
+
+	void selectRare(double upper=0.01, double lower=0.0)
+	{
+		//FIXME: want to do it smartly via sqlite. i.e., 
+		// "select * from genotype_x where maf<upper and maf>lower"
+		if (upper >= 1.0 && lower <= 0.0) {
+		}
+	}
+
+	double simpleRegression()
+	{
+		// simple linear and logistic regression score test
+		// returns a statistic
+		// FIXME: may later need a struct of output such as beta, CI, etc	
+
+		return 1.0;
+	}
+
+	double gaussianP(int sided = 1)
+	{
+		// one or two sided pvalue
+		return 1.0;
+	}
+
+// permutation should use Clopper-Pearson 95% interval which is exact and conservative	
+
 
 private:
 	/// raw phenotype and gneotype data
@@ -105,5 +162,4 @@ private:
 };
 
 }
-
 #endif
