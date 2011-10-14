@@ -35,6 +35,7 @@ import tempfile
 import shutil
 import ConfigParser
 import argparse
+from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .utils import DatabaseEngine, ProgressBar, StatusBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
@@ -914,10 +915,12 @@ class Project:
         from_empty = numVariants == 0 and numSample == 0
         #
         #
-        # Go through projects and see if there is any problem
+        # step 0: Go through projects and see if there is any problem
         #
         projects = []
         info_fields = []
+        phenotype_fields = []
+        var_tables = {}
         for idx, dir in enumerate(dirs):
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
@@ -925,8 +928,10 @@ class Project:
             proj_file = files[0]
             if proj_file in [x[0] for x in projects]:
                 self.logger.warning('Remove duplicate merge {}'.format(proj_file))
-            dbName = self.db.attach(files[0], '__fromDB')
             #
+            self.db.attach(files[0], '__fromDB')
+            # 
+            # get primary and alternative reference genome
             cur = self.db.cursor()
             # primary reference genome
             cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
@@ -978,6 +983,10 @@ class Project:
                     info_fields.append((fld, fld_type))
             projects.append((proj_file, idx, [x[0] for x in fields]))
             #
+            # FIXME: analyze other variant tables
+            #
+            # FIXME: analyze sample tables
+            #
             self.db.detach('__fromDB')
         #
         self.logger.debug('Fields of the master variant table: {}'.format(', '.join([x[0] for x in info_fields])))
@@ -987,94 +996,62 @@ class Project:
         # Step 1: loading variants
         status = StatusBar('reading variants')
         #
-        self.db.attach(':memory:', '__temp')
-        # source, id_from_source, OTHER FIELDS
-        query = '''CREATE TABLE __temp.__variant (
-            __source INT,
-            __old_id INT,
-            __new_id INT,
-            {});'''.format(', '.join(['{} {}'.format(x,y) for x,y in info_fields[1:]]))
-        self.logger.debug(query)
-        cur.execute(query)
+        # FIXME: does not handle info
+        psort = Popen(['sort', '-k4,4', '-k5,5n', '-k6,7'], stdin=PIPE, stdout=PIPE)
         for proj, idx, fields in projects:
             dbName = self.db.attach(proj, '__fromDB')
             status.update(proj)
-            # reading in an ordered status might help later sorting
-            query = 'INSERT INTO __temp.__variant (__source, __old_id, {}) SELECT {}, * FROM __fromDB.variant;'.format(
-                ', '.join(fields[1:]), idx)
-            self.logger.debug(query)
-            cur.execute(query)
+            if self.alt_build:
+                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
+                for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
+                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
+            else:
+                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
+                for id, bin, chr, pos, ref, alt in cur:
+                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt))
             self.db.detach('__fromDB')
+        psort.stdin.close()
         status.done()
         #
-        # step 2: remove duplicates and create a new master variant table
-        #
-        status = StatusBar('create master variant table')
-        status.update('create index')
+        status.update('creating master variant table')
+        self.dropIndexOnMasterVariantTable()
         if self.alt_build:
-            query = 'CREATE INDEX __temp.__variant_idx ON __variant (chr ASC, pos ASC, ref ASC, alt ASC, alt_chr ASC, alt_pos ASC);'
+            query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
         else:
-            query = 'CREATE INDEX __temp.__variant_idx ON __variant (chr ASC, pos ASC, ref ASC, alt ASC);'
-        self.logger.debug(query)
-        cur.execute(query)
-        status.update('sorting variants')
-        if self.alt_build:
-            query = 'SELECT __source, __old_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __temp.__variant ORDER BY chr, pos, ref, alt, alt_chr, alt_pos;'
-        else:
-            query = 'SELECT __source, __old_id, chr, pos, ref, alt FROM __temp.__variant ORDER BY chr, pos, ref, alt;'
-        self.logger.debug(query)
-        cur.execute(query)
-        #
-        status.update('mapping variants')
+            query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt) VALUES ({});'.format(','.join([self.db.PH]*6))
         idMaps = {x[1]:{} for x in projects}
         last_rec = None
         new_id = 1
-        for rec in cur:
+        for line in psort.stdout:
+            rec = line.rstrip().split('\t')
             # rec[0] is source, rec[1] is source_id
-            if last_rec is None or last_rec[2:] != rec[2:]:
+            if last_rec is None or last_rec != rec[2:]:
                 # a new record
-                idMaps[rec[0]][rec[1]] = (new_id, 0)
-                last_rec = rec
+                idMaps[int(rec[0])][int(rec[1])] = (new_id, 0)
+                last_rec = rec[2:]
                 new_id += 1
+                cur.execute(query, [new_id] + rec[2:])
             else:
                 # last_rec[2:] == rec[2:]
                 # we use 1 to mark a duplicated entry
-                idMaps[rec[0]][rec[1]] = (new_id, 1)
+                idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
         #
         all_the_same = {}
         for source in idMaps.keys():
             status.update('create mapping table {}'.format(source + 1))
             cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT, is_dup INT);'.format(source))
             insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
-            update_query = 'UPDATE __temp.__variant SET __new_id = {0} WHERE __source={1} AND __old_id={0};'.format(self.db.PH, source)
             the_same = True
             for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
-                if not is_duplicate:
-                    cur.execute(update_query, (new_id, old_id))
                 cur.execute(insert_query, (old_id, new_id, is_duplicate))
                 if the_same and old_id != new_id:
                     the_same = False
             all_the_same[source] = the_same
-            #update_query = '''UPDATE __temp.__variant SET __new_id = (SELECT __id_map_{0}.new_id FROM __id_map_{0}
-            #    WHERE __variant.__old_id = __id_map_{0}.old_id AND __id_map_{0}.is_dup=0) 
-            #    WHERE __variant.__source = {0};'''.format(source)
-            #self.logger.debug(update_query)
-            #cur.execute(update_query)
-        #
         # free some RAM
         idMaps.clear()
         self.db.commit()
         #
-        status.update('writing variant table')
-        self.dropIndexOnMasterVariantTable()
-        cur.execute('DROP INDEX __temp.__variant_idx;')
-        cur.execute('CREATE INDEX __temp.__old_id_idx ON __variant (__new_id ASC);')
-        query = 'INSERT INTO variant (variant_id, {0}) SELECT __new_id, {0} FROM __temp.__variant WHERE __variant.__new_id IS NOT NULL ORDER BY __variant.__new_id;'.format(
-            ', '.join([x[0] for x in info_fields[1:]]))
-        self.logger.debug(query)
-        cur.execute(query)
         status.done()
-        self.db.detach('__temp')
         #
         # merging files
         #
