@@ -908,7 +908,7 @@ class Project:
         self.db.detach('__toDB')
         self.db.detach('__fromDB')
         
-    def merge(self, dirs):
+    def merge(self, dirs, sort):
         # merge from other projects
         numVariants = self.db.numOfRows('variant')
         numSample = self.db.numOfRows('filename')
@@ -996,60 +996,112 @@ class Project:
         # Step 1: loading variants
         status = StatusBar('reading variants')
         #
-        # FIXME: does not handle info
-        psort = Popen(['sort', '-k4,4', '-k5,5n', '-k6,7'], stdin=PIPE, stdout=PIPE)
-        for proj, idx, fields in projects:
-            dbName = self.db.attach(proj, '__fromDB')
-            status.update(proj)
+        # 
+        # method 1: use external sort
+        # 
+        # Pro: use less RAM       -- process 1G, max 3.6G (to hold maps) for RA project
+        # Con: slow               -- 63 min (RA), 55min load, 55 write, 11 sample for MG.
+        #
+        if sort:
+            psort = Popen(['sort', '-k4,4', '-k5,5n', '-k6,7'], stdin=PIPE, stdout=PIPE)
+            for proj, idx, fields in projects:
+                dbName = self.db.attach(proj, '__fromDB')
+                status.update(proj)
+                if self.alt_build:
+                    cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
+                    for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
+                        psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos).encode())
+                else:
+                    cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
+                    for id, bin, chr, pos, ref, alt in cur:
+                        psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt).encode())
+                self.db.detach('__fromDB')
+            psort.stdin.close()
+            #
+            status.update('creating master variant table')
+            self.dropIndexOnMasterVariantTable()
             if self.alt_build:
-                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
-                for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
-                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos))
+                query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
             else:
-                cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
-                for id, bin, chr, pos, ref, alt in cur:
-                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt))
-            self.db.detach('__fromDB')
-        psort.stdin.close()
-        status.done()
-        #
-        status.update('creating master variant table')
-        self.dropIndexOnMasterVariantTable()
-        if self.alt_build:
-            query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
+                query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt) VALUES ({});'.format(','.join([self.db.PH]*6))
+            idMaps = {x[1]:{} for x in projects}
+            last_rec = None
+            new_id = 1
+            for line in psort.stdout:
+                rec = line.decode().rstrip().split('\t')
+                # rec[0] is source, rec[1] is source_id
+                if last_rec is None or last_rec != rec[2:]:
+                    # a new record
+                    idMaps[int(rec[0])][int(rec[1])] = (new_id, 0)
+                    last_rec = rec[2:]
+                    new_id += 1
+                    cur.execute(query, [new_id] + rec[2:])
+                else:
+                    # last_rec[2:] == rec[2:]
+                    # we use 1 to mark a duplicated entry
+                    idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
+            #
+            all_the_same = {}
+            for source in idMaps.keys():
+                status.update('create mapping table {}'.format(source + 1))
+                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT);'.format(source))
+                insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(source, self.db.PH);
+                the_same = True
+                for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
+                    cur.execute(insert_query, (old_id, new_id))
+                    if the_same and old_id != new_id:
+                        the_same = False
+                all_the_same[source] = the_same
+            # free some RAM
+            idMaps.clear()
         else:
-            query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt) VALUES ({});'.format(','.join([self.db.PH]*6))
-        idMaps = {x[1]:{} for x in projects}
-        last_rec = None
-        new_id = 1
-        for line in psort.stdout:
-            rec = line.rstrip().split('\t')
-            # rec[0] is source, rec[1] is source_id
-            if last_rec is None or last_rec != rec[2:]:
-                # a new record
-                idMaps[int(rec[0])][int(rec[1])] = (new_id, 0)
-                last_rec = rec[2:]
-                new_id += 1
-                cur.execute(query, [new_id] + rec[2:])
+            existing = {}
+            new_id = 1
+            all_the_same = {}
+            for proj, idx, fields in projects:
+                idMaps = {}
+                dbName = self.db.attach(proj, '__fromDB')
+                status.update(proj)
+                if self.alt_build:
+                    cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
+                else:
+                    cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
+                #
+                for rec in cur:
+                    try:
+                        idMaps[rec[0]] = existing[rec[1:]]
+                    except:
+                        # a new record
+                        idMaps[rec[0]] = new_id
+                        existing[rec[1:]] = new_id
+                        new_id += 1
+                self.db.detach('__fromDB')
+                #
+                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT);'.format(idx))
+                insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(idx, self.db.PH);
+                the_same = True
+                for _old_id, _new_id in idMaps.iteritems():
+                    if the_same and _old_id != _new_id:
+                        the_same = False
+                        break
+                all_the_same[idx] = the_same
+                #
+                cur.executemany(insert_query, idMaps.iteritems())
+                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
+                self.db.commit()
+                idMaps.clear()
+            #
+            status.update('creating master variant table')
+            # write ...
+            self.dropIndexOnMasterVariantTable()
+            if self.alt_build:
+                query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
             else:
-                # last_rec[2:] == rec[2:]
-                # we use 1 to mark a duplicated entry
-                idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
-        #
-        all_the_same = {}
-        for source in idMaps.keys():
-            status.update('create mapping table {}'.format(source + 1))
-            cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT, is_dup INT);'.format(source))
-            insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
-            the_same = True
-            for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
-                cur.execute(insert_query, (old_id, new_id, is_duplicate))
-                if the_same and old_id != new_id:
-                    the_same = False
-            all_the_same[source] = the_same
-        # free some RAM
-        idMaps.clear()
-        self.db.commit()
+                query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt) VALUES ({});'.format(','.join([self.db.PH]*6))
+            # use a generator form ....
+            #if len(set(existing.values())) != len(existing):
+            #    raise ValueError('Non-unique ID: all {}, unique {}'.format(len(existing), len(set(existing.values()))))
+            cur.executemany(query, ([id] + list(rec) for rec, id in existing.iteritems()))
         #
         status.done()
         #
@@ -1156,10 +1208,7 @@ class Project:
                 count[idx] = 0
         self.logger.info('{:,} genotypes in {} sample{}{} are merged'.format(total_count[1], total_count[0],
             's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
-        s = delayedAction(self.logger.info, 'Creating indexes on the master variant table. This might take quite a while')
         self.createIndexOnMasterVariantTable()
-        del s
-
 
     #
     # Support for python with statement
@@ -1751,6 +1800,10 @@ def initArguments(parser):
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project.''')
+    subproj.add_argument('--sort', action='store_true',
+        help='''Sort variants read from subprojects, which takes less RAM but longer time. If
+            unset, all variants will be read to RAM and perform a faster merge at a clost of
+            high memory usage'''),
     parser.add_argument('--build',
         help='''Build of the primary reference genome of the project.'''),
     parser.add_argument('-f', '--force', action='store_true',
@@ -1788,7 +1841,7 @@ def init(args):
                     raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
                 proj.copyFrom(args.parent[0], args.parent[1])
             elif args.children:
-                proj.merge(args.children)
+                proj.merge(args.children, args.sort)
     except Exception as e:
         sys.exit(e)
 
