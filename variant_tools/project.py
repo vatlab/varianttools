@@ -994,8 +994,6 @@ class Project:
             return
         #
         # Step 1: loading variants
-        prog = ProgressBar('reading variants')
-        #
         # 
         # method 1: use external sort
         # 
@@ -1006,19 +1004,24 @@ class Project:
             psort = Popen(['sort', '-k4,4', '-k5,5n', '-k6,7'], stdin=PIPE, stdout=PIPE)
             for proj, idx, fields in projects:
                 dbName = self.db.attach(proj, '__fromDB')
-                prog.reset('reading variants: {}'.format(proj))
+                prog = ProgressBar('Reading variants from {}'.format(proj))
                 if self.alt_build:
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
-                    for id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos in cur:
+                    for count, (id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) in enumerate(cur):
                         psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos).encode())
+                        if count % 10000 == 0:
+                            prog.update(count)
                 else:
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt FROM __fromDB.variant;')
-                    for id, bin, chr, pos, ref, alt in cur:
+                    for count, (id, bin, chr, pos, ref, alt) in enumerate(cur):
                         psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, bin, chr, pos, ref, alt).encode())
+                        if count % 10000 == 0:
+                            prog.update(count)
+                prog.done()
                 self.db.detach('__fromDB')
             psort.stdin.close()
             #
-            prog.reset('creating master variant table')
+            prog = ProgressBar('Creating master variant table')
             self.dropIndexOnMasterVariantTable()
             if self.alt_build:
                 query = 'INSERT INTO variant (variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos) VALUES ({});'.format(','.join([self.db.PH]*9))
@@ -1042,9 +1045,11 @@ class Project:
                     idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
                 if count % 10000 == 0:
                     prog.update(count)
+            prog.done()
             #
             all_the_same = {}
-            for source in idMaps.keys():
+            prog = ProgressBar('Create mapping tables')
+            for count, source in enumerate(idMaps.keys()):
                 prog.reset('create mapping table {}'.format(source + 1))
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT);'.format(source))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(source, self.db.PH);
@@ -1054,6 +1059,8 @@ class Project:
                     if the_same and old_id != new_id:
                         the_same = False
                 all_the_same[source] = the_same
+                prog.update(count)
+            prog.done()
             # free some RAM
             idMaps.clear()
         else:
@@ -1063,7 +1070,7 @@ class Project:
             for proj, idx, fields in projects:
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
-                prog.reset(proj)
+                prog = ProgressBar('Reading variants from {}'.format(proj))
                 if self.alt_build:
                     count = 0
                     cur.execute('SELECT variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos FROM __fromDB.variant;')
@@ -1105,6 +1112,7 @@ class Project:
                             prog.update(count)
                     self.db.detach('__fromDB')
                 #
+                prog.reset('mapping ids')
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT);'.format(idx))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1});'.format(idx, self.db.PH);
                 the_same = True
@@ -1118,8 +1126,9 @@ class Project:
                 cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
                 self.db.commit()
                 idMaps.clear()
+                prog.done()
             #
-            prog.reset('creating master variant table')
+            prog = ProgressBar('Writing unique variants', new_id)
             # write ...
             self.dropIndexOnMasterVariantTable()
             if self.alt_build:
@@ -1136,7 +1145,7 @@ class Project:
                         count += 1
                         cur.execute(query, [new_id, bin, chr, pos, ref, alt, alt_bin, alt_chr, alt_pos])
                         if count % 10000 == 0:
-                            proj.update(count)
+                            prog.update(count)
             else:
                 count = 0
                 for (chr, ref, alt), rec in existing.iteritems():
@@ -1144,9 +1153,10 @@ class Project:
                         count += 1
                         cur.execute(query, [new_id, bin, chr, pos, ref, alt])
                         if count % 10000 == 0:
-                            proj.update(count)
-        #
-        prog.done()
+                            prog.update(count)
+            #
+            existing.clear()
+            prog.done()
         #
         # merging files
         #

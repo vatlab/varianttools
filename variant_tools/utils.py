@@ -207,13 +207,14 @@ class ProgressBar:
             self.signal_set = True
         except:
             self.term_width = 79
-        self.reset_count = 1
-        self.reset(totalCount)
+        self.count = 0
+        self.finished = 0
+        self.reset('', totalCount)
 
     def reset(self, msg='', totalCount = None):
         if msg:
-            self.message = '{} - {} ({})'.format(self.main, msg, self.reset_count)
-            self.reset_count += 1
+            self.message = '{} - {}'.format(self.main, msg)
+        self.finished += self.count
         self.count = 0
         self.totalCount = totalCount
         self.start_time = None
@@ -250,7 +251,7 @@ class ProgressBar:
         if self.count % 1000 == 0:
             self.outputProgress()
 
-    def outputProgress(self, done=False):
+    def outputProgress(self):
         '''Output progress'''
         if not self.start_time:
             self.start_time = time.time()
@@ -259,28 +260,29 @@ class ProgressBar:
         # stop update progress bar more than once per second.
         if self.count > 0 and self.count != self.totalCount and cur_time - self.last_time < 1:
             return
-        msg = ['', '', '', '', '', '']
+        msg = ['', '', '', '', '', '', '']
         # message
         msg[0] = self.message + ':'
         self.last_time = cur_time
-        second_elapsed = cur_time - (self.main_start_time if done else self.start_time)
-        cps = 0 if second_elapsed < 0.0001 else self.count / second_elapsed
-        # speed
-        if cps > 1000000:
-            msg[4] = ' {:.1f}M/s'.format(cps/1000000)
-        elif cps > 1000:
-            msg[4] = ' {:.1f}K/s'.format(cps/1000)
+        second_elapsed = cur_time - self.start_time
+        if second_elapsed < 0.0001 or self.count == 0:
+            msg[4] = ''
         else:
-            msg[4] = ' {:.1f}/s'.format(cps)
+            cps = self.count / second_elapsed
+            # speed
+            if cps > 1000000:
+                msg[4] = ' {:.1f}M/s'.format(cps/1000000)
+            elif cps > 1000:
+                msg[4] = ' {:.1f}K/s'.format(cps/1000)
+            else:
+                msg[4] = ' {:.1f}/s'.format(cps)
         # estimated time left
-        if done:
-            msg[5] = time.strftime(' in %H:%M:%S', time.gmtime(second_elapsed))
-        elif self.totalCount:
+        if self.totalCount:
             perc = min(1, float(self.count) / self.totalCount)
             time_left = (second_elapsed / perc * (1 - perc)) if perc > 0 else 0
             msg[5] += time.strftime(' in %H:%M:%S', time.gmtime(time_left))
         # percentage / progress
-        msg[3] = ' {:,}'.format(int(self.count))
+        msg[3] = ' {:,}'.format(int(self.count)) if self.count > 0 else ' '
         if self.totalCount:
             # percentage
             perc = min(1, float(self.count) / self.totalCount)
@@ -290,6 +292,9 @@ class ProgressBar:
                 front = int(perc * (width - 5))
                 back = width - 5 - front
                 msg[2] = ' [{}>{}]'.format('=' * front,  ' ' * back)
+        else:
+            width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4])
+            msg[6] = ' '*width
         # use stderr to avoid messing up process output
         sys.stderr.write('\r' + ''.join(msg))
 
@@ -297,8 +302,31 @@ class ProgressBar:
         '''Finish, output a new line'''
         if self.totalCount:
             self.count = self.totalCount
-        self.outputProgress(done=True)
-        sys.stderr.write('\n')
+        msg = ['', '', '', '', '', '']
+        # message
+        msg[0] = self.main + ':'
+        second_elapsed = time.time() - self.main_start_time
+        cps = 0 if second_elapsed < 0.0001 else (self.finished + self.count) / second_elapsed
+        # speed
+        if cps > 1000000:
+            msg[4] = ' {:.1f}M/s'.format(cps/1000000)
+        elif cps > 1000:
+            msg[4] = ' {:.1f}K/s'.format(cps/1000)
+        else:
+            msg[4] = ' {:.1f}/s'.format(cps)
+        msg[3] = ' {:,}'.format(self.finished + self.count)
+        msg[5] = time.strftime(' in %H:%M:%S', time.gmtime(second_elapsed))
+        # percentage / progress
+        if self.totalCount:
+            # percentage
+            perc = min(1, float(self.count) / self.totalCount)
+            msg[1] = ' {:5.1f}%'.format(perc * 100)
+            width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4]) - len(msg[5])
+            if width > 5:
+                front = int(perc * (width - 5))
+                back = width - 5 - front
+                msg[2] = ' [{}>{}]'.format('=' * front,  ' ' * back)
+        sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
 
