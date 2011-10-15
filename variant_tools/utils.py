@@ -274,8 +274,12 @@ class ProgressBar:
                 msg[4] = ' {:.1f}M/s'.format(cps/1000000)
             elif cps > 1000:
                 msg[4] = ' {:.1f}K/s'.format(cps/1000)
-            else:
+            elif cps > 0.05:
                 msg[4] = ' {:.1f}/s'.format(cps)
+            elif cps > 1e-6:
+                msg[4] = ' {:.1f}s each'.format(1. / cps)
+            else:
+                msg[4] = ' 0.0/s'
         # estimated time left
         if self.totalCount:
             perc = min(1, float(self.count) / self.totalCount)
@@ -312,8 +316,12 @@ class ProgressBar:
             msg[4] = ' {:.1f}M/s'.format(cps/1000000)
         elif cps > 1000:
             msg[4] = ' {:.1f}K/s'.format(cps/1000)
-        else:
+        elif cps > 0.05:
             msg[4] = ' {:.1f}/s'.format(cps)
+        elif cps > 1e-6:
+            msg[4] = ' {:.1f}s each'.format(1. / cps)
+        else:
+            msg[4] = ' 0.0/s'
         msg[3] = ' {:,}'.format(self.finished + self.count)
         msg[5] = time.strftime(' in %H:%M:%S', time.gmtime(second_elapsed))
         # percentage / progress

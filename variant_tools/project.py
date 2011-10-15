@@ -1125,6 +1125,7 @@ class Project:
                 prog.reset('mapping ids')
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(idx))
                 insert_query = 'INSERT INTO __id_map_{0} values ({1}, {1}, {1});'.format(idx, self.db.PH);
+                the_same = True
                 for _old_id, (_new_id, _is_duplicate) in idMaps.iteritems():
                     if _old_id != _new_id:
                         the_same = False
