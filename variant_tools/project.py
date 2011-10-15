@@ -1046,17 +1046,23 @@ class Project:
             prog.done()
             #
             all_the_same = {}
+            all_keep_all = {}
             prog = ProgressBar('Create mapping tables')
             for count, source in enumerate(idMaps.keys()):
                 prog.reset('create mapping table {}'.format(source + 1))
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(source))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
                 the_same = True
+                keep_all = True
                 for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
-                    if old_id != new_id:
+                    if the_same and old_id != new_id:
                         the_same = False
+                    if keep_all and is_duplicate:
+                        keep_all = False
+                    if not the_same and not keep_all:
                         break
                 all_the_same[source] = the_same
+                all_keep_all[source] = keep_all
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[source].iteritems()))
                 cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
                 prog.update(count)
@@ -1067,6 +1073,8 @@ class Project:
             existing = {}
             new_id = 1
             all_the_same = {}
+            all_keep_all = {}
+            keep_all = True
             for proj, idx, fields in projects:
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
@@ -1078,6 +1086,7 @@ class Project:
                         if (chr, ref, alt) in existing:
                             if (pos, alt_chr, alt_pos) in existing[(chr, ref, alt)]:
                                 idMaps[id] = (existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)], 1)
+                                keep_all = False
                             else:
                                 existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)] = new_id
                                 idMaps[id] = (new_id, 0)
@@ -1099,6 +1108,7 @@ class Project:
                         if (chr, ref, alt) in existing:
                             if pos in existing[(chr, ref, alt)]:
                                 idMaps[id] = (existing[(chr, ref, alt)][pos], 1)
+                                keep_all = False
                             else:
                                 existing[(chr, ref, alt)][pos] = new_id
                                 idMaps[id] = (new_id, 0)
@@ -1115,12 +1125,12 @@ class Project:
                 prog.reset('mapping ids')
                 cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(idx))
                 insert_query = 'INSERT INTO __id_map_{0} values ({1}, {1}, {1});'.format(idx, self.db.PH);
-                the_same = True
-                for _old_id, (_new_id, is_duplicate) in idMaps.iteritems():
+                for _old_id, (_new_id, _is_duplicate) in idMaps.iteritems():
                     if _old_id != _new_id:
                         the_same = False
                         break
                 all_the_same[idx] = the_same
+                all_keep_all[idx] = keep_all
                 #
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
                 cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
@@ -1135,14 +1145,27 @@ class Project:
             self.db.attach(proj, '__fromDB')
             if all_the_same[idx]:
                 # if all the same, copy from the old table 
-                query = '''INSERT INTO variant (variant_id, {0}) 
+                if all_keep_all[idx]:
+                    query = '''INSERT INTO variant (variant_id, {0}) 
+                                SELECT variant_id, {0} 
+                                FROM __fromDB.variant;'''.format(
+                    ', '.join([x[0] for x in info_fields[1:]]))
+                else:
+                    query = '''INSERT INTO variant (variant_id, {0}) 
                                 SELECT variant_id, {0} 
                                 FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
                                     ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
                                 WHERE __id_map_{1}.is_dup = 0;'''.format(
                     ', '.join([x[0] for x in info_fields[1:]]), idx)
             else:
-                query = '''INSERT INTO variant (variant_id, {0}) 
+                if all_keep_all[idx]:
+                    query = '''INSERT INTO variant (variant_id, {0}) 
+                                SELECT __id_map_{1}.new_id, {0} 
+                                FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
+                                    ON __fromDB.variant.variant_id = __id_map_{1}.old_id;'''.format(
+                    ', '.join([x[0] for x in info_fields[1:]]), idx)
+                else:
+                    query = '''INSERT INTO variant (variant_id, {0}) 
                                 SELECT __id_map_{1}.new_id, {0} 
                                 FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
                                     ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
