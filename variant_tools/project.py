@@ -1007,11 +1007,12 @@ class Project:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,6'], stdin=PIPE, stdout=PIPE)
             for proj, idx, fields in projects:
                 dbName = self.db.attach(proj, '__fromDB')
-                prog = ProgressBar('Reading variants from {}'.format(proj))
+                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)))
                 if self.alt_build:
                     cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __fromDB.variant;')
                     for count, (id, chr, pos, ref, alt, alt_chr, alt_pos) in enumerate(cur):
-                        psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, chr, pos, alt_chr, alt_pos, ref, alt).encode())
+                        psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.\
+                            format(idx, id, chr, pos, alt_chr, alt_pos, ref, alt).encode())
                         if count % 10000 == 0:
                             prog.update(count)
                 else:
@@ -1048,7 +1049,7 @@ class Project:
             prog = ProgressBar('Create mapping tables')
             for count, source in enumerate(idMaps.keys()):
                 prog.reset('create mapping table {}'.format(source + 1))
-                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT, is_dup INT);'.format(source))
+                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(source))
                 insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
                 the_same = True
                 for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
@@ -1057,6 +1058,7 @@ class Project:
                         break
                 all_the_same[source] = the_same
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[source].iteritems()))
+                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
                 prog.update(count)
             prog.done()
             # free some RAM
@@ -1111,8 +1113,8 @@ class Project:
                     self.db.detach('__fromDB')
                 #
                 prog.reset('mapping ids')
-                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT PRIMARY KEY, new_id INT, is_dup INT);'.format(idx))
-                insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(idx, self.db.PH);
+                cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(idx))
+                insert_query = 'INSERT INTO __id_map_{0} values ({1}, {1}, {1});'.format(idx, self.db.PH);
                 the_same = True
                 for _old_id, (_new_id, is_duplicate) in idMaps.iteritems():
                     if _old_id != _new_id:
@@ -1121,7 +1123,7 @@ class Project:
                 all_the_same[idx] = the_same
                 #
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
-                #cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
+                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
                 self.db.commit()
                 idMaps.clear()
                 prog.done()
@@ -1138,14 +1140,14 @@ class Project:
                                 FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
                                     ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
                                 WHERE __id_map_{1}.is_dup = 0;'''.format(
-	                ', '.join([x[0] for x in info_fields[1:]]), idx)
+                    ', '.join([x[0] for x in info_fields[1:]]), idx)
             else:
                 query = '''INSERT INTO variant (variant_id, {0}) 
                                 SELECT __id_map_{1}.new_id, {0} 
                                 FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
                                     ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
                                 WHERE __id_map_{1}.is_dup = 0;'''.format(
-	                ', '.join([x[0] for x in info_fields[1:]]), idx)
+                    ', '.join([x[0] for x in info_fields[1:]]), idx)
             self.logger.debug(query)
             cur.execute(query)
             prog.update(idx + 1)
