@@ -1070,7 +1070,7 @@ class Project:
             for proj, idx, fields in projects:
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
-                prog = ProgressBar('Reading variants from {}'.format(proj))
+                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)))
                 if self.alt_build:
                     count = 0
                     cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __fromDB.variant;')
