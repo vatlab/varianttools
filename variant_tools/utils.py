@@ -722,12 +722,13 @@ class DatabaseEngine:
         raise ValueError('No column called {} in table {}'.format(col, table))
 
 
-    def numOfRows(self, table):
-        '''FIXME: We need a fast way to get number of rows...
-        '''
+    def numOfRows(self, table, exact=True):
         cur = self.database.cursor()
-        # FIXME: How fast is this?
-        cur.execute('SELECT count(*) FROM {};'.format(table))
+        if not exact and self.engine == 'sqlite':
+            # this is much faster if we do not need exact count
+            cur.execute('SELECT max(rowid) FROM {};'.format(table))
+        else:
+            cur.execute('SELECT count(*) FROM {};'.format(table))
         return cur.fetchone()[0]
 
     def startProgress(self, text):

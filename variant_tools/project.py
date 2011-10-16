@@ -921,6 +921,7 @@ class Project:
         info_fields = []
         phenotype_fields = []
         var_tables = {}
+        num_of_variants = 0
         for idx, dir in enumerate(dirs):
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
@@ -981,7 +982,14 @@ class Project:
                         break
                 if not found:
                     info_fields.append((fld, fld_type))
-            projects.append((proj_file, idx, [x[0] for x in fields]))
+            # we put the largest project the first to improve efficiency, because the
+            # first project is effectively copied instead of merged.
+            if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
+                projects.insert(0, (proj_file, idx, [x[0] for x in fields]))
+                # we do not need an exact number
+                num_of_variants = self.db.numOfRows('__fromDB.variant', False)
+            else:
+                projects.append((proj_file, idx, [x[0] for x in fields]))
             #
             # FIXME: analyze other variant tables
             #
@@ -1007,7 +1015,7 @@ class Project:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,6'], stdin=PIPE, stdout=PIPE)
             for proj, idx, fields in projects:
                 dbName = self.db.attach(proj, '__fromDB')
-                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)))
+                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
                 if self.alt_build:
                     cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __fromDB.variant;')
                     for count, (id, chr, pos, ref, alt, alt_chr, alt_pos) in enumerate(cur):
@@ -1078,7 +1086,7 @@ class Project:
             for proj, idx, fields in projects:
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
-                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)))
+                prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
                 if self.alt_build:
                     count = 0
                     cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __fromDB.variant;')
@@ -1142,6 +1150,7 @@ class Project:
         # creating master variant table
         self.dropIndexOnMasterVariantTable()
         prog = ProgressBar('Copying variant tables', len(projects))
+        variants_copied = 0
         for proj, idx, fields in projects:
             self.db.attach(proj, '__fromDB')
             if all_the_same[idx]:
@@ -1174,9 +1183,11 @@ class Project:
                     ', '.join([x[0] for x in info_fields[1:]]), idx)
             self.logger.debug(query)
             cur.execute(query)
+            variants_copied += cur.rowcount
             prog.update(idx + 1)
             self.db.detach('__fromDB')
         prog.done()
+        self.logger.info('{:,} distinct variants are copied'.format(variants_copied))
         # merging files
         #
         filenames = []
@@ -1278,7 +1289,8 @@ class Project:
             for idx in range(len(count)):
                 total_count[idx] += count[idx]
                 count[idx] = 0
-        self.logger.info('{:,} genotypes in {} sample{}{} are merged'.format(total_count[1], total_count[0],
+        self.logger.info('Project {} created with {:,} variants and {:,} genotypes in {} sample{}{}.'.format(
+            self.name, variants_copied, total_count[1], total_count[0],
             's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
         self.createIndexOnMasterVariantTable()
 
@@ -1312,15 +1324,9 @@ class Project:
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE project (
-                name VARCHAR(40) NOT NULL,
+                name VARCHAR(40) NOT NULL PRIMARY KEY,
                 value VARCHAR(256) NULL
             )''')
-        # create index
-        try:
-            cur.execute('''CREATE UNIQUE INDEX project_index ON name (name ASC);''')
-        except Exception as e:
-            # the index might already exists
-            return
 
     def createFilenameTable(self):
         self.logger.debug('Creating table filename')
