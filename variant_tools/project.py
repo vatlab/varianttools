@@ -1096,16 +1096,22 @@ class Project:
                     count = 0
                     cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM __fromDB.variant;')
                     for id, chr, pos, ref, alt, alt_chr, alt_pos in cur:
+                        if alt_chr is None:
+                            sub_key = pos
+                        elif alt_chr == chr:
+                            sub_key = (pos, alt_pos)
+                        else:
+                            sub_key = (pos, alt_chr, alt_pos)
                         if (chr, ref, alt) in existing:
-                            if (pos, alt_chr, alt_pos) in existing[(chr, ref, alt)]:
-                                idMaps[id] = (existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)], 1)
+                            if sub_key in existing[(chr, ref, alt)]:
+                                idMaps[id] = (existing[(chr, ref, alt)][sub_key], 1)
                                 keep_all = False
                             else:
-                                existing[(chr, ref, alt)][(pos, alt_chr, alt_pos)] = new_id
+                                existing[(chr, ref, alt)][sub_key] = new_id
                                 idMaps[id] = (new_id, 0)
                                 new_id += 1
                         else:
-                            existing[(chr, ref, alt)] = {(pos, alt_chr, alt_pos): new_id}
+                            existing[(chr, ref, alt)] = {sub_key: new_id}
                             idMaps[id] = (new_id, 0)
                             new_id += 1
                         count += 1
