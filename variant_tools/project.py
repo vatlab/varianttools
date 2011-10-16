@@ -918,10 +918,8 @@ class Project:
         # step 0: Go through projects and see if there is any problem
         #
         projects = []
-        info_fields = []
-        phenotype_fields = []
-        var_tables = {}
         num_of_variants = 0
+        structure = {}
         for idx, dir in enumerate(dirs):
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
@@ -971,33 +969,38 @@ class Project:
                     .format(alt_build[0], proj_file, self.alt_build))
             #
             # analyze the master variant table
-            fields = self.db.fieldsOfTable('__fromDB.variant')
-            for fld, fld_type in fields:
-                found = False
-                for x, y in info_fields:
-                    if x == fld:
-                        if y != fld_type:
-                            self.logger.warning('Ignoring field {} of project {} due to inconsistent type'.format(x, proj_file))
-                        found = True
-                        break
-                if not found:
-                    info_fields.append((fld, fld_type))
+            if idx == 0:
+                tables = self.db.tables('__fromDB')
+                cur.execute('DROP TABLE variant;')
+                cur.execute('DROP TABLE sample;')
+                for db_table in tables:
+                    table = db_table.split('.')[-1]
+                    structure[table] = self.db.fieldsOfTable('__fromDB.{}'.format(table))
+                    if table in ['project', 'filename']:
+                        continue
+                    cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
+                            (table, ))
+                    sql = cur.fetchone()
+                    cur.execute(sql[0])
+            else:
+                tables = self.db.tables('__fromDB')
+                tables.sort()
+                if tables != sorted(list(structure.keys())):
+                    raise ValueError("Project {} does not have the same set of variant tables ({}) as other projects ({})".format(proj_file, len(tables) - 3, len(structure.keys()) -3))
+                for table in tables:
+                    if structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
+                        raise ValueError('Table {} in project {} does not have the same structure as others.'.format(table, proj_file))
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
             if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
-                projects.insert(0, (proj_file, [x[0] for x in fields]))
+                projects.insert(0, proj_file)
                 # we do not need an exact number
                 num_of_variants = self.db.numOfRows('__fromDB.variant', False)
             else:
-                projects.append((proj_file, [x[0] for x in fields]))
-            #
-            # FIXME: analyze other variant tables
-            #
-            # FIXME: analyze sample tables
+                projects.append(proj_file)
             #
             self.db.detach('__fromDB')
         #
-        self.logger.debug('Fields of the master variant table: {}'.format(', '.join([x[0] for x in info_fields])))
         if len(projects) == 0:
             return
         #
@@ -1013,7 +1016,7 @@ class Project:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,8'], stdin=PIPE, stdout=PIPE)
             else:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,6'], stdin=PIPE, stdout=PIPE)
-            for idx, (proj, fields) in enumerate(projects):
+            for idx, proj in enumerate(projects):
                 dbName = self.db.attach(proj, '__fromDB')
                 prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
                 if self.alt_build:
@@ -1083,7 +1086,7 @@ class Project:
             all_the_same = {}
             all_keep_all = {}
             keep_all = True
-            for idx, (proj, fields) in enumerate(projects):
+            for idx, proj in enumerate(projects):
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
                 prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
@@ -1151,38 +1154,39 @@ class Project:
         self.dropIndexOnMasterVariantTable()
         prog = ProgressBar('Copying variant tables', len(projects))
         variants_copied = 0
-        for idx, (proj, fields) in enumerate(projects):
+        for idx, proj in enumerate(projects):
             self.db.attach(proj, '__fromDB')
-            if all_the_same[idx]:
-                # if all the same, copy from the old table 
-                if all_keep_all[idx]:
-                    query = '''INSERT INTO variant (variant_id, {0}) 
-                                SELECT variant_id, {0} 
-                                FROM __fromDB.variant;'''.format(
-                    ', '.join([x[0] for x in info_fields[1:]]))
+            for table in structure.keys():
+                if table in ['sample', 'filename', 'project']:
+                    continue
+                if all_the_same[idx]:
+                    # if all the same, copy from the old table 
+                    if all_keep_all[idx]:
+                        query = '''INSERT INTO {0} 
+                                    SELECT *
+                                    FROM __fromDB.{0};'''.format(table)
+                    else:
+                        query = '''INSERT INTO {0}  
+                                    SELECT *
+                                    FROM __fromDB.{0} LEFT OUTER JOIN __id_map_{1} 
+                                        ON __fromDB.{0}.variant_id = __id_map_{1}.old_id 
+                                    WHERE __id_map_{1}.is_dup = 0;'''.format(table, idx)
                 else:
-                    query = '''INSERT INTO variant (variant_id, {0}) 
-                                SELECT variant_id, {0} 
-                                FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
-                                    ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
-                                WHERE __id_map_{1}.is_dup = 0;'''.format(
-                    ', '.join([x[0] for x in info_fields[1:]]), idx)
-            else:
-                if all_keep_all[idx]:
-                    query = '''INSERT INTO variant (variant_id, {0}) 
-                                SELECT __id_map_{1}.new_id, {0} 
-                                FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
-                                    ON __fromDB.variant.variant_id = __id_map_{1}.old_id;'''.format(
-                    ', '.join([x[0] for x in info_fields[1:]]), idx)
-                else:
-                    query = '''INSERT INTO variant (variant_id, {0}) 
-                                SELECT __id_map_{1}.new_id, {0} 
-                                FROM __fromDB.variant LEFT OUTER JOIN __id_map_{1} 
-                                    ON __fromDB.variant.variant_id = __id_map_{1}.old_id 
-                                WHERE __id_map_{1}.is_dup = 0;'''.format(
-                    ', '.join([x[0] for x in info_fields[1:]]), idx)
-            self.logger.debug(query)
-            cur.execute(query)
+                    if all_keep_all[idx]:
+                        query = '''INSERT INTO {2} (variant_id {0}) 
+                                    SELECT __id_map_{1}.new_id {0} 
+                                    FROM __fromDB.{2} LEFT OUTER JOIN __id_map_{1} 
+                                        ON __fromDB.{2}.variant_id = __id_map_{1}.old_id;'''.format(
+                        ' '.join([', {}'.format(x[0]) for x in structure[table][1:]]), idx, table)
+                    else:
+                        query = '''INSERT INTO {2} (variant_id {0}) 
+                                    SELECT __id_map_{1}.new_id {0} 
+                                    FROM __fromDB.{2} LEFT OUTER JOIN __id_map_{1} 
+                                        ON __fromDB.{2}.variant_id = __id_map_{1}.old_id 
+                                    WHERE __id_map_{1}.is_dup = 0;'''.format(
+                        ' '.join([', {}'.format(x[0]) for x in structure[table][1:]]), idx, table)
+                self.logger.debug(query)
+                cur.execute(query)
             variants_copied += cur.rowcount
             prog.update(idx + 1)
             self.db.detach('__fromDB')
@@ -1209,7 +1213,7 @@ class Project:
         total_count = [0, 0, 0]
         #
         self.db.attach('{}_genotype'.format(self.name), '__myGeno')
-        for idx, (proj, tmp) in enumerate(projects):
+        for idx, proj in enumerate(projects):
             dbName = self.db.attach(proj, '__proj')
             _from_geno = self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
             #
@@ -1877,7 +1881,8 @@ def initArguments(parser):
             processed in parallel.''')
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
-            this new project.''')
+            this new project. The subprojects must have the same structure (primary
+            and alternative reference genome, variant info and phentoype.''')
     sub.add_argument('--sort', action='store_true',
         help='''Sort variants read from subprojects, which takes less RAM but longer time. If
             unset, all variants will be read to RAM and perform a faster merge at a clost of
