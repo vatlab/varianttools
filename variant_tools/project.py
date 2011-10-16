@@ -989,7 +989,9 @@ class Project:
                     raise ValueError("Project {} does not have the same set of variant tables ({}) as other projects ({})".format(proj_file, len(tables) - 3, len(structure.keys()) -3))
                 for table in tables:
                     if structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
-                        raise ValueError('Table {} in project {} does not have the same structure as others.'.format(table, proj_file))
+                        raise ValueError('Table {} ({} columns) in project {} does not have the same structure as others ({} columns).'\
+                            .format(table, len(self.db.fieldsOfTable('__fromDB.{}'.format(table))),
+                            proj_file, len(structure[table])))
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
             if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
@@ -1037,7 +1039,7 @@ class Project:
             psort.stdin.close()
             #
             prog = ProgressBar('Sorting variants')
-            idMaps = {x[1]:{} for x in projects}
+            idMaps = {x:{} for x in range(len(projects))}
             last_rec = None
             new_id = 1
             for count, line in enumerate(psort.stdout):
@@ -1075,7 +1077,7 @@ class Project:
                 all_the_same[source] = the_same
                 all_keep_all[source] = keep_all
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[source].iteritems()))
-                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
+                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(source))
                 prog.update(count)
             prog.done()
             # free some RAM
@@ -1241,11 +1243,8 @@ class Project:
                 _old_sid = [x[0] for x in cur.fetchall()]
                 _new_sid = []
                 for _id in _old_sid:
-                    cur.execute('SELECT sample_name FROM __proj.sample WHERE sample_id = {};'.format(self.db.PH),
-                        (_id,))
-                    _sample_name = cur.fetchone()[0]
-                    cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                        (_new_file_id, _sample_name))
+                    cur.execute('INSERT INTO sample ({0}) SELECT {0} FROM __proj.sample WHERE __proj.sample.sample_id = {1};'\
+                        .format(', '.join([x[0] for x in structure['sample'][1:]]), self.db.PH), (_id,))
                     _new_sid.append(cur.lastrowid)
                 #
                 _old_sample_id.extend(_old_sid)
