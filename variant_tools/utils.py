@@ -724,11 +724,17 @@ class DatabaseEngine:
 
     def numOfRows(self, table, exact=True):
         cur = self.database.cursor()
-        if not exact and self.engine == 'sqlite':
+        if not exact and self.engine == 'sqlite3':
             # this is much faster if we do not need exact count
-            cur.execute('SELECT max(rowid) FROM {};'.format(table))
-        else:
-            cur.execute('SELECT count(*) FROM {};'.format(table))
+            if '.' in table:
+                db, tbl = table.rsplit('.', 1)
+                cur.execute('SELECT seq FROM {}.sqlite_sequence WHERE name = {};'.format(db, self.PH), (tbl,))
+            else:
+                cur.execute('SELECT seq FROM sqlite_sequence WHERE name = {};'.format(self.PH), (table,))
+            res = cur.fetchone()
+            if res is not None:
+                return res[0]
+        cur.execute('SELECT count(*) FROM {};'.format(table))
         return cur.fetchone()[0]
 
     def startProgress(self, text):

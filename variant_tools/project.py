@@ -985,11 +985,11 @@ class Project:
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
             if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
-                projects.insert(0, (proj_file, idx, [x[0] for x in fields]))
+                projects.insert(0, (proj_file, [x[0] for x in fields]))
                 # we do not need an exact number
                 num_of_variants = self.db.numOfRows('__fromDB.variant', False)
             else:
-                projects.append((proj_file, idx, [x[0] for x in fields]))
+                projects.append((proj_file, [x[0] for x in fields]))
             #
             # FIXME: analyze other variant tables
             #
@@ -1013,7 +1013,7 @@ class Project:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,8'], stdin=PIPE, stdout=PIPE)
             else:
                 psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,6'], stdin=PIPE, stdout=PIPE)
-            for proj, idx, fields in projects:
+            for idx, (proj, fields) in enumerate(projects):
                 dbName = self.db.attach(proj, '__fromDB')
                 prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
                 if self.alt_build:
@@ -1083,7 +1083,7 @@ class Project:
             all_the_same = {}
             all_keep_all = {}
             keep_all = True
-            for proj, idx, fields in projects:
+            for idx, (proj, fields) in enumerate(projects):
                 idMaps = {}
                 dbName = self.db.attach(proj, '__fromDB')
                 prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(projects)), self.db.numOfRows('__fromDB.variant',  False))
@@ -1151,7 +1151,7 @@ class Project:
         self.dropIndexOnMasterVariantTable()
         prog = ProgressBar('Copying variant tables', len(projects))
         variants_copied = 0
-        for proj, idx, fields in projects:
+        for idx, (proj, fields) in enumerate(projects):
             self.db.attach(proj, '__fromDB')
             if all_the_same[idx]:
                 # if all the same, copy from the old table 
@@ -1209,7 +1209,7 @@ class Project:
         total_count = [0, 0, 0]
         #
         self.db.attach('{}_genotype'.format(self.name), '__myGeno')
-        for proj, idx, tmp in projects:
+        for idx, (proj, tmp) in enumerate(projects):
             dbName = self.db.attach(proj, '__proj')
             _from_geno = self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
             #
@@ -1286,9 +1286,9 @@ class Project:
             first = False
             self.logger.info('{:,} genotypes in {} sample{}{} are merged'.format(count[1], count[0],
                 's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
-            for idx in range(len(count)):
-                total_count[idx] += count[idx]
-                count[idx] = 0
+            for i in range(len(count)):
+                total_count[i] += count[i]
+                count[i] = 0
         self.logger.info('Project {} created with {:,} variants and {:,} genotypes in {} sample{}{}.'.format(
             self.name, variants_copied, total_count[1], total_count[0],
             's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
