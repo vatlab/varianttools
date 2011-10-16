@@ -1102,12 +1102,13 @@ class Project:
                             sub_key = (pos, alt_pos)
                         else:
                             sub_key = (pos, alt_chr, alt_pos)
-                        if (chr, ref, alt) in existing:
-                            if sub_key in existing[(chr, ref, alt)]:
-                                idMaps[id] = (existing[(chr, ref, alt)][sub_key], 1)
+                        vv = existing.get((chr, ref, alt))
+                        if vv is not None:
+                            if sub_key in vv:
+                                idMaps[id] = (vv[sub_key], 1)
                                 keep_all = False
                             else:
-                                existing[(chr, ref, alt)][sub_key] = new_id
+                                vv[sub_key] = new_id
                                 idMaps[id] = (new_id, 0)
                                 new_id += 1
                         else:
@@ -1124,12 +1125,13 @@ class Project:
                     #
                     for id, chr, pos, ref, alt in cur:
                         # a new record
-                        if (chr, ref, alt) in existing:
-                            if pos in existing[(chr, ref, alt)]:
-                                idMaps[id] = (existing[(chr, ref, alt)][pos], 1)
+                        vv = existing.get((chr, ref, alt))
+                        if vv is not None:
+                            if pos in vv:
+                                idMaps[id] = (vv[pos], 1)
                                 keep_all = False
                             else:
-                                existing[(chr, ref, alt)][pos] = new_id
+                                vv[pos] = new_id
                                 idMaps[id] = (new_id, 0)
                                 new_id += 1
                         else:
@@ -1152,8 +1154,9 @@ class Project:
                 all_the_same[idx] = the_same
                 all_keep_all[idx] = keep_all
                 #
-                cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
-                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
+                if not (all_the_same[idx] and all_keep_all[idx]):
+                    cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
+                    cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
                 self.db.commit()
                 idMaps.clear()
                 prog.done()
