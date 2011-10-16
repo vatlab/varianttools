@@ -836,20 +836,20 @@ class Project:
             raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
         proj_file = files[0]
         #self.logger.info('Importing data from parental project {}'.format(proj_file))
-        dbName = self.db.attach(files[0])
+        self.db.attach(proj_file, '__fromDB')
         #
-        prog = ProgressBar('Copying project {}'.format(dbName))
-        tables = self.db.tables(dbName)
+        prog = ProgressBar('Copying project {}'.format(proj_file))
+        tables = self.db.tables('__fromDB')
         if vtable not in tables:
-            raise ValueError('Table {} does not exist in project {}'.format(vtable, dbName))
-        headers = self.db.getHeaders('{}.{}'.format(dbName, vtable))
+            raise ValueError('Table {} does not exist in project {}'.format(vtable, files[0]))
+        headers = self.db.getHeaders('__fromDB.{}'.format(vtable))
         if headers[0] != 'variant_id':
             raise ValueError('Table {} is not a variant table'.format(args.table[1]))
         #
         cur = self.db.cursor()
         for table in tables:
             # get schema
-            cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(dbName, self.db.PH),
+            cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={};'.format(self.db.PH),
                 (table,))
             sql = cur.fetchone()[0]
             if self.db.hasTable(table):
@@ -865,31 +865,32 @@ class Project:
             if self.isVariantTable(table):
                 if vtable == 'variant':
                     # copy all variants
-                    cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
                 else:
-                    cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0} WHERE {1}.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, vtable))
             else:
-                cur.execute('INSERT INTO {0} SELECT * FROM {1}.{0};'.format(table, dbName))
+                cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
         # creating indexes
-        cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="index";'.format(dbName))
+        cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="index";')
         sqls = cur.fetchall()
         for sql in sqls:
-            # creating indexes
-            cur.execute(sql[0])
+            # creating  indexes, sql[0] can be None for some internal index
+            if sql[0]:
+                cur.execute(sql[0])
         # copy genotype table
         files = glob.glob('{}/*_genotype.DB'.format(dir))
         if len(files) == 0:
             return
-        myDB = self.db.attach('{}_genotype'.format(self.name), '__toDB')
-        genoDB = self.db.attach(files[0], '__fromDB')
+        myDB = self.db.attach('{}_genotype'.format(self.name), '__toGeno')
+        genoDB = self.db.attach(files[0], '__fromGeno')
         tables = self.db.tables(genoDB)
         for table in tables:
             # get schema
             cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, self.db.PH),
                 (table,))
-            sql = cur.fetchone()[0].replace('genotype_', '__toDB.genotype_')
-            if self.db.hasTable('__toDB.{}'.format(table)):
-                self.db.removeTable('__toDB.{}'.format(table))
+            sql = cur.fetchone()[0].replace('genotype_', '__toGeno.genotype_')
+            if self.db.hasTable('__toGeno.{}'.format(table)):
+                self.db.removeTable('__toGeno.{}'.format(table))
             try:
                 # self.logger.debug(sql)
                 cur.execute(sql)
@@ -898,14 +899,15 @@ class Project:
             # copying data over
             if vtable == 'variant':
                 # copy all variants
-                cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0};'.format(table))
+                cur.execute('INSERT INTO __toGeno.{0} SELECT * FROM __fromGeno.{0};'.format(table))
             else:
-                cur.execute('INSERT INTO __toDB.{0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM {1}.{2});'.format(table, dbName, vtable))
+                cur.execute('INSERT INTO __toGeno.{0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, vtable))
         # remove all annotations
         self.saveProperty('annoDB', '[]')
-        prog.done('{} variants and {} samples are copied'.format(self.db.numOfRows('variant'), len(tables)))
-        self.db.detach(dbName)
-        self.db.detach('__toDB')
+        self.logger.info('{} variants and {} samples are copied'.format(self.db.numOfRows('variant'), len(tables)))
+        prog.done()
+        self.db.detach('__toGeno')
+        self.db.detach('__fromGeno')
         self.db.detach('__fromDB')
         
     def merge(self, dirs, sort):
