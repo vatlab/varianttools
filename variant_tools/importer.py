@@ -762,7 +762,6 @@ class BaseImporter:
                     var_id = int(var_id)
                 except:
                     continue
-                key = (chr, ref, alt)
                 cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
                 count += 1
                 if count % self.db.batch == 0:

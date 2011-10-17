@@ -174,7 +174,6 @@ class LiftOverTool:
         #
         #
         mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
-        prog = ProgressBar('Updating table variant', lineCount(mapped_file))
         if flip:
             self.logger.info('Flipping primary and alterantive reference genome')
             cur.execute('UPDATE variant SET alt_bin=bin, alt_chr=chr, alt_pos=pos;')
@@ -182,6 +181,7 @@ class LiftOverTool:
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
         else:
             query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+        prog = ProgressBar('Updating table variant', lineCount(mapped_file))
         with open(mapped_file) as var_mapped:
             for count, line in enumerate(var_mapped):
                 chr, start, end, id = line.strip().split()
