@@ -830,87 +830,7 @@ class Project:
         self.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
-    def copyFrom(self, dir, vtable):
-        # copy from another project
-        files = glob.glob('{}/*.proj'.format(dir))
-        if len(files) != 1:
-            raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
-        proj_file = files[0]
-        #self.logger.info('Importing data from parental project {}'.format(proj_file))
-        self.db.attach(proj_file, '__fromDB')
-        #
-        prog = ProgressBar('Copying project {}'.format(proj_file))
-        tables = self.db.tables('__fromDB')
-        if vtable not in tables:
-            raise ValueError('Table {} does not exist in project {}'.format(vtable, files[0]))
-        headers = self.db.getHeaders('__fromDB.{}'.format(vtable))
-        if headers[0] != 'variant_id':
-            raise ValueError('Table {} is not a variant table'.format(args.table[1]))
-        #
-        cur = self.db.cursor()
-        for table in tables:
-            # get schema
-            cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={};'.format(self.db.PH),
-                (table,))
-            sql = cur.fetchone()[0]
-            if self.db.hasTable(table):
-                self.db.removeTable(table)
-            try:
-                #self.logger.debug(sql)
-                cur.execute(sql)
-            except Exception as e:
-                self.logger.debug(e)
-            # copying data over
-            #self.logger.info('Copying table {}...'.format(table))
-            prog.reset('copying {}'.format(table))
-            if self.isVariantTable(table):
-                if vtable == 'variant':
-                    # copy all variants
-                    cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
-                else:
-                    cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0} WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, vtable))
-            else:
-                cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
-        # creating indexes
-        cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="index";')
-        sqls = cur.fetchall()
-        for sql in sqls:
-            # creating  indexes, sql[0] can be None for some internal index
-            if sql[0]:
-                cur.execute(sql[0])
-        # copy genotype table
-        files = glob.glob('{}/*_genotype.DB'.format(dir))
-        if len(files) == 0:
-            return
-        myDB = self.db.attach('{}_genotype'.format(self.name), '__toGeno')
-        genoDB = self.db.attach(files[0], '__fromGeno')
-        tables = self.db.tables(genoDB)
-        for table in tables:
-            # get schema
-            cur.execute('SELECT sql FROM {0}.sqlite_master WHERE type="table" AND name={1};'.format(genoDB, self.db.PH),
-                (table,))
-            sql = cur.fetchone()[0].replace('genotype_', '__toGeno.genotype_')
-            if self.db.hasTable('__toGeno.{}'.format(table)):
-                self.db.removeTable('__toGeno.{}'.format(table))
-            try:
-                # self.logger.debug(sql)
-                cur.execute(sql)
-            except Exception as e:
-                self.logger.debug(e)
-            # copying data over
-            if vtable == 'variant':
-                # copy all variants
-                cur.execute('INSERT INTO __toGeno.{0} SELECT * FROM __fromGeno.{0};'.format(table))
-            else:
-                cur.execute('INSERT INTO __toGeno.{0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, vtable))
-        # remove all annotations
-        self.saveProperty('annoDB', '[]')
-        self.logger.info('{} variants and {} samples are copied'.format(self.db.numOfRows('variant'), len(tables)))
-        prog.done()
-        self.db.detach('__toGeno')
-        self.db.detach('__fromGeno')
-        self.db.detach('__fromDB')
-       
+
     #
     # Support for python with statement
     #
@@ -980,10 +900,11 @@ class Project:
                 ''.join([', {} {}\n'.format(x,y) for x,y in fields])))
         self.createIndexOnMasterVariantTable()
 
-    def createIndexOnMasterVariantTable(self):
+    def createIndexOnMasterVariantTable(self, quiet=False):
         # create indexes
         #
-        s = delayedAction(self.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
+        if not quiet:
+            s = delayedAction(self.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
         try:
             #
             # Index on the primary reference genome is UNIQUE when there is no alternative reference
@@ -1027,7 +948,8 @@ class Project:
             # the index might already exists, this does not really matter
             self.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
-        del s
+        if not quiet:
+            del s
 
     def dropIndexOnMasterVariantTable(self):
         # before bulk inputting data, it is recommended to drop index.
@@ -1475,6 +1397,134 @@ class Project:
         raise ValueError('Failed to locate field {}'.format(field))
         
 
+class ProjCopier:
+    def __init__(self, proj, dir, vtable):
+        self.proj = proj
+        self.logger = proj.logger
+        self.db = proj.db
+        #
+        files = glob.glob('{}/*.proj'.format(dir))
+        if len(files) != 1:
+            raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
+        self.vtable = vtable
+        self.proj_file = files[0]
+        self.geno_file = self.proj_file.replace('.proj', '_genotype.DB')
+        if not os.path.isfile(self.geno_file):
+            self.geno_file = None
+
+    def copyProject(self):
+        self.db.attach(self.proj_file, '__fromDB')
+        tables = self.db.tables('__fromDB')
+        if self.vtable not in tables:
+            raise ValueError('Table {} does not exist in project {}'.format(self.vtable, files[0]))
+        headers = self.db.getHeaders('__fromDB.{}'.format(self.vtable))
+        if headers[0] != 'variant_id':
+            raise ValueError('Table {} is not a variant table'.format(args.table[1]))
+        #
+        prog = ProgressBar('Copying variant tables {}'.format(self.proj_file), len(tables))
+        cur = self.db.cursor()
+        for idx, table in enumerate(tables):
+            # get schema
+            cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={};'.format(self.db.PH),
+                (table,))
+            sql = cur.fetchone()[0]
+            if self.db.hasTable(table):
+                self.db.removeTable(table)
+            try:
+                #self.logger.debug(sql)
+                cur.execute(sql)
+            except Exception as e:
+                self.logger.debug(e)
+            # copying data over
+            if self.proj.isVariantTable(table):
+                if self.vtable == 'variant':
+                    # copy all variants
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
+                else:
+                    cur.execute('''INSERT INTO {0} SELECT * FROM __fromDB.{0} 
+                        WHERE __fromDB.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'''\
+                            .format(table, self.vtable))
+            else:
+                cur.execute('INSERT INTO {0} SELECT * FROM __fromDB.{0};'.format(table))
+            #
+            prog.update(idx)
+        prog.done()
+        self.proj.saveProperty('annoDB', '[]')
+        return self.db.numOfRows('variant', False)
+
+    def copySamples(self):
+        # copy genotype table
+        db = DatabaseEngine()
+        db.connect('{}_genotype'.format(self.proj.name))
+        db.attach(self.proj_file, '__fromDB')
+        db.attach(self.geno_file, '__fromGeno')
+        cur = db.cursor()
+        tables = db.tables('__fromGeno')
+        prog = ProgressBar('Copying samples', len(tables))
+        for idx, table in enumerate(tables):
+            # get schema
+            cur.execute('SELECT sql FROM __fromGeno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
+                (table,))
+            sql = cur.fetchone()[0]
+            if db.hasTable(table):
+                db.removeTable(table)
+            try:
+                # self.logger.debug(sql)
+                cur.execute(sql)
+            except Exception as e:
+                self.logger.debug(e)
+            # copying data over
+            if self.vtable == 'variant':
+                # copy all variants
+                cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0};'.format(table))
+            else:
+                cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, self.vtable))
+            prog.update(idx + 1)
+        # remove all annotations
+        prog.done()
+        db.detach('__fromGeno')
+        db.detach('__fromDB')
+        db.close()
+        return len(tables)
+
+    def createIndex(self, sqls):
+        db = DatabaseEngine()
+        db.connect(self.proj.proj_file)
+        cur = db.cursor()
+        for sql in sqls:
+            # sql can be None ...
+            if sql[0]:
+                cur.execute(sql[0])
+        db.close()
+
+    def copy(self):
+        copied_variants = self.copyProject()
+        # create indexes in a separate thread
+        cur = self.db.cursor()
+        cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="index";')
+        sqls = cur.fetchall()
+        # close project because it will be opened again in a separate thread
+        self.proj.db.detach('__fromDB')
+        self.proj.db.close()
+        #
+        thread = threading.Thread(target=self.createIndex, args=(sqls,))
+        thread.start()
+        # start copying samples
+        if self.geno_file is not None:
+            copied_samples = self.copySamples()
+        else:
+            copied_samples = 0
+        self.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
+        # wait for the thread to close
+        s = delayedAction(self.logger.info, 'Create indexes')
+        if thread.is_alive():
+            thread.join()
+        del s
+        # re-connect the main database for proer cleanup
+        self.proj.db = DatabaseEngine()
+        self.proj.db.connect(self.proj.proj_file)
+
+    
 class ProjMerger:
     def __init__(self, proj, dirs, sort):
         '''Check if merge is possible, set primary and reference genome
@@ -1625,27 +1675,37 @@ class ProjMerger:
         self.all_the_same = {}
         self.keep_all = {}
         prog = ProgressBar('Create mapping tables')
-        for count, source in enumerate(idMaps.keys()):
-            prog.reset('create mapping table {}'.format(source + 1))
-            cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(source))
-            insert_query = 'INSERT INTO __id_map_{0} VALUES ({1}, {1}, {1});'.format(source, self.db.PH);
+        for idx, proj in enumerate(self.projects):
+            self.db.attach(proj, '__fromDB')
+            prog.reset('create mapping table {}'.format(idx + 1))
+            cur.execute('DROP TABLE IF EXISTS __fromDB.__id_map;')
+            cur.execute('CREATE TABLE __fromDB.__id_map (old_id INT, new_id INT, is_dup INT);')
+            insert_query = 'INSERT INTO __fromDB.__id_map VALUES ({0}, {0}, {0});'.format(self.db.PH);
             the_same = True
             keep_all = True
-            for old_id, (new_id, is_duplicate) in idMaps[source].iteritems():
+            for old_id, (new_id, is_duplicate) in idMaps[idx].iteritems():
                 if the_same and old_id != new_id:
                     the_same = False
                 if keep_all and is_duplicate:
                     keep_all = False
                 if not the_same and not keep_all:
                     break
-            self.all_the_same[source] = the_same
-            self.keep_all[source] = keep_all
-            cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[source].iteritems()))
-            cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(source))
+            self.all_the_same[idx] = the_same
+            self.keep_all[idx] = keep_all
+            cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[idx].iteritems()))
+            cur.execute('CREATE INDEX __fromDB.__id_map_idx ON __id_map (old_id ASC);')
             prog.update(count)
+            self.db.detach('__fromDB')
         prog.done()
         # free some RAM
         idMaps.clear()
+
+    def createMapIndex(self, proj):
+        db = DatabaseEngine()
+        db.connect(proj)
+        cur = db.cursor()
+        cur.execute('CREATE INDEX __id_map_idx ON __id_map (old_id ASC);')
+        db.close()
 
     def mapVariants(self):
         existing = {}
@@ -1654,6 +1714,7 @@ class ProjMerger:
         self.keep_all = {}
         keep_all = True
         cur = self.db.cursor()
+        threads = []
         for idx, proj in enumerate(self.projects):
             idMaps = {}
             dbName = self.db.attach(proj, '__fromDB')
@@ -1684,7 +1745,6 @@ class ProjMerger:
                     count += 1
                     if count % 10000 == 0:
                         prog.update(count)
-                self.db.detach('__fromDB')
             else:
                 count = 0
                 cur.execute('SELECT variant_id, chr, pos, ref, alt FROM __fromDB.variant;')
@@ -1707,11 +1767,11 @@ class ProjMerger:
                     count += 1
                     if count % 10000 == 0:
                         prog.update(count)
-                self.db.detach('__fromDB')
             #
             prog.reset('mapping ids')
-            cur.execute('CREATE TEMP TABLE __id_map_{} (old_id INT, new_id INT, is_dup INT);'.format(idx))
-            insert_query = 'INSERT INTO __id_map_{0} values ({1}, {1}, {1});'.format(idx, self.db.PH);
+            cur.execute('DROP TABLE IF EXISTS __fromDB.__id_map;')
+            cur.execute('CREATE TABLE __fromDB.__id_map (old_id INT, new_id INT, is_dup INT);')
+            insert_query = 'INSERT INTO __fromDB.__id_map values ({0}, {0}, {0});'.format(self.db.PH);
             the_same = True
             for _old_id, (_new_id, _is_duplicate) in idMaps.iteritems():
                 if _old_id != _new_id:
@@ -1722,11 +1782,19 @@ class ProjMerger:
             #
             if not (self.all_the_same[idx] and self.keep_all[idx]):
                 cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
-                cur.execute('CREATE INDEX __id_map_{0}_idx ON __id_map_{0} (old_id ASC);'.format(idx))
             self.db.commit()
             idMaps.clear()
             prog.done()
+            self.db.detach('__fromDB')
+            if not (self.all_the_same[idx] and self.keep_all[idx]):
+                t = threading.Thread(target=self.createMapIndex, args=(proj,))
+                t.start()
+                threads.append(t)
         existing.clear()
+        s = delayedAction(self.logger.info, 'Indexing id maps')
+        for t in threads:
+            t.join()
+        del s
 
     def copyVariantTables(self):
         # creating master variant table
@@ -1737,7 +1805,7 @@ class ProjMerger:
         for idx, proj in enumerate(self.projects):
             self.db.attach(proj, '__fromDB')
             for table in self.structure.keys():
-                if table in ['sample', 'filename', 'project']:
+                if table in ['sample', 'filename', 'project', '__id_map']:
                     continue
                 if self.all_the_same[idx]:
                     # if all the same, copy from the old table 
@@ -1748,23 +1816,23 @@ class ProjMerger:
                     else:
                         query = '''INSERT INTO {0}  
                                     SELECT *
-                                    FROM __fromDB.{0} LEFT OUTER JOIN __id_map_{1} 
-                                        ON __fromDB.{0}.variant_id = __id_map_{1}.old_id 
-                                    WHERE __id_map_{1}.is_dup = 0;'''.format(table, idx)
+                                    FROM __fromDB.{0} v LEFT OUTER JOIN __fromDB.__id_map m
+                                        ON v.variant_id = m.old_id 
+                                    WHERE m.is_dup = 0;'''.format(table, idx)
                 else:
                     if self.keep_all[idx]:
-                        query = '''INSERT INTO {2} (variant_id {0}) 
-                                    SELECT __id_map_{1}.new_id {0} 
-                                    FROM __fromDB.{2} LEFT OUTER JOIN __id_map_{1} 
-                                        ON __fromDB.{2}.variant_id = __id_map_{1}.old_id;'''.format(
-                        ' '.join([', {}'.format(x[0]) for x in self.structure[table][1:]]), idx, table)
+                        query = '''INSERT INTO {1} (variant_id {0}) 
+                                    SELECT m.new_id {0} 
+                                    FROM __fromDB.{1} v LEFT OUTER JOIN __fromDB.__id_map m
+                                        ON v.variant_id = m.old_id;'''.format(
+                        ' '.join([', {}'.format(x[0]) for x in self.structure[table][1:]]), table)
                     else:
-                        query = '''INSERT INTO {2} (variant_id {0}) 
-                                    SELECT __id_map_{1}.new_id {0} 
-                                    FROM __fromDB.{2} LEFT OUTER JOIN __id_map_{1} 
-                                        ON __fromDB.{2}.variant_id = __id_map_{1}.old_id 
-                                    WHERE __id_map_{1}.is_dup = 0;'''.format(
-                        ' '.join([', {}'.format(x[0]) for x in self.structure[table][1:]]), idx, table)
+                        query = '''INSERT INTO {1} (variant_id {0}) 
+                                    SELECT m.new_id {0} 
+                                    FROM __fromDB.{1} v LEFT OUTER JOIN __fromDB.__id_map m
+                                        ON v.variant_id = m.old_id 
+                                    WHERE m.is_dup = 0;'''.format(
+                        ' '.join([', {}'.format(x[0]) for x in self.structure[table][1:]]), table)
                 self.logger.debug(query)
                 cur.execute(query)
             variants_copied += cur.rowcount
@@ -1774,23 +1842,17 @@ class ProjMerger:
         self.logger.info('{:,} distinct variants are copied'.format(variants_copied))
         return variants_copied
 
-    def mergeSamples(self):
+    def mapSamples(self):
         # merging files
         #
         cur = self.db.cursor()
         cur.execute('SELECT filename FROM filename;')
         filenames = [x[0] for x in cur.fetchall()]
         #
-        # statistics
-        # 1 number of samples
-        # 2 number of genotypes
-        # 3 ignored samples
-        count = [0, 0, 0]
-        total_count = [0, 0, 0]
-        #
-        self.db.attach('{}_genotype'.format(self.proj.name), '__myGeno')
+        ignored_files = 0
+        self.sampleMap = {}
         for idx, proj in enumerate(self.projects):
-            dbName = self.db.attach(proj, '__proj')
+            self.db.attach(proj, '__proj')
             _from_geno = self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
             #
             # handline sample
@@ -1803,7 +1865,7 @@ class ProjMerger:
             _new_sample_id = []
             for _old_file_id, _filename, _header in _filename_records:
                 if _filename in filenames:
-                    count[2] += 1
+                    ignored_files += 1
                     continue
                 else:
                     filenames.append(_filename)
@@ -1823,17 +1885,32 @@ class ProjMerger:
                 #
                 _old_sample_id.extend(_old_sid)
                 _new_sample_id.extend(_new_sid)
+            self.sampleMap[idx] = (_old_sample_id, _new_sample_id)
+            self.db.detach('__proj')
+            self.db.detach('__geno')
+        return ignored_files
+
+    def mergeSamples(self):
+        count = [0, 0]
+        total_count = [0, 0]
+        db = DatabaseEngine()
+        db.connect('{}_genotype'.format(self.proj.name))
+        cur = db.cursor()
+        for idx, proj in enumerate(self.projects):
+            _from_geno = db.attach(proj, '__proj')
+            _from_geno = db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
+            _old_sample_id, _new_sample_id = self.sampleMap[idx]
             prog = ProgressBar('Merge {}'.format(proj), len(_old_sample_id))
             for _old_id, _new_id in zip(_old_sample_id, _new_sample_id):
                 count[0] += 1
                 # 
                 # create genotype table
-                cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
+                cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
                     ('genotype_{}'.format(_old_id), ))
                 sql = cur.fetchone()
                 if sql is None:
                     raise ValueError('Cannot recreate genotype table {}'.format(_old_id))
-                sql = sql[0].replace('genotype_{}'.format(_old_id), '__myGeno.genotype_{}'.format(_new_id))
+                sql = sql[0].replace('genotype_{}'.format(_old_id), 'genotype_{}'.format(_new_id))
                 try:
                     self.logger.debug(sql)
                     cur.execute(sql)
@@ -1842,32 +1919,40 @@ class ProjMerger:
                 #
                 # copy data over
                 if self.all_the_same[idx]:
-                    query = 'INSERT INTO __myGeno.genotype_{} SELECT * FROM __geno.genotype_{};'\
+                    query = 'INSERT INTO genotype_{} SELECT * FROM __geno.genotype_{};'\
                         .format(_new_id, _old_id)
                     self.logger.debug(query)
                     cur.execute(query)
                 else:
-                    headers = self.db.getHeaders('__myGeno.genotype_{}'.format(_new_id))
-                    query = 'INSERT INTO __myGeno.genotype_{0} SELECT new_id {1} FROM __geno.genotype_{2} LEFT JOIN __id_map_{3} ON __id_map_{3}.old_id = __geno.genotype_{2}.variant_id;'\
-                        .format(_new_id, ''.join([', {}'.format(x) for x in headers[1:]]), _old_id, idx)
+                    headers = db.getHeaders('genotype_{}'.format(_new_id))
+                    query = 'INSERT INTO genotype_{0} SELECT new_id {1} FROM __geno.genotype_{2} LEFT JOIN __proj.__id_map ON __id_map.old_id = __geno.genotype_{2}.variant_id;'\
+                        .format(_new_id, ''.join([', {}'.format(x) for x in headers[1:]]), _old_id)
                     self.logger.debug(query)
                     cur.execute(query)
                 count[1] += cur.rowcount
                 prog.update(count[0])
             # clean up
-            self.db.detach('__proj')
-            self.db.detach('__geno')
+            cur.execute('DROP TABLE IF EXISTS __proj.__id_map;')
+            db.detach('__proj')
+            db.detach('__geno')
             #if _ignored > 0:
             #    self.logger.info('{} existing files are ignored'.format(_ignored))
             prog.done()
             first = False
-            self.logger.info('{:,} genotypes in {} sample{}{} are merged'.format(count[1], count[0],
-                's' if count[0] > 1 else '', ' ({} ignored)'.format(count[2]) if count[2] > 0 else ''))
+            self.logger.info('{:,} genotypes in {} sample{} are merged'.format(count[1], count[0],
+                's' if count[0] > 1 else ''))
             for i in range(len(count)):
                 total_count[i] += count[i]
                 count[i] = 0
         return total_count
  
+    def createIndex(self):
+        # re-open the project in this thread
+        self.proj.db = DatabaseEngine()
+        self.proj.db.connect(self.proj.proj_file)
+        self.proj.createIndexOnMasterVariantTable(True)
+        self.proj.db.close()
+        
     def merge(self):
         if len(self.projects) == 0:
             return
@@ -1876,12 +1961,24 @@ class ProjMerger:
         else:
             self.mapVariants()
         variants_copied = self.copyVariantTables()
+        ignored_files = self.mapSamples()
+        # the .proj will no longer be used so we create a separate thread to create
+        # index
+        self.proj.db.close()
+        thread = threading.Thread(target=self.createIndex)
+        thread.start()
         total_count = self.mergeSamples()
         self.logger.info('Project {} created with {:,} variants and {:,} genotypes in {} sample{}{}.'.format(
             self.proj.name, variants_copied, total_count[1], total_count[0],
             's' if total_count[0] > 1 else '',
-            ' ({} ignored)'.format(total_count[2]) if total_count[2] > 0 else ''))
-        self.proj.createIndexOnMasterVariantTable()
+            ' (samples from {} files are ignored)'.format(ignored_files) if ignored_files > 0 else ''))
+        if thread.is_alive():
+            self.logger.info('Creating indexes on master variant table. This might take quite a while.')
+        thread.join()
+        # keep the connection open for proper clean up
+        self.proj.db = DatabaseEngine()
+        self.proj.db.connect(self.proj.proj_file)
+            
         
 #
 #
@@ -1943,7 +2040,8 @@ def init(args):
             if args.parent:
                 if len(args.parent) != 2:
                     raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
-                proj.copyFrom(args.parent[0], args.parent[1])
+                copier = ProjCopier(proj, args.parent[0], args.parent[1])
+                copier.copy()
             elif args.children:
                 merger = ProjMerger(proj, args.children, args.sort)
                 merger.merge()
