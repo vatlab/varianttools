@@ -129,7 +129,7 @@ class LiftOverTool:
         if err:
             self.logger.info(err)
 
-    def updateAltCoordinates(self):
+    def updateAltCoordinates(self, flip=False):
         '''Download and use the UCSC LiftOver tool to translate coordinates from primary
         to secondary reference genome'''
         if self.proj.build is None:
@@ -175,7 +175,13 @@ class LiftOverTool:
         #
         mapped_file = os.path.join(self.proj.temp_dir, 'var_out.bed')
         prog = ProgressBar('Updating table variant', lineCount(mapped_file))
-        query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+        if flip:
+            self.logger.info('Flipping primary and alterantive reference genome')
+            cur.execute('UPDATE variant SET alt_bin=bin, alt_chr=chr, alt_pos=pos;')
+            cur.execute('UPDATE variant SET bin=NULL, chr=NULL, pos=NULL')
+            query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
+        else:
+            query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
         with open(mapped_file) as var_mapped:
             for count, line in enumerate(var_mapped):
                 chr, start, end, id = line.strip().split()
@@ -186,15 +192,22 @@ class LiftOverTool:
         self.db.commit()
         prog.done()
                 
-    def setAltRefGenome(self, alt_build, build_index=True):
+    def setAltRefGenome(self, alt_build, build_index=True, flip=False):
         if self.proj.build == alt_build:
             raise ValueError('Cannot set alternative build the same as primary build')
         if self.proj.alt_build is not None and self.proj.alt_build != alt_build:
             self.logger.warning('Setting a different alternative reference genome.')
             self.logger.warning('The original alternative genome {} will be overritten.'.format(self.proj.alt_build))
-        self.proj.alt_build = alt_build
-        self.proj.saveProperty('alt_build', alt_build)
-        self.updateAltCoordinates()
+        if flip:
+            self.proj.alt_build = self.proj.build
+            self.proj.build = alt_build
+            self.proj.saveProperty('build', self.proj.build)
+            self.proj.saveProperty('alt_build', self.proj.alt_build)
+            self.proj.dropIndexOnMasterVariantTable()
+        else:
+            self.proj.alt_build = alt_build
+            self.proj.saveProperty('alt_build', alt_build)
+        self.updateAltCoordinates(flip)
         if build_index:
             self.proj.createIndexOnMasterVariantTable()
 
@@ -232,13 +245,16 @@ class LiftOverTool:
 #
 
 def liftOverArguments(parser):
-    parser.add_argument('build', help='Name of the alternative reference genome')
+    parser.add_argument('build', help='Name of the alternative reference genome'),
+    parser.add_argument('--flip', action='store_true', help='''Flip primary and alternative
+	reference genomes so that the specified build will become the primary
+        reference genome of the project.''')
 
 def liftOver(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             tool = LiftOverTool(proj)
-            tool.setAltRefGenome(args.build)
+            tool.setAltRefGenome(args.build, flip=args.flip)
         proj.close()
     except Exception as e:
         sys.exit(e)
