@@ -503,6 +503,13 @@ class DatabaseEngine:
             cur.execute('PRAGMA default_cache_size=2000;')
             self.database.commit()
 
+    def close(self):
+        if self.engine == 'mysql':
+            # do not know what to do
+            pass
+        else:
+            self.database.close()
+
     def attach(self, db, name=None):
         '''Attach another database to this one. Only needed by sqlite'''
         if self.engine == 'mysql':
