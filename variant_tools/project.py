@@ -1544,7 +1544,7 @@ class SortedVariantMapper(threading.Thread):
             db = DatabaseEngine()
             db.connect(proj)
             cur = db.cursor()
-            prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(self.projects)), db.numOfRows('variant',  False))
+            prog = ProgressBar('Loading {} ({}/{})'.format(proj[:-5], idx+1, len(self.projects)), db.numOfRows('variant',  False))
             if self.alt_build:
                 cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
                 for count, (id, chr, pos, ref, alt, alt_chr, alt_pos) in enumerate(cur):
@@ -1631,7 +1631,7 @@ class VariantMapper(threading.Thread):
             db.connect(proj)
             cur = db.cursor()
             idMaps = {}
-            prog = ProgressBar('Reading variants from {} ({}/{})'.format(proj, idx+1, len(self.projects)), db.numOfRows('variant',  False))
+            prog = ProgressBar('Loading {} ({}/{})'.format(proj[:-5], idx+1, len(self.projects)), db.numOfRows('variant',  False))
             if self.alt_build:
                 count = 0
                 cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
