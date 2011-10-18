@@ -198,16 +198,14 @@ class LiftOverTool:
         if self.proj.alt_build is not None and self.proj.alt_build != alt_build:
             self.logger.warning('Setting a different alternative reference genome.')
             self.logger.warning('The original alternative genome {} will be overritten.'.format(self.proj.alt_build))
+        self.proj.alt_build = alt_build
+        self.proj.saveProperty('alt_build', alt_build)
+        self.updateAltCoordinates(flip)
         if flip:
-            self.proj.alt_build = self.proj.build
-            self.proj.build = alt_build
+            self.proj.alt_build, self.proj.build = self.proj.build, self.proj.alt_build
             self.proj.saveProperty('build', self.proj.build)
             self.proj.saveProperty('alt_build', self.proj.alt_build)
             self.proj.dropIndexOnMasterVariantTable()
-        else:
-            self.proj.alt_build = alt_build
-            self.proj.saveProperty('alt_build', alt_build)
-        self.updateAltCoordinates(flip)
         if build_index:
             self.proj.createIndexOnMasterVariantTable()
 
