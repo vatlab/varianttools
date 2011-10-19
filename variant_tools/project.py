@@ -764,7 +764,6 @@ class Project:
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')
 
-    
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
         # DBs in different paths but with the same name are considered to be the same.
@@ -778,9 +777,6 @@ class Project:
 
     def close(self):
         '''Write everything to disk...'''
-        # This is no longer needed once we create temporary table outside
-        # of the project database
-        #self.removeTempTables()
         self.db.commit()
         if self.temp_dir != 'cache' and os.path.isdir(self.temp_dir):
             shutil.rmtree(self.temp_dir)
@@ -1528,12 +1524,15 @@ class ProjCopier:
 
 
 class SortedVariantMapper(threading.Thread):
-    '''The worker thread read variants from all projects...'''
+    '''The worker thread read variants from all projects, sort them, and
+       figure out the distinct variants. It uses less RAM than another mapper
+       but requires the Unix sort command. A huge disadvantage of this mapper
+       if that the read and process threads cannot be run in parallel.'''
     def __init__(self, projects, alt_build, status):
         self.projects = projects
         self.alt_build = alt_build
         self.status = status
-        threading.Thread.__init__(self, name='sort')
+        threading.Thread.__init__(self, name='Read, sort and map variants')
 
     def run(self):
         if self.alt_build:
@@ -1600,27 +1599,27 @@ class SortedVariantMapper(threading.Thread):
                     keep_all = False
                 if not the_same and not keep_all:
                     break
-            if the_same:
-                self.status.setTheSame(proj)
-            if keep_all:
-                self.status.setKeepAll(proj)
+            self.status.set(proj, 'the_same', the_same)
+            self.status.set(proj, 'keep_all', keep_all)
             cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[idx].iteritems()))
             prog.update(count)
             db.close()
         prog.done()
         # free some RAM
         idMaps.clear()
-        # launch all variantCachers
+        # tells the dispatcher that we have created all maps
         for proj in self.projects:
-            self.status.setStatus(proj, 1)
+            self.status.set(proj, 'completed', 1)
 
 class VariantMapper(threading.Thread):
-    '''The worker thread read variants from all projects...'''
+    '''The worker thread read variants from all projects and create 
+    id maps along the way. This mapper does not sort variants, uses 
+    more RAM, but it is much faster because it can run in paralle..'''
     def __init__(self, projects, alt_build, status):
         self.projects = projects
         self.alt_build = alt_build
         self.status = status
-        threading.Thread.__init__(self, name='getting variants')
+        threading.Thread.__init__(self, name='Read and map variants')
 
     def run(self):
         existing = {}
@@ -1691,10 +1690,8 @@ class VariantMapper(threading.Thread):
                     the_same = False
                     break
             #
-            if the_same:
-                self.status.setTheSame(proj)
-            if keep_all:
-                self.status.setKeepAll(proj)
+            self.status.set(proj, 'the_same', the_same)
+            self.status.set(proj, 'keep_all', keep_all)
             # insert into database
             cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
             db.commit()
@@ -1702,13 +1699,13 @@ class VariantMapper(threading.Thread):
             idMaps.clear()
             prog.done()
             #
-            self.status.setStatus(proj, 1)
+            self.status.set(proj, 'completed', 1)
             db.close()
         # free all the RAM
         existing.clear()
 
     
-class VariantCacher(threading.Thread):
+class VariantProcessor(threading.Thread):
     '''The worker thread to merge a project to the master project'''
     def __init__(self, queue, status, logger):
         self.queue = queue
@@ -1724,8 +1721,8 @@ class VariantCacher(threading.Thread):
                 break
             # get parameters
             self.src_proj = item
-            self.all_the_same = self.status.theSame(self.src_proj)
-            self.keep_all = self.status.keepAll(self.src_proj)
+            self.all_the_same = self.status.get(self.src_proj, 'the_same')
+            self.keep_all = self.status.get(self.src_proj, 'keep_all')
             if not (self.all_the_same and self.keep_all):
                 d, p = os.path.split(self.src_proj)
                 if not os.path.isdir(os.path.join(d, 'cache')):
@@ -1737,7 +1734,9 @@ class VariantCacher(threading.Thread):
                     os.remove(self.cache_proj)
                 #
                 self.cacheVariants()
-            self.status.setStatus(self.src_proj, 2)
+            self.status.set(self.src_proj, 'completed', 2)
+            # get be further processed
+            self.status.set(self.src_proj, 'scheduled', False)
             self.queue.task_done()
 
     def cacheVariants(self):
@@ -1809,7 +1808,7 @@ class VariantCacher(threading.Thread):
         db.detach('__fromDB')
         db.close()
 
-class SampleCacher(threading.Thread):
+class SampleProcessor(threading.Thread):
     def __init__(self, queue, status, logger):
         self.queue = queue
         self.logger = logger
@@ -1823,8 +1822,9 @@ class SampleCacher(threading.Thread):
                 self.queue.task_done()
                 break
             # get parameters
-            self.src_proj, self.samples = item
-            self.all_the_same = self.status.theSame(self.src_proj)
+            self.src_proj = item
+            self.all_the_same = self.status.get(self.src_proj, 'the_same')
+            self.samples = self.status.get(self.src_proj, 'old_ids')
             #
             if not self.all_the_same:
                 self.src_geno = self.src_proj.replace('.proj', '_genotype.DB')
@@ -1840,7 +1840,8 @@ class SampleCacher(threading.Thread):
                     os.remove(self.cache_geno)
                 #
                 self.cacheSample()
-            self.status.setStatus(self.src_proj, 3)
+            self.status.set(self.src_proj, 'completed', 3)
+            self.status.set(self.src_proj, 'scheduled', False)
             self.queue.task_done()
 
     def cacheSample(self):
@@ -1892,8 +1893,8 @@ class VariantCopier(threading.Thread):
         db = DatabaseEngine()
         db.connect(self.proj.proj_file)
         for idx, proj in enumerate(self.projects):
-            all_the_same = self.status.theSame(proj)
-            keep_all = self.status.keepAll(proj)
+            all_the_same = self.status.get(proj, 'the_same')
+            keep_all = self.status.get(proj, 'keep_all')
             # get cache_proj
             db.attach(proj, '__fromDB')
             if not (all_the_same and keep_all):
@@ -1936,6 +1937,7 @@ class VariantCopier(threading.Thread):
             db.detach('__fromDB')
             if not (all_the_same and keep_all):
                 db.detach('__cacheDB')
+            self.status.set('__copyVariants', 'completed', idx + 1)
         # create index
         #
         if self.proj.alt_build is not None:
@@ -1944,16 +1946,15 @@ class VariantCopier(threading.Thread):
         else:
             db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         db.close()
-        self.status.setStatus('__copyVariants', 1)
+        self.status.set('__copyVariants', 'completed', len(self.projects) + 10)
 
 class SampleCopier(threading.Thread):
-    def __init__(self, proj, projects, status, sample_map):
+    def __init__(self, proj, projects, status):
         self.proj = proj
         self.logger = proj.logger
         #
         self.projects = projects
         self.status = status
-        self.sample_map = sample_map
         #
         threading.Thread.__init__(self, name='copy samples')
 
@@ -1961,8 +1962,9 @@ class SampleCopier(threading.Thread):
         # connect to cache geno
         db = DatabaseEngine()
         db.connect(self.proj.proj_file.replace('.proj', '_genotype.DB'))
-        for idx, proj in enumerate(self.projects):
-            all_the_same = self.status.theSame(proj)
+        count = 0
+        for proj in self.projects:
+            all_the_same = self.status.get(proj, 'the_same')
             if all_the_same:
                 src_geno = proj.replace('.proj', '_genotype.DB')
                 db.attach(src_geno, '__geno')
@@ -1974,7 +1976,7 @@ class SampleCopier(threading.Thread):
                 db.attach(cache_geno, '__geno')
             #
             cur = db.cursor()
-            for _old_id, _new_id in zip(self.sample_map[idx][0], self.sample_map[idx][1]):
+            for _old_id, _new_id in zip(self.status.get(proj, 'old_ids'), self.status.get(proj, 'new_ids')):
                 # create table
                 cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={};'.format(db.PH),
                     ('genotype_{}'.format(_old_id),))
@@ -1984,78 +1986,52 @@ class SampleCopier(threading.Thread):
                     .format(_new_id, _old_id)
                 self.logger.debug('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
                 cur.execute(query)
+                count += 1
             db.detach('__geno')
+            self.status.set('__copySamples', 'completed', count)
         db.close()
-        self.status.setStatus('__copySamples', 1)
 
 class MergeStatus:
-    def __init__(self, projects):
-        tasks = projects + ['__copyVariants', '__copySamples']
-        self.status = {x:0 for x in tasks}
-        self.busy = {x:False for x in tasks}
-        self.the_same = {x:False for x in projects}
-        self.keep_all = {x:False for x in projects}
+    def __init__(self):
+        self.tasks = {}
         self.lock = threading.Lock()
 
-    def isBusy(self, proj):
-        return self.busy[proj]
+    def add(self, name, items):
+        self.tasks[name] = items
 
-    def setBusy(self, proj):
+    def set(self, proj, item, value):
         self.lock.acquire()
-        self.busy[proj] = True
+        self.tasks[proj][item] = value
         self.lock.release()
 
-    def getStatus(self, proj):
-        return self.status[proj]
+    def get(self, proj, item):
+        return self.tasks[proj][item]
 
-    def setKeepAll(self, proj):
-        self.keep_all[proj] = True
+    def canProcessVariant(self, proj):
+        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['completed'] == 1
 
-    def keepAll(self, proj):
-        return self.keep_all[proj]
-
-    def setTheSame(self, proj):
-        self.the_same[proj] = True
-
-    def theSame(self, proj):
-        return self.the_same[proj]
-
-    def setStatus(self, proj, status):
-        # status 0:    not ready
-        # status 1:    all variants read
-        # status 2:    finished processing variant tables
-        # status 3:    finished processing sample tables
-        self.lock.acquire()
-        self.status[proj] = status
-        self.busy[proj] = False
-        self.lock.release()
-
-    def canCacheVariant(self, proj):
-        return self.status[proj] == 1
-
-    def canCacheSample(self, proj):
-        return self.status[proj] == 2
-
-    def varCached(self):
-        return sum([x >=2 for x in self.status.values()])
+    def canProcessSample(self, proj):
+        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['completed'] == 2
 
     def canCopyVariants(self):
-        return (not self.busy['__copyVariants']) and (not self.status['__copyVariants'] == 1) and all([y >=2 for x,y in self.status.iteritems() if x not in ['__copyVariants', '__copySamples']])
+        return (not self.tasks['__copyVariants']['scheduled']) and \
+            all([y['completed'] >=2 for x,y in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
 
     def canCopySamples(self):
-        return (not self.busy['__copySamples']) and (not self.status['__copySamples'] == 1) and all([y >=3 for x,y  in self.status.iteritems() if x not in ['__copyVariants', '__copySamples']])
+        return (not self.tasks['__copySamples']['scheduled']) and \
+            all([y['completed'] >=3 for x,y  in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
 
     def count(self):
-        return sum(self.status.values())
+        return sum([x['completed'] for x in self.tasks.values()])
+    
+    def total_count(self):
+        return sum([x['total_count'] for x in self.tasks.values()])
 
     def report(self):
-        # for debugging 
-        print '\nRead {}, var cached {}, sample cached {}, copy var {}, caopy sample {}'.format(
-            sum([x >= 1 for x in self.status.values()]),
-            sum([x >= 2 for x in self.status.values()]),
-            sum([x >= 3 for x in self.status.values()]),
-            self.canCopyVariants(), self.canCopySamples())
-        
+        for key in self.tasks:
+            print key, self.tasks[key]['completed'],
+        print
+        #print self.tasks
 
 class ProjectsMerger:
     def __init__(self, proj, dirs, sort, jobs):
@@ -2141,12 +2117,14 @@ class ProjectsMerger:
                 tables.sort()
                 if tables != sorted(list(structure.keys())):
                     raise ValueError("Project {} does not have the same set of variant tables ({}) as other projects ({})"\
-                        .format(proj_file, len(tables) - 3, len(structure.keys()) -3))
+                        .format(proj_file,
+                        ', '.join([x for x in tables if x not in ['sample', 'filename', 'project']]),
+                        ', '.join([x for x in structure.keys() if x not in ['sample', 'filename', 'project']])))
                 for table in tables:
                     if structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
-                        raise ValueError('Table {} ({} columns) in project {} does not have the same structure as others ({} columns).'\
-                            .format(table, len(self.db.fieldsOfTable('__fromDB.{}'.format(table))),
-                            proj_file, len(structure[table])))
+                        raise ValueError('Columns of table {} ({}) in project {} does not match those are in others ({}).'\
+                            .format(table, ', '.join(self.db.getHeaders('__fromDB.{}'.format(table))),
+                            proj_file, ', '.join([x[0] for x in structure[table]])))
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
             if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
@@ -2158,47 +2136,48 @@ class ProjectsMerger:
             #
             self.db.detach('__fromDB')
        
-    def mapSamples(self):
+    def mapSamples(self, status):
         '''Population filename and sample table, return id maps
         '''
         cur = self.db.cursor()
         filenames = []
         #
         ignored_files = 0
-        self.sample_map = {}
-        for idx, proj in enumerate(self.projects):
+        for proj in self.projects:
             self.db.attach(proj, '__proj')
             self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
             #
             # handling filename
             cur.execute('SELECT file_id, filename, header FROM __proj.filename;')
-            _filename_records = cur.fetchall()
-            _old_sample_id = []
-            _new_sample_id = []
-            for _old_file_id, _filename, _header in _filename_records:
-                if _filename in filenames:
+            filename_records = cur.fetchall()
+            old_sample_id = []
+            new_sample_id = []
+            for old_file_id, filename, header in filename_records:
+                if filename in filenames:
                     ignored_files += 1
                     continue
                 else:
-                    filenames.append(_filename)
+                    filenames.append(filename)
                 #
                 cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(self.db.PH),
-                    (_filename, _header))
-                _new_file_id = cur.lastrowid
+                    (filename, header))
+                new_file_id = cur.lastrowid
                 # get samples
                 cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
-                    (_old_file_id, ))
-                _old_sid = [x[0] for x in cur.fetchall()]
-                _new_sid = []
+                    (old_file_id, ))
+                old_sid = [x[0] for x in cur.fetchall()]
+                new_sid = []
                 headers = self.db.getHeaders('sample')
-                for _id in _old_sid:
-                    cur.execute('INSERT INTO sample ({0}) SELECT {0} FROM __proj.sample WHERE __proj.sample.sample_id = {1};'\
-                        .format(', '.join(headers[1:]), self.db.PH), (_id,))
-                    _new_sid.append(cur.lastrowid)
+                for sid in old_sid:
+                    cur.execute('''INSERT INTO sample ('file_id', {0}) SELECT {1}, {0} 
+                        FROM __proj.sample WHERE __proj.sample.sample_id = {1};'''\
+                        .format(', '.join(headers[2:]), self.db.PH), (new_file_id, sid))
+                    new_sid.append(cur.lastrowid)
                 #
-                _old_sample_id.extend(_old_sid)
-                _new_sample_id.extend(_new_sid)
-            self.sample_map[idx] = (_old_sample_id, _new_sample_id)
+                old_sample_id.extend(old_sid)
+                new_sample_id.extend(new_sid)
+            status.set(proj, 'old_ids', old_sample_id)
+            status.set(proj, 'new_ids', new_sample_id)
             self.db.detach('__proj')
             self.db.detach('__geno')
         return ignored_files
@@ -2206,54 +2185,75 @@ class ProjectsMerger:
     def merge(self):
         if len(self.projects) == 0:
             return
-        ignored_files = self.mapSamples()
         nJobs = max(min(self.jobs, len(self.projects) + 1), 1)
         #
-        self.proj.db.close()
+        #
+        # collect status
+        status = MergeStatus()
+        #
+        # for projects, total_count means
+        # 1: read
+        # 2. variant processed
+        # 3. sample processed
+        for proj in self.projects:
+            status.add(proj, {'completed': 0, 'scheduled': False, 'total_count': 3})
+        # this will set for each project
+        #  old_ids: sample id of the original projects
+        #  new_ids: sample id in the new project
+        ignored_files = self.mapSamples(status)
         # stop the database so that it can be opened in thread
-        status = MergeStatus(self.projects)
+        self.proj.db.close()
+        #
+        # two more tasks
+        #
+        # copy variants: performed after all variants are processed
+        # the number of count is the number of projects + 10, which is the estimated
+        # amount of work to build indexes
+        status.add('__copyVariants', {'completed': 0, 'scheduled': False,
+            'total_count': len(self.projects) + 10})
+        # copy samples: performaned after all samples are processed,
+        # the number of count is the number of samples
+        status.add('__copySamples', {'completed': 0, 'scheduled': False,
+            'total_count': sum([len(status.get(proj, 'old_ids')) for proj in self.projects])})
+        # start all variant cachers
+        self.vcQueue = Queue.Queue()
+        for j in range(nJobs):
+            VariantProcessor(self.vcQueue, status, self.logger).start()
+        #
+        # start all sample cachers
+        self.scQueue = Queue.Queue()
+        for j in range(nJobs):
+            SampleProcessor(self.scQueue, status, self.logger).start()
+        #
         # create a thread to read variants
         if self.sort:
             SortedVariantMapper(self.projects, self.proj.alt_build, status).start()
         else:
             VariantMapper(self.projects, self.proj.alt_build, status).start()
-        # start all variant cachers
-        self.vcQueue = Queue.Queue()
-        for j in range(nJobs):
-            VariantCacher(self.vcQueue, status, self.logger).start()
-        #
-        # start all sample cachers
-        self.scQueue = Queue.Queue()
-        for j in range(nJobs):
-            SampleCacher(self.scQueue, status, self.logger).start()
         #
         prog = None
         count = 0
-        total_count = 3 * len(self.projects) + 2
         while True:
             for idx, proj in enumerate(self.projects):
-                #self.logger.debug('Status proj: {}'.format(status.getStatus(proj)))
-                if status.isBusy(proj):
-                    continue
-                if status.canCacheVariant(proj) and self.vcQueue.qsize() < nJobs:
-                    self.logger.debug('caching variant for {}'.format(proj))
-                    status.setBusy(proj)
+                if status.canProcessVariant(proj) and self.vcQueue.qsize() < nJobs:
+                    self.logger.debug('Process variant in {}'.format(proj))
+                    status.set(proj, 'scheduled', True)
                     self.vcQueue.put(proj)
-                if status.canCacheSample(proj) and self.vcQueue.qsize() + self.scQueue.qsize() < nJobs:
-                    self.logger.debug('caching sample for {}'.format(proj))
-                    status.setBusy(proj)
-                    self.scQueue.put((proj, self.sample_map[idx][0]))
+                if status.canProcessSample(proj) and self.vcQueue.qsize() + self.scQueue.qsize() < nJobs:
+                    self.logger.debug('Process variant in {}'.format(proj))
+                    status.set(proj, 'scheduled', True)
+                    self.scQueue.put(proj)
             if status.canCopyVariants():
-                status.setBusy('__copyVariants')
+                status.set('__copyVariants', 'scheduled', True)
                 VariantCopier(self.proj, self.projects, status).start()
                 # stop all variant cachers
                 for j in range(nJobs):
                     self.vcQueue.put(None)
                 self.vcQueue.join()
-                prog = ProgressBar('Merging all projects', total_count)
+                prog = ProgressBar('Merging all projects', status.total_count())
             if status.canCopySamples():
-                status.setBusy('__copySamples')
-                SampleCopier(self.proj, self.projects, status, self.sample_map).start()
+                status.set('__copySamples', 'scheduled', True)
+                SampleCopier(self.proj, self.projects, status).start()
                 # stop all sample cachers
                 for j in range(nJobs):
                     self.scQueue.put(None)
@@ -2262,7 +2262,7 @@ class ProjectsMerger:
             if status.count() > count and prog:
                 count = status.count()
                 prog.update(count)
-            if status.count() == total_count:
+            if status.count() == status.total_count():
                 break
             time.sleep(1)
         #
