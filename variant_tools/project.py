@@ -2298,10 +2298,10 @@ def initArguments(parser):
             and alternative reference genome, variant info and phentoype.''')
     sub.add_argument('--sort', action='store_true',
         help='''Sort variants read from subprojects, which takes less RAM but longer time. If
-            unset, all variants will be read to RAM and perform a faster merge at a clost of
-            high memory usage'''),
-    sub.add_argument('-j', '--jobs', type=int, default=4,
-        help='''Number of threads used to merge subprojects. Default to 4.'''),
+            unset, all variants will be read to RAM and perform a faster merge at a cost of
+            higher memory usage'''),
+    #sub.add_argument('-j', '--jobs', type=int, default=4,
+    #    help='''Number of threads used to merge subprojects. Default to 4.'''),
     parser.add_argument('--build',
         help='''Build of the primary reference genome of the project.'''),
     parser.add_argument('-f', '--force', action='store_true',
@@ -2340,7 +2340,10 @@ def init(args):
                 copier = ProjCopier(proj, args.parent[0], args.parent[1])
                 copier.copy()
             elif args.children:
-                merger = ProjectsMerger(proj, args.children, args.sort, args.jobs)
+                # args.jobs is temporarily removed to keep interface clean
+                # a default value of 4 is used. We will see if there is a need
+                # to add it back
+                merger = ProjectsMerger(proj, args.children, args.sort, 4)
                 merger.merge()
     except Exception as e:
         sys.exit(e)
