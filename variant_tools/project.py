@@ -1587,9 +1587,9 @@ class SortedVariantMapper(threading.Thread):
             db.connect(proj)
             cur = db.cursor()
             prog.reset('create mapping table {}'.format(idx + 1))
-            cur.execute('DROP TABLE IF EXISTS __fromDB.__id_map;')
-            cur.execute('CREATE TABLE __fromDB.__id_map (old_id INT, new_id INT, is_dup INT);')
-            insert_query = 'INSERT INTO __fromDB.__id_map VALUES ({0}, {0}, {0});'.format(db.PH);
+            cur.execute('DROP TABLE IF EXISTS __id_map;')
+            cur.execute('CREATE TABLE __id_map (old_id INT, new_id INT, is_dup INT);')
+            insert_query = 'INSERT INTO __id_map VALUES ({0}, {0}, {0});'.format(db.PH);
             the_same = True
             keep_all = True
             for old_id, (new_id, is_duplicate) in idMaps[idx].iteritems():
@@ -1603,6 +1603,7 @@ class SortedVariantMapper(threading.Thread):
             self.status.set(proj, 'keep_all', keep_all)
             cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[idx].iteritems()))
             prog.update(count)
+            db.commit()
             db.close()
         prog.done()
         # free some RAM
