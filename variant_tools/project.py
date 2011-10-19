@@ -2296,14 +2296,14 @@ def initArguments(parser):
         help='''A list of a subprojects (directories) that will be merged to create
             this new project. The subprojects must have the same structure (primary
             and alternative reference genome, variant info and phentoype.''')
-    sub.add_argument('--sort', action='store_true',
-        help='''Sort variants read from subprojects, which takes less RAM but longer time. If
-            unset, all variants will be read to RAM and perform a faster merge at a cost of
-            higher memory usage'''),
+    #sub.add_argument('--sort', action='store_true',
+    #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
+    #        unset, all variants will be read to RAM and perform a faster merge at a cost of
+    #        higher memory usage'''),
     #sub.add_argument('-j', '--jobs', type=int, default=4,
     #    help='''Number of threads used to merge subprojects. Default to 4.'''),
-    parser.add_argument('--build',
-        help='''Build of the primary reference genome of the project.'''),
+    #parser.add_argument('--build',
+    #    help='''Build of the primary reference genome of the project.'''),
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
     engine = parser.add_argument_group('Database connection')
@@ -2316,8 +2316,8 @@ def initArguments(parser):
         help='User name to the MySQL server. Default to current username.')
     engine.add_argument('--passwd',
         help='Password to the MySQL server.')
-    parser.add_argument('--batch', default=10000, 
-        help='Number of query per transaction. Larger number leads to better performance but requires more ram.')
+    #parser.add_argument('--batch', default=10000, 
+    #    help='Number of query per transaction. Larger number leads to better performance but requires more ram.')
 
 
 def init(args):
@@ -2330,10 +2330,13 @@ def init(args):
             except:
                 pass
         # create a new project
-        with Project(name=args.project, build=args.build, new=True, 
+        #
+        # args.batch is temporarily removed to keep interface clean
+        # args.build is temporarily removed to keep interface clean
+        with Project(name=args.project, build=None, new=True, 
             verbosity='1' if args.verbosity is None else args.verbosity,
             engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
-            batch=args.batch) as proj:
+            batch=10000) as proj:
             if args.parent:
                 if len(args.parent) != 2:
                     raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
@@ -2343,7 +2346,11 @@ def init(args):
                 # args.jobs is temporarily removed to keep interface clean
                 # a default value of 4 is used. We will see if there is a need
                 # to add it back
-                merger = ProjectsMerger(proj, args.children, args.sort, 4)
+                #
+                # args.sort is temporarily removed to keep interface clean
+                # because the only advantage (save RAM) does not really justify
+                # its inclusion.
+                merger = ProjectsMerger(proj, args.children, False, 4)
                 merger.merge()
     except Exception as e:
         sys.exit(e)
