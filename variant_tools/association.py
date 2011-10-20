@@ -98,7 +98,7 @@ class AssociationTester(Sample):
         '''Get phenotype for specified samples (specified by condition).'''
         try:
             query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(phenotype)) + \
-                (' WHERE {}'.format(' AND '.join(condition)) if condition else '') + ';'
+                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
