@@ -193,7 +193,6 @@ class Sample:
             if field.lower() not in [x.lower() for x in cur_fields]:
                 self.proj.checkFieldName(field, exclude='sample')
                 new_field[field] = True
-                count[1] += 1  # new
             else:
                 new_field[field] = False
                 count[2] += 1  # updated
@@ -206,7 +205,7 @@ class Sample:
                 query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
                     .format(', '.join([x[1] for x in stat]), self.proj.name, ID,
                         'WHERE {}'.format(genotypes) if genotypes.strip() else '')
-                self.logger.info(query)
+                self.logger.debug(query)
                 try:
                     cur.execute(query)
                     res = cur.fetchone()
@@ -216,7 +215,7 @@ class Sample:
                         query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
                             .format(expr, self.proj.name, ID,
                                 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
-                        self.logger.info(query)
+                        self.logger.debug(query)
                         try:
                             cur.execute(query)
                             v = cur.fetchone()
@@ -224,7 +223,6 @@ class Sample:
                                 res[idx] = v[0]
                         except Exception as e:
                             self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
-                self.logger.info('RES {}'.format(res))
                 for val, (field, expr) in zip(res, stat):
                     if val is None:
                         if not new_field:
@@ -239,6 +237,7 @@ class Sample:
                                  str: 'VARCHAR(255)',
                                  None: 'FLOAT'}[type(val)]))
                             new_field[field] = False
+                            count[1] += 1  # new
                         cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [val, ID])
                         count[0] += 1
                 prog.update(prog_count + 1)
