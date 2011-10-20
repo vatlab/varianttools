@@ -158,9 +158,9 @@ def select(args, reverse=False):
             if args.samples:
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
-                IDs = proj.selectSampleByPhenotype(' AND '.join(args.samples))
+                IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
                 if len(IDs) == 0:
-                    proj.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(args.samples)))
+                    proj.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in args.samples])))
                     # nothing will be selected
                     where_clause += ' AND 0'
                 #

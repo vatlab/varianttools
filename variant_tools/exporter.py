@@ -493,7 +493,7 @@ def export(args):
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
-                samples=' AND '.join(args.samples), format=args.format, build=args.build, header=args.header,
+                samples=' AND '.join(['({})'.format(x) for x in args.samples]), format=args.format, build=args.build, header=args.header,
                 fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()

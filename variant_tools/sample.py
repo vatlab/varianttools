@@ -132,7 +132,54 @@ class Sample:
             count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
         self.db.commit()
 
-    def setField(self, field, expression, genotypes, samples):
+    def setPhenotype(self, field, expression, samples):
+        '''Add a field using expression calculated from sample variant table'''
+        IDs = self.proj.selectSampleByPhenotype(samples)
+        if not IDs:
+            raise ValueError('No sample is selected using condition "{}"'.format(samples))
+        #
+        count = [0, 0, 0]
+        cur = self.db.cursor()
+        cur.execute('SELECT {} FROM sample;'.format(expression))
+        fldType = None
+        for rec in cur:
+            if fldType is None:
+                fldType = type(rec[0])
+                continue
+            elif rec[0] is None: # missing
+                continue
+            if type(rec[0]) != fldType:
+                if type(rec[0]) is float and fldType is int:
+                    fltType = float
+                else:
+                    raise ValueError('Inconsistent type returned from different samples')
+        if expression != 'NULL' and fldType is None:
+            raise ValueError('Cannot determine the type of the expression')
+        # if adding a new field
+        cur_fields = self.db.getHeaders('sample')[3:]
+        if field.lower() not in [x.lower() for x in cur_fields]:
+            self.proj.checkFieldName(field, exclude='sample')
+            self.logger.info('Adding field {}'.format(field))
+            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
+                {int: 'INT',
+                 float: 'FLOAT',
+                 str: 'VARCHAR(255)',
+                 None: 'FLOAT'}[fldType]))
+            count[1] += 1  # new
+        else:
+            # FIXME: check the case for type mismatch
+            count[2] += 1  # updated
+        #
+        cur = self.db.cursor()
+        for ID in IDs:
+            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(field, 
+                None if expression == 'NULL' else expression, self.db.PH), (ID,))
+            count[0] += 1
+        self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
+            count[0], count[1]+count[2], count[1], count[2], len(IDs)))
+        self.db.commit()
+
+    def fromSampleStat(self, field, expression, genotypes, samples):
         '''Add a field using expression calculated from sample variant table'''
         IDs = self.proj.selectSampleByPhenotype(samples)
         if not IDs:
@@ -143,40 +190,44 @@ class Sample:
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
             self.proj.checkFieldName(field, exclude='sample')
-            self.logger.info('Adding field {}'.format(field))
-            if expression.isdigit():  # all digit 
-                fldtype = 'INT'
-            elif (expression.startswith('"') and expression.endswith('"')) or \
-                (expression.startswith("'") and expression.endswith("'")):
-                fldtype = 'VARCHAR({})'.format(len(expression))
-            else:
-                fldtype = 'FLOAT'
-            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
+            new_field = True
             count[1] += 1  # new
         else:
+            new_field = False
             count[2] += 1  # updated
         #
         cur = self.db.cursor()
         for ID in IDs:
-            # if it is a constant, ...
-            if '(' not in expression:
-                cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH),
-                    [None if expression == 'NULL' else expression, ID])
-                count[0] += 1
-            else:
+            try:
+                query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
+                    .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
+                self.logger.info(query)
                 try:
-                    query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
-                        .format(expression, self.proj.name, ID, 'WHERE {}'.format(genotypes) if genotypes.strip() else '')
                     cur.execute(query)
                     res = cur.fetchone()
-                    if res is None:
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
-                    else:
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
-                        count[0] += 1
                 except Exception as e:
-                    self.logger.debug('Failed query: {}, setting value to None'.format(query))
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
+                    self.logger.debug('Failed: {}. Setting value to NULL.'.format(e))
+                    res = None
+                self.logger.info('RES {}'.format(res))
+                if res is None:
+                    if not new_field:
+                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
+                else:
+                    if new_field:
+                        self.logger.info('Adding field {}'.format(field))
+                        # determine the type of value from the first one.
+                        self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
+                            {int: 'INT',
+                             float: 'FLOAT',
+                             str: 'VARCHAR(255)',
+                             None: 'FLOAT'}[type(res[0])]))
+                        new_field = False
+                    self.logger.debug('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH))
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[0], ID])
+                    count[0] += 1
+            except Exception as e:
+                self.logger.info('Updating phenotype {} failed: {}'.format(field, e))
+                #cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
         self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
@@ -289,7 +340,7 @@ class Sample:
         for id in IDs:
             whereClause = ''
             if genotypes is not None and len(genotypes) != 0:
-                whereClause = 'where ' + ' AND '.join(genotypes)
+                whereClause = 'where ' + ' AND '.join(['({})'.format(x) for x in genotypes])
             
             fieldSelect = ''
             if validGenotypeFields is not None and len(validGenotypeFields) != 0:
@@ -435,14 +486,20 @@ def phenotypeArguments(parser):
             only the specified phenotypes will be imported. Parameter --samples
             could be used to limit the samples for which phenotypes are imported.'''),
     parser.add_argument('--set', nargs='*', default=[],
+        help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
+            using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio
+            of the number of high quality variants to the number of all variants, where
+            high_qt and all_qt are obtained from sample statistics using parameter
+            --from_stat). Parameters --samples could be used to limit the samples for
+            which genotypes will be set.'''),
+    parser.add_argument('--from_stat', nargs='*', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
-            example, '--set "num=count(*)"' sets phenotype num to be the number of
+            example, '--stat "num=count(*)"' sets phenotype num to be the number of
             genotypes of a sample, '--set "DP=avg(DP)"' sets phenotype DP to be the 
             average depth (if DP is one of the genotype fields) of the sample. Multiple
-            fields (e.g. '--set "num=count(*)" "DP=avg(DP)"') and constant expressions
-            (e.g. '--set aff=1') are also allowed. Parameters --genotypes and --samples
-            could be used to limit the genotypes to be considered and the samples for
-            which genotypes will be set.'''),
+            fields (e.g. '--set "num=count(*)" "DP=avg(DP)"') are also allowed. 
+            Parameters --genotypes and --samples could be used to limit the genotypes
+            to be considered and the samples for which genotypes will be set.'''),
     parser.add_argument('-g', '--genotypes', nargs='*', default=[],
         help='''Limit the operation to genotypes that match specified conditions.
             Use 'vtools show genotypes' to list usable fields for each sample.'''),
@@ -453,18 +510,26 @@ def phenotypeArguments(parser):
 def phenotype(args):
     try:
         with Project() as proj:
+            proj.db.attach('{}_genotype'.format(proj.name))
             p = Sample(proj)
             if args.from_file:
                 filename = args.from_file[0]
                 fields = args.from_file[1:]
-                p.load(filename, fields, ' AND '.join(args.samples))
+                p.load(filename, fields, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.set:
-                proj.db.attach('{}_genotype'.format(proj.name))
                 for item in args.set:
                     field, expr = [x.strip() for x in item.split('=', 1)]
                     if not expr:
-                        raise ValueError('Invalid parameter {}, which should have format field=expression'.format(item))
-                    p.setField(field, expr, ' AND '.join(args.genotypes), ' AND '.join(args.samples))
+                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_phenotype'.format(item))
+                    p.setPhenotype(field, expr, ' AND '.join(['({})'.format(x) for x in args.samples]))
+            if args.from_stat:
+                for item in args.from_stat:
+                    field, expr = [x.strip() for x in item.split('=', 1)]
+                    if not expr:
+                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_field'.format(item))
+                    p.fromSampleStat(field, expr,
+                        ' AND '.join(['({})'.format(x) for x in args.genotypes]),
+                        ' AND '.join(['({})'.format(x) for x in args.samples]))
         proj.close()
     except Exception as e:
         sys.exit(e)
@@ -501,7 +566,7 @@ def sampleStat(args):
             p = Sample(proj)
             IDs = None
             if args.samples:
-                IDs = proj.selectSampleByPhenotype(' AND '.join(args.samples))
+                IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
                 if len(IDs) == 0:
                     p.logger.info('No sample is selected (or available)')
                     return

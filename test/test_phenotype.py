@@ -70,10 +70,13 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
         # FIXME the following tests pass but have to verify the output. Will do that manually and add assertEqual
         # total genotypes per individual. apply "count" on sample variant tables
-        self.assertSucc('vtools phenotype --set "numGeno=count(*)"')
-        self.assertSucc("vtools phenotype --set 'validGeno=count(*)' --genotypes 'DP_FMT>10'")
+
+    def testPhenotypeFromStat(self):
+        'Test command phenotype --from_stat'
+        self.assertSucc('vtools phenotype --from_stat "numGeno=count(*)"')
+        self.assertSucc("vtools phenotype --from_stat 'validGeno=count(*)' --genotypes 'DP_FMT>10'")
         # apply some sqlite functions on sample variant tables to provide useful information for genotype qualities
-        self.assertSucc('vtools phenotype --set "meanDP=avg(DP_FMT)" "minDP=min(DP_FMT)" "maxDP=max(DP_FMT)"')
+        self.assertSucc('vtools phenotype --from_stat "meanDP=avg(DP_FMT)" "minDP=min(DP_FMT)" "maxDP=max(DP_FMT)"')
         
 
 if __name__ == '__main__':

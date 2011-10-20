@@ -2399,9 +2399,9 @@ def remove(args):
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select samples to be removed')
                 proj.db.attach(proj.name + '_genotype')
-                IDs = proj.selectSampleByPhenotype(' AND '.join(args.items))
+                IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.items]))
                 if len(IDs) == 0:
-                    proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(args.items)))
+                    proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(['({})'.format(x) for x in args.items])))
                 proj.removeSamples(IDs)
             elif args.type == 'fields':
                 from_table = defaultdict(list)
@@ -2463,7 +2463,7 @@ def remove(args):
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select genotypes to be removed')
                 proj.db.attach(proj.name + '_genotype')
-                proj.removeGenotypes(' AND '.join(args.items))
+                proj.removeGenotypes(' AND '.join(['({})'.format(x) for x in args.items]))
             elif args.type == 'phenotypes':
                 if len(args.items) == 0:
                     raise ValueError('Please specify one or more phenotypes (columns in the output of "vtools show samples") to be removed')

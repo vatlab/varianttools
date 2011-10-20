@@ -85,11 +85,11 @@ class AssociationTester(Sample):
     def getSamples(self, condition):
         '''Get a list of samples from specified condition. This function sets self.IDs'''
         if condition:
-            self.IDs = self.proj.selectSampleByPhenotype(' AND '.join(condition))
+            self.IDs = self.proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in condition]))
             if len(self.IDs) == 0:
-                raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(condition)))
+                raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
-                self.logger.info('{} condition are selected by condition: {}'.format(len(self.IDs), ' AND '.join(condition)))
+                self.logger.info('{} condition are selected by condition: {}'.format(len(self.IDs), ' AND '.join(['({})'.format(x) for x in condition])))
         else:
             # select all condition
             self.IDs = self.proj.selectSampleByPhenotype('1')
