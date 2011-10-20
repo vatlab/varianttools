@@ -89,6 +89,7 @@ namespace std
     %template(vectorf)    vector<double>; 
     %template(vectori)    vector<int>; 
     %template(matrixi)    vector<vector<int> >;
+    %template(matrixf)    vector<vector<double> >;
     %template(vectora)    vector<vtools::BaseAction * >; 
 }
 

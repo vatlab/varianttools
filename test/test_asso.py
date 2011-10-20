@@ -19,7 +19,7 @@ if __name__ == '__main__':
         print(data.phenotype())
         print(data.genotype())
     #
-        p = t.PhenoPermutator(100, [t.SomeTest()])
+        p = t.PhenoPermutator(100, [t.SimpleLinearRegression()])
         print(p.permute(data))
 
     except:

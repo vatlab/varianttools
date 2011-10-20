@@ -78,29 +78,29 @@ public:
 };
 
 
-class SomeTest : public BaseAction
+class SimpleLinearRegression : public BaseAction
 {
 public:
-	SomeTest() : BaseAction()
+	SimpleLinearRegression() : BaseAction()
 	{
 	}
 
 
 	BaseAction * clone()
 	{
-		return new SomeTest(*this);
+		return new SimpleLinearRegression(*this);
 	}
 
 
-	double apply(AssoData & d)
-	{
-        //
-        // get genotype 
-        // get phenotype
-        // perform some statistical test
-        // return p-value
-		return 1.;
-	}
+	double apply(AssoData & d, int sided = 1)
+  {    
+    //assert(m_phenotype.size() == m_genotype.size());
+    d.binToX();
+    double xbar = d.mean_genotype();
+    double ybar = d.mean_phenotype();
+    double statistic = d.simpleLinear(xbar, ybar);
+    return d.gaussianP(statistic, sided); 
+  }
 
 
 };
