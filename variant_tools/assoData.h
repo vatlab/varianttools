@@ -108,6 +108,16 @@ public:
     return mean / (1.0 * m_X.size());
   }
 
+  double pvalue()
+  {
+    return m_pval;
+  }
+  
+  double statistic()
+  {
+    return m_statistic;
+  }
+
 
 public:
 	void permuteY()
@@ -138,7 +148,7 @@ public:
 					break;
 				}
 				else if (m_genotype[i][j] > 0.0) {
-					pnovar *= m_genotype[i][j];
+					pnovar *= (1.0 - m_genotype[i][j]);
 				} 
 				else;
 			}
@@ -164,7 +174,6 @@ public:
     for (size_t j = 0; j != m_maf.size(); ++j) {
       if (m_maf[j] <= lower || m_maf[j] > upper) 
         continue;
-
       else {
         for (size_t i = 0; i != xdat.size(); ++i)
           m_genotype[i].push_back(xdat[i][j]);
@@ -172,14 +181,13 @@ public:
     }  
   }
 
-	double simpleLinear(double xbar, double ybar)
+	void simpleLinear(double xbar, double ybar)
   {
     // simple linear regression score test
     // FIXME: may later need a struct of output such as beta, CI, etc	
     //!- Statistic: LSE (MLE) for beta, centered and scaled (bcz E[b] = 0 and sigma = 1 by simulation) 
     //!- See page 41 of Kutner's Applied Linear Stat. Model, 5th ed.
     //
-    double statistic = 0.0;
     double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
     for (size_t i = 0; i != m_X.size(); ++i) {
       numerator += (m_X[i] - xbar) * m_phenotype[i];
@@ -192,22 +200,19 @@ public:
       //!- Compute MSE and V[\hat{beta}]
       //!- V[\hat{beta}] = MSE / denominator
       double varb = ysigma / (m_phenotype.size() * denominator);
-      statistic = (numerator / denominator) / sqrt(varb); 
-    } 
-    
-    return statistic;
+      m_statistic = (numerator / denominator) / sqrt(varb); 
+    }
+    else m_statistic = 0.0;
   }
 
-	double gaussianP(double statistic, int sided = 1)
+	void gaussianP(unsigned sided = 1)
   {
-    double p = 1.0;
     if (sided == 1) {
-      p = gsl_cdf_ugaussian_Q(statistic);
+      m_pval = gsl_cdf_ugaussian_Q(m_statistic);
     }
     else {
-      p = gsl_cdf_chisq_Q(statistic*statistic, 1.0);
+      m_pval = gsl_cdf_chisq_Q(m_statistic*m_statistic, 1.0);
     }
-    return p;
   }
 
 // permutation should use Clopper-Pearson 95% interval which is exact and conservative	
@@ -222,6 +227,9 @@ private:
 	vectorf m_maf;
 	/// translated genotype
 	vectorf m_X;
+
+  double m_pval;
+  double m_statistic;
 };
 
 }

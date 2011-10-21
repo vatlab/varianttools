@@ -22,10 +22,13 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef _UTILS_H
+#define _UTILS_H
 
 #include <cmath>
 #include <limits>
 
-bool fEqual(double a, double b) {
-    return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
+inline bool fEqual(double a, double b) {
+  return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
 }
+#endif

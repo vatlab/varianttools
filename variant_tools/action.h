@@ -1,5 +1,5 @@
 /**
- *  $File: assoData.h $
+ *  $File: action.h $
  *  $LastChangedDate: 2011-07-06 23:27:10 -0500 (Wed, 06 Jul 2011) $
  *  $Rev: 4256 $
  *
@@ -7,7 +7,7 @@
  *  summarize, and filter variants for next-gen sequencing ananlysis.
  *  Please visit http://varianttools.sourceforge.net for details.
  *
- *  Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+ *  Copyright (C) 2011 Gao Wang (wangow@gmail.com) and Bo Peng (bpeng@mdanderson.org)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -98,8 +98,9 @@ public:
     d.binToX();
     double xbar = d.mean_genotype();
     double ybar = d.mean_phenotype();
-    double statistic = d.simpleLinear(xbar, ybar);
-    return d.gaussianP(statistic, sided); 
+    d.simpleLinear(xbar, ybar);
+    d.gaussianP(sided); 
+    return d.pvalue();
   }
 
 
