@@ -54,6 +54,9 @@ public:
 };
 
 
+typedef std::vector<BaseAction *> vectora;
+
+
 class SumToX : public BaseAction
 {
 public:
@@ -73,8 +76,28 @@ public:
 		d.sumToX();
 		return 0;
 	}
+};
 
 
+class BinToX : public BaseAction
+{
+public:
+	BinToX() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone()
+	{
+		return new BinToX(*this);
+	}
+
+
+	double apply(AssoData & d)
+	{
+		d.binToX();
+		return 0;
+	}
 };
 
 
@@ -92,22 +115,43 @@ public:
 	}
 
 
-	double apply(AssoData & d, int sided = 1)
+	double apply(AssoData & d)
   {    
-    //assert(m_phenotype.size() == m_genotype.size());
-    d.binToX();
+    //assert(m_phenotype.size() == m_X.size());
     double xbar = d.mean_genotype();
     double ybar = d.mean_phenotype();
     d.simpleLinear(xbar, ybar);
-    d.gaussianP(sided); 
-    return d.pvalue();
+    return 0;
   }
-
-
 };
 
 
-typedef std::vector<BaseAction *> vectora;
+class GaussianPval : public BaseAction
+{
+public:
+	GaussianPval(unsigned sided=1) 
+    : BaseAction(), m_sided(sided)
+	{
+	}
+
+
+	BaseAction * clone()
+	{
+		return new GaussianPval(*this);
+	}
+
+
+	double apply(AssoData & d)
+	{
+    d.gaussianP(m_sided); 
+    return 0;
+	}
+
+private:
+  unsigned m_sided;
+};
+
+
 
 
 }

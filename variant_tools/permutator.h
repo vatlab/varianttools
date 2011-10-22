@@ -29,6 +29,7 @@
 #include "assoConfig.h"
 #include "assoData.h"
 #include "action.h"
+#include <functional>
 
 namespace vtools {
 
@@ -73,6 +74,7 @@ protected:
 
 class PhenoPermutator : public BasePermutator
 {
+
 public:
 	PhenoPermutator(size_t times, const vectora & actions)
 		: m_times(times), BasePermutator(actions)
@@ -82,22 +84,22 @@ public:
 
 	double permute(AssoData & d)
 	{
-		double all_p = 0;
+		vectorf all_statistic(m_times);
 
 		for (size_t i = 0; i < m_times; ++i) {
-			d.permuteY();
 			for (size_t j = 0; j < m_actions.size(); ++j) {
-				all_p += m_actions[j]->apply(d);
+				m_actions[j]->apply(d);
 			}
+      all_statistic[i] = d.statistic(); 
+			d.permuteY();
 		}
-		return all_p;
+		return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
 	}
 
 
 private:
 	size_t m_times;
 };
-
 
 }
 

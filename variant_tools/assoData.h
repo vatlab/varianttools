@@ -45,7 +45,9 @@ namespace vtools {
 class AssoData
 {
 public:
-	AssoData() : m_phenotype(0), m_genotype(0), m_maf(0), m_X(0)
+	AssoData() : 
+    m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
+    m_statistic(0.0), m_pval(0.0)
 	{
 
 	}
