@@ -485,7 +485,7 @@ class DatabaseEngine:
         return DatabaseEngine(engine=self.engine, batch=self.batch,
             **self.connectionParams)
         
-    def connect(self, db):
+    def connect(self, db, readonly=False):
         '''Connect to a database'''
         if self.engine == 'mysql':
             if '.' in db or os.sep in db:
@@ -497,11 +497,12 @@ class DatabaseEngine:
             cur.execute('USE {};'.format(self.dbName))
         else:
             self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
-            self.database = sqlite3.connect(self.dbName)
+            self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
             # set default cache size to a larger number to improve query performance
-            cur = self.database.cursor()
-            cur.execute('PRAGMA default_cache_size=2000;')
-            self.database.commit()
+            if not readonly:
+                cur = self.database.cursor()
+                cur.execute('PRAGMA default_cache_size=2000;')
+                self.database.commit()
 
     def close(self):
         if self.engine == 'mysql':

@@ -49,11 +49,11 @@ class GenotypeStatStatus:
         return len(self.tasks)
 
 class GenotypeStatCalculator(threading.Thread):
-    def __init__(self, dbName, stat, queue, status, genotypes, logger):
+    def __init__(self, dbName, stat, idQueue, status, genotypes, logger):
         '''Use sql to process sample passed from queue, set results in status'''
         self.dbName = dbName
         self.stat = stat
-        self.queue = queue
+        self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
         self.logger = logger
@@ -61,7 +61,7 @@ class GenotypeStatCalculator(threading.Thread):
 
     def run(self):
         db = DatabaseEngine()
-        db.connect(self.dbName)
+        db.connect(self.dbName, readonly=True)
         cur = db.cursor()
         while True:
             ID = self.queue.get()
@@ -258,15 +258,15 @@ class Sample:
         # at least one, at most number of IDs
         nJobs = max(min(self.jobs, len(IDs)), 1)
         # start all workers
-        queue = Queue.Queue()
+        idQueue = Queue.Queue()
         status = GenotypeStatStatus()
         for j in range(nJobs):
             GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
-                stat, queue, status, genotypes, self.logger).start()
+                stat, idQueue, status, genotypes, self.logger).start()
         #
-        # put all jobs to queuq, the workers will work on them
+        # put all jobs to queue, the workers will work on them
         for ID in IDs:
-            queue.put(ID)
+            idQueue.put(ID)
         #
         count = 0
         prog = ProgressBar('Calculating phenotype', len(IDs))
@@ -278,7 +278,7 @@ class Sample:
             if status.count() == len(IDs):
                 # stop all threads
                 for j in range(nJobs):
-                    queue.put(None)
+                    idQueue.put(None)
                 break
             # wait 1 sec to check status again
             time.sleep(1)
