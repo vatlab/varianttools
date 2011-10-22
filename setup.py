@@ -41,23 +41,56 @@ VTOOLS_VERSION = '1.0rc2'
 with_association = False
 
 if with_association:
-    GSL_FILES = [
-        'variant_tools/gsl/elementary.c',
-        'variant_tools/gsl/error.c',
-        'variant_tools/gsl/exp.c',
-        'variant_tools/gsl/fdiv.c',
-        'variant_tools/gsl/gamma.c',
-        'variant_tools/gsl/hyperg.c',
-        'variant_tools/gsl/hypergeometric.c',
-        'variant_tools/gsl/infnan.c',
-        'variant_tools/gsl/log.c',
-        'variant_tools/gsl/log1p.c',
-        'variant_tools/gsl/math.c',
-        'variant_tools/gsl/psi.c',
-        'variant_tools/gsl/trig.c',
-        'variant_tools/gsl/chisq.c',
-        'variant_tools/gsl/zeta.c'
-    ]    
+    LIB_GSL = [ 
+    'variant_tools/gsl/error.c',
+    'variant_tools/gsl/sys/infnan.c',
+    'variant_tools/gsl/sys/coerce.c',
+    'variant_tools/gsl/sys/fdiv.c',
+    'variant_tools/gsl/sys/pow_int.c',
+    'variant_tools/gsl/sys/fcmp.c',
+    'variant_tools/gsl/sys/log1p.c',
+    'variant_tools/gsl/sys/invhyp.c',
+    'variant_tools/gsl/complex/math.c',
+    'variant_tools/gsl/specfunc/beta.c',
+    'variant_tools/gsl/specfunc/psi.c',
+    'variant_tools/gsl/specfunc/trig.c',
+    'variant_tools/gsl/specfunc/exp.c',
+    'variant_tools/gsl/specfunc/expint.c',
+    'variant_tools/gsl/specfunc/log.c',
+    'variant_tools/gsl/specfunc/erfc.c',
+    'variant_tools/gsl/specfunc/zeta.c',
+    'variant_tools/gsl/specfunc/elementary.c',
+    'variant_tools/gsl/specfunc/gamma.c',
+    'variant_tools/gsl/specfunc/gamma_inc.c',
+    'variant_tools/gsl/rng/rng.c',
+    'variant_tools/gsl/rng/default.c',
+    'variant_tools/gsl/rng/mt.c',
+    'variant_tools/gsl/rng/types.c',
+    'variant_tools/gsl/randist/binomial.c',
+    'variant_tools/gsl/randist/binomial_tpe.c',
+    'variant_tools/gsl/randist/beta.c',
+    'variant_tools/gsl/randist/exponential.c',
+    'variant_tools/gsl/randist/geometric.c',
+    'variant_tools/gsl/randist/nbinomial.c',
+    'variant_tools/gsl/randist/poisson.c',
+    'variant_tools/gsl/randist/multinomial.c',
+    'variant_tools/gsl/randist/chisq.c',
+    'variant_tools/gsl/randist/gauss.c',
+    'variant_tools/gsl/randist/gausszig.c',
+    'variant_tools/gsl/randist/gamma.c',
+    'variant_tools/gsl/randist/hyperg.c',
+    'variant_tools/gsl/cdf/binomial.c',
+    'variant_tools/gsl/cdf/beta.c',
+    'variant_tools/gsl/cdf/betainv.c',
+    'variant_tools/gsl/cdf/gauss.c',
+    'variant_tools/gsl/cdf/gaussinv.c',
+    'variant_tools/gsl/cdf/chisq.c',
+    'variant_tools/gsl/cdf/chisqinv.c',
+    'variant_tools/gsl/cdf/gamma.c',
+    'variant_tools/gsl/cdf/gammainv.c',
+    'variant_tools/gsl/cdf/hypergeometric.c',
+    'variant_tools/gsl/cdf/poisson.c'
+    ] 
     
     # Under linux/gcc, lib stdc++ is needed for C++ based extension.
     if sys.platform == 'linux2':
@@ -72,11 +105,11 @@ if with_association:
     ext_module = [
         Extension('variant_tools/_assoTests',
             sources = ['variant_tools/assoTests.i',
-                'variant_tools/assoData.cpp'] + GSL_FILES,
+                'variant_tools/assoData.cpp'] + LIB_GSL,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
             library_dirs = [],
             libraries = libs,
-            include_dirs = [".", "variant_tools"],
+            include_dirs = [".", "variant_tools", "variant_tools/gsl"],
         )
       ]
 else:
