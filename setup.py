@@ -38,7 +38,7 @@ VTOOLS_VERSION = '1.0rc2'
 #
 # the association module is not ready for prime time...
 # 
-with_association = True
+with_association = False
 
 if with_association:
     GSL_FILES = [

@@ -25,13 +25,83 @@
 #
 
 import sys
+import threading
+import Queue
+import time
 from collections import defaultdict
 from .project import Project
-from .utils import ProgressBar, typeOfValues
+from .utils import DatabaseEngine, ProgressBar, typeOfValues
+
+class GenotypeStatStatus:
+    def __init__(self):
+        self.tasks = {}
+        self.lock = threading.Lock()
+
+    def set(self, task, value):
+        self.lock.acquire()
+        self.tasks[task] = value
+        self.lock.release()
+    
+    def get(self, task):
+        return self.tasks[task]
+        
+    def count(self):
+        return len(self.tasks)
+
+class GenotypeStatCalculator(threading.Thread):
+    def __init__(self, dbName, stat, queue, status, genotypes, logger):
+        '''Use sql to process sample passed from queue, set results in status'''
+        self.dbName = dbName
+        self.stat = stat
+        self.queue = queue
+        self.status = status
+        self.genotypes = genotypes
+        self.logger = logger
+        threading.Thread.__init__(self, name='Calculate genotype statistics')
+
+    def run(self):
+        db = DatabaseEngine()
+        db.connect(self.dbName)
+        cur = db.cursor()
+        while True:
+            ID = self.queue.get()
+            # finish everything
+            if ID is None:
+                self.queue.task_done()
+                break
+            # run query
+            res = [None] * len(self.stat)
+            #
+            query = 'SELECT {} FROM genotype_{} {};'\
+                .format(', '.join([x[1] for x in self.stat]), ID,
+                    'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+            self.logger.debug(query)
+            try:
+                cur.execute(query)
+                res = cur.fetchone()
+            except Exception as e:
+                # some field might not exist, so we will have to run one by one
+                for idx, (field, expr) in enumerate(self.stat):
+                    query = 'SELECT {} FROM genotype_{} {};'\
+                        .format(expr, ID,
+                            'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                    self.logger.debug(query)
+                    try:
+                        cur.execute(query)
+                        v = cur.fetchone()
+                        if v is not None:
+                            res[idx] = v[0]
+                    except Exception as e:
+                        self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
+            # set result
+            self.status.set(ID, res)
+            self.queue.task_done()
+        db.close()  
 
 class Sample:
-    def __init__(self, proj):
+    def __init__(self, proj, jobs):
         self.proj = proj
+        self.jobs = jobs
         self.logger = proj.logger
         self.db = proj.db
 
@@ -185,8 +255,36 @@ class Sample:
         if not IDs:
             raise ValueError('No sample is selected using condition "{}"'.format(samples))
         #
+        # at least one, at most number of IDs
+        nJobs = max(min(self.jobs, len(IDs)), 1)
+        # start all workers
+        queue = Queue.Queue()
+        status = GenotypeStatStatus()
+        for j in range(nJobs):
+            GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
+                stat, queue, status, genotypes, self.logger).start()
+        #
+        # put all jobs to queuq, the workers will work on them
+        for ID in IDs:
+            queue.put(ID)
+        #
+        count = 0
+        prog = ProgressBar('Calculating phenotype', len(IDs))
+        while True:
+            if status.count() > count:
+                count = status.count()
+                prog.update(count)
+            # if everything is done
+            if status.count() == len(IDs):
+                # stop all threads
+                for j in range(nJobs):
+                    queue.put(None)
+                break
+            # wait 1 sec to check status again
+            time.sleep(1)
+        prog.done()
+        # submit all results, these should be quick so no progress bar is used
         count = [0, 0, 0]
-        # if adding a new field
         cur_fields = self.db.getHeaders('sample')[3:]
         new_field = {}
         for field in [x[0] for x in stat]:
@@ -196,55 +294,20 @@ class Sample:
             else:
                 new_field[field] = False
                 count[2] += 1  # updated
-        #
         cur = self.db.cursor()
-        prog = ProgressBar('Calculating phenotype', len(IDs))
-        for prog_count, ID in enumerate(IDs):
-            try:
-                res = [None] * len(stat)
-                query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
-                    .format(', '.join([x[1] for x in stat]), self.proj.name, ID,
-                        'WHERE {}'.format(genotypes) if genotypes.strip() else '')
-                self.logger.debug(query)
-                try:
-                    cur.execute(query)
-                    res = cur.fetchone()
-                except Exception as e:
-                    # some field might not exist, so we will have to run one by one
-                    for idx, (field, expr) in enumerate(stat):
-                        query = 'SELECT {} FROM {}_genotype.genotype_{} {};'\
-                            .format(expr, self.proj.name, ID,
-                                'WHERE {}'.format(genotypes) if genotypes.strip() else '')
-                        self.logger.debug(query)
-                        try:
-                            cur.execute(query)
-                            v = cur.fetchone()
-                            if v is not None:
-                                res[idx] = v[0]
-                        except Exception as e:
-                            self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
-                for val, (field, expr) in zip(res, stat):
-                    if val is None:
-                        if not new_field:
-                            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
-                    else:
-                        if new_field[field]:
-                            self.logger.debug('Adding field {}'.format(field))
-                            # determine the type of value from the first one.
-                            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
-                                {int: 'INT',
-                                 float: 'FLOAT',
-                                 str: 'VARCHAR(255)',
-                                 None: 'FLOAT'}[type(val)]))
-                            new_field[field] = False
-                            count[1] += 1  # new
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [val, ID])
-                        count[0] += 1
-                prog.update(prog_count + 1)
-            except Exception as e:
-                self.logger.info('Updating phenotype {} failed: {}'.format(field, e))
-                #cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [None, ID])
-        prog.done()
+        for ID in IDs:
+            res = status.get(ID)
+            for idx, (field, expr) in enumerate(stat):
+                if new_field[field]:
+                    self.logger.debug('Adding field {}'.format(field))
+                    # determine the type of value
+                    self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
+                        typeOfValues([str(status.get(x)[idx]) for x in IDs])))
+                    new_field[field] = False
+                    count[1] += 1  # new
+                cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                count[0] += 1
+        # report result
         self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
@@ -527,8 +590,7 @@ def phenotypeArguments(parser):
 def phenotype(args):
     try:
         with Project() as proj:
-            proj.db.attach('{}_genotype'.format(proj.name))
-            p = Sample(proj)
+            p = Sample(proj, args.jobs)
             if args.from_file:
                 filename = args.from_file[0]
                 fields = args.from_file[1:]

@@ -40,10 +40,12 @@ try:
 except ImportError:
     with_association = False
 
-def addVerbosityArg(parser):
+def addCommonArgs(parser):
     parser.add_argument('-v', '--verbosity', metavar='STD[LOG]',
         help='''Output error and warning (0), info (1) and debug (2) information
-            to standard output (default to 1), and to a logfile (default to 2).''')
+            to standard output (default to 1), and to a logfile (default to 2).'''),
+    parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
+        help='''Allow at most N concurrent jobs.''')
 
 if __name__ == '__main__':
     #
@@ -64,7 +66,7 @@ if __name__ == '__main__':
         command will fail if another project already exists in this directory,
         unless option '--force' is used to remove the existing project.''')
     project.initArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=project.init)
     #
     # command import
@@ -73,7 +75,7 @@ if __name__ == '__main__':
         description='''Import variants and related sample genotype from one or more
             delimiter separated files (e.g. VCF and a number of indel formats).''')
     importer.importVariantsArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=importer.importVariants)
     # 
     # command phenotype
@@ -81,13 +83,13 @@ if __name__ == '__main__':
         description='''Import phenotypes from a file or set phenotype according
             to summary statistics of sample genotype.''')
     sample.phenotypeArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=sample.phenotype)
     #
     # command show
     parser = subparsers.add_parser('show', help='Display content of a project')
     project.showArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=project.show)
     #
     # command liftover
@@ -98,7 +100,7 @@ if __name__ == '__main__':
             coordinates in an alternative reference genome. The UCSC liftover
             tool will be automatically downloaded if it is not available.''')
     liftOver.liftOverArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=liftOver.liftOver)
     #
     # command sample_stat
@@ -110,14 +112,14 @@ if __name__ == '__main__':
             max_FIELD (e.g. --mean_GQ_INFO for the average genotype call quality across all samples).
         ''')
     sample.sampleStatArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=sample.sampleStat)
     #
     # command use
     parser = subparsers.add_parser('use',
         help='Prepare (download or import if necessary) and use an annotation database.')
     annotation.useArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=annotation.use)
     #
     # command update
@@ -127,7 +129,7 @@ if __name__ == '__main__':
             variants or their locations (e.g. Read annotation from ANNOVAR output files, import additional
             variant or genotype fields from .vcf files).''')
     importer.updateArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=importer.update)
     #
     # command select
@@ -135,7 +137,7 @@ if __name__ == '__main__':
         help='''Output or save select variants that match specified conditions''')
     variant.selectArguments(parser)
     variant.generalOutputArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=variant.select)
     #
     # command exclude
@@ -143,7 +145,7 @@ if __name__ == '__main__':
         help='''Output or save variants after excluding variants that match specified conditions''')
     variant.excludeArguments(parser)
     variant.generalOutputArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=variant.exclude)
     #
     # command compare
@@ -151,7 +153,7 @@ if __name__ == '__main__':
         help='''Compare two variant tables, count or output 
             intersect and difference to other tables''')
     variant.compareArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=variant.compare)
     #
     # command output
@@ -159,20 +161,20 @@ if __name__ == '__main__':
         help='Output variants in tab or comma separated format.')
     variant.outputArguments(parser)
     variant.generalOutputArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=variant.output)
     #
     # command export
     parser = subparsers.add_parser('export',
         help='Export samples (variants and genotypes) in specified format.')
     exporter.exportArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=exporter.export)
     #
     # command remove
     parser = subparsers.add_parser('remove', help='Remove project or its contents.')
     project.removeArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
     #
     # command merge
@@ -182,7 +184,7 @@ if __name__ == '__main__':
     #    same reference genomes. Variant info fields that do not exist in the current
     #    project and samples that already exist in the project will be ignored.''')
     #project.mergeArguments(parser)
-    #addVerbosityArg(parser)
+    #addCommonArgs(parser)
     #parser.set_defaults(func=project.merge)
     #
     # command associate
@@ -194,13 +196,13 @@ if __name__ == '__main__':
             description='''Call one or more statistical association tests and
             return test results as fields to variants tested.''')
         association.associateArguments(parser)
-        addVerbosityArg(parser)
+        addCommonArgs(parser)
         parser.set_defaults(func=association.associate)
     #
     # command execute
     parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement.')
     project.executeArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=project.execute)
     #
     # getting args, some commands accept arbitrary arguments so we need to

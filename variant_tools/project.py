@@ -2343,14 +2343,10 @@ def init(args):
                 copier = ProjCopier(proj, args.parent[0], args.parent[1])
                 copier.copy()
             elif args.children:
-                # args.jobs is temporarily removed to keep interface clean
-                # a default value of 4 is used. We will see if there is a need
-                # to add it back
-                #
                 # args.sort is temporarily removed to keep interface clean
                 # because the only advantage (save RAM) does not really justify
                 # its inclusion.
-                merger = ProjectsMerger(proj, args.children, False, 4)
+                merger = ProjectsMerger(proj, args.children, False, args.jobs)
                 merger.merge()
     except Exception as e:
         sys.exit(e)
