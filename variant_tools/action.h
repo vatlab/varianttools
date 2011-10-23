@@ -126,6 +126,32 @@ public:
 };
 
 
+class SimpleLogisticRegression : public BaseAction
+{
+public:
+	SimpleLogisticRegression() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone()
+	{
+		return new SimpleLogisticRegression(*this);
+	}
+
+
+	double apply(AssoData & d)
+  {    
+    //assert(m_phenotype.size() == m_X.size());
+    //check for binary
+    double xbar = d.mean_genotype();
+    unsigned ncases = d.count_cases();
+    d.simpleLogit(xbar, ncases);
+    return 0;
+  }
+};
+
+
 class GaussianPval : public BaseAction
 {
 public:

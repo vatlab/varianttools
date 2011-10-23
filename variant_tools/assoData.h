@@ -34,6 +34,8 @@ typedef std::vector<std::vector<int> > matrixi;
 #include <cassert>
 #include <numeric>
 #include <algorithm>
+#include <functional>
+
 #include "assoConfig.h"
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
@@ -110,6 +112,11 @@ public:
     return mean / (1.0 * m_X.size());
   }
 
+  unsigned count_cases()
+  {
+    return (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), std::bind2nd(std::equal_to<double>(),1.0));
+  }
+
   double pvalue()
   {
     return m_pval;
@@ -160,6 +167,7 @@ public:
 		}
 	}
 
+
 	void filterByMaf(double upper=0.01, double lower=0.0)
   {
     //FIXME: may want to do it smartly via sqlite. i.e., 
@@ -182,6 +190,7 @@ public:
       }
     }  
   }
+
 
 	void simpleLinear(double xbar, double ybar)
   {
@@ -206,6 +215,37 @@ public:
     }
     else m_statistic = 0.0;
   }
+
+
+  void simpleLogit(double xbar, unsigned n1)
+  {
+    //!- Score test implementation for logistic regression model logit(p) = b0 + b1x 
+    //!- labnotes vol.2 page 3
+    //!- input phenotypes have to be binary values 0 or 1
+
+    //double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
+    //double bo = log(ebo);
+
+    double po = (1.0 * n1) / (1.0 * m_phenotype.size());
+    double ss = 0.0;
+    // the score
+    for (size_t i = 0; i != m_X.size(); ++i) { 
+      ss += (m_X[i] - xbar) * ((m_phenotype[i]) - po);
+    }
+    double vm1 = 0.0;
+    // variance^-1 of score
+    for (size_t i = 0; i != m_X.size(); ++i) {
+      vm1 += (m_X[i] - xbar) * (m_X[i] - xbar) * po * (1.0 - po);
+    }
+
+    m_statistic = ss * sqrt(vm1);
+
+    //!-FIXME: (not sure why this happens)
+    //!- w/ rounding to 0 I get strange number such as 3.72397e-35
+    //!- this would lead to type I error problem
+    fRound(m_statistic, 0.0001);
+  }
+
 
 	void gaussianP(unsigned sided = 1)
   {

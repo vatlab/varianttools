@@ -29,7 +29,6 @@
 #include "assoConfig.h"
 #include "assoData.h"
 #include "action.h"
-#include <functional>
 
 namespace vtools {
 

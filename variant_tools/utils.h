@@ -31,4 +31,18 @@
 inline bool fEqual(double a, double b) {
   return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
 }
+
+inline void fRound(double& myValue, double PRECISION) 
+{
+  double myRemainder = fmod(myValue, PRECISION);
+  if (myRemainder > ( 0.5 * PRECISION ))
+  {
+    myValue = (myValue - myRemainder + PRECISION);
+  }
+  else
+  {
+    myValue = (myValue  - myRemainder);
+  }
+  return;
+}
 #endif
