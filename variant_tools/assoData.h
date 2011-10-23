@@ -230,15 +230,15 @@ public:
     double ss = 0.0;
     // the score
     for (size_t i = 0; i != m_X.size(); ++i) { 
-      ss += (m_X[i] - xbar) * ((m_phenotype[i]) - po);
+      ss += (m_X[i] - xbar) * (m_phenotype[i] - po);
     }
     double vm1 = 0.0;
-    // variance^-1 of score
+    // variance of score, under the null
     for (size_t i = 0; i != m_X.size(); ++i) {
       vm1 += (m_X[i] - xbar) * (m_X[i] - xbar) * po * (1.0 - po);
     }
 
-    m_statistic = ss * sqrt(vm1);
+    m_statistic = ss / sqrt(vm1);
 
     //!-FIXME: (not sure why this happens)
     //!- w/ rounding to 0 I get strange number such as 3.72397e-35
