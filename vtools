@@ -210,7 +210,7 @@ if __name__ == '__main__':
     args, argv = master_parser.parse_known_args()
     # only command associate and sample_stat accept arbitrary parameter
     if (with_association and args.func == association.associate) or \
-        (args.func in [importer.importVariants, importer.update, exporter.export, sample.sampleStat]):
+        (args.func in [project.init, importer.importVariants, importer.update, exporter.export, sample.sampleStat]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

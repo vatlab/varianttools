@@ -1396,7 +1396,7 @@ class Project:
         
 
 class ProjCopier:
-    def __init__(self, proj, dir, vtable):
+    def __init__(self, proj, dir, vtable, unknown_args):
         self.proj = proj
         self.logger = proj.logger
         self.db = proj.db
@@ -1405,16 +1405,30 @@ class ProjCopier:
         if len(files) != 1:
             raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
         self.vtable = vtable
+        self.parse(unknown_args)
         self.proj_file = files[0]
         self.geno_file = self.proj_file.replace('.proj', '_genotype.DB')
         if not os.path.isfile(self.geno_file):
             self.geno_file = None
 
+    def parse(self, unknown_args):
+        parser = argparse.ArgumentParser(prog='vtools init --parent',
+            description='Parameters to copy items from a parental project')
+        parser.add_argument('--samples', nargs='*', metavar='COND', default=[],
+            help='''Copy only samples that match certain conditions to the subproject.''')
+        parser.add_argument('--sample_range', nargs=2, metavar=['START', 'END'],
+            help='''Copy only samples from start to end (1-based).''')
+        parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
+            help='''Copy only genotypes that match certain conditions''')
+        args = parser.parse_args(unknown_args)
+        self.samples = ' AND '.join(['({})'.format(x) for x in args.samples])
+        self.genotypes = ' AND '.join(['({})'.format(x) for x in args.genotypes])
+
     def copyProject(self):
         self.db.attach(self.proj_file, '__fromDB')
         tables = self.db.tables('__fromDB')
         if self.vtable not in tables:
-            raise ValueError('Table {} does not exist in project {}'.format(self.vtable, files[0]))
+            raise ValueError('Table {} does not exist in project {}'.format(self.vtable, self.proj_file))
         headers = self.db.getHeaders('__fromDB.{}'.format(self.vtable))
         if headers[0] != 'variant_id':
             raise ValueError('Table {} is not a variant table'.format(args.table[1]))
@@ -1447,6 +1461,16 @@ class ProjCopier:
             #
             prog.update(idx)
         prog.done()
+        # remove uncopied samples
+        self.IDs = self.proj.selectSampleByPhenotype(self.samples)
+        # if a condition is specified, remove unselected IDs
+        if self.samples:
+            allIDs = self.proj.selectSampleByPhenotype('')
+            removed = [x for x in allIDs if x not in self.IDs]
+            for ID in removed:
+                cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH),
+                    (ID,))
+            self.logger.debug('Removing {} unselected samples'.format(len(removed)))
         self.proj.saveProperty('annoDB', '[]')
         return self.db.numOfRows('variant', False)
 
@@ -1457,9 +1481,9 @@ class ProjCopier:
         db.attach(self.proj_file, '__fromDB')
         db.attach(self.geno_file, '__fromGeno')
         cur = db.cursor()
-        tables = db.tables('__fromGeno')
-        prog = ProgressBar('Copying samples', len(tables))
-        for idx, table in enumerate(tables):
+        prog = ProgressBar('Copying samples', len(self.IDs))
+        for idx, ID in enumerate(sorted(self.IDs)):
+            table = 'genotype_{}'.format(ID)
             # get schema
             cur.execute('SELECT sql FROM __fromGeno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
                 (table,))
@@ -1483,7 +1507,7 @@ class ProjCopier:
         db.detach('__fromGeno')
         db.detach('__fromDB')
         db.close()
-        return len(tables)
+        return len(self.IDs)
 
     def createIndex(self, sqls):
         db = DatabaseEngine()
@@ -2291,7 +2315,9 @@ def initArguments(parser):
         help='''Directory and variant table of a parent project (e.g. --parent ../ chr1) from
             which variants in specified variant table will be copied to the new project. This
             option is often used to split a project into several subprojects that will be
-            processed in parallel.''')
+            processed in parallel. This option also allows parameter --samples, --sample_range,
+            and --genotypes which copy selected samples by conditions or range (e.g. 1-100, 1-based, 
+            inclusive at both ends), and selected genotypes by condition.''')
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project. The subprojects must have the same structure (primary
@@ -2340,12 +2366,14 @@ def init(args):
             if args.parent:
                 if len(args.parent) != 2:
                     raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
-                copier = ProjCopier(proj, args.parent[0], args.parent[1])
+                copier = ProjCopier(proj, args.parent[0], args.parent[1], args.unknown_args)
                 copier.copy()
             elif args.children:
                 # args.sort is temporarily removed to keep interface clean
                 # because the only advantage (save RAM) does not really justify
                 # its inclusion.
+                if args.unknown_args:
+                    raise ValueError('Unknown args for option --children: {}'.format(' '.join(args.unknown_args)))
                 merger = ProjectsMerger(proj, args.children, False, args.jobs)
                 merger.merge()
     except Exception as e:
