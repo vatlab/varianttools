@@ -27,6 +27,15 @@
 
 #include <cmath>
 #include <limits>
+#include <algorithm>
+#include <functional>
+
+extern struct VPlus {
+  template<typename T> std::vector<T> operator()(std::vector<T> x, std::vector<T> y) {
+    std::transform(x.begin(), x.end(), y.begin(), x.begin(), std::plus<T>());
+    return x;
+  }
+} vplus;
 
 inline bool fEqual(double a, double b) {
   return std::fabs(a - b) < std::numeric_limits<double>::epsilon();

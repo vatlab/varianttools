@@ -60,10 +60,10 @@ public:
 
 
 	virtual double permute(AssoData & d)
-	{
-		//
-        throw RuntimeError("The base permutation class should not be called");
-	}
+  {
+    //
+    throw RuntimeError("The base permutation class should not be called");
+  }
 
 
 protected:

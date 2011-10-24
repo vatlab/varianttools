@@ -41,8 +41,8 @@ typedef std::vector<std::vector<int> > matrixi;
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
 
-namespace vtools {
 
+namespace vtools {
 
 class AssoData
 {
@@ -78,9 +78,18 @@ public:
 
 	void setMaf(const vectorf & maf)
 	{
-		//FIXME: will get these info directly from the variant table
+		//will get these info directly from the variant table
 		//Or, alternatively, may want to get the freq info from external sources rather than sample-based
     m_maf = maf;
+	}
+
+
+	void setMaf()
+	{
+		//compute sample based maf
+    m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), m_genotype[0], vplus);
+    std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
+std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
 	}
 
 
@@ -98,6 +107,11 @@ public:
 	matrixf raw_genotype()
 	{
 		return m_genotype;
+	}
+
+	vectorf maf()
+	{
+		return m_maf;
 	}
 
   double mean_phenotype()
