@@ -27,6 +27,7 @@
 import os
 import sys
 import gzip
+import bz2
 import re
 from itertools import izip, repeat
 from .project import Project, fileFMT
@@ -575,6 +576,8 @@ class BaseImporter:
     def openFile(self, filename):
         if filename.lower().endswith('.gz'):
             return gzip.open(filename, 'rb')
+        elif filename.lower().endswith('.bz2'):
+            return bz2.BZ2File(filename, 'rb')
         else:
             # text file
             # because readline() from gzip.open will be byte, not string, we should return
