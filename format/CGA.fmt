@@ -1,0 +1,63 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Input format from Complete Genomics Variant file, created by Complete Genomcis Analysis Tools (GSA Tools 1.5 or eariler, http://www.completegenomics.com/sequence-data/cgatools/, http://media.completegenomics.com/documents/DataFileFormats+Standard+Pipeline+2.0.pdf). This format imports chr, pos, ref, alt of most likely genotype.
+variant=seq_name, pos, ref, alt
+
+genotype=%(geno)s
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+geno=max_g_type
+geno_info=Q_indel
+
+[seq_name]
+index=4
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=5
+type=INTEGER NOT NULL
+adj=IncreaseBy(1)
+comment=
+
+[type]
+index=7
+type=VARCHAR(255)
+comment=
+
+[ref]
+index=8
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion
+
+[alt]
+index=9
+adj=ExtractField(2, '/')
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion
+
+
+[varScoreVAF]
+index=10
+type=INT
+comment=
+
+[varScoreEAF]
+index=11
+type=INT
+comment=
+
+[varQuality]
+index=12
+adj=MapValue({'VQLOW': 0, 'VAHIGH': 1})
+type=INT
+comment=
+
