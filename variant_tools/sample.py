@@ -415,7 +415,7 @@ class Sample:
         # too bad that I can not use a default dict...
         variants = dict()
         prog = ProgressBar('Counting variants',
-            sum([self.db.numOfRows('{}_genotype.genotype_{}'.format(self.proj.name, id)) for id in IDs]))
+            self.db.numOfRows('{}_genotype.genotype_{}'.format(self.proj.name, list(IDs)[0])) * len(IDs))
         count = 0
         for id in IDs:
             whereClause = ''
