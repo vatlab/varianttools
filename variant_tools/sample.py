@@ -99,7 +99,7 @@ class GenotypeStatCalculator(threading.Thread):
         db.close()  
 
 class Sample:
-    def __init__(self, proj, jobs):
+    def __init__(self, proj, jobs=4):
         self.proj = proj
         self.jobs = jobs
         self.logger = proj.logger
