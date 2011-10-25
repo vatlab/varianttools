@@ -464,7 +464,7 @@ def exportArguments(parser):
         If parameter --samples is specified, only variants belong to one or more of the
         samples will be exported.'''),
     parser.add_argument('filename', help='''Name of output file.'''),
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Samples that will be exported, specified by conditions such as 'aff=1'
             and 'filename like "MG%%"'. Multiple samples could be exported to a
             file if the output format allows. No sample will be outputted if this

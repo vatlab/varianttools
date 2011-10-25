@@ -583,7 +583,7 @@ def phenotypeArguments(parser):
     parser.add_argument('-g', '--genotypes', nargs='*', default=[],
         help='''Limit the operation to genotypes that match specified conditions.
             Use 'vtools show genotypes' to list usable fields for each sample.'''),
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Update phenotype for samples that match specified conditions.
             Use 'vtools show samples' to list usable fields in the sample table.''')
 
@@ -618,11 +618,11 @@ def phenotype(args):
 
 def sampleStatArguments(parser):
     '''Arguments to calculate sample statistics such as allele count'''
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
-    parser.add_argument('--genotypes', nargs='*', default=[],
+    parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show genotypes' (e.g. 'GQ_INFO>15').''')
     parser.add_argument('table',

@@ -108,7 +108,7 @@ def selectArguments(parser):
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be selected.''')
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
@@ -247,7 +247,7 @@ def excludeArguments(parser):
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be excluded.''')
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
