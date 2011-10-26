@@ -1,0 +1,66 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Input format from Complete Genomics Variant file, created by Complete Genomcis Analysis
+	Tools (GSA Tools 1.5 or eariler, http://www.completegenomics.com/sequence-data/cgatools/,
+	http://media.completegenomics.com/documents/DataFileFormats+Standard+Pipeline+2.0.pdf). This
+	format imports chr, pos, ref, alt of most likely genotype.
+variant=chr, pos, ref, alt
+genotype=GT
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+geno_info=
+
+[chr]
+index=3
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=4
+type=INTEGER NOT NULL
+adj=IncreaseBy(1)
+comment=1-based position (increased by 1 from original start position)
+
+[varType]
+index=7
+type=VARCHAR(255)
+comment=Can be ref, snp, ins, del etc. We only handle snp, ins and del
+
+[ref]
+index=7,8
+# other types will return None
+adj=lambda x: x[1] if x[0] in ('snp', 'ins', 'del') else None
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion
+
+[alt]
+index=9,10
+adj=lambda x: x[0] if x[0] == x[1] else ','.join(x)
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion
+
+[GT]
+index=6
+adj=MapValue({'hom': '2', 'het': '1', 'half': None, 'no-call': None})
+type=INT
+comment=Genotype type (2 for homozygote, 1 for heterozygote, and None for others)
+
+[allele1Score]
+index=11
+type=INT
+comment=Quality score for allele 1
+
+[allele2Score]
+index=12
+type=INT
+comment=Quality score for allele 2
+
+
