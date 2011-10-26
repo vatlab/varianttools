@@ -41,6 +41,7 @@ import time
 import tokenize
 import cStringIO
 import gzip
+import bz2
 import threading
 import re
 
@@ -113,10 +114,21 @@ def lineCount(filename):
         # small file, read the number of lines directly
         if filename.endswith('.gz'):
             return len(gzip.open(filename).readlines())
+        elif filename.endswith('.bz2'):
+            return len(bz2.BZ2File(filename).readlines())
         else:
             return len(open(filename).readlines())
     elif filename.endswith('.gz'):
         input = gzip.open(filename, 'rb')
+        input.seek(1000, 0)
+        content = input.read(99000).decode()
+        input.close()
+        lineCount = len(content.split('\n'))
+        input.close()
+        # assuming an arbitrary compression ratio of 5. :-)
+        return int(lineCount * (5 * totalSize / 99000.))
+    elif filename.endswith('.bz2'):
+        input = bz2.BZ2File(filename, 'rb')
         input.seek(1000, 0)
         content = input.read(99000).decode()
         input.close()

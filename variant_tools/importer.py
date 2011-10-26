@@ -304,7 +304,7 @@ class Nullify:
     def nullify_multiple(self, item):
         return None if item in self.val else item
 
-class InvalidRecord(Exception):
+class IgnoredRecord(Exception):
     def __init__(self, value=None):
         self.value = value
 
@@ -321,12 +321,12 @@ class DiscardRecord:
 
     def discard_single(self, item):
         if item == self.val:
-            raise InvalidRecord()
+            raise IgnoredRecord()
         return item
 
     def discard_multiple(self, item):
         if item in self.val:
-            raise InvalidRecord()
+            raise IgnoredRecord()
         return item
     
 class SequentialExtractor:
@@ -524,7 +524,7 @@ class LineImporter:
             # we first trust that nothing can go wrong and use a quicker method
             records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
-        except InvalidRecord as e:
+        except IgnoredRecord as e:
             return
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
@@ -732,10 +732,12 @@ class BaseImporter:
                                     if not fixed:
                                         cols = [x[-1] for x in cols]
                                 header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
-                                if max(cols) - min(cols)  < len(header):
+                                if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
                                     return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
                                 else:
                                     return len(rec), []
+                    except IgnoredRecord:
+                        continue
                     except Exception as e:
                         # perhaps not start with #, if we have no header, use it anyway
                         if header_line is None:
