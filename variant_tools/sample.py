@@ -580,6 +580,9 @@ def phenotypeArguments(parser):
             fields (e.g. '--set "num=count(*)" "DP=avg(DP)"') are also allowed. 
             Parameters --genotypes and --samples could be used to limit the genotypes
             to be considered and the samples for which genotypes will be set.'''),
+    parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
+        help='''Allow at most N concurrent jobs to obtain sample statistics for
+            parameter --from_stat.''')
     parser.add_argument('-g', '--genotypes', nargs='*', default=[],
         help='''Limit the operation to genotypes that match specified conditions.
             Use 'vtools show genotypes' to list usable fields for each sample.'''),

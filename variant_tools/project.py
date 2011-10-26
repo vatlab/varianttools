@@ -2372,9 +2372,12 @@ def init(args):
                 # args.sort is temporarily removed to keep interface clean
                 # because the only advantage (save RAM) does not really justify
                 # its inclusion.
+                #
+                # A default value 4 is given for args.jobs because more threads usually
+                # do not improve effiency
                 if args.unknown_args:
                     raise ValueError('Unknown args for option --children: {}'.format(' '.join(args.unknown_args)))
-                merger = ProjectsMerger(proj, args.children, False, args.jobs)
+                merger = ProjectsMerger(proj, args.children, False, 4)
                 merger.merge()
     except Exception as e:
         sys.exit(e)
