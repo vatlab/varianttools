@@ -251,6 +251,8 @@ class fileFMT:
         self.logger = logger
         # for export only
         self.export_by_fields = 0
+        # for import only
+        self.merge_by_cols = ()
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]
@@ -357,6 +359,8 @@ class fileFMT:
                 self.description = item[1]
             elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
+            elif item[0] == 'merge_by':
+                self.merge_by_cols = eval(item[1])
             elif item[0] == 'export_by':
                 self.export_by_fields = item[1]
             elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
