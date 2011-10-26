@@ -301,15 +301,15 @@ class AnnoDBConfiger:
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
             self.logger.info('Importing annotation data from {0}'.format(f))
-            all_lines = 0
+            all_records = 0
             skipped_lines = 0
             prog = ProgressBar(os.path.split(f)[-1], lineCount(f))
             with self.openAnnoFile(f) as input_file:
                 for bins, rec in processor.processInput(input_file):
                     all_records += 1
                     cur.execute(insert_query, bins + rec)
-                    if all_lines % db.batch == 0:
-                        prog.update(all_lines)
+                    if all_records % db.batch == 0:
+                        prog.update(all_records)
                         db.commit()
             db.commit()
             prog.done()
