@@ -305,26 +305,16 @@ class AnnoDBConfiger:
             skipped_records = 0
             prog = ProgressBar(os.path.split(f)[-1], lineCount(f))
             with self.openAnnoFile(f) as input_file:
-                for line in input_file:
-                    line = line.decode()
-                    num_records = 1
-                    try:
-                        if line.startswith('#'):
-                            continue
-                        for bins,rec in processor.process(line):
-                            all_records += 1
-                            cur.execute(insert_query, bins + rec)
-                    except Exception as e:
-                        # if any problem happens, just ignore
-                        self.logger.debug(e)
-                        skipped_records += 1
+                for bins, rec in processor.processInput(input_file):
+                    all_records += 1
+                    cur.execute(insert_query, bins + rec)
                     if all_records % db.batch == 0:
                         prog.update(all_records)
                         db.commit()
             db.commit()
             prog.done()
             self.logger.info('{0} records are handled, {1} ignored.'\
-                .format(all_records, skipped_records))
+                .format(all_records, processor.skipped_records))
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''

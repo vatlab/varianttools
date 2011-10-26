@@ -252,7 +252,7 @@ class fileFMT:
         # for export only
         self.export_by_fields = 0
         # for import only
-        self.merge_by_cols = ()
+        self.merge_by_cols = None
         #
         if os.path.isfile(name + '.fmt'):
             self.name = os.path.split(name)[-1]

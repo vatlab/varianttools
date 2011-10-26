@@ -347,12 +347,25 @@ class LineImporter:
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
         self.valid_till = None  # genotype fields might be disabled
+        self.skipped_records = 0
 
     def reset(self, validTill=None):
         self.first_time = True
         self.fields = []
         self.nColumns = 0
         self.valid_till = validTill
+
+    def processInput(self, input_file):
+        for line in input_file:
+            line = line.decode()
+            try:
+                if line.startswith('#'):
+                    continue
+                for bins,rec in self.process(line):
+                    yield bins, rec
+            except Exception as e:
+                self.logger.debug(e)
+                self.skipped_records += 1
 
     def process(self, line):
         tokens = [x.strip() for x in line.split(self.delimiter)]
