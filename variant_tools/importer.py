@@ -304,6 +304,31 @@ class Nullify:
     def nullify_multiple(self, item):
         return None if item in self.val else item
 
+class InvalidRecord(Exception):
+    def __init__(self, value=None):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+class DiscardRecord:
+    def __init__(self, val):
+        self.val = val
+        if type(self.val) == str:
+            self.__call__ = self.discard_single
+        else:
+            self.__call__ = self.discard_multiple
+
+    def discard_single(self, item):
+        if item == self.val:
+            raise InvalidRecord()
+        return item
+
+    def discard_multiple(self, item):
+        if item in self.val:
+            raise InvalidRecord()
+        return item
+    
 class SequentialExtractor:
     def __init__(self, extractors):
         '''Define an extractor that calls a list of extractors. The string extracted from
@@ -349,8 +374,9 @@ class LineImporter:
         self.first_time = True
         self.valid_till = None  # genotype fields might be disabled
         # used to report result
-        self.all_lines = 0
+        self.processed_lines = 0
         self.skipped_lines = 0
+        self.num_records = 0
 
     def reset(self, validTill=None):
         self.first_time = True
@@ -359,25 +385,24 @@ class LineImporter:
         self.valid_till = validTill
 
     def processInput(self, input_file):
+        self.processed_lines = 0
+        self.skipped_lines = 0
+        self.num_records = 0
+        #
         if self.merge_by_cols is None:
-            all_lines = 0
-            skipped_lines = 0
             for line in input_file:
                 line = line.decode()
                 try:
                     if line.startswith('#'):
                         continue
-                    all_lines += 1
+                    self.processed_lines += 1
                     for bins,rec in self.process(line):
+                        self.num_records += 1
                         yield bins, rec
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    skipped_lines += 1
-            self.all_lines = all_lines
-            self.skipped_lines = skipped_lines
+                    self.skipped_lines += 1
         else:
-            all_lines = 0
-            skipped_lines = 0
             rec_key = []
             rec_stack = []
             for line in input_file:
@@ -385,7 +410,7 @@ class LineImporter:
                 try:
                     if line.startswith('#'):
                         continue
-                    all_lines += 1
+                    self.processed_lines += 1
                     tokens = [x.strip() for x in line.split(self.delimiter)]
                     key = [tokens(x) for x in self.merge_by_cols]
                     if not rec_stack:
@@ -412,12 +437,11 @@ class LineImporter:
                         rec_key = key
                     #
                     for bins,rec in self.process(line):
+                        self.num_records += 1
                         yield bins, rec
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    skipped_lines += 1
-            self.all_lines = all_lines
-            self.skipped_lines = skipped_lines
+                    self.skipped_lines += 1
 
     def process(self, tokens):
         if type(tokens) is not list:
@@ -500,6 +524,8 @@ class LineImporter:
             # we first trust that nothing can go wrong and use a quicker method
             records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
+        except InvalidRecord as e:
+            return
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
             records = []
@@ -1012,7 +1038,6 @@ class TextImporter(BaseImporter):
             genotype_status = 0
         with self.openFile(input_filename) as input_file:
             for bins, rec in self.processor.processInput(input_file):
-                self.count[2] += 1
                 variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                 if genotype_status == 1:
                     if fld_cols is None:
@@ -1031,12 +1056,13 @@ class TextImporter(BaseImporter):
                     # should have only one sample
                     for id in sample_ids:
                         cur.execute(genotype_insert_query[id], [variant_id])
-                if self.count[2] % self.db.batch == 0:
+                if self.processor.processed_lines % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(self.count[2])
+                    prog.update(self.processor.processed_lines)
             self.db.commit()
             prog.done()
-        self.count[0] = self.processor.all_lines
+        self.count[2] = self.processor.num_records
+        self.count[0] = self.processor.processed_lines
         self.count[7] = self.processor.skipped_lines
 
 class TextUpdater(BaseImporter):
@@ -1215,12 +1241,12 @@ class TextUpdater(BaseImporter):
                         if rec[self.ranges[2] + idx] is not None:
                             cur.execute(genotype_update_query[id], [rec[c] for c in fld_cols[idx]] + [variant_id])
                             self.count[1] += 1
-                self.count[0] += 1
-                if self.count[0] % self.db.batch == 0:
+                if self.processor.processed_lines % self.db.batch == 0:
                     self.db.commit()
-                    prog.update(self.count[0])
+                    prog.update(self.processed_lines)
             self.db.commit()
             prog.done()
+        self.count[0] = self.processor.num_records
         self.count[7] = self.processor.skipped_lines
 
 #

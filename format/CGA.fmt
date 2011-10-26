@@ -11,6 +11,7 @@ description=Input format from Complete Genomics Variant file, created by Complet
 	http://media.completegenomics.com/documents/DataFileFormats+Standard+Pipeline+2.0.pdf). This
 	format imports chr, pos, ref, alt of most likely genotype.
 variant=chr, pos, ref, alt
+variant_info=varType
 genotype=GT
 genotype_info=%(geno_info)s
 
@@ -31,13 +32,12 @@ comment=1-based position (increased by 1 from original start position)
 
 [varType]
 index=7
+adj=DiscardRecord(('ref', 'no-call-rc', 'no-call-ri', 'no-call', 'No-ref'))
 type=VARCHAR(255)
 comment=Can be ref, snp, ins, del etc. We only handle snp, ins and del
 
 [ref]
-index=7,8
-# other types will return None
-adj=lambda x: x[1] if x[0] in ('snp', 'ins', 'del') else None
+index=8
 type=VARCHAR(255)
 comment=Reference allele, '-' for insertion
 
