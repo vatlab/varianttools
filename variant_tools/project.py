@@ -360,7 +360,7 @@ class fileFMT:
             elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             elif item[0] == 'merge_by':
-                self.merge_by_cols = eval(item[1])
+                self.merge_by_cols = [x-1 for x in eval(item[1])]
             elif item[0] == 'export_by':
                 self.export_by_fields = item[1]
             elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:

@@ -294,7 +294,7 @@ class AnnoDBConfiger:
             except Exception as e:
                 self.logger.error('No field {} for build {}'.format(items[1], key))
         #
-        processor = LineImporter(self.fields, build_info, self.delimiter, self.logger)
+        processor = LineImporter(self.fields, build_info, self.delimiter, None, self.logger)
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \

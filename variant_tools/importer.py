@@ -332,7 +332,7 @@ class SequentialExtractor:
 
 class LineImporter:
     '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, logger):
+    def __init__(self, fields, build, delimiter, merge_by_cols, logger):
         '''Fields: a list of fields with index, adj (other items are not used)
         builds: index(es) of position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
@@ -344,6 +344,7 @@ class LineImporter:
         self.raw_fields = fields
         self.fields = []
         self.delimiter = delimiter
+        self.merge_by_cols = merge_by_cols
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
         self.valid_till = None  # genotype fields might be disabled
@@ -358,25 +359,69 @@ class LineImporter:
         self.valid_till = validTill
 
     def processInput(self, input_file):
-        all_lines = 0
-        skipped_lines = 0
-        all_records = 0
-        for line in input_file:
-            line = line.decode()
-            try:
-                if line.startswith('#'):
-                    continue
-                all_lines += 1
-                for bins,rec in self.process(line):
-                    yield bins, rec
-            except Exception as e:
-                self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                skipped_lines += 1
-        self.all_lines = all_lines
-        self.skipped_lines = skipped_lines
+        if self.merge_by_cols is None:
+            all_lines = 0
+            skipped_lines = 0
+            for line in input_file:
+                line = line.decode()
+                try:
+                    if line.startswith('#'):
+                        continue
+                    all_lines += 1
+                    for bins,rec in self.process(line):
+                        yield bins, rec
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    skipped_lines += 1
+            self.all_lines = all_lines
+            self.skipped_lines = skipped_lines
+        else:
+            all_lines = 0
+            skipped_lines = 0
+            rec_key = []
+            rec_stack = []
+            for line in input_file:
+                line = line.decode()
+                try:
+                    if line.startswith('#'):
+                        continue
+                    all_lines += 1
+                    tokens = [x.strip() for x in line.split(self.delimiter)]
+                    key = [tokens(x) for x in self.merge_by_cols]
+                    if not rec_stack:
+                        rec_key = key
+                        rec_stack.append(tokens)
+                        continue
+                    # if the same, wait fot the next record
+                    elif rec_key == key:
+                        rec_stack.append(tokens)
+                        continue
+                    # if not the same, ...
+                    elif len(rec_stack) == 1:
+                        # use the value in stack
+                        line = rec_stack[0]
+                        rec_stack[0] = tokens
+                        rec_key = key
+                    # if multiple
+                    else:
+                        n = len(rec_stack)
+                        # merge values
+                        line = [rec_stack[0][x] if x in self.merge_by_cols else \
+                            ','.join([rec_stack[i][x] for i in range(n)]) for x in range(len(tokens))]
+                        rec_stack[0] = tokens
+                        rec_key = key
+                    #
+                    for bins,rec in self.process(line):
+                        yield bins, rec
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    skipped_lines += 1
+            self.all_lines = all_lines
+            self.skipped_lines = skipped_lines
 
-    def process(self, line):
-        tokens = [x.strip() for x in line.split(self.delimiter)]
+    def process(self, tokens):
+        if type(tokens) is not list:
+            tokens = [x.strip() for x in tokens.split(self.delimiter)]
         if self.first_time:
             self.nColumns = len(tokens)
             cIdx = 0
@@ -830,12 +875,12 @@ class TextImporter(BaseImporter):
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.logger)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of sample
         if self.genotype_field:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
+            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -1031,12 +1076,12 @@ class TextUpdater(BaseImporter):
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.logger)
+            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.logger)
         else:  # position or range type
-            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, self.logger)
+            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, fmt.merge_by_cols, self.logger)
         # probe number of sample
         if self.genotype_field and self.genotype_info:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.logger)
+            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
