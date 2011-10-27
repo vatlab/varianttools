@@ -102,7 +102,7 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = cur.fetchall()
+            self.phenotype = zip(*cur.fetchall())[1]
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve phenotype '.format(', '.join(phenotype)))
@@ -116,7 +116,7 @@ class AssociationTester(Sample):
             group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
             self.from_clause = self.table
             where_clause = []
-            fields_info = sum([self.proj.linkFieldToTable(x, args.table) for x in fields], [])
+            fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
             #
             processed = set()
             for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
@@ -142,13 +142,14 @@ class AssociationTester(Sample):
         if not self.group_by:
             # group must be 'all'
             return self.table
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
         vtable = '__asso_tmp'
         if self.db.hasTable(vtable):
             self.db.truncateTable(vtable)
         else:
-            self.createVariantTable(vtable, temporary=True)
+            self.proj.createVariantTable(vtable, temporary=True)
         #
-        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in fields])
+        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.proj.db.PH) for x in fields])
         query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {} {};'.format(self.from_clause, where_clause)
         self.logger.debug('Running query {}'.format(query))
         cur = self.db.cursor()
@@ -187,10 +188,10 @@ def associate(args, reverse=False):
                 vtable = asso.getVariants(grp)
                 # passing everything to association test
                 genotype = asso.getGenotype(vtable)
-                for test in tests:
+                for test in asso.tests:
                     test.setGenotype(genotype)
                     # step 6: call stat.calculate
-                    values = test.calculate()
+                   # values = test.calculate()
                     # step 7: update variant table
                     fields = test.getOption('fields')
                     # ...
@@ -246,7 +247,7 @@ class NullTest:
 
     def setPhenotype(self, data):
         '''Set phenotype data'''
-        self.t.setPhenotype(data)
+        self.phenotype = data
 
     def setGenotype(self, data):
         self.genotype = data
@@ -265,7 +266,7 @@ class ExternTest(NullTest):
     and prase its output. This is the simplest, but also the slowest method
     to utilize a third-party association test program.
     '''
-    def __init__(self):
+    def __init__(self, logger=None, name=None, *method_args):
         pass
 
 class WssTest(NullTest):
