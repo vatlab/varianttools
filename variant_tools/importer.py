@@ -30,6 +30,7 @@ import gzip
 import bz2
 import re
 from itertools import izip, repeat
+from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
@@ -142,7 +143,7 @@ class CommonEnding:
             return self._commonEnding(item[0], item[1])
 
 
-class FieldFromFormat:
+class __FieldFromFormat:
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that return the value of a field according 
         to a format string. This is used to extract stuff from the format
@@ -150,26 +151,56 @@ class FieldFromFormat:
         '''
         self.name = name
         self.sep = sep
-        self.fmt = '\t'
-        self.idx = None
         self.default = default
+        self.factory = defaultdict(dict)
+        self.index = {}
 
     def __call__(self, item):
-        if not item[0] == self.fmt:
-            fmt, val = item
-            self.fmt = fmt
-            fields = fmt.split(self.sep)
-            if self.name in fields:
-                self.idx = fields.index(self.name)
-                return val.split(self.sep)[self.idx]
-            else:
-                self.idx = None
-                return self.default
         try:
-            return item[1].split(self.sep)[self.idx]
+            # first try to get from a global factory
+            return self.factory[item[0]][item[1]]
         except:
-            # in the case that self.idx is None, or if item[1].split(self.sep) does not have enough items
-            return self.default
+            fmt, val = item
+            try:
+                # now split .... assuming the format has been handled before.
+                # this should be the case most of the time
+                res = val.split(self.sep)[self.index[fmt]]
+                # we assume that the most common ones has been added...
+                # and we do not want to add all sorts of rare values forever
+                if len(self.factory[fmt]) < 10000:
+                    self.factory[fmt][val] = res
+                return res
+            except:
+                # if the format has not been handled before.
+                if fmt not in self.index:
+                    fields = fmt.split(self.sep)
+                    if self.name in fields:
+                        self.index[fmt] = fields.index(self.name)
+                    else:
+                        self.index[fmt] = None
+                # try again
+                try:
+                    res = val.split(self.sep)[self.index[fmt]]
+                    if len(self.factory[fmt]) < 10000:
+                        self.factory[fmt][val] = res
+                    return res
+                # if still error
+                except:
+                    self.factory[fmt][val] = self.default
+                    return self.default
+
+__all_field_from_format = {}
+
+def FieldFromFormat(name, sep=';', default=None):
+    # this is a factory of __FieldFromFormat class
+    #
+    global __all_field_from_format
+    if (name, sep, default) in __all_field_from_format:
+        return __all_field_from_format[(name, sep, default)]
+    else:
+        obj = __FieldFromFormat(name, sep, default)
+        __all_field_from_format[(name, sep, default)] = obj
+        return obj
 
 class VcfGenotype:
     def __init__(self, default=None):
