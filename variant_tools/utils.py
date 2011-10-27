@@ -148,6 +148,20 @@ def lineCount(filename):
         input.close()
         return int(lineCount * (totalSize / 99000.))
 
+
+def openFile(filename):
+    if filename.lower().endswith('.gz'):
+        return gzip.open(filename, 'rb')
+    elif filename.lower().endswith('.bz2'):
+        return bz2.BZ2File(filename, 'rb')
+    else:
+        # text file
+        # because readline() from gzip.open will be byte, not string, we should return
+        # binary here in order to process them equally in order for things to work
+        # correctly under python 3 
+        return open(filename, 'rb')
+
+
 def typeOfValues(vals):
     '''Figure out type of values and return INT, FLOAT or VARCHAR(maxLength)'''
     if len(vals) == 0:

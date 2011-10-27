@@ -29,11 +29,12 @@ import sys
 import gzip
 import bz2
 import re
+from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant
+from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, openFile
 
 # Extractors to extract value from a field
 class ExtractField:
@@ -386,6 +387,39 @@ class SequentialExtractor:
         return item
 
 
+class Preprocessor(Process):
+    def __init__(self, processor, input, output, logger):
+        self.processor = processor
+        self.input = input
+        self.output = output
+        self.logger = logger
+        Process.__init__(self)
+
+    def run(self): 
+        count = 0
+        first = True
+        self.processed_lines = 0
+        self.num_records = 0
+        with openFile(self.input) as input_file:
+            for line in input_file:
+                line = line.decode()
+                try:
+                    if line.startswith('#'):
+                        continue
+                    self.processed_lines += 1
+                    for bins,rec in self.processor.process(line):
+                        self.num_records += 1
+                        if first:
+                            self.output.send(self.processor.columnRange)
+                            first = False
+                        self.output.send((bins, rec))
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    self.skipped_lines += 1
+        # everything is done
+        self.output.send(None)
+
+
 class LineImporter:
     '''An intepreter that read a record, process it and return processed records.'''
     def __init__(self, fields, build, delimiter, merge_by_cols, logger):
@@ -696,18 +730,6 @@ class BaseImporter:
         # by default, reference genome cannot be determined from file
         return None
 
-    def openFile(self, filename):
-        if filename.lower().endswith('.gz'):
-            return gzip.open(filename, 'rb')
-        elif filename.lower().endswith('.bz2'):
-            return bz2.BZ2File(filename, 'rb')
-        else:
-            # text file
-            # because readline() from gzip.open will be byte, not string, we should return
-            # binary here in order to process them equally in order for things to work
-            # correctly under python 3 
-            return open(filename, 'rb')
-
     def createLocalVariantIndex(self):
         '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
         self.variantIndex = {}
@@ -737,7 +759,7 @@ class BaseImporter:
         '''Prove text file for sample name'''
         header_line = None
         count = 0
-        with self.openFile(filename) as input:
+        with openFile(filename) as input:
             for line in input:
                 line = line.decode()
                 # the last # line
@@ -782,7 +804,7 @@ class BaseImporter:
         cur = self.db.cursor()
         # get header of file
         header = ''
-        with self.openFile(filename) as input:
+        with openFile(filename) as input:
             for line in input:
                 line = line.decode()
                 if line.startswith('#'):
@@ -792,7 +814,7 @@ class BaseImporter:
         cur.execute("INSERT INTO filename (filename, header) VALUES ({0}, {0});".format(self.db.PH), (filename, header))
         filenameID = cur.lastrowid
         sample_ids = []
-        s = delayedAction(self.logger.info, 'Creating {} sample variant tables'.format(len(sampleNames)))
+        s = delayedAction(self.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
         for samplename in sampleNames:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                 (filenameID, samplename))
@@ -904,8 +926,9 @@ class BaseImporter:
 class TextImporter(BaseImporter):
     '''Import variants from one or more tab or comma separated files.'''
     def __init__(self, proj, files, build, format, sample_name=None, 
-        force=False, fmt_args=[]):
+        force=False, jobs=1, fmt_args=[]):
         BaseImporter.__init__(self, proj, files, build, force, mode='insert')
+        self.jobs = jobs
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
@@ -1053,7 +1076,6 @@ class TextImporter(BaseImporter):
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, len(self.genotype_field) > 0, self.genotype_info)
         #
         cur = self.db.cursor()
-        prog = ProgressBar(os.path.split(input_filename)[-1], lineCount(input_filename))
         if sample_ids:
             genotype_insert_query = {id: 'INSERT INTO {0}_genotype.genotype_{1} VALUES ({2});'\
                 .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
@@ -1069,12 +1091,67 @@ class TextImporter(BaseImporter):
         else:
             # no genotype no sample
             genotype_status = 0
-        with self.openFile(input_filename) as input_file:
-            for bins, rec in self.processor.processInput(input_file):
+        lc = lineCount(input_filename)
+        update_after = min(max(lc//200, 1000), 100000)
+        if self.jobs == 1:
+            # preprocess data
+            prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+            with openFile(input_filename) as input_file:
+                for bins, rec in self.processor.processInput(input_file):
+                    variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+                    if genotype_status == 1:
+                        if fld_cols is None:
+                            col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                            fld_cols = []
+                            for idx in range(len(sample_ids)):
+                                fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+                            if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                                self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                                    col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
+                        for idx, id in enumerate(sample_ids):
+                            if rec[self.ranges[2] + idx] is not None:
+                                self.count[1] += 1
+                                cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
+                    elif genotype_status == 2:
+                        # should have only one sample
+                        for id in sample_ids:
+                            cur.execute(genotype_insert_query[id], [variant_id])
+                    if self.processor.processed_lines % update_after == 0:
+                        self.db.commit()
+                        prog.update(self.processor.processed_lines)
+            self.count[2] = self.processor.num_records
+            self.count[0] = self.processor.processed_lines
+            self.count[7] = self.processor.skipped_lines
+            self.db.commit()
+            prog.done()
+        else:
+            # one process is for the main program, the
+            # other thread will handle input
+            try:
+                reader, child_output = Pipe(False)
+                p = Preprocessor(self.processor, input_filename, child_output, self.logger)
+                p.start()
+            except Exception as e:
+                self.logger.error('Failed to start processing process: {}'.format(e))
+                raise e
+            # preprocess data
+            prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+            #with openFile(input_filename) as input_file:
+            count = 0
+            columnRange = reader.recv()
+            while True:
+                try:
+                    bins, rec = reader.recv()
+                except TypeError:
+                    # the last one has been reached
+                    reader.close()
+                    break
+                count += 1
+                #for bins, rec in self.processor.processInput(input_file):
                 variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
                 if genotype_status == 1:
                     if fld_cols is None:
-                        col_rngs = [self.processor.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                        col_rngs = [columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                         fld_cols = []
                         for idx in range(len(sample_ids)):
                             fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
@@ -1089,14 +1166,12 @@ class TextImporter(BaseImporter):
                     # should have only one sample
                     for id in sample_ids:
                         cur.execute(genotype_insert_query[id], [variant_id])
-                if self.processor.processed_lines % 100 == 0:
+                if count % update_after == 0:
                     self.db.commit()
-                    prog.update(self.processor.processed_lines)
+                    prog.update(count)
+            p.join()
             self.db.commit()
             prog.done()
-        self.count[2] = self.processor.num_records
-        self.count[0] = self.processor.processed_lines
-        self.count[7] = self.processor.skipped_lines
 
 class TextUpdater(BaseImporter):
     '''Import variants from one or more tab or comma separated files.'''
@@ -1257,7 +1332,7 @@ class TextUpdater(BaseImporter):
                 self.db.PH)
                 for id in sample_ids}
         fld_cols = None
-        with self.openFile(input_filename) as input_file:
+        with openFile(input_filename) as input_file:
             for bins, rec in self.processor.processInput(input_file):
                 variant_id = self.updateVariant(cur, bins, rec[0:self.ranges[2]])
                 # variant might not exist
@@ -1319,7 +1394,10 @@ def importVariantsArguments(parser):
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
-            not remove wrongfully imported variants from the master variant table.''')
+            not remove wrongfully imported variants from the master variant table.'''),
+    parser.add_argument('-j', '--jobs', default=1, type=int,
+        help='''Number of thread to process input file. Due to the overhead of inter-process
+            communication, more jobs do not automatically lead to better performance.''')
 
 def importVariants(args):
     try:
@@ -1327,7 +1405,7 @@ def importVariants(args):
             proj.db.attach(proj.name + '_genotype')
             importer = TextImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force, fmt_args=args.unknown_args)
+                force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
             importer.importData()
             importer.finalize()
         proj.close()
