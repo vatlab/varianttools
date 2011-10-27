@@ -766,7 +766,7 @@ class BaseImporter:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                 (filenameID, samplename))
             sample_ids.append(cur.lastrowid)
-            self.proj.createNewSampleVariantTable('{0}_genotype.genotype_{1}'.format(self.proj.name, cur.lastrowid),
+            self.proj.createNewSampleVariantTable(cur, '{0}_genotype.genotype_{1}'.format(self.proj.name, cur.lastrowid),
                 hasGenotype, sampleFields)
         del s
         return sample_ids
@@ -1058,7 +1058,7 @@ class TextImporter(BaseImporter):
                     # should have only one sample
                     for id in sample_ids:
                         cur.execute(genotype_insert_query[id], [variant_id])
-                if self.processor.processed_lines % self.db.batch == 0:
+                if self.processor.processed_lines % 100 == 0:
                     self.db.commit()
                     prog.update(self.processor.processed_lines)
             self.db.commit()
