@@ -29,6 +29,8 @@ import sys
 import gzip
 import bz2
 import re
+import threading
+import Queue
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from collections import defaultdict
@@ -388,6 +390,40 @@ class SequentialExtractor:
         return item
 
 
+class GenotypeWriter(Process):
+    def __init__(self, receiver, query, ids, hasGenotype, sampleFields, db_idx):
+        self.receiver = receiver
+        self.query = query
+        self.ids = ids
+        self.genotype = hasGenotype
+        self.fields = sampleFields
+        self.db_idx = db_idx
+        Process.__init__(self)
+
+    def run(self):
+        db = DatabaseEngine()
+        dbFile = os.path.join('cache', 'temp_{}.DB'.format(self.db_idx))
+        if os.path.isfile(dbFile):
+            os.remove(dbFile)
+        db.connect(dbFile)
+        cur = db.cursor()
+        for id in self.ids:
+            cur.execute('''\
+                CREATE TABLE IF NOT EXISTS genotype_{0} (
+                    variant_id INT NOT NULL
+                '''.format(id) + 
+                (', GT INT' if self.genotype else '') + 
+                ''.join([', {} {}'.format(f.name, f.type) for f in self.fields]) + ');'
+             )
+        while True:
+            item = self.receiver.recv()
+            if item is None:
+                break
+            id, rec = item
+            cur.execute(self.query.format(id), rec)
+        db.close()
+            
+        
 class Preprocessor(Process):
     def __init__(self, processor, input, output, logger):
         self.processor = processor
@@ -424,57 +460,6 @@ class Preprocessor(Process):
         self.output.send((num_records, skipped_lines))
 
 
-class GenotypeWriter(Process):
-    def __init__(self, db_name, queries, receiver, genotype_status, sample_ids,
-        ranges, columnRange, logger):
-        self.db_name = db_name
-        self.queries = queries
-        self.receiver = receiver
-        self.genotype_status = genotype_status
-        self.sample_ids = sample_ids
-        self.ranges = ranges
-        self.columnRange = columnRange
-        self.logger = logger
-        col_rngs = [self.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-        self.fld_cols = []
-        for idx in range(len(sample_ids)):
-            self.fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-        if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
-            self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
-                col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
-        Process.__init__(self)
-
-    def run(self):
-        db = DatabaseEngine()
-        db.connect(self.db_name)
-        cur = db.cursor()
-        count = 0
-        while True:
-            try:
-                if self.genotype_status == 2:
-                    id = self.receiver.recv()
-                    if id is None:
-                        break
-                    for id in self.sample_ids:
-                        cur.execute(self.queries[id], [id])
-                else:
-                    var_id, rec = self.receiver.recv()
-                    for idx, id in enumerate(self.sample_ids):
-                        if rec[self.ranges[2] + idx] is not None:
-                            #self.count[1] += 1
-                            #cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
-                            cur.execute(self.queries[id], [var_id] + [rec[c] for c in self.fld_cols[idx]])
-                count += 1
-                if count % 10000 == 0:
-                    db.commit()
-            except TypeError:
-                break
-        db.commit()
-        db.close()
-
-
-        
-        
     #
 #     def run1(self):
 #         # this is a hold for the merge_by_col feature which is disabled for now
@@ -855,12 +840,16 @@ class BaseImporter:
         filenameID = cur.lastrowid
         sample_ids = []
         s = delayedAction(self.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
+        #
         for samplename in sampleNames:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                 (filenameID, samplename))
-            sample_ids.append(cur.lastrowid)
-            self.proj.createNewSampleVariantTable(cur, '{0}_genotype.genotype_{1}'.format(self.proj.name, cur.lastrowid),
-                hasGenotype, sampleFields)
+            sid = cur.lastrowid
+            sample_ids.append(sid)
+            #self.proj.createNewSampleVariantTable(cur, '{0}_genotype.genotype_{1}'.format(self.proj.name, sid),
+            #    hasGenotype, sampleFields)
+        self.hasGenotype = hasGenotype
+        self.sampleFields = sampleFields
         del s
         return sample_ids
 
@@ -1116,6 +1105,7 @@ class TextImporter(BaseImporter):
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, len(self.genotype_field) > 0, self.genotype_info)
         #
         cur = self.db.cursor()
+        fld_cols = None
         # cache genotype status
         if len(self.genotype_field) > 0:
             # has genotype
@@ -1137,24 +1127,24 @@ class TextImporter(BaseImporter):
         except Exception as e:
             self.logger.error('Failed to start processing process: {}'.format(e))
             raise e
-        #
-        #with openFile(input_filename) as input_file:
-        columnRange = reader.recv()
-        if sample_ids:
-            genotype_insert_query = {id: 'INSERT INTO genotype_{0} VALUES ({1});'\
-                .format(id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
-                for id in sample_ids}
-            try:
-                g_receiver, g_sender = Pipe(False)
-                self.db.detach('{}_genotype'.format(self.proj.name))
-                g = GenotypeWriter('{}_genotype.DB'.format(self.proj.name), genotype_insert_query,
-                    g_receiver, genotype_status, sample_ids, self.ranges, columnRange, self.logger)
-                g.start()
-            except Exception as e:
-                self.logger.error('Failed to start genotype writing process: {}'.format(e))
-                raise e
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+        #with openFile(input_filename) as input_file:
+        columnRange = reader.recv()
+        #
+        # use multiple threads for writing
+        if sample_ids:
+            genotype_insert_query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+                .format(','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
+            gSender = []
+            #
+            nTempDB = min(len(sample_ids), 2)
+            for i in range(nTempDB):
+                receiver, sender = Pipe(False)
+                gSender.append(sender)
+                GenotypeWriter(receiver, genotype_insert_query, [x for x in sample_ids if x % nTempDB == i],
+                    self.hasGenotype, self.sampleFields, i).start()
+        #
         while True:
             try:
                 self.count[0], bins, rec = reader.recv()
@@ -1165,15 +1155,52 @@ class TextImporter(BaseImporter):
                 break
             #for bins, rec in self.processor.processInput(input_file):
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-            if genotype_status == 2:
-                g_sender.send(variant_id)
-            elif genotype_status == 1:
-                g_sender.send([variant_id, rec])
-            if self.count[0] == 100 or self.count[0] % update_after == 0:
+            if genotype_status == 1:
+                if fld_cols is None:
+                    col_rngs = [columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                    fld_cols = []
+                    for idx in range(len(sample_ids)):
+                        fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+                    if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                        self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                            col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
+                for idx, id in enumerate(sample_ids):
+                    if rec[self.ranges[2] + idx] is not None:
+                        self.count[1] += 1
+                        #cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
+                        gSender[id % nTempDB].send(
+                            [id, [variant_id] + [rec[c] for c in fld_cols[idx]]])
+            elif genotype_status == 2:
+                # should have only one sample
+                for id in sample_ids:
+                    gSender[id % nTempDB].send([id, [variant_id]])
+                    #cur.execute(genotype_insert_query[id], [variant_id])
+            if self.count[0] % update_after == 0:
                 self.db.commit()
                 prog.update(self.count[0])
-        g_sender.send(None)
+        prog.done()
+        p.join()
+        # stop writers
+        for q in gSender:
+            q.send(None)
         self.db.commit()
+        # copying genotype tables
+        prog = ProgressBar('Copying genotypes', len(sample_ids))
+        # pass self.db
+        db = DatabaseEngine()
+        db.connect('{}_genotype.DB'.format(self.proj.name))
+        cur = db.cursor()
+        for i in range(nTempDB):
+            dbFile = os.path.join('cache', 'temp_{}.DB'.format(i))
+            db.attach(dbFile, '__from_{}'.format(i))
+        for idx, sid in enumerate(sample_ids):
+            # create table
+            self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(sid),
+                self.hasGenotype, self.sampleFields)
+            cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
+            db.commit()
+            prog.update(idx+1)
+        db.close()
         prog.done()
 
 class TextUpdater(BaseImporter):
