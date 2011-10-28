@@ -39,6 +39,11 @@ from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine
 
+#
+#
+# Functors to process input 
+#
+#
 # Extractors to extract value from a field
 class ExtractField:
     def __init__(self, index, sep=';', default=None):
@@ -50,7 +55,7 @@ class ExtractField:
     
     def __call__(self, item):
         try:
-            return item.split(self.sep)[self.index]
+            return item.split(self.sep, self.index + 1)[self.index]
         except:
             return self.default
 
@@ -377,133 +382,22 @@ class SequentialExtractor:
 
     def __call__(self, item):
         for e in self.extractors:
-            # if item is None or ''
-            if not item:
-                return item
             # if multiple records are returned, apply to each of them
             if type(item) is tuple:
                 if type(item[0]) is tuple:
                     raise ValueError('Nested vector extracted is not allowed')
                 item = [e(x) for x in item]
+            # if item is None or ''
+            elif not item:
+                return item
             else:
                 item = e(item)
         return item
 
-
-class GenotypeWriter(Process):
-    def __init__(self, receiver, query, ids, hasGenotype, sampleFields, db_idx):
-        self.receiver = receiver
-        self.query = query
-        self.ids = ids
-        self.genotype = hasGenotype
-        self.fields = sampleFields
-        self.db_idx = db_idx
-        Process.__init__(self)
-
-    def run(self):
-        db = DatabaseEngine()
-        dbFile = os.path.join('cache', 'temp_{}.DB'.format(self.db_idx))
-        if os.path.isfile(dbFile):
-            os.remove(dbFile)
-        db.connect(dbFile)
-        cur = db.cursor()
-        for id in self.ids:
-            cur.execute('''\
-                CREATE TABLE IF NOT EXISTS genotype_{0} (
-                    variant_id INT NOT NULL
-                '''.format(id) + 
-                (', GT INT' if self.genotype else '') + 
-                ''.join([', {} {}'.format(f.name, f.type) for f in self.fields]) + ');'
-             )
-        while True:
-            item = self.receiver.recv()
-            if item is None:
-                break
-            id, rec = item
-            cur.execute(self.query.format(id), rec)
-        db.close()
-            
-        
-class Preprocessor(Process):
-    def __init__(self, processor, input, output, logger):
-        self.processor = processor
-        self.input = input
-        self.output = output
-        self.logger = logger
-        Process.__init__(self)
-
-    def run(self): 
-        first = True
-        #
-        num_records = 0
-        processed_lines = 0
-        skipped_lines = 0
-        with openFile(self.input) as input_file:
-            for line in input_file:
-                line = line.decode()
-                try:
-                    if line.startswith('#'):
-                        continue
-                    processed_lines += 1
-                    for bins,rec in self.processor.process(line):
-                        num_records += 1
-                        if first:
-                            self.output.send(self.processor.columnRange)
-                            first = False
-                        self.output.send((processed_lines, bins, rec))
-                except Exception as e:
-                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    skipped_lines += 1
-        # everything is done, stop the pipe
-        self.output.send(None)
-        # and send the summary statistics
-        self.output.send((num_records, skipped_lines))
-
-
-    #
-#     def run1(self):
-#         # this is a hold for the merge_by_col feature which is disabled for now
-#         rec_key = []
-#         rec_stack = []
-#         for line in input_file:
-#             line = line.decode()
-#             try:
-#                 if line.startswith('#'):
-#                     continue
-#                 self.processed_lines += 1
-#                 tokens = [x.strip() for x in line.split(self.delimiter)]
-#                 key = [tokens(x) for x in self.merge_by_cols]
-#                 if not rec_stack:
-#                     rec_key = key
-#                     rec_stack.append(tokens)
-#                     continue
-#                 # if the same, wait fot the next record
-#                 elif rec_key == key:
-#                     rec_stack.append(tokens)
-#                     continue
-#                 # if not the same, ...
-#                 elif len(rec_stack) == 1:
-#                     # use the value in stack
-#                     line = rec_stack[0]
-#                     rec_stack[0] = tokens
-#                     rec_key = key
-#                 # if multiple
-#                 else:
-#                     n = len(rec_stack)
-#                     # merge values
-#                     line = [rec_stack[0][x] if x in self.merge_by_cols else \
-#                         ','.join([rec_stack[i][x] for i in range(n)]) for x in range(len(tokens))]
-#                     rec_stack[0] = tokens
-#                     rec_key = key
-#                 #
-#                 for bins,rec in self.process(line):
-#                     self.num_records += 1
-#                     yield bins, rec
-#             except Exception as e:
-#                 self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-#                 self.skipped_lines += 1
-
-
+#
+#
+# Process each line using the above functors
+#
 class LineImporter:
     '''An intepreter that read a record, process it and return processed records.'''
     def __init__(self, fields, build, delimiter, merge_by_cols, logger):
@@ -666,6 +560,239 @@ class LineImporter:
                     rec[alt_idx] = alt
                 yield bins, rec
 
+
+#
+#
+# Write genotype to disk
+# 
+#
+class WriterWorker(Process):
+    def __init__(self, receiver, query, ids, hasGenotype, sampleFields, db_idx):
+        self.receiver = receiver
+        self.query = query
+        self.ids = ids
+        self.genotype = hasGenotype
+        self.fields = sampleFields
+        self.db_idx = db_idx
+        Process.__init__(self)
+
+    def run(self):
+        db = DatabaseEngine()
+        dbFile = os.path.join('cache', 'temp_{}.DB'.format(self.db_idx))
+        if os.path.isfile(dbFile):
+            os.remove(dbFile)
+        db.connect(dbFile)
+        cur = db.cursor()
+        for id in self.ids:
+            cur.execute('''\
+                CREATE TABLE IF NOT EXISTS genotype_{0} (
+                    variant_id INT NOT NULL
+                '''.format(id) + 
+                (', GT INT' if self.genotype else '') + 
+                ''.join([', {} {}'.format(f.name, f.type) for f in self.fields]) + ');'
+             )
+        while True:
+            item = self.receiver.recv()
+            if item is None:
+                break
+            id, rec = item
+            cur.execute(self.query.format(id), rec)
+        db.close()
+            
+
+class GenotypeWriter:
+    def __init__(self, proj, geno, geno_info, jobs, sample_ids):
+        self.jobs = jobs
+        self.proj = proj
+        self.logger = proj.logger
+        self.geno_db = '{}_genotype'.format(proj.name)
+        #gSender = []
+        #
+        #nTempDB = min(len(sample_ids), 2)
+        #for i in range(nTempDB):
+        #    receiver, sender = Pipe(False)
+        #    gSender.append(sender)
+        #    GenotypeWriter(receiver, genotype_insert_query, [x for x in sample_ids if x % nTempDB == i],
+        #        self.hasGenotype, self.genotype_info, i).start()
+        self.db = DatabaseEngine()
+        self.db.connect(self.geno_db)
+        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+            .format(','.join([self.db.PH] * (1 + len(geno) + len(geno_info))))
+        self.cur = self.db.cursor()
+        for idx, sid in enumerate(sample_ids):
+            # create table
+            self.proj.createNewSampleVariantTable(self.cur,
+                'genotype_{0}'.format(sid),
+                len(geno) > 0, geno_info)
+            #cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
+        self.db.commit()
+        self.count = 0
+
+    def write(self, id, rec):
+        self.cur.execute(self.query.format(id), rec)
+        self.count += 1
+        if self.count % 10000 == 0:
+            self.db.commit()
+    
+    def close(self):
+        self.db.commit()
+        self.db.close()
+        return
+        # copying genotype tables
+        prog = ProgressBar('Copying genotypes', len(sample_ids))
+        # pass self.db
+        db = DatabaseEngine()
+        db.connect('{}_genotype.DB'.format(self.proj.name))
+        cur = db.cursor()
+        for i in range(nTempDB):
+            dbFile = os.path.join('cache', 'temp_{}.DB'.format(i))
+            db.attach(dbFile, '__from_{}'.format(i))
+        for idx, sid in enumerate(sample_ids):
+            # create table
+            self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(sid),
+                self.hasGenotype, self.genotype_info)
+            cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
+            db.commit()
+            prog.update(idx+1)
+        db.close()
+        prog.done()
+#
+# Read record from disk file
+#
+class TextWorker(Process):
+    #
+    # This class starts a process and use passed LineProcessor
+    # to process input line. If multiple works are started,
+    # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
+    #
+    def __init__(self, processor, input, output, step, index, logger):
+        self.processor = processor
+        self.input = input
+        self.output = output
+        self.step = step
+        self.index = index
+        self.logger = logger
+        Process.__init__(self)
+
+    def run(self): 
+        first = True
+        num_records = 0
+        skipped_lines = 0
+        line_no = 0
+        with openFile(self.input) as input_file:
+            for line in input_file:
+                line_no += 1
+                if line_no % self.step != self.index:
+                    continue
+                line = line.decode()
+                try:
+                    if line.startswith('#'):
+                        continue
+                    for bins,rec in self.processor.process(line):
+                        if first:
+                            self.output.send(self.processor.columnRange)
+                            first = False
+                        num_records += 1
+                        self.output.send((line_no, bins, rec))
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    skipped_lines += 1
+        # everything is done, stop the pipe
+        self.output.send(None)
+        # and send the summary statistics
+        self.output.send((num_records, skipped_lines))
+        self.output.close()
+
+class TextReader:
+    #
+    # This processor fire up num workers to read an input file
+    # and gather their outputs
+    #
+    def __init__(self, processor, input, num, logger):
+        self.readers = []
+        self.workers = []
+        self.num_records = 0
+        self.skipped_lines = 0
+        for i in range(num):
+            r, w = Pipe(False)
+            p = TextWorker(processor, input, w, num, i, logger)
+            self.readers.append(r)
+            self.workers.append(p)
+            p.start()
+        # the send value is columnRange
+        for reader in self.readers:
+            self.columnRange = reader.recv()
+        
+    def records(self):
+        all_workers = len(self.readers)
+        still_working = len(self.readers)
+        while True:
+            for idx, reader in enumerate(self.readers):
+                val = reader.recv()
+                if val is None:
+                    # one thread died ...
+                    still_working -= 1
+                    nr, sl = reader.recv()
+                    self.num_records += nr
+                    self.skipped_lines += sl
+                    self.readers[idx] = None
+                else:
+                    yield val
+            if still_working < all_workers:
+                self.readers = [x for x in self.readers if x is not None]
+                all_workers = len(self.readers)
+                if all_workers == 0:
+                    break
+        for p in self.workers:
+            p.join()
+
+#     def run1(self):
+#         # this is a hold for the merge_by_col feature which is disabled for now
+#         rec_key = []
+#         rec_stack = []
+#         for line in input_file:
+#             line = line.decode()
+#             try:
+#                 if line.startswith('#'):
+#                     continue
+#                 self.processed_lines += 1
+#                 tokens = [x.strip() for x in line.split(self.delimiter)]
+#                 key = [tokens(x) for x in self.merge_by_cols]
+#                 if not rec_stack:
+#                     rec_key = key
+#                     rec_stack.append(tokens)
+#                     continue
+#                 # if the same, wait fot the next record
+#                 elif rec_key == key:
+#                     rec_stack.append(tokens)
+#                     continue
+#                 # if not the same, ...
+#                 elif len(rec_stack) == 1:
+#                     # use the value in stack
+#                     line = rec_stack[0]
+#                     rec_stack[0] = tokens
+#                     rec_key = key
+#                 # if multiple
+#                 else:
+#                     n = len(rec_stack)
+#                     # merge values
+#                     line = [rec_stack[0][x] if x in self.merge_by_cols else \
+#                         ','.join([rec_stack[i][x] for i in range(n)]) for x in range(len(tokens))]
+#                     rec_stack[0] = tokens
+#                     rec_key = key
+#                 #
+#                 for bins,rec in self.process(line):
+#                     self.num_records += 1
+#                     yield bins, rec
+#             except Exception as e:
+#                 self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+#                 self.skipped_lines += 1
+
+#
+# Import data
+#
+#
+
 class BaseImporter:
     '''A general class for importing variants'''
     def __init__(self, proj, files, build, force, mode='insert'):
@@ -689,7 +816,9 @@ class BaseImporter:
                     if force:
                         self.logger.info('Re-importing imported file {}'.format(filename))
                         IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                        self.proj.db.attach(self.proj.name + '_genotype')
                         proj.removeSamples(IDs)
+                        self.proj.db.detach(self.proj.name + '_genotype')
                         # remove file record
                         cur = self.db.cursor()
                         cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
@@ -825,7 +954,7 @@ class BaseImporter:
                             raise ValueError('No genotype column could be determined after 1000 lines.')
                         self.logger.debug(e)
 
-    def recordFileAndSample(self, filename, sampleNames, hasGenotype=True, sampleFields = []):
+    def recordFileAndSample(self, filename, sampleNames):
         cur = self.db.cursor()
         # get header of file
         header = ''
@@ -846,10 +975,6 @@ class BaseImporter:
                 (filenameID, samplename))
             sid = cur.lastrowid
             sample_ids.append(sid)
-            #self.proj.createNewSampleVariantTable(cur, '{0}_genotype.genotype_{1}'.format(self.proj.name, sid),
-            #    hasGenotype, sampleFields)
-        self.hasGenotype = hasGenotype
-        self.sampleFields = sampleFields
         del s
         return sample_ids
 
@@ -1047,50 +1172,42 @@ class TextImporter(BaseImporter):
                 self.variantIndex[var_key] = {rec[2]: (variant_id, 1)}
             return variant_id
 
-    def importFromFile(self, input_filename):
-        '''Import a TSV file to sample_variant'''
-        # reset text processor to allow the input of files with different number of columns
-        self.processor.reset()
-        if self.genotype_field:
-            self.prober.reset()
-        #
+    def getSampleIDs(self, input_filename):
         if not self.sample_name:
             # if no sample name is specified
             if not self.genotype_field:
                 self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
-                sample_ids = []
                 self.sample_in_file = []
+                return []
             else:
                 try:
                     numSample, names = self.getSampleName(input_filename, self.prober)
                     if not names:
                         if numSample == 1:
                             self.logger.debug('Missing sample name (name None is used)'.format(numSample))
-                            sample_ids = self.recordFileAndSample(input_filename, [None], True,
-                                self.genotype_info)
                             self.sample_in_file = [None]
+                            return self.recordFileAndSample(input_filename, [None])
                         elif numSample == 0:
                             self.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
-                            sample_ids = []
                             self.sample_in_file = []
+                            return []
                         else:
                             raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
                     else:
-                        sample_ids = self.recordFileAndSample(input_filename, names, True,
-                            self.genotype_info)
                         self.sample_in_file = [x for x in names]
+                        return self.recordFileAndSample(input_filename, names)
                 except ValueError:
                     # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
                     self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
                     self.genotype_field = []
-                    sample_ids = []
                     self.sample_in_file = []
+                    return []
         else:
             self.sample_in_file = [x for x in self.sample_name]
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 self.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
-                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, False, self.genotype_info)
+                return self.recordFileAndSample(input_filename, self.sample_name)
             else:
                 try:
                     numSample, names = self.getSampleName(input_filename, self.prober)
@@ -1102,10 +1219,18 @@ class TextImporter(BaseImporter):
                     self.genotype_info = []
                     # remove genotype field from processor
                     self.processor.reset(validTill=self.ranges[2])
-                sample_ids = self.recordFileAndSample(input_filename, self.sample_name, len(self.genotype_field) > 0, self.genotype_info)
+                return self.recordFileAndSample(input_filename, self.sample_name)
+ 
+    def importFromFile(self, input_filename):
+        '''Import a TSV file to sample_variant'''
+        # reset text processor to allow the input of files with different number of columns
+        self.processor.reset()
+        if self.genotype_field:
+            self.prober.reset()
+        #
+        sample_ids = self.getSampleIDs(input_filename)
         #
         cur = self.db.cursor()
-        fld_cols = None
         # cache genotype status
         if len(self.genotype_field) > 0:
             # has genotype
@@ -1118,46 +1243,23 @@ class TextImporter(BaseImporter):
             genotype_status = 0
         lc = lineCount(input_filename)
         update_after = min(max(lc//200, 100), 100000)
+        update_after = 20
         # one process is for the main program, the
-        # other thread will handle input
-        try:
-            reader, child_output = Pipe(False)
-            p = Preprocessor(self.processor, input_filename, child_output, self.logger)
-            p.start()
-        except Exception as e:
-            self.logger.error('Failed to start processing process: {}'.format(e))
-            raise e
+        # other threads will handle input
+        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
+        if genotype_status != 0:
+            writer = GenotypeWriter(self.proj,
+                self.genotype_field, self.genotype_info,
+                self.jobs - 1, sample_ids)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
-        #with openFile(input_filename) as input_file:
-        columnRange = reader.recv()
-        #
-        # use multiple threads for writing
-        if sample_ids:
-            genotype_insert_query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
-                .format(','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
-            gSender = []
-            #
-            nTempDB = min(len(sample_ids), 2)
-            for i in range(nTempDB):
-                receiver, sender = Pipe(False)
-                gSender.append(sender)
-                GenotypeWriter(receiver, genotype_insert_query, [x for x in sample_ids if x % nTempDB == i],
-                    self.hasGenotype, self.sampleFields, i).start()
-        #
-        while True:
-            try:
-                self.count[0], bins, rec = reader.recv()
-            except TypeError:
-                # the last one has been reached
-                self.count[2], self.count[7] = reader.recv()
-                reader.close()
-                break
-            #for bins, rec in self.processor.processInput(input_file):
+        last_count = 0
+        fld_cols = None
+        for self.count[0], bins, rec in reader.records():
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
             if genotype_status == 1:
                 if fld_cols is None:
-                    col_rngs = [columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
                     for idx in range(len(sample_ids)):
                         fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
@@ -1167,48 +1269,28 @@ class TextImporter(BaseImporter):
                 for idx, id in enumerate(sample_ids):
                     if rec[self.ranges[2] + idx] is not None:
                         self.count[1] += 1
-                        #cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
-                        gSender[id % nTempDB].send(
-                            [id, [variant_id] + [rec[c] for c in fld_cols[idx]]])
+                        writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
             elif genotype_status == 2:
                 # should have only one sample
                 for id in sample_ids:
-                    gSender[id % nTempDB].send([id, [variant_id]])
-                    #cur.execute(genotype_insert_query[id], [variant_id])
-            if self.count[0] % update_after == 0:
+                    writer.write(id, [variant_id])
+            if (last_count == 0 and self.count[0] > 200) or (self.count[0] - last_count > update_after):
                 self.db.commit()
+                last_count = self.count[0]
                 prog.update(self.count[0])
         prog.done()
-        p.join()
         # stop writers
-        for q in gSender:
-            q.send(None)
+        if genotype_status != 0:
+            writer.close()
         self.db.commit()
-        # copying genotype tables
-        prog = ProgressBar('Copying genotypes', len(sample_ids))
-        # pass self.db
-        db = DatabaseEngine()
-        db.connect('{}_genotype.DB'.format(self.proj.name))
-        cur = db.cursor()
-        for i in range(nTempDB):
-            dbFile = os.path.join('cache', 'temp_{}.DB'.format(i))
-            db.attach(dbFile, '__from_{}'.format(i))
-        for idx, sid in enumerate(sample_ids):
-            # create table
-            self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(sid),
-                self.hasGenotype, self.sampleFields)
-            cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
-            db.commit()
-            prog.update(idx+1)
-        db.close()
-        prog.done()
-
+       
 class TextUpdater(BaseImporter):
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, table, files, build, format, fmt_args=[]):
+    def __init__(self, proj, table, files, build, format, jobs, fmt_args=[]):
         # if update is None, recreate index
         BaseImporter.__init__(self, proj, files, build, True, mode='update')
         #
+        self.jobs = jobs
         if not proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         # we cannot guess build information from txt files
@@ -1365,29 +1447,15 @@ class TextUpdater(BaseImporter):
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other thread will handle input
-        try:
-            reader, child_output = Pipe(False)
-            p = Preprocessor(self.processor, input_filename, child_output, self.logger)
-            p.start()
-        except Exception as e:
-            self.logger.error('Failed to start processing process: {}'.format(e))
-            raise e
+        reader = TextReader(self.processor, input_filename, self.jobs, self.logger)
         fld_cols = None
-        columnRange = reader.recv()
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
-        while True:
-            try:
-                self.count[0], bins, rec = reader.recv()
-            except TypeError:
-                # the last one has been reached
-                self.count[2], self.count[7] = reader.recv()
-                reader.close()
-                break
+        for self.count[0], bins, rec in reader.records():
             variant_id = self.updateVariant(cur, bins, rec[0:self.ranges[2]])
             # variant might not exist
             if variant_id is not None and sample_ids:
                 if fld_cols is None:
-                    col_rngs = [columnRange[x] for x in range(self.ranges[3], self.ranges[4])]
+                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[3], self.ranges[4])]
                     fld_cols = []
                     for idx in range(len(sample_ids)):
                         fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
@@ -1442,17 +1510,17 @@ def importVariantsArguments(parser):
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
             not remove wrongfully imported variants from the master variant table.'''),
-    #parser.add_argument('-j', '--jobs', default=1, type=int,
-    #    help='''Number of thread to process input file. Due to the overhead of inter-process
-    #        communication, more jobs do not automatically lead to better performance.''')
+    parser.add_argument('-j', '--jobs', default=2, type=int,
+        help='''Number of processes to process input file. Due to the potential bottleneck
+            of disk speed and overhead of inter-process communication, more jobs do not
+            automatically lead to better performance.''')
 
 def importVariants(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            proj.db.attach(proj.name + '_genotype')
             importer = TextImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force, jobs=2, fmt_args=args.unknown_args)
+                force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
             importer.importData()
             importer.finalize()
         proj.close()
@@ -1480,13 +1548,17 @@ def updateArguments(parser):
             or a local format specification file (with extension .fmt). Some formats 
             accept parameters (c.f. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
+    parser.add_argument('-j', '--jobs', default=2, type=int,
+        help='''Number of processes to process input file. Due to the potential bottleneck
+            of disk speed and overhead of inter-process communication, more jobs do not
+            automatically lead to better performance.''')
 
 def update(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
-                build=args.build, format=args.format, fmt_args=args.unknown_args)
+                build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)
             importer.importData()
             # no need to finalize
         proj.close()

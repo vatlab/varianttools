@@ -36,7 +36,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
-from .importer import LineImporter, Preprocessor
+from .importer import LineImporter, TextReader
   
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -46,7 +46,7 @@ class AnnoDBConfiger:
     is used. In the later case, the information will be directly read from
     the annotation table in the database. Please check annotation/dbNSFP.ann
     for a description of the format of the configuration file.'''
-    def __init__(self, proj, annoDB):
+    def __init__(self, proj, annoDB, jobs=2):
         '''Create an annotation database.
         proj: current project
         annoDB: annotation database. It can be either a mysql or sqlite database
@@ -55,6 +55,7 @@ class AnnoDBConfiger:
         '''
         self.proj = proj
         self.logger = proj.logger
+        self.jobs = jobs
         #
         # data that will be available after parsing
         self.path = ''
@@ -298,23 +299,9 @@ class AnnoDBConfiger:
             skipped_lines = 0
             lc = lineCount(f)
             update_after = min(max(lc//200, 100), 100000)
-            try:
-                reader, child_output = Pipe(False)
-                p = Preprocessor(processor, f, child_output, self.logger)
-                p.start()
-            except Exception as e:
-                self.logger.error('Failed to start processing process: {}'.format(e))
-                raise e
+            p = TextReader(processor, f, self.jobs, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
-            reader.recv()
-            while True:
-                try:
-                    all_records, bins, rec = reader.recv()
-                except TypeError:
-                    # the last one has been reached
-                    reader.recv()
-                    reader.close()
-                    break
+            for all_records, bins, rec in p.records():
                 cur.execute(insert_query, bins + rec)
                 if all_records % update_after == 0:
                     prog.update(all_records)
@@ -468,7 +455,9 @@ def useArguments(parser):
     parser.add_argument('--rebuild', action='store_true',
         help='''If set, variant tools will always rebuild the annotation database from source,
             ignoring existing local and online database. In addition to $name.DB, variant tools
-            will also create $name-$version.DB.gz that can be readily distributed.''')
+            will also create $name-$version.DB.gz that can be readily distributed.'''),
+    parser.add_argument('-j', '--jobs', type=int, default=2,
+        help='''If need to build database from source, maximum number of processes to use.''')
 
 
 def use(args):
@@ -512,7 +501,7 @@ def use(args):
             # annDB is now a local file
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
-                    cfg = AnnoDBConfiger(proj, annoDB)
+                    cfg = AnnoDBConfiger(proj, annoDB, args.jobs)
                     return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
@@ -537,7 +526,7 @@ def use(args):
                     except Exception as e:
                         proj.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
-                    cfg = AnnoDBConfiger(proj, annoDB + '.ann')
+                    cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.jobs)
                     try:
                         return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                     except Exception as e:
