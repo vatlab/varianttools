@@ -47,6 +47,7 @@ public:
 
 	virtual double apply(AssoData & d)
 	{
+    throw RuntimeError("The base action class should not be called");
 		return 0;
 	}
 

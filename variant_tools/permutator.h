@@ -61,13 +61,33 @@ public:
 
 	virtual double permute(AssoData & d)
   {
-    //
     throw RuntimeError("The base permutation class should not be called");
+    return 0;
   }
 
 
 protected:
 	vectora m_actions;
+};
+
+
+class ActionExecuter : public BasePermutator
+{
+
+public:
+	ActionExecuter(const vectora & actions)
+		: BasePermutator(actions)
+	{
+	}
+
+
+	double apply(AssoData & d)
+  {
+    for (size_t j = 0; j < m_actions.size(); ++j) {
+      m_actions[j]->apply(d);
+    }
+    return 0;
+  }
 };
 
 
@@ -81,7 +101,7 @@ public:
 	}
 
 
-	double permute(AssoData & d)
+	double apply(AssoData & d)
 	{
 		vectorf all_statistic(m_times);
 

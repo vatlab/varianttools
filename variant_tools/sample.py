@@ -322,7 +322,7 @@ class Sample:
             self.logger.warning('No statistics is specified')
             return
 
-        coreDestinations = [num, hom, het, other]  
+        coreDestinations = [num, hom, het, other]
 
         # keys to speed up some operations
         MEAN = 0
@@ -336,7 +336,7 @@ class Sample:
         genotypeFields = []
         validGenotypeFields = []
         destinations = []
-        fieldCalcs = []   
+        fieldCalcs = []
         for index in range(0, len(other_stats), 2):
             if other_stats[index].startswith('--'):
                 if other_stats[index].find('_') == -1:
@@ -352,7 +352,7 @@ class Sample:
                 destinations.append(other_stats[index + 1])
             else:
                 raise ValueError('Expected to see an argument (e.g., --mean_FIELD) here, but found {} instead.'.format(other_stats[index]))
-          
+        
         #
         cur = self.db.cursor()
         if IDs is None:

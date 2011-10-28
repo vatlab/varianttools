@@ -232,6 +232,7 @@ class NullTest:
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
+        self.result = {}
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
@@ -262,7 +263,6 @@ class NullTest:
         for all variants, or a list of p-values for each variant'''
         self.logger.info('#samples: {}'.format(len(self.data.phenotype())))
         self.logger.info('#variants: {}'.format(len(self.data.raw_genotype()[0])))
-        
         return 1
 
 class ExternTest(NullTest):
@@ -274,22 +274,21 @@ class ExternTest(NullTest):
         pass
 
 class LogisticBurdenTest(NullTest):
+    '''Simple Logistic regression score test on collapsed genotypes
+    within an association testing group
+    '''
     def __init__(self, logger=None, name=None, *method_args):
         NullTest.__init__(self, logger, name, *method_args)
         self.ptime = 1000
+        self.pvalue = None;
    
     def calculate(self):
         data = self.data.clone()
-        # preprocessing
-        a = t.SumToX()
+        a = t.ActionExecuter([t.SumToX(), t.SimpleLogisticRegression(), t.GaussianPval(1)])
         a.apply(data)
-        # logistic regression score test, no permutation
-        a = t.SimpleLogisticRegression()
-        a.apply(data)
-        a = t.GaussianPval(1)
-        a.apply(data)
-        self.logger.info('p-value (asymptotic) = {}'.format(data.pvalue()))
+        self.pvalue = data.pvalue()
+        self.logger.info('p-value (asymptotic) = {}'.format(self.pvalue))
         # logistic regression, permutation 
         p = t.PhenoPermutator(self.ptime, [t.SimpleLogisticRegression()])
-        self.logger.info('p-value (permutation) = {}'.format(p.permute(data) / float(self.ptime)))
+        self.logger.info('p-value (permutation) = {}'.format(p.apply(data) / float(self.ptime)))
         return 1

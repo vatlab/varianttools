@@ -65,7 +65,7 @@ public:
 	// set data
 	void setGenotype(const matrixf & g)
 	{
-		//FIXME: codings are 0, 1, 2, -9 and float numbers for most likely genotypes
+		//codings are 0, 1, 2, -9 and U(0,1) number for "expected" genotype
 		m_genotype = g;
 	}
 
@@ -78,15 +78,14 @@ public:
 
 	void setMaf(const vectorf & maf)
 	{
-		//will get these info directly from the variant table
-		//Or, alternatively, may want to get the freq info from external sources rather than sample-based
+		//get this field directly from the variant table
     m_maf = maf;
 	}
 
 
 	void setMaf()
 	{
-		//compute sample based maf
+		//sample based maf
     struct VPlus vplus;
     m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), 
         m_genotype[0], vplus);
@@ -134,6 +133,11 @@ public:
         std::bind2nd(std::equal_to<double>(),1.0));
   }
 
+  vectori sites()
+  {
+    return m_sites;
+  }
+
   double pvalue()
   {
     return m_pval;
@@ -157,11 +161,11 @@ public:
 	{
 		m_X.resize(m_genotype.size());
 		for (size_t i = 0; i < m_genotype.size(); ++i) {
+			//m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
       m_X[i] = 0.0;
       for (size_t j = 0; j < m_genotype[i].size(); ++j) {
         if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j]; 
       }
-			//m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
 		}
 	}
 
@@ -191,8 +195,7 @@ public:
 
 	void filterByMaf(double upper=0.01, double lower=0.0)
   {
-    //FIXME: may want to do it smartly via sqlite. i.e., 
-    // "select * from genotype_x where maf<upper and maf>lower"
+    //FIXME: may want to do it in AssociationTester.getVariants 
     if (upper > 1.0 || lower < 0.0) {
       throw ValueError("Minor allele frequency value should fall between 0 and 1.");
     }
@@ -206,6 +209,7 @@ public:
       if (m_maf[j] <= lower || m_maf[j] > upper) 
         continue;
       else {
+        m_sites.push_back(static_cast<int>(j));
         for (size_t i = 0; i != xdat.size(); ++i)
           m_genotype[i].push_back(xdat[i][j]);
       }
@@ -216,7 +220,7 @@ public:
 	void simpleLinear(double xbar, double ybar)
   {
     // simple linear regression score test
-    // FIXME: may later need a struct of output such as beta, CI, etc	
+    // FIXME: may later need other output fields such as beta, CI, etc	
     //!- Statistic: LSE (MLE) for beta, centered and scaled (bcz E[b] = 0 and sigma = 1 by simulation) 
     //!- See page 41 of Kutner's Applied Linear Stat. Model, 5th ed.
     //
@@ -290,6 +294,9 @@ private:
 	vectorf m_maf;
 	/// translated genotype
 	vectorf m_X;
+
+  // sites that are involved in the association test
+  vectori m_sites;
 
   double m_pval;
   double m_statistic;
