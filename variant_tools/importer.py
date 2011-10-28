@@ -1080,7 +1080,7 @@ class TextImporter(BaseImporter):
             # no genotype no sample
             genotype_status = 0
         lc = lineCount(input_filename)
-        update_after = min(max(lc//200, 1000), 100000)
+        update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other thread will handle input
         try:
@@ -1287,7 +1287,7 @@ class TextUpdater(BaseImporter):
         #
         cur = self.db.cursor()
         lc = lineCount(input_filename)
-        update_after = min(max(lc//200, 1000), 100000)
+        update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other thread will handle input
         try:

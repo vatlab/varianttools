@@ -297,7 +297,7 @@ class AnnoDBConfiger:
             self.logger.info('Importing annotation data from {0}'.format(f))
             skipped_lines = 0
             lc = lineCount(f)
-            update_after = min(max(lc//200, 1000), 100000)
+            update_after = min(max(lc//200, 100), 100000)
             try:
                 reader, child_output = Pipe(False)
                 p = Preprocessor(processor, f, child_output, self.logger)
