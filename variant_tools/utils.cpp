@@ -1,5 +1,5 @@
 /*
- *  $File: utils.h $
+ *  $File: utils.cpp $
  *  $LastChangedDate: 2011-07-06 23:27:10 -0500 (Wed, 06 Jul 2011) $
  *  $Rev: 4256 $
  *
@@ -22,24 +22,24 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _UTILS_H
-#define _UTILS_H
-#include <cmath>
-#include <limits>
-#include <algorithm>
-#include <functional>
-#include <vector>
+#include "utils.h"
 
-struct VPlus {
-  template<typename T> std::vector<T> operator()(std::vector<T> x, std::vector<T> y) {
-    //std::transform(x.begin(), x.end(), y.begin(), x.begin(), std::plus<T>());
-    for (size_t i = 0; i < x.size(); ++i) {
-      if (y[i] > 0) x[i] += y[i];
-    }
-    return x;
+
+
+bool fEqual(double a, double b) {
+  return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
+}
+
+void fRound(double& myValue, double PRECISION) 
+{
+  double myRemainder = fmod(myValue, PRECISION);
+  if (myRemainder > ( 0.5 * PRECISION ))
+  {
+    myValue = (myValue - myRemainder + PRECISION);
   }
-};
-
-bool fEqual(double a, double b);
-void fRound(double& myValue, double PRECISION); 
-#endif
+  else
+  {
+    myValue = (myValue  - myRemainder);
+  }
+  return;
+}

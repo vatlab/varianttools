@@ -195,7 +195,7 @@ def associate(args, reverse=False):
                 for test in asso.tests:
                     test.setGenotype(genotype)
                     # step 6: call stat.calculate
-                   # values = test.calculate()
+                    values = test.calculate()
                     # step 7: update variant table
                     fields = test.getOption('fields')
                     # ...
@@ -212,6 +212,8 @@ def getAllTests():
     '''List all tests (all classes that subclasses of NullTest) in this module'''
     return [name for name,obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
 
+import variant_tools.assoTests as t
+
 class NullTest:
     '''A base class that defines a common interface for association
     statistics calculator. Instances of these calculators will be created
@@ -226,9 +228,7 @@ class NullTest:
     def __init__(self, logger=None, name=None, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to 
         parse it'''
-        self.phenotype = None
-        self.genotype = None
-        self.annotation = None
+        self.data = t.AssoData()
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
@@ -251,18 +251,18 @@ class NullTest:
 
     def setPhenotype(self, data):
         '''Set phenotype data'''
-        self.phenotype = data
+        self.data.setPhenotype(data)
 
     def setGenotype(self, data):
-        self.genotype = data
+        self.data.setGenotype(data)
+        self.data.setMaf()
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant'''
-        self.t.permute()
-        return t.calculate()
-        self.logger.info('Phenotype: {}'.format(len(self.phenotype)))
-        self.logger.info('Genotype: {}'.format(len(self.genotype)))
+        self.logger.info('#samples: {}'.format(len(self.data.phenotype())))
+        self.logger.info('#variants: {}'.format(len(self.data.raw_genotype()[0])))
+        
         return 1
 
 class ExternTest(NullTest):
@@ -273,92 +273,23 @@ class ExternTest(NullTest):
     def __init__(self, logger=None, name=None, *method_args):
         pass
 
-class WssTest(NullTest):
-    def __init__(self, phenotypes, genotypes, covariates, annotations, mode, weightingTheme):
-        self.y = phenotypes
-        self.x = genotypes
-        self.z = covariates
-        self.a = annotations
-        self.wt = weightingTheme
-        if mode == 'R':
-            scipy.where(x==2.0, 1.0, 0.0)
-        elif mode == 'D':
-            scipy.where(x!=0.0, 1.0, 0.0)
-        else:
-            pass
-        
-    def weighting(self):
-        nsamples = [self.y.shape[0]]*self.y.shape[1]
-        ncases = self.y.sum(axis=0)
-        nctrls = [s - cs for s, cs in zip(nsamples, ncases)]
-        nvariants = self.x.sum(axis=1)
-        #!NOTICE: Now focus only on the primary phenotype, y[:,0]
-        countsinctrls = [sum([m[i] for i in range(nsamples[0]) if not self.y[i, 0]]) for m in self.x.transpose()]
-        countsincases = [all - ct for all, ct in zip(nvariants, countsinctrls)]
-        # apply weighting theme based on annotation
-        if self.wt == 1:
-            weights = -scipy.log([1-i for i in self.a])
-        #
-        # apply weighting theme based on observed sample
-        # there can be many more other weighting themes ... or combinations of these themes
-        else:
-            # weigthing by variants exclusive to ctrls
-            q = [(m+1.0)/(nctrls[0]+2.0) for m in countsinctrls]
-            weights = [1.0/scipy.sqrt(freq*(1.0-freq)) for freq in q]
-        return weights, countsincases
-    
-    def simplePerm(self, nperm):
-        weights = self.weighting()
-        statistic = sum([w*c for w,c in zip(weights[0], weights[1])])
-        permcount1, permcount2 = 0, 0
-        for i in range(nperm):
-            numpy.random.shuffle(self.y[:,0])
-            weights = self.weighting()
-            perm_statistic = sum([w*c for w,c in zip(weights[0], weights[1])])
-            if perm_statistic >= statistic: permcount1 += 1
-            if perm_statistic <= statistic: permcount2 += 1
-        return permcount1, permcount2
-    
-    def regressionR(self, covariate=[1,2]):
-        # logistic regression using R via rpy2
-        # dirty codes for proof of concept
-        weights = scipy.array(self.weighting()[0])
-        regressors = scipy.matrix(self.x) * scipy.matrix(weights).transpose()
-        #   input = scipy.concatenate((y, regressors, z), axis=1)
-        R.assign('Y', Rfloats(self.y[:,0].tolist()))
-        R.assign('X', Rfloats(regressors.transpose().tolist()[0]))
-        for i in covariate:
-            R.assign('Z'+str(i), Rfloats(self.z[:, i-1].tolist()))
-        summary = R('glm(Y~X+Z1+Z2, family = "binomial")')
-        beta_x = summary[0][1]
-        return beta_x
-    
-    def regressionPerm(self, nperm, covariate=[1,2]):
-        statistic = self.regressionR(covariate)
-        permcount1, permcount2 = 0, 0
-        for i in range(nperm):
-            # permutation on X, permute the rows
-            numpy.random.shuffle(self.x)
-            perm_statistic = self.regressionR(covariate)
-            if perm_statistic >= statistic: permcount1 += 1
-            if perm_statistic <= statistic: permcount2 += 1
-        return permcount1, permcount2
-    
-    def calcP1(self, covariate, nperm):
-        # one-sided test
-        if covariate:
-            counts = self.regressionPerm(nperm, covariate)[0]
-            return float(counts)/float(nperm)
-        else:
-            counts = self.simplePerm(nperm)[0]
-            return float(counts)/float(nperm)        
-        
-    def calcP2(self, covariate, nperm):
-        # two-sided test
-        if covariate:
-            counts = min(self.regressionPerm(nperm, covariate))
-            return 2.0 * float(counts)/float(nperm)
-        else:
-            counts = min(self.simplePerm(nperm))
-            return 2.0 * float(counts)/float(nperm)
-
+class LogisticBurdenTest(NullTest):
+    def __init__(self, logger=None, name=None, *method_args):
+        NullTest.__init__(self, logger, name, *method_args)
+        self.ptime = 1000
+   
+    def calculate(self):
+        data = self.data.clone()
+        # preprocessing
+        a = t.SumToX()
+        a.apply(data)
+        # logistic regression score test, no permutation
+        a = t.SimpleLogisticRegression()
+        a.apply(data)
+        a = t.GaussianPval(1)
+        a.apply(data)
+        self.logger.info('p-value (asymptotic) = {}'.format(data.pvalue()))
+        # logistic regression, permutation 
+        p = t.PhenoPermutator(self.ptime, [t.SimpleLogisticRegression()])
+        self.logger.info('p-value (permutation) = {}'.format(p.permute(data) / float(self.ptime)))
+        return 1

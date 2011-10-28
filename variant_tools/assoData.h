@@ -87,9 +87,11 @@ public:
 	void setMaf()
 	{
 		//compute sample based maf
-    m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), m_genotype[0], vplus);
+    struct VPlus vplus;
+    m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), 
+        m_genotype[0], vplus);
     std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
-std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
+        std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
 	}
 
 
@@ -128,7 +130,8 @@ std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
 
   unsigned count_cases()
   {
-    return (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), std::bind2nd(std::equal_to<double>(),1.0));
+    return (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        std::bind2nd(std::equal_to<double>(),1.0));
   }
 
   double pvalue()
@@ -154,7 +157,11 @@ public:
 	{
 		m_X.resize(m_genotype.size());
 		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
+      m_X[i] = 0.0;
+      for (size_t j = 0; j < m_genotype[i].size(); ++j) {
+        if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j]; 
+      }
+			//m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
 		}
 	}
 
