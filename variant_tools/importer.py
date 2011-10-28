@@ -34,7 +34,8 @@ from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, openFile
+from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
+    normalizeVariant, openFile, DatabaseEngine
 
 # Extractors to extract value from a field
 class ExtractField:
@@ -423,6 +424,57 @@ class Preprocessor(Process):
         self.output.send((num_records, skipped_lines))
 
 
+class GenotypeWriter(Process):
+    def __init__(self, db_name, queries, receiver, genotype_status, sample_ids,
+        ranges, columnRange, logger):
+        self.db_name = db_name
+        self.queries = queries
+        self.receiver = receiver
+        self.genotype_status = genotype_status
+        self.sample_ids = sample_ids
+        self.ranges = ranges
+        self.columnRange = columnRange
+        self.logger = logger
+        col_rngs = [self.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+        self.fld_cols = []
+        for idx in range(len(sample_ids)):
+            self.fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+        if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+            self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
+                col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
+        Process.__init__(self)
+
+    def run(self):
+        db = DatabaseEngine()
+        db.connect(self.db_name)
+        cur = db.cursor()
+        count = 0
+        while True:
+            try:
+                if self.genotype_status == 2:
+                    id = self.receiver.recv()
+                    if id is None:
+                        break
+                    for id in self.sample_ids:
+                        cur.execute(self.queries[id], [id])
+                else:
+                    var_id, rec = self.receiver.recv()
+                    for idx, id in enumerate(self.sample_ids):
+                        if rec[self.ranges[2] + idx] is not None:
+                            #self.count[1] += 1
+                            #cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
+                            cur.execute(self.queries[id], [var_id] + [rec[c] for c in self.fld_cols[idx]])
+                count += 1
+                if count % 10000 == 0:
+                    db.commit()
+            except TypeError:
+                break
+        db.commit()
+        db.close()
+
+
+        
+        
     #
 #     def run1(self):
 #         # this is a hold for the merge_by_col feature which is disabled for now
@@ -1064,11 +1116,6 @@ class TextImporter(BaseImporter):
                 sample_ids = self.recordFileAndSample(input_filename, self.sample_name, len(self.genotype_field) > 0, self.genotype_info)
         #
         cur = self.db.cursor()
-        if sample_ids:
-            genotype_insert_query = {id: 'INSERT INTO {0}_genotype.genotype_{1} VALUES ({2});'\
-                .format(self.proj.name, id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
-                for id in sample_ids}
-        fld_cols = None
         # cache genotype status
         if len(self.genotype_field) > 0:
             # has genotype
@@ -1090,10 +1137,24 @@ class TextImporter(BaseImporter):
         except Exception as e:
             self.logger.error('Failed to start processing process: {}'.format(e))
             raise e
-        # preprocess data
-        prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+        #
         #with openFile(input_filename) as input_file:
         columnRange = reader.recv()
+        if sample_ids:
+            genotype_insert_query = {id: 'INSERT INTO genotype_{0} VALUES ({1});'\
+                .format(id, ','.join([self.db.PH] * (1 + len(self.genotype_field) + len(self.genotype_info))))
+                for id in sample_ids}
+            try:
+                g_receiver, g_sender = Pipe(False)
+                self.db.detach('{}_genotype'.format(self.proj.name))
+                g = GenotypeWriter('{}_genotype.DB'.format(self.proj.name), genotype_insert_query,
+                    g_receiver, genotype_status, sample_ids, self.ranges, columnRange, self.logger)
+                g.start()
+            except Exception as e:
+                self.logger.error('Failed to start genotype writing process: {}'.format(e))
+                raise e
+        # preprocess data
+        prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         while True:
             try:
                 self.count[0], bins, rec = reader.recv()
@@ -1104,27 +1165,14 @@ class TextImporter(BaseImporter):
                 break
             #for bins, rec in self.processor.processInput(input_file):
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-            if genotype_status == 1:
-                if fld_cols is None:
-                    col_rngs = [columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                    fld_cols = []
-                    for idx in range(len(sample_ids)):
-                        fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-                    if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
-                        self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
-                            col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
-                for idx, id in enumerate(sample_ids):
-                    if rec[self.ranges[2] + idx] is not None:
-                        self.count[1] += 1
-                        cur.execute(genotype_insert_query[id], [variant_id] + [rec[c] for c in fld_cols[idx]])
-            elif genotype_status == 2:
-                # should have only one sample
-                for id in sample_ids:
-                    cur.execute(genotype_insert_query[id], [variant_id])
-            if self.count[0] % update_after == 0:
+            if genotype_status == 2:
+                g_sender.send(variant_id)
+            elif genotype_status == 1:
+                g_sender.send([variant_id, rec])
+            if self.count[0] == 100 or self.count[0] % update_after == 0:
                 self.db.commit()
                 prog.update(self.count[0])
-        p.join()
+        g_sender.send(None)
         self.db.commit()
         prog.done()
 
