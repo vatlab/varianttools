@@ -31,6 +31,8 @@ import bz2
 import re
 import threading
 import Queue
+from cPickle import dumps, loads, HIGHEST_PROTOCOL
+from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from collections import defaultdict
@@ -605,58 +607,48 @@ class GenotypeWriter:
         self.jobs = jobs
         self.proj = proj
         self.logger = proj.logger
-        self.geno_db = '{}_genotype'.format(proj.name)
-        #gSender = []
+        self.geno = geno
+        self.geno_info = geno_info
+        self.sample_ids = sample_ids
         #
-        #nTempDB = min(len(sample_ids), 2)
-        #for i in range(nTempDB):
-        #    receiver, sender = Pipe(False)
-        #    gSender.append(sender)
-        #    GenotypeWriter(receiver, genotype_insert_query, [x for x in sample_ids if x % nTempDB == i],
-        #        self.hasGenotype, self.genotype_info, i).start()
-        self.db = DatabaseEngine()
-        self.db.connect(self.geno_db)
-        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
-            .format(','.join([self.db.PH] * (1 + len(geno) + len(geno_info))))
-        self.cur = self.db.cursor()
-        for idx, sid in enumerate(sample_ids):
-            # create table
-            self.proj.createNewSampleVariantTable(self.cur,
-                'genotype_{0}'.format(sid),
-                len(geno) > 0, geno_info)
-            #cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
-        self.db.commit()
-        self.count = 0
+        self.psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=PIPE)
+        self.output = self.psort.stdin
+        self.input = self.psort.stdout
+        #self.temp = open('tte', 'w')
 
     def write(self, id, rec):
-        self.cur.execute(self.query.format(id), rec)
-        self.count += 1
-        if self.count % 10000 == 0:
-            self.db.commit()
+        self.output.write('{}\t'.format(id, dumps(rec, protocol=HIGHEST_PROTOCOL)).encode())
+        #self.temp.write('{}\t{}\n'.format(id, dumps(rec)).encode())
     
     def close(self):
+        # tell sort everything is done
+        # and we can start reading
+        self.output.close()
+        #self.temp.close()
+        #
+        db = DatabaseEngine()
+        db.connect('{}_genotype'.format(self.proj.name))
+        cur = db.cursor()
+        query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+            .format(','.join([db.PH] * (1 + len(self.geno) + len(self.geno_info))))
+        prog = ProgressBar('Copying genotypes', len(self.sample_ids))
+        last_id = 0
+        count = 0
+        for input in self.input:
+            id, item = input.split('\t', 1)
+            if id != last_id:
+                last_id = id
+                # a new table 
+                db.commit()
+                self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(id),
+                    len(self.geno) > 0, self.geno_info)
+                count += 1
+                prog.update(count)
+            cur.execute(query.format(id), loads(item))
+        prog.done()
         self.db.commit()
         self.db.close()
-        return
-        # copying genotype tables
-        prog = ProgressBar('Copying genotypes', len(sample_ids))
-        # pass self.db
-        db = DatabaseEngine()
-        db.connect('{}_genotype.DB'.format(self.proj.name))
-        cur = db.cursor()
-        for i in range(nTempDB):
-            dbFile = os.path.join('cache', 'temp_{}.DB'.format(i))
-            db.attach(dbFile, '__from_{}'.format(i))
-        for idx, sid in enumerate(sample_ids):
-            # create table
-            self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(sid),
-                self.hasGenotype, self.genotype_info)
-            cur.execute('INSERT INTO genotype_{0} SELECT * FROM __from_{1}.genotype_{0};'.format(sid, sid % nTempDB))
-            db.commit()
-            prog.update(idx+1)
-        db.close()
-        prog.done()
-#
+
 # Read record from disk file
 #
 class TextWorker(Process):
