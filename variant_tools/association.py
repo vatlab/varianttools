@@ -25,6 +25,7 @@
 #
 
 import sys
+from array import array
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName
 from .sample import Sample
@@ -102,7 +103,7 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = zip(*cur.fetchall())[1]
+            self.phenotype = array('d', zip(*cur.fetchall())[1])
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve phenotype '.format(', '.join(phenotype)))
@@ -158,14 +159,17 @@ class AssociationTester(Sample):
 
     def getGenotype(self, vtable):
         '''Get genotype for variants in specified table'''
-        genotype = {}
+        genotype = []
         cur = self.db.cursor()
+        cur.execute('SELECT min(variant_id), max(variant_id) FROM {}'.format(vtable))
+        start, end = cur.fetchall()[0]
         for ID in self.IDs:
             query = 'SELECT variant_id, GT FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.proj.name, ID, vtable)
             self.logger.debug('Running query {}'.format(query))
             cur.execute(query)
-            genotype[ID] = cur.fetchall()
+            gtmp = {x[0]:x[1] for x in cur.fetchall()}
+            genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
         return genotype
 
 def associate(args, reverse=False):
