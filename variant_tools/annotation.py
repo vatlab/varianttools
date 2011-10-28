@@ -31,11 +31,12 @@ import shutil
 import urlparse
 import gzip
 import zipfile
+from multiprocessing import Process, Pipe
 
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
-from .importer import LineImporter
+from .importer import LineImporter, Preprocessor
   
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -268,13 +269,6 @@ class AnnoDBConfiger:
         bundle.extractall(self.proj.temp_dir)
         return [os.path.join(self.proj.temp_dir, name) for name in bundle.namelist()]
     
-    def openAnnoFile(self, filename):
-        if filename.lower().endswith('.gz'):
-            return gzip.open(filename, 'rb')
-        else:
-            # text file
-            return open(filename, 'rb')
-
     def importTxtRecords(self, db, source_files):
         #
         build_info = []
@@ -301,16 +295,30 @@ class AnnoDBConfiger:
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
             self.logger.info('Importing annotation data from {0}'.format(f))
-            all_records = 0
             skipped_lines = 0
-            prog = ProgressBar(os.path.split(f)[-1], lineCount(f))
-            with self.openAnnoFile(f) as input_file:
-                for bins, rec in processor.processInput(input_file):
-                    all_records += 1
-                    cur.execute(insert_query, bins + rec)
-                    if all_records % db.batch == 0:
-                        prog.update(all_records)
-                        db.commit()
+            lc = lineCount(f)
+            update_after = min(max(lc//200, 1000), 100000)
+            try:
+                reader, child_output = Pipe(False)
+                p = Preprocessor(processor, f, child_output, self.logger)
+                p.start()
+            except Exception as e:
+                self.logger.error('Failed to start processing process: {}'.format(e))
+                raise e
+            prog = ProgressBar(os.path.split(f)[-1], lc)
+            reader.recv()
+            while True:
+                try:
+                    all_records, bins, rec = reader.recv()
+                except TypeError:
+                    # the last one has been reached
+                    reader.recv()
+                    reader.close()
+                    break
+                cur.execute(insert_query, bins + rec)
+                if all_records % update_after == 0:
+                    prog.update(all_records)
+                    db.commit()
             db.commit()
             prog.done()
             self.logger.info('{0} records are handled, {1} ignored.'\
