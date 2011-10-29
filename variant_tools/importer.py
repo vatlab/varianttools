@@ -31,7 +31,7 @@ import bz2
 import re
 import threading
 import Queue
-from cPickle import dumps, loads, HIGHEST_PROTOCOL
+import cPickle as pickle
 from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
@@ -614,17 +614,15 @@ class GenotypeWriter:
         self.psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=PIPE)
         self.output = self.psort.stdin
         self.input = self.psort.stdout
-        #self.temp = open('tte', 'w')
+        self.format_string = '\t'.join(['{}']*(2 + len(self.geno) + len(self.geno_info))) + '\n'
 
     def write(self, id, rec):
-        self.output.write('{}\t'.format(id, dumps(rec, protocol=HIGHEST_PROTOCOL)).encode())
-        #self.temp.write('{}\t{}\n'.format(id, dumps(rec)).encode())
+        self.output.write(self.format_string.format(id, *rec).encode())
     
     def close(self):
         # tell sort everything is done
         # and we can start reading
         self.output.close()
-        #self.temp.close()
         #
         db = DatabaseEngine()
         db.connect('{}_genotype'.format(self.proj.name))
@@ -635,7 +633,8 @@ class GenotypeWriter:
         last_id = 0
         count = 0
         for input in self.input:
-            id, item = input.split('\t', 1)
+            items = [None if x == 'None' else x for x in input.rstrip().split('\t')]
+            id = items[0]
             if id != last_id:
                 last_id = id
                 # a new table 
@@ -644,10 +643,10 @@ class GenotypeWriter:
                     len(self.geno) > 0, self.geno_info)
                 count += 1
                 prog.update(count)
-            cur.execute(query.format(id), loads(item))
+            cur.execute(query.format(id), items[1:])
         prog.done()
-        self.db.commit()
-        self.db.close()
+        db.commit()
+        db.close()
 
 # Read record from disk file
 #
