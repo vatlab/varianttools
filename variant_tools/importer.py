@@ -1234,7 +1234,6 @@ class TextImporter(BaseImporter):
             genotype_status = 0
         lc = lineCount(input_filename)
         update_after = min(max(lc//200, 100), 100000)
-        update_after = 20
         # one process is for the main program, the
         # other threads will handle input
         reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
