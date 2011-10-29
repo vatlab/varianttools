@@ -2330,16 +2330,16 @@ def initArguments(parser):
     #    help='''Build of the primary reference genome of the project.'''),
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
-    engine = parser.add_argument_group('Database connection')
-    engine.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
-        help='''Database engine to use, can be mysql or sqlite3. Parameters --host, --user
-            and --passwd will be needed for the creation of a new mysql project.''')
-    engine.add_argument('--host', default='localhost', 
-        help='The MySQL server that hosts the project databases.')
-    engine.add_argument('--user', default=getpass.getuser(),
-        help='User name to the MySQL server. Default to current username.')
-    engine.add_argument('--passwd',
-        help='Password to the MySQL server.')
+    #engine = parser.add_argument_group('Database connection')
+    #engine.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
+    #    help='''Database engine to use, can be mysql or sqlite3. Parameters --host, --user
+    #        and --passwd will be needed for the creation of a new mysql project.''')
+    #engine.add_argument('--host', default='localhost', 
+    #    help='The MySQL server that hosts the project databases.')
+    #engine.add_argument('--user', default=getpass.getuser(),
+    #    help='User name to the MySQL server. Default to current username.')
+    #engine.add_argument('--passwd',
+    #    help='Password to the MySQL server.')
     #parser.add_argument('--batch', default=10000, 
     #    help='Number of query per transaction. Larger number leads to better performance but requires more ram.')
 
@@ -2357,9 +2357,12 @@ def init(args):
         #
         # args.batch is temporarily removed to keep interface clean
         # args.build is temporarily removed to keep interface clean
+        #
+        # args.engine, host, user, passwd is disabled because MySQL support is
+        # currently lagging behind.
         with Project(name=args.project, build=None, new=True, 
             verbosity='1' if args.verbosity is None else args.verbosity,
-            engine=args.engine, host=args.host, user=args.user, passwd=args.passwd,
+            engine='sqlite3', host=None, user=None, passwd=None,
             batch=10000) as proj:
             if args.parent:
                 if len(args.parent) != 2:
