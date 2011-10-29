@@ -39,7 +39,7 @@ from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    normalizeVariant, openFile, DatabaseEngine
+    normalizeVariant, openFile, DatabaseEngine, hasCommand
 
 #
 #
@@ -602,11 +602,53 @@ class WriterWorker(Process):
         db.close()
             
 
-class GenotypeWriter:
-    def __init__(self, proj, geno, geno_info, jobs, sample_ids):
-        self.jobs = jobs
+def GenotypeWriter(proj, geno, geno_info, sample_ids):
+    if len(sample_ids) == 1 or not hasCommand(['sort', '-h']):
+        return DirectGenotypeWriter(proj, geno, geno_info, sample_ids)
+    else:
+        return SortGenotypeWriter(proj, geno, geno_info, sample_ids)
+
+class DirectGenotypeWriter:
+    def __init__(self, proj, geno, geno_info, sample_ids):
         self.proj = proj
         self.logger = proj.logger
+        self.logger.debug('Using a direct genotype writer')
+        self.geno_db = '{}_genotype'.format(proj.name)
+        #
+        self.db = DatabaseEngine()
+        self.db.connect(self.geno_db)
+        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+            .format(','.join([self.db.PH] * (1 + len(geno) + len(geno_info))))
+        self.cur = self.db.cursor()
+        s = delayedAction(self.logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
+        for idx, sid in enumerate(sample_ids):
+            # create table
+            self.proj.createNewSampleVariantTable(self.cur,
+                'genotype_{0}'.format(sid), len(geno) > 0, geno_info)
+        self.db.commit()
+        del s
+        self.count = 0
+
+    def write(self, id, rec):
+        self.cur.execute(self.query.format(id), rec)
+        self.count += 1
+        if self.count % 500000 == 0:
+            self.db.commit()
+    
+    def close(self):
+        self.db.commit()
+        self.db.close()
+
+class SortGenotypeWriter:
+    '''This genotype writer sort samples before they are inserted to 
+        the genotype database. This greatly helps the performance of subsequent
+        operations on the genotype table because tables are not scattered
+        around the whole database.
+    '''
+    def __init__(self, proj, geno, geno_info, sample_ids):
+        self.proj = proj
+        self.logger = proj.logger
+        self.logger.debug('Using a sorted genotype writer')
         self.geno = geno
         self.geno_info = geno_info
         self.sample_ids = sample_ids
@@ -1236,11 +1278,10 @@ class TextImporter(BaseImporter):
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
+        reader = TextReader(self.processor, input_filename, self.jobs, self.logger)
         if genotype_status != 0:
-            writer = GenotypeWriter(self.proj,
-                self.genotype_field, self.genotype_info,
-                self.jobs - 1, sample_ids)
+            writer = GenotypeWriter(self.proj, self.genotype_field, self.genotype_info,
+                sample_ids)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0

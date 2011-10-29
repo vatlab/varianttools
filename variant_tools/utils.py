@@ -149,6 +149,20 @@ def lineCount(filename):
         return int(lineCount * (totalSize / 99000.))
 
 
+def hasCommand(cmd):
+    try:
+        fnull = open(os.devnull, 'w')
+        result = subprocess.Popen(cmd, shell=True, stdout=fnull, stderr=fnull)
+        result.terminate()
+        fnull.close()
+    except OSError:
+        # command not found
+        return False
+    except Exception:
+        # other error is OK
+        return True
+    return True
+
 def openFile(filename):
     if filename.lower().endswith('.gz'):
         return gzip.open(filename, 'rb')
