@@ -649,33 +649,86 @@ class SortGenotypeWriter:
     def __init__(self, proj, geno, geno_info, sample_ids):
         self.proj = proj
         self.logger = proj.logger
-        self.logger.debug('Using a sorted genotype writer')
         self.geno = geno
         self.geno_info = geno_info
         self.sample_ids = sample_ids
         #
-        self.psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=PIPE)
-        self.output = self.psort.stdin
-        self.input = self.psort.stdout
+        self.batch_count = 0
+        self.file_idx = 0
+        #
+        sorted_file = open(os.path.join('cache', 'temp_db_{}.sorted'.format(self.file_idx)), 'w')
+        self.sorted_files = [sorted_file]
+        #
+        psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=sorted_file)
+        self.psort = [psort]
+        #
+        self.output = psort.stdin
+        #
+        RAM_CACHE_SIZE = 10000000   # we cache 10M records
+        RAM_CACHE_RECORDS = RAM_CACHE_SIZE // (1 + len(geno) + len(geno_info)) // len(sample_ids) # number of records
+        RECORDS_PER_BATCH = max(RAM_CACHE_RECORDS, 100)    # at least 100 in batch
+        self.RECORDS_PER_BATCH = min(RECORDS_PER_BATCH, 5000)   # at most 5000 in batch
+        DISK_CACHE_SIZE = 1000000000  # 1G records per temp file
+        DISK_CACHE_BATCHES = DISK_CACHE_SIZE // (self.RECORDS_PER_BATCH * (1 + len(geno) + len(geno_info)))
+        self.DISK_CACHE_BATCHES = max(DISK_CACHE_BATCHES, 1000)  # at least 1000 batches per temp file
+
+        # for testing
+        #self.RECORDS_PER_BATCH=20
+        #self.DISK_CACHE_BATCHES=2000
+        self.logger.debug('Using a sorted genotype writer with {} per sort entry and {} per temp file'.format(self.RECORDS_PER_BATCH, self.DISK_CACHE_BATCHES))
         #
         self.cache = {x: [] for x in sample_ids}
 
     def write(self, id, rec):
-        if len(self.cache[id]) < 5000:
+        if len(self.cache[id]) < self.RECORDS_PER_BATCH:
             self.cache[id].append(rec)
         else:
             # encode the entire list ....
             self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
             self.cache[id] = []
+            self.batch_count += 1
+            if self.batch_count == self.DISK_CACHE_BATCHES:
+                # close the previous one
+                self.output.close()
+                # check if existing processes have been finished
+                # we will need to close some files in case too many temporary files are used
+                for idx, (p, f) in enumerate(zip(self.psort, self.sorted_files)):
+                    if p.poll() is not None:   # if it is done
+                        f.close()              # close file
+                        self.psort[idx] = None
+                        self.sorted_files[idx] = None
+                self.psort = [x for x in self.psort if x is not None]
+                self.sorted_files = [x for x in self.sorted_files if x is not None]
+                #
+                # a new disk file
+                self.file_idx += 1
+                sorted_file = open(os.path.join('cache', 'temp_db_{}.sorted'.format(self.file_idx)), 'w')
+                self.sorted_files.append(sorted_file)
+                # a new process
+                psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=sorted_file)
+                self.psort.append(psort)
+                # reset batch count
+                self.batch_count = 0
+                # direct to a new output
+                self.output = psort.stdin
     
     def close(self):
-        # tell sort everything is done
-        # and we can start reading
+        # tell sort everything is done so we can start reading
         for id in self.sample_ids:
-            if len(self.sample_ids) > 0:
+            if len(self.cache[id]) > 0:
                 self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
         del self.cache
         self.output.close()
+        # 
+        # wait for everyone to finish
+        s = delayedAction(self.logger.info, 'Preparing genotype')
+        # if there are more than one files, do a merge sort
+        for p in self.psort:
+            p.wait()
+        # close all files
+        for f in self.sorted_files:
+            f.close()
+        del s
         #
         db = DatabaseEngine()
         db.connect('{}_genotype'.format(self.proj.name))
@@ -685,7 +738,13 @@ class SortGenotypeWriter:
         prog = ProgressBar('Copying genotypes', len(self.sample_ids))
         last_id = 0
         count = 0
-        for input in self.input:
+        if self.file_idx == 0:
+            source = open(os.path.join('cache', 'temp_db_0.sorted'), 'r')
+        else:
+            psort = Popen(['sort', '-k1', '-n', '-s', '-m'] + [os.path.join('cache', 'temp_db_{}.sorted'.format(x)) for x in range(self.file_idx + 1)],
+                stdin=None, stdout=PIPE)
+            source = psort.stdout
+        for input in source:
             id, items = input.decode().rstrip().split('\t',1)
             if id != last_id:
                 last_id = id
@@ -697,6 +756,7 @@ class SortGenotypeWriter:
                 prog.update(count)
             # execute many is supposed to be faster than execute...
             cur.executemany(query.format(id), loads(a2b_base64(items)))
+        source.close()
         prog.done()
         db.commit()
         db.close()
