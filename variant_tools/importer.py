@@ -31,6 +31,7 @@ import bz2
 import re
 import threading
 import Queue
+from heapq import heappush, heappop, heappushpop
 from cPickle import dumps, loads, HIGHEST_PROTOCOL
 from binascii import a2b_base64, b2a_base64
 from subprocess import Popen, PIPE
@@ -819,7 +820,40 @@ class TextWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-class TextReader:
+def TextReader(processor, input, num, logger):
+    if num == 1:
+        return SingleTextReader(processor, input, logger)
+    else:
+        return MultiTextReader(processor, input, num, logger)
+
+class SingleTextReader:
+    #
+    # This processor fire up num workers to read an input file
+    # and gather their outputs
+    #
+    def __init__(self, processor, input, logger):
+        self.readers = []
+        self.workers = []
+        self.num_records = 0
+        self.skipped_lines = 0
+        #
+        self.reader, w = Pipe(False)
+        self.worker = TextWorker(processor, input, w, 1, 0, logger)
+        self.worker.start()
+        # the send value is columnRange
+        self.columnRange = self.reader.recv()
+        
+    def records(self):
+        while True:
+            val = self.reader.recv()
+            if val is None:
+                self.num_records, self.skipped_lines = self.reader.recv()
+                break
+            else:
+                yield val
+        self.worker.join()
+
+class MultiTextReader:
     #
     # This processor fire up num workers to read an input file
     # and gather their outputs
@@ -838,10 +872,18 @@ class TextReader:
         # the send value is columnRange
         for reader in self.readers:
             self.columnRange = reader.recv()
+        #
         
     def records(self):
         all_workers = len(self.readers)
         still_working = len(self.readers)
+        #
+        # we need a heap to keep records read from multiple processes in order
+        # we can not really guarantee this if there are large trunks of ignored
+        # records but a heap size = 4 * number of readers should work in most cases
+        #
+        heap = []
+        filled = False
         while True:
             for idx, reader in enumerate(self.readers):
                 val = reader.recv()
@@ -852,12 +894,18 @@ class TextReader:
                     self.num_records += nr
                     self.skipped_lines += sl
                     self.readers[idx] = None
+                elif filled:
+                    yield heappushpop(heap, val)
                 else:
-                    yield val
+                    heappush(heap, val)
+                    filled = len(heap) == 4 * len(self.readers)
             if still_working < all_workers:
                 self.readers = [x for x in self.readers if x is not None]
                 all_workers = len(self.readers)
                 if all_workers == 0:
+                    # return all things in the heap
+                    for i in range(len(heap)):
+                        yield heappop(heap)
                     break
         for p in self.workers:
             p.join()
@@ -1196,7 +1244,7 @@ class BaseImporter:
 class TextImporter(BaseImporter):
     '''Import variants from one or more tab or comma separated files.'''
     def __init__(self, proj, files, build, format, sample_name=None, 
-        force=False, jobs=2, fmt_args=[]):
+        force=False, jobs=1, fmt_args=[]):
         BaseImporter.__init__(self, proj, files, build, force, mode='insert')
         self.jobs = jobs
         # we cannot guess build information from txt files
@@ -1315,7 +1363,6 @@ class TextImporter(BaseImporter):
                 except ValueError:
                     # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
                     self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
-                    self.genotype_field = []
                     self.sample_in_file = []
                     return []
         else:
@@ -1348,7 +1395,7 @@ class TextImporter(BaseImporter):
         #
         cur = self.db.cursor()
         # cache genotype status
-        if len(self.genotype_field) > 0:
+        if len(sample_ids) > 0 and len(self.genotype_field) > 0:
             # has genotype
             genotype_status = 1
         elif len(sample_ids) > 0:
@@ -1624,7 +1671,7 @@ def importVariantsArguments(parser):
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
             not remove wrongfully imported variants from the master variant table.'''),
-    parser.add_argument('-j', '--jobs', default=2, type=int,
+    parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Number of processes to process input file. Due to the potential bottleneck
             of disk speed and overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
@@ -1662,7 +1709,7 @@ def updateArguments(parser):
             or a local format specification file (with extension .fmt). Some formats 
             accept parameters (c.f. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
-    parser.add_argument('-j', '--jobs', default=2, type=int,
+    parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Number of processes to process input file. Due to the potential bottleneck
             of disk speed and overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
