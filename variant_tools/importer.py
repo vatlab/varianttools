@@ -32,7 +32,7 @@ import re
 import threading
 import Queue
 from cPickle import dumps, loads, HIGHEST_PROTOCOL
-from binascii import a2b_hex, b2a_hex, a2b_base64, b2a_base64
+from binascii import a2b_base64, b2a_base64
 from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
@@ -684,7 +684,8 @@ class SortGenotypeWriter:
             self.cache[id].append(rec)
         else:
             # encode the entire list ....
-            self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
+            self.output.write('{}\t'.format(id).encode())
+            self.output.write(b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL)))
             self.cache[id] = []
             self.batch_count += 1
             if self.batch_count == self.DISK_CACHE_BATCHES:
@@ -716,12 +717,13 @@ class SortGenotypeWriter:
         # tell sort everything is done so we can start reading
         for id in self.sample_ids:
             if len(self.cache[id]) > 0:
-                self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
+                self.output.write('{}\t'.format(id).encode())
+                self.output.write(b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL)))
         del self.cache
         self.output.close()
         # 
         # wait for everyone to finish
-        s = delayedAction(self.logger.info, 'Preparing genotype')
+        s = delayedAction(self.logger.info, 'Preparing genotypes for copying')
         # if there are more than one files, do a merge sort
         for p in self.psort:
             p.wait()
@@ -735,17 +737,21 @@ class SortGenotypeWriter:
         cur = db.cursor()
         query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
             .format(','.join([db.PH] * (1 + len(self.geno) + len(self.geno_info))))
-        prog = ProgressBar('Copying genotypes', len(self.sample_ids))
-        last_id = 0
+        prog = ProgressBar('Copying samples', len(self.sample_ids))
+        last_id = None
         count = 0
         if self.file_idx == 0:
-            source = open(os.path.join('cache', 'temp_db_0.sorted'), 'r')
+            source = open(os.path.join('cache', 'temp_db_0.sorted'), 'rb')
         else:
-            psort = Popen(['sort', '-k1', '-n', '-s', '-m'] + [os.path.join('cache', 'temp_db_{}.sorted'.format(x)) for x in range(self.file_idx + 1)],
+            psort = Popen(['sort', '-k1', '-n', '-s', '-m'] + \
+                [os.path.join('cache', 'temp_db_{}.sorted'.format(x)) for x in range(self.file_idx + 1)],
                 stdin=None, stdout=PIPE)
             source = psort.stdout
         for input in source:
-            id, items = input.decode().rstrip().split('\t',1)
+            # we could use split('\t', 1) but python3 requires split(b'\t', 1) which does not exist in python2
+            # rstrip is not needed because a2b_base64 can handle it
+            id, items = input.split(None, 1)
+            id = int(id)
             if id != last_id:
                 last_id = id
                 # a new table 
@@ -758,6 +764,12 @@ class SortGenotypeWriter:
             cur.executemany(query.format(id), loads(a2b_base64(items)))
         source.close()
         prog.done()
+        # remove all temp files
+        try:
+            for x in range(self.file_idx + 1):
+                os.remove(os.path.join('cache', 'temp_db_{}.sorted'.format(x)))
+        except:
+            pass
         db.commit()
         db.close()
 
