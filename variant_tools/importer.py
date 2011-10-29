@@ -31,7 +31,8 @@ import bz2
 import re
 import threading
 import Queue
-import cPickle as pickle
+from cPickle import dumps, loads, HIGHEST_PROTOCOL
+from binascii import a2b_hex, b2a_hex, a2b_base64, b2a_base64
 from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
@@ -656,14 +657,24 @@ class SortGenotypeWriter:
         self.psort = Popen(['sort', '-k1', '-n', '-s', '--temporary-directory=cache'], stdin=PIPE, stdout=PIPE)
         self.output = self.psort.stdin
         self.input = self.psort.stdout
-        self.format_string = '\t'.join(['{}']*(2 + len(self.geno) + len(self.geno_info))) + '\n'
+        #
+        self.cache = {x: [] for x in sample_ids}
 
     def write(self, id, rec):
-        self.output.write(self.format_string.format(id, *rec).encode())
+        if len(self.cache[id]) < 5000:
+            self.cache[id].append(rec)
+        else:
+            # encode the entire list ....
+            self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
+            self.cache[id] = []
     
     def close(self):
         # tell sort everything is done
         # and we can start reading
+        for id in self.sample_ids:
+            if len(self.sample_ids) > 0:
+                self.output.write('{}\t{}'.format(id, b2a_base64(dumps(self.cache[id], HIGHEST_PROTOCOL))).encode())
+        del self.cache
         self.output.close()
         #
         db = DatabaseEngine()
@@ -675,8 +686,7 @@ class SortGenotypeWriter:
         last_id = 0
         count = 0
         for input in self.input:
-            items = [None if x == 'None' else x for x in input.rstrip().split('\t')]
-            id = items[0]
+            id, items = input.decode().rstrip().split('\t',1)
             if id != last_id:
                 last_id = id
                 # a new table 
@@ -685,7 +695,8 @@ class SortGenotypeWriter:
                     len(self.geno) > 0, self.geno_info)
                 count += 1
                 prog.update(count)
-            cur.execute(query.format(id), items[1:])
+            # execute many is supposed to be faster than execute...
+            cur.executemany(query.format(id), loads(a2b_base64(items)))
         prog.done()
         db.commit()
         db.close()
