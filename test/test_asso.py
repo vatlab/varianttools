@@ -14,11 +14,11 @@ def linearBurden(test_data):
   a.apply(data)
   a = gw.GaussianPval(1)
   a.apply(data)
-  print data.pvalue()
+  print(data.pvalue())
  
   # linear regression, permutation based 
   p = gw.PhenoPermutator(1000, [gw.SimpleLinearRegression()])
-  print p.permute(data) / 1000.0
+  print(p.permute(data) / 1000.0)
 
 def logisticBurden(test_data):
   data = test_data.clone()
@@ -30,11 +30,11 @@ def logisticBurden(test_data):
   a.apply(data)
   a = gw.GaussianPval(2)
   a.apply(data)
-  print data.pvalue()
+  print(data.pvalue())
  
   # logistic regression, permutation based 
   p = gw.PhenoPermutator(10000, [gw.SimpleLogisticRegression()])
-  print p.permute(data) / 10000.0
+  print(p.permute(data) / 10000.0)
   
   
 if __name__ == '__main__':
@@ -50,7 +50,7 @@ if __name__ == '__main__':
   test_data.setPhenotype([float(x.split()[0]) for x in file('txt/assoc.dat')])
   test_data.setMaf()
   test_data.filterByMaf(upper=0.05, lower=0.0)
-  print test_data.maf()
+  print(test_data.maf())
   #print(test_data.phenotype())
   #print(test_data.raw_genotype())
   logisticBurden(test_data)
