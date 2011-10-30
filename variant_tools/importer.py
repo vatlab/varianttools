@@ -570,39 +570,6 @@ class LineImporter:
 # Write genotype to disk
 # 
 #
-class WriterWorker(Process):
-    def __init__(self, receiver, query, ids, hasGenotype, sampleFields, db_idx):
-        self.receiver = receiver
-        self.query = query
-        self.ids = ids
-        self.genotype = hasGenotype
-        self.fields = sampleFields
-        self.db_idx = db_idx
-        Process.__init__(self)
-
-    def run(self):
-        db = DatabaseEngine()
-        dbFile = os.path.join('cache', 'temp_{}.DB'.format(self.db_idx))
-        if os.path.isfile(dbFile):
-            os.remove(dbFile)
-        db.connect(dbFile)
-        cur = db.cursor()
-        for id in self.ids:
-            cur.execute('''\
-                CREATE TABLE IF NOT EXISTS genotype_{0} (
-                    variant_id INT NOT NULL
-                '''.format(id) + 
-                (', GT INT' if self.genotype else '') + 
-                ''.join([', {} {}'.format(f.name, f.type) for f in self.fields]) + ');'
-             )
-        while True:
-            item = self.receiver.recv()
-            if item is None:
-                break
-            id, rec = item
-            cur.execute(self.query.format(id), rec)
-        db.close()
-            
 
 def GenotypeWriter(proj, geno, geno_info, sample_ids):
     if len(sample_ids) == 1 or not hasCommand(['sort', '-h']):
@@ -672,7 +639,7 @@ class SortGenotypeWriter:
         DISK_CACHE_SIZE = 1000000000  # 1G records per temp file
         DISK_CACHE_BATCHES = DISK_CACHE_SIZE // (self.RECORDS_PER_BATCH * (1 + len(geno) + len(geno_info)))
         self.DISK_CACHE_BATCHES = max(DISK_CACHE_BATCHES, 1000)  # at least 1000 batches per temp file
-
+        #
         # for testing
         #self.RECORDS_PER_BATCH=20
         #self.DISK_CACHE_BATCHES=2000
@@ -740,7 +707,6 @@ class SortGenotypeWriter:
             .format(','.join([db.PH] * (1 + len(self.geno) + len(self.geno_info))))
         prog = ProgressBar('Copying samples', len(self.sample_ids))
         last_id = None
-        count = 0
         if self.file_idx == 0:
             source = open(os.path.join('cache', 'temp_db_0.sorted'), 'rb')
         else:
@@ -748,6 +714,7 @@ class SortGenotypeWriter:
                 [os.path.join('cache', 'temp_db_{}.sorted'.format(x)) for x in range(self.file_idx + 1)],
                 stdin=None, stdout=PIPE)
             source = psort.stdout
+        sample_count = 0
         for input in source:
             # we could use split('\t', 1) but python3 requires split(b'\t', 1) which does not exist in python2
             # rstrip is not needed because a2b_base64 can handle it
@@ -759,8 +726,8 @@ class SortGenotypeWriter:
                 db.commit()
                 self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(id),
                     len(self.geno) > 0, self.geno_info)
-                count += 1
-                prog.update(count)
+                sample_count += 1
+                prog.update(sample_count)
             # execute many is supposed to be faster than execute...
             cur.executemany(query.format(id), loads(a2b_base64(items)))
         source.close()
@@ -771,8 +738,10 @@ class SortGenotypeWriter:
                 os.remove(os.path.join('cache', 'temp_db_{}.sorted'.format(x)))
         except:
             pass
+        #self.logger.info('{} genotypes in {} samples are copied'.format(genotype_count, sample_count))
         db.commit()
         db.close()
+
 
 # Read record from disk file
 #
@@ -820,11 +789,11 @@ class TextWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-def TextReader(processor, input, num, logger):
-    if num == 1:
+def TextReader(processor, input, jobs, logger):
+    if jobs == 1:
         return SingleTextReader(processor, input, logger)
     else:
-        return MultiTextReader(processor, input, num, logger)
+        return MultiTextReader(processor, input, jobs, logger)
 
 class SingleTextReader:
     #
@@ -832,8 +801,6 @@ class SingleTextReader:
     # and gather their outputs
     #
     def __init__(self, processor, input, logger):
-        self.readers = []
-        self.workers = []
         self.num_records = 0
         self.skipped_lines = 0
         #
@@ -858,21 +825,20 @@ class MultiTextReader:
     # This processor fire up num workers to read an input file
     # and gather their outputs
     #
-    def __init__(self, processor, input, num, logger):
+    def __init__(self, processor, input, jobs, logger):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.skipped_lines = 0
-        for i in range(num):
+        for i in range(jobs):
             r, w = Pipe(False)
-            p = TextWorker(processor, input, w, num, i, logger)
+            p = TextWorker(processor, input, w, jobs, i, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
         # the send value is columnRange
         for reader in self.readers:
             self.columnRange = reader.recv()
-        #
         
     def records(self):
         all_workers = len(self.readers)
