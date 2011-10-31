@@ -6,7 +6,9 @@
 #
 
 [format description]
-description=Input format illumina snps.txt file, created by CASAVA version 1.8 (http://www.illumina.com/support/documentation.ilmn). This format imports chr, pos, ref, alt of most likely genotype, and a Q score for the most likely genotype.
+description=Input format illumina snps.txt file, created by CASAVA version 1.8
+	(http://www.illumina.com/support/documentation.ilmn). This format imports chr,
+	pos, ref, alt of most likely genotype, and a Q score for the most likely genotype.
 variant=seq_name, pos, ref, alt
 genotype=%(geno)s
 genotype_info=%(geno_info)s
