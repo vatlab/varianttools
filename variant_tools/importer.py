@@ -1440,6 +1440,8 @@ class TextImporter(BaseImporter):
                 last_count = self.count[0]
                 prog.update(self.count[0])
         prog.done()
+        self.count[2] = reader.num_records
+        self.count[7] = reader.skipped_lines
         # stop writers
         if genotype_status != 0:
             writer.close()
@@ -1630,6 +1632,8 @@ class TextUpdater(BaseImporter):
             if self.count[0] % update_after == 0:
                 self.db.commit()
                 prog.update(self.count[0])
+        self.count[2] = reader.num_records
+        self.count[7] = reader.skipped_lines
         self.db.commit()
         prog.done()
 

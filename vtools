@@ -37,7 +37,7 @@ from variant_tools import exporter
 try:
     from variant_tools import association
     with_association = True
-except ImportError:
+except (ImportError, AttributeError):
     with_association = False
 
 def addCommonArgs(parser):
