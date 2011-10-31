@@ -38,7 +38,7 @@ VTOOLS_VERSION = '1.0rc2'
 #
 # the association module is not ready for prime time...
 # 
-with_association = True
+with_association = False
 
 if with_association:
     LIB_GSL = [ 
@@ -106,7 +106,7 @@ if with_association:
         Extension('variant_tools/_assoTests',
             sources = ['variant_tools/assoTests.i',
                 'variant_tools/assoData.cpp', 'variant_tools/utils.cpp'] + LIB_GSL,
-            swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
+            swig_opts = ['-O', '-shadow', '-c++', '-keyword','-w-511'],
             library_dirs = [],
             libraries = libs,
             include_dirs = [".", "variant_tools", "variant_tools/gsl"],

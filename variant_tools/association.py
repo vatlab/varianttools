@@ -170,8 +170,29 @@ class AssociationTester(Sample):
             cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
-        return genotype
-
+        return genotype, start, end
+    
+    def updateTestResult(self, test, startID, endID):
+        '''Write result from association test to variant table
+        for variants from startID to endID '''
+        fields = test.getFields()
+        for field, fldtype in fields:
+            if field not in self.db.getHeaders(self.table):
+                self.logger.info('Adding field {}'.format(field))
+                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(self.table, field, fldtype))
+            # if the field exists it will be re-written
+            prog = ProgressBar('Updating {}'.format(self.table), endID-startID+1)
+            update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(self.table, self.db.PH,
+            ' ,'.join(['{}={}'.format(field, self.db.PH)]))
+            for idx, id in enumerate(range(startID, endID+1)):
+                value = test.result[field.split('_')[1]][idx]
+                self.db.execute(update_query, (value, id))
+                if idx % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(idx)
+            self.db.commit()
+            prog.done()
+                            
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
@@ -191,14 +212,14 @@ def associate(args, reverse=False):
                 # select variants from each group:
                 vtable = asso.getVariants(grp)
                 # passing everything to association test
-                genotype = asso.getGenotype(vtable)
+                genotype, startID, endID = asso.getGenotype(vtable)
                 for test in asso.tests:
                     test.setGenotype(genotype)
+                    test.setAttributes(grp)
                     # step 6: call stat.calculate
                     values = test.calculate()
                     # step 7: update variant table
-                    fields = test.getOption('fields')
-                    # ...
+                    asso.updateTestResult(test, startID, endID)  
     except Exception as e:
         sys.exit(e) 
 
@@ -232,7 +253,8 @@ class NullTest:
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
-        self.result = {}
+        self.result = {'pvalue':None, 'statistic':None}
+        self.group = None
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
@@ -244,11 +266,13 @@ class NullTest:
         # incorporate args to this class
         self.__dict__.update(vars(args))
     
-    def getOption(self, name):
-        '''Get option for the association test.'''
-        if name == 'fields':
-            # the null test does not set any field
-            return []
+    def getFields(self):
+        '''Get updated fields for the association test.'''
+        fields = []
+        for key in self.result.keys():
+            if self.result[key] is not None:
+                fields.append(('_'.join([self.__class__.__name__, key]), 'FLOAT'))
+        return fields
 
     def setPhenotype(self, data):
         '''Set phenotype data'''
@@ -256,13 +280,22 @@ class NullTest:
 
     def setGenotype(self, data):
         self.data.setGenotype(data)
+    
+    def setAttributes(self, grp):
+        self.group = repr(grp[0].encode('ascii'))
         self.data.setMaf()
+        self.data.filterByMaf(upper=1.0, lower=0.0)
+        self.data.mean_phenotype()
+        self.data.count_cases()
+        self.data.count_ctrls()
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
-        for all variants, or a list of p-values for each variant'''
-        self.logger.info('#samples: {}'.format(len(self.data.phenotype())))
-        self.logger.info('#variants: {}'.format(len(self.data.raw_genotype()[0])))
+        for all variants, or a list of p-values for each variant. Will print
+        data if NullTest is called'''
+        print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
+        print(' '.join(map(str, self.data.phenotype())))
+        print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
         return 1
 
 class ExternTest(NullTest):
@@ -280,15 +313,17 @@ class LogisticBurdenTest(NullTest):
     def __init__(self, logger=None, name=None, *method_args):
         NullTest.__init__(self, logger, name, *method_args)
         self.ptime = 1000
-        self.pvalue = None;
    
     def calculate(self):
         data = self.data.clone()
-        a = t.ActionExecuter([t.SumToX(), t.SimpleLogisticRegression(), t.GaussianPval(1)])
+        actions = [t.SumToX(), t.SimpleLogisticRegression(), t.GaussianPval(1)]
+        a = t.ActionExecuter(actions)
         a.apply(data)
-        self.pvalue = data.pvalue()
-        self.logger.info('p-value (asymptotic) = {}'.format(self.pvalue))
+        self.logger.debug('{} on group {}, p-value (asymptotic) = {}'\
+                         .format(self.__class__.__name__, self.group, data.pvalue()))
         # logistic regression, permutation 
         p = t.PhenoPermutator(self.ptime, [t.SimpleLogisticRegression()])
-        self.logger.info('p-value (permutation) = {}'.format(p.apply(data) / float(self.ptime)))
+        self.logger.debug('{} on group {}, p-value (permutation) = {}'\
+                        .format(self.__class__.__name__, self.group, p.apply(data) / float(self.ptime)))
+        self.result['pvalue'] = [data.pvalue()]*len(self.data.raw_genotype()[0])
         return 1

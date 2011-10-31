@@ -50,8 +50,6 @@ public:
     throw RuntimeError("The base action class should not be called");
 		return 0;
 	}
-
-
 };
 
 
@@ -75,6 +73,7 @@ public:
 	double apply(AssoData & d)
 	{
 		d.sumToX();
+    d.mean_genotype();
 		return 0;
 	}
 };
@@ -97,6 +96,7 @@ public:
 	double apply(AssoData & d)
 	{
 		d.binToX();
+    d.mean_genotype();
 		return 0;
 	}
 };
@@ -119,9 +119,7 @@ public:
 	double apply(AssoData & d)
   {    
     //assert(m_phenotype.size() == m_X.size());
-    double xbar = d.mean_genotype();
-    double ybar = d.mean_phenotype();
-    d.simpleLinear(xbar, ybar);
+    d.simpleLinear();
     return 0;
   }
 };
@@ -145,9 +143,7 @@ public:
   {    
     //assert(m_phenotype.size() == m_X.size());
     //check for binary
-    double xbar = d.mean_genotype();
-    unsigned ncases = d.count_cases();
-    d.simpleLogit(xbar, ncases);
+    d.simpleLogit();
     return 0;
   }
 };

@@ -51,9 +51,7 @@ public:
     m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
     m_statistic(0.0), m_pval(0.0)
 	{
-
 	}
-
 
 	// make a copy of the data
 	virtual AssoData * clone() const
@@ -82,7 +80,6 @@ public:
     m_maf = maf;
 	}
 
-
 	void setMaf()
 	{
 		//sample based maf
@@ -93,8 +90,31 @@ public:
         std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
 	}
 
+  void mean_phenotype()
+  {
+    m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
+    m_ybar /= (1.0 * m_phenotype.size());
+  }
 
-	// return some information
+  void mean_genotype()
+  {
+    m_xbar = std::accumulate(m_X.begin(), m_X.end(), 0.0);
+    m_xbar /= (1.0 * m_X.size());
+  }
+
+  void count_cases()
+  {
+    m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        std::bind2nd(std::equal_to<double>(),1.0));
+  }
+
+  void count_ctrls()
+  {
+    m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        std::bind2nd(std::equal_to<double>(),0.0));
+  }
+
+  // return some information
 	vectorf phenotype()
 	{
 		return m_phenotype;
@@ -114,25 +134,7 @@ public:
 	{
 		return m_maf;
 	}
-
-  double mean_phenotype()
-  {
-    double mean = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-    return mean / (1.0 * m_phenotype.size());
-  }
-
-  double mean_genotype()
-  {
-    double mean = std::accumulate(m_X.begin(), m_X.end(), 0.0);
-    return mean / (1.0 * m_X.size());
-  }
-
-  unsigned count_cases()
-  {
-    return (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-        std::bind2nd(std::equal_to<double>(),1.0));
-  }
-
+  
   vectori sites()
   {
     return m_sites;
@@ -217,7 +219,7 @@ public:
   }
 
 
-	void simpleLinear(double xbar, double ybar)
+	void simpleLinear()
   {
     // simple linear regression score test
     // FIXME: may later need other output fields such as beta, CI, etc	
@@ -226,10 +228,10 @@ public:
     //
     double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
     for (size_t i = 0; i != m_X.size(); ++i) {
-      numerator += (m_X[i] - xbar) * m_phenotype[i];
-      denominator += pow(m_X[i] - xbar, 2.0);
+      numerator += (m_X[i] - m_xbar) * m_phenotype[i];
+      denominator += pow(m_X[i] - m_xbar, 2.0);
       //SSE
-      ysigma += pow(m_phenotype[i] - ybar, 2.0);
+      ysigma += pow(m_phenotype[i] - m_ybar, 2.0);
     }
 
     if (!fEqual(numerator, 0.0)) {  
@@ -242,7 +244,7 @@ public:
   }
 
 
-  void simpleLogit(double xbar, unsigned n1)
+  void simpleLogit()
   {
     //!- Score test implementation for logistic regression model logit(p) = b0 + b1x 
     //!- labnotes vol.2 page 3
@@ -251,16 +253,16 @@ public:
     //double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
     //double bo = log(ebo);
 
-    double po = (1.0 * n1) / (1.0 * m_phenotype.size());
+    double po = (1.0 * m_ncases) / (1.0 * m_phenotype.size());
     double ss = 0.0;
     // the score
     for (size_t i = 0; i != m_X.size(); ++i) { 
-      ss += (m_X[i] - xbar) * (m_phenotype[i] - po);
+      ss += (m_X[i] - m_xbar) * (m_phenotype[i] - po);
     }
     double vm1 = 0.0;
     // variance of score, under the null
     for (size_t i = 0; i != m_X.size(); ++i) {
-      vm1 += (m_X[i] - xbar) * (m_X[i] - xbar) * po * (1.0 - po);
+      vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
     }
 
     m_statistic = ss / sqrt(vm1);
@@ -298,6 +300,10 @@ private:
   // sites that are involved in the association test
   vectori m_sites;
 
+  double m_xbar;
+  double m_ybar;
+  unsigned m_ncases;
+  unsigned m_nctrls;
   double m_pval;
   double m_statistic;
 };

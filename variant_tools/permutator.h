@@ -59,7 +59,7 @@ public:
 	}
 
 
-	virtual double permute(AssoData & d)
+	virtual double apply(AssoData & d)
   {
     throw RuntimeError("The base permutation class should not be called");
     return 0;
