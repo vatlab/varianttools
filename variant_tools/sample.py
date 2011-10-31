@@ -234,6 +234,7 @@ class Sample:
                 {int: 'INT',
                  float: 'FLOAT',
                  str: 'VARCHAR(255)',
+                 unicode: 'VARCHAR(255)',
                  None: 'FLOAT'}[fldType]))
             count[1] += 1  # new
         else:
@@ -600,16 +601,18 @@ def phenotype(args):
                 p.load(filename, fields, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.set:
                 for item in args.set:
-                    field, expr = [x.strip() for x in item.split('=', 1)]
-                    if not expr:
-                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_phenotype'.format(item))
+                    try:
+                        field, expr = [x.strip() for x in item.split('=', 1)]
+                    except Exception as e:
+                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_phenotype: {}'.format(item, e))
                     p.setPhenotype(field, expr, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.from_stat:
                 stat = []
                 for item in args.from_stat:
-                    field, expr = [x.strip() for x in item.split('=', 1)]
-                    if not expr:
-                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_field'.format(item))
+                    try:
+                        field, expr = [x.strip() for x in item.split('=', 1)]
+                    except Exception as e:
+                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_field: {}'.format(item, e))
                     stat.append((field, expr))
                 p.fromSampleStat(stat,
                         ' AND '.join(['({})'.format(x) for x in args.genotypes]),
