@@ -790,14 +790,48 @@ class TextWorker(Process):
         self.output.close()
 
 def TextReader(processor, input, jobs, logger):
-    if jobs == 1:
-        return SingleTextReader(processor, input, logger)
+    if jobs == 0:
+        return EmbeddedTextReader(processor, input, logger)
+    elif jobs == 1:
+        return StandaloneTextReader(processor, input, logger)
     else:
         return MultiTextReader(processor, input, jobs, logger)
 
-class SingleTextReader:
+class EmbeddedTextReader:
     #
-    # This processor fire up num workers to read an input file
+    # This processor uses the passed line processor to process input
+    # in the main process. No separate process is spawned.
+    #
+    def __init__(self, processor, input, logger):
+        self.num_records = 0
+        self.skipped_lines = 0
+        self.processor = processor
+        self.input = input
+        self.logger = logger
+
+    def records(self): 
+        first = True
+        line_no = 0
+        with openFile(self.input) as input_file:
+            for line in input_file:
+                line_no += 1
+                line = line.decode()
+                try:
+                    if line.startswith('#'):
+                        continue
+                    for bins,rec in self.processor.process(line):
+                        if first:
+                            self.columnRange = self.processor.columnRange
+                            first = False
+                        self.num_records += 1
+                        yield (line_no, bins, rec)
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    self.skipped_lines += 1
+
+class StandaloneTextReader:
+    #
+    # This processor fire up 1 worker to read an input file
     # and gather their outputs
     #
     def __init__(self, processor, input, logger):
@@ -1212,7 +1246,7 @@ class TextImporter(BaseImporter):
     def __init__(self, proj, files, build, format, sample_name=None, 
         force=False, jobs=1, fmt_args=[]):
         BaseImporter.__init__(self, proj, files, build, force, mode='insert')
-        self.jobs = jobs
+        self.jobs = max(1, jobs)
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
@@ -1374,7 +1408,7 @@ class TextImporter(BaseImporter):
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, self.jobs, self.logger)
+        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
         if genotype_status != 0:
             writer = GenotypeWriter(self.proj, self.genotype_field, self.genotype_info,
                 sample_ids)
@@ -1417,7 +1451,7 @@ class TextUpdater(BaseImporter):
         # if update is None, recreate index
         BaseImporter.__init__(self, proj, files, build, True, mode='update')
         #
-        self.jobs = jobs
+        self.jobs = max(1, jobs)
         if not proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         # we cannot guess build information from txt files
@@ -1574,7 +1608,7 @@ class TextUpdater(BaseImporter):
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other thread will handle input
-        reader = TextReader(self.processor, input_filename, self.jobs, self.logger)
+        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
         fld_cols = None
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         for self.count[0], bins, rec in reader.records():
@@ -1676,8 +1710,10 @@ def updateArguments(parser):
             accept parameters (c.f. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Number of processes to process input file. Due to the potential bottleneck
-            of disk speed and overhead of inter-process communication, more jobs do not
+        help='''Number of processes to import input file. Variant tools by default
+            uses a single process for reading and writing, and can use one or more
+            dedicated reader processes (jobs=2 or more) to process input files. Due
+            to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
 
 def update(args):
