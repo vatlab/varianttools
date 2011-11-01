@@ -808,7 +808,7 @@ class DatabaseEngine:
                     table)
                 return [x[0] for x in cur.fetchall()]
             else:
-                cur.execute('SELECT * FROM {} LIMIT 0,0;'.format(table))
+                cur.execute('SELECT * FROM {} LIMIT 1;'.format(table))
                 return [x[0] for x in cur.description]
         except:
             return None
