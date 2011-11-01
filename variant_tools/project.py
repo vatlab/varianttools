@@ -1191,7 +1191,7 @@ class Project:
         '''Check if a field name has been used, or is the SQL keyword'''
         if name.upper() in SQL_KEYWORDS:
             raise ValueError("Field name '{}' is not allowed because it is a reserved word.".format(name))
-        for table in self.getVariantTables() + ['sample', 'filename']:
+        for table in self.getVariantTables(): #  + ['sample', 'filename']:
             if table == exclude:
                 continue
             if name.lower() in [x.lower() for x in self.db.getHeaders(table)]:
