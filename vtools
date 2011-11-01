@@ -49,7 +49,7 @@ def addCommonArgs(parser):
 
 if __name__ == '__main__':
     #
-    master_parser = argparse.ArgumentParser(description='''A variant annotation and processing tool
+    master_parser = argparse.ArgumentParser(description='''A variant processing, annotation and analysis tool
         for next-gen sequencing studies.''',
         prog='vtools',
         #formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -60,7 +60,8 @@ if __name__ == '__main__':
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init
-    parser = subparsers.add_parser('init', help='Create a new project or a subproject of a parent project',
+    parser = subparsers.add_parser('init', help='''Create a new project, or a subproject 
+        from an existing parent project, or merge several existing projects into one''',
         # FIXME: we should add descriptions to other commands as well.
         description='''Create an empty project in the current directory. This
         command will fail if another project already exists in this directory,
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     # command liftover
     parser = subparsers.add_parser('liftover',
         help='''Set alternative reference genome and update alternative coordinates
-            of all variant tables.''',
+            of all variant tables''',
         description='''Convert coordinates of existing variants to alternative 
             coordinates in an alternative reference genome. The UCSC liftover
             tool will be automatically downloaded if it is not available.''')
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     #
     # command sample_stat
     parser = subparsers.add_parser('sample_stat',
-        help='Calculate sample statistics (allele count etc) for all or selected samples.',
+        help='Calculate sample statistics (allele count etc) for all or selected samples',
         description='''Calculate count of alleles, homozygotes, heterozygotes, and summary
             statistics for genotype information fields in all or selected samples. Statistics for a
             genotype information field FIELD include mean_FIELD, sum_FIELD, min_FIELD and
@@ -117,7 +118,7 @@ if __name__ == '__main__':
     #
     # command use
     parser = subparsers.add_parser('use',
-        help='Prepare (download or import if necessary) and use an annotation database.')
+        help='Prepare (download or import if necessary) and use an annotation database')
     annotation.useArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=annotation.use)
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     #
     # command output
     parser = subparsers.add_parser('output',
-        help='Output variants in tab or comma separated format.')
+        help='Output variants in tab or comma separated format')
     variant.outputArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -166,13 +167,13 @@ if __name__ == '__main__':
     #
     # command export
     parser = subparsers.add_parser('export',
-        help='Export samples (variants and genotypes) in specified format.')
+        help='Export samples (variants and genotypes) in specified format')
     exporter.exportArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=exporter.export)
     #
     # command remove
-    parser = subparsers.add_parser('remove', help='Remove project or its contents.')
+    parser = subparsers.add_parser('remove', help='Remove project or its contents (entries, tables, fields, etc.)')
     project.removeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
@@ -200,7 +201,7 @@ if __name__ == '__main__':
         parser.set_defaults(func=association.associate)
     #
     # command execute
-    parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement.')
+    parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement')
     project.executeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.execute)

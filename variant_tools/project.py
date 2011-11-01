@@ -2319,7 +2319,7 @@ def initArguments(parser):
     subproj.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project. The subprojects must have the same structure (primary
-            and alternative reference genome, variant info and phentoype.''')
+            and alternative reference genome, variant info and phenotype).''')
     #sub.add_argument('--sort', action='store_true',
     #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
     #        unset, all variants will be read to RAM and perform a faster merge at a cost of
