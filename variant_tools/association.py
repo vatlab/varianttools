@@ -175,24 +175,25 @@ class AssociationTester(Sample):
     def updateTestResult(self, test, startID, endID):
         '''Write result from association test to variant table
         for variants from startID to endID '''
-        fields = zip(*test.getFields())[0]
-        for field, fldtype in test.getFields():
+        fields = test.getFields()
+        for field, fldtype in fields:
             if field not in self.db.getHeaders(self.table):
                 self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(self.table, field, fldtype))
+                self.db.commit()
         # if the field exists it will be re-written
         prog = ProgressBar('Updating {}'.format(self.table), endID-startID+1)
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(self.table, self.db.PH,
-        ', '.join(['{}={}'.format(field, self.db.PH) for field in fields]))
+        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
         for idx, id in enumerate(range(startID, endID+1)):
-            values = [test.result[field.split('_')[1]][idx] for field in fields]
+            values = [test.result[field.split('_')[1]][idx] for field, fldtype in fields]
             self.db.execute(update_query, values+[id])
             if idx % self.db.batch == 0:
                 self.db.commit()
                 prog.update(idx)
         self.db.commit()
         prog.done()
-                            
+
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
