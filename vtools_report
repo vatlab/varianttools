@@ -201,8 +201,8 @@ def variantStat(args):
             sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
         #
         # 2a) Get the counts for snps and substitutions:
-        #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 or length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
-        num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 or length(alt) = 1)",
+        #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 and length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
+        num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 and length(alt) = 1)",
             '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
         num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
             '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
