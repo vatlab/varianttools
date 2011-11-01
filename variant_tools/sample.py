@@ -456,8 +456,9 @@ class Sample:
                         for index in validGenotypeIndices:
                             queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
                             recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
-                            # ignore missing (NULL) values
-                            if rec[queryIndex] is None:
+                            # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
+                            # by sqlite even when the field type is INT.
+                            if rec[queryIndex] in [None, '']:
                                 continue
                             operation = operations[index]
                             field = genotypeFields[index]
