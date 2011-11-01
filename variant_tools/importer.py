@@ -999,7 +999,7 @@ class BaseImporter:
                 if not os.path.isfile(filename):
                     raise ValueError('File {} does not exist'.format(filename))
             self.files = files
-        # for #record, #sample variant (new or updated), #variant, new SNV, insertion, deletion, complex variants, invalid record, updated record
+        # for #record, #genotype (new or updated), #new variant, SNV, insertion, deletion, complex variants, invalid record, updated record
         self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
@@ -1149,9 +1149,9 @@ class BaseImporter:
             self.logger.info('{} variants from {} ({}/{})'.format('Importing' if self.mode == 'insert' else 'Updating', f, count + 1, len(self.files)))
             self.importFromFile(f)
             if self.mode == 'insert':
-                new_var = sum(self.count[3:7])
+                total_var = sum(self.count[3:7])
                 self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
-                    .format(self.count[2], new_var, 
+                    .format(total_var, self.count[2],
                         ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                         self.count[0],
@@ -1166,9 +1166,9 @@ class BaseImporter:
             sample_in_files.extend(self.sample_in_file)
         if len(self.files) > 1:
             if self.mode == 'insert':
-                new_var = sum(self.total_count[3:7])
+                total_var = sum(self.total_count[3:7])
                 self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
-                    .format(self.total_count[2], new_var, 
+                    .format(total_var, self.total_count[2],
                         ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                         self.total_count[0],
@@ -1309,6 +1309,14 @@ class TextImporter(BaseImporter):
                     
     def addVariant(self, cur, rec):
         #
+        if rec[4] == '-':
+            self.count[5] += 1
+        elif rec[3] == '-':
+            self.count[4] += 1
+        elif len(rec[4]) == 1 and len(rec[3]) == 1:
+            self.count[3] += 1
+        else:
+            self.count[6] += 1
         var_key = tuple((rec[1], rec[3], rec[4]))
         if var_key in self.variantIndex and rec[2] in self.variantIndex[var_key]:
             variant_id = self.variantIndex[var_key][rec[2]][0]
@@ -1318,15 +1326,8 @@ class TextImporter(BaseImporter):
             return variant_id
         else:
             # new varaint!
-            if rec[4] == '-':
-                self.count[5] += 1
-            elif rec[3] == '-':
-                self.count[4] += 1
-            elif len(rec[4]) == 1 and len(rec[3]) == 1:
-                self.count[3] += 1
-            else:
-                self.count[6] += 1
             # alt_chr and alt_pos are updated if adding by alternative reference genome
+            self.count[2] += 1
             cur.execute(self.variant_insert_query, rec)
             variant_id = cur.lastrowid
             # one for new variant
@@ -1440,7 +1441,6 @@ class TextImporter(BaseImporter):
                 last_count = self.count[0]
                 prog.update(self.count[0])
         prog.done()
-        self.count[2] = reader.num_records
         self.count[7] = reader.skipped_lines
         # stop writers
         if genotype_status != 0:
@@ -1632,7 +1632,6 @@ class TextUpdater(BaseImporter):
             if self.count[0] % update_after == 0:
                 self.db.commit()
                 prog.update(self.count[0])
-        self.count[2] = reader.num_records
         self.count[7] = reader.skipped_lines
         self.db.commit()
         prog.done()
