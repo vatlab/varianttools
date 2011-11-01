@@ -225,7 +225,6 @@ try:
     import termios
 except ImportError:
     pass
-import signal
 
 class ProgressBar:
     '''A text-based progress bar'''
@@ -242,9 +241,8 @@ class ProgressBar:
         self.main_start_time = time.time()
         self.message = self.main
         try:
-            self.handle_resize(None,None)
-            signal.signal(signal.SIGWINCH, self.handle_resize)
-            self.signal_set = True
+            h,w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0'*8))[:2]
+            self.term_width = w
         except:
             self.term_width = 79
         self.count = 0
@@ -263,11 +261,6 @@ class ProgressBar:
 
     def empty(self, *args, **kwargs):
         return
-
-    def handle_resize(self, signum, frame):
-        # this is borrowed from python progressbar module
-        h,w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0'*8))[:2]
-        self.term_width = w
 
     def update(self, count):
         '''finished count jobs'''
