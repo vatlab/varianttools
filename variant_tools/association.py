@@ -176,8 +176,9 @@ class AssociationTester(Sample):
         '''Write result from association test to variant table
         for variants from startID to endID '''
         fields = test.getFields()
+        headers = self.db.getHeaders(self.table)
         for field, fldtype in fields:
-            if field not in self.db.getHeaders(self.table):
+            if field not in headers:
                 self.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(self.table, field, fldtype))
                 self.db.commit()
@@ -185,10 +186,11 @@ class AssociationTester(Sample):
         prog = ProgressBar('Updating {}'.format(self.table), endID-startID+1)
         update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(self.table, self.db.PH,
         ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
+        names = [x.split('_')[1] for x,y in fields]
         for idx, id in enumerate(range(startID, endID+1)):
-            values = [test.result[field.split('_')[1]][idx] for field, fldtype in fields]
+            values = [test.result[x][idx] for x in names]
             self.db.execute(update_query, values+[id])
-            if idx % self.db.batch == 0:
+            if idx % 10000 == 0:
                 self.db.commit()
                 prog.update(idx)
         self.db.commit()
