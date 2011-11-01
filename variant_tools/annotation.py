@@ -299,7 +299,7 @@ class AnnoDBConfiger:
             skipped_lines = 0
             lc = lineCount(f)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, self.jobs, self.logger)
+            p = TextReader(processor, f, self.jobs - 1, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             for all_records, bins, rec in p.records():
                 cur.execute(insert_query, bins + rec)
