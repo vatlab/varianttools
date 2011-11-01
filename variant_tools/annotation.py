@@ -456,7 +456,7 @@ def useArguments(parser):
         help='''If set, variant tools will always rebuild the annotation database from source,
             ignoring existing local and online database. In addition to $name.DB, variant tools
             will also create $name-$version.DB.gz that can be readily distributed.'''),
-    parser.add_argument('-j', '--jobs', type=int, default=2,
+    parser.add_argument('-j', '--jobs', metavar='N', type=int, default=2,
         help='''If need to build database from source, maximum number of processes to use.''')
 
 

@@ -1657,10 +1657,10 @@ def importVariantsArguments(parser):
             coordinates between the primary and alternative reference genomes.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as VCF (c.f. 'vtools show formats'), or a 
+            supported file types such as VCF (cf. 'vtools show formats'), or a 
             local format specification file (with extension .fmt). If unspecified,
             variant tools will try to guess format from file extension. Some file
-            formats accept parameters (c.f. 'vtools show format FMT') and allow you
+            formats accept parameters (cf. 'vtools show format FMT') and allow you
             to import additional or alternative fields defined for the format. ''')
     parser.add_argument('--sample_name', nargs='*', default=[],
         help='''Name of the samples imported by the input files. The same names will be
@@ -1675,9 +1675,11 @@ def importVariantsArguments(parser):
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
             not remove wrongfully imported variants from the master variant table.'''),
-    parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Number of processes to process input file. Due to the potential bottleneck
-            of disk speed and overhead of inter-process communication, more jobs do not
+    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
+        help='''Number of processes to import input file. Variant tools by default
+            uses a single process for reading and writing, and can use one or more
+            dedicated reader processes (jobs=2 or more) to process input files. Due
+            to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
 
 def importVariants(args):
@@ -1709,11 +1711,11 @@ def updateArguments(parser):
             added to the project if needed.''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as ANNOVAR_mut_type (c.f. 'vtools show formats'),
+            supported file types such as ANNOVAR_output (cf. 'vtools show formats'),
             or a local format specification file (with extension .fmt). Some formats 
-            accept parameters (c.f. 'vtools show format FMT') and allow you to update
+            accept parameters (cf. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
-    parser.add_argument('-j', '--jobs', default=1, type=int,
+    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to import input file. Variant tools by default
             uses a single process for reading and writing, and can use one or more
             dedicated reader processes (jobs=2 or more) to process input files. Due

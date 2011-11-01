@@ -81,8 +81,8 @@ if __name__ == '__main__':
     # 
     # command phenotype
     parser = subparsers.add_parser('phenotype', help='Manage sample phenotypes',
-        description='''Import phenotypes from a file or set phenotype according
-            to summary statistics of sample genotype.''')
+        description='''Import phenotypes from a file, or set phenotypes to constants, 
+            or to summary statistics of sample genotype fields.''')
     sample.phenotypeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=sample.phenotype)
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         description='''Calculate count of alleles, homozygotes, heterozygotes, and summary
             statistics for genotype information fields in all or selected samples. Statistics for a
             genotype information field FIELD include mean_FIELD, sum_FIELD, min_FIELD and
-            max_FIELD (e.g. --mean_GQ_INFO for the average genotype call quality across all samples).
+            max_FIELD (e.g. --mean_GQ for the average genotype call quality across all samples).
         ''')
     sample.sampleStatArguments(parser)
     addCommonArgs(parser)

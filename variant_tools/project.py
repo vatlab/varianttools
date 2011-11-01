@@ -2324,7 +2324,7 @@ def initArguments(parser):
     #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
     #        unset, all variants will be read to RAM and perform a faster merge at a cost of
     #        higher memory usage'''),
-    #sub.add_argument('-j', '--jobs', type=int, default=4,
+    #sub.add_argument('-j', '--jobs', metavar='N', type=int, default=4,
     #    help='''Number of threads used to merge subprojects. Default to 4.'''),
     #parser.add_argument('--build',
     #    help='''Build of the primary reference genome of the project.'''),
@@ -2404,14 +2404,14 @@ def removeArguments(parser):
             be removed (optional), for 'tables' names of one or more variant tables,
             for 'samples' patterns using which matching samples are removed, for 'fields'
             name of fields to be removed, for 'geno_fields' name of genotype fields to 
-            be removed (c.f. show genotypes), for "annotations" names of annotation databases,
+            be removed (cf. 'vtools show genotypes'), for 'annotations' names of annotation databases,
             for 'variants' variant tables whose variants will be removed from all variant
             tables and genotypes, for 'genotypes' conditions using which matching genotypes
             are removed, and for 'phenotypes' columns in the output of 'vtools show samples'.
             Note that removal of samples will only remove sample name, filename (if all related
             samples are removed), and related genotypes, but not variants themselves; removal
             of annotation databases will stop using these databases in the project, but will
-            not removing them from disk.''')
+            not delete them from disk.''')
 
 def remove(args):
     try:
@@ -2647,7 +2647,7 @@ def executeArguments(parser):
     parser.add_argument('query', nargs='*',
         help='''A SQL query to be executed. The project genotype database is
         attached as $name_genotype. Annotation databases used in the project
-        are attached and are available by thire rnames.''')
+        are attached and are available by their names.''')
     parser.add_argument('-d', '--delimiter', default='\t',
         help='Delimiter used to output results, default to tab.')
 

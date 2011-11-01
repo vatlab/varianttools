@@ -471,10 +471,10 @@ def exportArguments(parser):
             parameter is ignored.''')
     parser.add_argument('--format',
         help='''Format of the exported file. It can be one of the variant tools
-            supported file types such as VCF (c.f. 'vtools show formats') or a local
+            supported file types such as VCF (cf. 'vtools show formats') or a local
             format specification file (with extension .fmt). If unspecified, variant
             tools will try to guess format from file extension. Some formats accept
-            additional parameters (c.f. 'vtools show format FMT') and allows you to
+            additional parameters (cf. 'vtools show format FMT') and allows you to
             export additional or alternative fields.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
@@ -486,7 +486,7 @@ def exportArguments(parser):
             exist, variant tools will retrieve saved header of this file (if filename exists
             in the sample table) or the file from which the first sample is imported (if
             filename is empty and --samples are specified). No header will be used for
-            the exported file is this parameter is left unspecified.''')
+            the exported file if this parameter is left unspecified.''')
 
 def export(args):
     try:

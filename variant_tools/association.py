@@ -37,9 +37,9 @@ def associateArguments(parser):
     parser.add_argument('phenotype', nargs='+',
         help='''A list of phenotypes that will be passed to the association
             statistics calculator''')
-    parser.add_argument('--covariants', nargs='*',
+    parser.add_argument('--covariates', nargs='*',
         help='''Optional phenotypes that will be passed to statistical
-            tests as covariants. Values of these phenotypes should be integer
+            tests as covariates. Values of these phenotypes should be integer
             or float.''')
     parser.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each

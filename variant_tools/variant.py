@@ -117,7 +117,7 @@ def selectArguments(parser):
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant, which is a shortcut to '--output count(1)'.''')
-    grp.add_argument('-o', '--output', nargs='*', default=[],
+    grp.add_argument('-o', '--output', nargs='*', metavar='FIELDS', default=[],
         help='''A list of fields that will be outputed. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
@@ -256,7 +256,7 @@ def excludeArguments(parser):
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant, which is a shortcut to '--output count(1)'.''')
-    grp.add_argument('-o', '--output', nargs='*', default=[],
+    grp.add_argument('-o', '--output', nargs='*', metavar='FIELDS', default=[],
         help='''A list of fields that will be outputed. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 

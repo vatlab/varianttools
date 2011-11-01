@@ -558,7 +558,7 @@ class Sample:
                 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
-    parser.add_argument('-f', '--from_file', nargs='*',
+    parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
         help='''Import phenotype from a tab delimited file. The file should have
             a header, with either 'sample_name' as the first column, or 'filename'
             and 'sample_name' as the first two columns. In the former case, samples
@@ -566,25 +566,25 @@ def phenotypeArguments(parser):
             a list of phenotypes (columns of the file) is specified after filename,
             only the specified phenotypes will be imported. Parameter --samples
             could be used to limit the samples for which phenotypes are imported.'''),
-    parser.add_argument('--set', nargs='*', default=[],
+    parser.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
             using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio
             of the number of high quality variants to the number of all variants, where
             high_qt and all_qt are obtained from sample statistics using parameter
-            --from_stat). Parameters --samples could be used to limit the samples for
+            --from_stat). Parameter --samples could be used to limit the samples for
             which genotypes will be set.'''),
-    parser.add_argument('--from_stat', nargs='*', default=[],
+    parser.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
             example, '--stat "num=count(*)"' sets phenotype num to be the number of
-            genotypes of a sample, '--set "DP=avg(DP)"' sets phenotype DP to be the 
+            genotypes of a sample, '--set "GD=avg(DP)"' sets phenotype DP to be the 
             average depth (if DP is one of the genotype fields) of the sample. Multiple
-            fields (e.g. '--set "num=count(*)" "DP=avg(DP)"') are also allowed. 
+            fields (e.g. '--set "num=count(*)" "GD=avg(DP)"') are also allowed. 
             Parameters --genotypes and --samples could be used to limit the genotypes
             to be considered and the samples for which genotypes will be set.'''),
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from_stat.''')
-    parser.add_argument('-g', '--genotypes', nargs='*', default=[],
+    parser.add_argument('-g', '--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limit the operation to genotypes that match specified conditions.
             Use 'vtools show genotypes' to list usable fields for each sample.'''),
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
@@ -630,7 +630,7 @@ def sampleStatArguments(parser):
             'filename like "MG%%"').''')
     parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
-            use columns shown in command 'vtools show genotypes' (e.g. 'GQ_INFO>15').''')
+            use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15').''')
     parser.add_argument('table',
         help='''Variant table for which the statistics will be calculated and updated.''')
     parser.add_argument('-n', '--num',
