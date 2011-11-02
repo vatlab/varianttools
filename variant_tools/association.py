@@ -22,15 +22,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
 import sys
+import threading
+import Queue
+import time
 from array import array
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName
 from .sample import Sample
 import argparse
-
+import variant_tools.assoTests as t
 
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
@@ -57,8 +59,9 @@ def associateArguments(parser):
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
 
-
 class AssociationTester(Sample):
+    '''Parse command line and get data for association testing'''
+    
     def __init__(self, proj, table):
         Sample.__init__(self, proj)
         # table?
@@ -173,28 +176,52 @@ class AssociationTester(Sample):
         return genotype, start, end
     
     def updateTestResult(self, test, startID, endID):
-        '''Write result from association test to variant table
-        for variants from startID to endID '''
-        fields = test.getFields()
-        headers = self.db.getHeaders(self.table)
-        for field, fldtype in fields:
-            if field not in headers:
-                self.logger.info('Adding field {}'.format(field))
-                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(self.table, field, fldtype))
-                self.db.commit()
-        # if the field exists it will be re-written
-        prog = ProgressBar('Updating {}'.format(self.table), endID-startID+1)
-        update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(self.table, self.db.PH,
-        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
-        names = [x.split('_')[1] for x,y in fields]
-        for idx, id in enumerate(range(startID, endID+1)):
-            values = [test.result[x][idx] for x in names]
-            self.db.execute(update_query, values+[id])
-            if idx % 10000 == 0:
-                self.db.commit()
-                prog.update(idx)
-        self.db.commit()
-        prog.done()
+
+        if test.__class__.__name__ == 'NullTest':
+
+        
+class StatStatus:
+    def __init__(self):
+        self.tasks = {}
+        self.lock = threading.Lock()
+
+    def set(self, task, value):
+        self.lock.acquire()
+        self.tasks[task] = value
+        self.lock.release()
+    
+    def get(self, task):
+        return self.tasks[task]
+        
+    def count(self):
+        return len(self.tasks)
+        
+class GroupAssociationCalculator(threading.Thread):
+    def __init__(self, asso, grpQueue, status, logger):
+        self.asso = asso
+        self.queue = grpQueue
+        self.status = status
+        self.logger = logger
+        threading.Thread.__init__(self, name='Phenotype association analysis for a group of variants')
+    
+    def run(self):
+        while True:
+            grp = self.queue.get()
+            if grp is None:
+                self.queue.task_done()
+                break
+            # select variants from each group:
+            vtable = asso.getVariants(grp)
+            genotype, startID, endID = asso.getGenotype(vtable)
+            values = [(startID, endID)]
+            for test in asso.tests:
+                test.setGenotype(genotype)
+                test.setAttributes(grp)
+                test.calculate()
+                values.append((test.getFields(), test.result))
+            self.status.set(grp, values)
+            self.queue.task_done()
+        
 
 def associate(args, reverse=False):
     try:
@@ -210,19 +237,62 @@ def associate(args, reverse=False):
                 test.setPhenotype(asso.phenotype)
             # step 3: handle group_by
             asso.identifyGroups(args.group_by)
+            nJobs = max(min(args.jobs, len(asso.groups)), 1)
+            # step 4: start all workers
+            grpQueue = Queue.Queue()
+            status = StatStatus()
             proj.db.attach(proj.name + '_genotype')
-            for grp in asso.groups: 
-                # select variants from each group:
-                vtable = asso.getVariants(grp)
-                # passing everything to association test
-                genotype, startID, endID = asso.getGenotype(vtable)
-                for test in asso.tests:
-                    test.setGenotype(genotype)
-                    test.setAttributes(grp)
-                    # step 6: call stat.calculate
-                    values = test.calculate()
-                    # step 7: update variant table
-                    asso.updateTestResult(test, startID, endID)  
+            for j in range(nJobs):
+                GroupAssociationCalculator(asso, grpQueue, status, proj.logger).start()
+            # put all jobs to queue, the workers will work on them
+            for grp in asso.groups:
+                idQueue.put(grp)
+
+            count = 0
+            prog = ProgressBar('Testing for association', len(asso.groups))
+            while True:
+                if status.count() > count:
+                    count = status.count()
+                    prog.update(count)
+                # if everything is done
+                if status.count() == len(IDs):
+                    # stop all threads
+                    for j in range(nJobs):
+                        idQueue.put(None)
+                    break
+                # wait 1 sec to check status again
+                time.sleep(1)
+            prog.done()
+        
+            # step 5: update variant table by groups
+            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
+            for igrp, grp in enumerate(asso.groups):
+                res = status.get(grp)
+                startID, endID = res[0]
+                fields = [x[0] for x in res[1:]]
+                results = [x[1] for x in res[1:]]
+                headers = self.db.getHeaders(args.table)
+                for field, fldtype in fields:
+                    if field not in headers:
+                        proj.logger.info('Adding field {}'.format(field))
+                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(proj.table, field, fldtype))
+                        proj.db.commit()
+                # if the field exists it will be re-written
+                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(proj.table, proj.db.PH,
+                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
+                # fill up the update query and execute the update command
+                names = [x.split('_')[1] for x,y in fields]
+                for idx, id in enumerate(range(startID, endID+1)):
+                    values = []
+                    for result in results:
+                        values.extend([result[x][idx] for x in names])
+                    self.db.execute(update_query, values+[id])
+                
+                if igrp % 100 == 0:
+                    proj.db.commit()
+                    prog.update(idx)
+            proj.db.commit()
+            prog.done()                
     except Exception as e:
         sys.exit(e) 
 
@@ -234,9 +304,8 @@ def associate(args, reverse=False):
 #
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest) in this module'''
-    return [name for name,obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
+    return [name for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
 
-import variant_tools.assoTests as t
 
 class NullTest:
     '''A base class that defines a common interface for association
