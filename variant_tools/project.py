@@ -1394,7 +1394,7 @@ class Project:
         
 
 class ProjCopier:
-    def __init__(self, proj, dir, vtable, unknown_args):
+    def __init__(self, proj, dir, vtable, samples, genotypes):
         self.proj = proj
         self.logger = proj.logger
         self.db = proj.db
@@ -1403,24 +1403,12 @@ class ProjCopier:
         if len(files) != 1:
             raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
         self.vtable = vtable
-        self.parse(unknown_args)
+        self.samples = samples
+        self.genotypes = genotypes
         self.proj_file = files[0]
         self.geno_file = self.proj_file.replace('.proj', '_genotype.DB')
         if not os.path.isfile(self.geno_file):
             self.geno_file = None
-
-    def parse(self, unknown_args):
-        parser = argparse.ArgumentParser(prog='vtools init --parent',
-            description='Parameters to copy items from a parental project')
-        parser.add_argument('--samples', nargs='*', metavar='COND', default=[],
-            help='''Copy only samples that match certain conditions to the subproject.''')
-        parser.add_argument('--sample_range', nargs=2, metavar=['START', 'END'],
-            help='''Copy only samples from start to end (1-based).''')
-        parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
-            help='''Copy only genotypes that match certain conditions''')
-        args = parser.parse_args(unknown_args)
-        self.samples = ' AND '.join(['({})'.format(x) for x in args.samples])
-        self.genotypes = ' AND '.join(['({})'.format(x) for x in args.genotypes])
 
     def copyProject(self):
         self.db.attach(self.proj_file, '__fromDB')
@@ -2307,19 +2295,26 @@ def initArguments(parser):
     parser.add_argument('project',
         help='''Name of a new project. This will create a new file $project.proj under
             the current directory. Only one project is allowed in a directory.''')
-    sub = parser.add_argument_group('Subprojects')
-    subproj = sub.add_mutually_exclusive_group()
-    subproj.add_argument('--parent', nargs=2, metavar=('DIR','TABLE'),
-        help='''Directory and variant table of a parent project (e.g. --parent ../ chr1) from
-            which variants in specified variant table will be copied to the new project. This
-            option is often used to split a project into several subprojects that will be
-            processed in parallel. This option also allows parameter --samples, --sample_range,
-            and --genotypes which copy selected samples by conditions or range (e.g. 1-100, 1-based, 
-            inclusive at both ends), and selected genotypes by condition.''')
-    subproj.add_argument('--children', nargs='+', metavar='DIR',
+    parent = parser.add_argument_group('Derive from a parent project')
+    parser.add_argument('-f', '--force', action='store_true',
+        help='''Remove a project if it already exists.''')
+    parent.add_argument('--parent', metavar='DIR',
+        help='''Directory of a parent project (e.g. --parent ../main) from which all or part
+            of variants (--variants), samples (--samples) and genotypes (--genotypes) will
+            be copied to the newly created project.'''),
+    parent.add_argument('--variants', nargs='?', metavar='TABLE', default='variant',
+        help='''A variant table of the parental project whose variants will be copied to
+            the new project. Default to variant (all variants).'''),
+    parent.add_argument('--samples', nargs='*', metavar='COND', default=[],
+        help='''Copy only samples of the parental project that match specified conditions.''')
+    parent.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
+        help='''Copy only genotypes that match specified conditions.''')
+    children = parser.add_argument_group('Merge from children projects')
+    children.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project. The subprojects must have the same structure (primary
-            and alternative reference genome, variant info and phenotype).''')
+            and alternative reference genome, variant info and phenotype). Samples
+            imported from the same files will be ignored''')
     #sub.add_argument('--sort', action='store_true',
     #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
     #        unset, all variants will be read to RAM and perform a faster merge at a cost of
@@ -2328,8 +2323,6 @@ def initArguments(parser):
     #    help='''Number of threads used to merge subprojects. Default to 4.'''),
     #parser.add_argument('--build',
     #    help='''Build of the primary reference genome of the project.'''),
-    parser.add_argument('-f', '--force', action='store_true',
-        help='''Remove a project if it already exists.''')
     #engine = parser.add_argument_group('Database connection')
     #engine.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
     #    help='''Database engine to use, can be mysql or sqlite3. Parameters --host, --user
@@ -2365,9 +2358,9 @@ def init(args):
             engine='sqlite3', host=None, user=None, passwd=None,
             batch=10000) as proj:
             if args.parent:
-                if len(args.parent) != 2:
-                    raise ValueError('Option --parent must be followed by path to a parent project and name of a variant table in that project.')
-                copier = ProjCopier(proj, args.parent[0], args.parent[1], args.unknown_args)
+                copier = ProjCopier(proj, args.parent, args.variants,
+                    ' AND '.join(['({})'.format(x) for x in args.samples]),
+                    ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
             elif args.children:
                 # args.sort is temporarily removed to keep interface clean

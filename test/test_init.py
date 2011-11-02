@@ -51,7 +51,7 @@ class TestInit(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
-        self.assertSucc('vtools init test --parent parent ceu')
+        self.assertSucc('vtools init test --parent parent --variants ceu')
         self.assertEqual(numOfVariant(), 288)
         self.assertEqual(numOfSample(), 61)
         shutil.rmtree('parent')
