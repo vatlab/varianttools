@@ -58,7 +58,9 @@ def associateArguments(parser):
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
-
+    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
+        help='''Number of processes to carry out association tests.''')
+        
 class AssociationTester(Sample):
     '''Parse command line and get data for association testing'''
     
@@ -175,11 +177,7 @@ class AssociationTester(Sample):
             genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
         return genotype, start, end
     
-    def updateTestResult(self, test, startID, endID):
 
-        if test.__class__.__name__ == 'NullTest':
-
-        
 class StatStatus:
     def __init__(self):
         self.tasks = {}
@@ -211,10 +209,10 @@ class GroupAssociationCalculator(threading.Thread):
                 self.queue.task_done()
                 break
             # select variants from each group:
-            vtable = asso.getVariants(grp)
-            genotype, startID, endID = asso.getGenotype(vtable)
+            vtable = self.asso.getVariants(grp)
+            genotype, startID, endID = self.asso.getGenotype(vtable)
             values = [(startID, endID)]
-            for test in asso.tests:
+            for test in self.asso.tests:
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
@@ -246,7 +244,7 @@ def associate(args, reverse=False):
                 GroupAssociationCalculator(asso, grpQueue, status, proj.logger).start()
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
-                idQueue.put(grp)
+                grpQueue.put(grp)
 
             count = 0
             prog = ProgressBar('Testing for association', len(asso.groups))
@@ -255,10 +253,10 @@ def associate(args, reverse=False):
                     count = status.count()
                     prog.update(count)
                 # if everything is done
-                if status.count() == len(IDs):
+                if status.count() == len(asso.groups):
                     # stop all threads
                     for j in range(nJobs):
-                        idQueue.put(None)
+                        grpQueue.put(None)
                     break
                 # wait 1 sec to check status again
                 time.sleep(1)
