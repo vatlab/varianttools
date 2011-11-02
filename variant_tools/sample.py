@@ -568,6 +568,15 @@ class Sample:
         self.db.commit()
         prog.done()
         self.logger.info('{} records are updated'.format(count))
+
+    def output(self, fields, samples):
+        # output
+        query = 'SELECT {} FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {}'.format(
+            ','.join(fields), '' if not samples else 'WHERE ' + samples)
+        cur = self.db.cursor()
+        cur.execute(query)
+        for rec in cur:
+            print '\t'.join(rec)
                 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
@@ -594,6 +603,9 @@ def phenotypeArguments(parser):
             fields (e.g. '--set "num=count(*)" "GD=avg(DP)"') are also allowed. 
             Parameters --genotypes and --samples could be used to limit the genotypes
             to be considered and the samples for which genotypes will be set.'''),
+    parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
+        help='''A list of phenotype to be outputted. SQL-compatible expressions or
+            functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from_stat.''')
@@ -630,6 +642,8 @@ def phenotype(args):
                 p.fromSampleStat(stat,
                         ' AND '.join(['({})'.format(x) for x in args.genotypes]),
                         ' AND '.join(['({})'.format(x) for x in args.samples]))
+            if args.output:
+                p.output(args.output, ' AND '.join(['({})'.format(x) for x in args.samples]))
         proj.close()
     except Exception as e:
         sys.exit(e)
