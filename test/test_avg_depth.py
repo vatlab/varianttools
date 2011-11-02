@@ -36,7 +36,7 @@ class TestAvgDepth(ProcessTestCase):
         runCmd('vtools init test  -f')
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_FMT')
         runCmd('vtools import vcf/SAMP1.vcf --geno_info DP_FMT')
-        runCmd('vtools sample_stat variant --num num --mean_DP_FMT depth')
+        runCmd('vtools sample_stat variant --num num --from_stat "depth=avg(DP_FMT)"')
         
     def removeProj(self):
         runCmd('vtools remove project')

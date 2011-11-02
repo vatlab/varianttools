@@ -28,6 +28,7 @@ import sys
 import threading
 import Queue
 import time
+import re
 from collections import defaultdict
 from .project import Project
 from .utils import DatabaseEngine, ProgressBar, typeOfValues
@@ -314,12 +315,28 @@ class Sample:
         self.db.commit()
 
 
-    def calcSampleStat(self, IDs, variant_table, genotypes, num, hom, het, other, other_stats):
+    def calcSampleStat(self, IDs, variant_table, genotypes, num, hom, het, other, from_stat):
         '''Count sample allele count etc for specified sample and variant table'''
         if not self.proj.isVariantTable(variant_table):
             raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
-        
-        if num is None and hom is None and het is None and other is None and not other_stats:
+        #
+        #
+        # NOTE: this function could be implemented using one or more query more
+        # or less in the form of
+        #
+        # UPDATE variant SET something = something 
+        # FROM 
+        # (SELECT variant_id, avg(FIELD) FROM (
+        #       SELECT FIELD FROM genotype_1 WHERE ...
+        #       UNION SELECT FIELD FROM genotype_2 WHERE ...
+        #       ...
+        #       UNION SELECT FIELD FROM genotype_2 WHERE ) as total
+        #   GROUP BY variant_id;
+        #
+        # This query can be faster because it is executed at a lower level, we cannot
+        # really see the progress of the query though.
+        #
+        if num is None and hom is None and het is None and other is None and not from_stat:
             self.logger.warning('No statistics is specified')
             return
 
@@ -330,7 +347,7 @@ class Sample:
         SUM = 1
         MIN = 2
         MAX = 3
-        operationKeys = {'mean': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
+        operationKeys = {'avg': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
         possibleOperations = operationKeys.keys()
         
         operations = []
@@ -338,22 +355,17 @@ class Sample:
         validGenotypeFields = []
         destinations = []
         fieldCalcs = []
-        for index in range(0, len(other_stats), 2):
-            if other_stats[index].startswith('--'):
-                if other_stats[index].find('_') == -1:
-                    raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(other_stats[index][2:], ', '.join(possibleOperations)))
-                operation, field = other_stats[index][2:].split('_',1)
-                if operation not in possibleOperations:
-                    raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
-                operations.append(operationKeys[operation])
-                genotypeFields.append(field)
-                fieldCalcs.append(None)
-                if index + 1 >= len(other_stats) or other_stats[index + 1].startswith('--'):
-                    raise ValueError('Missing or invalid field name following parameter {}'.format(other_stats[index]))
-                destinations.append(other_stats[index + 1])
-            else:
-                raise ValueError('Expected to see an argument (e.g., --mean_FIELD) here, but found {} instead.'.format(other_stats[index]))
-        
+        for stat in from_stat:
+            groups = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat).groups()
+            if groups is None:
+                raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO)'.format(stat))
+            dest, operation, field = groups
+            if operation not in possibleOperations:
+                raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
+            operations.append(operationKeys[operation])
+            genotypeFields.append(field)
+            fieldCalcs.append(None)
+            destinations.append(dest)
         #
         cur = self.db.cursor()
         if IDs is None:
@@ -642,6 +654,10 @@ def sampleStatArguments(parser):
         help='''Name of the field to hold number of samples with one reference and one alternative alleles.''')
     parser.add_argument('--other',
         help='''Name of the field to hold number of samples with two different alternative alleles.''')
+    parser.add_argument('--from_stat', metavar='EXPR', nargs='*', default=[],
+        help='''One or more expressions such as meanQT=avg(QT) that aggregate genotype info (e.g. QT)
+            of variants in all or selected samples to specified fields (e.g. meanQT). Functions sum, avg,
+            max, and min are currently supported.''')
     
 def sampleStat(args):
     try:
@@ -661,7 +677,7 @@ def sampleStat(args):
                 else:
                     p.logger.info('{} samples are selected'.format(len(IDs)))
             p.calcSampleStat(IDs, variant_table, args.genotypes, args.num, args.hom,
-                args.het, args.other, args.unknown_args)
+                args.het, args.other, args.from_stat)
         # temporary tables will be removed
         proj.close()
     except Exception as e:

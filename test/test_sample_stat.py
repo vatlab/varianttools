@@ -64,14 +64,14 @@ class TestSampleStat(ProcessTestCase):
         'Test command vtools sample_stat min/max/sum/mean_FIELD'
         runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # non-existing field, should fail
-        self.assertFail('vtools sample_stat variant --max_GQ1 max_gq --min_GQ min_gq')
-        self.assertSucc('vtools sample_stat variant --max_GQ max_gq --min_GQ min_gq --mean_GQ mean_gq')
+        self.assertFail('vtools sample_stat variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
+        self.assertSucc('vtools sample_stat variant --from_stat "max_gq=max(GQ)" "min_gq=min(GQ)" "mean_gq=avg(GQ)"')
         out = output2list('vtools output variant max_gq min_gq mean_gq')
         self.assertEqual(out[0], 'NA\tNA\tNA')
         self.assertTrue(out[3].startswith('100\t15\t69.3333'))
         self.assertTrue(out[4].startswith('6\t3\t4.0'))
         self.assertTrue(out[5].startswith('4\t3\t3.33333'))
-        self.assertSucc('vtools sample_stat variant --sum_GD total_dp')
+        self.assertSucc('vtools sample_stat variant --from_stat "total_dp=sum(GD)"')
         self.assertEqual(output2list('vtools output variant total_dp'), ['NA', 'NA', 'NA', '60', '7', '4'])
         # ffilter out variants having GQ less than 4,
         # then for each remining variant count the total number of alt genotypes across all samples
