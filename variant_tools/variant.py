@@ -25,6 +25,7 @@
 #
 
 import sys
+import re
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount
 from .sample import Sample
@@ -38,6 +39,9 @@ def outputArguments(parser):
 
 def generalOutputArguments(parser):
     grp = parser.add_argument_group('Output options')
+    grp.add_argument('--header', nargs='*',
+        help='''Header of the output, default names derived from field names will be
+            used if the parameter is given without any value.'''),
     grp.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
     grp.add_argument('--na', default='NA',
@@ -53,9 +57,6 @@ def generalOutputArguments(parser):
 
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
-    # output
-    out = sys.stdout
-    #
     # table
     if not proj.isVariantTable(table):
         raise ValueError('Variant table {} does not exist.'.format(table))
@@ -90,8 +91,11 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     # if output to a file
     cur = proj.db.cursor()
     cur.execute(query)
+    if args.header is not None:
+        sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in \
+            (output_fields if len(args.header) == 0 else args.header)]) + '\n')
     for count, rec in enumerate(cur):
-        out.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
+        sys.stdout.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
 
 
 def output(args):
