@@ -336,9 +336,11 @@ class ProgressBar:
         # use stderr to avoid messing up process output
         sys.stderr.write('\r' + ''.join(msg))
 
-    def done(self):
+    def done(self, completed=None):
         '''Finish, output a new line'''
-        if self.totalCount:
+        if completed is not None:
+            self.count = completed
+        elif self.totalCount:
             self.count = self.totalCount
         msg = ['', '', '', '', '', '']
         # message

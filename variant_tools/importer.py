@@ -751,11 +751,12 @@ class TextWorker(Process):
     # to process input line. If multiple works are started,
     # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     #
-    def __init__(self, processor, input, output, step, index, logger):
+    def __init__(self, processor, input, varIdx, output, step, index, logger):
         self.processor = processor
         self.input = input
         self.output = output
         self.step = step
+        self.varIdx = varIdx
         self.index = index
         self.logger = logger
         Process.__init__(self)
@@ -779,6 +780,10 @@ class TextWorker(Process):
                             self.output.send(self.processor.columnRange)
                             first = False
                         num_records += 1
+                        if self.varIdx is not None:
+                            var_key = (rec[0], rec[2], rec[3])
+                            if (var_key not in self.varIdx) or (rec[1] not in self.varIdx[var_key]):
+                                continue
                         self.output.send((line_no, bins, rec))
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
@@ -789,24 +794,25 @@ class TextWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-def TextReader(processor, input, jobs, logger):
+def TextReader(processor, input, varIdx, jobs, logger):
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, logger)
+        return EmbeddedTextReader(processor, input, varIdx, logger)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, logger)
+        return StandaloneTextReader(processor, input, varIdx, logger)
     else:
-        return MultiTextReader(processor, input, jobs, logger)
+        return MultiTextReader(processor, input, varIdx, jobs, logger)
 
 class EmbeddedTextReader:
     #
     # This processor uses the passed line processor to process input
     # in the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, logger):
+    def __init__(self, processor, input, varIdx, logger):
         self.num_records = 0
         self.skipped_lines = 0
         self.processor = processor
         self.input = input
+        self.varIdx = varIdx
         self.logger = logger
 
     def records(self): 
@@ -824,6 +830,10 @@ class EmbeddedTextReader:
                             self.columnRange = self.processor.columnRange
                             first = False
                         self.num_records += 1
+                        if self.varIdx is not None:
+                            var_key = (rec[0], rec[2], rec[3])
+                            if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                continue
                         yield (line_no, bins, rec)
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
@@ -834,12 +844,12 @@ class StandaloneTextReader:
     # This processor fire up 1 worker to read an input file
     # and gather their outputs
     #
-    def __init__(self, processor, input, logger):
+    def __init__(self, processor, input, varIdx, logger):
         self.num_records = 0
         self.skipped_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = TextWorker(processor, input, w, 1, 0, logger)
+        self.worker = TextWorker(processor, input, varIdx, w, 1, 0, logger)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -859,14 +869,14 @@ class MultiTextReader:
     # This processor fire up num workers to read an input file
     # and gather their outputs
     #
-    def __init__(self, processor, input, jobs, logger):
+    def __init__(self, processor, input, varIdx, jobs, logger):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.skipped_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = TextWorker(processor, input, w, jobs, i, logger)
+            p = TextWorker(processor, input, varIdx, w, jobs, i, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1410,7 +1420,7 @@ class TextImporter(BaseImporter):
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
+        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.logger)
         if genotype_status != 0:
             writer = GenotypeWriter(self.proj, self.genotype_field, self.genotype_info,
                 sample_ids)
@@ -1517,6 +1527,7 @@ class TextUpdater(BaseImporter):
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         #
         self.createLocalVariantIndex(table)
+        self.table = table
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
@@ -1578,10 +1589,16 @@ class TextUpdater(BaseImporter):
         #
         # do we handle genotype info as well?
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
+        # one process is for the main program, the
+        # other thread will handle input
+        reader = TextReader(self.processor, input_filename,
+            # in the case of variant, we filter from the reading stage to save some time
+            None if (self.table == 'variant' or self.input_type != 'variant') else self.variantIndex,
+            self.jobs - 1, self.logger)
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:
-            s = delayedAction(self.logger.info, 'Preparing genotype tables (adding needed fields)...')
+            s = delayedAction(self.logger.info, 'Preparing genotype tables (adding needed fields and indexes)...')
             cur = self.db.cursor()
             for id in sample_ids:
                 headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
@@ -1592,34 +1609,28 @@ class TextUpdater(BaseImporter):
                     if field.name.upper() not in headers:
                         self.logger.debug('Adding column {} to table genotype_{}'.format(field.name, id))
                         cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
+            # if we are updating by variant_id, we will need to create an index for it
+            for id in sample_ids:
+                if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
             del s
+            genotype_update_query = {id: 'UPDATE {0}_genotype.genotype_{1} SET {2} WHERE variant_id = {3};'\
+                .format(self.proj.name, id,
+                ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
+                self.db.PH)
+                for id in sample_ids}
         else:
             # do not import genotype even if the input file has them
             self.genotype_field = []
             self.genotype_info = []
             self.processor.reset(validTill=self.ranges[2])
         #
-        if sample_ids:
-            genotype_update_query = {id: 'UPDATE {0}_genotype.genotype_{1} SET {2} WHERE variant_id = {3};'\
-                .format(self.proj.name, id,
-                ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
-                self.db.PH)
-                for id in sample_ids}
-            # if we are updating by variant_id, we will need to create an index for it
-            s = delayedAction(self.logger.info, 'Creating indexes on genotype tables')
-            for id in sample_ids:
-                if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
-                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
-            del s
-        #
         cur = self.db.cursor()
         lc = lineCount(input_filename)
         update_after = min(max(lc//200, 100), 100000)
-        # one process is for the main program, the
-        # other thread will handle input
-        reader = TextReader(self.processor, input_filename, self.jobs - 1, self.logger)
         fld_cols = None
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+        last_count = 0
         for self.count[0], bins, rec in reader.records():
             variant_id = self.updateVariant(cur, bins, rec[0:self.ranges[2]])
             # variant might not exist
@@ -1636,12 +1647,13 @@ class TextUpdater(BaseImporter):
                     if rec[self.ranges[2] + idx] is not None:
                         cur.execute(genotype_update_query[id], [rec[c] for c in fld_cols[idx]] + [variant_id])
                         self.count[1] += 1
-            if self.count[0] % update_after == 0:
+            if self.count[0] - last_count > update_after:
+                last_count = self.count[0]
                 self.db.commit()
                 prog.update(self.count[0])
         self.count[7] = reader.skipped_lines
         self.db.commit()
-        prog.done()
+        prog.done(self.count[0])
 
 #
 #
