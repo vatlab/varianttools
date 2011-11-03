@@ -332,6 +332,10 @@ class fileFMT:
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
             else:
+                if not section.replace('_', '').isalnum():
+                  raise ValueError('Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))
+                if section.upper() in SQL_KEYWORDS:
+                  raise ValueError('Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     for item in items:

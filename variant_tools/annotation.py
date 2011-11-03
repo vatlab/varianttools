@@ -163,7 +163,7 @@ class AnnoDBConfiger:
             if section == 'linked fields' or section == 'data sources':
                 continue
             if not section.replace('_', '').isalnum():
-                raise ValueError('Illegal field name {}. Field names and field names can only contain alphanumeric characters and underscores.'.format(repr(section)))
+                raise ValueError('Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))
             if section.upper() in SQL_KEYWORDS:
                 raise ValueError('Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
             try:

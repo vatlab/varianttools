@@ -195,24 +195,34 @@ class StatStatus:
         return len(self.tasks)
         
 class GroupAssociationCalculator(threading.Thread):
-    def __init__(self, asso, grpQueue, status, logger):
-        self.asso = asso
+    def __init__(self, samples, phenotypes, tests, dbname, grpQueue, status):
+        self.samples = samples
+        self.phenotypes = phenotypes
+        self.tests = tests
+        self.dbname = dbname
         self.queue = grpQueue
         self.status = status
-        self.logger = logger
+        self.logger = dbname.logger
         threading.Thread.__init__(self, name='Phenotype association analysis for a group of variants')
     
     def run(self):
+        db = DatabaseEngine()
+        db.connect(self.dbname, readonly=True)
+        # FIXME: attached the database here ...
+        asso = AssociationTester()
+        asso.IDs = self.samples
+        asso.phenotype = self.phenotypes
+        asso.tests = self.tests
         while True:
             grp = self.queue.get()
             if grp is None:
                 self.queue.task_done()
                 break
             # select variants from each group:
-            vtable = self.asso.getVariants(grp)
-            genotype, startID, endID = self.asso.getGenotype(vtable)
+            vtable = asso.getVariants(grp)
+            genotype, startID, endID = asso.getGenotype(vtable)
             values = [(startID, endID)]
-            for test in self.asso.tests:
+            for test in asso.tests:
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
@@ -239,9 +249,9 @@ def associate(args, reverse=False):
             # step 4: start all workers
             grpQueue = Queue.Queue()
             status = StatStatus()
-            proj.db.attach(proj.name + '_genotype')
+            dbname = proj.name + '_genotype.DB'
             for j in range(nJobs):
-                GroupAssociationCalculator(asso, grpQueue, status, proj.logger).start()
+                GroupAssociationCalculator(asso.IDs, asso.phenotype, asso.tests, dbname, grpQueue, status, proj.logger).start()
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
