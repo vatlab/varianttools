@@ -1774,6 +1774,7 @@ class VariantProcessor(threading.Thread):
             if table in ['sample', 'filename', 'project']:
                 continue
             query = None
+            headers = db.getHeaders(table)
             if self.all_the_same:
                 # table variant:
                 #     if keep_all: do not copy anything
@@ -1785,10 +1786,10 @@ class VariantProcessor(threading.Thread):
                 # 
                 if table == 'variant' and not self.keep_all:
                     query = '''INSERT INTO {0}  
-                                SELECT *
+                                SELECT {1}
                                 FROM __fromDB.{0} v LEFT OUTER JOIN __fromDB.__id_map m
                                     ON v.variant_id = m.old_id 
-                                WHERE m.is_dup = 0;'''.format(table)
+                                WHERE m.is_dup = 0;'''.format(table, ', '.join(headers))
             else:
                 # table variant:
                 #     if keep_all: copy with id map
@@ -1798,7 +1799,6 @@ class VariantProcessor(threading.Thread):
                 #     if keep_all: copy with id_map
                 #     otherwise:   copy with id_map 
                 #
-                headers = db.getHeaders(table)
                 if table != 'variant' or not self.keep_all:
                     query = '''INSERT INTO {1} (variant_id {0}) 
                                 SELECT m.new_id {0} 
