@@ -35,7 +35,8 @@ from multiprocessing import Process, Pipe
 
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
-    DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, normalizeVariant, compressFile
+    DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
+    normalizeVariant, compressFile, SQL_KEYWORDS
 from .importer import LineImporter, TextReader
   
 class AnnoDBConfiger:
@@ -161,6 +162,10 @@ class AnnoDBConfiger:
         for section in sections:
             if section == 'linked fields' or section == 'data sources':
                 continue
+            if not section.replace('_', '').isalnum():
+                raise ValueError('Illegal field name {}. Field names and field names can only contain alphanumeric characters and underscores.'.format(repr(section)))
+            if section.upper() in SQL_KEYWORDS:
+                raise ValueError('Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
             try:
                 items = [x[0] for x in parser.items(section, raw=True)]
                 for item in items:
