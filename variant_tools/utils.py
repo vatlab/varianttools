@@ -650,7 +650,7 @@ class DatabaseEngine:
         if '.' not in table:
             return table.lower() in [x.lower() for x in self.tables()]
         else:
-            dbName, tableName = table.split('.')
+            dbName, tableName = table.split('.', 1)
             return tableName.lower() in [x.lower() for x in self.tables(dbName)]
 
     def hasIndex(self, index):
