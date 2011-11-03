@@ -419,21 +419,17 @@ class Sample:
             if name is not None:
                 self.proj.checkFieldName(name, exclude=variant_table)
         #
-        from_variants = set()
-        if variant_table != 'variant':
-            self.logger.info('Getting variants from table {}'.format(variant_table))
-            cur.execute('SELECT variant_id FROM {};'.format(variant_table))
-            from_variants = set([x[0] for x in cur.fetchall()])
-        #
         # too bad that I can not use a default dict...
         variants = dict()
-        prog = ProgressBar('Counting variants',
-            self.db.numOfRows('{}_genotype.genotype_{}'.format(self.proj.name, list(IDs)[0])) * len(IDs))
-        count = 0
-        for id in IDs:
-            whereClause = ''
+        prog = ProgressBar('Counting variants', len(IDs))
+        prog_step = max(len(IDs) // 100, 1) 
+        for id_idx, id in enumerate(IDs):
+            where_cond = []
             if genotypes is not None and len(genotypes) != 0:
-                whereClause = 'where ' + ' AND '.join(['({})'.format(x) for x in genotypes])
+                where_cond.extend(genotypes)
+            if variant_table != 'variant':
+                where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
+            whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
             
             fieldSelect = ''
             if validGenotypeFields is not None and len(validGenotypeFields) != 0:
@@ -441,60 +437,59 @@ class Sample:
             
             query = 'SELECT variant_id, GT{} FROM {}_genotype.genotype_{} {};'.format(fieldSelect,
                 self.proj.name, id, whereClause)
+            #self.logger.debug(query)
             cur.execute(query)
 
             for rec in cur:
-                if len(from_variants) == 0 or rec[0] in from_variants:
-                    if rec[0] not in variants:
-                        variants[rec[0]] = [0, 0, 0, 0]
-                        variants[rec[0]].extend(list(fieldCalcs))
+                if rec[0] not in variants:
+                    variants[rec[0]] = [0, 0, 0, 0]
+                    variants[rec[0]].extend(list(fieldCalcs))
 
-                    # type heterozygote
-                    if rec[1] == 1:
-                        variants[rec[0]][0] += 1
-                    # type homozygote
-                    elif rec[1] == 2:
-                        variants[rec[0]][1] += 1
-                    # type double heterozygote with two different alternative alleles
-                    elif rec[1] == -1:
-                        variants[rec[0]][2] += 1
-                    elif rec[1] in [0, None]:
-                        pass
-                    else:
-                        self.logger.warning('Invalid genotype type {}'.format(rec[1]))
-                
-                    # this collects genotype_field information
-                    if len(validGenotypeFields) > 0:
-                        for index in validGenotypeIndices:
-                            queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
-                            recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
-                            # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
-                            # by sqlite even when the field type is INT.
-                            if rec[queryIndex] in [None, '']:
-                                continue
-                            operation = operations[index]
-                            field = genotypeFields[index]
-                            if operation == MEAN:
-                                if variants[rec[0]][recIndex] is None:
-                                    # we need to track the number of valid records
-                                    variants[rec[0]][recIndex] = [rec[queryIndex], 1]
-                                else:
-                                    variants[rec[0]][recIndex][0] += rec[queryIndex]
-                                    variants[rec[0]][recIndex][1] += 1
-                            elif operation == SUM:
-                                if variants[rec[0]][recIndex] is None:
-                                    variants[rec[0]][recIndex] = rec[queryIndex]
-                                else:
-                                    variants[rec[0]][recIndex] += rec[queryIndex]
-                            elif operation == MIN:
-                                if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
-                                    variants[rec[0]][recIndex] = rec[queryIndex]
-                            elif operation == MAX:
-                                if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
-                                    variants[rec[0]][recIndex] = rec[queryIndex]  
-                count += 1
-                if count % self.db.batch == 0:
-                    prog.update(count)
+                # type heterozygote
+                if rec[1] == 1:
+                    variants[rec[0]][0] += 1
+                # type homozygote
+                elif rec[1] == 2:
+                    variants[rec[0]][1] += 1
+                # type double heterozygote with two different alternative alleles
+                elif rec[1] == -1:
+                    variants[rec[0]][2] += 1
+                elif rec[1] in [0, None]:
+                    pass
+                else:
+                    self.logger.warning('Invalid genotype type {}'.format(rec[1]))
+            
+                # this collects genotype_field information
+                if len(validGenotypeFields) > 0:
+                    for index in validGenotypeIndices:
+                        queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
+                        recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
+                        # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
+                        # by sqlite even when the field type is INT.
+                        if rec[queryIndex] in [None, '']:
+                            continue
+                        operation = operations[index]
+                        field = genotypeFields[index]
+                        if operation == MEAN:
+                            if variants[rec[0]][recIndex] is None:
+                                # we need to track the number of valid records
+                                variants[rec[0]][recIndex] = [rec[queryIndex], 1]
+                            else:
+                                variants[rec[0]][recIndex][0] += rec[queryIndex]
+                                variants[rec[0]][recIndex][1] += 1
+                        elif operation == SUM:
+                            if variants[rec[0]][recIndex] is None:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                            else:
+                                variants[rec[0]][recIndex] += rec[queryIndex]
+                        elif operation == MIN:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                        elif operation == MAX:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]  
+            if id_idx % prog_step == 0:
+                prog.update(id_idx + 1)
         prog.done()
         if len(variants) == 0:
             raise ValueError('No variant is updated')
