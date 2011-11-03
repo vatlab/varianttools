@@ -659,6 +659,10 @@ class DatabaseEngine:
         if self.engine == 'mysql':
             cur.execute("SHOW INDEXES;")
             return index.lower() in [x[0].lower() for x in cur.fetchall()]
+        elif '.' in index:
+            db, idx = index.split('.', 1)
+            cur.execute("SELECT name FROM {}.sqlite_master WHERE type='index';".format(db))
+            return idx.lower() in [x[0].lower() for x in cur.fetchall() if not x[0].startswith('sqlite')]
         else:
             cur.execute("SELECT name FROM sqlite_master WHERE type='index' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='index';")
             return index.lower() in [x[0].lower() for x in cur.fetchall() if not x[0].startswith('sqlite')]

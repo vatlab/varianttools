@@ -1048,18 +1048,19 @@ class BaseImporter:
         # by default, reference genome cannot be determined from file
         return None
 
-    def createLocalVariantIndex(self):
+    def createLocalVariantIndex(self, table='variant'):
         '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
         self.variantIndex = {}
         cur = self.db.cursor()
-        numVariants = self.db.numOfRows('variant')
+        numVariants = self.db.numOfRows(table)
         if numVariants == 0:
             return
         self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         if self.import_alt_build:
-            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant;')
+            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
         else:
-            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
+            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant {};'.format(where_clause))
         prog = ProgressBar('Getting existing variants', numVariants)
         for count, rec in enumerate(cur):
             # zero for existing loci
@@ -1508,14 +1509,14 @@ class TextUpdater(BaseImporter):
         self.input_type = fmt.input_type
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
         from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
-        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1} {2};'\
-            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH, from_table)
+        self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
+            .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
         self.update_position_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} = {0} {5};'\
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         #
-        self.createLocalVariantIndex()
+        self.createLocalVariantIndex(table)
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
@@ -1589,7 +1590,7 @@ class TextUpdater(BaseImporter):
                     cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
                 for field in self.genotype_info:
                     if field.name.upper() not in headers:
-                        self.logger.debug('Adding column {} to table genotype_{}'.format(field, id))
+                        self.logger.debug('Adding column {} to table genotype_{}'.format(field.name, id))
                         cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
             del s
         else:
@@ -1604,6 +1605,12 @@ class TextUpdater(BaseImporter):
                 ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
                 self.db.PH)
                 for id in sample_ids}
+            # if we are updating by variant_id, we will need to create an index for it
+            s = delayedAction(self.logger.info, 'Creating indexes on genotype tables')
+            for id in sample_ids:
+                if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
+            del s
         #
         cur = self.db.cursor()
         lc = lineCount(input_filename)
