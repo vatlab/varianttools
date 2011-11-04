@@ -729,6 +729,8 @@ class DatabaseEngine:
 
     def removeFields(self, table, cols):
         '''Remove fields from a table'''
+        if len(cols) == 0:
+            return
         cur = self.database.cursor()
         if self.engine == 'mysql':
             cur.execute('ALTER TABLE {} {};'.format(table,
@@ -736,7 +738,9 @@ class DatabaseEngine:
         elif '.' not in table:
             # for my sqlite, we have to create a new table
             fields = self.fieldsOfTable(table)
-            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [y.lower() for y in cols]]
+            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [z.lower() for z in cols]]
+            if len(fields) == len(new_fields):
+                raise ValueError('No field could be removed from table {}'.format(table))
             # rename existing table
             cur.execute('ALTER TABLE {0} RENAME TO _{0}_tmp_;'.format(table))
             # create a new table
@@ -749,7 +753,9 @@ class DatabaseEngine:
         else:
             db, tbl = table.rsplit('.', 1)
             fields = self.fieldsOfTable(table)
-            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [y.lower() for y in cols]]
+            new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [z.lower() for z in cols]]
+            if len(fields) == len(new_fields):
+                raise ValueError('No field could be removed from table {}'.format(table))
             # rename existing table
             cur.execute('ALTER TABLE {1}.{0} RENAME TO _{0}_tmp_;'.format(tbl, db))
             # create a new table
