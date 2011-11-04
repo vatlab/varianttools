@@ -28,8 +28,9 @@ import threading
 import Queue
 import time
 from array import array
+from copy import copy, deepcopy
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName
+from .utils import ProgressBar, consolidateFieldName, DatabaseEngine
 from .sample import Sample
 import argparse
 import variant_tools.assoTests as t
@@ -143,41 +144,6 @@ class AssociationTester(Sample):
             self.logger.info('Find {} groups'.format(len(self.groups)))
             self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
 
-    def getVariants(self, group):
-        '''Get variants for a certain group'''
-        if not self.group_by:
-            # group must be 'all'
-            return self.table
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
-        vtable = '__asso_tmp'
-        if self.db.hasTable(vtable):
-            self.db.truncateTable(vtable)
-        else:
-            self.proj.createVariantTable(vtable, temporary=True)
-        #
-        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.proj.db.PH) for x in fields])
-        query = 'INSERT INTO __asso_tmp SELECT variant_id FROM {} {};'.format(self.from_clause, where_clause)
-        self.logger.debug('Running query {}'.format(query))
-        cur = self.db.cursor()
-        cur.execute(query, group)
-        return vtable
-
-    def getGenotype(self, vtable):
-        '''Get genotype for variants in specified table'''
-        genotype = []
-        cur = self.db.cursor()
-        cur.execute('SELECT min(variant_id), max(variant_id) FROM {}'.format(vtable))
-        start, end = cur.fetchall()[0]
-        for ID in self.IDs:
-            query = 'SELECT variant_id, GT FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(self.proj.name, ID, vtable)
-            self.logger.debug('Running query {}'.format(query))
-            cur.execute(query)
-            gtmp = {x[0]:x[1] for x in cur.fetchall()}
-            genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
-        return genotype, start, end
-    
-
 class StatStatus:
     def __init__(self):
         self.tasks = {}
@@ -195,38 +161,77 @@ class StatStatus:
         return len(self.tasks)
         
 class GroupAssociationCalculator(threading.Thread):
-    def __init__(self, samples, phenotypes, tests, dbname, grpQueue, status):
-        self.samples = samples
-        self.phenotypes = phenotypes
+    '''Association test calculator'''
+    def __init__(self, table, samples, tests, pjname, grpfields, grpQueue, where, status, logger):
+        self.table = table
+        self.IDs = samples
         self.tests = tests
-        self.dbname = dbname
+        self.pjname = pjname
+        self.group_fields = grpfields[0]
+        self.fields = grpfields[1]
         self.queue = grpQueue
         self.status = status
-        self.logger = dbname.logger
+        self.logger = logger
+        self.db = None
+        self.where_clause = where
         threading.Thread.__init__(self, name='Phenotype association analysis for a group of variants')
+        
+    def getVariants(self, group):
+        '''Get variants for a certain group'''
+
+        if not self.group_fields:
+            # group must be 'all'
+            return self.table
+        vtable = '__asso_tmp_{}'.format(group[0])
+        if self.db.hasTable(vtable):
+            self.db.truncateTable(vtable)
+        else:
+            self.db.execute('''CREATE TEMPORARY TABLE {} (
+                variant_id INTEGER PRIMARY KEY);'''.format(vtable))
+            self.db.commit()
+        #
+        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.fields])
+        query = 'INSERT INTO __asso_tmp_{} SELECT variant_id FROM {} {};'.format(group[0], self.table, where_clause)
+        self.logger.debug('Running query {}'.format(query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        return vtable
+
+    def getGenotype(self, vtable):
+        '''Get genotype for variants in specified table'''
+        genotype = []
+        self.db.attach(self.pjname+'_genotype.DB', '__fromGeno')
+        cur = self.db.cursor()
+        cur.execute('SELECT min(variant_id), max(variant_id) FROM {}'.format(vtable))
+        start, end = cur.fetchall()[0]
+        for ID in self.IDs:
+            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(ID, vtable)
+            self.logger.debug('Running query {}'.format(query))
+            cur.execute(query)
+            gtmp = {x[0]:x[1] for x in cur.fetchall()}
+            genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
+        self.db.detach('__fromGeno')
+        return genotype, start, end
     
     def run(self):
-        db = DatabaseEngine()
-        db.connect(self.dbname, readonly=True)
-        # FIXME: attached the database here ...
-        asso = AssociationTester()
-        asso.IDs = self.samples
-        asso.phenotype = self.phenotypes
-        asso.tests = self.tests
+        self.db = DatabaseEngine()
+        self.db.connect(self.pjname+'.proj')
         while True:
             grp = self.queue.get()
             if grp is None:
                 self.queue.task_done()
                 break
             # select variants from each group:
-            vtable = asso.getVariants(grp)
-            genotype, startID, endID = asso.getGenotype(vtable)
-            values = [(startID, endID)]
-            for test in asso.tests:
+            vtable = self.getVariants(grp)
+            genotype, startID, endID = self.getGenotype(vtable)
+            values = [[startID, endID]]
+            for test in self.tests:
+                test = deepcopy(test)
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
-                values.append((test.getFields(), test.result))
+                values.append([test.getFields(), test.result])
             self.status.set(grp, values)
             self.queue.task_done()
         
@@ -244,14 +249,14 @@ def associate(args, reverse=False):
             for test in asso.tests:
                 test.setPhenotype(asso.phenotype)
             # step 3: handle group_by
+            gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
             asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue.Queue()
             status = StatStatus()
-            dbname = proj.name + '_genotype.DB'
             for j in range(nJobs):
-                GroupAssociationCalculator(asso.IDs, asso.phenotype, asso.tests, dbname, grpQueue, status, proj.logger).start()
+                GroupAssociationCalculator(args.table, asso.IDs, asso.tests, proj.name, gfields, grpQueue, asso.where_clause, status, proj.logger).start()
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
@@ -277,16 +282,19 @@ def associate(args, reverse=False):
             for igrp, grp in enumerate(asso.groups):
                 res = status.get(grp)
                 startID, endID = res[0]
-                fields = [x[0] for x in res[1:]]
-                results = [x[1] for x in res[1:]]
-                headers = self.db.getHeaders(args.table)
+                fields = []
+                results = []
+                for x,y in res[1:]:
+                    fields.extend(x)
+                    results.append(y)
+                headers = proj.db.getHeaders(args.table)
                 for field, fldtype in fields:
                     if field not in headers:
                         proj.logger.info('Adding field {}'.format(field))
-                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(proj.table, field, fldtype))
+                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
                         proj.db.commit()
                 # if the field exists it will be re-written
-                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(proj.table, proj.db.PH,
+                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
                 ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
                 # fill up the update query and execute the update command
                 names = [x.split('_')[1] for x,y in fields]
@@ -294,13 +302,15 @@ def associate(args, reverse=False):
                     values = []
                     for result in results:
                         values.extend([result[x][idx] for x in names])
-                    self.db.execute(update_query, values+[id])
+                    proj.logger.debug('Running query {}'.format(update_query))
+                    print idx, id
+                    proj.db.execute(update_query, values+[id])
                 
                 if igrp % 100 == 0:
                     proj.db.commit()
-                    prog.update(idx)
+                    prog.update(igrp)
             proj.db.commit()
-            prog.done()                
+            prog.done()
     except Exception as e:
         sys.exit(e) 
 
