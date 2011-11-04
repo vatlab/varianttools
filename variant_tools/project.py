@@ -2449,6 +2449,13 @@ def remove(args):
                         proj.logger.info('Removing alternative reference genome because of removal of related fields')
                         proj.alt_build = None
                         proj.saveProperty('alt_build', None)
+                # it is possible that new indexes are needed
+                s = delayedAction(proj.logger.info, 'Rebuilding indexes')
+                try:
+                    proj.createIndexOnMasterVariantTable()
+                except:
+                    pass
+                del s
             elif args.type == 'geno_fields':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of genotype fields to be removed')
