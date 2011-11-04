@@ -25,7 +25,8 @@
 
 import sys
 import threading
-import Queue
+from multiprocessing import Process, Queue, Pipe
+#import Queue
 import time
 from array import array
 from copy import copy, deepcopy
@@ -155,19 +156,16 @@ class AssociationTester(Sample):
             # get group by
             cur = self.db.cursor()
             cur.execute(query)
-            self.groups = cur.fetchall()
+            self.groups = [x[0] for x in cur.fetchall()]
             self.logger.info('Find {} groups'.format(len(self.groups)))
             self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
 
 class StatStatus:
     def __init__(self):
         self.tasks = {}
-        self.lock = threading.Lock()
 
     def set(self, task, value):
-        self.lock.acquire()
         self.tasks[task] = value
-        self.lock.release()
     
     def get(self, task):
         return self.tasks[task]
@@ -175,9 +173,9 @@ class StatStatus:
     def count(self):
         return len(self.tasks)
         
-class GroupAssociationCalculator(threading.Thread):
+class GroupAssociationCalculator(Process):
     '''Association test calculator'''
-    def __init__(self, table, samples, tests, pjname, grpfields, grpQueue, where, status, logger):
+    def __init__(self, table, samples, tests, pjname, grpfields, grpQueue, where, output, logger):
         self.table = table
         self.IDs = samples
         self.tests = tests
@@ -185,19 +183,18 @@ class GroupAssociationCalculator(threading.Thread):
         self.group_fields = grpfields[0]
         self.fields = grpfields[1]
         self.queue = grpQueue
-        self.status = status
+        self.output = output
         self.logger = logger
         self.db = None
         self.where_clause = where
-        threading.Thread.__init__(self, name='Phenotype association analysis for a group of variants')
+        Process.__init__(self, name='Phenotype association analysis for a group of variants')
         
     def getVariants(self, group):
         '''Get variants for a certain group'''
-
         if not self.group_fields:
             # group must be 'all'
             return self.table
-        vtable = '__asso_tmp_{}'.format(group[0])
+        vtable = '__asso_tmp_{}'.format(group)
         if self.db.hasTable(vtable):
             self.db.truncateTable(vtable)
         else:
@@ -206,10 +203,10 @@ class GroupAssociationCalculator(threading.Thread):
             self.db.commit()
         #
         where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.fields])
-        query = 'INSERT INTO __asso_tmp_{} SELECT variant_id FROM {} {};'.format(group[0], self.table, where_clause)
+        query = 'INSERT INTO __asso_tmp_{} SELECT variant_id FROM {} {};'.format(group, self.table, where_clause)
         self.logger.debug('Running query {}'.format(query))
         cur = self.db.cursor()
-        cur.execute(query, group)
+        cur.execute(query, (group,))
         return vtable
 
     def getGenotype(self, vtable):
@@ -234,8 +231,10 @@ class GroupAssociationCalculator(threading.Thread):
         self.db.connect(self.pjname+'.proj')
         while True:
             grp = self.queue.get()
+            print 'Getting ', grp
             if grp is None:
-                self.queue.task_done()
+                print 'I am done, sending None'
+                self.output.send(None)
                 break
             # select variants from each group:
             vtable = self.getVariants(grp)
@@ -247,8 +246,8 @@ class GroupAssociationCalculator(threading.Thread):
                 test.setAttributes(grp)
                 test.calculate()
                 values.append([test.getFields(), test.result])
-            self.status.set(grp, values)
-            self.queue.task_done()
+            print 'Finish ', grp
+            self.output.send((grp, values))
         
 
 def associate(args, reverse=False):
@@ -269,17 +268,34 @@ def associate(args, reverse=False):
             asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
-            grpQueue = Queue.Queue()
+            grpQueue = Queue()
             status = StatStatus()
+            readers = []
             for j in range(nJobs):
-                GroupAssociationCalculator(args.table, asso.IDs, asso.tests, proj.name, gfields, grpQueue, asso.where_clause, status, proj.logger).start()
+                r, w = Pipe(False)
+                GroupAssociationCalculator(args.table, asso.IDs, 
+                    asso.tests, proj.name, gfields, grpQueue, asso.where_clause,
+                    w, proj.logger).start()
+                readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
 
             count = 0
             prog = ProgressBar('Testing for association', len(asso.groups))
+            #
+            proc_status = [True] * len(readers)
             while True:
+                for idx, (s,r) in enumerate(zip(proc_status, readers)):
+                    if not s:
+                        continue
+                    res = r.recv()
+                    print res[0]
+                    if res is None:
+                        proc_status[idx] = False
+                    else:
+                        status.set(res[0], res[1])
+                #
                 if status.count() > count:
                     count = status.count()
                     prog.update(count)
@@ -289,43 +305,41 @@ def associate(args, reverse=False):
                     for j in range(nJobs):
                         grpQueue.put(None)
                     break
-                # wait 1 sec to check status again
-                time.sleep(1)
             prog.done()
         
             # step 5: update variant table by groups
-#            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
-#            for igrp, grp in enumerate(asso.groups):
-#                res = status.get(grp)
-#                startID, endID = res[0]
-#                fields = []
-#                results = []
-#                for x,y in res[1:]:
-#                    fields.extend(x)
-#                    results.append(y)
-#                headers = proj.db.getHeaders(args.table)
-#                for field, fldtype in fields:
-#                    if field not in headers:
-#                        proj.logger.info('Adding field {}'.format(field))
-#                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
-#                        proj.db.commit()
-#                # if the field exists it will be re-written
-#                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
-#                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
-#                # fill up the update query and execute the update command
-#                names = [x.split('_')[1] for x,y in fields]
-#                for idx, id in enumerate(range(startID, endID+1)):
-#                    values = []
-#                    for result in results:
-#                        values.extend([result[x][idx] for x in names])
-#                    proj.logger.debug('Running query {}'.format(update_query))
-#                    proj.db.execute(update_query, values+[id])
-#                
-#                if igrp % 100 == 0:
-#                    proj.db.commit()
-#                    prog.update(igrp)
-#            proj.db.commit()
-#            prog.done()
+            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
+            for igrp, grp in enumerate(asso.groups):
+                res = status.get(grp)
+                startID, endID = res[0]
+                fields = []
+                results = []
+                for x,y in res[1:]:
+                    fields.extend(x)
+                    results.append(y)
+                headers = proj.db.getHeaders(args.table)
+                for field, fldtype in fields:
+                    if field not in headers:
+                        proj.logger.info('Adding field {}'.format(field))
+                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
+                        proj.db.commit()
+                # if the field exists it will be re-written
+                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
+                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
+                # fill up the update query and execute the update command
+                names = [x.split('_')[1] for x,y in fields]
+                for idx, id in enumerate(range(startID, endID+1)):
+                    values = []
+                    for result in results:
+                        values.extend([result[x][idx] for x in names])
+                    proj.logger.debug('Running query {}'.format(update_query))
+                    proj.db.execute(update_query, values+[id])
+                
+                if igrp % 100 == 0:
+                    proj.db.commit()
+                    prog.update(igrp)
+            proj.db.commit()
+            prog.done()
     except Exception as e:
         sys.exit(e) 
 
@@ -387,7 +401,7 @@ class NullTest:
         self.data.setGenotype(data)
     
     def setAttributes(self, grp):
-        self.group = repr(grp[0].encode('ascii'))
+        self.group = str(grp)
         self.data.setMaf()
         self.data.filterByMaf(upper=1.0, lower=0.0)
         self.data.mean_phenotype()
@@ -419,24 +433,28 @@ class LinearBurdenTest(NullTest):
         NullTest.__init__(self, logger, name, *method_args)
 
     def parseArgs(self, method_args):
-        parser.add_argument('-p', '--permutations', type=int, nargs=1, default=0,
-        help='''Number of permutations.''')
+        parser = argparse.ArgumentParser(description='''A base association test method
+            test does nothing, but can be used to measure the performance of 
+            retrieving data from vtools.''',
+            prog='vtools associate --method ' + self.name)
+        # no argumant is added
+        parser.add_argument('-p', '--permutations', type=int, default=0,
+            help='''Number of permutations.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
     def calculate(self):
-        self.ptime = args.permutations
         data = self.data.clone()
         actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        self.logger.info('{} on group {}, p-value (asymptotic) = {}'\
+        self.logger.debug('{} on group {}, p-value (asymptotic) = {}'\
                          .format(self.__class__.__name__, self.group, data.pvalue()))
         # permutation 
-        p = t.PhenoPermutator(self.ptime, [t.SimpleLinearRegression()])
-        self.logger.info('{} on group {}, p-value (permutation) = {}'\
-                        .format(self.__class__.__name__, self.group, p.apply(data) / float(self.ptime)))
+        p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+        self.logger.debug('{} on group {}, p-value (permutation) = {}'\
+                        .format(self.__class__.__name__, self.group, p.apply(data) / float(self.permutations)))
         self.result['pvalue'] = [data.pvalue()]*len(self.data.raw_genotype()[0])
         self.result['statistic'] = [data.statistic()]*len(self.data.raw_genotype()[0])
         return 1
