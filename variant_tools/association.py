@@ -109,11 +109,26 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = array('d', zip(*cur.fetchall())[1])
+            self.phenotype = [array('d', x) for x in zip(*cur.fetchall())[1:]]
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype '.format(', '.join(phenotype)))
-
+            raise ValueError('Failed to retrieve phenotype {}'.format(', '.join(phenotype)))
+    
+    def getCovariate(self, condition, covariates):
+        '''Get covariates for specified samples (specified by condition).'''
+        if not covariates:
+            return
+        try:
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(covariates)) + \
+                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
+            self.logger.debug('Select phenotype covariates using query {}'.format(query))
+            cur = self.db.cursor()
+            cur.execute(query)
+            self.covariates = [array('d', x) for x in zip(*cur.fetchall())[1:]]
+        except Exception as e:
+            self.logger.debug(e)
+            raise ValueError('Failed to retrieve phenotype covariate {}'.format(', '.join(covariates)))
+    
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         self.group_by = group_by
@@ -227,7 +242,7 @@ class GroupAssociationCalculator(threading.Thread):
             genotype, startID, endID = self.getGenotype(vtable)
             values = [[startID, endID]]
             for test in self.tests:
-                test = deepcopy(test)
+                #test = deepcopy(test)
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
@@ -245,9 +260,10 @@ def associate(args, reverse=False):
             # step 1: get samples
             asso.getSamples(args.samples)
             # step 2: get phenotype and set it to everyone
-            asso.getPhenotype(args.samples, args.phenotype)
+            asso.getPhenotype(args.samples, args.phenotype)           
+            asso.getCovariate(args.samples, args.covariates)
             for test in asso.tests:
-                test.setPhenotype(asso.phenotype)
+                test.setPhenotype(asso.phenotype[0])
             # step 3: handle group_by
             gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
             asso.identifyGroups(args.group_by)
@@ -278,39 +294,38 @@ def associate(args, reverse=False):
             prog.done()
         
             # step 5: update variant table by groups
-            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
-            for igrp, grp in enumerate(asso.groups):
-                res = status.get(grp)
-                startID, endID = res[0]
-                fields = []
-                results = []
-                for x,y in res[1:]:
-                    fields.extend(x)
-                    results.append(y)
-                headers = proj.db.getHeaders(args.table)
-                for field, fldtype in fields:
-                    if field not in headers:
-                        proj.logger.info('Adding field {}'.format(field))
-                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
-                        proj.db.commit()
-                # if the field exists it will be re-written
-                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
-                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
-                # fill up the update query and execute the update command
-                names = [x.split('_')[1] for x,y in fields]
-                for idx, id in enumerate(range(startID, endID+1)):
-                    values = []
-                    for result in results:
-                        values.extend([result[x][idx] for x in names])
-                    proj.logger.debug('Running query {}'.format(update_query))
-                    print idx, id
-                    proj.db.execute(update_query, values+[id])
-                
-                if igrp % 100 == 0:
-                    proj.db.commit()
-                    prog.update(igrp)
-            proj.db.commit()
-            prog.done()
+#            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
+#            for igrp, grp in enumerate(asso.groups):
+#                res = status.get(grp)
+#                startID, endID = res[0]
+#                fields = []
+#                results = []
+#                for x,y in res[1:]:
+#                    fields.extend(x)
+#                    results.append(y)
+#                headers = proj.db.getHeaders(args.table)
+#                for field, fldtype in fields:
+#                    if field not in headers:
+#                        proj.logger.info('Adding field {}'.format(field))
+#                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
+#                        proj.db.commit()
+#                # if the field exists it will be re-written
+#                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
+#                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
+#                # fill up the update query and execute the update command
+#                names = [x.split('_')[1] for x,y in fields]
+#                for idx, id in enumerate(range(startID, endID+1)):
+#                    values = []
+#                    for result in results:
+#                        values.extend([result[x][idx] for x in names])
+#                    proj.logger.debug('Running query {}'.format(update_query))
+#                    proj.db.execute(update_query, values+[id])
+#                
+#                if igrp % 100 == 0:
+#                    proj.db.commit()
+#                    prog.update(igrp)
+#            proj.db.commit()
+#            prog.done()
     except Exception as e:
         sys.exit(e) 
 
@@ -396,24 +411,31 @@ class ExternTest(NullTest):
     def __init__(self, logger=None, name=None, *method_args):
         pass
 
-class LogisticBurdenTest(NullTest):
-    '''Simple Logistic regression score test on collapsed genotypes
+class LinearBurdenTest(NullTest):
+    '''Simple Linear regression score test on collapsed genotypes
     within an association testing group
     '''
     def __init__(self, logger=None, name=None, *method_args):
         NullTest.__init__(self, logger, name, *method_args)
-        self.ptime = 1000
-   
+
+    def parseArgs(self, method_args):
+        parser.add_argument('-p', '--permutations', type=int, nargs=1, default=0,
+        help='''Number of permutations.''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
     def calculate(self):
+        self.ptime = args.permutations
         data = self.data.clone()
-        actions = [t.SumToX(), t.SimpleLogisticRegression(), t.GaussianPval(1)]
+        actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        self.logger.debug('{} on group {}, p-value (asymptotic) = {}'\
+        self.logger.info('{} on group {}, p-value (asymptotic) = {}'\
                          .format(self.__class__.__name__, self.group, data.pvalue()))
-        # logistic regression, permutation 
-        p = t.PhenoPermutator(self.ptime, [t.SimpleLogisticRegression()])
-        self.logger.debug('{} on group {}, p-value (permutation) = {}'\
+        # permutation 
+        p = t.PhenoPermutator(self.ptime, [t.SimpleLinearRegression()])
+        self.logger.info('{} on group {}, p-value (permutation) = {}'\
                         .format(self.__class__.__name__, self.group, p.apply(data) / float(self.ptime)))
         self.result['pvalue'] = [data.pvalue()]*len(self.data.raw_genotype()[0])
         self.result['statistic'] = [data.statistic()]*len(self.data.raw_genotype()[0])
