@@ -25,8 +25,7 @@
 
 import sys
 import threading
-from multiprocessing import Process, Queue, Pipe
-#import Queue
+from multiprocessing import Process, Queue, Pipe, Lock
 import time
 from array import array
 from copy import copy, deepcopy
@@ -160,18 +159,60 @@ class AssociationTester(Sample):
             self.logger.info('Find {} groups'.format(len(self.groups)))
             self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
 
-class StatStatus:
-    def __init__(self):
-        self.tasks = {}
+#class StatStatus:
+#    def __init__(self):
+#        self.tasks = {}
+#        self.lock = Lock()
+#
+#    def set(self, task, value):
+#        self.tasks[task] = value
+#    
+#    def get(self, task):
+#        return self.tasks[task]
+#        
+#    def count(self):
+#        return len(self.tasks)
 
-    def set(self, task, value):
-        self.tasks[task] = value
-    
-    def get(self, task):
-        return self.tasks[task]
+class UpdateResult:
+    def __init__(self, db, logger):
+        self.grps = []
+        self.lock = Lock()
+        self.db = db
+        self.logger = logger
+
+    def set(self, table, res):
+        self.lock.acquire()
+        self.grps.append(res[0])
+        startID, endID = res[1][0]
+        fields = []
+        results = []
+        for x,y in res[1][1:]:
+            fields.extend(x)
+            results.append(y)
+        headers = self.db.getHeaders(table)
+        for field, fldtype in fields:
+            if field not in headers:
+                self.logger.debug('Adding field {}'.format(field))
+                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(table, field, fldtype))
+                self.db.commit()
+        # if the field exists it will be re-written
+        update_query = 'UPDATE {0} SET {2} WHERE variant_id>={1} AND variant_id<={1};'.format(table, self.db.PH,
+        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
+        # fill up the update query and execute the update command
+        names = [x.split('_')[1] for x,y in fields]
+        values = []
+        for result in results:
+            values.extend([result[x] for x in names])
+            self.logger.debug('Running query {}'.format(update_query))
+            self.db.execute(update_query, values+[startID, endID])
+        self.db.commit()
+        self.lock.release()
         
+    def getgrp(self):
+        return self.grps
+    
     def count(self):
-        return len(self.tasks)
+        return len(self.grps)
         
 class GroupAssociationCalculator(Process):
     '''Association test calculator'''
@@ -230,10 +271,11 @@ class GroupAssociationCalculator(Process):
         self.db = DatabaseEngine()
         self.db.connect(self.pjname+'.proj')
         while True:
+#            print 'Getting ...' 
             grp = self.queue.get()
-            print 'Getting ', grp
+#            print 'Got', grp
             if grp is None:
-                print 'I am done, sending None'
+#                print 'I am done, sending None'
                 self.output.send(None)
                 break
             # select variants from each group:
@@ -241,12 +283,11 @@ class GroupAssociationCalculator(Process):
             genotype, startID, endID = self.getGenotype(vtable)
             values = [[startID, endID]]
             for test in self.tests:
-                #test = deepcopy(test)
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
                 values.append([test.getFields(), test.result])
-            print 'Finish ', grp
+#            print 'Finish ', grp
             self.output.send((grp, values))
         
 
@@ -269,7 +310,7 @@ def associate(args, reverse=False):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
-            status = StatStatus()
+            results = UpdateResult(proj.db, proj.logger)
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
@@ -280,7 +321,6 @@ def associate(args, reverse=False):
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
-
             count = 0
             prog = ProgressBar('Testing for association', len(asso.groups))
             #
@@ -290,55 +330,20 @@ def associate(args, reverse=False):
                     if not s:
                         continue
                     res = r.recv()
-                    print res[0]
                     if res is None:
                         proc_status[idx] = False
                     else:
-                        status.set(res[0], res[1])
+                        results.set(args.table, res)
                 #
-                if status.count() > count:
-                    count = status.count()
+                if results.count() > count:
+                    count = results.count()
                     prog.update(count)
                 # if everything is done
-                if status.count() == len(asso.groups):
+                if results.count() == len(asso.groups):
                     # stop all threads
                     for j in range(nJobs):
                         grpQueue.put(None)
                     break
-            prog.done()
-        
-            # step 5: update variant table by groups
-            prog = ProgressBar('Updating {}'.format(args.table), len(asso.groups))
-            for igrp, grp in enumerate(asso.groups):
-                res = status.get(grp)
-                startID, endID = res[0]
-                fields = []
-                results = []
-                for x,y in res[1:]:
-                    fields.extend(x)
-                    results.append(y)
-                headers = proj.db.getHeaders(args.table)
-                for field, fldtype in fields:
-                    if field not in headers:
-                        proj.logger.info('Adding field {}'.format(field))
-                        proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(args.table, field, fldtype))
-                        proj.db.commit()
-                # if the field exists it will be re-written
-                update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(args.table, proj.db.PH,
-                ', '.join(['{}={}'.format(field, proj.db.PH) for field, fldtype in fields]))
-                # fill up the update query and execute the update command
-                names = [x.split('_')[1] for x,y in fields]
-                for idx, id in enumerate(range(startID, endID+1)):
-                    values = []
-                    for result in results:
-                        values.extend([result[x][idx] for x in names])
-                    proj.logger.debug('Running query {}'.format(update_query))
-                    proj.db.execute(update_query, values+[id])
-                
-                if igrp % 100 == 0:
-                    proj.db.commit()
-                    prog.update(igrp)
-            proj.db.commit()
             prog.done()
     except Exception as e:
         sys.exit(e) 
@@ -449,12 +454,13 @@ class LinearBurdenTest(NullTest):
         actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        self.logger.debug('{} on group {}, p-value (asymptotic) = {}'\
-                         .format(self.__class__.__name__, self.group, data.pvalue()))
+        #print '{} on group {}, p-value (asymptotic) = {}'\
+        #                 .format(self.__class__.__name__, self.group, data.pvalue())
         # permutation 
-        p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
-        self.logger.debug('{} on group {}, p-value (permutation) = {}'\
-                        .format(self.__class__.__name__, self.group, p.apply(data) / float(self.permutations)))
-        self.result['pvalue'] = [data.pvalue()]*len(self.data.raw_genotype()[0])
-        self.result['statistic'] = [data.statistic()]*len(self.data.raw_genotype()[0])
+        if not self.permutations == 0:
+          p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+        #  print '{} on group {}, p-value (permutation) = {}'\
+        #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0))
+        self.result['pvalue'] = data.pvalue()
+        self.result['statistic'] = data.statistic()
         return 1
