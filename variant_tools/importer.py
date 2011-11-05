@@ -41,7 +41,7 @@ from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    normalizeVariant, openFile, DatabaseEngine, hasCommand
+    normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName
 
 #
 #
@@ -1712,9 +1712,76 @@ def importVariants(args):
     except Exception as e:
         sys.exit(e)
 
+
+def setFieldValue(proj, table, items, build):
+    # fields
+    expr = ','.join([x.split('=',1)[1] for x in items])
+    select_clause, fields = consolidateFieldName(proj, table, expr,
+        build and build == proj.alt_build)
+    #
+    # FROM clause
+    from_clause = 'FROM {} '.format(table)
+    fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
+    #
+    processed = set()
+    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+        if (tbl.lower(), conn.lower()) not in processed:
+            from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+            processed.add((tbl.lower(), conn.lower()))
+    # running query
+    cur = proj.db.cursor()
+    query = 'SELECT {} {};'.format(select_clause, from_clause)
+    proj.logger.debug('Running {}'.format(query))
+    cur.execute(query)
+    fldTypes = [None] * len(items)
+    for rec in cur:
+        for i in range(len(items)):
+            if fldTypes[i] is None:
+                fldTypes[i] = type(rec[i])
+                continue
+            elif rec[i] is None: # missing
+                continue
+            if type(rec[i]) != fldTypes:
+                if type(rec[i]) is float and fldTypes[i] is int:
+                    fltType[i] = float
+                else:
+                    raise ValueError('Inconsistent type returned from different samples')
+        if all([x is not None for x in fldTypes]):
+            break
+    #
+    if None in fldTypes:
+        raise ValueError('Cannot determine the type of the expression')
+    #
+    count = [0]*3
+    # if adding a new field
+    cur_fields = proj.db.getHeaders(table)[3:]
+    for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
+        if field.lower() not in [x.lower() for x in cur_fields]:
+            proj.checkFieldName(field, exclude=table)
+            proj.logger.info('Adding field {}'.format(field))
+            query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
+                {int: 'INT',
+                 float: 'FLOAT',
+                 str: 'VARCHAR(255)',
+                 unicode: 'VARCHAR(255)',
+                 None: 'FLOAT'}[fldType])
+            proj.logger.debug(query)
+            cur.execute(query)
+            count[1] += 1  # new
+        else:
+            # FIXME: check the case for type mismatch
+            count[2] += 1  # updated
+    proj.db.commit()
+    # really update things
+    query = 'UPDATE {} SET {};'.format(table, ','.join(items))
+    proj.logger.debug('Running {}'.format(query))
+    cur.execute(query)
+
+
 def updateArguments(parser):
     parser.add_argument('table', help='''variants to be updated.''')
-    parser.add_argument('input_files', nargs='+',
+    files = parser.add_argument_group('Update from files')
+    files.add_argument('--from_file', nargs='+',
         help='''A list of files that will be used to add or update existing fields of
             variants. The file should be delimiter separated with format described by
             parameter --format. Gzipped files are acceptable. If input files contains
@@ -1722,32 +1789,53 @@ def updateArguments(parser):
             samples they created without ambiguity (e.g. single sample, or samples with
             detectable sample names), genotypes and their information will also be
             updated.''')
-    parser.add_argument('--build',
+    files.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input files,
             which should be the primary (used by default) or alternative (if available)
             reference genome of the project. An alternative reference genome will be
             added to the project if needed.''')
-    parser.add_argument('--format',
+    files.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types such as ANNOVAR_output (cf. 'vtools show formats'),
             or a local format specification file (with extension .fmt). Some formats 
             accept parameters (cf. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
-    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
+    files.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to import input file. Variant tools by default
             uses a single process for reading and writing, and can use one or more
             dedicated reader processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
+    field = parser.add_argument_group('Set value from existing fields')
+    field.add_argument('--set', metavar='EXPR', nargs='*', default=[],
+        help='''Add a new field or updating an existing field using a constant (e.g. mark=1) or an
+            expression using other fields (e.g. freq=num/120). Parameter samples could be used to
+            limit the affected variants.''')
+    #field.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
+    #    help='''Limiting variants from samples that match conditions that
+    #        use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+    #        'filename like "MG%%"').''')
+    #field.add_argument('--build',
+    #    help='''Reference genome to use when chr and pos is used in expression.''')
+
 
 def update(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            proj.db.attach(proj.name + '_genotype')
-            importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
-                build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)
-            importer.importData()
-            # no need to finalize
+            if args.from_file: 
+                proj.db.attach(proj.name + '_genotype')
+                importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
+                    build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)
+                importer.importData()
+                # no need to finalize
+            if args.set:
+                for item in args.set:
+                    try:
+                        field, expr = [x.strip() for x in item.split('=', 1)]
+                    except Exception as e:
+                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_field: {}'.format(item, e))
+                setFieldValue(proj, args.table, args.set, proj.build)
+                #, ' AND '.join(['({})'.format(x) for x in args.samples]))
         proj.close()
     except Exception as e:
         sys.exit(e)
