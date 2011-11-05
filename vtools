@@ -104,15 +104,6 @@ if __name__ == '__main__':
     addCommonArgs(parser)
     parser.set_defaults(func=liftOver.liftOver)
     #
-    # command sample_stat
-    parser = subparsers.add_parser('sample_stat',
-        help='Calculate sample statistics (allele count etc) for all or selected samples',
-        description='''Calculate count of alleles, homozygotes, heterozygotes, and summary
-            statistics for genotype information fields in all or selected samples.''')
-    sample.sampleStatArguments(parser)
-    addCommonArgs(parser)
-    parser.set_defaults(func=sample.sampleStat)
-    #
     # command use
     parser = subparsers.add_parser('use',
         help='Prepare (download or import if necessary) and use an annotation database')
@@ -122,10 +113,11 @@ if __name__ == '__main__':
     #
     # command update
     parser = subparsers.add_parser('update',
-        help='Add or update fields of existing variants and genotype using information from specified files',
-        description='''Add or update fields of existing variants and genotype from files that annotate
-            variants or their locations (e.g. Read annotation from ANNOVAR output files, import additional
-            variant or genotype fields from .vcf files).''')
+        help='Add or update fields of existing variants and genotype using information from specified existing fields, sample genotype, or external files',
+        description='''Add or update fields of existing variants and genotype from other fields,
+            statistics of genotypes and genotype info, or files that annotate variants or their
+            locations (e.g. Read annotation from ANNOVAR output files, import additional variant
+            or genotype fields from .vcf files).''')
     importer.updateArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=importer.update)
