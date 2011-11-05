@@ -32,7 +32,7 @@ include variant_tools/importer.py
 include variant_tools/exporter.py
 include variant_tools/liftOver.py
 include variant_tools/project.py
-include variant_tools/sample.py
+include variant_tools/phenotype.py
 include variant_tools/utils.py
 include variant_tools/variant.py
 include test/vcf/*
