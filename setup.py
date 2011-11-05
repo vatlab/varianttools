@@ -38,7 +38,7 @@ VTOOLS_VERSION = '1.0rc3'
 #
 # the association module is not ready for prime time...
 # 
-with_association = True
+with_association = False
 
 if with_association:
     LIB_GSL = [ 
@@ -130,7 +130,7 @@ setup(name = "variant_tools",
         'variant_tools.project',
         'variant_tools.importer',
         'variant_tools.exporter',
-        'variant_tools.sample',
+        'variant_tools.phenotype',
         'variant_tools.variant',
         'variant_tools.annotation',
         'variant_tools.liftOver',

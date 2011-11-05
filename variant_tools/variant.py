@@ -28,7 +28,7 @@ import sys
 import re
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount
-from .sample import Sample
+from .phenotype import Sample
 
 
 def outputArguments(parser):
