@@ -36,7 +36,7 @@ class TestRemove(ProcessTestCase):
         initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
-        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --num CEU_cases_num')
+        runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
     def testRemove(self):
         'Test command vtools remove'
         self.assertFail('vtools remove')

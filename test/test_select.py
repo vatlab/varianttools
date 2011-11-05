@@ -35,8 +35,8 @@ class TestSelect(ProcessTestCase):
         'Create a project'
         initTest(6)
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
-        runCmd('vtools sample_stat CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --het CEU_cases_het')
+        runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+        runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
     def removeProj(self):
         runCmd('vtools remove project')
     

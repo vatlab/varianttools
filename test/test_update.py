@@ -42,8 +42,8 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
-        self.assertFail('vtools update --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
-        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
         
     def testUpdate(self):
@@ -51,10 +51,10 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools import vcf/SAMP1.vcf --build hg18')
         runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         # no hg19
-        self.assertFail('vtools update variant --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --build hg19')
+        self.assertFail('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
         runCmd('vtools liftover hg19')
         # a variant can have multiple entries -- thus 175 variants in variant table are updated from the 198 imported records
-        self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation txt/dbSNP_hg19validation.txt --build hg19')
+        self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175\n')
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
         
@@ -72,10 +72,10 @@ class TestImportVCF(ProcessTestCase):
         het = int(outputOfCmd("vtools execute 'select sum(het) from variant'").split('\n')[0])
         other = int(outputOfCmd("vtools execute 'select sum(other) from variant'").split('\n')[0])
         self.assertEqual(total, hom*2+het+other)
-        self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)# -s "filename like \'%CEU%\'"')
+        self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" -s "filename like \'%CEU%\'"')
         self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_num) from CEU'").split('\n')[0]), 6383)
         self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" "CEU_hom=#(hom)" "CEU_het=#(het)" "CEU_other=#(other)"  --samples "filename like \'%CEU%\'"')
-        self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)"--samples "filename like \'%CEU%\' and aff=\'2\'"')
+        self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
         self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from CEU'").split('\n')[0]), 1601)
         self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
         

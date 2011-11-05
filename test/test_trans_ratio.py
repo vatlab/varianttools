@@ -34,7 +34,7 @@ class TestTransRatio(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(2)
-        runCmd('vtools sample_stat variant --num num --from_stat "depth=sum(DP_FMT)"')
+        runCmd('vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_FMT)"')
     def removeProj(self):
         runCmd('vtools remove project')
     def testTransRatio(self):

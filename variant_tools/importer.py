@@ -1804,7 +1804,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         return
 
     # separate special functions...
-    coreDestinations = [None, None, None, None]
+    num = hom = het = other = None
 
     # keys to speed up some operations
     MEAN = 0
@@ -1822,13 +1822,13 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     for stat in from_stat:
         f, e = [x.strip() for x in stat.split('=')]
         if e == '#(alt)':
-            coreDestinations[0] = f
+            num = f
         elif e == '#(hom)':
-            coreDestinations[1] = f
+            hom = f
         elif e == '#(het)':
-            coreDestinations[2] = f
+            het = f
         elif e == '#(other)':
-            coreDestinations[3] = f
+            other = f
         else:
             groups = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat).groups()
             if groups is None:
@@ -1841,6 +1841,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             fieldCalcs.append(None)
             destinations.append(dest)
     #
+    coreDestinations = [num, hom, het, other]
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -1848,6 +1849,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     #
     numSample = len(IDs)
     if numSample == 0:
+        proj.logger.warning('No sample is selected.')
         return
     
     # Error checking with the user specified genotype fields
@@ -1882,7 +1884,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             validGenotypeIndices.append(index)
             validGenotypeFields.append(field)
 
-    if len(validGenotypeFields) == 0:
+    if all([x is None for x in coreDestinations]) and len(validGenotypeFields) == 0:
         proj.logger.warning("No valid sample statistics operation has been specified.")
         return
     
@@ -2098,7 +2100,7 @@ def update(args):
         with Project(verbosity=args.verbosity) as proj:
             if args.from_file: 
                 proj.db.attach(proj.name + '_genotype')
-                importer = TextUpdater(proj=proj, table=args.table, files=args.input_files,
+                importer = TextUpdater(proj=proj, table=args.table, files=args.from_file,
                     build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)
                 importer.importData()
                 # no need to finalize

@@ -55,7 +55,7 @@ class TestOutput(ProcessTestCase):
         
     def testOutputExpression(self):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools sample_stat variant --num num --hom hom --het het --other other')
+        runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         self.assertFail('vtools output variant sum(num)')
         self.assertEqual(outputOfCmd('vtools output variant "sum(num)" -v0'), '6383'+'\n')
         self.assertFail('vtools output variant count(1)')
