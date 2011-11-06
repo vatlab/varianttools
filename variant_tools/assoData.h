@@ -40,7 +40,12 @@ typedef std::vector<std::vector<int> > matrixi;
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
-
+#include "gsl/gsl_vector.h"
+#include "gsl/gsl_matrix.h"
+#include "gsl/gsl_blas.h"
+#include "gsl/gsl_linalg.h"
+#include "gsl/gsl_cdf.h"
+#include "gsl/gsl_errno.h"
 
 namespace vtools {
 
@@ -271,6 +276,19 @@ public:
     //!- w/ rounding to 0 I get strange number such as 3.72397e-35
     //!- this would lead to type I error problem
     fRound(m_statistic, 0.0001);
+  }
+
+
+  void multipleLinear()
+  {
+    //!- multiple linear regression parameter estimate
+    //!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
+    //!- Solve the system via gsl_linalg_SV_solve()
+    LinearM model;
+    model.setX(m_genotype);
+    model.setY(m_phenotype);
+    model.fit();
+    model.getBeta(); 
   }
 
 

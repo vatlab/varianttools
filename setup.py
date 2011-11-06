@@ -90,6 +90,11 @@ if with_association:
     'variant_tools/gsl/cdf/gammainv.c',
     'variant_tools/gsl/cdf/hypergeometric.c',
     'variant_tools/gsl/cdf/poisson.c'
+    #
+    'variant_tools/gsl/blas/blas.c'
+    'variant_tools/gsl/linalg/svd.c'
+    'variant_tools/gsl/matrix/matrix.c'
+    'variant_tools/gsl/matrix/vector.c'
     ] 
     
     # Under linux/gcc, lib stdc++ is needed for C++ based extension.
