@@ -64,18 +64,18 @@ filter_comment=Field for filter status
 info=
 info_comment=Field for info status
 
-[Field formatter]
+[field formatter]
 #
 # NOTE: if multiple records are collapsed, they are passed as tuples.
 # If no formatter is defined, the first value will be used in output.
 #
-GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: '', (-1,-1): '1/2'}[x]
-DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
+fmt_GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: '', (-1,-1): '1/2'}[x]
+fmt_DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
 # if there are multiple alternative alleles, join them by ','
 #
 # not sure if we need to keep both JoinRecords and JoinFields
-alt=JoinRecords(',')
-raw_alt=JoinRecords(',')
+fmt_alt=JoinRecords(',')
+fmt_raw_alt=JoinRecords(',')
 
 [col_1]
 field=chr

@@ -311,9 +311,10 @@ class fileFMT:
         for section in sections:
             if section == 'format description':
                 continue
-            if section == 'Field formatter':
+            if section == 'field formatter':
                 for item in parser.items(section, vars=defaults):
-                    self.formatter[item[0]] = item[1]
+                    if item[0].startswith('fmt_'):
+                        self.formatter[item[0][4:]] = item[1]
                 continue
             if section.startswith('col_'):
                 try:
