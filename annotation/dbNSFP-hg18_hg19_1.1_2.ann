@@ -1,4 +1,4 @@
-## Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 # 
 # Please refer to http://varianttools.sourceforge.net/Annotation/New 
@@ -27,11 +27,12 @@ source_pattern=dbNSFP.ch
 
 [chr]
 index=1
-type=CHAR(1) NOT NULL
+type=VARCHAR(20) NOT NULL
 
 [hg18pos]
 index=2
 type=INTEGER NOT NULL
+comment=physical position on the chromosome as to hg18 (1-based coordinate)
 
 [ref]
 index=3
@@ -62,7 +63,7 @@ adj=Nullify('NA')
 [genename]
 index=8
 type=VARCHAR(48) NULL
-comment=gene name
+comment=common gene name
 
 [geneid]
 index=9
