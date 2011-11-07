@@ -564,7 +564,7 @@ class Exporter:
         count = 0
         nr = self.db.numOfRows(self.table)
         last_count = 0
-        update_after = max(100, nr/100)
+        update_after = min(max(100, nr/100), 10000)
         rec_stack = []
         nFieldBy = len(self.format.export_by_fields.split(','))
         #
