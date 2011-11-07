@@ -328,6 +328,8 @@ def associate(args, reverse=False):
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
+            for j in range(nJobs):
+                grpQueue.put(None)
             count = 0
             prog = ProgressBar('Testing for association', len(asso.groups))
             #
@@ -340,17 +342,16 @@ def associate(args, reverse=False):
                     if res is None:
                         proc_status[idx] = False
                     else:
-#                        results.set(args.table, res)
+#                       results.set(args.table, res)
                         pass
                 #
                 if results.count() > count:
                     count = results.count()
                     prog.update(count)
-                # if everything is done
-                if results.count() == len(asso.groups):
-                    # stop all threads
-                    for j in range(nJobs):
-                        grpQueue.put(None)
+                #
+                if not any(proc_status):
+                    # if everything is done
+                    assert results.count() == len(asso.groups)
                     break
             prog.done()
     except Exception as e:
