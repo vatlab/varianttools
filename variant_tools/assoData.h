@@ -50,7 +50,7 @@ class AssoData
 public:
 	AssoData() : 
     m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
-    m_statistic(0.0), m_pval(0.0), m_C(0)
+    m_statistic(0.0), m_pval(0.0), m_C(0), m_ncovar(0)
 	{
 	}
 
@@ -80,6 +80,7 @@ public:
 	{
 		m_phenotype = p;
     m_C = c;
+    m_ncovar = c.size()-1;
     vectorf one(p.size());
     std::fill(one.begin(), one.end(), 1.0);
     m_C.push_back(one);
@@ -153,6 +154,11 @@ public:
   vectori sites()
   {
     return m_sites;
+  }
+  
+  unsigned covarcounts()
+  {
+    return m_ncovar;
   }
 
   double pvalue()
@@ -325,6 +331,7 @@ private:
 
   // covariates
   matrixf m_C;
+  unsigned m_ncovar;
 
   // observed minor allele frequencies
 	vectorf m_maf;

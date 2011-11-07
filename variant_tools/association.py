@@ -71,6 +71,8 @@ class AssociationTester(Sample):
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         self.table = table
+        self.phenotype = None
+        self.covariates = None
 
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
@@ -109,7 +111,7 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = [array('d', x) for x in zip(*cur.fetchall())[1:]]
+            self.phenotype = [array('d', map(float, x)) for x in zip(*cur.fetchall())[1:]]
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve phenotype {}'.format(', '.join(phenotype)))
@@ -124,7 +126,8 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.covariates = [array('d', x) for x in zip(*cur.fetchall())[1:]]
+            self.covariates = [array('d', map(float, x)) for x in zip(*cur.fetchall())[1:]]
+            self.covariates.insert(0, array('d', [1]*len(self.covariates[0])))
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve phenotype covariate {}'.format(', '.join(covariates)))
@@ -271,11 +274,11 @@ class GroupAssociationCalculator(Process):
         self.db = DatabaseEngine()
         self.db.connect(self.pjname+'.proj')
         while True:
-#            print 'Getting ...' 
+            print 'Getting ...' 
             grp = self.queue.get()
-#            print 'Got', grp
+            print 'Got', grp
             if grp is None:
-#                print 'I am done, sending None'
+                print 'I am done, sending None'
                 self.output.send(None)
                 break
             # select variants from each group:
@@ -286,8 +289,9 @@ class GroupAssociationCalculator(Process):
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
+                print "Finish test"
                 values.append([test.getFields(), test.result])
-#            print 'Finish ', grp
+            print 'Finish ', grp
             self.output.send((grp, values))
         
 
@@ -303,7 +307,7 @@ def associate(args, reverse=False):
             asso.getPhenotype(args.samples, args.phenotype)           
             asso.getCovariate(args.samples, args.covariates)
             for test in asso.tests:
-                test.setPhenotype(asso.phenotype[0])
+                test.setPhenotype(asso.phenotype[0], asso.covariates)
             # step 3: handle group_by
             gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
             asso.identifyGroups(args.group_by)
@@ -333,7 +337,8 @@ def associate(args, reverse=False):
                     if res is None:
                         proc_status[idx] = False
                     else:
-                        results.set(args.table, res)
+#                        results.set(args.table, res)
+                        pass
                 #
                 if results.count() > count:
                     count = results.count()
@@ -348,7 +353,6 @@ def associate(args, reverse=False):
     except Exception as e:
         sys.exit(e) 
 
-#
 #
 # Statistical Association tests. The first one is a NullTest that provides
 # some utility function and define an interface. All statistical tests should
@@ -446,10 +450,10 @@ class LinearBurdenTest(NullTest):
         # no argumant is added
         parser.add_argument('-p', '--permutations', type=int, default=0,
             help='''Number of permutations.''')
-        parser.add_argument('-m1', '--mafupper', type=float, default=1.0,
+        parser.add_argument('-q1', '--mafupper', type=float, default=1.0,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
             will be included in analysis. Default set to 1.0''')  
-        parser.add_argument('-m2', '--maflower', type=float, default=0.0,
+        parser.add_argument('-q2', '--maflower', type=float, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
             will be included in analysis. Default set to 0.0''') 
         args = parser.parse_args(method_args)
@@ -458,16 +462,24 @@ class LinearBurdenTest(NullTest):
 
     def calculate(self):
         data = self.data.clone()
-        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
+        doRegression = t.SimpleLinearRegression()
+        task_dbg = "Doing simple regression"
+        if data.covarcounts() > 0:
+            task_dbg = "Doing multiple regression"
+            doRegression = t.MultipleLinearRegression()
+        print "**"+task_dbg
+        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(1)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        #print '{} on group {}, p-value (asymptotic) = {}'\
-        #                 .format(self.__class__.__name__, self.group, data.pvalue())
+        print('{} on group {}, p-value (asymptotic) = {}'\
+                         .format(self.__class__.__name__, self.group, data.pvalue()))
         # permutation 
         if not self.permutations == 0:
-          p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
-        #  print '{} on group {}, p-value (permutation) = {}'\
-        #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0))
+            self.logger.info('permutation routine no ready')
+        #  p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+        #  print('{} on group {}, p-value (permutation) = {}'\
+        #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
+        print "ready to quit with", self.result
         return 1
