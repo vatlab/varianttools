@@ -28,7 +28,7 @@ import os
 import sys
 import gzip
 import re
-from multiprocessing import Process, Pipe
+from threading
 from itertools import izip, repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
@@ -132,7 +132,7 @@ class SequentialCollector:
                 item = e(item)
         return item
 
-MAX_COLUMN = 1000
+MAX_COLUMN = 63
 def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
     if jobs == 0 and len(IDs) < MAX_COLUMN:
@@ -146,6 +146,8 @@ def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
     else:
         # using multiple process to handle more than 1500 samples
+        if len(IDs) // MAX_COLUMN + 2 > jobs:
+            proj.logger.info('Using {} threads to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
         return MultiVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build, IDs, max(jobs, len(IDs) // MAX_COLUMN + 2))
 
@@ -335,7 +337,7 @@ class MultiVariantReader(BaseVariantReader):
         for p in self.workers:
             p.join()
 
-class VariantWorker(Process):
+class VariantWorker(threading):
     # this class starts a process and used passed query to read variants
     def __init__(self, dbname, query, output, logger):
         self.dbname = dbname
