@@ -27,8 +27,11 @@ class TestAsso(ProcessTestCase):
       self.assertSucc('vtools associate --method LinearBurdenTest -h')
       runCmd('vtools phenotype --from_file txt/assoc.phen')
       self.assertSucc('vtools associate variant phen2 -m "LinearBurdenTest" -g chr')
+      self.assertSucc('vtools associate variant phen2 -m "LinearBurdenTest"')
       self.assertSucc('vtools associate variant phen2 --covariate phen1 -m "LinearBurdenTest" -g chr')
       self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinearBurdenTest" -g chr')
+      self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinearBurdenTest -q1 0.05 -q2 0.001" -g chr')
+      self.assertSucc('vtools associate variant phen2 -m "LinearBurdenTest --alternative 2" -g chr')
       
 if __name__ == '__main__':
     unittest.main()

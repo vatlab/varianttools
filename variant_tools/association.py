@@ -137,6 +137,7 @@ class AssociationTester(Sample):
         self.group_by = group_by
         if not group_by:
             self.groups = ['all']
+            self.where_clause = None
         else:
             group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
             self.from_clause = self.table
@@ -309,7 +310,9 @@ def associate(args, reverse=False):
             for test in asso.tests:
                 test.setPhenotype(asso.phenotype[0], asso.covariates)
             # step 3: handle group_by
-            gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
+            gfields = (None,None)
+            if args.group_by:
+               gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
             asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
@@ -455,7 +458,10 @@ class LinearBurdenTest(NullTest):
             will be included in analysis. Default set to 1.0''')  
         parser.add_argument('-q2', '--maflower', type=float, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
-            will be included in analysis. Default set to 0.0''') 
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', type=int, default=1,
+            help='''Alternative hypothesis is one-sided (1) or two-sided (2).
+            Default set to 1''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -468,7 +474,7 @@ class LinearBurdenTest(NullTest):
             task_dbg = "Doing multiple regression"
             doRegression = t.MultipleLinearRegression()
         print "**"+task_dbg
-        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(1)]
+        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
         print('{} on group {}, p-value (asymptotic) = {}'\

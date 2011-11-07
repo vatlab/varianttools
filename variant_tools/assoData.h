@@ -316,8 +316,11 @@ public:
     if (sided == 1) {
       m_pval = gsl_cdf_ugaussian_Q(m_statistic);
     }
-    else {
+    else if (sided ==2) {
       m_pval = gsl_cdf_chisq_Q(m_statistic*m_statistic, 1.0);
+    }
+    else {
+      throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
     }
   }
 
