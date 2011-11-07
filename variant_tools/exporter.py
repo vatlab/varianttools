@@ -131,11 +131,75 @@ class SequentialCollector:
                 item = e(item)
         return item
 
+
+def VariantReader(proj, IDs, jobs):
+    if jobs == 1 and len(IDs) < 1500:
+        # using a single thread
+        EmbeddedVariantReader()
+    elif jobs > 1 and len(IDs) < 1500:
+        # using a standalone process to read things and
+        # pass information using a pipe
+        StandaloneVariantReader()
+    else:
+        # using multiple process to handle more than 1500 samples
+        MultiVariantReader()
+
+class EmbeddedVariantReader:
+    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields, export_alt_build,
+        IDs):
+        #    var_fields   geno_fields * IDs (only if sample_variant has the geno_field)
+        #
+        select_clause, fields = consolidateFieldName(proj, table,
+            ','.join(var_fields), export_alt_build)
+        #
+        if geno_fields:
+            for id in IDs:
+                header = [x.lower() for x in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, id))]
+                for fld in geno_fields:
+                    if fld.lower() in header:
+                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
+                    else:
+                        select_clause += ', NULL'
+        # FROM clause
+        from_clause = 'FROM {} '.format(table)
+        fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
+        #
+        processed = set()
+        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+            if (tbl.lower(), conn.lower()) not in processed:
+                from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                processed.add((tbl.lower(), conn.lower()))
+        if geno_fields:
+            for id in IDs:
+                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
+                    .format(proj.name, id, table)
+        # WHERE clause
+        where_clause = ''
+        # GROUP BY clause
+        if export_by_fields:
+            order_fields, tmp = consolidateFieldName(proj, table, export_by_fields)
+            order_clause = ' ORDER BY {}'.format(order_fields)
+        else:
+            order_clause = ''
+        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        proj.logger.debug('Running query {}'.format(query))
+        self.cur = proj.db.cursor()
+        try:
+            self.cur.execute(query)
+        except Exception as e:
+            raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
+                .format(e, ', '.join(var_fields)))
+
+    def records(self):
+        for rec in self.cur:
+            yield rec
+
 class Exporter:
     '''A general class for importing variants'''
-    def __init__(self, proj, table, filename, samples, format, build, header, fmt_args):
+    def __init__(self, proj, table, filename, samples, format, build, header, jobs, fmt_args):
         self.proj = proj
         self.db = proj.db
+        self.jobs = jobs
         self.logger = proj.logger
         #
         # table
@@ -291,56 +355,21 @@ class Exporter:
                     if fld not in var_fields:
                         var_fields.append(fld)
         #
-        # We are going to query:
-        #
-        #    var_fields   geno_fields * IDs (only if sample_variant has the geno_field)
+        # get indexes of fields
         #
         field_indexes = {}
         for idx,fld in enumerate(var_fields):
             # var_info, field = idx
             field_indexes[(-1, fld.lower())] = idx
         #
-        select_clause, fields = consolidateFieldName(self.proj, self.table,
-            ','.join(var_fields), self.export_alt_build)
-        #
         idx = len(var_fields)
         if geno_fields:
             for id in self.IDs:
                 header = [x.lower() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 for fld in geno_fields:
-                    if fld.lower() in header:
-                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
-                    else:
-                        select_clause += ', NULL'
                     field_indexes[(id, fld.lower())] = idx
                     idx += 1
-        # FROM clause
-        from_clause = 'FROM {} '.format(self.table)
-        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
-        #
-        processed = set()
-        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-            if (tbl.lower(), conn.lower()) not in processed:
-                from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                processed.add((tbl.lower(), conn.lower()))
-        if geno_fields:
-            for id in self.IDs:
-                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
-                    .format(self.proj.name, id, self.table)
-        # WHERE clause
-        where_clause = ''
-        # GROUP BY clause
-        if self.format.export_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.format.export_by_fields)
-            order_clause = ' ORDER BY {}'.format(order_fields)
-        else:
-            order_clause = ''
-        #if args.group_by:
-        #    group_fields, tmp = consolidateFieldName(proj, table, ','.join(args.group_by))
-        #    group_clause = ' GROUP BY {}'.format(group_fields)
-        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
-        self.logger.debug('Running query {}'.format(query))
-        #
+        # 
         # how to process each column
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
         formatters = [] # formatters that will be used to produce strings from values
@@ -368,26 +397,21 @@ class Exporter:
                 col_idx += max(1, len(fmt))
                 if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
                     raise ValueError('Columns with multiple fields must have an adjust function to merge values')
-        #print 'FORMA' , [x[1] for x in formatters]
-        #print 'COL  ' , [x[1] for x in col_adj]
-        #
-        # get variant and their info
-        cur = self.db.cursor()
-        try:
-            cur.execute(query)
-        except Exception as e:
-            raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
-                .format(e, ', '.join(var_fields)))
-        prog = ProgressBar(self.filename)
+
+        # needs fmt and adj
         count = 0
-        #
+        prog = ProgressBar(self.filename, self.db.numOfRows(self.table))
         rec_stack = []
         nFieldBy = len(self.format.export_by_fields.split(','))
+        #
+        #
+        reader = EmbeddedVariantReader(self.proj, self.table, self.format.export_by_fields,
+            var_fields, geno_fields, self.export_alt_build, self.IDs)
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
                 print >> output, self.header.rstrip()
-            for idx, raw_rec in enumerate(cur):
+            for idx, raw_rec in enumerate(reader.records()):
                 multi_records = False
                 try:
                     if nFieldBy != 4:
@@ -487,13 +511,17 @@ def exportArguments(parser):
             in the sample table) or the file from which the first sample is imported (if
             filename is empty and --samples are specified). No header will be used for
             the exported file if this parameter is left unspecified.''')
+    parser.add_argument('-j', '--jobs', type=int, default=1,
+        help='''Number of processes to export data. Multiple threads will be automatically
+            used if there are a large number of samples.''')
 
 def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
             exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
-                samples=' AND '.join(['({})'.format(x) for x in args.samples]), format=args.format, build=args.build, header=args.header,
+                samples=' AND '.join(['({})'.format(x) for x in args.samples]), format=args.format,
+                build=args.build, header=args.header, jobs=args.jobs,
                 fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()
