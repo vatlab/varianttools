@@ -1,0 +1,44 @@
+[format description]
+description=Input format for variants with multiple sample genotypes. 
+delimiter=None
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
+
+[DEFAULT]
+pos=pos
+pos_comment=Field for position. 
+
+ref=ref
+ref_comment=Field for reference allele. 
+
+alt=alt
+alt_comment=Field for alternative allele.
+
+geno=GT
+geno_comment=Field to extract genotype.
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based Position of the snp 
+
+[ref]
+index=3
+type=VARCHAR(255)
+comment=Reference allele
+
+[alt]
+index=4
+type=VARCHAR(255)
+comment=Alternative allele
+
+[GT]
+index=5:
+type=INTEGER 
+comment=Gentoype w/ 0,1,2 codings

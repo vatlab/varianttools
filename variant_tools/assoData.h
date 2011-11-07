@@ -26,6 +26,7 @@
 #ifndef _ASSODATA_H
 #define _ASSODATA_H
 
+
 #include <vector>
 typedef std::vector<double> vectorf;
 typedef std::vector<std::vector<double> > matrixf;
@@ -35,17 +36,12 @@ typedef std::vector<std::vector<int> > matrixi;
 #include <numeric>
 #include <algorithm>
 #include <functional>
-
+#include <iostream>
 #include "assoConfig.h"
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
-#include "gsl/gsl_vector.h"
-#include "gsl/gsl_matrix.h"
-#include "gsl/gsl_blas.h"
-#include "gsl/gsl_linalg.h"
-#include "gsl/gsl_cdf.h"
-#include "gsl/gsl_errno.h"
+
 
 namespace vtools {
 
@@ -54,7 +50,7 @@ class AssoData
 public:
 	AssoData() : 
     m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
-    m_statistic(0.0), m_pval(0.0)
+    m_statistic(0.0), m_pval(0.0), m_C(0)
 	{
 	}
 
@@ -79,6 +75,19 @@ public:
 		m_phenotype = p;
 	}
 
+
+	void setPhenotype(const vectorf & p, const matrixf & c)
+	{
+		m_phenotype = p;
+    m_C = c;
+    vectorf one(p.size());
+    std::fill(one.begin(), one.end(), 1.0);
+    m_C.push_back(one);
+    m_model.setY(m_phenotype);
+    m_model.setX(m_C);
+	}
+
+
 	void setMaf(const vectorf & maf)
 	{
 		//get this field directly from the variant table
@@ -94,6 +103,7 @@ public:
     std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
         std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
 	}
+
 
   void mean_phenotype()
   {
@@ -162,6 +172,10 @@ public:
 		random_shuffle(m_phenotype.begin(), m_phenotype.end());
 	}
 
+	void permuteX()
+	{
+		random_shuffle(m_X.begin(), m_X.end());
+	}
 
 	// manipulate data
 	void sumToX()
@@ -200,11 +214,11 @@ public:
 	}
 
 
-	void filterByMaf(double upper=0.01, double lower=0.0)
+	void filterByMaf(double upper, double lower)
   {
     //FIXME: may want to do it in AssociationTester.getVariants 
     if (upper > 1.0 || lower < 0.0) {
-      throw ValueError("Minor allele frequency value should fall between 0 and 1.");
+      throw ValueError("Minor allele frequency value should fall between 0 and 1");
     }
     if (fEqual(upper,1.0) && fEqual(lower,0.0)) return;
 
@@ -284,11 +298,10 @@ public:
     //!- multiple linear regression parameter estimate
     //!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
     //!- Solve the system via gsl_linalg_SV_solve()
-    LinearM model;
-    model.setX(m_genotype);
-    model.setY(m_phenotype);
-    model.fit();
-    model.getBeta(); 
+    m_model.replaceCol(m_X, m_C.size()-1);
+    m_model.fit();
+    vectorf beta = m_model.getBeta();
+    m_statistic = beta[beta.size()-1]; 
   }
 
 
@@ -310,6 +323,9 @@ private:
 	vectorf m_phenotype;
 	matrixf m_genotype;
 
+  // covariates
+  matrixf m_C;
+
   // observed minor allele frequencies
 	vectorf m_maf;
 	/// translated genotype
@@ -324,6 +340,7 @@ private:
   unsigned m_nctrls;
   double m_pval;
   double m_statistic;
+  LinearM m_model;
 };
 
 }

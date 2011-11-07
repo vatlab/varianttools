@@ -120,6 +120,35 @@ private:
 	size_t m_times;
 };
 
+
+class GenoPermutator : public BasePermutator
+{
+
+public:
+	GenoPermutator(size_t times, const vectora & actions)
+		: m_times(times), BasePermutator(actions)
+	{
+	}
+
+
+	double apply(AssoData & d)
+	{
+		vectorf all_statistic(m_times);
+
+		for (size_t i = 0; i < m_times; ++i) {
+			for (size_t j = 0; j < m_actions.size(); ++j) {
+				m_actions[j]->apply(d);
+			}
+      all_statistic[i] = d.statistic(); 
+			d.permuteX();
+		}
+		return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
+	}
+
+private:
+	size_t m_times;
+};
+
 }
 
 #endif

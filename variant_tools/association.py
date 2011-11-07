@@ -398,20 +398,21 @@ class NullTest:
                 fields.append(('_'.join([self.__class__.__name__, key]), 'FLOAT'))
         return fields
 
-    def setPhenotype(self, data):
+    def setPhenotype(self, data, covariates=None):
         '''Set phenotype data'''
-        self.data.setPhenotype(data)
+        if covariates:
+          self.data.setPhenotype(data, covariates)
+        else:
+          self.data.setPhenotype(data)
+        self.data.mean_phenotype()
+        self.data.count_cases()
+        self.data.count_ctrls()
 
     def setGenotype(self, data):
         self.data.setGenotype(data)
     
     def setAttributes(self, grp):
         self.group = str(grp)
-        self.data.setMaf()
-        self.data.filterByMaf(upper=1.0, lower=0.0)
-        self.data.mean_phenotype()
-        self.data.count_cases()
-        self.data.count_ctrls()
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
@@ -438,20 +439,26 @@ class LinearBurdenTest(NullTest):
         NullTest.__init__(self, logger, name, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''A base association test method
-            test does nothing, but can be used to measure the performance of 
-            retrieving data from vtools.''',
+        parser = argparse.ArgumentParser(description='''Linear regression test
+            which will collapse the variants within one group by counts and evaluate
+            the significance of effect size (regression coefficient) of the group''',
             prog='vtools associate --method ' + self.name)
         # no argumant is added
         parser.add_argument('-p', '--permutations', type=int, default=0,
             help='''Number of permutations.''')
+        parser.add_argument('-m1', '--mafupper', type=float, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 1.0''')  
+        parser.add_argument('-m2', '--maflower', type=float, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            will be included in analysis. Default set to 0.0''') 
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
     def calculate(self):
         data = self.data.clone()
-        actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
+        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
         a = t.ActionExecuter(actions)
         a.apply(data)
         #print '{} on group {}, p-value (asymptotic) = {}'\

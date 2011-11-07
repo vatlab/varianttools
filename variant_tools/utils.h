@@ -29,7 +29,15 @@
 #include <algorithm>
 #include <functional>
 #include <vector>
-#include <cassert>
+#include <iostream>
+
+#include "gsl/gsl_vector.h"
+#include "gsl/gsl_matrix.h"
+#include "gsl/gsl_blas.h"
+#include "gsl/gsl_linalg.h"
+#include "gsl/gsl_errno.h"
+
+#include "assoConfig.h"
 
 struct VPlus {
   template<typename T> std::vector<T> operator()(std::vector<T> x, std::vector<T> y) {
@@ -43,6 +51,22 @@ struct VPlus {
 
 bool fEqual(double a, double b);
 void fRound(double& myValue, double PRECISION);
+
+namespace std {
+//!- stdout for vector
+template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
+  {
+    if (!vec.empty()) {
+      typename vector<T>::const_iterator it = vec.begin();
+      out << *it;
+      for (++it; it != vec.end(); ++it)
+        out << " " << *it ;
+    }
+    return out;
+  }
+}
+
+namespace vtools {
 
 class BaseLm
 {
@@ -64,9 +88,16 @@ class BaseLm
 
     void setX(const std::vector<std::vector<double> > &x)
     { 
-      assert(x.size() > 0);
+      if (x.size() == 0) {
+        throw ValueError("No input data");
+      }
+
       if (m_nrow == 0) m_nrow = x[0].size();
-      else assert(m_nrow == x[0].size());
+      else {
+        if (m_nrow != x[0].size()) {
+          throw ValueError("Dimension not match");
+        }
+      }
       m_ncol = x.size();
 
       m_x = gsl_matrix_alloc(m_nrow, m_ncol);
@@ -79,9 +110,15 @@ class BaseLm
 
     void setY(std::vector<double> &y)
     { 
-      assert(y.size() > 0);
+      if (y.size() == 0) {
+        throw ValueError("No input data");
+      }
       if (m_nrow == 0) m_nrow = y.size();
-      else assert(m_nrow == y.size());
+      else {
+        if (m_nrow != y.size()) {
+          throw ValueError("Dimension not match");
+        }
+      }
 
       m_y = gsl_vector_alloc(m_nrow); 
       for (size_t i = 0; i < m_nrow; i++) {
@@ -92,7 +129,9 @@ class BaseLm
 
     void replaceCol(const std::vector<double> &col, int which)
     {
-      assert(which > 0);
+      if (which <= 0 || which >= m_ncol) {
+        throw ValueError("Invalid column index");
+      }
       // will never replace the 0th col since it is (1...1)'
       for (size_t i = 0; i < m_nrow; ++i) {
         gsl_matrix_set(m_x, i, which, col[i]); 
@@ -100,7 +139,7 @@ class BaseLm
     }
 
 
-  private:
+  protected:
     gsl_matrix *m_x;  
     gsl_vector *m_y;  
     int m_nrow;
@@ -126,27 +165,36 @@ class LinearM : public BaseLm
 
     void fit()
     {
+      m_beta = gsl_vector_alloc(m_ncol);
       //compute X'Y
       gsl_vector *b = gsl_vector_alloc(m_ncol);
       m_err = gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b);
-      assert(m_err==0);
+      if (m_err != 0) {
+        throw ValueError("Error in gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b)");
+      }
       //compute X'X
       gsl_matrix *A = gsl_matrix_alloc(m_ncol, m_ncol);
-      m_err = gsl_blas_dgemv(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A);
-      assert(m_err==0);
+      m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A);
+      if (m_err != 0) {
+        throw ValueError("Error in gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A)");
+      }
       //svd for X'X
       //On output the matrix A is replaced by U
       gsl_vector *s = gsl_vector_alloc(m_ncol);
       gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
       gsl_vector *work = gsl_vector_alloc(m_ncol);
       m_err = gsl_linalg_SV_decomp(A, V, s, work);
-      assert(m_err==0);
+      if (m_err != 0) {
+        throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
+      }
       //solve system Ax=b where x is beta
-      m_err = gsl_linalg_SV_solve (A, V, s, b, m_beta);
-      assert(m_err==0);
+      m_err = gsl_linalg_SV_solve(A, V, s, b, m_beta);
+      if (m_err != 0) {
+        throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
+      }
       //
       gsl_matrix_free(A);
-      gsl_matrix_free(v);
+      gsl_matrix_free(V);
       gsl_vector_free(b);
       gsl_vector_free(s);
       gsl_vector_free(work);
@@ -155,13 +203,16 @@ class LinearM : public BaseLm
     std::vector<double> getBeta()
     {
       std::vector<double> beta(m_ncol);
-      for (size_t i = 0; i < m_ncol; ++i) beta[i] = gsl_vector_get(m_beta, i);
+      for (size_t i = 0; i < m_ncol; ++i) {
+        beta[i] = gsl_vector_get(m_beta, i);
+      }
       return beta;
     }
 
   private:
     gsl_vector *m_beta;
     int m_err;
-
 };
+
+}
 #endif

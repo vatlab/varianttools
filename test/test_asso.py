@@ -1,51 +1,29 @@
 #!/usr/bin/env python
 
-import sys
+import os
+import glob
+import unittest
+import subprocess
+from testUtils import ProcessTestCase, runCmd, outputOfCmd
+from zipfile import ZipFile
 
-def linearBurden(test_data):
-  ptime = 1000
-  data = test_data.clone()
-  actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(1)]
-  a = t.ActionExecuter(actions)
-  a.apply(data)
-  p = t.PhenoPermutator(ptime, [t.SimpleLinearRegression()])
-  print(data.pvalue())
-  print(data.statistic())
-  print((p.apply(data)+1.0) / (ptime+1.0))
-  return 1
+class TestAsso(ProcessTestCase):
+  def setUp(self):
+      'Create a project'
+      #runCmd('vtools init test -f')
+      #runCmd('vtools import --format txt/assoc.fmt txt/assoc.dat --build hg18')
+      #runCmd('vtools phenotype --from_file txt/assoc.phen)
+      #too slow to build the test database. Better unzip a pre-stored project
+      zip = ZipFile('txt/assoproj.zip')
+      dir = os.getcwd()
+      zip.extractall(dir)
 
-def logisticBurden(test_data):
-  ptime = 1000
-  data = test_data.clone()
-  actions = [t.SumToX(), t.SimpleLogisticRegression(), t.GaussianPval(1)]
-  a = t.ActionExecuter(actions)
-  a.apply(data)
-  p = t.PhenoPermutator(ptime, [t.SimpleLogisticRegression()])
-  print(data.pvalue())
-  print(data.statistic())
-  print((p.apply(data)+1.0) / (ptime+1.0))
-  return 1  
-  
+  def removeProj(self):
+      runCmd('vtools remove project')
+
+  def testAsso(self):
+      'Test command associate'
+      self.assertSucc('vtools associate -h')
+      
 if __name__ == '__main__':
-    
-  try:
-    import variant_tools.assoTests as t
-  except:
-    sys.exit(5)
-  #
-  # set data
-  test_data = t.AssoData()
-  test_data.setGenotype([map(float, x.split()[1:]) for x in file('txt/assoc.dat')])
-  test_data.setPhenotype([float(x.split()[0]) for x in file('txt/assoc.dat')])
-  test_data.setMaf()
-  test_data.filterByMaf(upper=0.05, lower=0.0)
-  test_data.mean_phenotype()
-  test_data.count_cases()
-  test_data.count_ctrls()
-  #print(test_data.maf())
-  #print(test_data.phenotype())
-  #print(test_data.raw_genotype())
-  #logisticBurden(test_data)
-  #linearBurden(test_data)
-  
-
+    unittest.main()

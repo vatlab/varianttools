@@ -38,12 +38,10 @@ public:
 	{
 	}
 
-
 	virtual BaseAction * clone()
 	{
 		return new BaseAction(*this);
 	}
-
 
 	virtual double apply(AssoData & d)
 	{
@@ -63,12 +61,10 @@ public:
 	{
 	}
 
-
 	BaseAction * clone()
 	{
 		return new SumToX(*this);
 	}
-
 
 	double apply(AssoData & d)
 	{
@@ -86,12 +82,10 @@ public:
 	{
 	}
 
-
 	BaseAction * clone()
 	{
 		return new BinToX(*this);
 	}
-
 
 	double apply(AssoData & d)
 	{
@@ -102,6 +96,51 @@ public:
 };
 
 
+class SetMaf : public BaseAction
+{
+public:
+	SetMaf() : BaseAction()
+	{
+	}
+
+	BaseAction * clone()
+	{
+		return new SetMaf(*this);
+	}
+
+	double apply(AssoData & d)
+	{
+		d.setMaf();
+		return 0;
+	}
+};
+
+
+class FilterX : public BaseAction
+{
+public:
+	FilterX(double upper=1.0, double lower=0.0) : 
+    BaseAction(), m_upper(upper), m_lower(lower)
+	{
+	}
+
+	BaseAction * clone()
+	{
+		return new FilterX(*this);
+	}
+
+	double apply(AssoData & d)
+	{
+    d.filterByMaf(m_upper, m_lower);
+		return 0;
+	}
+
+private:
+  double m_upper;
+  double m_lower;
+};
+
+
 class SimpleLinearRegression : public BaseAction
 {
 public:
@@ -109,17 +148,34 @@ public:
 	{
 	}
 
-
 	BaseAction * clone()
 	{
 		return new SimpleLinearRegression(*this);
 	}
 
+	double apply(AssoData & d)
+  {    
+    d.simpleLinear();
+    return 0;
+  }
+};
+
+
+class MultipleLinearRegression : public BaseAction
+{
+public:
+	MultipleLinearRegression() : BaseAction()
+	{
+	}
+
+	BaseAction * clone()
+	{
+		return new MultipleLinearRegression(*this);
+	}
 
 	double apply(AssoData & d)
   {    
-    //assert(m_phenotype.size() == m_X.size());
-    d.simpleLinear();
+    d.multipleLinear();
     return 0;
   }
 };
@@ -132,12 +188,10 @@ public:
 	{
 	}
 
-
 	BaseAction * clone()
 	{
 		return new SimpleLogisticRegression(*this);
 	}
-
 
 	double apply(AssoData & d)
   {    
@@ -157,12 +211,10 @@ public:
 	{
 	}
 
-
 	BaseAction * clone()
 	{
 		return new GaussianPval(*this);
 	}
-
 
 	double apply(AssoData & d)
 	{
@@ -173,9 +225,6 @@ public:
 private:
   unsigned m_sided;
 };
-
-
-
 
 }
 
