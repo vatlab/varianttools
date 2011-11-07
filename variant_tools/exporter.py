@@ -28,7 +28,7 @@ import os
 import sys
 import gzip
 import re
-from threading
+from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
@@ -306,15 +306,7 @@ class MultiVariantReader(BaseVariantReader):
             w.start()
 
     def records(self):
-        all_workers = len(self.readers)
-        still_working = len(self.readers)
         #
-        # we need a heap to keep records read from multiple processes in order
-        # we can not really guarantee this if there are large trunks of ignored
-        # records but a heap size = 4 * number of readers should work in most cases
-        #
-        heap = []
-        filled = False
         rec = []
         id = None
         last = len(self.readers) - 1
@@ -324,6 +316,8 @@ class MultiVariantReader(BaseVariantReader):
                     val = reader.recv()
                     if val is None:
                         break
+                    print val[0],
+                    sys.stdout.flush()
                     if idx == 0:
                         id = val[0]
                     elif id != val[0]:
@@ -331,13 +325,14 @@ class MultiVariantReader(BaseVariantReader):
                     rec.extend(val[1:])
                     if idx == last:
                         yield rec
+                        print
                         rec = []
             except Exception as e:
-                print e
+                self.logger.debug('Failed to get record: {}'.format(e))
         for p in self.workers:
-            p.join()
+            p.terminate()
 
-class VariantWorker(threading):
+class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
     def __init__(self, dbname, query, output, logger):
         self.dbname = dbname
@@ -565,12 +560,15 @@ class Exporter:
 
         # needs fmt and adj
         count = 0
-        prog = ProgressBar(self.filename, self.db.numOfRows(self.table))
+        nr = self.db.numOfRows(self.table)
+        last_count = 0
+        update_after = max(100, nr/100)
         rec_stack = []
         nFieldBy = len(self.format.export_by_fields.split(','))
         #
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
+        prog = ProgressBar(self.filename, nr)
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
@@ -619,7 +617,8 @@ class Exporter:
                     count += 1
                 except Exception as e:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
-                if idx % 10000 == 0:
+                if idx - last_count > update_after:
+                    last_count = idx
                     prog.update(idx)
             # the last block
             if rec_stack:
