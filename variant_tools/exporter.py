@@ -132,13 +132,14 @@ class SequentialCollector:
                 item = e(item)
         return item
 
+MAX_COLUMN = 1000
 def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
-    if jobs == 0 and len(IDs) < 1500:
+    if jobs == 0 and len(IDs) < MAX_COLUMN:
         # using a single thread
         return EmbeddedVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
-    elif jobs > 0 and len(IDs) < 1500:
+    elif jobs > 0 and len(IDs) < MAX_COLUMN:
         # using a standalone process to read things and
         # pass information using a pipe
         return StandaloneVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
@@ -146,7 +147,7 @@ def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
     else:
         # using multiple process to handle more than 1500 samples
         return MultiVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
-            export_alt_build, IDs, min(jobs, len(IDs) // 1500 + 1))
+            export_alt_build, IDs, max(jobs, len(IDs) // MAX_COLUMN + 2))
 
 class BaseVariantReader:
     def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
@@ -209,10 +210,10 @@ class BaseVariantReader:
         where_clause = ''
         # GROUP BY clause
         if self.export_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, [self.export_by_fields, 'variant_id'])
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ',variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
-            order_clause = ' ORDER BY variant_id'
+            order_clause = ' ORDER BY {}.variant_id'.format(self.table)
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getSampleQuery(self, IDs):
@@ -228,14 +229,13 @@ class BaseVariantReader:
         # FROM clause
         from_clause = 'FROM {} '.format(self.table)
         processed = set()
-        if self.geno_fields:
-            for id in IDs:
-                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
-                    .format(self.proj.name, id, table)
+        for id in IDs:
+            from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
+                .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
-        order_clause = 'variant_id'
+        order_clause = ' ORDER BY {}.variant_id'.format(self.table)
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
 
@@ -288,13 +288,16 @@ class MultiVariantReader(BaseVariantReader):
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
+        block = len(IDs) // (jobs-1) + 1
         p = VariantWorker(proj.name, self.getVariantQuery(), w, proj.logger)
         self.workers = [p]
         self.readers = [r]
-        block = len(IDs) // (jobs - 1)
+        IDs = list(IDs)
+        IDs.sort()
         for i in range(jobs - 1):
             r, w = Pipe(False)
-            p = VariantWorker(proj.name, self.getSampleQuery(IDs[(block*i):((block + 1)*i)]), w, proj.logger)
+            subIDs = IDs[(block*i):(block *(i + 1))]
+            p = VariantWorker(proj.name, self.getSampleQuery(subIDs), w, proj.logger)
             self.workers.append(p)
             self.readers.append(r)
         for w in self.workers:
@@ -314,21 +317,23 @@ class MultiVariantReader(BaseVariantReader):
         id = None
         last = len(self.readers) - 1
         while True:
-            for idx, reader in enumerate(self.readers):
-                val = reader.recv()
-                if val is None:
-                    break
-                if idx == 0:
-                    id = val[0]
-                elif id != val[0]:
-                    raise ValueError('Read different IDs from multiple processes')
-                rec.extend(val)
-                if idx == last:
-                    yield rec
-                    rec = []
+            try:
+                for idx, reader in enumerate(self.readers):
+                    val = reader.recv()
+                    if val is None:
+                        break
+                    if idx == 0:
+                        id = val[0]
+                    elif id != val[0]:
+                        raise ValueError('Read different IDs from multiple processes')
+                    rec.extend(val[1:])
+                    if idx == last:
+                        yield rec
+                        rec = []
+            except Exception as e:
+                print e
         for p in self.workers:
             p.join()
-
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
@@ -341,7 +346,7 @@ class VariantWorker(Process):
 
     def run(self): 
         db = DatabaseEngine()
-        db.connect(self.dbname + '.proj')
+        db.connect(self.dbname + '.proj', readonly=True)
         if '{}_genotype.'.format(self.dbname) in self.query:
             db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname))
         cur = db.cursor()
@@ -561,7 +566,6 @@ class Exporter:
         prog = ProgressBar(self.filename, self.db.numOfRows(self.table))
         rec_stack = []
         nFieldBy = len(self.format.export_by_fields.split(','))
-        #
         #
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
