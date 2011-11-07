@@ -310,13 +310,14 @@ class MultiVariantReader(BaseVariantReader):
         rec = []
         id = None
         last = len(self.readers) - 1
+        all_done = False
         while True:
             try:
                 for idx, reader in enumerate(self.readers):
                     val = reader.recv()
                     if val is None:
+                        all_done = True
                         break
-                    print val[0],
                     sys.stdout.flush()
                     if idx == 0:
                         id = val[0]
@@ -325,8 +326,9 @@ class MultiVariantReader(BaseVariantReader):
                     rec.extend(val[1:])
                     if idx == last:
                         yield rec
-                        print
                         rec = []
+                if all_done:
+                    break
             except Exception as e:
                 self.logger.debug('Failed to get record: {}'.format(e))
         for p in self.workers:
