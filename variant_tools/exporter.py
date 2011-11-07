@@ -145,46 +145,98 @@ def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
     else:
         # using multiple process to handle more than 1500 samples
-        return MultiVariantReader()
+        return MultiVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs, min(jobs, len(IDs) // 1500 + 1))
 
 class BaseVariantReader:
     def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build, IDs):
-        #    var_fields   geno_fields * IDs (only if sample_variant has the geno_field)
-        #
-        select_clause, fields = consolidateFieldName(proj, table,
-            ','.join(var_fields), export_alt_build)
-        #
-        if geno_fields:
-            for id in IDs:
-                header = [x.lower() for x in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, id))]
-                for fld in geno_fields:
+        self.proj = proj
+        self.table = table
+        self.export_by_fields = export_by_fields
+        self.var_fields = var_fields
+        self.geno_fields = geno_fields
+        self.export_alt_build = export_alt_build
+        self.IDs = IDs
+
+    def getQuery(self):
+        select_clause, fields = consolidateFieldName(self.proj, self.table,
+            ','.join(self.var_fields), self.export_alt_build)
+        if self.geno_fields:
+            for id in self.IDs:
+                header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+                for fld in self.geno_fields:
                     if fld.lower() in header:
                         select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
                     else:
                         select_clause += ', NULL'
         # FROM clause
-        from_clause = 'FROM {} '.format(table)
-        fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
+        from_clause = 'FROM {} '.format(self.table)
+        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
         #
         processed = set()
         for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
             if (tbl.lower(), conn.lower()) not in processed:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
-        if geno_fields:
-            for id in IDs:
+        if self.geno_fields:
+            for id in self.IDs:
                 from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
-                    .format(proj.name, id, table)
+                    .format(self.proj.name, id, table)
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
-        if export_by_fields:
-            order_fields, tmp = consolidateFieldName(proj, table, export_by_fields)
+        if self.export_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields)
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
-        self.query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+
+    def getVariantQuery(self):
+        select_clause, fields = consolidateFieldName(self.proj, self.table,
+            ','.join(['variant_id'] + self.var_fields), self.export_alt_build)
+        # FROM clause
+        from_clause = 'FROM {} '.format(self.table)
+        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+        #
+        processed = set()
+        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+            if (tbl.lower(), conn.lower()) not in processed:
+                from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                processed.add((tbl.lower(), conn.lower()))
+        # WHERE clause
+        where_clause = ''
+        # GROUP BY clause
+        if self.export_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, [self.export_by_fields, 'variant_id'])
+            order_clause = ' ORDER BY {}'.format(order_fields)
+        else:
+            order_clause = ' ORDER BY variant_id'
+        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+
+    def getSampleQuery(self, IDs):
+        select_clause, fields = consolidateFieldName(self.proj, self.table,
+            'variant_id', False)
+        for id in IDs:
+            header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+            for fld in self.geno_fields:
+                if fld.lower() in header:
+                    select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
+                else:
+                    select_clause += ', NULL'
+        # FROM clause
+        from_clause = 'FROM {} '.format(self.table)
+        processed = set()
+        if self.geno_fields:
+            for id in IDs:
+                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
+                    .format(self.proj.name, id, table)
+        # WHERE clause
+        where_clause = ''
+        # GROUP BY clause
+        order_clause = 'variant_id'
+        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
 
 class EmbeddedVariantReader(BaseVariantReader):
@@ -197,10 +249,10 @@ class EmbeddedVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
 
     def records(self):
-        self.logger.debug('Running query {}'.format(self.query))
+        self.logger.debug('Running query {}'.format(self.getQuery()))
         cur = self.proj.db.cursor()
         try:
-            cur.execute(self.query)
+            cur.execute(self.getQuery())
         except Exception as e:
             raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
                 .format(e, ', '.join(self.var_fields)))
@@ -216,7 +268,7 @@ class StandaloneVariantReader(BaseVariantReader):
         self.proj = proj
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
-        self.worker = VariantWorker(proj.name, self.query, w, proj.logger)
+        self.worker = VariantWorker(proj.name, self.getQuery(), w, proj.logger)
         self.worker.start()
 
     def records(self):
@@ -226,6 +278,57 @@ class StandaloneVariantReader(BaseVariantReader):
                 break
             else:
                 yield rec
+
+class MultiVariantReader(BaseVariantReader):
+    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs, jobs):
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build,  IDs)
+        self.proj = proj
+        self.var_fields = var_fields
+        # the first job for variants
+        r, w = Pipe(False)
+        p = VariantWorker(proj.name, self.getVariantQuery(), w, proj.logger)
+        self.workers = [p]
+        self.readers = [r]
+        block = len(IDs) // (jobs - 1)
+        for i in range(jobs - 1):
+            r, w = Pipe(False)
+            p = VariantWorker(proj.name, self.getSampleQuery(IDs[(block*i):((block + 1)*i)]), w, proj.logger)
+            self.workers.append(p)
+            self.readers.append(r)
+        for w in self.workers:
+            w.start()
+
+    def records(self):
+        all_workers = len(self.readers)
+        still_working = len(self.readers)
+        #
+        # we need a heap to keep records read from multiple processes in order
+        # we can not really guarantee this if there are large trunks of ignored
+        # records but a heap size = 4 * number of readers should work in most cases
+        #
+        heap = []
+        filled = False
+        rec = []
+        id = None
+        last = len(self.readers) - 1
+        while True:
+            for idx, reader in enumerate(self.readers):
+                val = reader.recv()
+                if val is None:
+                    break
+                if idx == 0:
+                    id = val[0]
+                elif id != val[0]:
+                    raise ValueError('Read different IDs from multiple processes')
+                rec.extend(val)
+                if idx == last:
+                    yield rec
+                    rec = []
+        for p in self.workers:
+            p.join()
+
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
