@@ -36,9 +36,9 @@ import sys
 # python3 compatible before 2to3
 VTOOLS_VERSION = '1.0rc3'
 #
-# the association module is not ready for prime time...
+# the association module is not ready for prime time... and does not support python 3
 # 
-with_association = True
+with_association = True and sys.version_info.major == 2
 
 if with_association:
     LIB_GSL = [ 
