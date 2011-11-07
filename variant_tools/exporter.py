@@ -28,11 +28,12 @@ import os
 import sys
 import gzip
 import re
+from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
-    consolidateFieldName
+    consolidateFieldName, DatabaseEngine
 
  
 class JoinFields:
@@ -131,22 +132,24 @@ class SequentialCollector:
                 item = e(item)
         return item
 
-
-def VariantReader(proj, IDs, jobs):
-    if jobs == 1 and len(IDs) < 1500:
+def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+        export_alt_build, IDs, jobs):
+    if jobs == 0 and len(IDs) < 1500:
         # using a single thread
-        EmbeddedVariantReader()
-    elif jobs > 1 and len(IDs) < 1500:
+        return EmbeddedVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs)
+    elif jobs > 0 and len(IDs) < 1500:
         # using a standalone process to read things and
         # pass information using a pipe
-        StandaloneVariantReader()
+        return StandaloneVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs)
     else:
         # using multiple process to handle more than 1500 samples
-        MultiVariantReader()
+        return MultiVariantReader()
 
-class EmbeddedVariantReader:
-    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields, export_alt_build,
-        IDs):
+class BaseVariantReader:
+    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs):
         #    var_fields   geno_fields * IDs (only if sample_variant has the geno_field)
         #
         select_clause, fields = consolidateFieldName(proj, table,
@@ -181,18 +184,70 @@ class EmbeddedVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
-        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
-        proj.logger.debug('Running query {}'.format(query))
-        self.cur = proj.db.cursor()
-        try:
-            self.cur.execute(query)
-        except Exception as e:
-            raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
-                .format(e, ', '.join(var_fields)))
+        self.query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+
+
+class EmbeddedVariantReader(BaseVariantReader):
+    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs):
+        self.proj = proj
+        self.logger = proj.logger
+        self.var_fields = var_fields
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build,  IDs)
 
     def records(self):
-        for rec in self.cur:
+        self.logger.debug('Running query {}'.format(self.query))
+        cur = self.proj.db.cursor()
+        try:
+            cur.execute(self.query)
+        except Exception as e:
+            raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
+                .format(e, ', '.join(self.var_fields)))
+        for rec in cur:
             yield rec
+
+
+class StandaloneVariantReader(BaseVariantReader):
+    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build, IDs):
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+            export_alt_build,  IDs)
+        self.proj = proj
+        self.var_fields = var_fields
+        self.reader, w = Pipe(False)
+        self.worker = VariantWorker(proj.name, self.query, w, proj.logger)
+        self.worker.start()
+
+    def records(self):
+        while True:
+            rec = self.reader.recv()
+            if rec is None:
+                break
+            else:
+                yield rec
+
+class VariantWorker(Process):
+    # this class starts a process and used passed query to read variants
+    def __init__(self, dbname, query, output, logger):
+        self.dbname = dbname
+        self.query = query
+        self.output = output
+        self.logger = logger
+        Process.__init__(self)
+
+    def run(self): 
+        db = DatabaseEngine()
+        db.connect(self.dbname + '.proj')
+        if '{}_genotype.'.format(self.dbname) in self.query:
+            db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname))
+        cur = db.cursor()
+        cur.execute(self.query)
+        for rec in cur:
+            self.output.send(rec)
+        self.output.send(None)
+        db.close()
+
 
 class Exporter:
     '''A general class for importing variants'''
@@ -405,8 +460,8 @@ class Exporter:
         nFieldBy = len(self.format.export_by_fields.split(','))
         #
         #
-        reader = EmbeddedVariantReader(self.proj, self.table, self.format.export_by_fields,
-            var_fields, geno_fields, self.export_alt_build, self.IDs)
+        reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
+            var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         with open(self.filename, 'w') as output:
             # write header
             if self.header:
