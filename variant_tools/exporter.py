@@ -185,7 +185,7 @@ class BaseVariantReader:
         if self.geno_fields:
             for id in self.IDs:
                 from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
-                    .format(self.proj.name, id, table)
+                    .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
