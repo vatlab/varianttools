@@ -31,7 +31,7 @@ from array import array
 from copy import copy, deepcopy
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine
-from .sample import Sample
+from .phenotype import Sample
 import argparse
 import variant_tools.assoTests as t
 
@@ -489,4 +489,4 @@ class LinearBurdenTest(NullTest):
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
         print "ready to quit with", self.result
-        return 1
+        return 0
