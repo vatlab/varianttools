@@ -53,166 +53,192 @@ bool fEqual(double a, double b);
 void fRound(double& myValue, double PRECISION);
 
 namespace std {
-//!- stdout for vector
-template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
-  {
-    if (!vec.empty()) {
-      typename vector<T>::const_iterator it = vec.begin();
-      out << *it;
-      for (++it; it != vec.end(); ++it)
-        out << " " << *it ;
-    }
-    return out;
-  }
+	//!- stdout for vector
+	template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
+	{
+		if (!vec.empty()) {
+			typename vector<T>::const_iterator it = vec.begin();
+			out << *it;
+			for (++it; it != vec.end(); ++it)
+				out << " " << *it ;
+		}
+		return out;
+	}
 }
 
 namespace vtools {
 
-class BaseLm
-{
-  public:
-    BaseLm() : m_ncol(0), m_nrow(0) 
-    {
-    }
+	class BaseLm
+	{
+		public:
+			BaseLm() : m_ncol(0), m_nrow(0), m_x(NULL), m_y(NULL) 
+		{
+		}
 
-    ~BaseLm()
-    {
-      gsl_matrix_free(m_x);
-      gsl_vector_free(m_y);
-    }
+			~BaseLm()
+			{
+				if (m_x) {
+					gsl_matrix_free(m_x);
+				}
+				if (m_y) {
+					gsl_vector_free(m_y);
+				}
+			}
 
-    virtual BaseLm * clone()
-    {
-      return new BaseLm(*this);
-    }
+			BaseLm(const BaseLm & rhs): m_ncol(rhs.m_ncol), m_nrow(rhs.m_nrow), m_x(NULL), m_y(NULL)
+		{
+			if (rhs.m_x) {
+				m_x = gsl_matrix_alloc(m_nrow, m_ncol);
+				gsl_matrix_memcpy(m_x, rhs.m_x);
+			}
+			if (rhs.m_y) {
+				m_y = gsl_vector_alloc(m_nrow);
+				gsl_vector_memcpy(m_y, rhs.m_y);
+				}
+		}
 
-    void setX(const std::vector<std::vector<double> > &x)
-    { 
-      if (x.size() == 0) {
-        throw ValueError("No input data");
-      }
+			virtual BaseLm * clone()
+			{
+				return new BaseLm(*this);
+			}
 
-      if (m_nrow == 0) m_nrow = x[0].size();
-      else {
-        if (m_nrow != x[0].size()) {
-          throw ValueError("Dimension not match");
-        }
-      }
-      m_ncol = x.size();
+			void setX(const std::vector<std::vector<double> > &x)
+			{ 
+				if (x.size() == 0) {
+					throw ValueError("No input data");
+				}
 
-      m_x = gsl_matrix_alloc(m_nrow, m_ncol);
-      for (size_t j = 0; j < m_ncol; j++) {
-        for (size_t i = 0; i < m_nrow; i++) {
-          gsl_matrix_set(m_x, i, j, x[j][i]);         
-        }
-      }
-    }
+				if (m_nrow == 0) m_nrow = x[0].size();
+				else {
+					if (m_nrow != x[0].size()) {
+						throw ValueError("Dimension not match");
+					}
+				}
+				m_ncol = x.size();
 
-    void setY(std::vector<double> &y)
-    { 
-      if (y.size() == 0) {
-        throw ValueError("No input data");
-      }
-      if (m_nrow == 0) m_nrow = y.size();
-      else {
-        if (m_nrow != y.size()) {
-          throw ValueError("Dimension not match");
-        }
-      }
+				m_x = gsl_matrix_alloc(m_nrow, m_ncol);
+				for (size_t j = 0; j < m_ncol; j++) {
+					for (size_t i = 0; i < m_nrow; i++) {
+						gsl_matrix_set(m_x, i, j, x[j][i]);         
+					}
+				}
+			}
 
-      m_y = gsl_vector_alloc(m_nrow); 
-      for (size_t i = 0; i < m_nrow; i++) {
-        gsl_vector_set(m_y, i, y[i]);
-      }
-    }
+			void setY(std::vector<double> &y)
+			{ 
+				if (y.size() == 0) {
+					throw ValueError("No input data");
+				}
+				if (m_nrow == 0) m_nrow = y.size();
+				else {
+					if (m_nrow != y.size()) {
+						throw ValueError("Dimension not match");
+					}
+				}
 
-
-    void replaceCol(const std::vector<double> &col, int which)
-    {
-      if (which <= 0 || which >= m_ncol) {
-        throw ValueError("Invalid column index");
-      }
-      // will never replace the 0th col since it is (1...1)'
-      for (size_t i = 0; i < m_nrow; ++i) {
-        gsl_matrix_set(m_x, i, which, col[i]); 
-      }
-    }
+				m_y = gsl_vector_alloc(m_nrow); 
+				for (size_t i = 0; i < m_nrow; i++) {
+					gsl_vector_set(m_y, i, y[i]);
+				}
+			}
 
 
-  protected:
-    gsl_matrix *m_x;  
-    gsl_vector *m_y;  
-    int m_nrow;
-    int m_ncol;
-};
+			void replaceCol(const std::vector<double> &col, int which)
+			{
+				if (which <= 0 || which >= m_ncol) {
+					throw ValueError("Invalid column index");
+				}
+				// will never replace the 0th col since it is (1...1)'
+				for (size_t i = 0; i < m_nrow; ++i) {
+					gsl_matrix_set(m_x, i, which, col[i]); 
+				}
+			}
 
-class LinearM : public BaseLm
-{
-  public:
-    LinearM() : BaseLm(), m_err(0)
-    {
-    }
 
-    ~LinearM()
-    {
-      gsl_vector_free(m_beta);
-    }
+		protected:
+			gsl_matrix *m_x;  
+			gsl_vector *m_y;  
+			int m_nrow;
+			int m_ncol;
+	};
 
-    BaseLm * clone()
-    {
-      return new LinearM(*this);
-    }
+	class LinearM : public BaseLm
+	{
+		public:
+			LinearM() : BaseLm(), m_err(0), m_beta(NULL)
+		{
+		}
 
-    void fit()
-    {
-      m_beta = gsl_vector_alloc(m_ncol);
-      //compute X'Y
-      gsl_vector *b = gsl_vector_alloc(m_ncol);
-      m_err = gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b);
-      if (m_err != 0) {
-        throw ValueError("Error in gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b)");
-      }
-      //compute X'X
-      gsl_matrix *A = gsl_matrix_alloc(m_ncol, m_ncol);
-      m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A);
-      if (m_err != 0) {
-        throw ValueError("Error in gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A)");
-      }
-      //svd for X'X
-      //On output the matrix A is replaced by U
-      gsl_vector *s = gsl_vector_alloc(m_ncol);
-      gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
-      gsl_vector *work = gsl_vector_alloc(m_ncol);
-      m_err = gsl_linalg_SV_decomp(A, V, s, work);
-      if (m_err != 0) {
-        throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
-      }
-      //solve system Ax=b where x is beta
-      m_err = gsl_linalg_SV_solve(A, V, s, b, m_beta);
-      if (m_err != 0) {
-        throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
-      }
-      //
-      gsl_matrix_free(A);
-      gsl_matrix_free(V);
-      gsl_vector_free(b);
-      gsl_vector_free(s);
-      gsl_vector_free(work);
-    }
+			~LinearM()
+			{
+				if (m_beta) {
+					gsl_vector_free(m_beta);
+				}
+			}
 
-    std::vector<double> getBeta()
-    {
-      std::vector<double> beta(m_ncol);
-      for (size_t i = 0; i < m_ncol; ++i) {
-        beta[i] = gsl_vector_get(m_beta, i);
-      }
-      return beta;
-    }
+			LinearM(const LinearM & rhs): BaseLm(rhs), m_err(rhs.m_err), m_beta(NULL)
+		{
+			if (rhs.m_beta) {
+				m_beta = gsl_vector_alloc(m_ncol);
+				gsl_vector_memcpy(m_beta, rhs.m_beta);
+			}
+		}
 
-  private:
-    gsl_vector *m_beta;
-    int m_err;
-};
+			BaseLm * clone()
+			{
+				return new LinearM(*this);
+			}
+
+			void fit()
+			{
+				m_beta = gsl_vector_alloc(m_ncol);
+				//compute X'Y
+				gsl_vector *b = gsl_vector_alloc(m_ncol);
+				m_err = gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b);
+				if (m_err != 0) {
+					throw ValueError("Error in gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b)");
+				}
+				//compute X'X
+				gsl_matrix *A = gsl_matrix_alloc(m_ncol, m_ncol);
+				m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A);
+				if (m_err != 0) {
+					throw ValueError("Error in gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A)");
+				}
+				//svd for X'X
+				//On output the matrix A is replaced by U
+				gsl_vector *s = gsl_vector_alloc(m_ncol);
+				gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
+				gsl_vector *work = gsl_vector_alloc(m_ncol);
+				m_err = gsl_linalg_SV_decomp(A, V, s, work);
+				if (m_err != 0) {
+					throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
+				}
+				//solve system Ax=b where x is beta
+				m_err = gsl_linalg_SV_solve(A, V, s, b, m_beta);
+				if (m_err != 0) {
+					throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
+				}
+				//
+				gsl_matrix_free(A);
+				gsl_matrix_free(V);
+				gsl_vector_free(b);
+				gsl_vector_free(s);
+				gsl_vector_free(work);
+			}
+
+			std::vector<double> getBeta()
+			{
+				std::vector<double> beta(m_ncol);
+				for (size_t i = 0; i < m_ncol; ++i) {
+					beta[i] = gsl_vector_get(m_beta, i);
+				}
+				return beta;
+			}
+
+		private:
+			gsl_vector *m_beta;
+			int m_err;
+	};
 
 }
 #endif

@@ -275,11 +275,11 @@ class GroupAssociationCalculator(Process):
         self.db = DatabaseEngine()
         self.db.connect(self.pjname+'.proj')
         while True:
-            print 'Getting ...' 
+            self.logger.debug('Getting group ...') 
             grp = self.queue.get()
-            print 'Got', grp
+            self.logger.debug('Got group {}'.format(grp))
             if grp is None:
-                print 'I am done, sending None'
+                self.logger.debug('All groups are processed, sending None')
                 self.output.send(None)
                 break
             # select variants from each group:
@@ -290,9 +290,9 @@ class GroupAssociationCalculator(Process):
                 test.setGenotype(genotype)
                 test.setAttributes(grp)
                 test.calculate()
-                print "Finish test"
+                self.logger.debug('Finish test')
                 values.append([test.getFields(), test.result])
-            print 'Finish ', grp
+            self.logger.debug('Finished group {}'.format(grp))
             self.output.send((grp, values))
         
 
@@ -426,10 +426,11 @@ class NullTest:
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant. Will print
         data if NullTest is called'''
-        print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
-        print(' '.join(map(str, self.data.phenotype())))
-        print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
-        return 1
+	self.logger.info('Currently no action is defined for NullTest')
+        #print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
+        #print(' '.join(map(str, self.data.phenotype())))
+        #print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
+        return 0
 
 class ExternTest(NullTest):
     '''A test that exports data in standard formats, call an external program
@@ -474,7 +475,7 @@ class LinearBurdenTest(NullTest):
         if data.covarcounts() > 0:
             task_dbg = "Doing multiple regression"
             doRegression = t.MultipleLinearRegression()
-        print "**"+task_dbg
+        self.logger.info(task_dbg)
         actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
@@ -482,11 +483,12 @@ class LinearBurdenTest(NullTest):
                          .format(self.__class__.__name__, self.group, data.pvalue()))
         # permutation 
         if not self.permutations == 0:
-            self.logger.info('permutation routine no ready')
-        #  p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+            #self.logger.info('permutation routine no ready')
+            p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+	    p.apply(data)
         #  print('{} on group {}, p-value (permutation) = {}'\
         #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
-        print "ready to quit with", self.result
+        self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__, self.group, self.result))
         return 0
