@@ -44,7 +44,7 @@ comment=Reference allele.
 [EuropeanAmericanAltCount]
 index=6
 type=INTEGER NOT NULL
-comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed alt allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [EuropeanAmericanRefCount]
 index=7
@@ -64,12 +64,12 @@ comment=The observed ref allele counts for the African American population. Alle
 [AllAltCount]
 index=10
 type=INTEGER NOT NULL
-comment=The observed ref allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed alt allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [AllRefCount]
 index=11
 type=INTEGER NOT NULL
-comment=The observed alt allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed ref allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [EuropeanAmericanMaf] 
 index=12
@@ -79,7 +79,7 @@ comment=The European American minor-allele frequency in percent.
 [AfricanAmericanMaf] 
 index=13
 type=FLOAT NOT NULL
-comment=The European American minor-allele frequency in percent.
+comment=The African American minor-allele frequency in percent.
 
 [AllMaf] 
 index=14
