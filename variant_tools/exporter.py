@@ -28,6 +28,7 @@ import os
 import sys
 import gzip
 import re
+import time
 from multiprocessing import Process, Pipe
 from itertools import izip, repeat
 from .project import Project, fileFMT
@@ -147,9 +148,9 @@ def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
     else:
         # using multiple process to handle more than 1500 samples
         if len(IDs) // MAX_COLUMN + 2 > jobs:
-            proj.logger.info('Using {} threads to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
+            proj.logger.info('Using {} processes to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
         return MultiVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
-            export_alt_build, IDs, max(jobs, len(IDs) // MAX_COLUMN + 2))
+            export_alt_build, IDs, jobs)
 
 class BaseVariantReader:
     def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
@@ -225,19 +226,26 @@ class BaseVariantReader:
             header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
             for fld in self.geno_fields:
                 if fld.lower() in header:
-                    select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
+                    select_clause += ', g{}.{}'.format(id, fld)
                 else:
                     select_clause += ', NULL'
         # FROM clause
-        from_clause = 'FROM {} '.format(self.table)
+        from_clause = 'FROM {0}'.format(self.table)
+        if self.table != 'variant':
+            from_clause += ' LEFT OUTER JOIN variant on {0}.variant_id = variant.variant_id '.format(self.table)
         processed = set()
         for id in IDs:
-            from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
+            from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} g{1} ON g{1}.variant_id = {2}.variant_id '\
                 .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
-        order_clause = ' ORDER BY {}.variant_id'.format(self.table)
+        if self.export_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ', variant_id')
+            order_clause = ' ORDER BY {}'.format(order_fields)
+        else:
+            order_clause = ' ORDER BY {}.variant_id'.format(self.table)
+        #print 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
 
@@ -268,14 +276,20 @@ class StandaloneVariantReader(BaseVariantReader):
         BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
+        self.logger = proj.logger
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
         self.worker = VariantWorker(proj.name, self.getQuery(), w, proj.logger)
         self.worker.start()
 
+    def start(self):
+        # the first None, indicating ready to output
+        s = DelayedAction(self.logger.info, 'Selecting genotypes...')
+        self.reader.recv()
+        del s
+        
     def records(self):
         while True:
-            rec = self.reader.recv()
             if rec is None:
                 break
             else:
@@ -287,23 +301,57 @@ class MultiVariantReader(BaseVariantReader):
         BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
+        self.logger = proj.logger
+        self.jobs = jobs
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
-        block = len(IDs) // (jobs-1) + 1
         p = VariantWorker(proj.name, self.getVariantQuery(), w, proj.logger)
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
         IDs.sort()
+        # we may need more jobs due to the limit of max columns
+        # but we will only have self.jobs active jobs
+        jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
+        block = len(IDs) // (jobs-1) + 1
+        prog = ProgressBar('Creating indexes', len(IDs))
+        cur = self.proj.db.cursor()
+        for idx, id in enumerate(IDs):
+            if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
+            prog.update(idx)
+        prog.done()            
         for i in range(jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
             p = VariantWorker(proj.name, self.getSampleQuery(subIDs), w, proj.logger)
             self.workers.append(p)
             self.readers.append(r)
-        for w in self.workers:
-            w.start()
+
+    def start(self):
+        prog = ProgressBar('Selecting genotypes', len(self.readers))
+        status = [0] * len(self.readers)
+        while True:
+            for idx, (w,r) in enumerate(zip(self.workers, self.readers)):
+                if status[idx] == 2: # completed 
+                    continue
+                elif status[idx] == 1: # started?
+                    if r.poll():
+                        r.recv()   # should have None
+                        status[idx] = 2
+                        prog.update(sum([x==2 for x in status]))
+                else:    # not started
+                    # start another process
+                    if sum([x == 1 for x in status]) < self.jobs:
+                        #self.logger.info('Starting {}'.format(idx))
+                        status[idx] = 1
+                        w.start()
+            if sum(status) == 2 * len(self.readers):
+                break
+            else:
+                time.sleep(1)
+        prog.done()
 
     def records(self):
         #
@@ -350,6 +398,8 @@ class VariantWorker(Process):
             db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname))
         cur = db.cursor()
         cur.execute(self.query)
+        # reporting to the main process that SQL query is done
+        self.output.send(None)
         for rec in cur:
             self.output.send(rec)
         self.output.send(None)
@@ -562,6 +612,7 @@ class Exporter:
 
         # needs fmt and adj
         count = 0
+        failed_count = 0
         nr = self.db.numOfRows(self.table)
         last_count = 0
         update_after = min(max(100, nr/100), 10000)
@@ -570,6 +621,7 @@ class Exporter:
         #
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
+        reader.start()
         prog = ProgressBar(self.filename, nr)
         with open(self.filename, 'w') as output:
             # write header
@@ -619,6 +671,7 @@ class Exporter:
                     count += 1
                 except Exception as e:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                    failed_count += 1
                 if idx - last_count > update_after:
                     last_count = idx
                     prog.update(idx)
@@ -639,8 +692,9 @@ class Exporter:
                     count += 1
                 except Exception as e:
                     self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                    failed_count += 1
         prog.done()
-        self.logger.info('{} lines are exported'.format(count))
+        self.logger.info('{} lines are exported {}'.format(count, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
 
 
 
