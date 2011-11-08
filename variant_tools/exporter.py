@@ -277,6 +277,15 @@ class StandaloneVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
         self.proj = proj
         self.logger = proj.logger
+        ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
+        if len(ID_needed_idx) > 0:
+            prog = ProgressBar('Creating indexes', len(ID_needed_idx))
+            cur = self.proj.db.cursor()
+            for idx, id in enumerate(ID_needed_idx):
+                if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
+                prog.update(idx)
+            prog.done()            
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
         self.worker = VariantWorker(proj.name, self.getQuery(), w, proj.logger)
@@ -284,12 +293,13 @@ class StandaloneVariantReader(BaseVariantReader):
 
     def start(self):
         # the first None, indicating ready to output
-        s = DelayedAction(self.logger.info, 'Selecting genotypes...')
+        s = delayedAction(self.logger.info, 'Selecting genotypes...')
         self.reader.recv()
         del s
         
     def records(self):
         while True:
+            rec = self.reader.recv()
             if rec is None:
                 break
             else:
@@ -315,13 +325,18 @@ class MultiVariantReader(BaseVariantReader):
         # but we will only have self.jobs active jobs
         jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (jobs-1) + 1
-        prog = ProgressBar('Creating indexes', len(IDs))
-        cur = self.proj.db.cursor()
-        for idx, id in enumerate(IDs):
-            if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
-                cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
-            prog.update(idx)
-        prog.done()            
+        #
+        s = delayedAction(self.logger.info, 'Checking indexes')
+        ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
+        del s
+        if len(ID_needed_idx) > 0:
+            prog = ProgressBar('Creating indexes', len(ID_needed_idx))
+            cur = self.proj.db.cursor()
+            for idx, id in enumerate(ID_needed_idx):
+                if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
+                prog.update(idx)
+            prog.done()            
         for i in range(jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
@@ -656,11 +671,29 @@ class Exporter:
                     #
                     # this is extremely ugly but are we getting any performance gain?
                     if multi_records:
-                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                            if fmt else ('' if (col is None or rec[col][0] is None) else str(rec[col][0])) for fmt, col in formatters]
+                        try:
+                            fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                                if fmt else ('' if (col is None or rec[col][0] is None) else str(rec[col][0])) for fmt, col in formatters]
+                        except:
+                            for fmt, col in formatters:
+                                try:
+                                    if fmt:
+                                        fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                                except Exception as e:
+                                    raise ValueError('Failed to format value {} at col {}'.format(
+                                        rec[col] if type(col) is int else [rec[x] for x in col], col))
                     else:
-                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                            if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                        try:
+                            fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                                if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                        except:
+                            for fmt, col in formatters:
+                                try:
+                                    if fmt:
+                                        fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                                except Exception as e:
+                                    raise ValueError('Failed to format value {} at col {}'.format(
+                                        rec[col] if type(col) is int else [rec[x] for x in col], col))
                     # step two: apply adjusters
                     #
                     # adj: single or list
