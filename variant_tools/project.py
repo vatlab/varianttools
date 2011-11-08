@@ -1874,7 +1874,7 @@ class SampleProcessor(threading.Thread):
                 ('genotype_{}'.format(_old_id), ))
             sql = cur.fetchone()
             if sql is None:
-                raise ValueError('Cannot recreate genotype table {}'.format(_old_id))
+                raise ValueError('Cannot recreate genotype table {} from {}, please check the integrity of the database.'.format(_old_id, self.src_geno))
             sql = sql[0]
             try:
                 cur.execute(sql)
