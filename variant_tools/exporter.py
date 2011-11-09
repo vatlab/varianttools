@@ -133,7 +133,7 @@ class SequentialCollector:
                 item = e(item)
         return item
 
-MAX_COLUMN = 63
+MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
     if jobs == 0 and len(IDs) < MAX_COLUMN:
@@ -315,7 +315,7 @@ class MultiVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
         self.proj = proj
         self.logger = proj.logger
-        self.jobs = jobs
+        self.jobs = max(1, jobs)
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
@@ -362,7 +362,6 @@ class MultiVariantReader(BaseVariantReader):
                 else:    # not started
                     # start another process
                     if sum([x == 1 for x in status]) < self.jobs:
-                        #self.logger.info('Starting {}'.format(idx))
                         status[idx] = 1
                         w.start()
             if sum(status) == 2 * len(self.readers):
