@@ -2063,7 +2063,7 @@ class ProjectsMerger:
         # check if all subprojects have the same structure
         structure = {}
         # use the largest project as the first one
-        num_of_variants = 0
+        proj_size = 0
         for idx, dir in enumerate(dirs):
             files = glob.glob('{}/*.proj'.format(dir))
             if len(files) != 1:
@@ -2143,10 +2143,10 @@ class ProjectsMerger:
                             proj_file, ', '.join([x[0] for x in structure[table]])))
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
-            if self.db.numOfRows('__fromDB.variant', False) > num_of_variants:
+            if self.db.numOfRows('__fromDB.variant', False) * self.db.numOfRows('__fromDB.sample') > proj_size:
                 self.projects.insert(0, proj_file)
                 # we do not need an exact number
-                num_of_variants = self.db.numOfRows('__fromDB.variant', False)
+                proj_size = self.db.numOfRows('__fromDB.variant', False) * self.db.numOfRows('__fromDB.sample')
             else:
                 self.projects.append(proj_file)
             #
