@@ -2003,8 +2003,8 @@ class SampleCopier(threading.Thread):
                 self.logger.debug('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
                 cur.execute(query)
                 count += 1
+                self.status.set('__copySamples', 'completed', count)
             db.detach('__geno')
-            self.status.set('__copySamples', 'completed', count)
         db.close()
 
 class MergeStatus:
