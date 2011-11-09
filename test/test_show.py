@@ -50,7 +50,7 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show')
         # show project
         self.assertSucc('vtools show project')
-        self.assertEqual(output2list('vtools show table variant'), ['variant_id, bin, chr, pos, ref, alt', \
+        self.assertEqual(output2list('vtools show table variant')[:11], ['variant_id, bin, chr, pos, ref, alt', \
                                                          '1, 585, 1, 75927, G, C', \
                                                          '2, 585, 1, 76193, A, G', \
                                                          '3, 585, 1, 77052, G, A', \
