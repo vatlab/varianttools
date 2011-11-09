@@ -163,6 +163,9 @@ class BaseVariantReader:
         self.export_alt_build = export_alt_build
         self.IDs = IDs
 
+    def start(self):
+        pass
+
     def getQuery(self):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
             ','.join(self.var_fields), self.export_alt_build)
