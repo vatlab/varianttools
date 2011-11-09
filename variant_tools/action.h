@@ -31,200 +31,200 @@
 namespace vtools {
 
 
-	class BaseAction
-	{
-		public:
-			BaseAction()
-			{
-			}
+  class BaseAction
+  {
+    public:
+      BaseAction()
+      {
+      }
 
-			virtual BaseAction * clone()
-			{
-				return new BaseAction(*this);
-			}
+      virtual BaseAction * clone()
+      {
+        return new BaseAction(*this);
+      }
 
-			virtual double apply(AssoData & d)
-			{
-				throw RuntimeError("The base action class should not be called");
-				return 0;
-			}
-	};
-
-
-	typedef std::vector<BaseAction *> vectora;
+      virtual double apply(AssoData & d)
+      {
+        throw RuntimeError("The base action class should not be called");
+        return 0;
+      }
+  };
 
 
-	class SumToX : public BaseAction
-	{
-		public:
-			SumToX() : BaseAction()
-		{
-		}
-
-			BaseAction * clone()
-			{
-				return new SumToX(*this);
-			}
-
-			double apply(AssoData & d)
-			{
-				d.sumToX();
-				d.mean_genotype();
-				return 0;
-			}
-	};
+  typedef std::vector<BaseAction *> vectora;
 
 
-	class BinToX : public BaseAction
-	{
-		public:
-			BinToX() : BaseAction()
-		{
-		}
+  class SumToX : public BaseAction
+  {
+    public:
+      SumToX() : BaseAction()
+    {
+    }
 
-			BaseAction * clone()
-			{
-				return new BinToX(*this);
-			}
+      BaseAction * clone()
+      {
+        return new SumToX(*this);
+      }
 
-			double apply(AssoData & d)
-			{
-				d.binToX();
-				d.mean_genotype();
-				return 0;
-			}
-	};
-
-
-	class SetMaf : public BaseAction
-	{
-		public:
-			SetMaf() : BaseAction()
-		{
-		}
-
-			BaseAction * clone()
-			{
-				return new SetMaf(*this);
-			}
-
-			double apply(AssoData & d)
-			{
-				d.setMaf();
-				return 0;
-			}
-	};
+      double apply(AssoData & d)
+      {
+        d.sumToX();
+        d.mean_genotype();
+        return 0;
+      }
+  };
 
 
-	class FilterX : public BaseAction
-	{
-		public:
-			FilterX(double upper=1.0, double lower=0.0) : 
-				BaseAction(), m_upper(upper), m_lower(lower)
-		{
-		}
+  class BinToX : public BaseAction
+  {
+    public:
+      BinToX() : BaseAction()
+    {
+    }
 
-			BaseAction * clone()
-			{
-				return new FilterX(*this);
-			}
+      BaseAction * clone()
+      {
+        return new BinToX(*this);
+      }
 
-			double apply(AssoData & d)
-			{
-				d.filterByMaf(m_upper, m_lower);
-				return 0;
-			}
-
-		private:
-			double m_upper;
-			double m_lower;
-	};
+      double apply(AssoData & d)
+      {
+        d.binToX();
+        d.mean_genotype();
+        return 0;
+      }
+  };
 
 
-	class SimpleLinearRegression : public BaseAction
-	{
-		public:
-			SimpleLinearRegression() : BaseAction()
-		{
-		}
+  class SetMaf : public BaseAction
+  {
+    public:
+      SetMaf() : BaseAction()
+    {
+    }
 
-			BaseAction * clone()
-			{
-				return new SimpleLinearRegression(*this);
-			}
+      BaseAction * clone()
+      {
+        return new SetMaf(*this);
+      }
 
-			double apply(AssoData & d)
-			{    
-				d.simpleLinear();
-				return 0;
-			}
-	};
-
-
-	class MultipleLinearRegression : public BaseAction
-	{
-		public:
-			MultipleLinearRegression() : BaseAction()
-		{
-		}
-
-			BaseAction * clone()
-			{
-				return new MultipleLinearRegression(*this);
-			}
-
-			double apply(AssoData & d)
-			{    
-				d.multipleLinear();
-				return 0;
-			}
-	};
+      double apply(AssoData & d)
+      {
+        d.setMaf();
+        return 0;
+      }
+  };
 
 
-	class SimpleLogisticRegression : public BaseAction
-	{
-		public:
-			SimpleLogisticRegression() : BaseAction()
-		{
-		}
+  class FilterX : public BaseAction
+  {
+    public:
+      FilterX(double upper=1.0, double lower=0.0) : 
+        BaseAction(), m_upper(upper), m_lower(lower)
+    {
+    }
 
-			BaseAction * clone()
-			{
-				return new SimpleLogisticRegression(*this);
-			}
+      BaseAction * clone()
+      {
+        return new FilterX(*this);
+      }
 
-			double apply(AssoData & d)
-			{    
-				//assert(m_phenotype.size() == m_X.size());
-				//check for binary
-				d.simpleLogit();
-				return 0;
-			}
-	};
+      double apply(AssoData & d)
+      {
+        d.filterByMaf(m_upper, m_lower);
+        return 0;
+      }
+
+    private:
+      double m_upper;
+      double m_lower;
+  };
 
 
-	class GaussianPval : public BaseAction
-	{
-		public:
-			GaussianPval(unsigned sided=1) 
-				: BaseAction(), m_sided(sided)
-			{
-			}
+  class SimpleLinearRegression : public BaseAction
+  {
+    public:
+      SimpleLinearRegression() : BaseAction()
+    {
+    }
 
-			BaseAction * clone()
-			{
-				return new GaussianPval(*this);
-			}
+      BaseAction * clone()
+      {
+        return new SimpleLinearRegression(*this);
+      }
 
-			double apply(AssoData & d)
-			{
-				d.gaussianP(m_sided); 
-				return 0;
-			}
+      double apply(AssoData & d)
+      {    
+        d.simpleLinear();
+        return 0;
+      }
+  };
 
-		private:
-			unsigned m_sided;
-	};
+
+  class MultipleLinearRegression : public BaseAction
+  {
+    public:
+      MultipleLinearRegression() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new MultipleLinearRegression(*this);
+      }
+
+      double apply(AssoData & d)
+      {    
+        d.multipleLinear();
+        return 0;
+      }
+  };
+
+
+  class SimpleLogisticRegression : public BaseAction
+  {
+    public:
+      SimpleLogisticRegression() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new SimpleLogisticRegression(*this);
+      }
+
+      double apply(AssoData & d)
+      {    
+        //assert(m_phenotype.size() == m_X.size());
+        //check for binary
+        d.simpleLogit();
+        return 0;
+      }
+  };
+
+
+  class GaussianPval : public BaseAction
+  {
+    public:
+      GaussianPval(unsigned sided=1) 
+        : BaseAction(), m_sided(sided)
+      {
+      }
+
+      BaseAction * clone()
+      {
+        return new GaussianPval(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.gaussianP(m_sided); 
+        return 0;
+      }
+
+    private:
+      unsigned m_sided;
+  };
 
 }
 

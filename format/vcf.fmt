@@ -1,4 +1,5 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) # Distributed under GPL. see <http://www.gnu.org/licenses/>
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
 # a description of the format of this file.
@@ -20,8 +21,9 @@ format_string_comment=FORMAT string that is outputted in the 9th column of
 
 geno_info=
 geno_info_comment=Genotype information fields. No genotype field is imported by
-    default. Please check the FORMAT string of your .vcf file to determine
-    available fields to be imported.
+    default. You may edit it into, for example, "geno_info=GD,GQ,PL", if the .vcf
+    format field looks like "GT:GD:GQ:PL". Please check the FORMAT string of your .vcf 
+    file to determine available fields to be imported.
 
 geno=GT
 geno_comment=Field to extract genotype from .vcf file. You can set it to
@@ -69,7 +71,7 @@ info_comment=Field for info status
 # NOTE: if multiple records are collapsed, they are passed as tuples.
 # If no formatter is defined, the first value will be used in output.
 #
-fmt_GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: '', (-1,-1): '1/2'}[x]
+fmt_GT=lambda x: {0: '0/0', 1: '0/1', 2: '1/1', None: '', (-1,-1): '1/2', (0,1):'0/2', (0,2):'2/2'}[x]
 fmt_DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
 # if there are multiple alternative alleles, join them by ','
 #

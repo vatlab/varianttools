@@ -33,121 +33,121 @@
 namespace vtools {
 
 
-class BasePermutator
-{
-public:
-	BasePermutator(const vectora & actions)
-	{
-		for (size_t i = 0; i < actions.size(); ++i)
-			m_actions.push_back(actions[i]->clone());
-	}
-
-
-	~BasePermutator()
-	{
-		for (size_t i = 0; i < m_actions.size(); ++i)
-			delete m_actions[i];
-	}
-
-
-	BasePermutator(const BasePermutator & rhs)
-	{
-		for (size_t i = 0; i < m_actions.size(); ++i)
-			delete m_actions[i];
-		for (size_t i = 0; i < rhs.m_actions.size(); ++i)
-			m_actions.push_back(rhs.m_actions[i]->clone());
-	}
-
-
-	virtual double apply(AssoData & d)
+  class BasePermutator
   {
-    throw RuntimeError("The base permutation class should not be called");
-    return 0;
-  }
+    public:
+      BasePermutator(const vectora & actions)
+      {
+        for (size_t i = 0; i < actions.size(); ++i)
+          m_actions.push_back(actions[i]->clone());
+      }
 
 
-protected:
-	vectora m_actions;
-};
+      ~BasePermutator()
+      {
+        for (size_t i = 0; i < m_actions.size(); ++i)
+          delete m_actions[i];
+      }
 
 
-class ActionExecuter : public BasePermutator
-{
+      BasePermutator(const BasePermutator & rhs)
+      {
+        for (size_t i = 0; i < m_actions.size(); ++i)
+          delete m_actions[i];
+        for (size_t i = 0; i < rhs.m_actions.size(); ++i)
+          m_actions.push_back(rhs.m_actions[i]->clone());
+      }
 
-public:
-	ActionExecuter(const vectora & actions)
-		: BasePermutator(actions)
-	{
-	}
+
+      virtual double apply(AssoData & d)
+      {
+        throw RuntimeError("The base permutation class should not be called");
+        return 0;
+      }
 
 
-	double apply(AssoData & d)
+    protected:
+      vectora m_actions;
+  };
+
+
+  class ActionExecuter : public BasePermutator
   {
-    for (size_t j = 0; j < m_actions.size(); ++j) {
-      m_actions[j]->apply(d);
-    }
-    return 0;
-  }
-};
+
+    public:
+      ActionExecuter(const vectora & actions)
+        : BasePermutator(actions)
+      {
+      }
 
 
-class PhenoPermutator : public BasePermutator
-{
-
-public:
-	PhenoPermutator(size_t times, const vectora & actions)
-		: m_times(times), BasePermutator(actions)
-	{
-	}
-
-
-	double apply(AssoData & d)
-	{
-		vectorf all_statistic(m_times);
-
-		for (size_t i = 0; i < m_times; ++i) {
-			for (size_t j = 0; j < m_actions.size(); ++j) {
-				m_actions[j]->apply(d);
-			}
-      all_statistic[i] = d.statistic(); 
-			d.permuteY();
-		}
-		return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
-	}
+      double apply(AssoData & d)
+      {
+        for (size_t j = 0; j < m_actions.size(); ++j) {
+          m_actions[j]->apply(d);
+        }
+        return 0;
+      }
+  };
 
 
-private:
-	size_t m_times;
-};
+  class PhenoPermutator : public BasePermutator
+  {
+
+    public:
+      PhenoPermutator(size_t times, const vectora & actions)
+        : m_times(times), BasePermutator(actions)
+      {
+      }
 
 
-class GenoPermutator : public BasePermutator
-{
+      double apply(AssoData & d)
+      {
+        vectorf all_statistic(m_times);
 
-public:
-	GenoPermutator(size_t times, const vectora & actions)
-		: m_times(times), BasePermutator(actions)
-	{
-	}
+        for (size_t i = 0; i < m_times; ++i) {
+          for (size_t j = 0; j < m_actions.size(); ++j) {
+            m_actions[j]->apply(d);
+          }
+          all_statistic[i] = d.statistic(); 
+          d.permuteY();
+        }
+        return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
+      }
 
 
-	double apply(AssoData & d)
-	{
-		vectorf all_statistic(m_times);
+    private:
+      size_t m_times;
+  };
 
-		for (size_t i = 0; i < m_times; ++i) {
-			for (size_t j = 0; j < m_actions.size(); ++j) {
-				m_actions[j]->apply(d);
-			}
-      all_statistic[i] = d.statistic(); 
-			d.permuteX();
-		}
-		return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
-	}
 
-private:
-	size_t m_times;
-};
+  class GenoPermutator : public BasePermutator
+  {
+
+    public:
+      GenoPermutator(size_t times, const vectora & actions)
+        : m_times(times), BasePermutator(actions)
+      {
+      }
+
+
+      double apply(AssoData & d)
+      {
+        vectorf all_statistic(m_times);
+
+        for (size_t i = 0; i < m_times; ++i) {
+          for (size_t j = 0; j < m_actions.size(); ++j) {
+            m_actions[j]->apply(d);
+          }
+          all_statistic[i] = d.statistic(); 
+          d.permuteX();
+        }
+        return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
+      }
+
+    private:
+      size_t m_times;
+  };
 
 }
 
