@@ -2578,7 +2578,7 @@ def show(args):
                 fields = proj.db.getHeaders('sample')
                 # headers are ID, file, sample, FIELDS
                 print('filename\tsample_name{}'.format(''.join(['\t'+x for x in fields[3:]])))
-                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id {};'\
+                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'\
                     .format(', '.join(fields[2:]), limit_clause))
                 for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
@@ -2635,7 +2635,7 @@ def show(args):
                         proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 print('filename\tsample_name\tnum_genotypes\tsample_genotype_fields')
-                cur.execute('SELECT sample.sample_id, filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id {};'.format(limit_clause))
+                cur.execute('SELECT sample.sample_id, filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
                 for rec in records:
                     # sample fields

@@ -161,7 +161,8 @@ class BaseVariantReader:
         self.var_fields = var_fields
         self.geno_fields = geno_fields
         self.export_alt_build = export_alt_build
-        self.IDs = IDs
+        self.IDs = list(IDs)
+        self.IDs.sort()
 
     def start(self):
         pass
