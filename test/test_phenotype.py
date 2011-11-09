@@ -44,7 +44,7 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc('vtools phenotype --from_file -h')
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools phenotype --from_file phenotype/phenotype.txt')
-        out1 = output2list('vtools show samples')
+        out1 = output2list('vtools show samples -l -1')
         with open('phenotype/phenotype.txt') as inputfile:
             out2 = [x[:-1] for x in inputfile]
         self.assertEqual(out1, out2)
@@ -56,7 +56,7 @@ class TestPhenotype(ProcessTestCase):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
-        out3 = output2list('vtools show samples')
+        out3 = output2list('vtools show samples -l -1')
         with open('phenotype/phenotype.txt') as inputfile:
             out4 = ['\t'.join((x.split('\t')[:3])) for x in inputfile]
         self.assertEqual(out3, out4)
