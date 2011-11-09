@@ -1161,7 +1161,7 @@ class BaseImporter:
             self.importFromFile(f)
             if self.mode == 'insert':
                 total_var = sum(self.count[3:7])
-                self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
+                self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
                     .format(total_var, self.count[2],
                         ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
@@ -1178,7 +1178,7 @@ class BaseImporter:
         if len(self.files) > 1:
             if self.mode == 'insert':
                 total_var = sum(self.total_count[3:7])
-                self.logger.info('{:,} variants ({:,} new{}) from {:,} records are imported, {}.'\
+                self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
                     .format(total_var, self.total_count[2],
                         ''.join([', {:,} {}'.format(x, y) for x, y in \
                             zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
