@@ -2539,6 +2539,8 @@ def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             #
+            limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit > 0 else ''
+            omitted = '({} records omitted, use parameter --limit to see more)'
             if args.type == 'project':
                 print(proj.summarize())
             elif args.type == 'tables':
@@ -2562,12 +2564,12 @@ def show(args):
                 headers = proj.db.getHeaders(table)
                 print(', '.join(headers))
                 cur = proj.db.cursor()
-                if args.limit < 0:
-                    cur.execute('SELECT * FROM {};'.format(table, 10))
-                else:
-                    cur.execute('SELECT * FROM {} LIMIT 0,{};'.format(table, args.limit))
+                cur.execute('SELECT * FROM {} {};'.format(table, limit_clause))
                 for rec in cur:
                     print(', '.join([str(x) for x in rec]))
+                nAll = proj.db.numOfRows(table)
+                if args.limit > 0 and args.limit < nAll:
+                    print omitted.format(nAll - args.limit)
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
@@ -2576,10 +2578,13 @@ def show(args):
                 fields = proj.db.getHeaders('sample')
                 # headers are ID, file, sample, FIELDS
                 print('filename\tsample_name{}'.format(''.join(['\t'+x for x in fields[3:]])))
-                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id;'\
-                    .format(', '.join(fields[2:])))
+                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id {};'\
+                    .format(', '.join(fields[2:]), limit_clause))
                 for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
+                nAll = proj.db.numOfRows('sample')
+                if args.limit > 0 and args.limit < nAll:
+                    print omitted.format(nAll - args.limit)
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
                     proj.logger.info('No annotation database is attached.')
@@ -2630,7 +2635,7 @@ def show(args):
                         proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 print('filename\tsample_name\tnum_genotypes\tsample_genotype_fields')
-                cur.execute('SELECT sample.sample_id, filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id;')
+                cur.execute('SELECT sample.sample_id, filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id {};'.format(limit_clause))
                 records = cur.fetchall()
                 for rec in records:
                     # sample fields
@@ -2643,6 +2648,9 @@ def show(args):
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
+                nAll = proj.db.numOfRows('sample')
+                if args.limit > 0 and args.limit < nAll:
+                    print omitted.format(nAll - args.limit)
  
     except Exception as e:
         sys.exit(e)
