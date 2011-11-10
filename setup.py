@@ -31,6 +31,11 @@ except ImportError:
    from distutils.command.build_py import build_py
 
 import sys
+try:
+    import argparse
+except ImportError:
+    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
+
 
 # We cannot import variant_tools/project.py because that file is not 
 # python3 compatible before 2to3

@@ -25,7 +25,10 @@
 #
 
 import sys
-import argparse
+try:
+    import argparse
+except ImportError:
+    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
 from variant_tools import project
 from variant_tools import importer
