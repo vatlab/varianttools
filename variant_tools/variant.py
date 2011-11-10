@@ -27,7 +27,7 @@
 import sys
 import re
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount
+from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount, delayedAction
 from .phenotype import Sample
 
 
@@ -173,11 +173,50 @@ def select(args, reverse=False):
                 #elif len(IDs) == proj.db.numOfRows('sample'):
                 #    proj.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                 #    # we do not have to add anything to where_clause
-                else:
+                elif len(IDs) < 50:  
+                    # we allow 14 tables in other 'union' or from condition...
                     proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         args.from_table, 
                         '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in IDs])) 
+                else:
+                    # we have to create a temporary table and select variants sample by sample
+                    # this could be done in parallel if there are a large number of samples, but that needs a lot more
+                    # code, and perhaps RAM
+                    proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                    cur = proj.db.cursor()
+                    BLOCK_SIZE = 62
+                    NUM_BLOCKS = len(IDs) // BLOCK_SIZE + 1
+                    myIDs = list(IDs)
+                    myIDs.sort()
+                    merged_table = None
+                    prog = ProgressBar('Collecting sample variants', len(IDs))
+                    count = 0
+                    for i in range(NUM_BLOCKS):
+                        # step 1: create a table that holds all
+                        block_IDs = myIDs[(i*BLOCK_SIZE):((i+1)*BLOCK_SIZE)]
+                        if len(block_IDs) == 0:
+                            continue
+                        merged_table = '__variants_from_samples_{}'.format(i)
+                        query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
+                        proj.logger.debug(query)
+                        cur.execute(query)
+                        query = 'INSERT INTO {} {} {};'.format(merged_table,
+                            # also merge last batch
+                            '\nSELECT variant_id FROM __variants_from_samples_{} UNION '.format(i-1) if i > 1 else '',
+                            '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
+                        proj.logger.debug(query)
+                        cur.execute(query)
+                        if i > 1:
+                            # remove last batch
+                            query = 'DROP TABLE __variants_from_samples_{}'.format(i-1)
+                            proj.logger.debug(query)
+                            cur.execute(query)
+                        count += len(block_IDs)
+                        prog.update(count)
+                    prog.done()
+                    where_clause += ' AND ({}.variant_id IN (SELECT variant_id FROM {}))'.format(
+                        args.from_table, merged_table)
             #
             # we are treating different outcomes different, for better performance
             #
