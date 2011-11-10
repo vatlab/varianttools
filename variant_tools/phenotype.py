@@ -342,12 +342,12 @@ def phenotypeArguments(parser):
             which genotypes will be set.'''),
     parser.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
-            example, '--stat "num=count(*)"' sets phenotype num to be the number of
-            genotypes of a sample, '--set "GD=avg(DP)"' sets phenotype DP to be the 
-            average depth (if DP is one of the genotype fields) of the sample. Multiple
-            fields (e.g. '--set "num=count(*)" "GD=avg(DP)"') are also allowed. 
-            Parameters --genotypes and --samples could be used to limit the genotypes
-            to be considered and the samples for which genotypes will be set.'''),
+            example, "num=count(*)" sets phenotype num to be the number of genotypes
+            of a sample, "GD=avg(DP)" sets phenotype DP to be the average depth (if
+            DP is one of the genotype fields) of the sample. Multiple fields (e.g.
+            '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. Parameters
+            --genotypes and --samples could be used to limit the genotypes to be
+            considered and the samples for which genotypes will be set.'''),
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
