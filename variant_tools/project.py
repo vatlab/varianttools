@@ -1625,6 +1625,7 @@ class SortedVariantMapper(threading.Thread):
         idMaps.clear()
         # tells the dispatcher that we have created all maps
         for proj in self.projects:
+            self.status.set(proj, 'stage', 1)
             self.status.set(proj, 'completed', 1)
 
 class VariantMapper(threading.Thread):
@@ -1716,6 +1717,7 @@ class VariantMapper(threading.Thread):
             prog.done()
             #
             self.status.set(proj, 'completed', 1)
+            self.status.set(proj, 'stage', 1)
             db.close()
         # free all the RAM
         existing.clear()
@@ -1750,6 +1752,7 @@ class VariantProcessor(threading.Thread):
                     os.remove(self.cache_proj)
                 #
                 self.cacheVariants()
+            self.status.set(self.src_proj, 'stage', 2)
             self.status.set(self.src_proj, 'completed', 2)
             # get be further processed
             self.status.set(self.src_proj, 'scheduled', False)
@@ -1842,7 +1845,9 @@ class SampleProcessor(threading.Thread):
             self.all_the_same = self.status.get(self.src_proj, 'the_same')
             self.samples = self.status.get(self.src_proj, 'old_ids')
             #
-            if not self.all_the_same:
+            if self.all_the_same:
+                self.status.set(self.src_proj, 'completed', 2 + len(self.samples))
+            else:
                 self.src_geno = self.src_proj.replace('.proj', '_genotype.DB')
                 if not os.path.isfile(self.src_geno):
                     self.src_geno = None
@@ -1856,7 +1861,7 @@ class SampleProcessor(threading.Thread):
                     os.remove(self.cache_geno)
                 #
                 self.cacheSample()
-            self.status.set(self.src_proj, 'completed', 3)
+            self.status.set(self.src_proj, 'stage', 3)
             self.status.set(self.src_proj, 'scheduled', False)
             self.queue.task_done()
 
@@ -1867,8 +1872,9 @@ class SampleProcessor(threading.Thread):
         db.attach(self.src_proj, '__proj')
         db.attach(self.src_geno, '__geno')
         cur = db.cursor()
+        self.status.set(self.src_proj, 'total_count', 2 + len(self.samples))
         #
-        for _old_id in self.samples:
+        for idx, _old_id in enumerate(self.samples):
             # create genotype table
             cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
                 ('genotype_{}'.format(_old_id), ))
@@ -1889,6 +1895,7 @@ class SampleProcessor(threading.Thread):
             self.logger.debug('Caching sample {} of project {}'.format(_old_id, self.src_proj))
             cur.execute(query)
             db.commit()
+            self.status.set(self.src_proj, 'completed', 3 + idx)
         # clean up
         #cur.execute('DROP TABLE IF EXISTS __proj.__id_map;')
         db.detach('__proj')
@@ -2024,18 +2031,18 @@ class MergeStatus:
         return self.tasks[proj][item]
 
     def canProcessVariant(self, proj):
-        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['completed'] == 1
+        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['stage'] == 1
 
     def canProcessSample(self, proj):
-        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['completed'] == 2
+        return (not self.tasks[proj]['scheduled']) and self.tasks[proj]['stage'] == 2
 
     def canCopyVariants(self):
         return (not self.tasks['__copyVariants']['scheduled']) and \
-            all([y['completed'] >=2 for x,y in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
+            all([y['stage'] >=2 for x,y in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
 
     def canCopySamples(self):
         return (not self.tasks['__copySamples']['scheduled']) and \
-            all([y['completed'] >=3 for x,y  in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
+            all([y['stage'] >=3 for x,y  in self.tasks.iteritems() if x not in ['__copyVariants', '__copySamples']])
 
     def count(self):
         return sum([x['completed'] for x in self.tasks.values()])
@@ -2212,7 +2219,7 @@ class ProjectsMerger:
         # 2. variant processed
         # 3. sample processed
         for proj in self.projects:
-            status.add(proj, {'completed': 0, 'scheduled': False, 'total_count': 3})
+            status.add(proj, {'completed': 0, 'stage': 0, 'scheduled': False, 'total_count': 3})
         # this will set for each project
         #  old_ids: sample id of the original projects
         #  new_ids: sample id in the new project
