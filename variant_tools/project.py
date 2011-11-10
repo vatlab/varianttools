@@ -1846,8 +1846,9 @@ class SampleProcessor(threading.Thread):
             self.samples = self.status.get(self.src_proj, 'old_ids')
             #
             if self.all_the_same:
-                self.status.set(self.src_proj, 'completed', 2 + len(self.samples))
+                self.status.set(self.src_proj, 'completed', 3)
             else:
+                self.status.set(self.src_proj, 'total_count', 2 + len(self.samples))
                 self.src_geno = self.src_proj.replace('.proj', '_genotype.DB')
                 if not os.path.isfile(self.src_geno):
                     self.src_geno = None
@@ -1872,7 +1873,6 @@ class SampleProcessor(threading.Thread):
         db.attach(self.src_proj, '__proj')
         db.attach(self.src_geno, '__geno')
         cur = db.cursor()
-        self.status.set(self.src_proj, 'total_count', 2 + len(self.samples))
         #
         for idx, _old_id in enumerate(self.samples):
             # create genotype table
