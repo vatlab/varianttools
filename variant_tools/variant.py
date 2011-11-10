@@ -185,12 +185,12 @@ def select(args, reverse=False):
                     # code, and perhaps RAM
                     proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     cur = proj.db.cursor()
-                    BLOCK_SIZE = 62
+                    BLOCK_SIZE = 64
                     NUM_BLOCKS = len(IDs) // BLOCK_SIZE + 1
                     myIDs = list(IDs)
                     myIDs.sort()
                     merged_table = None
-                    prog = ProgressBar('Collecting sample variants', len(IDs))
+                    prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
                     count = 0
                     for i in range(NUM_BLOCKS):
                         # step 1: create a table that holds all
@@ -199,22 +199,24 @@ def select(args, reverse=False):
                             continue
                         merged_table = '__variants_from_samples_{}'.format(i)
                         query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-                        proj.logger.debug(query)
+                        # proj.logger.debug(query)
                         cur.execute(query)
                         query = 'INSERT INTO {} {} {};'.format(merged_table,
                             # also merge last batch
                             '\nSELECT variant_id FROM __variants_from_samples_{} UNION '.format(i-1) if i > 1 else '',
                             '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
-                        proj.logger.debug(query)
+                        #proj.logger.debug(query)
                         cur.execute(query)
                         if i > 1:
                             # remove last batch
                             query = 'DROP TABLE __variants_from_samples_{}'.format(i-1)
-                            proj.logger.debug(query)
+                            #proj.logger.debug(query)
                             cur.execute(query)
                         count += len(block_IDs)
-                        prog.update(count)
-                    prog.done()
+                        if prog:
+                            prog.update(count)
+                    if prog:
+                        prog.done()
                     where_clause += ' AND ({}.variant_id IN (SELECT variant_id FROM {}))'.format(
                         args.from_table, merged_table)
             #
