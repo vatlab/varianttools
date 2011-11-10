@@ -66,7 +66,7 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('init', help='''Create a new project, or a subproject 
         from an existing parent project, or merge several existing projects into one''',
         # FIXME: we should add descriptions to other commands as well.
-        description='''Create an empty project in the current directory. This
+        description='''Create a new project in the current directory. This
         command will fail if another project already exists in this directory,
         unless option '--force' is used to remove the existing project.''')
     project.initArguments(parser)
