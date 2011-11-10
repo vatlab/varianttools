@@ -160,7 +160,7 @@ class AnnoDBConfiger:
         # sections
         self.fields = []
         for section in sections:
-            if section == 'linked fields' or section == 'data sources':
+            if section.lower() == 'linked fields' or section.lower() == 'data sources':
                 continue
             if not section.replace('_', '').isalnum():
                 raise ValueError('Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))

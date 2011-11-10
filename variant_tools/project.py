@@ -309,9 +309,9 @@ class fileFMT:
         columns = []
         self.formatter = {}
         for section in sections:
-            if section == 'format description':
+            if section.lower() == 'format description':
                 continue
-            if section == 'field formatter':
+            if section.lower() == 'field formatter':
                 for item in parser.items(section, vars=defaults):
                     if item[0].startswith('fmt_'):
                         self.formatter[item[0][4:]] = item[1]
