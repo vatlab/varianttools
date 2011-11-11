@@ -24,6 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+import os
 import threading
 from multiprocessing import Process, Queue, Pipe, Lock
 import time
@@ -138,12 +139,12 @@ class AssociationTester(Sample):
         if not group_by:
             self.groups = ['all']
             self.where_clause = None
+            self.from_clause = None
         else:
             group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
             self.from_clause = self.table
             where_clause = []
             fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
-            print fields_info
             #
             processed = set()
             for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
@@ -155,7 +156,7 @@ class AssociationTester(Sample):
             self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
             # select disinct fields
             # FIXME the code here is buggy ...
-            query = 'SELECT DISTINCT {} FROM {} {};'.format(', '.join([x for x in fields]),
+            query = 'SELECT DISTINCT {} FROM {} {};'.format(group_fields,
                 self.from_clause, self.where_clause) 
             self.logger.debug('Running query {}'.format(query))
             # get group by
@@ -222,18 +223,19 @@ class UpdateResult:
         
 class GroupAssociationCalculator(Process):
     '''Association test calculator'''
-    def __init__(self, table, samples, tests, pjname, grpfields, grpQueue, where, output, logger):
+    def __init__(self, proj, table, samples, tests, grpfields, grpQueue, where, from_clause, output):
+        self.proj = proj
         self.table = table
         self.IDs = samples
         self.tests = tests
-        self.pjname = pjname
-        self.group_fields = grpfields[0]
-        self.fields = grpfields[1]
+        self.pjname = proj.name
+        self.group_fields = grpfields
         self.queue = grpQueue
         self.output = output
-        self.logger = logger
+        self.logger = proj.logger
         self.db = None
         self.where_clause = where
+        self.from_clause = from_clause
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         
     def getVariants(self, group):
@@ -249,8 +251,9 @@ class GroupAssociationCalculator(Process):
                 variant_id INTEGER PRIMARY KEY);'''.format(vtable))
             self.db.commit()
         #
-        where_clause = (self.where_clause + ' AND ' if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.fields])
-        query = 'INSERT INTO __asso_tmp_{} SELECT variant_id FROM {} {};'.format(group, self.table, where_clause)
+        where_clause = (self.where_clause + ' AND ' if self.where_clause else 'WHERE ') + \
+            ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.group_fields])
+        query = 'INSERT INTO __asso_tmp_{} SELECT {}.variant_id FROM {} {};'.format(group, self.table, self.from_clause, where_clause)
         self.logger.debug('Running query {}'.format(query))
         cur = self.db.cursor()
         cur.execute(query, (group,))
@@ -276,6 +279,9 @@ class GroupAssociationCalculator(Process):
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.pjname+'.proj')
+        for annoDB in self.proj.annoDB:
+           self.db.attach(os.path.join(annoDB.dir, annoDB.filename))
+        #
         while True:
             self.logger.debug('Getting group ...') 
             grp = self.queue.get()
@@ -312,9 +318,6 @@ def associate(args, reverse=False):
             for test in asso.tests:
                 test.setPhenotype(asso.phenotype[0], asso.covariates)
             # step 3: handle group_by
-            gfields = (None,None)
-            if args.group_by:
-               gfields = consolidateFieldName(proj, args.table, ','.join(args.group_by))
             asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
@@ -323,9 +326,9 @@ def associate(args, reverse=False):
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
-                GroupAssociationCalculator(args.table, asso.IDs, 
-                    asso.tests, proj.name, gfields, grpQueue, asso.where_clause,
-                    w, proj.logger).start()
+                GroupAssociationCalculator(proj, args.table, asso.IDs, 
+                    asso.tests, args.group_by, grpQueue, asso.where_clause,
+                    asso.from_clause, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
