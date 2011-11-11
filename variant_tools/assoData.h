@@ -202,6 +202,7 @@ namespace vtools {
           m_X[i] = 0.0;
           for (size_t j = 0; j < m_genotype[i].size(); ++j) {
             if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j]; 
+            if (fEqual(m_genotype[i][j], -1.0)) m_X[i] += 2.0; 
           }
         }
       }
@@ -214,7 +215,7 @@ namespace vtools {
           m_X[i] = 0.0;
           double pnovar = 1.0;
           for (size_t j = 0; j != m_genotype[i].size(); ++j) {  
-            if (m_genotype[i][j] >= 1.0) {  
+            if (m_genotype[i][j] >= 1.0 || fEqual(m_genotype[i][j], -1.0)) {  
               m_X[i] = 1.0;
               break;
             }

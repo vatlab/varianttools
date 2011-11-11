@@ -143,6 +143,7 @@ class AssociationTester(Sample):
             self.from_clause = self.table
             where_clause = []
             fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+            print fields_info
             #
             processed = set()
             for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
@@ -157,7 +158,6 @@ class AssociationTester(Sample):
             query = 'SELECT DISTINCT {} FROM {} {};'.format(', '.join([x for x in fields]),
                 self.from_clause, self.where_clause) 
             self.logger.debug('Running query {}'.format(query))
-            print query
             # get group by
             cur = self.db.cursor()
             cur.execute(query)
@@ -187,32 +187,32 @@ class UpdateResult:
         self.logger = logger
 
     def set(self, table, res):
-        self.lock.acquire()
         self.grps.append(res[0])
-        startID, endID = res[1][0]
-        fields = []
-        results = []
-        for x,y in res[1][1:]:
-            fields.extend(x)
-            results.append(y)
-        headers = self.db.getHeaders(table)
-        for field, fldtype in fields:
-            if field not in headers:
-                self.logger.debug('Adding field {}'.format(field))
-                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(table, field, fldtype))
-                self.db.commit()
-        # if the field exists it will be re-written
-        update_query = 'UPDATE {0} SET {2} WHERE variant_id>={1} AND variant_id<={1};'.format(table, self.db.PH,
-        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
-        # fill up the update query and execute the update command
-        names = [x.split('_')[1] for x,y in fields]
-        values = []
-        for result in results:
-            values.extend([result[x] for x in names])
-            self.logger.debug('Running query {}'.format(update_query))
-            self.db.execute(update_query, values+[startID, endID])
-        self.db.commit()
-        self.lock.release()
+#        self.lock.acquire()
+#        startID, endID = res[1][0]
+#        fields = []
+#        results = []
+#        for x,y in res[1][1:]:
+#            fields.extend(x)
+#            results.append(y)
+#        headers = self.db.getHeaders(table)
+#        for field, fldtype in fields:
+#            if field not in headers:
+#                self.logger.debug('Adding field {}'.format(field))
+#                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(table, field, fldtype))
+#                self.db.commit()
+#        # if the field exists it will be re-written
+#        update_query = 'UPDATE {0} SET {2} WHERE variant_id>={1} AND variant_id<={1};'.format(table, self.db.PH,
+#        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
+#        # fill up the update query and execute the update command
+#        names = [x.split('_')[1] for x,y in fields]
+#        values = []
+#        for result in results:
+#            values.extend([result[x] for x in names])
+#            self.logger.debug('Running query {}'.format(update_query))
+#            self.db.execute(update_query, values+[startID, endID])
+#        self.db.commit()
+#        self.lock.release()
         
     def getgrp(self):
         return self.grps
@@ -249,7 +249,7 @@ class GroupAssociationCalculator(Process):
                 variant_id INTEGER PRIMARY KEY);'''.format(vtable))
             self.db.commit()
         #
-        where_clause = (self.where_clause if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.fields])
+        where_clause = (self.where_clause + ' AND ' if self.where_clause else 'WHERE ') + ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.fields])
         query = 'INSERT INTO __asso_tmp_{} SELECT variant_id FROM {} {};'.format(group, self.table, where_clause)
         self.logger.debug('Running query {}'.format(query))
         cur = self.db.cursor()
@@ -344,8 +344,7 @@ def associate(args, reverse=False):
                     if res is None:
                         proc_status[idx] = False
                     else:
-#                       results.set(args.table, res)
-                        pass
+                        results.set(args.table, res)
                 #
                 if results.count() > count:
                     count = results.count()
@@ -473,27 +472,26 @@ class LinearBurdenTest(NullTest):
     def calculate(self):
         data = self.data.clone()
         doRegression = t.SimpleLinearRegression()
-        task_dbg = "Doing simple regression"
+        task_dbg = "-simple regression"
         if data.covarcounts() > 0:
-            task_dbg = "Doing multiple regression"
+            task_dbg = "-multiple regression"
             doRegression = t.MultipleLinearRegression()
-        self.logger.info(task_dbg)
         actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        print('{} on group {}, p-value (asymptotic) = {}'\
-                         .format(self.__class__.__name__, self.group, data.pvalue()))
+        #print('{} on group {}, p-value (asymptotic) = {}'\
+        #                 .format(self.__class__.__name__, self.group, data.pvalue()))
         # permutation 
         if not self.permutations == 0:
             #self.logger.info('permutation routine no ready')
             p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
-	    p.apply(data)
+            p.apply(data)
         #  print('{} on group {}, p-value (permutation) = {}'\
         #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
-        #print data.genotype(), '\n'
+        #print data.raw_genotype(), '\n'
         #print data.phenotype(), '\n'
         #print data.covariates()
-        self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__, self.group, self.result))
+        self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__+task_dbg, self.group, self.result))
         return 0
