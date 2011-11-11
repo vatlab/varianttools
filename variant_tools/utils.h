@@ -141,7 +141,17 @@ namespace vtools {
           gsl_vector_set(m_y, i, y[i]);
         }
       }
-
+  
+      std::vector<std::vector<double> > getX()
+      {
+        std::vector<std::vector<double> > xout(m_ncol);
+        for (size_t j = 0; j < m_ncol; j++) {
+          for (size_t i = 0; i < m_nrow; i++) {
+            xout[j].push_back(gsl_matrix_get(m_x, i, j));         
+          }
+        }
+        return xout;
+      }
 
       void replaceCol(const std::vector<double> &col, int which)
       {
@@ -165,7 +175,8 @@ namespace vtools {
   class LinearM : public BaseLm
   {
     public:
-      LinearM() : BaseLm(), m_err(0), m_beta(NULL)
+      LinearM() : BaseLm(), m_err(0), m_beta(NULL),
+      m_svdS(NULL), m_svdV(NULL), m_svdU(NULL)
     {
     }
 
@@ -173,14 +184,36 @@ namespace vtools {
       {
         if (m_beta) {
           gsl_vector_free(m_beta);
+        }      
+        if (m_svdS) {
+          gsl_vector_free(m_svdS);
+        }
+        if (m_svdV) {
+          gsl_matrix_free(m_svdV);
+        }
+        if (m_svdU) {
+          gsl_matrix_free(m_svdU);
         }
       }
 
-      LinearM(const LinearM & rhs): BaseLm(rhs), m_err(rhs.m_err), m_beta(NULL)
+      LinearM(const LinearM & rhs): BaseLm(rhs), m_err(rhs.m_err), m_beta(NULL),
+      m_svdS(NULL), m_svdV(NULL), m_svdU(NULL)
     {
       if (rhs.m_beta) {
         m_beta = gsl_vector_alloc(m_ncol);
         gsl_vector_memcpy(m_beta, rhs.m_beta);
+      }
+      if (rhs.m_svdS) {
+        m_svdS = gsl_vector_alloc(m_ncol);
+        gsl_vector_memcpy(m_svdS, rhs.m_svdS);
+      }
+      if (rhs.m_svdU) {
+        m_svdU = gsl_matrix_alloc(m_ncol, m_ncol);
+        gsl_matrix_memcpy(m_svdU, rhs.m_svdU);
+      }
+      if (rhs.m_svdV) {
+        m_svdV = gsl_matrix_alloc(m_ncol, m_ncol);
+        gsl_matrix_memcpy(m_svdV, rhs.m_svdV);
       }
     }
 
@@ -191,10 +224,20 @@ namespace vtools {
 
       void fit()
       {
-        //fit beta with a fresh start
+        //fit data with a fresh start
         if (m_beta) {
           gsl_vector_free(m_beta);
         }
+        if (m_svdS) {
+          gsl_vector_free(m_svdS);
+        }
+        if (m_svdV) {
+          gsl_matrix_free(m_svdV);
+        }
+        if (m_svdU) {
+          gsl_matrix_free(m_svdU);
+        }
+
         m_beta = gsl_vector_alloc(m_ncol);
         //compute X'Y
         gsl_vector *b = gsl_vector_alloc(m_ncol);
@@ -203,30 +246,31 @@ namespace vtools {
           throw ValueError("Error in gsl_blas_dgemv(CblasTrans, 1.0, m_x, m_y, 0.0, b)");
         }
         //compute X'X
-        gsl_matrix *A = gsl_matrix_alloc(m_ncol, m_ncol);
-        m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A);
+        //here m_svdU = X'X
+        m_svdU = gsl_matrix_alloc(m_ncol, m_ncol);
+        m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, m_svdU);
         if (m_err != 0) {
           throw ValueError("Error in gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, m_x, m_x, 0.0, A)");
         }
         //svd for X'X
-        //On output the matrix A is replaced by U
-        gsl_vector *s = gsl_vector_alloc(m_ncol);
-        gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
+        //On output the matrix m_svdU will actually be computed.
+        m_svdS = gsl_vector_alloc(m_ncol);
+        m_svdV = gsl_matrix_alloc(m_ncol, m_ncol);
         gsl_vector *work = gsl_vector_alloc(m_ncol);
-        m_err = gsl_linalg_SV_decomp(A, V, s, work);
+        m_err = gsl_linalg_SV_decomp(m_svdU, m_svdV, m_svdS, work);
         if (m_err != 0) {
           throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
         }
+        
+        
         //solve system Ax=b where x is beta
-        m_err = gsl_linalg_SV_solve(A, V, s, b, m_beta);
+        m_err = gsl_linalg_SV_solve(m_svdU, m_svdV, m_svdS, b, m_beta);
         if (m_err != 0) {
           throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
         }
-        //
-        gsl_matrix_free(A);
-        gsl_matrix_free(V);
+        
+        
         gsl_vector_free(b);
-        gsl_vector_free(s);
         gsl_vector_free(work);
       }
 
@@ -238,9 +282,63 @@ namespace vtools {
         }
         return beta;
       }
+      
+      std::vector<double> getSEBeta()
+      {
+        if (!m_beta) {
+          throw ValueError("Error in getSEBeta(): meed to fit the model first");
+        }
+        // compute (X'X)^-1 = V(diag(1/s))U'
+        // diagnal matrix
+        gsl_vector *oneovers = gsl_vector_alloc(m_ncol);
+        for (size_t i = 0; i < m_ncol; ++i) {
+          gsl_vector_set(oneovers, i, 1.0/gsl_vector_get(m_svdS,i));
+        }
+        gsl_matrix *D = gsl_matrix_alloc(m_ncol, m_ncol);
+        gsl_vector_view tmp = gsl_matrix_diagonal(D);
+        gsl_matrix_set_zero(D);
+        gsl_vector_memcpy(&tmp.vector, oneovers);
+        gsl_vector_free(oneovers);
+        
+        gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
+        m_err = gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, m_svdV, D, 0.0, V);
+        if (m_err != 0) {
+          throw ValueError("Error in gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, m_svdV, D, 0.0, V)");
+        }
+        m_err = gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, V, m_svdU, 0.0, D);
+        if (m_err != 0) {
+          throw ValueError("Error in gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, V, m_svdU, 0.0, D)");
+        }
+        gsl_matrix_free(V);
+
+        // compute mse = (Y-Xb)'(Y-Xb) / (n-p)
+        gsl_vector *fitted = gsl_vector_alloc(m_nrow);
+        m_err = gsl_blas_dgemv(CblasNoTrans, 1.0, m_x, m_beta, 0.0, fitted);
+        if (m_err != 0) {
+          throw ValueError("Error in gsl_blas_dgemv(CblasNoTrans, 1.0, m_x, m_beta, 0.0, fitted)");
+        }
+        double mse = 0.0;
+        for (size_t i = 0; i < m_nrow; ++i) {
+          mse += pow(gsl_vector_get(m_y, i)-gsl_vector_get(fitted, i), 2.0);
+        }
+        gsl_vector_free(fitted);
+        mse = mse / ((m_nrow-m_ncol)*1.0);
+       
+        // s(b) = mse(X'X)^-1
+        std::vector<double> seb(m_ncol);
+        //tmp is the diagnal vector for D
+        for (size_t i = 0; i < m_ncol; ++i) {
+          seb[i] = sqrt(mse*gsl_vector_get(&tmp.vector, i));
+        }
+        gsl_matrix_free(D);
+        return seb;
+      }
 
     private:
       gsl_vector *m_beta;
+      gsl_vector *m_svdS;
+      gsl_matrix *m_svdV;
+      gsl_matrix *m_svdU;
       int m_err;
   };
 

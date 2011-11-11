@@ -153,9 +153,11 @@ class AssociationTester(Sample):
             #
             self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
             # select disinct fields
-            query = 'SELECT {} FROM {} {};'.format(', '.join(['DISTINCT ' + x for x in fields]),
-                self.from_clause, self.where_clause)
+            # FIXME the code here is buggy ...
+            query = 'SELECT DISTINCT {} FROM {} {};'.format(', '.join([x for x in fields]),
+                self.from_clause, self.where_clause) 
             self.logger.debug('Running query {}'.format(query))
+            print query
             # get group by
             cur = self.db.cursor()
             cur.execute(query)
@@ -264,7 +266,7 @@ class GroupAssociationCalculator(Process):
         for ID in self.IDs:
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(ID, vtable)
-            self.logger.debug('Running query {}'.format(query))
+            #self.logger.debug('Running query {}'.format(query))
             cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
@@ -426,10 +428,10 @@ class NullTest:
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant. Will print
         data if NullTest is called'''
-	self.logger.info('Currently no action is defined for NullTest')
-        #print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
-        #print(' '.join(map(str, self.data.phenotype())))
-        #print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
+        self.logger.info('Currently no action is defined for NullTest')
+#        print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
+#        print(' '.join(map(str, self.data.phenotype())))
+#        print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
         return 0
 
 class ExternTest(NullTest):
@@ -490,5 +492,8 @@ class LinearBurdenTest(NullTest):
         #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
+        #print data.genotype(), '\n'
+        #print data.phenotype(), '\n'
+        #print data.covariates()
         self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__, self.group, self.result))
         return 0

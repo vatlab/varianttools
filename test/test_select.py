@@ -101,6 +101,11 @@ class TestSelect(ProcessTestCase):
         self.assertOutput("vtools select NA0 -c", '{}\n'.format(lv))
         self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
+
+    def testSelectLargeSample(self):
+        runCmd('vtools import vcf/5kSAMP.vcf')
+        self.assertSucc('vtools select variant "sample_name like \'SAMP52%\'" -c')
+
     
 if __name__ == '__main__':
     unittest.main()

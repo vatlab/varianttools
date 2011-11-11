@@ -151,6 +151,11 @@ namespace vtools {
         return m_genotype;
       }
 
+      matrixf covariates()
+      {
+        return m_model.getX();
+      }
+
       vectorf maf()
       {
         return m_maf;
@@ -312,7 +317,8 @@ namespace vtools {
         m_model.replaceCol(m_X, m_C.size()-1);
         m_model.fit();
         vectorf beta = m_model.getBeta();
-        m_statistic = beta[beta.size()-1]; 
+        vectorf seb = m_model.getSEBeta();
+        m_statistic = beta[beta.size()-1] / seb[seb.size()-1]; 
       }
 
 
