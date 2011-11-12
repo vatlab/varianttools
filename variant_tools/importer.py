@@ -1730,52 +1730,112 @@ def setFieldValue(proj, table, items, build):
             processed.add((tbl.lower(), conn.lower()))
     # running query
     cur = proj.db.cursor()
-    query = 'SELECT {} {};'.format(select_clause, from_clause)
-    proj.logger.debug('Running {}'.format(query))
-    cur.execute(query)
-    fldTypes = [None] * len(items)
-    for rec in cur:
-        for i in range(len(items)):
-            if fldTypes[i] is None:
-                fldTypes[i] = type(rec[i])
-                continue
-            elif rec[i] is None: # missing
-                continue
-            if type(rec[i]) != fldTypes:
-                if type(rec[i]) is float and fldTypes[i] is int:
-                    fltType[i] = float
-                else:
-                    raise ValueError('Inconsistent type returned from different samples')
-        if all([x is not None for x in fldTypes]):
-            break
     #
-    if None in fldTypes:
-        raise ValueError('Cannot determine the type of the expression')
-    #
-    count = [0]*3
-    # if adding a new field
-    cur_fields = proj.db.getHeaders(table)[3:]
-    for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
-        if field.lower() not in [x.lower() for x in cur_fields]:
-            proj.checkFieldName(field, exclude=table)
-            proj.logger.info('Adding field {}'.format(field))
-            query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
-                {int: 'INT',
-                 float: 'FLOAT',
-                 str: 'VARCHAR(255)',
-                 unicode: 'VARCHAR(255)',
-                 None: 'FLOAT'}[fldType])
-            proj.logger.debug(query)
-            cur.execute(query)
-            count[1] += 1  # new
-        else:
-            # FIXME: check the case for type mismatch
-            count[2] += 1  # updated
-    proj.db.commit()
-    # really update things
-    query = 'UPDATE {} SET {};'.format(table, ','.join(items))
-    proj.logger.debug('Running {}'.format(query))
-    cur.execute(query)
+    if 'LEFT OUTER JOIN' not in from_clause:  # if everything is done in one table
+        query = 'SELECT {} {};'.format(select_clause, from_clause)
+        proj.logger.debug('Running {}'.format(query))
+        cur.execute(query)
+        fldTypes = [None] * len(items)
+        for rec in cur:
+            for i in range(len(items)):
+                if rec[i] is None: # missing
+                    continue
+                elif fldTypes[i] is None:
+                    fldTypes[i] = type(rec[i])
+                    continue
+                if type(rec[i]) != fldTypes[i]:
+                    if type(rec[i]) is float and fldTypes[i] is int:
+                        fltType[i] = float
+                    else:
+                        raise ValueError('Inconsistent type returned from different samples')
+            if all([x is not None for x in fldTypes]):
+                break
+     #
+        if None in fldTypes:
+            raise ValueError('Cannot determine the type of the expression')
+        #
+        count = [0]*3
+        # if adding a new field
+        cur_fields = proj.db.getHeaders(table)[3:]
+        for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
+            if field.lower() not in [x.lower() for x in cur_fields]:
+                proj.checkFieldName(field, exclude=table)
+                proj.logger.info('Adding field {}'.format(field))
+                query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
+                    {int: 'INT',
+                     float: 'FLOAT',
+                     str: 'VARCHAR(255)',
+                     unicode: 'VARCHAR(255)',
+                     None: 'FLOAT'}[fldType])
+                proj.logger.debug(query)
+                cur.execute(query)
+                count[1] += 1  # new
+            else:
+                # FIXME: check the case for type mismatch
+                count[2] += 1  # updated
+        proj.db.commit()
+        # really update things
+        query = 'UPDATE {} SET {};'.format(table, ','.join(items))
+        proj.logger.debug('Running {}'.format(query))
+        cur.execute(query)
+    else:
+        query = 'SELECT {}, {}.variant_id {};'.format(select_clause, table, from_clause)
+        proj.logger.debug('Running {}'.format(query))
+        cur.execute(query)
+        fldTypes = [None] * len(items)
+        s = delayedAction(proj.logger.info, 'Evaluating all expressions')
+        results = cur.fetchall()
+        del s
+        #
+        for res in results:
+            for i in range(len(items)):
+                if res[i] is None: # missing
+                    continue
+                elif fldTypes[i] is None:
+                    fldTypes[i] = type(res[i])
+                    continue
+                if type(res[i]) != fldTypes[i]:
+                    if type(res[i]) is float and fldTypes[i] is int:
+                        fltType[i] = float
+                    else:
+                        raise ValueError('Inconsistent type returned from different samples')
+            if all([x is not None for x in fldTypes]):
+                break
+        #
+        if None in fldTypes:
+            raise ValueError('Cannot determine the type of the expression')
+        #
+        count = [0]*3
+        # if adding a new field
+        cur_fields = proj.db.getHeaders(table)[3:]
+        new_fields = [x.split('=', 1)[0] for x in items]
+        for field, fldType in zip(new_fields, fldTypes):
+            if field.lower() not in [x.lower() for x in cur_fields]:
+                proj.checkFieldName(field, exclude=table)
+                proj.logger.info('Adding field {}'.format(field))
+                query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
+                    {int: 'INT',
+                     float: 'FLOAT',
+                     str: 'VARCHAR(255)',
+                     unicode: 'VARCHAR(255)',
+                     None: 'FLOAT'}[fldType])
+                proj.logger.debug(query)
+                cur.execute(query)
+                count[1] += 1  # new
+            else:
+                # FIXME: check the case for type mismatch
+                count[2] += 1  # updated
+        proj.db.commit()
+        # really update things
+        query = 'UPDATE {} SET {} WHERE variant_id={};'.format(table,
+            ','.join(['{}={}'.format(x, proj.db.PH) for x in new_fields]), proj.db.PH)
+        proj.logger.debug('Using query {}'.format(query))
+        prog = ProgressBar('Updating {}'.format(table), len(results))
+        for count, res in enumerate(results):
+            cur.execute(query, res)
+            if count % 10000 == 0:
+                prog.update(count)
+        prog.done()
 
 
 def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
@@ -2070,9 +2130,11 @@ def updateArguments(parser):
             automatically lead to better performance.''')
     field = parser.add_argument_group('Set value from existing fields')
     field.add_argument('--set', metavar='EXPR', nargs='*', default=[],
-        help='''Add a new field or updating an existing field using a constant (e.g. mark=1) or an
-            expression using other fields (e.g. freq=num/120). Parameter samples could be used to
-            limit the affected variants.''')
+        help='''Add a new field or updating an existing field using a constant
+            (e.g. mark=1) or an expression using other fields (e.g. freq=num/120,
+            num=refGene.name). If multiple values are returned for a variant, only
+            one of them will be used. Parameter samples could be used to limit the
+            affected variants.''')
     #field.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
     #    help='''Limiting variants from samples that match conditions that
     #        use columns shown in command 'vtools show sample' (e.g. 'aff=1',
