@@ -62,7 +62,8 @@ def associateArguments(parser):
             into groups and are tested one by one.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
-        
+    parser.add_argument('--to_file', metavar='FILE', nargs=1,
+        help='''File name to which results from association tests will be written''')        
 class AssociationTester(Sample):
     '''Parse command line and get data for association testing'''
     
@@ -181,11 +182,12 @@ class AssociationTester(Sample):
 #        return len(self.tasks)
 
 class UpdateResult:
-    def __init__(self, db, logger):
+    def __init__(self, db, logger, fn):
         self.grps = []
         self.lock = Lock()
         self.db = db
         self.logger = logger
+        self.fn = fn[0]
 
     def set(self, table, res):
         self.grps.append(res[0])
@@ -214,6 +216,15 @@ class UpdateResult:
 #            self.db.execute(update_query, values+[startID, endID])
 #        self.db.commit()
 #        self.lock.release()
+        if not self.fn:
+            self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
+        output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\n'.format(res[0],
+                    res[1][1][0][0][0].split('_')[0], res[1][1][1]['pvalue'], res[1][1][1]['statistic'])
+        self.lock.acquire()
+        with open(self.fn, 'a') as out:
+            out.write(output)
+        self.lock.release()
+        return
         
     def getgrp(self):
         return self.grps
@@ -322,7 +333,7 @@ def associate(args, reverse=False):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
-            results = UpdateResult(proj.db, proj.logger)
+            results = UpdateResult(proj.db, proj.logger, args.to_file)
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
@@ -496,5 +507,5 @@ class LinearBurdenTest(NullTest):
         #print data.raw_genotype(), '\n'
         #print data.phenotype(), '\n'
         #print data.covariates()
-        self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__+task_dbg, self.group, self.result))
+        #self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__+task_dbg, self.group, self.result))
         return 0
