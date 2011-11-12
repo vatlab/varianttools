@@ -187,7 +187,7 @@ class UpdateResult:
         self.lock = Lock()
         self.db = db
         self.logger = logger
-        self.fn = fn[0]
+        self.fn = fn[0] if fn else None
 
     def set(self, table, res):
         self.grps.append(res[0])
@@ -218,12 +218,16 @@ class UpdateResult:
 #        self.lock.release()
         if not self.fn:
             self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
-        output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\n'.format(res[0],
-                    res[1][1][0][0][0].split('_')[0], res[1][1][1]['pvalue'], res[1][1][1]['statistic'])
-        self.lock.acquire()
-        with open(self.fn, 'a') as out:
-            out.write(output)
-        self.lock.release()
+        try:
+            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format(res[0],
+                        res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
+            self.lock.acquire()
+            with open(self.fn, 'a') as out:
+                out.write(output)
+            self.lock.release()
+        except IndexError as e:
+            self.logger.info('No association tests done for {}'.format(self.grps[-1]))
+            pass
         return
         
     def getgrp(self):
@@ -234,10 +238,12 @@ class UpdateResult:
         
 class GroupAssociationCalculator(Process):
     '''Association test calculator'''
-    def __init__(self, proj, table, samples, tests, grpfields, grpQueue, where, from_clause, output):
+    def __init__(self, proj, table, samples, phenotypes, covariates, tests, grpfields, grpQueue, where, from_clause, output):
         self.proj = proj
         self.table = table
         self.IDs = samples
+        self.phenotypes = phenotypes
+        self.covariates = covariates
         self.tests = tests
         self.pjname = proj.name
         self.group_fields = grpfields
@@ -275,17 +281,22 @@ class GroupAssociationCalculator(Process):
         genotype = []
         self.db.attach(self.pjname+'_genotype.DB', '__fromGeno')
         cur = self.db.cursor()
-        cur.execute('SELECT min(variant_id), max(variant_id) FROM {}'.format(vtable))
-        start, end = cur.fetchall()[0]
+        cur.execute('SELECT variant_id FROM {}'.format(vtable))
+        variant_id = cur.fetchall()[0]
+        numSites = len(variant_id)
         for ID in self.IDs:
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(ID, vtable)
             #self.logger.debug('Running query {}'.format(query))
             cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
-            genotype.append(array('d', [gtmp.get(x, -9) for x in range(start,end+1)]))
+            genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
         self.db.detach('__fromGeno')
-        return genotype, start, end
+        missing_counts = [x.count(-9.0) for x in genotype]
+        # remove individuals having many missing genotypes
+        toKeep = [(x<0.5*numSites) for x in missing_counts]
+        self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.IDs)-sum(toKeep)))
+        return genotype, toKeep
     
     def run(self):
         self.db = DatabaseEngine()
@@ -303,14 +314,18 @@ class GroupAssociationCalculator(Process):
                 break
             # select variants from each group:
             vtable = self.getVariants(grp)
-            genotype, startID, endID = self.getGenotype(vtable)
-            values = [[startID, endID]]
-            for test in self.tests:
-                test.setGenotype(genotype)
-                test.setAttributes(grp)
-                test.calculate()
-                self.logger.debug('Finish test')
-                values.append([test.getFields(), test.result])
+            genotype, which = self.getGenotype(vtable)
+            values = []
+            try:
+                for test in self.tests:
+                    test.setPhenotype(which, self.phenotypes, self.covariates)
+                    test.setGenotype(which, genotype)
+                    test.setAttributes(grp)
+                    test.calculate()
+                    self.logger.debug('Finish test')
+                    values.append([test.getFields(), test.result])
+            except Exception as e:
+                self.logger.info('Error processing {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
             self.output.send((grp, values))
         
@@ -326,8 +341,6 @@ def associate(args, reverse=False):
             # step 2: get phenotype and set it to everyone
             asso.getPhenotype(args.samples, args.phenotype)           
             asso.getCovariate(args.samples, args.covariates)
-            for test in asso.tests:
-                test.setPhenotype(asso.phenotype[0], asso.covariates)
             # step 3: handle group_by
             asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
@@ -337,9 +350,8 @@ def associate(args, reverse=False):
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
-                GroupAssociationCalculator(proj, args.table, asso.IDs, 
-                    asso.tests, args.group_by, grpQueue, asso.where_clause,
-                    asso.from_clause, w).start()
+                GroupAssociationCalculator(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
+                    asso.tests, args.group_by, grpQueue, asso.where_clause, asso.from_clause, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
@@ -402,6 +414,7 @@ class NullTest:
         self.parseArgs(*method_args)
         self.result = {'pvalue':None, 'statistic':None}
         self.group = None
+        
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
@@ -412,6 +425,7 @@ class NullTest:
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
+        
     
     def getFields(self):
         '''Get updated fields for the association test.'''
@@ -420,20 +434,25 @@ class NullTest:
             if self.result[key] is not None:
                 fields.append(('_'.join([self.__class__.__name__, key]), 'FLOAT'))
         return fields
-
-    def setPhenotype(self, data, covariates=None):
+        
+        
+    def setGenotype(self, which, data):
+        geno = [x for idx, x in enumerate(data) if which[idx]]
+        self.data.setGenotype(geno)
+    
+    
+    def setPhenotype(self, which, data, covariates=None):
         '''Set phenotype data'''
+        phen = [x for idx, x in enumerate(data) if which[idx]]
         if covariates:
-          self.data.setPhenotype(data, covariates)
+          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
+          self.data.setPhenotype(phen, covt)
         else:
-          self.data.setPhenotype(data)
+          self.data.setPhenotype(phen)
         self.data.mean_phenotype()
         self.data.count_cases()
         self.data.count_ctrls()
-
-    def setGenotype(self, data):
-        self.data.setGenotype(data)
-    
+        
     def setAttributes(self, grp):
         self.group = str(grp)
 
@@ -504,6 +523,7 @@ class LinearBurdenTest(NullTest):
         #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
+        self.result['samples'] = data.samplecounts()
         #print data.raw_genotype(), '\n'
         #print data.phenotype(), '\n'
         #print data.covariates()

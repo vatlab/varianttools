@@ -89,6 +89,7 @@ namespace vtools {
         vectorf one(p.size());
         std::fill(one.begin(), one.end(), 1.0);
         m_C.push_back(one);
+        m_model.clear();
         m_model.setY(m_phenotype);
         m_model.setX(m_C);
       }
@@ -169,6 +170,11 @@ namespace vtools {
       unsigned covarcounts()
       {
         return m_ncovar;
+      }
+
+      unsigned samplecounts()
+      {
+        return m_phenotype.size();
       }
 
       double pvalue()

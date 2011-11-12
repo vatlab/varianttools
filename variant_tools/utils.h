@@ -73,6 +73,7 @@ namespace vtools {
     public:
       BaseLm() : m_ncol(0), m_nrow(0), m_x(NULL), m_y(NULL) 
     {
+      gsl_set_error_handler_off();
     }
 
       ~BaseLm()
@@ -111,7 +112,7 @@ namespace vtools {
         if (m_nrow == 0) m_nrow = x[0].size();
         else {
           if (m_nrow != x[0].size()) {
-            throw ValueError("Dimension not match");
+            throw ValueError("Dimension not match with input X");
           }
         }
         m_ncol = x.size();
@@ -124,6 +125,14 @@ namespace vtools {
         }
       }
 
+      virtual void clear()
+      {
+        m_ncol = 0;
+        m_nrow = 0;
+        if (m_y) gsl_vector_free(m_y);
+        if (m_x) gsl_matrix_free(m_x);
+      }
+
       void setY(std::vector<double> &y)
       { 
         if (y.size() == 0) {
@@ -132,7 +141,7 @@ namespace vtools {
         if (m_nrow == 0) m_nrow = y.size();
         else {
           if (m_nrow != y.size()) {
-            throw ValueError("Dimension not match");
+            throw ValueError("Dimension not match with input Y");
           }
         }
 
