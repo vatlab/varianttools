@@ -306,15 +306,21 @@ class AnnoDBConfiger:
             update_after = min(max(lc//200, 100), 100000)
             p = TextReader(processor, f, None, self.jobs - 1, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
+            all_records = 0
+            skipped_records = 0
             for all_records, bins, rec in p.records():
-                cur.execute(insert_query, bins + rec)
+                try:
+                    cur.execute(insert_query, bins + rec)
+                except Exception as e:
+                    skipped_records += 1
+                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 if all_records % update_after == 0:
                     prog.update(all_records)
                     db.commit()
             db.commit()
             prog.done()
             self.logger.info('{0} records are handled, {1} ignored.'\
-                .format(all_records, processor.skipped_lines))
+                .format(all_records, processor.skipped_lines + skipped_records))
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''

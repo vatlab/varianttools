@@ -390,7 +390,7 @@ class SequentialExtractor:
             if type(item) is tuple:
                 if type(item[0]) is tuple:
                     raise ValueError('Nested vector extracted is not allowed')
-                item = [e(x) for x in item]
+                item = tuple(e(x) for x in item)
             # if item is None or ''
             elif not item:
                 return item
