@@ -119,27 +119,39 @@ def transRatioArguments(parser):
     parser.add_argument('-n', '--num_field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
             command 'vtools sample_stat sample --num FIELD_NAME'.''')
-    parser.add_argument('--by_count', action='store_true',
-        help='Output transition/transversion rate for each sample variant frequency (count) group')
+    parser.add_argument('--group_by', nargs='*', default=[],
+        help='''Output transition/transversion rate for groups of variants. e.g. --group_by 
+            num for each sample variant frequency group.''')
     parser.add_argument('table', 
         help='''Variant table for which transversion/transversion mutants are counted.''')
 
 def transRatio(args):
     #
-    if args.by_count:
-        print('sample_count\tnum_of_transition\tnum_of_transversion\tratio')
-        nSample = getNumOfSamples()
-        for i in range(1, 2 * nSample + 1):
-            transition = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
-                "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))",
-                '-c']))
-            transversion = int(getoutput(['vtools', 'select', args.table, '{}={} AND '.format(args.num_field, i) + 
-                "((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
-                " (ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
-                " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))",
-                '-c']))
-            print('{}\t{}\t{}\t{:.3f}'.format(i, transition, transversion,
-                transition / float(transversion) if transversion != 0 else 0))
+    if args.group_by:
+        print('group\tnum_of_transition\tnum_of_transversion\tratio')
+        transition = getoutput(['vtools', 'select', args.table, 
+            "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))", 
+            '--output'] + args.group_by + ['sum({})'.format(args.num_field), '--group_by'] + args.group_by)
+        transversion = getoutput(['vtools', 'select', args.table, 
+            "((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+            " (ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
+            " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))", '--output'] + args.group_by +  
+            ['sum({})'.format(args.num_field), '--group_by'] +  args.group_by)
+        values = {}
+        for item in transition.split('\n'):
+            g, v = item.rsplit('\t', 1)
+            values[g] = [v, '0']
+        for item in transversion.split('\n'):
+            g, v = item.rsplit('\t', 1)
+            if g in values:
+                values[g][1] = v
+            else:
+                values[g] = ['0', v]
+        keys = values.keys()
+        keys.sort()
+        for k in keys:
+            print '{}\t{:,}\t{:,}\t{:.3f}'.format(k, int(values[k][0]), int(values[k][1]),
+                int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0)
     else:
         print('num_of_transition\tnum_of_transversion\tratio')
         transition = int(getoutput(['vtools', 'select', args.table, 
