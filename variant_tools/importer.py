@@ -2138,7 +2138,7 @@ def updateArguments(parser):
     field.add_argument('--set', metavar='EXPR', nargs='*', default=[],
         help='''Add a new field or updating an existing field using a constant
             (e.g. mark=1) or an expression using other fields (e.g. freq=num/120,
-            num=refGene.name). If multiple values are returned for a variant, only
+            refgene=refGene.name). If multiple values are returned for a variant, only
             one of them will be used. Parameter samples could be used to limit the
             affected variants.''')
     #field.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],

@@ -293,8 +293,10 @@ class GroupAssociationCalculator(Process):
             genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
         self.db.detach('__fromGeno')
         missing_counts = [x.count(-9.0) for x in genotype]
-        # remove individuals having many missing genotypes
-        toKeep = [(x<0.5*numSites) for x in missing_counts]
+        # remove individuals having many missing genotypes, or have all missing variants
+        # FIXME will pass it as an input arguement later
+        #toKeep = [(x<0.5*numSites) for x in missing_counts]
+        toKeep = [(x<numSites) for x in missing_counts]
         self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.IDs)-sum(toKeep)))
         return genotype, toKeep
     
