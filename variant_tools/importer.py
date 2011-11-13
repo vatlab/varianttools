@@ -715,6 +715,7 @@ class SortGenotypeWriter:
                 stdin=None, stdout=PIPE)
             source = psort.stdout
         sample_count = 0
+        remaining_ids = set(self.sample_ids)
         for input in source:
             # we could use split('\t', 1) but python3 requires split(b'\t', 1) which does not exist in python2
             # rstrip is not needed because a2b_base64 can handle it
@@ -722,6 +723,7 @@ class SortGenotypeWriter:
             id = int(id)
             if id != last_id:
                 last_id = id
+                remaining_ids.remove(id)
                 # a new table 
                 db.commit()
                 self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(id),
@@ -732,6 +734,10 @@ class SortGenotypeWriter:
             cur.executemany(query.format(id), loads(a2b_base64(items)))
         source.close()
         prog.done()
+        # Write empty genotype tables in the genotype database
+        for id in remaining_ids:
+            self.proj.createNewSampleVariantTable(cur, 'genotype_{0}'.format(id),
+                len(self.geno) > 0, self.geno_info)
         # remove all temp files
         try:
             for x in range(self.file_idx + 1):
