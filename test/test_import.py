@@ -182,10 +182,10 @@ class TestImport(ProcessTestCase):
         # import additional information on variants and on genotypes.
         # DP_INFO and DP_FMT are fields provided in the default vcf.fmt
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP_INFO --geno_info DP_FMT --build hg18')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
         self.assertEqual(numOfSample(), 60)
         self.assertEqual(numOfVariant(), 288)
-        self.assertSucc('vtools output variant DP_INFO')
+        self.assertSucc('vtools output variant DP')
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(genotype_1)"')), 3)
         # FIXME: the following is not right. Please check
         #self.assertEqual(output2list('vtools execute "select DP_FMT from genotype_1"'), [ '0', '2', '7', '1', '2', '7', \

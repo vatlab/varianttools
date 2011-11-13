@@ -103,8 +103,8 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
 
     def testSelectLargeSample(self):
-        runCmd('vtools import vcf/5kSAMP.vcf')
-        self.assertSucc('vtools select variant "sample_name like \'SAMP52%\'" -c')
+        runCmd('vtools import vcf/500SAMP.vcf')
+        self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
 
     
 if __name__ == '__main__':
