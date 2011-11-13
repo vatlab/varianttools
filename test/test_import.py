@@ -64,7 +64,6 @@ class TestImport(ProcessTestCase):
         # test downloading fmt file from the website
         self.assertSucc('vtools import --build hg18 --format ANNOVAR txt/ANNOVAR.txt')
         self.assertFail('vtools import --build hg18 --format ../format/non_existing_fmt txt/input.tsv')
-        
     
     def testGenotypes(self):
         'Testing the import of genotypes'
@@ -180,26 +179,22 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfSample(), 62)
         self.assertEqual(numOfVariant(), 698)
         # import additional information on variants and on genotypes.
-        # DP_INFO and DP_FMT are fields provided in the default vcf.fmt
+        # DP and DP_geno are fields provided in the default vcf.fmt
         runCmd('vtools init test -f')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
         self.assertEqual(numOfSample(), 60)
         self.assertEqual(numOfVariant(), 288)
         self.assertSucc('vtools output variant DP')
         self.assertEqual(len(output2list('vtools execute "PRAGMA table_info(genotype_1)"')), 3)
-        # FIXME: the following is not right. Please check
-        #self.assertEqual(output2list('vtools execute "select DP_FMT from genotype_1"'), [ '0', '2', '7', '1', '2', '7', \
-        #'1', '0', '0', '0', '0', '4', '2', '2', '0', '0', '6', '1', '2', '6', '3', '3', '1', '5', '1', '0', '0', '1', '3', '2',\
-        # '1', '2', '7', '1', '1', '1', '1', '5', '2', '3', '3', '6', '2', '4', '2', '7', '3', '3', '7', '3', '4', '2', '1', '2', \
-        # '7', '2', '0', '0', '4', '3', '5', '2', '7', '1', '2', '0', '5', '1', '1', '0'])
+        self.assertEqual(output2list('vtools execute "select DP_geno from genotype_1"'), ["6","1","1","0","1","0","0","0","3","1","0","0","0","0","0","2","0","0","1","3","0","0","3","0","0","2","2","7","2","4","2","3","2","0","1","6","0","2","1","3","1","5","3","1","5","1","0","1","2","1","4","2","3","7","1","0","1","1","2","0","0","5","1","0","0","1","3","1","0","3","3","1","0","4","0","4","3","2","0","2","2","4","4","0","0","6","2","0","0","1","1","0","0","2","5","1","1","1","2","1","0","1","1","4","0","6","1","3","3","1","3","1","5","0","1","2","1","0","0","1","1","2","1","3","5","1","3","3","1","0","2","0","1","3","5","9","2","4","2","2","1","2","1","2","1","2","0","7","7","9","6","1","1","1","1","1","7","9","3","2","1","1","2","1","1","1","2","2","5","4","1","5","5","3","2","2","0","3","3","0","2","2","2","3","5","1","2","3","1","3","0","8","2","3","6","2","2","0","4","2","7","1","3","0","3","4","7","3","1","3","4","2","1","3","2","1","1","1","7","1","2","2","0","0","1","2","3","1","4","2","1","1","2","4","1","2","4","3","1","5","2","8","8","5","5","3","6","7","8","5","3","2","5","7","0","3","3","3","2","2","5","1","12","1","1","2","2","0","6","1","2","5","3","3","3","1","1","1","0","0","1","2","2","0","1","3","0"])
 
     def testImportVCFIndel(self):
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
-        #self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno')
-        #self.assertEqual(numOfSample(), 0)
-        #self.assertEqual(numOfVariant(), 137+12159)
+        self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
+        self.assertEqual(numOfSample(), 0)
+        self.assertEqual(numOfVariant(), 137+12159)
         
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'

@@ -34,9 +34,9 @@ class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test  -f')
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
         runCmd('vtools import vcf/SAMP1.vcf --geno_info DP_geno')
-        runCmd('vtools update variant --from_stat "num=#(alt)" "depth=avg(DP)"')
+        runCmd('vtools update variant --from_stat "num=#(alt)" "depth=avg(DP_geno)"')
         
     def removeProj(self):
         runCmd('vtools remove project')

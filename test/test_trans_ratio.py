@@ -34,7 +34,7 @@ class TestTransRatio(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(2)
-        runCmd('vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_FMT)"')
+        runCmd('vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_geno)"')
     def removeProj(self):
         runCmd('vtools remove project')
     def testTransRatio(self):
@@ -46,7 +46,7 @@ class TestTransRatio(ProcessTestCase):
         self.assertSucc('vtools_report trans_ratio variant -n num')
         # ValueError: invalid literal for int() with base 10: '6292.38333333\n'
         #self.assertFail('vtools_report trans_ratio variant -n depth')
-        self.assertSucc('vtools_report trans_ratio variant -n num --by_count')
+        self.assertSucc('vtools_report trans_ratio variant -n num --group_by num')
 
 if __name__ == '__main__':
     unittest.main()

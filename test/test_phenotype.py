@@ -34,7 +34,7 @@ class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
-        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_FMT')
+        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno')
     def removeProj(self):
         runCmd('vtools remove project')
     def testImportPhenotype(self):
@@ -74,9 +74,9 @@ class TestPhenotype(ProcessTestCase):
     def testPhenotypeFromStat(self):
         'Test command phenotype --from_stat'
         self.assertSucc('vtools phenotype --from_stat "numGeno=count(*)"')
-        self.assertSucc("vtools phenotype --from_stat 'validGeno=count(*)' --genotypes 'DP_FMT>10'")
+        self.assertSucc("vtools phenotype --from_stat 'validGeno=count(*)' --genotypes 'DP_geno>10'")
         # apply some sqlite functions on sample variant tables to provide useful information for genotype qualities
-        self.assertSucc('vtools phenotype --from_stat "meanDP=avg(DP_FMT)" "minDP=min(DP_FMT)" "maxDP=max(DP_FMT)"')
+        self.assertSucc('vtools phenotype --from_stat "meanDP=avg(DP_geno)" "minDP=min(DP_geno)" "maxDP=max(DP_geno)"')
         
 
 if __name__ == '__main__':

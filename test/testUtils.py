@@ -106,7 +106,7 @@ def getGenotypes(projname='test', num=8):
         genotypes.append(output2list('vtools execute "select GT from {}_genotype.genotype_{}"'.format(projname, i+1)))
     return genotypes
 
-def getGenotypeInfo(projname='test', num=8, info=['DP_FMT']):
+def getGenotypeInfo(projname='test', num=8, info=['DP_geno']):
     nsamples = numOfSample()
     genotypeInfo = []
     # getGenotypeInfo for 8 samples
