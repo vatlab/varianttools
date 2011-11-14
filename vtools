@@ -53,11 +53,11 @@ def addCommonArgs(parser):
 if __name__ == '__main__':
     #
     master_parser = argparse.ArgumentParser(description='''A variant processing, annotation and analysis tool
-        for next-gen sequencing studies.''',
+        for next-generation sequencing studies.''',
         prog='vtools',
         #formatter_class=argparse.RawDescriptionHelpFormatter,
         fromfile_prefix_chars='@',  
-        epilog='''Use 'vtools.py cmd -h' for details about each command.
+        epilog='''Use 'vtools cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
     master_parser.add_argument('--version', action='version', version='%(prog)s {}'.format(project.VTOOLS_VERSION))
     subparsers = master_parser.add_subparsers(title='subcommands')
