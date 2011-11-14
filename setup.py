@@ -39,11 +39,11 @@ except ImportError:
 
 # We cannot import variant_tools/project.py because that file is not 
 # python3 compatible before 2to3
-VTOOLS_VERSION = '1.0rc3'
+VTOOLS_VERSION = '1.0'
 #
 # the association module is not ready for prime time... and does not support python 3
 # 
-with_association = True and sys.version_info.major == 2
+with_association = False and sys.version_info.major == 2
 
 if with_association:
     LIB_GSL = [ 
