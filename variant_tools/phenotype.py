@@ -31,7 +31,7 @@ import time
 import re
 from collections import defaultdict
 from .project import Project
-from .utils import DatabaseEngine, ProgressBar, typeOfValues
+from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS
 
 class GenotypeStatStatus:
     def __init__(self):
@@ -53,7 +53,21 @@ class GenotypeStatCalculator(threading.Thread):
     def __init__(self, dbName, stat, idQueue, status, genotypes, logger):
         '''Use sql to process sample passed from queue, set results in status'''
         self.dbName = dbName
-        self.stat = stat
+        # query, where, idx
+        self.stat = []
+        for field, item in stat:
+            if item == '#(GT)':
+                self.stat.append(('count(*)', None))
+            elif item == '#(alt)':
+                self.stat.append(('sum(abs(GT))', None))
+            elif item == '#(hom)':
+                self.stat.append(('count(*)', 'GT=2'))
+            elif item == '#(het)':
+                self.stat.append(('count(*)', 'GT=1'))
+            elif item == '#(other)':
+                self.stat.append(('count(*)', 'GT=-1'))
+            else:
+                self.stat.append((item, None))
         self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
@@ -70,22 +84,43 @@ class GenotypeStatCalculator(threading.Thread):
             if ID is None:
                 self.queue.task_done()
                 break
-            # run query
-            res = [None] * len(self.stat)
-            #
-            query = 'SELECT {} FROM genotype_{} {};'\
-                .format(', '.join([x[1] for x in self.stat]), ID,
-                    'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
-            self.logger.debug(query)
-            try:
-                cur.execute(query)
-                res = cur.fetchone()
-            except Exception as e:
-                # some field might not exist, so we will have to run one by one
-                for idx, (field, expr) in enumerate(self.stat):
+            # if everything can be executed in a single query
+            if all([x[1] is None for x in self.stat]):
+                # run query
+                res = [None] * len(self.stat)
+                # regular stat
+                query = 'SELECT {} FROM genotype_{} {};'\
+                    .format(', '.join([x[0] for x in self.stat]), ID,
+                        'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                self.logger.debug(query)
+                try:
+                    cur.execute(query)
+                    res = cur.fetchone()
+                except Exception as e:
+                    # some field might not exist, so we will have to run one by one
+                    for idx, (expr, where) in enumerate(self.stat):
+                        query = 'SELECT {} FROM genotype_{} {};'\
+                            .format(expr, ID,
+                                'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                        self.logger.debug(query)
+                        try:
+                            cur.execute(query)
+                            v = cur.fetchone()
+                            if v is not None:
+                                res[idx] = v[0]
+                        except Exception as e:
+                            self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
+            else:
+                res = [None] * len(self.stat)
+                for idx, (expr, where) in enumerate(self.stat):
+                    where_clause = 'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else ''
+                    if where:
+                        if where_clause:
+                            where_clause += ' AND ({})'.format(where)
+                        else:
+                            where_clause = 'WHERE {}'.format(where)
                     query = 'SELECT {} FROM genotype_{} {};'\
-                        .format(expr, ID,
-                            'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                        .format(expr, ID, where_clause)
                     self.logger.debug(query)
                     try:
                         cur.execute(query)
@@ -94,6 +129,7 @@ class GenotypeStatCalculator(threading.Thread):
                             res[idx] = v[0]
                     except Exception as e:
                         self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
+            #
             # set result
             self.status.set(ID, res)
             self.queue.task_done()
@@ -229,7 +265,8 @@ class Sample:
         # if adding a new field
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
-            self.proj.checkFieldName(field, exclude='sample')
+            if x.upper in SQL_KEYWORDS:
+                raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
             self.logger.info('Adding field {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                 {int: 'INT',
@@ -291,7 +328,8 @@ class Sample:
         new_field = {}
         for field in [x[0] for x in stat]:
             if field.lower() not in [x.lower() for x in cur_fields]:
-                self.proj.checkFieldName(field, exclude='sample')
+                if field.upper in SQL_KEYWORDS:
+                    raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
                 new_field[field] = True
             else:
                 new_field[field] = False
@@ -345,9 +383,13 @@ def phenotypeArguments(parser):
             example, "num=count(*)" sets phenotype num to be the number of genotypes
             of a sample, "GD=avg(DP)" sets phenotype DP to be the average depth (if
             DP is one of the genotype fields) of the sample. Multiple fields (e.g.
-            '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. Parameters
-            --genotypes and --samples could be used to limit the genotypes to be
-            considered and the samples for which genotypes will be set.'''),
+            '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
+            standard SQL aggregation functions, variant tools supports special functions
+            #(GT), #(alt), #(hom), #(het) and #(other), which calculates the number of
+            genotypes (the same as count(*)), alternative alleles, homozygotes, 
+            heterozygotes, and genotypes with two different alternative alleles.
+            Parameters --genotypes and --samples could be used to limit the genotypes
+            to be considered and the samples for which genotypes will be set.'''),
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
