@@ -128,7 +128,7 @@ def transRatioArguments(parser):
 def transRatio(args):
     #
     if args.group_by:
-        print('group\tnum_of_transition\tnum_of_transversion\tratio')
+        print('{}\tnum_of_transition\tnum_of_transversion\tratio'.format('\t'.join(args.group_by)))
         transition = getoutput(['vtools', 'select', args.table, 
             "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))", 
             '--output'] + args.group_by + ['sum({})'.format(args.num_field), '--group_by'] + args.group_by)
