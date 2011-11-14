@@ -109,7 +109,7 @@ class GenotypeStatCalculator(threading.Thread):
                             if v is not None:
                                 res[idx] = v[0]
                         except Exception as e:
-                            self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
+                            self.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
             else:
                 res = [None] * len(self.stat)
                 for idx, (expr, where) in enumerate(self.stat):
@@ -128,7 +128,7 @@ class GenotypeStatCalculator(threading.Thread):
                         if v is not None:
                             res[idx] = v[0]
                     except Exception as e:
-                        self.logger.debug('Failed: {}. Setting field {} to NULL.'.format(e, field))
+                        self.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
             #
             # set result
             self.status.set(ID, res)
@@ -265,7 +265,7 @@ class Sample:
         # if adding a new field
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
-            if x.upper in SQL_KEYWORDS:
+            if field.upper in SQL_KEYWORDS:
                 raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
             self.logger.info('Adding field {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
