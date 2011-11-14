@@ -118,7 +118,7 @@ def getSamples(samples, group_by=[]):
 def transRatioArguments(parser):
     parser.add_argument('-n', '--num_field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
-            command 'vtools sample_stat sample --num FIELD_NAME'.''')
+            command 'vtools update table --from_stat "num=#(alt)"'.''')
     parser.add_argument('--group_by', nargs='*', default=[],
         help='''Output transition/transversion rate for groups of variants. e.g. --group_by 
             num for each sample variant frequency group.''')
@@ -171,10 +171,10 @@ def transRatio(args):
 def avgDepthArguments(parser):
     parser.add_argument('-n', '--num_field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
-            command 'vtools sample_stat table --num FIELD_NAME'.''')
+            command 'vtools update table --from_stat "num=#(alt)"'.''')
     parser.add_argument('-d', '--depth_field', required=True,
         help='''Name of the field that holds average depth of each variant, which is the field
-            name for command 'vtools sample_stat table --mean_DP FIELD_NAME'.''')
+            name for command 'vtools update table --from_stat "meanDP=avg(DP_geno)"'.''')
     parser.add_argument('--group_by', nargs='*', default=[],
         help='''Output average depth for each group, for example,
             '--group_by NUM_FIELD to output depth for each sample variant frequency (count).''')
@@ -256,7 +256,7 @@ if __name__ == '__main__':
             from a normal sample. If option '--by_count' is specified, it will calculate
             this ratio for variants with different sample allele frequency (count). This
             commands requires a field that stores the sample count for each variant, which
-            should be prepared using command 'vtools sample_stat table --num FIELD_NAME'.''')
+            should be prepared using command 'vtools update table --from_stat "num=#(alt)"'.''')
     transRatioArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=transRatio)
@@ -264,14 +264,14 @@ if __name__ == '__main__':
     # command avg_depth
     parser = subparsers.add_parser('avg_depth',
         help='Average depth for each variant, can be divided by sample variant count',
-        description='''Command 'vtools sample_stat table --mean_DP depth' calculates the average
+        description='''Command 'vtools update table --from_stat "meanDP=avg(DP_geno)"' calculates the average
             depth of variants across sample (e.g. average depth of three variants if the 
             variant appears three times in the sample). This command report average depth
             of all variants, or variants divided by sample allele count (output count,
             number of variant, and average depth for count from 1 to 2*#sample). This
             command requires a field that stores the sample count for each variant and
             a field to store average depth of each variant, which should be prepared
-            using command 'vtools sample_stat table --num FIELD_NAME --mean_DP FIELD_NAME'.''')
+            using command 'vtools update table --from_stat "num=#(alt)" "meanDP=avg(DP_geno)"'.''')
     avgDepthArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=avgDepth)
