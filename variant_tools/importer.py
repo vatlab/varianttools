@@ -1870,7 +1870,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         return
 
     # separate special functions...
-    num = hom = het = other = None
+    num = hom = het = other = cnt = None
 
     # keys to speed up some operations
     MEAN = 0
@@ -1895,6 +1895,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             het = f
         elif e == '#(other)':
             other = f
+        elif e == '#(GT)':
+            cnt = f
         else:
             groups = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat).groups()
             if groups is None:
@@ -1907,7 +1909,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             fieldCalcs.append(None)
             destinations.append(dest)
     #
-    coreDestinations = [num, hom, het, other]
+    coreDestinations = [num, hom, het, other, cnt]
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -1961,7 +1963,6 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if name is not None:
             proj.checkFieldName(name, exclude=variant_table)
     #
-    # too bad that I can not use a default dict...
     variants = dict()
     prog = ProgressBar('Counting variants', len(IDs))
     prog_step = max(len(IDs) // 100, 1) 
@@ -1988,6 +1989,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
                 variants[rec[0]].extend(list(fieldCalcs))
 
             # type heterozygote
+            if rec[1] is not None:
+                variants[rec[0]][3] += 1
             if rec[1] == 1:
                 variants[rec[0]][0] += 1
             # type homozygote
@@ -1996,9 +1999,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             # type double heterozygote with two different alternative alleles
             elif rec[1] == -1:
                 variants[rec[0]][2] += 1
-            elif rec[1] in [0, None]:
-                pass
-            else:
+            elif rec[1] not in [0, None]:
                 proj.logger.warning('Invalid genotype type {}'.format(rec[1]))
         
             # this collects genotype_field information
@@ -2038,8 +2039,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     #
     headers = [x.lower() for x in proj.db.getHeaders(variant_table)]
     table_attributes = [(num, 'INT'), (hom, 'INT'),
-            (het, 'INT'), (other, 'INT')]
-    fieldsDefaultZero = [num, hom, het, other]
+            (het, 'INT'), (other, 'INT'), (cnt, 'INT')]
+    fieldsDefaultZero = [num, hom, het, other, cnt]
     
     for index in validGenotypeIndices:
         field = genotypeFields[index]
@@ -2085,12 +2086,14 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             res.append(value[0])
         if other is not None:
             res.append(value[2])
+        if cnt is not None:
+            res.append(value[3])
             
         # for genotype_field operations, the value[operation_index] holds the result of the operation
         # except for the "mean" operation which needs to be divided by num_samples that have that variant
         try:
             for index in validGenotypeIndices:
-                operationIndex = index + 4     # the first 3 indices hold the values for hom, het, double het and wildtype
+                operationIndex = index + 4     # the first 4 indices hold the values for hom, het, double het and total genotype
                 operationCalculation = value[operationIndex]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
@@ -2151,9 +2154,10 @@ def updateArguments(parser):
     stat.add_argument('--from_stat', metavar='EXPR', nargs='*', default=[],
         help='''One or more expressions such as meanQT=avg(QT) that aggregate genotype info (e.g. QT)
             of variants in all or selected samples to specified fields (e.g. meanQT). Functions sum, avg,
-            max, and min are currently supported. In addition, special functions #(alt), #(hom), #(het)
-            #(other) are provided to count the number of alternative alleles, homozygotes, heterozygotes,
-            and individuals with two different alterantive alleles.''')
+            max, and min are currently supported. In addition, special functions #(GT), #(alt), #(hom),
+            #(het) and  #(other) are provided to count the number of valid genotypes (not NULL),
+            alternative alleles, homozygotes, heterozygotes, and individuals with two different
+            alterantive alleles.''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
