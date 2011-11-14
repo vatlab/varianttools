@@ -356,10 +356,11 @@ class Sample:
         # output
         query = 'SELECT {} FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {}'.format(
             ','.join(fields), '' if not samples else 'WHERE ' + samples)
+        self.logger.debug(query)
         cur = self.db.cursor()
         cur.execute(query)
         for rec in cur:
-            print '\t'.join(rec)
+            print '\t'.join([str(x) for x in rec])
                 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
@@ -405,7 +406,7 @@ def phenotypeArguments(parser):
 
 def phenotype(args):
     try:
-        with Project() as proj:
+        with Project(verbosity=args.verbosity) as proj:
             p = Sample(proj, args.jobs)
             if args.from_file:
                 filename = args.from_file[0]
