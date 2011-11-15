@@ -30,7 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase, runCmd, numOfSample, numOfVariant, outputOfCmd, initTest, output2list
 
-class TestImportVCF(ProcessTestCase):
+class TestUpdate(ProcessTestCase):
     def setUp(self):
         'Create a project'
         runCmd('vtools init test -f')
@@ -86,8 +86,9 @@ class TestImportVCF(ProcessTestCase):
         runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # non-existing field, should fail
         self.assertFail('vtools update variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
-        self.assertSucc('vtools update variant --from_stat "max_gq=max(GQ)" "min_gq=min(GQ)" "mean_gq=avg(GQ)"')
-        out = output2list('vtools output variant max_gq min_gq mean_gq')
+        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
+                            'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
+        out = output2list('vtools output variant maxGQv minGQv meanGQv')
         self.assertEqual(out[0], 'NA\tNA\tNA')
         self.assertTrue(out[3].startswith('100\t15\t69.3333'))
         self.assertTrue(out[4].startswith('6\t3\t4.0'))
@@ -98,6 +99,8 @@ class TestImportVCF(ProcessTestCase):
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
         self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
+        
+        
         
 if __name__ == '__main__':
     unittest.main()
