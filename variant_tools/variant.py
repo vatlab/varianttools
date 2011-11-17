@@ -334,17 +334,23 @@ def compare(args):
                 proj.logger.warning('No action parameter is specified. Nothing to do.')
                 return
             #
+            # We can use a direct query to get diff/union/intersection of tables but we cannot
+            # display a progress bar during query. We therefore only use that faster method (3m38s
+            # instead of 2m33s) in the case of -v0.
+            direct_query = proj.verbosity is not None and proj.verbosity.startswith('0')
             cur = proj.db.cursor()
-            # read variants in table_A
-            proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_A), args.table_A))
-            cur.execute('SELECT variant_id from {};'.format(args.table_A))
-            variant_A = set([x[0] for x in cur.fetchall()])
-            # read variants in table_B
-            proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_B), args.table_B))
-            cur.execute('SELECT variant_id from {};'.format(args.table_B))
-            variant_B = set([x[0] for x in cur.fetchall()])
+            variant_A = set()
+            variant_B = set()
+            if args.count or not direct_query:
+                # read variants in table_A
+                proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_A, exact=False), args.table_A))
+                cur.execute('SELECT variant_id from {};'.format(args.table_A))
+                variant_A = set([x[0] for x in cur.fetchall()])
+                # read variants in table_B
+                proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_B, exact=False), args.table_B))
+                cur.execute('SELECT variant_id from {};'.format(args.table_B))
+                variant_B = set([x[0] for x in cur.fetchall()])
             #
-            # output?
             if args.count:
                 proj.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
                 print('{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
@@ -353,11 +359,11 @@ def compare(args):
                     len(variant_A | variant_B)
                     ))
             #
-            for var, table in [
-                    (set() if args.A_diff_B is None else variant_A - variant_B, args.A_diff_B), 
-                    (set() if args.B_diff_A is None else variant_B - variant_A, args.B_diff_A), 
-                    (set() if args.A_and_B is None else variant_A & variant_B, args.A_and_B), 
-                    (set() if args.A_or_B is None else variant_A | variant_B, args.A_or_B)]:
+            for var, opt, table, table_A, table_B in [
+                    (set() if args.A_diff_B is None else variant_A - variant_B, 'EXCEPT', args.A_diff_B, args.table_A, args.table_B), 
+                    (set() if args.B_diff_A is None else variant_B - variant_A, 'EXCEPT', args.B_diff_A, args.table_B, args.table_A), 
+                    (set() if args.A_and_B is None else variant_A & variant_B, 'INTERSECT', args.A_and_B, args.table_A, args.table_B), 
+                    (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.table_A, args.table_B)]:
                 if table is None:
                     continue
                 if table == 'variant':
@@ -366,17 +372,24 @@ def compare(args):
                     new_table = proj.db.backupTable(table)
                     proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
                 proj.createVariantTable(table)
-                prog = ProgressBar('Writing to ' + table, len(var))
-                query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
-                # sort var so that variant_id will be in order, which might
-                # improve database performance
-                for count,id in enumerate(sorted(var)):
-                    cur.execute(query, (id,))
-                    if count % proj.db.batch == 0:
-                        proj.db.commit()
-                        prog.update(count)
+                if direct_query:
+                    #proj.db.startProgress('Creating table {}'.format(table))
+                    cur = proj.db.cursor()
+                    query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=table, table_A=table_A, table_B=table_B)
+                    proj.logger.debug(query)
+                    cur.execute(query)
+                    #proj.db.stopProgress()
+                else:
+                    prog = ProgressBar('Writing to ' + table, len(var))
+                    query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
+                    # sort var so that variant_id will be in order, which might
+                    # improve database performance
+                    for count,id in enumerate(sorted(var)):
+                        cur.execute(query, (id,))
+                        if count % 10,000 == 0:
+                            prog.update(count)
+                    prog.done()       
                 proj.db.commit()
-                prog.done()
     except Exception as e:
         sys.exit(e) 
 
