@@ -386,7 +386,7 @@ def compare(args):
                     # improve database performance
                     for count,id in enumerate(sorted(var)):
                         cur.execute(query, (id,))
-                        if count % 10,000 == 0:
+                        if count % 10000 == 0:
                             prog.update(count)
                     prog.done()       
                 proj.db.commit()

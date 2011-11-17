@@ -1144,14 +1144,16 @@ class Project:
             if t.lower() == table.lower():
                 continue
             cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
-            self.logger.info('Removing {} variants from table {}'.format(cur.rowcount, t))
+            self.logger.info('{} variants are removed from table {}'.format(cur.rowcount, t))
         # get sample_ids
         cur.execute('SELECT sample_id FROM sample;')
         IDs = [x[0] for x in cur.fetchall()]
         for ID in IDs:
+            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
+                cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, ID))
             cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.name, ID, table))
-            self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
+            self.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, ID))
         # remove the table itself
         self.logger.info('Removing table {} itself'.format(table))
         self.db.removeTable(table)
