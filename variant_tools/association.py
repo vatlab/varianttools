@@ -137,35 +137,53 @@ class AssociationTester(Sample):
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         self.group_by = group_by
+        # set default group_by to positions
         if not group_by:
-            self.groups = ['all']
-            self.where_clause = None
-            self.from_clause = None
-        else:
-            group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
-            self.from_clause = self.table
-            where_clause = []
-            fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
-            #
-            processed = set()
-            for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-                if (tbl.lower(), conn.lower()) not in processed:
-                    self.from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                    where_clause.append('({})'.format(conn))
-                    processed.add((tbl.lower(), conn.lower()))
-            #
-            self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
-            # select disinct fields
-            # FIXME the code here is buggy ...
-            query = 'SELECT DISTINCT {} FROM {} {};'.format(group_fields,
-                self.from_clause, self.where_clause) 
-            self.logger.debug('Running query {}'.format(query))
-            # get group by
-            cur = self.db.cursor()
-            cur.execute(query)
-            self.groups = [x[0] for x in cur.fetchall()]
-            self.logger.info('Find {} groups'.format(len(self.groups)))
-            self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
+          self.group_by = ['pos']
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
+        #f_types = [self.db.typeOfColumn(x.split('.')[0], x.split('.')[1]) for x in fields if x.split('.')[1] != 'variant_id']
+        cur = self.db.cursor()
+        # create a table that holds variant ids and groups, indexed for groups
+        cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
+        cur.execute('''\
+            CREATE TABLE __asso_tmp (
+              variant_id INT NOT NULL,
+              {});
+              '''.format(' VARCHAR(255) NULL, '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']) + ' VARCHAR(255) NULL'))
+        # select variant_id and groups for association testing
+        from_clause = []
+        from_clause.append(self.table)
+        where_clause = []
+        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+        #
+        processed = set()
+        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+            if (tbl.lower(), conn.lower()) not in processed:
+                from_clause.append('{}'.format(tbl))
+                where_clause.append('({})'.format(conn))
+                processed.add((tbl.lower(), conn.lower()))
+        #
+        self.from_clause = ', '.join(from_clause) 
+        self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
+        # This will be the tmp table to extract variant_id by groups
+        query = 'INSERT INTO __asso_tmp SELECT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
+            self.from_clause, self.where_clause) 
+        self.logger.debug('Running query {}'.format(query))
+        cur.execute(query)
+        cur.execute('''\
+            CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
+            '''.format(' ASC, '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id'])+' ASC'))
+        cur.execute('SELECT * from __asso_tmp')
+        # get group by
+        cur.execute('''\
+            SELECT DISTINCT {} FROM __asso_tmp;
+            '''.format(', '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id'])))
+        # FIXME well, now takes only the first group by argument. 
+        # not sure if we really want to do multiple groups
+        self.groups = [x[0] for x in cur.fetchall()]
+        self.logger.info('Find {} groups'.format(len(self.groups)))
+        # FIXME not for multiple groups
+        self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
 
 #class StatStatus:
 #    def __init__(self):
@@ -238,7 +256,7 @@ class UpdateResult:
         
 class GroupAssociationCalculator(Process):
     '''Association test calculator'''
-    def __init__(self, proj, table, samples, phenotypes, covariates, tests, grpfields, grpQueue, where, from_clause, output):
+    def __init__(self, proj, table, samples, phenotypes, covariates, tests, group_by, grpQueue, output):
         self.proj = proj
         self.table = table
         self.IDs = samples
@@ -246,49 +264,38 @@ class GroupAssociationCalculator(Process):
         self.covariates = covariates
         self.tests = tests
         self.pjname = proj.name
-        self.group_fields = grpfields
+        self.group_by = group_by
         self.queue = grpQueue
         self.output = output
         self.logger = proj.logger
         self.db = None
-        self.where_clause = where
-        self.from_clause = from_clause
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
-        
-    def getVariants(self, group):
-        '''Get variants for a certain group'''
-        if not self.group_fields:
-            # group must be 'all'
-            return self.table
-        vtable = '__asso_tmp_{}'.format(group)
-        if self.db.hasTable(vtable):
-            self.db.truncateTable(vtable)
-        else:
-            self.db.execute('''CREATE TEMPORARY TABLE {} (
-                variant_id INTEGER PRIMARY KEY);'''.format(vtable))
-            self.db.commit()
-        #
-        where_clause = (self.where_clause + ' AND ' if self.where_clause else 'WHERE ') + \
-            ' AND '.join(['{}={}'.format(x, self.db.PH) for x in self.group_fields])
-        query = 'INSERT INTO __asso_tmp_{} SELECT {}.variant_id FROM {} {};'.format(group, self.table, self.from_clause, where_clause)
-        self.logger.debug('Running query {}'.format(query))
-        cur = self.db.cursor()
-        cur.execute(query, (group,))
-        return vtable
+    
 
-    def getGenotype(self, vtable):
-        '''Get genotype for variants in specified table'''
+    def getGenotype(self, group):
+        '''Get genotype for variants in specified group'''
+        if not self.group_by:
+            self.group_by = ['pos']
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
+        where_clause =  'WHERE ' + \
+            ' AND '.join(['{0}={1}'.format(x.replace('.', '_'), self.db.PH) for x in fields if x.split('.')[1] != 'variant_id'])
+        #
+        # get variant_id
+        query = 'SELECT variant_id FROM __asso_tmp {}'.format(where_clause)
+        self.logger.debug('Running on group {0} query {1}'.format(group, query))
+        cur = self.db.cursor()
+        cur.execute(query, (str(group),))
+        variant_id = [x[0] for x in cur.fetchall()]
+        numSites = len(variant_id)
+        #
+        # get genotypes
         genotype = []
         self.db.attach(self.pjname+'_genotype.DB', '__fromGeno')
-        cur = self.db.cursor()
-        cur.execute('SELECT variant_id FROM {}'.format(vtable))
-        variant_id = cur.fetchall()[0]
-        numSites = len(variant_id)
         for ID in self.IDs:
-            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(ID, vtable)
+            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp {1});'\
+                .format(ID, where_clause)
             #self.logger.debug('Running query {}'.format(query))
-            cur.execute(query)
+            cur.execute(query, (group,))
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
         self.db.detach('__fromGeno')
@@ -300,11 +307,11 @@ class GroupAssociationCalculator(Process):
         self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.IDs)-sum(toKeep)))
         return genotype, toKeep
     
+
     def run(self):
         self.db = DatabaseEngine()
-        self.db.connect(self.pjname+'.proj')
-        for annoDB in self.proj.annoDB:
-           self.db.attach(os.path.join(annoDB.dir, annoDB.filename))
+        self.db.connect(self.pjname+'.proj', readonly=True)
+
         #
         while True:
             self.logger.debug('Getting group ...') 
@@ -315,8 +322,7 @@ class GroupAssociationCalculator(Process):
                 self.output.send(None)
                 break
             # select variants from each group:
-            vtable = self.getVariants(grp)
-            genotype, which = self.getGenotype(vtable)
+            genotype, which = self.getGenotype(grp)
             values = []
             try:
                 for test in self.tests:
@@ -353,7 +359,7 @@ def associate(args, reverse=False):
             for j in range(nJobs):
                 r, w = Pipe(False)
                 GroupAssociationCalculator(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
-                    asso.tests, args.group_by, grpQueue, asso.where_clause, asso.from_clause, w).start()
+                    asso.tests, args.group_by, grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
