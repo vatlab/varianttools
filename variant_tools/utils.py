@@ -661,11 +661,11 @@ class DatabaseEngine:
             return index.lower() in [x[0].lower() for x in cur.fetchall()]
         elif '.' in index:
             db, idx = index.split('.', 1)
-            cur.execute("SELECT name FROM {}.sqlite_master WHERE type='index';".format(db))
-            return idx.lower() in [x[0].lower() for x in cur.fetchall() if not x[0].startswith('sqlite')]
+            cur.execute("SELECT count(name) FROM {}.sqlite_master WHERE type='index' AND name={};".format(db, self.PH), (idx,))
+            return cur.fetchone()[0] > 0
         else:
-            cur.execute("SELECT name FROM sqlite_master WHERE type='index' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='index';")
-            return index.lower() in [x[0].lower() for x in cur.fetchall() if not x[0].startswith('sqlite')]
+            cur.execute("SELECT count(name) FROM sqlite_master WHERE type='index' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='index' AND name={};".format(self.PH), (index,))
+            return cur.fetchone()[0] > 0
 
     def dropIndex(self, index, table):
         if self.engine == 'mysql':
