@@ -145,9 +145,9 @@ class AssociationTester(Sample):
         else:
           self.group_by = group_by
         #
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
-        fields_names = [x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']
-        #fields_types = [self.db.typeOfColumn(x.split('.')[0], x.split('.')[1]) for x in fields if x.split('.')[1] != 'variant_id']
+        table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in self.group_by]
+        fields_names = [x.replace('.', '_') for x in self.group_by]
+        fields_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(self.group_by, table_of_fields)]
         cur = self.db.cursor()
         # create a table that holds variant ids and groups, indexed for groups
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
@@ -156,8 +156,9 @@ class AssociationTester(Sample):
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL,
               {});
-              '''.format(' VARCHAR(255) NULL, '.join(fields_names) + ' VARCHAR(255) NULL'))
+              '''.format(','.join(['{} {} NULL'.format(x,y) for x,y in zip(fields_names, fields_types)])))
         # select variant_id and groups for association testing
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))        
         from_clause = []
         from_clause.append(self.table)
         where_clause = []
@@ -184,7 +185,7 @@ class AssociationTester(Sample):
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(fields_names)))
-        self.groups = [map(str, x) for x in cur.fetchall()]
+        self.groups = cur.fetchall() # [map(str, x) for x in cur.fetchall()]
         self.logger.info('Find {} groups'.format(len(self.groups)))
         # FIXME not for multiple groups
         self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
@@ -240,8 +241,8 @@ class GroupAssociationCalculator(Process):
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
-        fields_names = [x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']
+        #print 'Getting', group, self.table, self.group_by
+        fields_names = [x.replace('.', '_') for x in self.group_by]
         where_clause =  'WHERE ' + \
             ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in fields_names])
         #
@@ -314,6 +315,17 @@ def associate(args, reverse=False):
             asso.getAssoTests(args.methods, args.unknown_args)
             # step 1: get samples
             asso.getSamples(args.samples)
+            #
+            proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
+            unindexed_IDs = [x for x in asso.IDs if \
+                not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(x))]
+            if unindexed_IDs:
+                cur = proj.db.cursor()
+                prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
+                for idx, ID in enumerate(unindexed_IDs):
+                    cur.execute('CREATE INDEX __fromGeno.genotype_{0}_index ON genotype_{0} (variant_id ASC)'.format(ID))
+                    prog.update(idx + 1)
+                prog.done()
             # step 2: get phenotype and set it to everyone
             asso.getPhenotype(args.samples, args.phenotype)           
             asso.getCovariate(args.samples, args.covariates)
@@ -430,7 +442,7 @@ class NullTest:
         self.data.count_ctrls()
         
     def setAttributes(self, grp):
-        self.group = '__'.join(grp)
+        self.group = '__'.join([str(x) for x in grp])
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
