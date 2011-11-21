@@ -64,6 +64,8 @@ def associateArguments(parser):
         help='''Number of processes to carry out association tests.''')
     parser.add_argument('--to_file', metavar='FILE', nargs=1,
         help='''File name to which results from association tests will be written''')        
+
+
 class AssociationTester(Sample):
     '''Parse command line and get data for association testing'''
     
@@ -75,6 +77,7 @@ class AssociationTester(Sample):
         self.table = table
         self.phenotype = None
         self.covariates = None
+
 
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
@@ -148,6 +151,7 @@ class AssociationTester(Sample):
         cur = self.db.cursor()
         # create a table that holds variant ids and groups, indexed for groups
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
+        cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
         cur.execute('''\
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL,
@@ -169,18 +173,18 @@ class AssociationTester(Sample):
         self.from_clause = ', '.join(from_clause) 
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups
-        query = 'INSERT INTO __asso_tmp SELECT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
+        query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
             self.from_clause, self.where_clause) 
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
             CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
-            '''.format(' ASC, '.join(fields_names) +' ASC'))
+            '''.format(' ASC, '.join(fields_names) + ' ASC'))
         # get group by
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(fields_names)))
-        self.groups = tuple([map(str, x) for x in cur.fetchall()])
+        self.groups = [map(str, x) for x in cur.fetchall()]
         self.logger.info('Find {} groups'.format(len(self.groups)))
         # FIXME not for multiple groups
         self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
@@ -248,6 +252,7 @@ class GroupAssociationCalculator(Process):
         cur.execute(query, group)
         variant_id = [x[0] for x in cur.fetchall()]
         numSites = len(variant_id)
+        self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
         #
         # get genotypes
         genotype = []
@@ -259,6 +264,8 @@ class GroupAssociationCalculator(Process):
             cur.execute(query, group)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
+        #
+        self.logger.debug('Retrieved genotypes for {} samples'.format(len(genotype)))
         self.db.detach('__fromGeno')
         missing_counts = [x.count(-9.0) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
