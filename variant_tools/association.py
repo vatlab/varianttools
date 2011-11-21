@@ -257,16 +257,17 @@ class GroupAssociationCalculator(Process):
         self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
         #
         # get genotypes
-        cur.execute('DROP TABLE IF EXISTS __id_of_group;')
-        cur.execute('CREATE TEMPORARY TABLE __id_of_group (variant_id INT NOT NULL);')
-        cur.execute('INSERT INTO __id_of_group SELECT variant_id FROM __asso_tmp {};'.format(where_clause), group)
+#        cur.execute('DROP TABLE IF EXISTS __id_of_group;')
+#        cur.execute('CREATE TEMPORARY TABLE __id_of_group (variant_id INT NOT NULL);')
+#        cur.execute('INSERT INTO __id_of_group SELECT variant_id FROM __asso_tmp {};'.format(where_clause), group)
         genotype = []
         self.db.attach(self.proj.name+'_genotype.DB', '__fromGeno')
         for ID in self.IDs:
-            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM __id_of_group);'\
-                .format(ID)
-            #self.logger.debug('Running query {}'.format(query))
-            cur.execute(query)
+#            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM __id_of_group);'\
+            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp {1});'\
+                .format(ID, where_clause)
+            cur.execute(query, group)
+#            cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
         #
