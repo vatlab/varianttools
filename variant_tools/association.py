@@ -180,15 +180,15 @@ class AssociationTester(Sample):
         cur.execute(query)
         cur.execute('''\
             CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
-            '''.format(' ASC, '.join(fields_names) + ' ASC'))
+            '''.format(','.join(['{} ASC'.format(x) for x in fields_names])))
         # get group by
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(fields_names)))
-        self.groups = cur.fetchall() # [map(str, x) for x in cur.fetchall()]
+        self.groups = cur.fetchall() 
         self.logger.info('Find {} groups'.format(len(self.groups)))
         # FIXME not for multiple groups
-        self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
+        self.logger.debug('Group by: {}'.format(', '.join(map(str, self.groups))))
 
 
 class UpdateResult:
@@ -205,7 +205,7 @@ class UpdateResult:
         if not self.fn:
             self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
         try:
-            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(res[0]),
+            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(map(str, res[0])),
                         res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
             self.lock.acquire()
             with open(self.fn, 'a') as out:
@@ -442,7 +442,7 @@ class NullTest:
         self.data.count_ctrls()
         
     def setAttributes(self, grp):
-        self.group = '__'.join([str(x) for x in grp])
+        self.group = '__'.join(map(str, grp))
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
