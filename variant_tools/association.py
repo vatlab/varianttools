@@ -136,12 +136,15 @@ class AssociationTester(Sample):
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
-        self.group_by = group_by
         # set default group_by to positions
         if not group_by:
-          self.group_by = ['pos']
+          self.group_by = ['chr','pos']
+        else:
+          self.group_by = group_by
+        #
         group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
-        #f_types = [self.db.typeOfColumn(x.split('.')[0], x.split('.')[1]) for x in fields if x.split('.')[1] != 'variant_id']
+        fields_names = [x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']
+        #fields_types = [self.db.typeOfColumn(x.split('.')[0], x.split('.')[1]) for x in fields if x.split('.')[1] != 'variant_id']
         cur = self.db.cursor()
         # create a table that holds variant ids and groups, indexed for groups
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
@@ -149,7 +152,7 @@ class AssociationTester(Sample):
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL,
               {});
-              '''.format(' VARCHAR(255) NULL, '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']) + ' VARCHAR(255) NULL'))
+              '''.format(' VARCHAR(255) NULL, '.join(fields_names) + ' VARCHAR(255) NULL'))
         # select variant_id and groups for association testing
         from_clause = []
         from_clause.append(self.table)
@@ -172,32 +175,16 @@ class AssociationTester(Sample):
         cur.execute(query)
         cur.execute('''\
             CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
-            '''.format(' ASC, '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id'])+' ASC'))
-        cur.execute('SELECT * from __asso_tmp')
+            '''.format(' ASC, '.join(fields_names) +' ASC'))
         # get group by
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
-            '''.format(', '.join([x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id'])))
-        # FIXME well, now takes only the first group by argument. 
-        # not sure if we really want to do multiple groups
-        self.groups = [x[0] for x in cur.fetchall()]
+            '''.format(', '.join(fields_names)))
+        self.groups = tuple([map(str, x) for x in cur.fetchall()])
         self.logger.info('Find {} groups'.format(len(self.groups)))
         # FIXME not for multiple groups
         self.logger.debug('Group by: {}'.format(', '.join([str(x) for x in self.groups])))
 
-#class StatStatus:
-#    def __init__(self):
-#        self.tasks = {}
-#        self.lock = Lock()
-#
-#    def set(self, task, value):
-#        self.tasks[task] = value
-#    
-#    def get(self, task):
-#        return self.tasks[task]
-#        
-#    def count(self):
-#        return len(self.tasks)
 
 class UpdateResult:
     def __init__(self, db, logger, fn):
@@ -209,42 +196,18 @@ class UpdateResult:
 
     def set(self, table, res):
         self.grps.append(res[0])
-#        self.lock.acquire()
-#        startID, endID = res[1][0]
-#        fields = []
-#        results = []
-#        for x,y in res[1][1:]:
-#            fields.extend(x)
-#            results.append(y)
-#        headers = self.db.getHeaders(table)
-#        for field, fldtype in fields:
-#            if field not in headers:
-#                self.logger.debug('Adding field {}'.format(field))
-#                self.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(table, field, fldtype))
-#                self.db.commit()
-#        # if the field exists it will be re-written
-#        update_query = 'UPDATE {0} SET {2} WHERE variant_id>={1} AND variant_id<={1};'.format(table, self.db.PH,
-#        ', '.join(['{}={}'.format(field, self.db.PH) for field, fldtype in fields]))
-#        # fill up the update query and execute the update command
-#        names = [x.split('_')[1] for x,y in fields]
-#        values = []
-#        for result in results:
-#            values.extend([result[x] for x in names])
-#            self.logger.debug('Running query {}'.format(update_query))
-#            self.db.execute(update_query, values+[startID, endID])
-#        self.db.commit()
-#        self.lock.release()
+
         if not self.fn:
             self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
         try:
-            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format(res[0],
+            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(res[0]),
                         res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
             self.lock.acquire()
             with open(self.fn, 'a') as out:
                 out.write(output)
             self.lock.release()
         except IndexError as e:
-            self.logger.info('No association tests done for {}'.format(self.grps[-1]))
+            self.logger.warning('No association tests done for {}'.format(self.grps[-1]))
             pass
         return
         
@@ -263,7 +226,6 @@ class GroupAssociationCalculator(Process):
         self.phenotypes = phenotypes
         self.covariates = covariates
         self.tests = tests
-        self.pjname = proj.name
         self.group_by = group_by
         self.queue = grpQueue
         self.output = output
@@ -274,28 +236,27 @@ class GroupAssociationCalculator(Process):
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
-        if not self.group_by:
-            self.group_by = ['pos']
         group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))
+        fields_names = [x.replace('.', '_') for x in fields if x.split('.')[1] != 'variant_id']
         where_clause =  'WHERE ' + \
-            ' AND '.join(['{0}={1}'.format(x.replace('.', '_'), self.db.PH) for x in fields if x.split('.')[1] != 'variant_id'])
+            ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in fields_names])
         #
         # get variant_id
         query = 'SELECT variant_id FROM __asso_tmp {}'.format(where_clause)
         self.logger.debug('Running on group {0} query {1}'.format(group, query))
         cur = self.db.cursor()
-        cur.execute(query, (str(group),))
+        cur.execute(query, group)
         variant_id = [x[0] for x in cur.fetchall()]
         numSites = len(variant_id)
         #
         # get genotypes
         genotype = []
-        self.db.attach(self.pjname+'_genotype.DB', '__fromGeno')
+        self.db.attach(self.proj.name+'_genotype.DB', '__fromGeno')
         for ID in self.IDs:
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp {1});'\
                 .format(ID, where_clause)
             #self.logger.debug('Running query {}'.format(query))
-            cur.execute(query, (group,))
+            cur.execute(query, group)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
         self.db.detach('__fromGeno')
@@ -310,7 +271,7 @@ class GroupAssociationCalculator(Process):
 
     def run(self):
         self.db = DatabaseEngine()
-        self.db.connect(self.pjname+'.proj', readonly=True)
+        self.db.connect(self.proj.name+'.proj', readonly=True)
 
         #
         while True:
@@ -359,7 +320,7 @@ def associate(args, reverse=False):
             for j in range(nJobs):
                 r, w = Pipe(False)
                 GroupAssociationCalculator(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
-                    asso.tests, args.group_by, grpQueue, w).start()
+                    asso.tests, asso.group_by, grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
@@ -462,7 +423,7 @@ class NullTest:
         self.data.count_ctrls()
         
     def setAttributes(self, grp):
-        self.group = str(grp)
+        self.group = '__'.join(grp)
 
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
