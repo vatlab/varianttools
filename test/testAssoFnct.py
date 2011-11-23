@@ -63,20 +63,39 @@ class TestAssoFnct(ProcessTestCase):
     self.assertEqual(list(self.data.phenotype()), list(self.y))
     self.assertEqual(ybar, sum(self.y) / (1.0*len(self.y)))
     self.assertEqual(self.data.samplecounts(), len(self.y))
+    
+    data = self.data.clone()
     # simple linear regression
-    actions = [t.SumToX(), t.SimpleLinearRegression(), t.GaussianPval(2)]
+    actions = [t.SumToX(), t.SimpleLinearRegression(), t.StudentPval(2)]
     a = t.ActionExecuter(actions)
-    a.apply(self.data)
+    a.apply(data)
     # compare with lm(y~x) in R
-    self.assertEqual(round(self.data.statistic(), 3), round(3.898, 3))
-    a = t.StudentPval(2)
-    a.apply(self.data)
-    self.assertEqual(self.data.meanOfX(), sum([i[0] for i in self.x]) / (1.0*len(self.x)))
-    self.assertEqual(round(self.data.pvalue(), 5), round(0.00212, 5))
+    self.assertEqual(round(data.statistic(), 3), round(3.898, 3))
+    self.assertEqual(data.meanOfX(), sum([i[0] for i in self.x]) / (1.0*len(self.x)))
+    self.assertEqual(round(data.pvalue(), 5), round(0.00212, 5))
     
   def testMultiReg(self):
-    self.data.setPhenotype(self.y, self.z)
-
+    ybar = self.data.setPhenotype(self.y, self.z)
+    self.assertEqual(ybar, sum(self.y) / (1.0*len(self.y)))
+    self.assertEqual(self.data.covarcounts(), 3)
+    self.assertEqual([list(x) for x in self.data.covariates()[:-1]], [list(x) for x in self.z])
+    self.assertEqual(list(self.data.covariates()[-1]), list(self.z[0]))
+    self.data.setGenotype(self.x)
+    
+    data = self.data.clone()
+    
+    # multiple linear regression
+    actions = [t.SumToX(), t.MultipleLinearRegression(), t.StudentPval(2)]
+    a = t.ActionExecuter(actions)
+    a.apply(data)
+    #y = c(165,-22,228,166,277,-18,102,13,231,22,-54,66,94,36)
+    #x = c(2,0,1,2,1,0,1,0,2,1,0,0,1,0)
+    #z2 = c(92,221,-3,143,170,-86,236,61,32,132,1,95,-206,83)
+    #z3 = c(98,204,145,73,223,93,-50,269,107,135,-4,-99,120,14)
+    #z1 = c(56,104,114,22,124,179,25,15,107,170,176,83,261,-15)
+    #summary(lm(y~x+z1+z2+z3))
+    self.assertEqual(round(data.statistic(), 3), round(3.371, 3)) 
+    self.assertEqual(round(data.pvalue(), 5), round(0.00824, 5)) 
       
 if __name__ == '__main__':
   unittest.main()
