@@ -67,21 +67,30 @@ namespace vtools {
 
 
       // set data
-      void setGenotype(const matrixf & g)
+      double setGenotype(const matrixf & g)
       {
         //codings are 0, 1, 2, -9 and U(0,1) number for "expected" genotype
         m_genotype = g;
+        return 0.0;
       }
 
 
-      void setPhenotype(const vectorf & p)
+      double setPhenotype(const vectorf & p)
       {
         //FIXME: have to consider missing phenotypes (especially when they are treated covariates) as well as multiple phenotypes
         m_phenotype = p;
+        // set phenotype statistics
+        m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
+        m_ybar /= (1.0 * m_phenotype.size());
+        m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+            std::bind2nd(std::equal_to<double>(),1.0));
+        m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+            std::bind2nd(std::equal_to<double>(),0.0));
+        return m_ybar;
       }
 
 
-      void setPhenotype(const vectorf & p, const matrixf & c)
+      double setPhenotype(const vectorf & p, const matrixf & c)
       {
         m_phenotype = p;
         m_C = c;
@@ -92,6 +101,14 @@ namespace vtools {
         m_model.clear();
         m_model.setY(m_phenotype);
         m_model.setX(m_C);
+        // set phenotype statistics
+        m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
+        m_ybar /= (1.0 * m_phenotype.size());
+        m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+            std::bind2nd(std::equal_to<double>(),1.0));
+        m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+            std::bind2nd(std::equal_to<double>(),0.0));
+        return m_ybar;
       }
 
 
@@ -112,29 +129,13 @@ namespace vtools {
       }
 
 
-      void mean_phenotype()
-      {
-        m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-        m_ybar /= (1.0 * m_phenotype.size());
-      }
-
-      void mean_genotype()
+      double meanOfX()
       {
         m_xbar = std::accumulate(m_X.begin(), m_X.end(), 0.0);
         m_xbar /= (1.0 * m_X.size());
+        return m_xbar;
       }
 
-      void count_cases()
-      {
-        m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),1.0));
-      }
-
-      void count_ctrls()
-      {
-        m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),0.0));
-      }
 
       // return some information
       vectorf phenotype()
@@ -266,21 +267,26 @@ namespace vtools {
         // simple linear regression score test
         // FIXME: may later need other output fields such as beta, CI, etc	
         //!- Statistic: LSE (MLE) for beta, centered and scaled (bcz E[b] = 0 and sigma = 1 by simulation) 
-        //!- See page 41 of Kutner's Applied Linear Stat. Model, 5th ed.
+        //!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
         //
         double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
         for (size_t i = 0; i != m_X.size(); ++i) {
           numerator += (m_X[i] - m_xbar) * m_phenotype[i];
           denominator += pow(m_X[i] - m_xbar, 2.0);
-          //SSE
-          ysigma += pow(m_phenotype[i] - m_ybar, 2.0);
         }
 
         if (!fEqual(numerator, 0.0)) {  
           //!- Compute MSE and V[\hat{beta}]
           //!- V[\hat{beta}] = MSE / denominator
-          double varb = ysigma / (m_phenotype.size() * denominator);
-          m_statistic = (numerator / denominator) / sqrt(varb); 
+          double b1 = numerator / denominator;
+          double b0 = m_ybar - b1*m_xbar;
+
+          //SSE
+          for (size_t i = 0; i != m_X.size(); ++i) {
+            ysigma += pow(m_phenotype[i] - (b0+b1*m_X[i]), 2.0);
+          }
+          double varb = ysigma / (m_phenotype.size() - 2.0) / denominator;
+          m_statistic = b1 / sqrt(varb); 
         }
         else m_statistic = 0.0;
       }
@@ -334,7 +340,7 @@ namespace vtools {
         if (sided == 1) {
           m_pval = gsl_cdf_ugaussian_Q(m_statistic);
         }
-        else if (sided ==2) {
+        else if (sided == 2) {
           m_pval = gsl_cdf_chisq_Q(m_statistic*m_statistic, 1.0);
         }
         else {
@@ -342,8 +348,22 @@ namespace vtools {
         }
       }
 
-      // permutation should use Clopper-Pearson 95% interval which is exact and conservative	
+      void studentP(unsigned sided = 1)
+      {
+        // df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
+        if (sided == 1) {
+          m_pval = gsl_cdf_tdist_Q(m_statistic, m_phenotype.size() - (m_ncovar+2.0));
+        }
+        else if (sided == 2) {
+          double p = gsl_cdf_tdist_Q(m_statistic, m_phenotype.size() - (m_ncovar+2.0));
+          m_pval = fmin(p, 1.0-p) * 2.0;
+        }
+        else {
+          throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
+        }
+      }
 
+      // permutation should use Clopper-Pearson 95% interval which is exact and conservative	
 
     private:
       /// raw phenotype and gneotype data

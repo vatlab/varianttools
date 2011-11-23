@@ -69,7 +69,7 @@ namespace vtools {
       double apply(AssoData & d)
       {
         d.sumToX();
-        d.mean_genotype();
+        d.meanOfX();
         return 0;
       }
   };
@@ -90,7 +90,7 @@ namespace vtools {
       double apply(AssoData & d)
       {
         d.binToX();
-        d.mean_genotype();
+        d.meanOfX();
         return 0;
       }
   };
@@ -219,6 +219,30 @@ namespace vtools {
       double apply(AssoData & d)
       {
         d.gaussianP(m_sided); 
+        return 0;
+      }
+
+    private:
+      unsigned m_sided;
+  };
+
+
+  class StudentPval : public BaseAction
+  {
+    public:
+      StudentPval(unsigned sided=1) 
+        : BaseAction(), m_sided(sided)
+      {
+      }
+
+      BaseAction * clone()
+      {
+        return new StudentPval(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.studentP(m_sided); 
         return 0;
       }
 

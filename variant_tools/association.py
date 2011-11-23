@@ -56,7 +56,7 @@ def associateArguments(parser):
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%%"').''')
+            'filename like "MG%"').''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
@@ -83,7 +83,7 @@ class AssociationTester(Sample):
         '''Get a list of methods from parameter methods, passing method specific and common 
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
-            raise ValueError('Please specify at least a statistical tests. Available statistical tests are {}'.format(', '.join(getAllTests())))
+            raise ValueError('Please specify at least one statistical test. Available statistical tests are {}'.format(', '.join(getAllTests())))
         self.tests = []
         for m in methods:
             name = m.split()[0]
@@ -119,7 +119,9 @@ class AssociationTester(Sample):
             self.phenotype = [array('d', map(float, x)) for x in zip(*cur.fetchall())[1:]]
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype {}'.format(', '.join(phenotype)))
+            raise ValueError('Failed to retrieve phenotype {}. Please \
+                             make sure the specified phenotype names are correct and there \
+                             is no missing value'.format(', '.join(phenotype)))
     
     def getCovariate(self, condition, covariates):
         '''Get covariates for specified samples (specified by condition).'''
@@ -135,7 +137,9 @@ class AssociationTester(Sample):
             self.covariates.insert(0, array('d', [1]*len(self.covariates[0])))
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype covariate {}'.format(', '.join(covariates)))
+            raise ValueError('Failed to retrieve phenotype covariates {}. Please \
+                             make sure the specified phenotype covariates names are correct and \
+                             there is no missing value'.format(', '.join(covariates)))
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
@@ -188,7 +192,6 @@ class AssociationTester(Sample):
             '''.format(', '.join(fields_names)))
         self.groups = cur.fetchall() 
         self.logger.info('Find {} groups'.format(len(self.groups)))
-        # FIXME not for multiple groups
         self.logger.debug('Group by: {}'.format(', '.join(map(str, self.groups))))
 
 
@@ -206,8 +209,14 @@ class UpdateResult:
         if not self.fn:
             self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
         try:
-            output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(map(str, res[0])),
-                        res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
+            #output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(map(str, res[0])),
+            #            res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
+            col_grp = '__'.join(map(str, res[0]))
+            col_test = res[1][0][0][0][0].split('_')[0]
+            cols_stat = res[1][0][1]
+            output = '\t'.join(map(str, [col_grp, col_test, cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']])) + '\n'
+            if len(self.grps) == 1:
+                output = '\t'.join(['#test_unit', 'method', 'pvalue', 'statistic', 'sample_size']) + '\n' + output
             self.lock.acquire()
             with open(self.fn, 'a') as out:
                 out.write(output)
@@ -292,7 +301,7 @@ class GroupAssociationCalculator(Process):
             grp = self.queue.get()
             self.logger.debug('Got group {}'.format(grp))
             if grp is None:
-                self.logger.debug('All groups are processed, sending None')
+                self.logger.debug('All groups are processed, terminating the queue')
                 self.output.send(None)
                 break
             # select variants from each group:
@@ -307,7 +316,7 @@ class GroupAssociationCalculator(Process):
                     self.logger.debug('Finish test')
                     values.append([test.getFields(), test.result])
             except Exception as e:
-                self.logger.info('Error processing {}, {}'.format(grp, e))
+                self.logger.info('Error processing group {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
             self.output.send((grp, values))
         
@@ -405,7 +414,7 @@ class NullTest:
         self.logger = logger
         self.name = name
         self.parseArgs(*method_args)
-        self.result = {'pvalue':None, 'statistic':None}
+        self.result = {}
         self.group = None
         
 
@@ -442,9 +451,6 @@ class NullTest:
           self.data.setPhenotype(phen, covt)
         else:
           self.data.setPhenotype(phen)
-        self.data.mean_phenotype()
-        self.data.count_cases()
-        self.data.count_ctrls()
         
     def setAttributes(self, grp):
         self.group = '__'.join(map(str, grp))
@@ -454,9 +460,6 @@ class NullTest:
         for all variants, or a list of p-values for each variant. Will print
         data if NullTest is called'''
         self.logger.info('Currently no action is defined for NullTest')
-#        print('Group name: {}\n'.format(self.group)+'Phenotype-genotype data:')
-#        print(' '.join(map(str, self.data.phenotype())))
-#        print('\n'.join([' '.join(map(str, map(int, x))) for x in self.data.raw_genotype()])+'\n')
         return 0
 
 class ExternTest(NullTest):
@@ -497,28 +500,22 @@ class LinearBurdenTest(NullTest):
 
     def calculate(self):
         data = self.data.clone()
-        doRegression = t.SimpleLinearRegression()
-        task_dbg = "-simple regression"
-        if data.covarcounts() > 0:
-            task_dbg = "-multiple regression"
-            doRegression = t.MultipleLinearRegression()
-        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.GaussianPval(self.alternative)]
+        doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
+        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.StudentPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
-        #print('{} on group {}, p-value (asymptotic) = {}'\
-        #                 .format(self.__class__.__name__, self.group, data.pvalue()))
-        # permutation 
-        if not self.permutations == 0:
-            #self.logger.info('permutation routine no ready')
-            p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
-            p.apply(data)
-        #  print('{} on group {}, p-value (permutation) = {}'\
-        #                .format(self.__class__.__name__, self.group, (p.apply(data)+1.0) / (self.permutations+1.0)))
+        # permutation routine not ready
+        #if not self.permutations == 0:
+        #    p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+        #    p.apply(data)
+        
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
         self.result['samples'] = data.samplecounts()
-        #print data.raw_genotype(), '\n'
-        #print data.phenotype(), '\n'
-        #print data.covariates()
-        #self.logger.debug('Finished test {0} for group {1}, {2}'.format(self.__class__.__name__+task_dbg, self.group, self.result))
+        #print "TEST", self.__class__.__name__, '\n'
+        #print "PHENOTYPES", data.phenotype(), '\n'
+        #print "COVARIATES", data.covariates(), '\n'
+        #print "GENOTYPES", data.raw_genotype(), '\n'
+        #print "GROUP", self.result, '\n'
+        #print "RESULTS", self.result
         return 0
