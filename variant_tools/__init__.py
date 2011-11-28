@@ -32,3 +32,8 @@ if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (
 
 __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
+VTOOLS_VERSION='1.0.1svn'
+VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
+VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
+VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
+

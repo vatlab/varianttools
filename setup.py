@@ -36,14 +36,15 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-
-# We cannot import variant_tools/project.py because that file is not 
-# python3 compatible before 2to3
-VTOOLS_VERSION = '1.0'
+from variant_tools import VTOOLS_VERSION
 #
-# the association module is not ready for prime time... and does not support python 3
+# the association module is not ready for prime time so we only enable it for the subversion version
 # 
-with_association = False and sys.version_info.major == 2
+with_association = VTOOLS_VERSION.endswith('svn')
+
+SWIG_OPTS = ['-O', '-shadow', '-c++', '-keyword','-w-511'] 
+if sys.version_info.major == 3:
+    SWIG_OPTS.append('-py3')
 
 if with_association:
     LIB_GSL = [ 
@@ -279,7 +280,7 @@ if with_association:
         Extension('variant_tools/_assoTests',
             sources = ['variant_tools/assoTests.i',
                 'variant_tools/assoData.cpp', 'variant_tools/utils.cpp'] + LIB_GSL,
-            swig_opts = ['-O', '-shadow', '-c++', '-keyword','-w-511'],
+            swig_opts = SWIG_OPTS,
             library_dirs = [],
             libraries = libs,
             include_dirs = [".", "variant_tools", "variant_tools/gsl"],
