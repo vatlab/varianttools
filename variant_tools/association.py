@@ -48,15 +48,15 @@ def associateArguments(parser):
     parser.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
-            --method "m --field mp" "m1 --permute 10000 --field m1p"), although
+            --method "m --alternative 2" "m1 --permute 1000"), although
             the common method parameters can be specified separately, as long as
-            they do not conflict with command arguments. (e.g. --method m1 m2 -p 10 
-            is equivalent to --method "m1 -p 10" "m2 -p 10".). Available statistical
+            they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000 
+            is equivalent to --method "m1 -p 1000" "m2 -p 1000".). Available statistical
             tests are {}.'''.format(', '.join(getAllTests())))
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%"').''')
+            'filename like "MG%%"').''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
@@ -478,12 +478,12 @@ class LinearBurdenTest(NullTest):
         NullTest.__init__(self, logger, name, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Linear regression test
-            which will collapse the variants within one group by counts and evaluate
-            the significance of effect size (regression coefficient) of the group''',
+        parser = argparse.ArgumentParser(description='''Linear regression test. p-value
+            is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, it will collapse the variants within a group into a single pseudo code.''',
             prog='vtools associate --method ' + self.name)
         # no argumant is added
-        parser.add_argument('-p', '--permutations', type=int, default=0,
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations.''')
         parser.add_argument('-q1', '--mafupper', type=float, default=1.0,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
@@ -491,9 +491,12 @@ class LinearBurdenTest(NullTest):
         parser.add_argument('-q2', '--maflower', type=float, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', type=int, default=1,
-            help='''Alternative hypothesis is one-sided (1) or two-sided (2).
+        parser.add_argument('--alternative', metavar='SIDED', type=int, default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--use_indicator', action='store_true',
+            help='''This option will apply binary coding to genotype groups
+            ("1" if ANY locus in the group has the alternative allele; "0" otherwise)''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -501,7 +504,8 @@ class LinearBurdenTest(NullTest):
     def calculate(self):
         data = self.data.clone()
         doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
-        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), t.SumToX(), doRegression, t.StudentPval(self.alternative)]
+        codeX = t.BinToX() if self.use_indicator else t.SumToX()
+        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
         # permutation routine not ready
@@ -516,6 +520,6 @@ class LinearBurdenTest(NullTest):
         #print "PHENOTYPES", data.phenotype(), '\n'
         #print "COVARIATES", data.covariates(), '\n'
         #print "GENOTYPES", data.raw_genotype(), '\n'
-        #print "GROUP", self.result, '\n'
+        #print "GROUP", self.group, '\n'
         #print "RESULTS", self.result
         return 0
