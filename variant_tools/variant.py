@@ -145,7 +145,7 @@ def select(args, reverse=False):
                     try:
                         # if table name is specified
                         db, fld = field.split('.', 1)
-                        annoDB = [x for x in proj.annoDB if x.name == db][0]
+                        annoDB = [x for x in proj.annoDB if x.name.lower() == db.lower()][0]
                     except:
                         continue
                     # db is one of the annotation database but fld has already been indexed
