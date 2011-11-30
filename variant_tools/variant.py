@@ -140,6 +140,31 @@ def select(args, reverse=False):
             if len(args.condition) > 0:    
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
                 condition, fields = consolidateFieldName(proj, args.from_table, ' AND '.join(['({})'.format(x) for x in args.condition]))
+                for field in fields:
+                    # indexing fields in annotation databases?
+                    try:
+                        # if table name is specified
+                        db, fld = field.split('.', 1)
+                        annoDB = [x for x in proj.annoDB if x.name == db][0]
+                    except:
+                        continue
+                    # db is one of the annotation database but fld has already been indexed
+                    if fld.lower() in [x.lower() for x in annoDB.linked_by] or \
+                        (annoDB.build is not None and fld.lower() in [x.lower() for x in annoDB.build]) or \
+                        (annoDB.alt_build is not None and fld.lower() in [x.lower() for x in annoDB.alt_build]) or \
+                        (fld.lower() not in [x.lower() for x in proj.db.getHeaders('{0}.{0}'.format(db))]) or \
+                        proj.db.hasIndex('{0}.{0}_{1}'.format(db, fld)):
+                        continue
+                    #
+                    s = delayedAction(proj.logger.info, 'Indexing {}'.format(field))
+                    cur = proj.db.cursor()
+                    try:
+                        query = 'CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(db, fld)
+                        proj.logger.debug(query)
+                        cur.execute(query)
+                    except Exception as e:
+                        proj.logger.debug('Failed to create index: {}'.format(e))
+                    del s
                 # 
                 fields_info = sum([proj.linkFieldToTable(x, args.from_table) for x in fields], [])
                 # WHERE clause: () is important because OR in condition might go beyond condition
