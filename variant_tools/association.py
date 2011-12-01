@@ -505,7 +505,7 @@ class LinearBurdenTest(NullTest):
         data = self.data.clone()
         doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
-        actions = [t.SetMaf(), t.FilterX(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
+        actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
         a = t.ActionExecuter(actions)
         a.apply(data)
         # permutation routine not ready

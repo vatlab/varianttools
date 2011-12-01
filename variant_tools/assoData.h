@@ -208,6 +208,11 @@ namespace vtools {
           //m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
           m_X[i] = 0.0;
           for (size_t j = 0; j < m_genotype[i].size(); ++j) {
+            // check if we should skip this site
+            if (m_sites.size() != 0) { 
+              if (m_sites[j] == 0) continue;
+            }
+
             if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j]; 
             if (fEqual(m_genotype[i][j], -1.0)) m_X[i] += 2.0; 
           }
@@ -222,6 +227,11 @@ namespace vtools {
           m_X[i] = 0.0;
           double pnovar = 1.0;
           for (size_t j = 0; j != m_genotype[i].size(); ++j) {  
+            // check if we should skip this site
+            if (m_sites.size() != 0) { 
+              if (m_sites[j] == 0) continue;
+            }
+        
             if (m_genotype[i][j] >= 1.0 || fEqual(m_genotype[i][j], -1.0)) {  
               m_X[i] = 1.0;
               break;
@@ -238,25 +248,20 @@ namespace vtools {
       }
 
 
-      void filterByMaf(double upper, double lower)
+      void setSitesByMaf(double upper, double lower)
       {
-        //FIXME: may want to do it in AssociationTester.getVariants 
+        //Will update m_sites with 0 = sites not to be analyzed; 1 = sites to be analyzed 
         if (upper > 1.0 || lower < 0.0) {
           throw ValueError("Minor allele frequency value should fall between 0 and 1");
         }
         if (fEqual(upper,1.0) && fEqual(lower,0.0)) return;
 
-        matrixf xdat = m_genotype;
-        m_genotype.clear();
-        m_genotype.resize(xdat.size());
-
         for (size_t j = 0; j != m_maf.size(); ++j) {
-          if (m_maf[j] <= lower || m_maf[j] > upper) 
-            continue;
+          if (m_maf[j] <= lower || m_maf[j] > upper) { 
+            m_sites.push_back(0);
+          }
           else {
-            m_sites.push_back(static_cast<int>(j));
-            for (size_t i = 0; i != xdat.size(); ++i)
-              m_genotype[i].push_back(xdat[i][j]);
+            m_sites.push_back(1);
           }
         }  
       }

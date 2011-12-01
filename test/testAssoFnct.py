@@ -49,13 +49,18 @@ class TestAssoFnct(ProcessTestCase):
     self.assertEqual(list(self.data.genotype()), [1 if sum(i)>0 else 0 for i in self.x2])
     # test filter by MAF
     self.assertEqual(list(self.data.sites()), [])
-    a = t.FilterX(0.3, 0.1)
+    a = t.SetSites(0.3, 0.1)
     a.apply(self.data)
-    self.assertEqual([list(i) for i in self.data.raw_genotype()], \
-      [list([j for idx, j in enumerate(i) if maf[idx]<0.3 and maf[idx]>0.1]) for i in self.x2])
+    self.assertEqual([list(i) for i in self.data.raw_genotype()], [list(i) for i in self.x2])
     self.assertEqual(list(self.data.sites()), \
-                     [idx for idx, x in enumerate(maf) if x <0.3 and x>0.1])
+                     [1 if x <0.3 and x>0.1 else 0 for x in maf])
     
+    self.data.setGenotype(self.x2)
+    actions = [t.SetMaf(), t.SetSites(0.3, 0.1), t.SumToX()]
+    a = t.ActionExecuter(actions)
+    a.apply(self.data)
+    self.assertEqual(list(self.data.genotype()), [1.0,2.0,0.0])
+
   def testSimpleReg(self):
     self.data.setGenotype(self.x)
     ybar = self.data.setPhenotype(self.y)
@@ -80,9 +85,9 @@ class TestAssoFnct(ProcessTestCase):
     self.assertEqual(self.data.covarcounts(), 3)
     self.assertEqual([list(x) for x in self.data.covariates()[:-1]], [list(x) for x in self.z])
     self.assertEqual(list(self.data.covariates()[-1]), list(self.z[0]))
-    self.data.setGenotype(self.x)
-    
     data = self.data.clone()
+    data.setGenotype(self.x)
+    
     
     # multiple linear regression
     actions = [t.SumToX(), t.MultipleLinearRegression(), t.StudentPval(2)]
@@ -96,6 +101,6 @@ class TestAssoFnct(ProcessTestCase):
     #summary(lm(y~x+z1+z2+z3))
     self.assertEqual(round(data.statistic(), 3), round(3.371, 3)) 
     self.assertEqual(round(data.pvalue(), 5), round(0.00824, 5)) 
-      
+
 if __name__ == '__main__':
   unittest.main()

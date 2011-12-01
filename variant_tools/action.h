@@ -116,22 +116,22 @@ namespace vtools {
   };
 
 
-  class FilterX : public BaseAction
+  class SetSites : public BaseAction
   {
     public:
-      FilterX(double upper=1.0, double lower=0.0) : 
+      SetSites(double upper=1.0, double lower=0.0) : 
         BaseAction(), m_upper(upper), m_lower(lower)
     {
     }
 
       BaseAction * clone()
       {
-        return new FilterX(*this);
+        return new SetSites(*this);
       }
 
       double apply(AssoData & d)
       {
-        d.filterByMaf(m_upper, m_lower);
+        d.setSitesByMaf(m_upper, m_lower);
         return 0;
       }
 
