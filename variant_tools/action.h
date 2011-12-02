@@ -96,6 +96,46 @@ namespace vtools {
   };
 
 
+  class PermuteX : public BaseAction
+  {
+    public:
+      PermuteX() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new PermuteX(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.permuteX();
+        return 0;
+      }
+  };
+
+
+  class PermuteY : public BaseAction
+  {
+    public:
+      PermuteY() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new PermuteY(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.permuteY();
+        return 0;
+      }
+  };
+
+
   class SetMaf : public BaseAction
   {
     public:

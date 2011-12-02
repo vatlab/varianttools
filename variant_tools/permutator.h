@@ -91,64 +91,172 @@ namespace vtools {
   };
 
 
-  class PhenoPermutator : public BasePermutator
+  class FixedPermutator : public BasePermutator
   {
 
     public:
-      PhenoPermutator(size_t times, const vectora & actions)
-        : m_times(times), BasePermutator(actions)
+      FixedPermutator(size_t times, char pm, unsigned alternative, const vectora & actions)
+        : m_times(times), m_alternative(alternative), BasePermutator(actions)
       {
+        if (pm == 'Y') {
+          PermuteY* permute;
+          m_permute = permute->clone();
+        }
+        else {
+          PermuteX* permute;
+          m_permute = permute->clone();
+        }
       }
 
-
+      ~FixedPermutator()
+      {
+        delete m_permute;
+      }
+      
       double apply(AssoData & d)
       {
-        vectorf all_statistic(m_times);
+        unsigned permcount1 = 0, permcount2 = 0;
+        double obstatistic = 0.0;
+        double pvalue = 9.0;
 
         for (size_t i = 0; i < m_times; ++i) {
           for (size_t j = 0; j < m_actions.size(); ++j) {
             m_actions[j]->apply(d);
           }
-          all_statistic[i] = d.statistic(); 
-          d.permuteY();
+          double statistic = d.statistic(); 
+          if (i == 0) {
+            obstatistic = statistic;
+          }
+          else {
+            if (statistic >= obstatistic) 
+              ++permcount1;
+            if (statistic <= obstatistic)
+              ++permcount2;
+          }
+          if (pvalue <= 1.0) {
+            break;
+          }
+          m_permute->apply(d);
         }
-        return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
+
+        if (pvalue <= 1.0) {
+          d.setPvalue(pvalue); 
+        }
+        else {
+          if (m_alternative == 1) { 
+            pvalue = (permcount1 + 1.0) / (m_times + 1.0);
+          }
+          else {
+            double permcount = fmin(permcount1, permcount2);
+            pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
+          }
+          d.setPvalue(pvalue);
+        } 
+
+        return 0.0;
+        //return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
       }
 
 
     private:
       size_t m_times;
+      BaseAction *m_permute;
+      unsigned m_alternative;
   };
 
 
-  class GenoPermutator : public BasePermutator
+  class VariablePermutator : public BasePermutator
   {
-
+    // permutator for variable thresholds methods
     public:
-      GenoPermutator(size_t times, const vectora & actions)
-        : m_times(times), BasePermutator(actions)
+      VariablePermutator(size_t times, char pm, unsigned alternative, const vectora & actions)
+        : m_times(times), m_alternative(alternative), BasePermutator(actions)
       {
+        if (pm == 'Y') {
+          PermuteY* permute;
+          m_permute = permute->clone();
+        }
+        else {
+          PermuteX* permute;
+          m_permute = permute->clone();
+        }
       }
 
+      ~VariablePermutator()
+      {
+        delete m_permute;
+      }
 
       double apply(AssoData & d)
       {
-        vectorf all_statistic(m_times);
+
+        // obtain proper thresholds cutoffs
+        vectorf maf;
+        if (d.sites().size() == 0) {
+          maf = d.maf();
+        }
+        else {
+          maf.resize(0);
+          vectorf mafall = d.maf();
+          vectori sites = d.sites();
+          for (size_t i = 0; i < mafall.size(); ++i) {
+            if (sites[i] == 1) maf.push_back(mafall[i]);
+          }
+        }
+        std::sort(maf.begin(), maf.end());
+        std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
+        maf.resize(it - maf.begin()); 
+        double maflower = maf[0] - std::numeric_limits<double>::epsilon();
+
+        // apply variable thresholds w/i permutation test
+        unsigned permcount1 = 0;
+        double obstatistic = 0.0;
+        double pvalue = 9.0;
 
         for (size_t i = 0; i < m_times; ++i) {
-          for (size_t j = 0; j < m_actions.size(); ++j) {
-            m_actions[j]->apply(d);
+          vectorf vt_statistic(0);
+          for (size_t m = 0; m < maf.size(); ++m) {
+            d.setSitesByMaf(maflower, maf[m]);
+            for (size_t j = 0; j < m_actions.size(); ++j) {
+              m_actions[j]->apply(d);
+            }
+            if (m_alternative != 1) {
+              vt_statistic.push_back(fabs(d.statistic()));
+            }
+            else {
+              vt_statistic.push_back(d.statistic());
+            }
           }
-          all_statistic[i] = d.statistic(); 
-          d.permuteX();
+          double statistic = *max_element(vt_statistic.begin(), vt_statistic.end()); 
+          if (i == 0) {
+            obstatistic = statistic;
+          }
+          else {
+            if (statistic >= obstatistic) 
+              ++permcount1;
+          }
+          if (pvalue <= 1.0) {
+            break;
+          }
+          m_permute->apply(d);
         }
-        return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
+
+        if (pvalue <= 1.0) {
+          d.setPvalue(pvalue); 
+        }
+        else {
+          pvalue = (1.0 + permcount1) / (1.0 + m_times);
+          d.setPvalue(pvalue);
+        } 
+        return 0.0;
       }
+
 
     private:
       size_t m_times;
+      BaseAction *m_permute;
+      unsigned m_alternative;
   };
 
 }
-
 #endif

@@ -183,6 +183,12 @@ namespace vtools {
         return m_pval;
       }
 
+      double setPvalue(double pval)
+      {
+        m_pval = pval;
+        return 0.0;
+      }
+
       double statistic()
       {
         return m_statistic;
@@ -251,6 +257,7 @@ namespace vtools {
       void setSitesByMaf(double upper, double lower)
       {
         //Will update m_sites with 0 = sites not to be analyzed; 1 = sites to be analyzed 
+        m_sites.resize(0);
         if (upper > 1.0 || lower < 0.0) {
           throw ValueError("Minor allele frequency value should fall between 0 and 1");
         }
