@@ -116,12 +116,12 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = [array('d', map(float, x)) for x in zip(*cur.fetchall())[1:]]
+            self.phenotype = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype {}. Please \
-                             make sure the specified phenotype names are correct and there \
-                             is no missing value'.format(', '.join(phenotype)))
+            raise ValueError('''Failed to retrieve phenotype {}. Please 
+                             make sure the specified phenotype names are correct and there 
+                             is no missing value'''.format(', '.join(phenotype)))
     
     def getCovariate(self, condition, covariates):
         '''Get covariates for specified samples (specified by condition).'''
@@ -133,13 +133,13 @@ class AssociationTester(Sample):
             self.logger.debug('Select phenotype covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.covariates = [array('d', map(float, x)) for x in zip(*cur.fetchall())[1:]]
+            self.covariates = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
             self.covariates.insert(0, array('d', [1]*len(self.covariates[0])))
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype covariates {}. Please \
-                             make sure the specified phenotype covariates names are correct and \
-                             there is no missing value'.format(', '.join(covariates)))
+            raise ValueError('''Failed to retrieve phenotype covariates {}. Please 
+                             make sure the specified phenotype covariates names are correct and 
+                             there is no missing value'''.format(', '.join(covariates)))
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
