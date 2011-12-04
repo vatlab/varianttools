@@ -469,6 +469,17 @@ class ExternTest(NullTest):
     '''
     def __init__(self, logger=None, name=None, *method_args):
         pass
+    
+def freq(input):
+    try:
+        value = float(input)
+        if not (value >=0 and value <= 1):
+            msg = "%r is not valid input. Valid input should fall in range [0, 1]" % input
+            raise ValueError(msg)
+    except Exception as e:
+        raise argparse.ArgumentTypeError(e)
+    return value
+
 
 class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes
@@ -483,20 +494,31 @@ class LinearBurdenTest(NullTest):
             option is specified, it will collapse the variants within a group into a single pseudo code.''',
             prog='vtools associate --method ' + self.name)
         # no argumant is added
-        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
-            help='''Number of permutations.''')
-        parser.add_argument('-q1', '--mafupper', type=float, default=1.0,
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
             will be included in analysis. Default set to 1.0''')  
-        parser.add_argument('-q2', '--maflower', type=float, default=0.0,
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, default=1,
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--use_indicator', action='store_true',
-            help='''This option will apply binary coding to genotype groups
-            ("1" if ANY locus in the group has the alternative allele; "0" otherwise)''')
+            help='''This option, if envoked, will apply binary coding to genotype groups
+            (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations.''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 100,000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommanded to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To not using adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--variable_thresholds', action='store_true',
+            help='''This option, if envoked, will apply variable thresholds method to the permutation routine.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -505,13 +527,17 @@ class LinearBurdenTest(NullTest):
         data = self.data.clone()
         doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
-        actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
-        a = t.ActionExecutor(actions)
-        a.apply(data)
-        # permutation routine not ready
-        #if not self.permutations == 0:
-        #    p = t.FixedPermutator('Y', self.alternative, self.permutations, self.adaptive, [t.SimpleLinearRegression()])
-        #    p.apply(data)
+        if self.permutations == 0:
+            actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
+            a = t.ActionExecutor(actions)
+            a.apply(data)
+        else:
+            actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower)]
+            a = t.ActionExecutor(actions)
+            a.apply(data)
+            permutator = t.VariablePermutator() if self.variable_thresholds else t.FixedPermutator()
+            p = permutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, [codeX, doRegression])
+            p.apply(data)
         
         self.result['pvalue'] = data.pvalue()
         self.result['statistic'] = data.statistic()
