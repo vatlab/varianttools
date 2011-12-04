@@ -100,7 +100,28 @@ class TestAssoFnct(ProcessTestCase):
     #z1 = c(56,104,114,22,124,179,25,15,107,170,176,83,261,-15)
     #summary(lm(y~x+z1+z2+z3))
     self.assertEqual(round(data.statistic(), 3), round(3.371, 3)) 
-    self.assertEqual(round(data.pvalue(), 5), round(0.00824, 5)) 
+    self.assertEqual(round(data.pvalue(), 5), round(0.00824, 5))
+    
+  def testPermute(self):
+    ybar = self.data.setPhenotype(self.y, self.z)
+    self.data.setGenotype(self.x)
+    a = t.SumToX()
+    a.apply(self.data)
+    # test if permutation works
+    data = self.data.clone()
+    p = t.FixedPermutator('Y', 1, 1, 9, [t.SimpleLinearRegression()])
+    p.apply(data)
+    pheno = data.phenotype()
+    self.assertNotEqual(self.data.phenotype(), pheno)
+    self.assertEqual(self.data.genotype(), data.genotype())
+    p = t.FixedPermutator('X', 1, 1, 9, [t.SimpleLinearRegression()])
+    p.apply(data)
+    self.assertEqual(data.phenotype(), pheno)
+    self.assertNotEqual(data.genotype(), self.data.genotype())
+    # test if adaptive permutation works
+    data = self.data.clone()
+    p = t.FixedPermutator('Y', 2, 10000000, 0.002, [t.SimpleLinearRegression()])
+    p.apply(data)
 
 if __name__ == '__main__':
   unittest.main()

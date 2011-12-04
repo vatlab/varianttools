@@ -510,7 +510,7 @@ class LinearBurdenTest(NullTest):
         a.apply(data)
         # permutation routine not ready
         #if not self.permutations == 0:
-        #    p = t.PhenoPermutator(self.permutations, [t.SimpleLinearRegression()])
+        #    p = t.FixedPermutator('Y', self.alternative, self.permutations, self.adaptive, [t.SimpleLinearRegression()])
         #    p.apply(data)
         
         self.result['pvalue'] = data.pvalue()

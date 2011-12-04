@@ -1099,8 +1099,7 @@ class Project:
         cur = self.db.cursor()
         try:
             query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {};'.format(' WHERE {}'.format(cond) if cond.strip() else '')
-            self.logger.debug('Select samples using query')
-            self.logger.debug(query)
+            self.logger.debug('Select samples using query {}'.format(query))
             cur.execute(query)
             return set([x[0] for x in cur.fetchall()])
         except Exception as e:
