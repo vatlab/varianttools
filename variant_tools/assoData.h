@@ -187,6 +187,12 @@ namespace vtools {
       {
         m_pval = pval;
         return 0.0;
+      }      
+      
+      double setStatistic(double stat)
+      {
+        m_statistic = stat;
+        return 0.0;
       }
 
       double statistic()
@@ -257,7 +263,7 @@ namespace vtools {
       void setSitesByMaf(double upper, double lower)
       {
         //Will update m_sites with 0 = sites not to be analyzed; 1 = sites to be analyzed 
-        m_sites.resize(0);
+        m_sites.clear();
         if (upper > 1.0 || lower < 0.0) {
           throw ValueError("Minor allele frequency value should fall between 0 and 1");
         }
@@ -281,6 +287,9 @@ namespace vtools {
         //!- Statistic: LSE (MLE) for beta, centered and scaled (bcz E[b] = 0 and sigma = 1 by simulation) 
         //!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
         //
+        if (m_X.size() != m_phenotype.size()) {
+          throw ValueError("Genotype/Phenotype length not equal!");
+        }
         double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
         for (size_t i = 0; i != m_X.size(); ++i) {
           numerator += (m_X[i] - m_xbar) * m_phenotype[i];
@@ -309,7 +318,9 @@ namespace vtools {
         //!- Score test implementation for logistic regression model logit(p) = b0 + b1x 
         //!- labnotes vol.2 page 3
         //!- input phenotypes have to be binary values 0 or 1
-
+        if (m_X.size() != m_phenotype.size()) {
+          throw ValueError("Genotype/Phenotype length not equal!");
+        }
         //double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
         //double bo = log(ebo);
 
@@ -339,6 +350,9 @@ namespace vtools {
         //!- multiple linear regression parameter estimate
         //!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
         //!- Solve the system via gsl_linalg_SV_solve()
+        if (m_X.size() != m_phenotype.size()) {
+          throw ValueError("Genotype/Phenotype length not equal!");
+        }
         m_model.replaceCol(m_X, m_C.size()-1);
         m_model.fit();
         vectorf beta = m_model.getBeta();

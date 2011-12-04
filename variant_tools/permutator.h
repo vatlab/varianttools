@@ -65,17 +65,17 @@ namespace vtools {
         return 0;
       }
 
-      double check(int pcount1, int pcount2, size_t current, unsigned alt, double sig) const
+      double check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
       {
         // the adaptive p-value technique
         if (current % 10000 != 0 || current == 0) {
           return 9.0;
         }
         double x;
-        if (alt == 1 || pcount2 < 0) {
+        if (alt == 1) {
           x = 1.0 + pcount1;
-        }
-        else {
+        } else
+        {
           x = fmin(pcount1 + 1.0, pcount2 + 1.0);
         }
 
@@ -105,12 +105,12 @@ namespace vtools {
         double z = gsl_cdf_gaussian_Pinv(1.0-alpha/2.0, 1.0);
         double zsq = z*z;
         double plw = (pval + zsq / (2.0*n) - z * sqrt((pval*(1.0-pval)+zsq/(4.0*n))/(1.0*n))) / (1.0+zsq/(1.0*n));
-        plw = (alt == 1 || pcount2 < 0)?plw:plw*2.0;
+        plw = (alt == 1) ? plw : plw*2.0;
 
         if (plw > sig) { 
-          return (alt == 1 || pcount2 < 0)?pval:pval*2.0;
-        }
-        else {
+          return (alt == 1) ? pval : pval*2.0;
+        } else
+        {
           return 9.0;
         }
       }
@@ -120,11 +120,11 @@ namespace vtools {
   };
 
 
-  class ActionExecuter : public BasePermutator
+  class ActionExecutor : public BasePermutator
   {
 
     public:
-      ActionExecuter(const vectora & actions)
+      ActionExecutor(const vectora & actions)
         : BasePermutator(actions)
       {
       }
@@ -150,8 +150,8 @@ namespace vtools {
         if (pm == 'Y') {
           PermuteY* permute = new PermuteY();
           m_permute = permute->clone();
-        }
-        else {
+        } else
+        {
           PermuteX* permute = new PermuteX();
           m_permute = permute->clone();
         }
@@ -164,7 +164,7 @@ namespace vtools {
       
       double apply(AssoData & d)
       {
-        int permcount1 = 0, permcount2 = 0;
+        unsigned permcount1 = 0, permcount2 = 0;
         double obstatistic = 0.0;
         double pvalue = 9.0;
 
@@ -175,8 +175,8 @@ namespace vtools {
           double statistic = d.statistic(); 
           if (i == 0) {
             obstatistic = statistic;
-          }
-          else {
+          } else
+          {
             if (statistic >= obstatistic) 
               ++permcount1;
             if (statistic <= obstatistic)
@@ -194,18 +194,19 @@ namespace vtools {
 
         if (pvalue <= 1.0) {
           d.setPvalue(pvalue); 
-        }
-        else {
+        } else
+        {
           if (m_alternative == 1) { 
             pvalue = (permcount1 + 1.0) / (m_times + 1.0);
-          }
-          else {
+          } else 
+          {
             double permcount = fmin(permcount1, permcount2);
             pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
           }
           d.setPvalue(pvalue);
         } 
 
+        d.setStatistic(obstatistic);
         return 0.0;
         //return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
       }
@@ -229,8 +230,8 @@ namespace vtools {
         if (pm == 'Y') {
           PermuteY* permute = new PermuteY();
           m_permute = permute->clone();
-        }
-        else {
+        } else 
+        {
           PermuteX* permute = new PermuteX();
           m_permute = permute->clone();
         }
@@ -244,12 +245,16 @@ namespace vtools {
       double apply(AssoData & d)
       {
 
+        if (d.maf().size()==0) {
+          throw ValueError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
+        }
+
         // obtain proper thresholds cutoffs
         vectorf maf;
         if (d.sites().size() == 0) {
           maf = d.maf();
-        }
-        else {
+        } else
+        {
           maf.resize(0);
           vectorf mafall = d.maf();
           vectori sites = d.sites();
@@ -260,38 +265,40 @@ namespace vtools {
         std::sort(maf.begin(), maf.end());
         std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
         maf.resize(it - maf.begin()); 
+        if (fEqual(maf[0], 0.0)) {
+          maf.erase(maf.begin());
+        }  
         double maflower = maf[0] - std::numeric_limits<double>::epsilon();
 
         // apply variable thresholds w/i permutation test
-        int permcount1 = 0;
-        double obstatistic = 0.0;
+        unsigned permcount1 = 0, permcount2 = 0;
+        double max_obstatistic = 0.0, min_obstatistic = 0.0;
         double pvalue = 9.0;
 
         for (size_t i = 0; i < m_times; ++i) {
           vectorf vt_statistic(0);
           for (size_t m = 0; m < maf.size(); ++m) {
-            d.setSitesByMaf(maflower, maf[m]);
+            d.setSitesByMaf(maf[m], maflower);
             for (size_t j = 0; j < m_actions.size(); ++j) {
               m_actions[j]->apply(d);
             }
-            if (m_alternative != 1) {
-              vt_statistic.push_back(fabs(d.statistic()));
-            }
-            else {
-              vt_statistic.push_back(d.statistic());
-            }
+            vt_statistic.push_back(d.statistic());
           }
-          double statistic = *max_element(vt_statistic.begin(), vt_statistic.end()); 
+          double max_statistic = *max_element(vt_statistic.begin(), vt_statistic.end()); 
+          double min_statistic = *min_element(vt_statistic.begin(), vt_statistic.end()); 
           if (i == 0) {
-            obstatistic = statistic;
-          }
-          else {
-            if (statistic >= obstatistic) 
+            max_obstatistic = max_statistic;
+            min_obstatistic = min_statistic;
+          } else
+          {
+            if (max_statistic >= max_obstatistic) 
               ++permcount1;
+            if (min_statistic <= min_obstatistic) 
+              ++permcount2;
           }
           // adaptive p-value calculation
           if (m_sig < 1.0) {
-            pvalue = check(permcount1, -1, i, m_alternative, m_sig);
+            pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
           }
           if (pvalue <= 1.0) {
             break;
@@ -301,11 +308,26 @@ namespace vtools {
 
         if (pvalue <= 1.0) {
           d.setPvalue(pvalue); 
-        }
-        else {
-          pvalue = (1.0 + permcount1) / (1.0 + m_times);
+        } else
+        {
+          if (m_alternative == 1) { 
+            pvalue = (permcount1 + 1.0) / (m_times + 1.0);
+          } else
+          {
+            double permcount = fmin(permcount1, permcount2);
+            pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
+          }
           d.setPvalue(pvalue);
         } 
+
+        // set statistic, a bit involved
+        if (m_alternative == 1) { 
+          d.setStatistic(max_obstatistic);
+        } else 
+        {
+          (permcount1 >= permcount2)?d.setStatistic(max_obstatistic):d.setStatistic(min_obstatistic);
+        }
+
         return 0.0;
       }
 

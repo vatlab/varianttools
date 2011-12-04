@@ -57,7 +57,7 @@ class TestAssoFnct(ProcessTestCase):
     
     self.data.setGenotype(self.x2)
     actions = [t.SetMaf(), t.SetSites(0.3, 0.1), t.SumToX()]
-    a = t.ActionExecuter(actions)
+    a = t.ActionExecutor(actions)
     a.apply(self.data)
     self.assertEqual(list(self.data.genotype()), [1.0,2.0,0.0])
 
@@ -72,7 +72,7 @@ class TestAssoFnct(ProcessTestCase):
     data = self.data.clone()
     # simple linear regression
     actions = [t.SumToX(), t.SimpleLinearRegression(), t.StudentPval(2)]
-    a = t.ActionExecuter(actions)
+    a = t.ActionExecutor(actions)
     a.apply(data)
     # compare with lm(y~x) in R
     self.assertEqual(round(data.statistic(), 3), round(3.898, 3))
@@ -91,7 +91,7 @@ class TestAssoFnct(ProcessTestCase):
     
     # multiple linear regression
     actions = [t.SumToX(), t.MultipleLinearRegression(), t.StudentPval(2)]
-    a = t.ActionExecuter(actions)
+    a = t.ActionExecutor(actions)
     a.apply(data)
     #y = c(165,-22,228,166,277,-18,102,13,231,22,-54,66,94,36)
     #x = c(2,0,1,2,1,0,1,0,2,1,0,0,1,0)
@@ -103,6 +103,7 @@ class TestAssoFnct(ProcessTestCase):
     self.assertEqual(round(data.pvalue(), 5), round(0.00824, 5))
     
   def testPermute(self):
+    'Test permutator with fixed maf threshold'
     ybar = self.data.setPhenotype(self.y, self.z)
     self.data.setGenotype(self.x)
     a = t.SumToX()
@@ -111,17 +112,65 @@ class TestAssoFnct(ProcessTestCase):
     data = self.data.clone()
     p = t.FixedPermutator('Y', 1, 1, 9, [t.SimpleLinearRegression()])
     p.apply(data)
-    pheno = data.phenotype()
-    self.assertNotEqual(self.data.phenotype(), pheno)
+    self.assertEqual(round(data.statistic(), 5), 3.89829)
+    self.assertNotEqual(self.data.phenotype(), data.phenotype())
     self.assertEqual(self.data.genotype(), data.genotype())
+    data = self.data.clone()
     p = t.FixedPermutator('X', 1, 1, 9, [t.SimpleLinearRegression()])
     p.apply(data)
-    self.assertEqual(data.phenotype(), pheno)
+    self.assertEqual(round(data.statistic(), 5), 3.89829)
+    self.assertEqual(data.phenotype(), self.data.phenotype())
     self.assertNotEqual(data.genotype(), self.data.genotype())
     # test if adaptive permutation works
+    #n = 100000
+    #val = vector()
+    #for(i in 1:n) {
+    # val[i] = summary(lm(y~x))$coef[2,3]
+    # y=sample(y)
+    #}
+    #length(which(pval>=val[1]))/n *2
     data = self.data.clone()
     p = t.FixedPermutator('Y', 2, 10000000, 0.002, [t.SimpleLinearRegression()])
     p.apply(data)
-
+    self.assertEqual(round(data.statistic(), 5), 3.89829)
+    #print data.pvalue()
+    
+  def testVariablePermute(self):
+    'Test permutator with variable thresholds'
+    ybar = self.data.setPhenotype(self.y, self.z)
+    self.data.setGenotype(self.x2)
+    # test if permutation with variable thresholds works
+    data = self.data.clone()
+    a = t.SetMaf()
+    a.apply(data)
+    p = t.VariablePermutator('Y', 1, 1, 9, [t.SumToX(), t.BinToX()])
+    p.apply(data)
+    # all maf: 0.333333 0 0.333333 0.333333 0.333333 0 0.166667 0 0.333333 0.166667 0 0 0.166667 0
+    # sorted: 0 0 0 0 0 0 0.166667 0.166667 0.166667 0.333333 0.333333 0.333333 0.333333 0.333333
+    # unique: 0 0.166667 0.333333
+    # first vt: 0 0 0 0 0 0 1 0 0 1 0 0 1 0
+    # 2nd vt: 1 0 1 1 1 0 1 0 1 1 0 0 1 0
+    # test if it works on pre-trimmed data
+    data = self.data.clone()
+    a = t.ActionExecutor([t.SetMaf(), t.SetSites(1, 0.17)])
+    a.apply(data)
+    p = t.VariablePermutator('Y', 1, 1, 9, [t.SumToX(), t.BinToX()])
+    p.apply(data)     
+    # all maf: 0.333333 0.333333 0.333333 0.333333 0.333333
+    # sorted: 0.333333 0.333333 0.333333 0.333333 0.333333
+    # unique: 0.333333
+    # first (only) vt: 1 0 1 1 1 0 0 0 1 0 0 0 0 0
+    # 
+    # test variable threshold permutation 
+    self.data.setGenotype(self.x)
+    data = self.data.clone()
+    a = t.SetMaf()
+    a.apply(data)
+    print data.maf()
+    p = t.VariablePermutator('Y', 2, 10000000, 0.002, [t.SumToX(), t.SimpleLinearRegression()])
+    p.apply(data)
+    self.assertEqual(round(data.statistic(), 5), 3.89829)
+    #print data.pvalue()
+    
 if __name__ == '__main__':
   unittest.main()
