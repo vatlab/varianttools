@@ -495,7 +495,7 @@ class LinearBurdenTest(NullTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo code.''',
+            option is specified, it will collapse the variants within a group into a single pseudo coding''',
             prog='vtools associate --method ' + self.name)
         # no argumant is added
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
@@ -512,7 +512,7 @@ class LinearBurdenTest(NullTest):
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
-            help='''Number of permutations.''')
+            help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
@@ -522,10 +522,10 @@ class LinearBurdenTest(NullTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if envoked, will apply variable thresholds method to the permutation routine in GENE based analysis.''')
+            help='''This option, if envoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight_by_maf', action='store_true',
             help='''This option, if envoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to the permutation routine in GENE based analysis. Note this option will be masked if --use_indicator is envoked''')
+            to GENE based analysis. Note this option will be masked if --use_indicator is envoked''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
