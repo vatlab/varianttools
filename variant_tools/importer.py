@@ -1897,11 +1897,13 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             other = f
         elif e == '#(GT)':
             cnt = f
+        elif e.startswith('#('):
+            raise ValueError('Unrecognized parameter {}: only parameters alt, hom, het, other and GT are accepted for special function #'.format(stat))
         else:
-            groups = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat).groups()
-            if groups is None:
-                raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO)'.format(stat))
-            dest, operation, field = groups
+            m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
+            if m is None:
+                raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max and min'.format(stat))
+            dest, operation, field = m.groups()
             if operation not in possibleOperations:
                 raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
             operations.append(operationKeys[operation])
