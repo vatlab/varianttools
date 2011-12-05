@@ -128,6 +128,29 @@ namespace vtools {
             std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
       }
 
+      void setMafWeight()
+      {
+        // compute w = 1 / sqrt(p*(1-p))
+        if (m_maf.size()==0) {
+          throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+        }
+        //
+        m_weight.clear();
+        for (size_t i = 0; i < m_maf.size(); ++i) {
+          if (fEqual(m_maf[i], 0.0) || fEqual(m_maf[i], 1.0)) {
+            m_weight.push_back(0.0);
+          } else 
+          {
+            m_weight.push_back(1.0/sqrt(m_maf[i] * (1.0-m_maf[i])));
+          }
+        }
+      }
+
+      void setMafWeight(const std::vector<size_t> & idx) 
+      {
+        // FIXME weight by maf from selected samples (ctrls, low QT samples, etc)
+      }
+
 
       double meanOfX()
       {
@@ -188,7 +211,7 @@ namespace vtools {
         m_pval = pval;
         return 0.0;
       }      
-      
+
       double setStatistic(double stat)
       {
         m_statistic = stat;
@@ -226,7 +249,16 @@ namespace vtools {
             }
 
             if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j]; 
-            if (fEqual(m_genotype[i][j], -1.0)) m_X[i] += 2.0; 
+          }
+        }
+      }
+
+      void weightX()
+      {
+        if (m_weight.size() == 0) return;
+        for (size_t i = 0; i < m_genotype.size(); ++i) {
+          for (size_t j = 0; j < m_genotype[i].size(); ++j) {
+            if (m_genotype[i][j] > 0) m_genotype[i][j] *= m_weight[j]; 
           }
         }
       }
@@ -243,8 +275,8 @@ namespace vtools {
             if (m_sites.size() != 0) { 
               if (m_sites[j] == 0) continue;
             }
-        
-            if (m_genotype[i][j] >= 1.0 || fEqual(m_genotype[i][j], -1.0)) {  
+
+            if (m_genotype[i][j] >= 1.0) {  
               m_X[i] = 1.0;
               break;
             }
@@ -407,6 +439,9 @@ namespace vtools {
 
       // sites that are involved in the association test
       vectori m_sites;
+
+      // weights
+      vectorf m_weight;
 
       double m_xbar;
       double m_ybar;

@@ -166,7 +166,7 @@ class TestAssoFnct(ProcessTestCase):
     data = self.data.clone()
     a = t.SetMaf()
     a.apply(data)
-    print data.maf()
+#    print data.maf()
     p = t.VariablePermutator('Y', 2, 10000000, 0.002, [t.SumToX(), t.SimpleLinearRegression()])
     p.apply(data)
     self.assertEqual(round(data.statistic(), 5), 3.89829)

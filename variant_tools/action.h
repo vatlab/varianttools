@@ -154,6 +154,28 @@ namespace vtools {
         return 0;
       }
   };
+  
+  
+  class WeightByAllMaf : public BaseAction
+  {
+    // this will change the raw genotypes directly!
+    public:
+      WeightByAllMaf() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new WeightByAllMaf(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.setMafWeight();
+        d.weightX();
+        return 0;
+      }
+  };
 
 
   class SetSites : public BaseAction

@@ -278,7 +278,11 @@ class GroupAssociationCalculator(Process):
             cur.execute(query, group)
 #            cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
-            genotype.append(array('d', [gtmp.get(x, -9.0) for x in variant_id]))
+            # handle missing values
+            gtmp = [gtmp.get(x, -9.0) for x in variant_id]
+            # handle -1 coding (double heterozygotes)
+            gtmp = [2.0 if int(x) == -1 else x for x in gtmp]
+            genotype.append(array('d', gtmp))
         #
         self.logger.debug('Retrieved genotypes for {} samples'.format(len(genotype)))
         self.db.detach('__fromGeno')
@@ -518,7 +522,10 @@ class LinearBurdenTest(NullTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if envoked, will apply variable thresholds method to the permutation routine.''')
+            help='''This option, if envoked, will apply variable thresholds method to the permutation routine in GENE based analysis.''')
+        parser.add_argument('--weight_by_maf', action='store_true',
+            help='''This option, if envoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
+            to the permutation routine in GENE based analysis. Note this option will be masked if --use_indicator is envoked''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -529,14 +536,25 @@ class LinearBurdenTest(NullTest):
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
         if self.permutations == 0:
             actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
+            if self.weight_by_maf and not self.use_indicator:
+                actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), t.WeightByAllMaf(), codeX, doRegression, t.StudentPval(self.alternative)]
             a = t.ActionExecutor(actions)
             a.apply(data)
         else:
             actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower)]
+            if self.weight_by_maf and not self.use_indicator:
+                actions.append(t.WeightByAllMaf())
+            permute_actions = [codeX, doRegression]
+            permutator = t.VariablePermutator()
+            if not self.variable_thresholds:
+                permutator = t.FixedPermutator()
+                permute_actions = [doRegression]
+                actions.append(codeX)
+            # pre-processing data
             a = t.ActionExecutor(actions)
             a.apply(data)
-            permutator = t.VariablePermutator() if self.variable_thresholds else t.FixedPermutator()
-            p = permutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, [codeX, doRegression])
+            # permutation
+            p = permutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
             p.apply(data)
         
         self.result['pvalue'] = data.pvalue()

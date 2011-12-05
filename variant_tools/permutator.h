@@ -246,7 +246,7 @@ namespace vtools {
       {
 
         if (d.maf().size()==0) {
-          throw ValueError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
+          throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
         }
 
         // obtain proper thresholds cutoffs
