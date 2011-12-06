@@ -42,6 +42,16 @@ index=7
 type=CHAR(1) NULL
 comment=which DNA strand contains the observed alleles
 
+[refNCBI]
+index=8
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from dbSNP
+
+[refUCSC]
+index=9
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from UCSC lookup of chrom,chromStart,chromEnd
+
 [observed]
 index=10
 type=VARCHAR(200) NULL
@@ -51,7 +61,7 @@ comment=Strand-specific observed alleles
 index=7,8,10
 # lambda x converts the observed string to the positive strand
 # lambda z extracts out the alternate allele from lambda x
-adj=lambda x: [x[1], x[2].split('/')] if (x[0] == '+') else [x[1], ''.join(map(lambda y: {'A':'T', 'T':'A', 'C':'G', 'G':'C', '/':'/', '-':'-', '':''}[y], x[2])).split('/')], lambda z: z[1][0] if z[1][0] != z[0] else z[1][1]
+adj=lambda x: [x[1], x[2].split('/')] if (x[0] == '+') else [x[1], ''.join(map(lambda y: {'A':'T', 'T':'A', 'C':'G', 'G':'C', '/':'/', '-':'-', '':''}[y], x[2])).split('/')], lambda z: z[1][0] if z[1][0] != z[0] else z[1][1] 
 type=VARCHAR(200) NULL
 comment=alternate allele on the '+' strand
 
