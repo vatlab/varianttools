@@ -129,10 +129,6 @@ namespace vtools {
             gx[i] = 0.0;
             continue;
           } 
-          if (gx[i] < 0.0) {
-            // double het
-            gx[i] = 2.0;
-          }
         }
         m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), 
             gx, vplus);

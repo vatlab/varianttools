@@ -517,7 +517,7 @@ class LinearBurdenTest(NullTest):
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
-            The program will compute a p-value every 2500 permutations and compare the lower bound of the 95 percent CI
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommanded to
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')

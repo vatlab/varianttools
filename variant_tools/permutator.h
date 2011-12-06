@@ -69,7 +69,7 @@ namespace vtools {
       double check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
       {
         // the adaptive p-value technique
-        if (current % 2000 != 0 || current == 0) {
+        if (current % 1000 != 0 || current == 0) {
           return 9.0;
         }
         double x;
