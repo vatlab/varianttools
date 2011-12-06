@@ -517,7 +517,7 @@ class LinearBurdenTest(NullTest):
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
-            The program will compute a p-value every 100,000 permutations and compare the lower bound of the 95 percent CI
+            The program will compute a p-value every 2500 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommanded to
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
@@ -545,16 +545,15 @@ class LinearBurdenTest(NullTest):
             if self.weight_by_maf and not self.use_indicator:
                 actions.append(t.WeightByAllMaf())
             permute_actions = [codeX, doRegression]
-            permutator = t.VariablePermutator()
+            p = t.VariablePermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
             if not self.variable_thresholds:
-                permutator = t.FixedPermutator()
                 permute_actions = [doRegression]
+                p = t.FixedPermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
                 actions.append(codeX)
             # pre-processing data
             a = t.ActionExecutor(actions)
             a.apply(data)
             # permutation
-            p = permutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
             p.apply(data)
         
         self.result['pvalue'] = data.pvalue()

@@ -122,8 +122,20 @@ namespace vtools {
       {
         //sample based maf
         struct VPlus vplus;
+        vectorf gx = m_genotype.front();
+        for (size_t i = 0; i < gx.size(); ++i) {
+          if (gx[i] < -1.0) {
+            // missing
+            gx[i] = 0.0;
+            continue;
+          } 
+          if (gx[i] < 0.0) {
+            // double het
+            gx[i] = 2.0;
+          }
+        }
         m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), 
-            m_genotype[0], vplus);
+            gx, vplus);
         std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
             std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
       }
@@ -296,9 +308,13 @@ namespace vtools {
       {
         //Will update m_sites with 0 = sites not to be analyzed; 1 = sites to be analyzed 
         m_sites.clear();
-        if (upper > 1.0 || lower < 0.0) {
-          throw ValueError("Minor allele frequency value should fall between 0 and 1");
+        if (upper > 1.0) {
+          throw ValueError("Minor allele frequency value should not exceed 1");
         }
+        if (lower < 0.0) {
+          throw ValueError("Minor allele frequency should be a positive value");
+        }
+
         if (fEqual(upper,1.0) && fEqual(lower,0.0)) return;
 
         for (size_t j = 0; j != m_maf.size(); ++j) {

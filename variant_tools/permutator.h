@@ -29,6 +29,7 @@
 #include "assoConfig.h"
 #include "assoData.h"
 #include "action.h"
+#include <limits>
 
 namespace vtools {
 
@@ -68,7 +69,7 @@ namespace vtools {
       double check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
       {
         // the adaptive p-value technique
-        if (current % 10000 != 0 || current == 0) {
+        if (current % 2000 != 0 || current == 0) {
           return 9.0;
         }
         double x;
@@ -117,6 +118,7 @@ namespace vtools {
 
     protected:
       vectora m_actions;
+
   };
 
 
@@ -164,6 +166,9 @@ namespace vtools {
       
       double apply(AssoData & d)
       {
+        RNG rng;
+        gsl_rng* gslr = rng.get();
+
         unsigned permcount1 = 0, permcount2 = 0;
         double obstatistic = 0.0;
         double pvalue = 9.0;
@@ -177,10 +182,16 @@ namespace vtools {
             obstatistic = statistic;
           } else
           {
-            if (statistic >= obstatistic) 
+            if (statistic > obstatistic) {
               ++permcount1;
-            if (statistic <= obstatistic)
+            } else if (statistic < obstatistic) 
+            {
               ++permcount2;
+            } else
+            {
+              if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
+              else ++permcount2;
+            }
           }
           // adaptive p-value calculation
           if (m_sig < 1.0) {
@@ -244,10 +255,12 @@ namespace vtools {
 
       double apply(AssoData & d)
       {
-
         if (d.maf().size()==0) {
           throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
         }
+        
+        RNG rng;
+        gsl_rng* gslr = rng.get();
 
         // obtain proper thresholds cutoffs
         vectorf maf;
@@ -265,10 +278,20 @@ namespace vtools {
         std::sort(maf.begin(), maf.end());
         std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
         maf.resize(it - maf.begin()); 
-        if (fEqual(maf[0], 0.0)) {
+        if (fEqual(maf.front(), 0.0)) {
           maf.erase(maf.begin());
-        }  
-        double maflower = maf[0] - std::numeric_limits<double>::epsilon();
+        }
+        if (fEqual(maf.back(), 1.0)) {
+          maf.erase(maf.end());
+        }
+        if (maf.size() == 0) {
+          // nothing to do
+          d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+          d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+          return 0.0;
+        }
+
+        double maflower = maf.front() - std::numeric_limits<double>::epsilon();
 
         // apply variable thresholds w/i permutation test
         unsigned permcount1 = 0, permcount2 = 0;
@@ -289,13 +312,22 @@ namespace vtools {
           if (i == 0) {
             max_obstatistic = max_statistic;
             min_obstatistic = min_statistic;
-          } else
+          } else          
           {
-            if (max_statistic >= max_obstatistic) 
-              ++permcount1;
-            if (min_statistic <= min_obstatistic) 
-              ++permcount2;
+            if (max_statistic>= max_obstatistic && min_statistic <= min_obstatistic) {
+              if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
+              else ++permcount2;
+            } else
+            {
+              if (max_statistic >= max_obstatistic) {
+                ++permcount1;
+              }
+              if (min_statistic <= min_obstatistic) {
+                ++permcount2;
+              }
+            }
           }
+
           // adaptive p-value calculation
           if (m_sig < 1.0) {
             pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
@@ -330,7 +362,6 @@ namespace vtools {
 
         return 0.0;
       }
-
 
     private:
       size_t m_times;

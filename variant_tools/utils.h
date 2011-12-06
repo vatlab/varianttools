@@ -30,7 +30,8 @@
 #include <functional>
 #include <vector>
 #include <iostream>
-
+#include <ctime>
+#include "gsl/gsl_rng.h"
 #include "gsl/gsl_vector.h"
 #include "gsl/gsl_matrix.h"
 #include "gsl/gsl_blas.h"
@@ -67,6 +68,31 @@ namespace std {
 }
 
 namespace vtools {
+
+  class RNG 
+  {
+    public:
+      // gsl_rng_alloc(gsl_rng_ranlxs2)    
+      RNG() : rng( gsl_rng_alloc(gsl_rng_mt19937) ) {};
+      ~RNG() { gsl_rng_free( rng ); }
+      gsl_rng* get()
+      {  
+        // time(NULL): number of seconds since 00:00:00 GMT Jan. 1, 1970
+        __seed = static_cast<unsigned long>(time (NULL) + getpid());
+        gsl_rng_set(rng, __seed);
+        return rng; 
+      }    
+      gsl_rng* get(const unsigned long seed)
+      {  
+        __seed = seed;
+        gsl_rng_set(rng, __seed);
+        return rng; 
+      }
+
+    private:
+      gsl_rng* rng;
+      unsigned long __seed;
+  };
 
   class BaseLm
   {
@@ -150,7 +176,7 @@ namespace vtools {
           gsl_vector_set(m_y, i, y[i]);
         }
       }
-  
+
       std::vector<std::vector<double> > getX()
       {
         std::vector<std::vector<double> > xout(m_ncol);
@@ -270,15 +296,15 @@ namespace vtools {
         if (m_err != 0) {
           throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
         }
-        
-        
+
+
         //solve system Ax=b where x is beta
         m_err = gsl_linalg_SV_solve(m_svdU, m_svdV, m_svdS, b, m_beta);
         if (m_err != 0) {
           throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
         }
-        
-        
+
+
         gsl_vector_free(b);
         gsl_vector_free(work);
       }
@@ -291,7 +317,7 @@ namespace vtools {
         }
         return beta;
       }
-      
+
       std::vector<double> getSEBeta()
       {
         if (!m_beta) {
@@ -308,7 +334,7 @@ namespace vtools {
         gsl_matrix_set_zero(D);
         gsl_vector_memcpy(&tmp.vector, oneovers);
         gsl_vector_free(oneovers);
-        
+
         gsl_matrix *V = gsl_matrix_alloc(m_ncol, m_ncol);
         m_err = gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, m_svdV, D, 0.0, V);
         if (m_err != 0) {
@@ -332,7 +358,7 @@ namespace vtools {
         }
         gsl_vector_free(fitted);
         mse = mse / ((m_nrow-m_ncol)*1.0);
-       
+
         // s(b) = mse(X'X)^-1
         std::vector<double> seb(m_ncol);
         //tmp is the diagnal vector for D
