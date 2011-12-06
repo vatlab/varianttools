@@ -180,7 +180,8 @@ class AssociationTester(Sample):
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
-            self.from_clause, self.where_clause) 
+            self.from_clause, self.where_clause)
+        self.logger.info("Creating association test table (please be patient ...)")
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\

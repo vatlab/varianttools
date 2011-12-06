@@ -247,9 +247,9 @@ namespace vtools {
       void sumToX()
       {
         m_X.resize(m_genotype.size());
+        std::fill(m_X.begin(), m_X.end(), 0.0);
         for (size_t i = 0; i < m_genotype.size(); ++i) {
           //m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
-          m_X[i] = 0.0;
           for (size_t j = 0; j < m_genotype[i].size(); ++j) {
             // check if we should skip this site
             if (m_sites.size() != 0) { 
@@ -275,8 +275,8 @@ namespace vtools {
       {
         // binning the data with proper handling of missing genotype
         m_X.resize(m_genotype.size());
+        std::fill(m_X.begin(), m_X.end(), 0.0);
         for (size_t i = 0; i < m_genotype.size(); ++i) {
-          m_X[i] = 0.0;
           double pnovar = 1.0;
           for (size_t j = 0; j != m_genotype[i].size(); ++j) {  
             // check if we should skip this site

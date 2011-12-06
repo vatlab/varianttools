@@ -94,8 +94,15 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     if args.header is not None:
         sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in \
             (output_fields if len(args.header) == 0 else args.header)]) + '\n')
+    # FIXME: a semi-solution to potentially duplicated lines in output
+    last_line = None
     for count, rec in enumerate(cur):
-        sys.stdout.write(args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n')
+        line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
+        if line == last_line:
+            continue
+        last_line = line
+        sys.stdout.write(line)
+
 
 
 def output(args):
