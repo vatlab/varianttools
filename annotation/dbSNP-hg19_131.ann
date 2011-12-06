@@ -5,10 +5,10 @@
 # for a description of the format of this file.
 
 [linked fields]
-hg19=chr, start
+hg19=chr, start, refNCBI, alt
 
 [data sources]
-anno_type=position
+anno_type=variant
 description=dbSNP version 131
 version=hg19_131
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp131.txt.gz

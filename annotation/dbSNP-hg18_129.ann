@@ -10,10 +10,10 @@
 #
 
 [linked fields]
-hg18=chr, start
+hg18=chr, start, refNCBI, alt
 
 [data sources]
-anno_type=position
+anno_type=variant
 description=dbSNP version 129
 version=hg18_129
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snp129.txt.gz
