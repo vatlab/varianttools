@@ -757,13 +757,14 @@ class TextWorker(Process):
     # to process input line. If multiple works are started,
     # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     #
-    def __init__(self, processor, input, varIdx, output, step, index, logger):
+    def __init__(self, processor, input, varIdx, output, step, index, encoding, logger):
         self.processor = processor
         self.input = input
         self.output = output
         self.step = step
         self.varIdx = varIdx
         self.index = index
+        self.encoding = encoding
         self.logger = logger
         Process.__init__(self)
 
@@ -777,7 +778,7 @@ class TextWorker(Process):
                 line_no += 1
                 if line_no % self.step != self.index:
                     continue
-                line = line.decode()
+                line = line.decode(self.encoding)
                 try:
                     if line.startswith('#'):
                         continue
@@ -800,25 +801,26 @@ class TextWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-def TextReader(processor, input, varIdx, jobs, logger):
+def TextReader(processor, input, varIdx, jobs, encoding, logger):
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, logger)
+        return EmbeddedTextReader(processor, input, varIdx, encoding, logger)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, logger)
+        return StandaloneTextReader(processor, input, varIdx, encoding, logger)
     else:
-        return MultiTextReader(processor, input, varIdx, jobs, logger)
+        return MultiTextReader(processor, input, varIdx, jobs, encoding, logger)
 
 class EmbeddedTextReader:
     #
     # This processor uses the passed line processor to process input
     # in the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, logger):
+    def __init__(self, processor, input, varIdx, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
         self.processor = processor
         self.input = input
         self.varIdx = varIdx
+        self.encoding = encoding
         self.logger = logger
 
     def records(self): 
@@ -827,7 +829,7 @@ class EmbeddedTextReader:
         with openFile(self.input) as input_file:
             for line in input_file:
                 line_no += 1
-                line = line.decode()
+                line = line.decode(self.encoding)
                 try:
                     if line.startswith('#'):
                         continue
@@ -850,12 +852,12 @@ class StandaloneTextReader:
     # This processor fire up 1 worker to read an input file
     # and gather their outputs
     #
-    def __init__(self, processor, input, varIdx, logger):
+    def __init__(self, processor, input, varIdx, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = TextWorker(processor, input, varIdx, w, 1, 0, logger)
+        self.worker = TextWorker(processor, input, varIdx, w, 1, 0, encoding, logger)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -875,14 +877,14 @@ class MultiTextReader:
     # This processor fire up num workers to read an input file
     # and gather their outputs
     #
-    def __init__(self, processor, input, varIdx, jobs, logger):
+    def __init__(self, processor, input, varIdx, jobs, encoding, logger):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.skipped_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = TextWorker(processor, input, varIdx, w, jobs, i, logger)
+            p = TextWorker(processor, input, varIdx, w, jobs, i, encoding, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1096,7 +1098,7 @@ class BaseImporter:
         count = 0
         with openFile(filename) as input:
             for line in input:
-                line = line.decode()
+                line = line.decode(self.encoding)
                 # the last # line
                 if line.startswith('#'):
                     header_line = line
@@ -1141,7 +1143,7 @@ class BaseImporter:
         header = ''
         with openFile(filename) as input:
             for line in input:
-                line = line.decode()
+                line = line.decode(self.encoding)
                 if line.startswith('#'):
                     header += line
                 else:
@@ -1314,6 +1316,7 @@ class TextImporter(BaseImporter):
             self.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
         #
         self.input_type = fmt.input_type
+        self.encoding = fmt.encoding
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
         self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
             .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
@@ -1422,11 +1425,11 @@ class TextImporter(BaseImporter):
         else:
             # no genotype no sample
             genotype_status = 0
-        lc = lineCount(input_filename)
+        lc = lineCount(input_filename, self.encoding)
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.logger)
+        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.encoding, self.logger)
         if genotype_status != 0:
             writer = GenotypeWriter(self.proj, self.genotype_field, self.genotype_info,
                 sample_ids)
@@ -1523,6 +1526,7 @@ class TextUpdater(BaseImporter):
         #    raise ValueError('No field could be updated using this input file')
         #
         self.input_type = fmt.input_type
+        self.encoding = fmt.encoding
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
         from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
@@ -1600,7 +1604,7 @@ class TextUpdater(BaseImporter):
         reader = TextReader(self.processor, input_filename,
             # in the case of variant, we filter from the reading stage to save some time
             None if (self.table == 'variant' or self.input_type != 'variant') else self.variantIndex,
-            self.jobs - 1, self.logger)
+            self.jobs - 1, self.encoding, self.logger)
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:
@@ -1632,7 +1636,7 @@ class TextUpdater(BaseImporter):
             self.processor.reset(validTill=self.ranges[2])
         #
         cur = self.db.cursor()
-        lc = lineCount(input_filename)
+        lc = lineCount(input_filename, self.encoding)
         update_after = min(max(lc//200, 100), 100000)
         fld_cols = None
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)

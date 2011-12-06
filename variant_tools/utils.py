@@ -105,7 +105,7 @@ def setOptions(verbosity=None, temp_dir=None):
 #
 # Utility functions
 #
-def lineCount(filename):
+def lineCount(filename, encoding='UTF-8'):
     '''Estimate the number of lines using file size and line size. This
     function does not attemp to calculate line count exactly because files
     handled by variant tools can be huge. '''
@@ -130,7 +130,7 @@ def lineCount(filename):
     elif filename.endswith('.bz2'):
         input = bz2.BZ2File(filename, 'rb')
         input.seek(50000, 0)
-        content = input.read(500000).decode()
+        content = input.read(500000).decode(encoding)
         input.close()
         lineCount = len(content.split('\n'))
         input.close()
@@ -144,7 +144,7 @@ def lineCount(filename):
         input.seek(-99000, 2)
         content = input.read()
         input.close()
-        lineCount = content.decode().count('\n')
+        lineCount = content.decode(encoding).count('\n')
         input.close()
         return int(lineCount * (totalSize / 99000.))
 

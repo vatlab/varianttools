@@ -72,6 +72,7 @@ class AnnoDBConfiger:
         self.fields = []
         self.delimiter = '\t'
         self.version = None
+        self.encoding = 'utf-8'
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
         # some fields have to be determined.
@@ -138,6 +139,8 @@ class AnnoDBConfiger:
         for item in parser.items('data sources'):
             if item[0] == 'direct_url':
                 self.direct_url = item[1]
+            elif item[0] == 'encoding':
+                self.encoding = item[1]
             elif item[0] == 'source_url':
                 self.source_url = item[1]
             elif item[0] == 'source_pattern':
@@ -302,9 +305,9 @@ class AnnoDBConfiger:
         for f in source_files:
             self.logger.info('Importing annotation data from {0}'.format(f))
             skipped_lines = 0
-            lc = lineCount(f)
+            lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, None, self.jobs - 1, self.logger)
+            p = TextReader(processor, f, None, self.jobs - 1, self.encoding, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             all_records = 0
             skipped_records = 0

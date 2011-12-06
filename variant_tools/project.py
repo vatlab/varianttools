@@ -244,6 +244,7 @@ class fileFMT:
         self.variant_info = None
         self.genotype_fields = None
         self.genotype_info = None
+        self.encoding = 'utf-8'
         self.logger = logger
         # for export only
         self.export_by_fields = 0
@@ -360,6 +361,8 @@ class fileFMT:
                 self.description = item[1]
             elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
+            elif item[0] == 'encoding':
+                self.encoding = item[1]
             elif item[0] == 'merge_by':
                 self.merge_by_cols = [x-1 for x in eval(item[1])]
             elif item[0] == 'export_by':
