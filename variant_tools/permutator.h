@@ -243,7 +243,7 @@ namespace vtools {
           m_permute = permute->clone();
         } else 
         {
-          PermuteX* permute = new PermuteX();
+          PermuteRawX* permute = new PermuteRawX();
           m_permute = permute->clone();
         }
       }
@@ -292,12 +292,11 @@ namespace vtools {
         }
 
         double maflower = maf.front() - std::numeric_limits<double>::epsilon();
-
         // apply variable thresholds w/i permutation test
         unsigned permcount1 = 0, permcount2 = 0;
         double max_obstatistic = 0.0, min_obstatistic = 0.0;
         double pvalue = 9.0;
-
+        
         for (size_t i = 0; i < m_times; ++i) {
           vectorf vt_statistic(0);
           for (size_t m = 0; m < maf.size(); ++m) {
@@ -337,7 +336,6 @@ namespace vtools {
           }
           m_permute->apply(d);
         }
-
         if (pvalue <= 1.0) {
           d.setPvalue(pvalue); 
         } else
@@ -357,7 +355,7 @@ namespace vtools {
           d.setStatistic(max_obstatistic);
         } else 
         {
-          (permcount1 >= permcount2)?d.setStatistic(max_obstatistic):d.setStatistic(min_obstatistic);
+          (permcount1 >= permcount2)?d.setStatistic(min_obstatistic):d.setStatistic(max_obstatistic);
         }
 
         return 0.0;
@@ -369,6 +367,5 @@ namespace vtools {
       unsigned m_alternative;
       double m_sig;
   };
-
 }
 #endif

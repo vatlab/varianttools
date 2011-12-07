@@ -99,7 +99,7 @@ namespace vtools {
         std::fill(one.begin(), one.end(), 1.0);
         m_C.push_back(one);
         m_model.clear();
-        m_model.setY(m_phenotype);
+        // not setting Y here because I may permute them
         m_model.setX(m_C);
         // set phenotype statistics
         m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
@@ -236,6 +236,11 @@ namespace vtools {
       void permuteY()
       {
         random_shuffle(m_phenotype.begin(), m_phenotype.end());
+      }
+      
+      void permuteRawX()
+      {
+        random_shuffle(m_genotype.begin(), m_genotype.end());
       }
 
       void permuteX()
@@ -397,6 +402,7 @@ namespace vtools {
         if (m_X.size() != m_phenotype.size()) {
           throw ValueError("Genotype/Phenotype length not equal!");
         }
+        m_model.setY(m_phenotype);
         m_model.replaceCol(m_X, m_C.size()-1);
         m_model.fit();
         vectorf beta = m_model.getBeta();

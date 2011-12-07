@@ -115,6 +115,24 @@ namespace vtools {
       }
   };
 
+  class PermuteRawX : public BaseAction
+  {
+    public:
+      PermuteRawX() : BaseAction()
+    {
+    }
+
+      BaseAction * clone()
+      {
+        return new PermuteRawX(*this);
+      }
+
+      double apply(AssoData & d)
+      {
+        d.permuteRawX();
+        return 0;
+      }
+  };
 
   class PermuteY : public BaseAction
   {
