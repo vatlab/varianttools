@@ -32,8 +32,14 @@ if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (
 
 __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
+# This should be updated when vtools is released, or there is a need to mark a
+# revision between release cycles
 VTOOLS_VERSION='1.0.1svn'
-VTOOLS_COPYRIGHT = '''variant tools version {} : Copyright (c) 2011 Bo Peng.'''.format(VTOOLS_VERSION)
-VTOOLS_CITE = '''Please cite Anthony et al ....''' # pending
+VTOOLS_REVISION=812
+
+#
+VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
+VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2012 Bo Peng'''.format(VTOOLS_VERSION)
+VTOOLS_CITATION = '''Reference: Anthony et al (2011) Bioinformatics 10.1093/bioinformatics/btr667'''
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 

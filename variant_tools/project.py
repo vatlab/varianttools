@@ -40,7 +40,7 @@ import Queue
 import time
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
-from .__init__ import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITE, VTOOLS_CONTACT
+from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
 
 # define a field type
@@ -655,6 +655,7 @@ class Project:
         '''Create a new project'''
         # open the project file
         self.logger.info(VTOOLS_COPYRIGHT)
+        self.logger.info(VTOOLS_CITATION)
         self.logger.info(VTOOLS_CONTACT)
         self.logger.info('Creating a new project {}'.format(self.name))
         self.db = DatabaseEngine(engine='sqlite3', batch=kwargs.get('batch', 10000))
