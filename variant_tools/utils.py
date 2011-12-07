@@ -121,7 +121,7 @@ def lineCount(filename, encoding='UTF-8'):
     elif filename.endswith('.gz'):
         input = gzip.open(filename, 'rb')
         input.seek(50000, 0)
-        content = input.read(500000).decode()
+        content = input.read(500000).decode(encoding)
         input.close()
         lineCount = len(content.split('\n'))
         input.close()
