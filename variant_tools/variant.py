@@ -94,15 +94,21 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     if args.header is not None:
         sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in \
             (output_fields if len(args.header) == 0 else args.header)]) + '\n')
-    # FIXME: a semi-solution to potentially duplicated lines in output
+    # output with a warning to potentially duplicated lines
+    has_duplicate = False
     last_line = None
     for count, rec in enumerate(cur):
         line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-        if line == last_line:
-            continue
-        last_line = line
+        if not has_duplicate:
+            if line == last_line:
+                has_duplicate = True
+            else:
+                last_line = line
         sys.stdout.write(line)
-
+    if has_duplicate:
+        self.logger.warning('''Duplicate records are outputted. This may due to
+            multiple entries of variants in the annotation database. Pipe the output
+            to a uniq command ("vtools output ... | uniq") will remove these entries.''')
 
 
 def output(args):
