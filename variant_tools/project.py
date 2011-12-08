@@ -61,7 +61,7 @@ class AnnoDB:
     The annotation.py module is responsible of creating this structure from
     various sources.
     '''
-    def __init__(self, proj, annoDB, linked_by=[]):
+    def __init__(self, proj, annoDB, linked_by=[], anno_type=None, linked_fields=None):
         proj.logger.debug('Loading annotation database {}'.format(annoDB))
         self.db = proj.db.newConnection()
         if self.db.hasDatabase(annoDB):
@@ -111,9 +111,15 @@ class AnnoDB:
             elif rec[0] == 'version':
                 self.version = rec[1]
             elif rec[0] == 'anno_type':
-                self.anno_type = rec[1]
+                if anno_type is None:
+                    self.anno_type = rec[1]
+                else:
+                    self.anno_type = anno_type
             elif rec[0] == 'build':
                 self.refGenomes = eval(rec[1])
+                if linked_fields is not None:
+                    for key in self.refGenomes.keys():
+                        self.refGenomes[key] = linked_fields
                 for key in self.refGenomes.keys():
                     # no reference genome is needed
                     if key == '*':
@@ -737,8 +743,11 @@ class Project:
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]')):
             try:
-                linked_by = eval(self.loadProperty('{}_linked_by'.format(os.path.split(db)[-1].split('-')[0]), default='[]'))
-                self.annoDB.append(AnnoDB(self, db, linked_by))
+                db_name = os.path.split(db)[-1].split('-')[0]
+                linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
+                anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
+                linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
+                self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
                 self.db.attach(db)
             except Exception as e:
                 self.logger.warning(e)
@@ -783,6 +792,8 @@ class Project:
             self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
         # an annotation database might be re-used with a different linked_field
         self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
+        self.saveProperty('{}_anno_type'.format(db.name), str(db.anno_type))
+        self.saveProperty('{}_linked_fields'.format(db.name), str(db.build))
 
     def close(self):
         '''Write everything to disk...'''

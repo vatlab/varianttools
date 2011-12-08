@@ -36,7 +36,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
-    normalizeVariant, compressFile, SQL_KEYWORDS
+    normalizeVariant, compressFile, SQL_KEYWORDS, extractField
 from .importer import LineImporter, TextReader
   
 class AnnoDBConfiger:
@@ -414,7 +414,7 @@ class AnnoDBConfiger:
         db.commit()
         return db.dbName
 
-    def prepareDB(self, source_files=[], linked_by=[], rebuild=False):
+    def prepareDB(self, source_files=[], linked_by=[], rebuild=False, anno_type=None, linked_fields=None):
         '''Importing data to database. If direct_url or source_url is specified,
         they will overwrite settings in configuraiton file. If successful, this
         function set self.db to a live connection.
@@ -446,7 +446,7 @@ class AnnoDBConfiger:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
             self.logger.info('Creating compressed database {}'.format(dbFile))
             compressFile(self.name + '.DB', dbFile)
-        return AnnoDB(self.proj, self.name, linked_by)
+        return AnnoDB(self.proj, self.name, linked_by, anno_type, linked_fields)
 
 
 def useArguments(parser):
@@ -467,6 +467,16 @@ def useArguments(parser):
             tables in the existing project. This parameter is required only for
             'attribute' type of annotation databases that link to fields of existing
             tables.''')
+    parser.add_argument('--anno_type', choices=['variant', 'position', 'range', 'field'],
+        help='''This option overrides type of an existing annotation database when it
+            is attached to a project. It corresponds to key anno_type of the data sources
+            section of an annotation file (with suffix .ann) but does not affect the .ann file
+            or the database built from it.''')
+    parser.add_argument('--linked_fields', nargs='*',
+        help='''An alternative set of fields that are used to link the annotation database to
+            the master variant table. It should have four, two, and three values for database
+            of type variant, position, and range. Similar to anno_type, this option does not
+            affect the .ann file or the database built from it.''')
     parser.add_argument('--rebuild', action='store_true',
         help='''If set, variant tools will always rebuild the annotation database from source,
             ignoring existing local and online database. In addition to $name.DB, variant tools
@@ -517,7 +527,8 @@ def use(args):
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
                     cfg = AnnoDBConfiger(proj, annoDB, args.jobs)
-                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
+                    return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild,
+                        args.anno_type, args.linked_fields))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif args.rebuild:
@@ -526,24 +537,24 @@ def use(args):
                 if proj.db.engine != 'sqlite3':
                     raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                 if os.path.isfile(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
                 # no extension? try mysql database, .ann and .DB
                 if proj.db.engine == 'mysql' and proj.db.hasDatabase(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields))
                 if os.path.isfile(annoDB + '.DB'):
                     if proj.db.engine != 'sqlite3':
                         raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                     try:
-                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by))
+                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields))
                     except Exception as e:
                         proj.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.jobs)
                     try:
-                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
+                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild, args.anno_type, args.linked_fields))
                     except Exception as e:
                         proj.logger.debug(e)
                 # do not know what to do
