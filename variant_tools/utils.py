@@ -865,17 +865,6 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     # a quick fix for a.b parsed to a .b. :-(
     return tokenize.untokenize(res).replace(' .', '.'), fields
 
-def extractField(field):
-    '''Extract pos from strings such as pos + 100'''
-    if field.isalnum():
-        return field
-    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(field).readline)]
-    for i in range(len(tokens)):
-        toktype, toval, _, _, _ = tokens[i]
-        if toktype == 1:
-            return toval
-    raise ValueError('Invalid field name: {}'.format(field))
-
 #
 # Utility function to calculate bins.
 #

@@ -101,7 +101,6 @@ class AnnoDB:
         self.build = None
         self.alt_build = None
         self.version = None
-        self.parameters = []
         cur.execute('SELECT * from {}_info;'.format(self.name))
         for rec in cur:
             if rec[0] == 'description':
@@ -128,8 +127,6 @@ class AnnoDB:
                         self.build = self.refGenomes[key]
                     elif key == proj.alt_build:
                         self.alt_build = self.refGenomes[key]
-            elif rec[0] == 'parameters':
-                self.parameters = eval(rec[1])
         #
         if self.anno_type == 'variant' and ((self.build is not None and len(self.build) != 4) or (self.alt_build is not None and len(self.alt_build) != 4)):
             raise ValueError('There should be four linking fields for variant annotation databases.')
@@ -234,13 +231,7 @@ class AnnoDB:
                 print('Unique Entries:  {:,}'.format(res[0]))
                 if numeric:
                     print('Range:           {} - {}'.format(res[1], res[2]))
-        # parameters
-        if self.parameters:
-            print('Acceptable parameters when rebuilding this database:')
-            for par in self.parameters:
-                print('    {:<20}{}'.format(par[0], '\n'.join(textwrap.wrap(
-                    '{} (default:{})'.format(par[2], par[1]), initial_indent=' ',
-                    subsequent_indent=' '*25))))
+
 
 class fileFMT:
     def __init__(self, name, fmt_args=[], logger=None):

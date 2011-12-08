@@ -26,7 +26,6 @@
 
 import sys
 import os
-import argparse
 import ConfigParser
 import shutil
 import urlparse
@@ -37,7 +36,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
-    normalizeVariant, compressFile, SQL_KEYWORDS, extractField
+    normalizeVariant, compressFile, SQL_KEYWORDS
 from .importer import LineImporter, TextReader
   
 class AnnoDBConfiger:
@@ -48,7 +47,7 @@ class AnnoDBConfiger:
     is used. In the later case, the information will be directly read from
     the annotation table in the database. Please check annotation/dbNSFP.ann
     for a description of the format of the configuration file.'''
-    def __init__(self, proj, annoDB, ann_args=[], jobs=2):
+    def __init__(self, proj, annoDB, jobs=2):
         '''Create an annotation database.
         proj: current project
         annoDB: annotation database. It can be either a mysql or sqlite database
@@ -75,8 +74,7 @@ class AnnoDBConfiger:
         self.version = None
         self.encoding = 'utf-8'
         # where is annoDB, in which form?
-        args = self.parseArgs(annoDB, ann_args)
-        self.parseConfigFile(annoDB, defaults=args)
+        self.parseConfigFile(annoDB)
         # some fields have to be determined.
         if self.name is None:
             raise ValueError('No valid name is set')
@@ -96,29 +94,7 @@ class AnnoDBConfiger:
         self.logger.info('Removing database {}'.format(self.name))
         self.proj.db.removeDatabase(self.name)
 
-    def parseArgs(self, filename, ann_args):
-        fmt_parser = ConfigParser.SafeConfigParser()
-        fmt_parser.read(filename)
-        parameters = fmt_parser.items('DEFAULT')
-        parser = argparse.ArgumentParser(prog='vtools use ANNODB {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
-            existing format.''')
-        self.parameters = []
-        for par in parameters:
-            # $NAME_comment is used for documentation only
-            if par[0].endswith('_comment'):
-                continue
-            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
-            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
-            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
-                nargs='*', default=par[1])
-        print 'PPPP', self.parameters
-        args = vars(parser.parse_args(ann_args))
-        for key in args:
-            if type(args[key]) == list:
-                args[key] = ','.join(args[key])
-        return args
-
-    def parseConfigFile(self, filename, defaults):
+    def parseConfigFile(self, filename):
         '''Read from an ini style configuration file'''
         self.logger.debug('Checking configuration file {}'.format(filename))
         self.path = os.path.split(filename)[0]
@@ -143,13 +119,10 @@ class AnnoDBConfiger:
         # linked fields for each reference genome
         try:
             self.build = {}
-            for item in parser.items('linked fields', vars=defaults):
-                if item[0] in defaults.keys() + [x + '_comment' for x in defaults.keys()]:
-                    continue
+            for item in parser.items('linked fields'):
                 fields = [x.strip() for x in item[1].split(',')]
                 for field in fields:
-                    # field can be expressions such as pos + 100
-                    if extractField(field) not in sections:
+                    if field not in sections:
                         self.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
                 self.build[item[0]] = fields
             self.logger.debug('Reference genomes: {}'.format(self.build))
@@ -184,7 +157,7 @@ class AnnoDBConfiger:
                 if self.version is not None and self.version != item[1]:
                     raise Warning('Version obtained from filename ({}) is inconsistent with version specified in the annotation file ({})'.format(self.version, item[1]))
                 self.version = item[1]
-            elif item[0] not in defaults.keys() + [x + '_comment' for x in defaults.keys()]:
+            else:
                 raise ValueError('Invalid keyword {} in section "data sources".'.format(item[0]) + 
                     'Only direct_url, source_url, source_type, version, source_pattern and description are allowed')
         # sections
@@ -199,7 +172,7 @@ class AnnoDBConfiger:
             try:
                 items = [x[0] for x in parser.items(section, raw=True)]
                 for item in items:
-                    if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys() + [x + '_comment' for x in defaults.keys()]:
+                    if item not in ['index', 'type', 'adj', 'comment']:
                         raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
                 # 'index' - 1 because the input is in 1-based index
                 self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
@@ -313,16 +286,16 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
-                pos_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[1])][0]
+                pos_idx = [i for i,x in enumerate(self.fields) if x.name == items[1]][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
-                    ref_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[2])][0]
-                    alt_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[3])][0]
+                    ref_idx = [i for i,x in enumerate(self.fields) if x.name == items[2]][0]
+                    alt_idx = [i for i,x in enumerate(self.fields) if x.name == items[3]][0]
                     build_info.append((pos_idx, ref_idx, alt_idx))
                 else:
                     build_info.append((pos_idx, ))
             except Exception as e:
-                self.logger.error('No field {} for build {}: {}'.format(items[1], key, e))
+                self.logger.error('No field {} for build {}'.format(items[1], key))
         #
         processor = LineImporter(self.fields, build_info, self.delimiter, None, self.logger)
         # files?
@@ -388,7 +361,6 @@ class AnnoDBConfiger:
         cur.execute(query, ('description', self.description))
         cur.execute(query, ('version', self.version))
         cur.execute(query, ('build', str(self.build)))
-        cur.execute(query, ('parameters', str(self.parameters)))
         db.commit()
         self.logger.debug('Creating table {}'.format(self.name))
         self.createAnnotationTable(db)
@@ -406,10 +378,10 @@ class AnnoDBConfiger:
         for key in self.build.keys():
             if key != '*':
                 cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
-                    .format(key, self.name,  ', '.join(['{} ASC'.format(extractField(x)) for x in self.build[key]])))
+                    .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
             else:
                 cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
-                    .format(self.name,  ', '.join(['{} ASC'.format(extractField(x)) for x in self.build[key]])))
+                    .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         del s
         s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
         # This is only useful for sqlite
@@ -483,9 +455,7 @@ def useArguments(parser):
             Otherwise, this command will download a description file and the corresponding database
             from web (http://vtools.houstonbioinformatics.org/annoDB/$source.ann and the latest
             version of the datavase). If all means fail, this command will try to download the
-            source of the annotation database (or use source files provided by option --files).
-            Some annotation databases accept parameters (cf. 'vtools show annotation ANNODB')
-            and allow you to specify how the databases are build.''')
+            source of the annotation database (or use source files provided by option --files).''')
     parser.add_argument('-f', '--files', nargs='*', default=[],
         help='''A list of source files. If specified, vtools will not try to
             download and select source files. These source files will be
@@ -545,15 +515,13 @@ def use(args):
             # annDB is now a local file
             if annoDB.endswith('.ann'):
                 if os.path.isfile(annoDB):
-                    cfg = AnnoDBConfiger(proj, annoDB, args.unknown_args, args.jobs)
+                    cfg = AnnoDBConfiger(proj, annoDB, args.jobs)
                     return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif args.rebuild:
                 raise ValueError('Only an .ann file can be specified when option --rebuild is set')
             elif annoDB.endswith('.DB'):
-                if args.unknown_args:
-                    raise ValueError('Optional parameters are not allowed for rebuilding databases.')
                 if proj.db.engine != 'sqlite3':
                     raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                 if os.path.isfile(annoDB):
@@ -565,8 +533,6 @@ def use(args):
                 if proj.db.engine == 'mysql' and proj.db.hasDatabase(annoDB):
                     return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by))
                 if os.path.isfile(annoDB + '.DB'):
-                    if args.unknown_args:
-                        raise ValueError('Optional parameters are not allowed for rebuilding databases.')
                     if proj.db.engine != 'sqlite3':
                         raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                     try:
@@ -574,7 +540,7 @@ def use(args):
                     except Exception as e:
                         proj.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
-                    cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.unknown_args, args.jobs)
+                    cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.jobs)
                     try:
                         return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild))
                     except Exception as e:
