@@ -122,7 +122,8 @@ class AnnoDBConfiger:
             for item in parser.items('linked fields'):
                 fields = [x.strip() for x in item[1].split(',')]
                 for field in fields:
-                    if field not in sections:
+                    # field can be expressions such as pos + 100
+                    if extractField(field) not in sections:
                         self.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
                 self.build[item[0]] = fields
             self.logger.debug('Reference genomes: {}'.format(self.build))
@@ -286,16 +287,16 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
-                pos_idx = [i for i,x in enumerate(self.fields) if x.name == items[1]][0]
+                pos_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[1])][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
-                    ref_idx = [i for i,x in enumerate(self.fields) if x.name == items[2]][0]
-                    alt_idx = [i for i,x in enumerate(self.fields) if x.name == items[3]][0]
+                    ref_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[2])][0]
+                    alt_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[3])][0]
                     build_info.append((pos_idx, ref_idx, alt_idx))
                 else:
                     build_info.append((pos_idx, ))
             except Exception as e:
-                self.logger.error('No field {} for build {}'.format(items[1], key))
+                self.logger.error('No field {} for build {}: {}'.format(items[1], key, e))
         #
         processor = LineImporter(self.fields, build_info, self.delimiter, None, self.logger)
         # files?
