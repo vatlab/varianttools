@@ -107,7 +107,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
         sys.stdout.write(line)
     if has_duplicate:
         self.logger.warning('''Duplicate records are outputted. This may due to
-            multiple entries of variants in the annotation database. Pipe the output
+            multiple entries of variants in the annotation database. Piping standard output
             to a uniq command ("vtools output ... | uniq") will remove these entries.''')
 
 
