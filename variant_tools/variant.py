@@ -92,8 +92,14 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     cur = proj.db.cursor()
     cur.execute(query)
     if args.header is not None:
-        sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in \
-            (output_fields if len(args.header) == 0 else args.header)]) + '\n')
+        if len(args.header) == 0:
+            # if no real header is given, use output_fields, but removing things like (, ), and ,
+            sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in output_fields]) + '\n')
+        else:
+            # other wise, use the user-provided header
+            if len(args.header) != len(output_fields):
+                proj.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
+            sys.stdout.write(args.delimiter.join(args.header) + '\n')
     # output with a warning to potentially duplicated lines
     has_duplicate = False
     last_line = None
@@ -106,9 +112,9 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
                 last_line = line
         sys.stdout.write(line)
     if has_duplicate:
-        proj.logger.warning('''Duplicate records are outputted. This may due to
-            multiple entries of variants in the annotation database. Piping standard output
-            to a uniq command ("vtools output ... | uniq") will remove these entries.''')
+        proj.logger.warning('Duplicate records are outputted. This may due to '
+            'multiple entries of variants in the annotation database. Piping standard output '
+            'to a uniq command ("vtools output ... | uniq") will remove these entries.')
 
 
 def output(args):
