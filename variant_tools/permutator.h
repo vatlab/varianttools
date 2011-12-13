@@ -255,7 +255,7 @@ namespace vtools {
 
       double apply(AssoData & d)
       {
-        if (d.maf().size()==0) {
+        if (d.maf().size() == 0) {
           throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
         }
         
@@ -336,6 +336,8 @@ namespace vtools {
           }
           m_permute->apply(d);
         }
+
+        //
         if (pvalue <= 1.0) {
           d.setPvalue(pvalue); 
         } else

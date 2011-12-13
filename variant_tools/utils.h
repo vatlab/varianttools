@@ -74,7 +74,7 @@ namespace vtools {
     public:
       // gsl_rng_alloc(gsl_rng_ranlxs2)    
       RNG() : rng( gsl_rng_alloc(gsl_rng_mt19937) ) {};
-      ~RNG() { gsl_rng_free( rng ); }
+      ~RNG() { if (rng) gsl_rng_free(rng); }
       gsl_rng* get()
       {  
         // time(NULL): number of seconds since 00:00:00 GMT Jan. 1, 1970
@@ -135,9 +135,9 @@ namespace vtools {
           throw ValueError("No input data");
         }
 
-        if (m_nrow == 0) m_nrow = x[0].size();
+        if (m_nrow == 0) m_nrow = x.front().size();
         else {
-          if (m_nrow != x[0].size()) {
+          if (m_nrow != x.front().size()) {
             throw ValueError("Dimension not match with input X");
           }
         }
@@ -159,10 +159,10 @@ namespace vtools {
         if (m_x) gsl_matrix_free(m_x);
       }
 
-      void setY(std::vector<double> &y)
+      void setY(const std::vector<double> &y)
       { 
         if (y.size() == 0) {
-          throw ValueError("No input data");
+          throw RuntimeError("No input data");
         }
         if (m_nrow == 0) m_nrow = y.size();
         else {
@@ -190,12 +190,27 @@ namespace vtools {
 
       void replaceCol(const std::vector<double> &col, int which)
       {
-        if (which <= 0 || which >= m_ncol) {
-          throw ValueError("Invalid column index");
+        if (which < 0 || which >= m_ncol) {
+          throw IndexError("Invalid column index");
         }
-        // will never replace the 0th col since it is (1...1)'
-        for (size_t i = 0; i < m_nrow; ++i) {
-          gsl_matrix_set(m_x, i, which, col[i]); 
+        if (which != 0) {
+          // set m_x
+          if (!m_x) {
+            throw RuntimeError("m_x matrix not initialized");
+          }
+          // will never replace the 0th col since it is (1...1)'
+          for (size_t i = 0; i < m_nrow; ++i) {
+            gsl_matrix_set(m_x, i, which, col[i]); 
+          }
+        } else 
+        {
+          // set m_y
+          if (!m_y) {
+            throw RuntimeError("m_y vector not initialized");
+          }
+          for (size_t i = 0; i < m_nrow; ++i) {
+            gsl_vector_set(m_y, i, col[i]); 
+          }
         }
       }
 

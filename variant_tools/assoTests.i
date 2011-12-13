@@ -8,7 +8,7 @@
 // summarize, and filter variants for next-gen sequencing ananlysis.
 // Please visit http://varianttools.sourceforge.net for details.
 //
-// Copyright (C) 2004 - 2010 Bo Peng (bpeng@mdanderson.org)
+// Copyright (C) 2011 Gao Wang (wangow@gmail.com) and Bo Peng (bpeng@mdanderson.org)
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 
 %{
 #include "assoConfig.h"
+#include "utils.h"
 #include "assoData.h"
 #include "action.h"
 #include "permutator.h"
@@ -78,6 +79,7 @@
 %newobject vtools::AssoData::clone;
 %newobject vtools::BaseAction::clone;
 %newobject vtools::AssoTest::clone;
+%newobject vtools::BaseLm::clone;
 
 %include "std_vector.i"
 %include "std_string.i"
@@ -94,6 +96,7 @@ namespace std
 }
 
 %include "assoConfig.h"
+%include "utils.h"
 %include "assoData.h"
 %include "action.h"
 %include "permutator.h"

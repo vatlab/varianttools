@@ -77,7 +77,6 @@ namespace vtools {
 
       double setPhenotype(const vectorf & p)
       {
-        //FIXME: have to consider missing phenotypes (especially when they are treated covariates) as well as multiple phenotypes
         m_phenotype = p;
         // set phenotype statistics
         m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
@@ -99,15 +98,15 @@ namespace vtools {
         std::fill(one.begin(), one.end(), 1.0);
         m_C.push_back(one);
         m_model.clear();
-        // not setting Y here because I may permute them
+        m_model.setY(m_phenotype);
         m_model.setX(m_C);
         // set phenotype statistics
         m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
         m_ybar /= (1.0 * m_phenotype.size());
-        m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),1.0));
-        m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),0.0));
+        //m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        //    std::bind2nd(std::equal_to<double>(),1.0));
+        //m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        //    std::bind2nd(std::equal_to<double>(),0.0));
         return m_ybar;
       }
 
@@ -124,7 +123,7 @@ namespace vtools {
         struct VPlus vplus;
         vectorf gx = m_genotype.front();
         for (size_t i = 0; i < gx.size(); ++i) {
-          if (gx[i] < -1.0) {
+          if (gx[i] < 0.0) {
             // missing
             gx[i] = 0.0;
             continue;
@@ -139,7 +138,7 @@ namespace vtools {
       void setMafWeight()
       {
         // compute w = 1 / sqrt(p*(1-p))
-        if (m_maf.size()==0) {
+        if (m_maf.size() == 0) {
           throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
         }
         //
@@ -402,12 +401,14 @@ namespace vtools {
         if (m_X.size() != m_phenotype.size()) {
           throw ValueError("Genotype/Phenotype length not equal!");
         }
-        m_model.setY(m_phenotype);
+        // reset phenotype data
+        m_model.replaceCol(m_phenotype, 0);
+        // reset genotype data
         m_model.replaceCol(m_X, m_C.size()-1);
         m_model.fit();
         vectorf beta = m_model.getBeta();
         vectorf seb = m_model.getSEBeta();
-        m_statistic = beta[beta.size()-1] / seb[seb.size()-1]; 
+        m_statistic = beta.back() / seb.back(); 
       }
 
 
@@ -439,7 +440,6 @@ namespace vtools {
         }
       }
 
-      // permutation should use Clopper-Pearson 95% interval which is exact and conservative	
 
     private:
       /// raw phenotype and gneotype data

@@ -465,6 +465,11 @@ class NullTest:
         for all variants, or a list of p-values for each variant. Will print
         data if NullTest is called'''
         self.logger.info('Currently no action is defined for NullTest')
+        #self.logger.debug('Printing out group name, phenotypes, covariates and genotypes')
+        #self.logger.debug(self.group)
+        #self.logger.debug(self.data.phenotype())
+        #self.logger.debug(self.data.covariates())
+        #self.logger.debug(self.data.raw_genotype())
         return 0
 
 class ExternTest(NullTest):
