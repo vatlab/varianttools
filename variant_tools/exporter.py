@@ -774,9 +774,11 @@ class Exporter:
 def exportArguments(parser):
     parser.add_argument('table', help='''A variant table whose variants will be exported.
         If parameter --samples is specified, only variants belong to one or more of the
-        samples will be exported.'''),
-    parser.add_argument('filename', help='''Name of output file. Output will be written
-        to the standard output if this parameter is left unspecified. ''', nargs='?'),
+        samples will be exported.''')
+    parser.add_argument('filename', nargs='?', help='''(deprecated) Name of output file.
+        Output will be written to the standard output if this parameter is left unspecified.
+        This parameter is deprecated and might be removed in a future version of
+        variant tools.''')
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Samples that will be exported, specified by conditions such as 'aff=1'
             and 'filename like "MG%%"'. Multiple samples could be exported to a
@@ -785,10 +787,9 @@ def exportArguments(parser):
     parser.add_argument('--format',
         help='''Format of the exported file. It can be one of the variant tools
             supported file types such as VCF (cf. 'vtools show formats') or a local
-            format specification file (with extension .fmt). If unspecified, variant
-            tools will try to guess format from file extension if a filename is
-            specified. Some formats accept additional parameters (cf. 'vtools show
-            format FMT') and allows you to export additional or alternative fields.''')
+            format specification file (with extension .fmt). Some formats accept
+            additional parameters (cf. 'vtools show format FMT') and allows you to
+            export additional or alternative fields.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
