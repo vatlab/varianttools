@@ -81,10 +81,10 @@ namespace vtools {
         // set phenotype statistics
         m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
         m_ybar /= (1.0 * m_phenotype.size());
-        m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),1.0));
-        m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
-            std::bind2nd(std::equal_to<double>(),0.0));
+        //m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        //    std::bind2nd(std::equal_to<double>(),1.0));
+        //m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(), 
+        //    std::bind2nd(std::equal_to<double>(),0.0));
         return m_ybar;
       }
 
@@ -119,20 +119,75 @@ namespace vtools {
 
       void setMaf()
       {
-        //sample based maf
-        struct VPlus vplus;
-        vectorf gx = m_genotype.front();
-        for (size_t i = 0; i < gx.size(); ++i) {
-          if (gx[i] < 0.0) {
-            // missing
-            gx[i] = 0.0;
-            continue;
-          } 
+        //sample maf from data
+        //is problematic for variants on male chrX 
+        //but should be Ok if only use the relative mafs (e.g., weightings)
+        
+        m_maf.resize(m_genotype.front().size());
+        std::fill(m_maf.begin(), m_maf.end(), 0.0);
+        vectorf valid_all = m_maf, valid_alt = m_maf;
+
+        for (size_t j = 0; j < m_maf.size(); ++j) {
+          unsigned cnt1 = 0, cnt2 = 0;
+          // calc maf and loci counts for site j
+          for (size_t i = 0; i < m_genotype.size(); ++i) {
+            // genotype not missing
+            if (!(m_genotype[i][j] < 0.0)) {
+              valid_all[j] += 1.0;
+              if (m_genotype[i][j] > 0.0) {
+                if (fEqual(m_genotype[i][j], 1.0)) cnt1 += 1;
+                if (fEqual(m_genotype[i][j], 2.0)) cnt2 += 1;
+                valid_alt[j] += 1.0;
+                m_maf[j] += m_genotype[i][j];
+              }
+            }
+          }
+          //
+          //
+          // RECODING
+          // FIXME : currently it is an awkward re-coding approach,
+          // will recode sites where #alt>#ref alleles,
+          // assumes either excess of homo (2222200) only or heter (1111100 for male chrX) only,
+          // not like (1222200) or (2111100), which, if happens, will check if there are more 1's than 2's
+          // if #1>#2 (2111100) then have to put as (0000011)
+          // otherwise (1222200) should actually be (1000022)
+          //
+          if (valid_all[j] < 2.0*valid_alt[j]) {
+            // recoding is needed
+            m_maf[j] = 0.0;
+            // recode and re-calculate maf
+            for (size_t i = 0; i < m_genotype.size(); ++i) {
+              // genotype not missing
+              if (!(m_genotype[i][j] < 0.0)) {
+                if (cnt1 >= cnt2) {
+                  // recode (1111100) to (0000011)
+                  // force cases of (2111100) to be (0000011)
+                  m_genotype[i][j] = (m_genotype[i][j] > 0.0)?0.0:1.0;  
+                } else 
+                {
+                  // for (2222200) or (1222200) just flip the coding
+                  m_genotype[i][j] = 2.0 - m_genotype[i][j];
+                }
+                if (m_genotype[i][j] > 0.0) {
+                  m_maf[j] += m_genotype[i][j];
+                }
+              }
+            }
+          }
+          //
+          // count maf, will be incorrect for male chrX,
+          // but will not matter for our purpose
+          //
+          if (valid_all[j] > 0.0) {
+            m_maf[j] = m_maf[j] / (valid_all[j]*2.0);
+          }
         }
+        /*
         m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(), 
-            gx, vplus);
+            m_genotype.front(), vplus);
         std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
             std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
+        */
       }
 
       void setMafWeight()

@@ -37,21 +37,24 @@ class TestAssoFnct(ProcessTestCase):
     # test calculate MAF
     a = t.SetMaf()
     a.apply(self.data)
-    maf = [sum(x)/6.0 for x in zip(*self.x2)]
+    x2_recode = [array('d', [0,0,2,0,0,0,0,0,0,1,0,0,0,0]),
+                 array('d', [0,0,0,0,2,0,1,0,0,0,0,0,1,0]),
+                 array('d', [1,0,0,1,0,0,0,0,1,0,0,0,0,0])]
+    maf = [sum(x)/6.0 for x in zip(*x2_recode)]
     self.assertEqual(list(self.data.maf()), maf)
     # test SumToX
     a = t.SumToX()
     a.apply(self.data)
-    self.assertEqual(list(self.data.genotype()), [sum(i) for i in self.x2])
+    self.assertEqual(list(self.data.genotype()), [sum(i) for i in x2_recode])
     # test BinToX
     a = t.BinToX()
     a.apply(self.data)
-    self.assertEqual(list(self.data.genotype()), [1 if sum(i)>0 else 0 for i in self.x2])
+    self.assertEqual(list(self.data.genotype()), [1 if sum(i)>0 else 0 for i in x2_recode])
     # test filter by MAF
     self.assertEqual(list(self.data.sites()), [])
     a = t.SetSites(0.3, 0.1)
     a.apply(self.data)
-    self.assertEqual([list(i) for i in self.data.raw_genotype()], [list(i) for i in self.x2])
+    self.assertEqual([list(i) for i in self.data.raw_genotype()], [list(i) for i in x2_recode])
     self.assertEqual(list(self.data.sites()), \
                      [1 if x <0.3 and x>0.1 else 0 for x in maf])
     
@@ -59,7 +62,7 @@ class TestAssoFnct(ProcessTestCase):
     actions = [t.SetMaf(), t.SetSites(0.3, 0.1), t.SumToX()]
     a = t.ActionExecutor(actions)
     a.apply(self.data)
-    self.assertEqual(list(self.data.genotype()), [1.0,2.0,0.0])
+    self.assertEqual(list(self.data.genotype()), [1.0,2.0,3.0])
 
   def testSimpleReg(self):
     self.data.setGenotype(self.x)
@@ -166,10 +169,11 @@ class TestAssoFnct(ProcessTestCase):
     data = self.data.clone()
     a = t.SetMaf()
     a.apply(data)
+    # after recoding, x = [0,1,0,0,0,1,0,1,0,0,1,1,0,1]
 #    print data.maf()
     p = t.VariablePermutator('Y', 2, 10000000, 0.002, [t.SumToX(), t.SimpleLinearRegression()])
     p.apply(data)
-    self.assertEqual(round(data.statistic(), 5), 3.89829)
+    self.assertEqual(round(data.statistic(), 3), -4.127)
     #print data.pvalue()
     
 if __name__ == '__main__':
