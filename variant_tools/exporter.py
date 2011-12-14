@@ -476,8 +476,10 @@ class Exporter:
         # format
         if not format:
             filename = self.filename.lower() if self.filename is not None else ''
-            if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
+            if filename.lower().endswith('.vcf'):
                 format = 'vcf'
+            elif filename.lower().endswith('.csv'):
+                format = 'csv'
             else:
                 raise ValueError('Cannot guess input file type from filename')
         try:
@@ -774,9 +776,9 @@ def exportArguments(parser):
         help='''Format of the exported file. It can be one of the variant tools
             supported file types such as VCF (cf. 'vtools show formats') or a local
             format specification file (with extension .fmt). If unspecified, variant
-            tools will try to guess format from file extension. Some formats accept
-            additional parameters (cf. 'vtools show format FMT') and allows you to
-            export additional or alternative fields.''')
+            tools will try to guess format from file extension if a filename is
+            specified. Some formats accept additional parameters (cf. 'vtools show
+            format FMT') and allows you to export additional or alternative fields.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
