@@ -40,8 +40,12 @@ def outputArguments(parser):
 def generalOutputArguments(parser):
     grp = parser.add_argument_group('Output options')
     grp.add_argument('--header', nargs='*',
-        help='''Header of the output, default names derived from field names will be
-            used if the parameter is given without any value.'''),
+        help='''A complete header or a list of names that will be joined by a delimiter
+            (parameter --delimiter). If a special name - is specified, the header will
+            be read from the standard input, which is the preferred way to specify large
+            multi-line headers (e.g. cat myheader | vtools export --header -). If this
+            parameter is given without parameter, a default header will be derived from
+            field names.'''),
     grp.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
     grp.add_argument('--na', default='NA',
@@ -99,8 +103,11 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     cur.execute(query)
     if args.header is not None:
         if len(args.header) == 0:
-            # if no real header is given, use output_fields, but removing things like (, ), and ,
-            sys.stdout.write(args.delimiter.join([re.sub('[\W]+', '', x) for x in output_fields]) + '\n')
+            # if no real header is given, use output_fields, but replace things like (, ), and , to space
+            sys.stdout.write(args.delimiter.join([re.sub('[\W]+', ' ', x) for x in output_fields]) + '\n')
+        elif args.header == ['-']:
+            proj.logger.info('Reading header from standard input')
+            sys.stdout.write(sys.stdin.read())
         else:
             # other wise, use the user-provided header
             if len(args.header) != len(output_fields):
