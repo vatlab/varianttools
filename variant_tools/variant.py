@@ -54,6 +54,8 @@ def generalOutputArguments(parser):
     grp.add_argument('-g', '--group_by', nargs='*',
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
+    grp.add_argument('--order_by', nargs='*',
+        help='''Order output by specified fields in ascending order.''')
 
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
@@ -84,9 +86,13 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     if args.group_by:
         group_fields, tmp = consolidateFieldName(proj, table, ','.join(args.group_by))
         group_clause = ' GROUP BY {}'.format(group_fields)
+    order_clause = ''
+    if args.order_by:
+        order_fields, tmp = consolidateFieldName(proj, table, ','.join(args.order_by))
+        order_clause = ' ORDER BY {}'.format(order_fields)
     # LIMIT clause
     limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
-    query = 'SELECT {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, limit_clause)
+    query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
     proj.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
