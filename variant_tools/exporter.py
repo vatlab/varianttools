@@ -502,46 +502,14 @@ class Exporter:
             raise ValueError('Cannot output in format {} because no output column is defined for this format.'.format(format)) 
         #
         # header
-        self.header = self.getHeader(header, self.IDs)
-    
-    def getHeader(self, filename, IDs):
-        if filename is '':
-            return ''
-        elif filename == []:
-            if IDs:
-                # try to get filename for the sample
-                cur = self.db.cursor()
-                cur.execute('SELECT filename.header FROM filename LEFT JOIN sample ON filename.file_id = sample.file_id WHERE sample.sample_id = {};'.format(self.db.PH),
-                    (list(IDs)[0],))
-                return cur.fetchone()[0]
-            else:
-                return ''
-        #
-        filename = filename[0]
-        if os.path.isfile(filename):
-            if filename.lower().endswith('.gz'):
-                input = gzip.open(filename, 'rb')
-            else:
-                input = open(filename, 'rb')
-            header = ''
-            for line in input:
-                line = line.decode()
-                if line.startswith('#'):
-                    header += line
-                else:
-                    return header
-        #
-        # if file does not exist, try the filename table
-        cur = self.db.cursor()
-        try:
-            cur.execute('SELECT header from filename WHERE filename = {};'.format(self.db.PH), (filename,))
-            return cur.fetchone()[0]
-        except Exception as e:
-            self.logger.debug('Failed to get header: {}'.format(e))
-            return ''
-        # nothing works
-        self.logger.warning('Cannot get header from filename {}. Please check if this file exists in disk or in the sample table (vtools show samples)'.format(filename))
-        return ''
+        if header is None:
+            self.header = ''
+        elif header == ['-']:
+            # read from standard input
+            self.logger.info('Reading header from standard input')
+            self.header = sys.stdin.read()
+        else:
+            self.header = self.format.delimiter.join(header)
 
     def getAdjFunc(self, code):
         if not code:
@@ -793,13 +761,11 @@ def exportArguments(parser):
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
             genome of the project.'''),
-    parser.add_argument('--header', nargs='*', default='',
-        help='''If a valid file is specified, the header (leading comment lines starting with
-            #) of this file will become the header of the exported file. If the file does not
-            exist, variant tools will retrieve saved header of this file (if filename exists
-            in the sample table) or the file from which the first sample is imported (if
-            filename is empty and --samples are specified). No header will be used for
-            the exported file if this parameter is left unspecified.''')
+    parser.add_argument('--header', nargs='*', 
+        help='''A complete header or a list of names that will be joined by a delimiter
+            specified by the file format to form a header. If a special name - is specified,
+            the header will be read from the standard input, which is the preferred way
+            to specify large multi-line headers (e.g. cat myheader | vtools export --header -).''')
     parser.add_argument('-j', '--jobs', type=int, default=1,
         help='''Number of processes to export data. Multiple threads will be automatically
             used if there are a large number of samples.''')
