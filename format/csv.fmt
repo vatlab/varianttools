@@ -1,0 +1,43 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=Import variants (chr, pos, ref, alt) in csv format, or output arbitrary specified fields in csv format
+delimiter=','
+variant=chr,pos,ref,alt
+
+[DEFAULT]
+fields=chr,pos,ref,alt
+fields_comment=Fields to output, simple arithmetics are allowed (e.g. pos+1) but aggregation functions are not supported.
+
+[field formatter]
+fmt_*=CSVFormatter()
+
+[col_1]
+field=%(fields)s
+adj=JoinRecords(',')
+comment=Output all fields as one column
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=3
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=4
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
