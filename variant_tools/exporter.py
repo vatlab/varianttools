@@ -475,7 +475,7 @@ class Exporter:
         #
         # format
         if not format:
-            filename = self.filename.lower()
+            filename = self.filename.lower() if self.filename is not None else ''
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
             else:
@@ -655,96 +655,102 @@ class Exporter:
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
-        prog = ProgressBar(self.filename, nr)
-        with open(self.filename, 'w') as output:
-            # write header
-            if self.header:
-                print >> output, self.header.rstrip()
-            for idx, raw_rec in enumerate(reader.records()):
-                multi_records = False
-                try:
-                    if nFieldBy != 4 and nFieldBy != 0:
-                        if not rec_stack:
-                            rec_stack.append(raw_rec)
-                            continue
-                        # if the same, wait for the next record
-                        elif rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
-                            rec_stack.append(raw_rec)
-                            continue
-                        elif len(rec_stack) == 1:
-                            rec = rec_stack[0]
-                            rec_stack = [raw_rec]
-                        else:
-                            n = len(rec_stack)
-                            rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(len(raw_rec))]
-                            multi_records = True
-                            rec_stack = [raw_rec]
-                    else:
-                        rec = raw_rec
-                    # step one: apply formatters 
-                    # if there is no fmt, the item must be either empty or a single item
-                    #
-                    # fmt: single or list
-                    # no fmt: single or None
-                    #
-                    # this is extremely ugly but are we getting any performance gain?
-                    if multi_records:
-                        try:
-                            fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                                if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
-                        except:
-                            for fmt, col in formatters:
-                                try:
-                                    if fmt:
-                                        fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
-                                except Exception as e:
-                                    raise ValueError('Failed to format value {} at col {}'.format(
-                                        rec[col] if type(col) is int else [rec[x] for x in col], col))
-                    else:
-                        try:
-                            fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                                if fmt else ('' if (col is None or rec[col] is None) else default_formatter(rec[col])) for fmt, col in formatters]
-                        except:
-                            for fmt, col in formatters:
-                                try:
-                                    if fmt:
-                                        fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
-                                except Exception as e:
-                                    raise ValueError('Failed to format value {} at col {}'.format(
-                                        rec[col] if type(col) is int else [rec[x] for x in col], col))
-                    # step two: apply adjusters
-                    #
-                    # adj: single or list
-                    # no adj: must be single
-                    columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
-                    # step three: output columns
-                    print >> output, sep.join(columns)
-                    count += 1
-                except Exception as e:
-                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
-                    failed_count += 1
-                if idx - last_count > update_after:
-                    last_count = idx
-                    prog.update(idx)
-            # the last block
-            if rec_stack:
-                try:
-                    n = len(rec_stack)
-                    if n == 1:
+        prog = ProgressBar(self.filename, nr) if self.filename else None
+        #
+        # we cannot use a with statement here because we cannot close sys.stdout
+        # perhaps a better solution is available.
+        output = open(self.filename, 'w') if self.filename else sys.stdout
+        # write header
+        if self.header:
+            print >> output, self.header.rstrip()
+        for idx, raw_rec in enumerate(reader.records()):
+            multi_records = False
+            try:
+                if nFieldBy != 4 and nFieldBy != 0:
+                    if not rec_stack:
+                        rec_stack.append(raw_rec)
+                        continue
+                    # if the same, wait for the next record
+                    elif rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
+                        rec_stack.append(raw_rec)
+                        continue
+                    elif len(rec_stack) == 1:
                         rec = rec_stack[0]
+                        rec_stack = [raw_rec]
                     else:
-                        rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
-                    # step one: apply formatters
-                    fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
-                    # step two: apply adjusters
-                    columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
-                    # step three: output columns
-                    print >> output, sep.join(columns)
-                    count += 1
-                except Exception as e:
-                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
-                    failed_count += 1
-        prog.done()
+                        n = len(rec_stack)
+                        rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(len(raw_rec))]
+                        multi_records = True
+                        rec_stack = [raw_rec]
+                else:
+                    rec = raw_rec
+                # step one: apply formatters 
+                # if there is no fmt, the item must be either empty or a single item
+                #
+                # fmt: single or list
+                # no fmt: single or None
+                #
+                # this is extremely ugly but are we getting any performance gain?
+                if multi_records:
+                    try:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
+                    except:
+                        for fmt, col in formatters:
+                            try:
+                                if fmt:
+                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                            except Exception as e:
+                                raise ValueError('Failed to format value {} at col {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col))
+                else:
+                    try:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col] is None) else default_formatter(rec[col])) for fmt, col in formatters]
+                    except:
+                        for fmt, col in formatters:
+                            try:
+                                if fmt:
+                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                            except Exception as e:
+                                raise ValueError('Failed to format value {} at col {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col))
+                # step two: apply adjusters
+                #
+                # adj: single or list
+                # no adj: must be single
+                columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
+                # step three: output columns
+                print >> output, sep.join(columns)
+                count += 1
+            except Exception as e:
+                self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                failed_count += 1
+            if prog is not None and idx - last_count > update_after:
+                last_count = idx
+                prog.update(idx)
+        # the last block
+        if rec_stack:
+            try:
+                n = len(rec_stack)
+                if n == 1:
+                    rec = rec_stack[0]
+                else:
+                    rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
+                # step one: apply formatters
+                fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                # step two: apply adjusters
+                columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
+                # step three: output columns
+                print >> output, sep.join(columns)
+                count += 1
+            except Exception as e:
+                self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                failed_count += 1
+        if self.filename is not None:
+            output.close()
+        if prog is not None:
+            prog.done()
         self.logger.info('{} lines are exported {}'.format(count, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
 
 
@@ -757,7 +763,8 @@ def exportArguments(parser):
     parser.add_argument('table', help='''A variant table whose variants will be exported.
         If parameter --samples is specified, only variants belong to one or more of the
         samples will be exported.'''),
-    parser.add_argument('filename', help='''Name of output file.'''),
+    parser.add_argument('filename', help='''Name of output file. Output will be written
+        to the standard output if this parameter is left unspecified. ''', nargs='?'),
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Samples that will be exported, specified by conditions such as 'aff=1'
             and 'filename like "MG%%"'. Multiple samples could be exported to a
