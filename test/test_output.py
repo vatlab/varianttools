@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
 
 class TestOutput(ProcessTestCase):
     def setUp(self):
@@ -57,9 +57,12 @@ class TestOutput(ProcessTestCase):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         self.assertFail('vtools output variant sum(num)')
+        self.assertSucc('vtools output variant alt "sum(num)" --group_by alt')
         self.assertEqual(outputOfCmd('vtools output variant "sum(num)" -v0'), '6383'+'\n')
         self.assertFail('vtools output variant count(1)')
         self.assertEqual(outputOfCmd('vtools output variant "count(1)"'), '626'+'\n')
+        self.assertSucc('vtools output variant chr pos ref alt num --order_by num')
+        self.assertEqual(output2list('vtools output variant num --order_by num')[-10:], ['110', '110', '110', '113', '114', '119', '119', '120', '120', '120'])
         
 
 if __name__ == '__main__':
