@@ -667,7 +667,7 @@ class Exporter:
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
-        prog = ProgressBar(self.filename, nr) if self.filename else None
+        prog = ProgressBar(self.filename if self.filename else 'Writing', nr)
         #
         # we cannot use a with statement here because we cannot close sys.stdout
         # perhaps a better solution is available.
@@ -738,7 +738,7 @@ class Exporter:
             except Exception as e:
                 self.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
-            if prog is not None and idx - last_count > update_after:
+            if idx - last_count > update_after:
                 last_count = idx
                 prog.update(idx)
         # the last block
@@ -761,8 +761,7 @@ class Exporter:
                 failed_count += 1
         if self.filename is not None:
             output.close()
-        if prog is not None:
-            prog.done()
+        prog.done()
         self.logger.info('{} lines are exported {}'.format(count, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
 
 
