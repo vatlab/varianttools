@@ -146,30 +146,31 @@ class SequentialCollector:
         return item
 
 MAX_COLUMN = 62
-def VariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
     if jobs == 0 and len(IDs) < MAX_COLUMN:
         # using a single thread
-        return EmbeddedVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+        return EmbeddedVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
     elif jobs > 0 and len(IDs) < MAX_COLUMN:
         # using a standalone process to read things and
         # pass information using a pipe
-        return StandaloneVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+        return StandaloneVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
     else:
         # using multiple process to handle more than 1500 samples
         if len(IDs) // MAX_COLUMN + 2 > jobs:
             proj.logger.info('Using {} processes to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
-        return MultiVariantReader(proj, table, export_by_fields, var_fields, geno_fields,
+        return MultiVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs, jobs)
 
 class BaseVariantReader:
-    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+    def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs):
         self.proj = proj
         self.table = table
         self.export_by_fields = export_by_fields
+        self.order_by_fields = order_by_fields
         self.var_fields = var_fields
         self.geno_fields = geno_fields
         self.export_alt_build = export_alt_build
@@ -209,6 +210,9 @@ class BaseVariantReader:
         if self.export_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields)
             order_clause = ' ORDER BY {}'.format(order_fields)
+        elif self.order_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields)
+            order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
@@ -230,6 +234,9 @@ class BaseVariantReader:
         # GROUP BY clause
         if self.export_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ',variant_id')
+            order_clause = ' ORDER BY {}'.format(order_fields)
+        elif self.order_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields + ',variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
@@ -259,6 +266,9 @@ class BaseVariantReader:
         if self.export_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ', variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
+        elif self.order_by_fields:
+            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields + ', variant_id')
+            order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
         #print 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
@@ -266,12 +276,12 @@ class BaseVariantReader:
 
 
 class EmbeddedVariantReader(BaseVariantReader):
-    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+    def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs):
         self.proj = proj
         self.logger = proj.logger
         self.var_fields = var_fields
-        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
 
     def records(self):
@@ -287,9 +297,9 @@ class EmbeddedVariantReader(BaseVariantReader):
 
 
 class StandaloneVariantReader(BaseVariantReader):
-    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+    def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs):
-        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
         self.logger = proj.logger
@@ -322,9 +332,9 @@ class StandaloneVariantReader(BaseVariantReader):
                 yield rec
 
 class MultiVariantReader(BaseVariantReader):
-    def __init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+    def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs, jobs):
-        BaseVariantReader.__init__(self, proj, table, export_by_fields, var_fields, geno_fields,
+        BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
         self.logger = proj.logger
@@ -654,7 +664,7 @@ class Exporter:
         # if export_by_fields is empty
         nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
         #
-        reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
+        reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
         prog = ProgressBar(self.filename, nr) if self.filename else None

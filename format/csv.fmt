@@ -8,10 +8,14 @@
 description=Import variants (chr, pos, ref, alt) in csv format, or output arbitrary specified fields in csv format
 delimiter=','
 variant=chr,pos,ref,alt
+sort_output_by=%(order_by)s
 
 [DEFAULT]
 fields=chr,pos,ref,alt
 fields_comment=Fields to output, simple arithmetics are allowed (e.g. pos+1) but aggregation functions are not supported.
+
+order_by=
+order_by_comment=Fields used to order output in ascending order.
 
 [field formatter]
 fmt_*=CSVFormatter()
