@@ -104,6 +104,18 @@ class Formatter:
         except:
             return str(item)
 
+class CSVFormatter:
+    def __init__(self):
+        pass
+
+    def __call__(self, item):
+        val = str(item)
+        if '"' in val:
+            return '"' + val.replace('"', '""') + '"'
+        if ',' in val or '\n' in val:
+            return '"' + val + '"'
+        return val
+
 class Constant:
     def __init__(self, val=''):
         self.val = val
@@ -604,6 +616,8 @@ class Exporter:
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
         formatters = [] # formatters that will be used to produce strings from values
         col_adj = []        # adjust functions to combine values to one column.
+
+        default_formatter = str if '*' not in self.format.formatter.keys() else self.getAdjFunc(self.format.formatter['*'])
         #
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
@@ -635,7 +649,8 @@ class Exporter:
         last_count = 0
         update_after = min(max(100, nr/100), 10000)
         rec_stack = []
-        nFieldBy = len(self.format.export_by_fields.split(','))
+        # if export_by_fields is empty
+        nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
         #
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
@@ -648,7 +663,7 @@ class Exporter:
             for idx, raw_rec in enumerate(reader.records()):
                 multi_records = False
                 try:
-                    if nFieldBy != 4:
+                    if nFieldBy != 4 and nFieldBy != 0:
                         if not rec_stack:
                             rec_stack.append(raw_rec)
                             continue
@@ -676,7 +691,7 @@ class Exporter:
                     if multi_records:
                         try:
                             fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                                if fmt else ('' if (col is None or rec[col][0] is None) else str(rec[col][0])) for fmt, col in formatters]
+                                if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
                         except:
                             for fmt, col in formatters:
                                 try:
@@ -688,7 +703,7 @@ class Exporter:
                     else:
                         try:
                             fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                                if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                                if fmt else ('' if (col is None or rec[col] is None) else default_formatter(rec[col])) for fmt, col in formatters]
                         except:
                             for fmt, col in formatters:
                                 try:

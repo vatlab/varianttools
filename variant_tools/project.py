@@ -253,7 +253,7 @@ class fileFMT:
         self.encoding = 'utf-8'
         self.logger = logger
         # for export only
-        self.export_by_fields = 0
+        self.export_by_fields = ''
         # for import only
         self.merge_by_cols = None
         #
