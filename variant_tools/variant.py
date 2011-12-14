@@ -51,10 +51,10 @@ def generalOutputArguments(parser):
     grp.add_argument('--build',
         help='''Output reference genome. If set to alternative build, chr and pos
             in the fields will be replaced by alt_chr and alt_pos''')
-    grp.add_argument('-g', '--group_by', nargs='*',
+    grp.add_argument('-g', '--group_by', nargs='*', metavar='FIELD',
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
-    grp.add_argument('--order_by', nargs='*',
+    grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
 
 def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
