@@ -113,11 +113,11 @@ def lineCount(filename, encoding='UTF-8'):
     if totalSize < 500000:
         # small file, read the number of lines directly
         if filename.endswith('.gz'):
-            return len(gzip.open(filename).readlines())
+            return len(gzip.open(filename, 'rb').readlines())
         elif filename.endswith('.bz2'):
             return len(bz2.BZ2File(filename).readlines())
         else:
-            return len(open(filename).readlines())
+            return len(open(filename, 'rb').readlines())
     elif filename.endswith('.gz'):
         input = gzip.open(filename, 'rb')
         input.seek(50000, 0)
