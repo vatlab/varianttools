@@ -6,7 +6,7 @@
 #
 # To rebuild this database using a new version of data
 # 1. download an excel file from Cancer Genome Project: http://www.sanger.ac.uk/genetics/CGP/Census/
-# 2. save the data in a tab-delimited text file in filename CancerGeneCensus.txt.
+# 2. save the data in a tab-delimited text file in filename CancerGeneCensus.txt. Remove the header.
 # 3. run vtools use CancerGeneCensus.ann --files CancerGeneCensus.txt
 
 [linked fields]
