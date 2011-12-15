@@ -107,7 +107,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
             sys.stdout.write(args.delimiter.join([re.sub('[\W]+', ' ', x) for x in output_fields]) + '\n')
         elif args.header == ['-']:
             proj.logger.info('Reading header from standard input')
-            sys.stdout.write(sys.stdin.read())
+            sys.stdout.write(sys.stdin.read().rstrip() + '\n')
         else:
             # other wise, use the user-provided header
             if len(args.header) != len(output_fields):
