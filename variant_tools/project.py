@@ -1191,9 +1191,9 @@ class Project:
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
         info += 'Database engine:             {}\n'.format(self.db.engine)
-        info += 'Variant tables:              {}\n'.format(', '.join(self.getVariantTables()))
-        info += 'Annotation databases:        {}\n'.format(', '.join([os.path.join(x.dir, x.name) \
-            + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]))
+        info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
+        info += 'Annotation databases:        {}\n'.format('\n'.join([' '*29 + os.path.join(x.dir, x.name) \
+            + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
         return info
 
     #
