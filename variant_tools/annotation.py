@@ -423,7 +423,7 @@ class AnnoDBConfiger:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
             if os.path.isfile(dbFile):
                 try:
-                    return AnnoDB(self.proj, dbFile, linked_by)
+                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except ValueError as e:
                     self.logger.debug(e)
                     self.logger.info('Existing database cannot be used.')
@@ -435,7 +435,7 @@ class AnnoDBConfiger:
                     s = delayedAction(self.logger.info, 'Decompressing {}'.format(dbFile))
                     dbFile = decompressIfNeeded(dbFile, inplace=True)
                     del s
-                    return AnnoDB(self.proj, dbFile, linked_by)
+                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except Exception as e:
                     self.logger.debug(e)
                     self.logger.info('Failed to download database or downloaded database unusable.')
