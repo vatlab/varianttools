@@ -29,6 +29,7 @@ import sys
 import gzip
 import bz2
 import re
+import array
 import threading
 import Queue
 from heapq import heappush, heappop, heappushpop
@@ -372,6 +373,41 @@ class DiscardRecord:
         if item in self.val:
             raise IgnoredRecord()
         return item
+    
+class SequenceExtractor:
+    '''This sequence extractor extract subsequence from a pre-specified sequence'''
+    def __init__(self, filename):
+        # a dictionary for seq for each chromosome
+        self.seq = {}
+        # we assume that the input file has format
+        #
+        # >chr9
+        # seq
+        # >chr10
+        # seq
+        #
+        current_chr = None
+        with open(filename) as input:   
+            # for each chromosome? need to fix it here
+            for line in input.readlines():
+                if line.startswith('>'):
+                    chr = line[4:].rstrip()
+                    self.seq[chr] = array('c', [])
+                else:
+                    self.seq[chr].extend(line.rstrip())
+
+    def __call__(self, item):
+        # need to handle 'chr' here (what is in faster, what is stored, and what is passed)
+        return self.seq[item[0]][item[1]]
+
+# this is a dictionary to save extractors for each file used
+g_SeqExtractor = {}
+def SeqAtLoc(filename):
+    # return the same object for multiple instances of SeqAtLoc because
+    # we do not want to read the fasta file multiple times
+    if filename in g_SeqExtractor:
+        g_SeqExtractor[filename] = SequenceExtractor(filename)
+    return g_SeqExtractor[filename]
     
 class SequentialExtractor:
     def __init__(self, extractors):
