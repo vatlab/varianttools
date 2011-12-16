@@ -11,6 +11,18 @@ variant=chr,pos,ref,alt
 sort_output_by=%(order_by)s
 
 [DEFAULT]
+chr_col=1
+chr_col_comment=Column index for the chromosome field
+
+pos_col=2
+pos_col_comment=Column index for the position field
+
+ref_col=3
+ref_col_comment=Column index for the reference field
+
+alt_col=4
+alt_col_comment=Column index for the alternative field
+
 fields=chr,pos,ref,alt
 fields_comment=Fields to output, simple arithmetics are allowed (e.g. pos+1) but aggregation functions are not supported.
 
@@ -26,22 +38,22 @@ adj=JoinRecords(',')
 comment=Output all fields as one column
 
 [chr]
-index=1
+index=%(chr_col)s
 type=VARCHAR(20)
 adj=RemoveLeading('chr')
 comment=Chromosome
 
 [pos]
-index=2
+index=%(pos_col)s
 type=INTEGER NOT NULL
 comment=1-based position
 
 [ref]
-index=3
+index=%(ref_col)s
 type=VARCHAR(255)
 comment=Reference allele, '-' for insertion.
 
 [alt]
-index=4
+index=%(alt_col)s
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion.
