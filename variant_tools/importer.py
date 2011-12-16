@@ -1957,6 +1957,13 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
                 proj.logger.warning('Field {} exists in {} of {} selected samples'.format(field, len(fieldInTable[field.lower()]), len(IDs))) 
             validGenotypeIndices.append(index)
             validGenotypeFields.append(field)
+    # check GT field
+    if not all([x is None for x in coreDestinations]):
+        if 'gt' not in [x.lower() for x in genotypeFieldTypes.keys()]:
+            proj.logger.warning('Genotype field does not exist in any of the selected samples')
+        else:
+            if len(fieldInTable['gt']) < len(IDs):
+                proj.logger.warning('Genotype field GT exists in {} of {} selected samples'.format(len(fieldInTable[field.lower()]), len(IDs))) 
 
     if all([x is None for x in coreDestinations]) and len(validGenotypeFields) == 0:
         proj.logger.warning("No valid sample statistics operation has been specified.")
@@ -1980,11 +1987,14 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
         whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
         
-        fieldSelect = ''
+        fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
         if validGenotypeFields is not None and len(validGenotypeFields) != 0:
-            fieldSelect = ' '.join([', ' + x if id in fieldInTable[x.lower()] else ', NULL' for x in validGenotypeFields])
+            fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
         
-        query = 'SELECT variant_id, GT{} FROM {}_genotype.genotype_{} {};'.format(fieldSelect,
+        if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
+            continue
+
+        query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
             proj.name, id, whereClause)
         #proj.logger.debug(query)
         cur.execute(query)
