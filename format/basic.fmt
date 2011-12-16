@@ -21,6 +21,9 @@ ref_col_comment=Column index for the reference field
 alt_col=4
 alt_col_comment=Column index for the alternative field
 
+pos_adj=0
+pos_adj_comment=Change this value to 1 if the input position is zero-based.
+
 [chr]
 index=%(chr_col)s
 type=VARCHAR(20)
@@ -29,6 +32,7 @@ comment=Chromosome
 
 [pos]
 index=%(pos_col)s
+adj=IncreaseBy(%(pos_adj)s)
 type=INTEGER NOT NULL
 comment=1-based position
 
