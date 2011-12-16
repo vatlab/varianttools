@@ -1760,23 +1760,21 @@ def setFieldValue(proj, table, items, build):
                         raise ValueError('Inconsistent type returned from different samples')
             if all([x is not None for x in fldTypes]):
                 break
-     #
-        if None in fldTypes:
-            raise ValueError('Cannot determine the type of the expression')
         #
         count = [0]*3
         # if adding a new field
         cur_fields = proj.db.getHeaders(table)[3:]
         for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
+                if fldType is None:
+                    raise ValueError('Cannot determine the value of a new field {} because the values are all NULL'.format(field))
                 proj.checkFieldName(field, exclude=table)
                 proj.logger.info('Adding field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
                     {int: 'INT',
                      float: 'FLOAT',
                      str: 'VARCHAR(255)',
-                     unicode: 'VARCHAR(255)',
-                     None: 'FLOAT'}[fldType])
+                     unicode: 'VARCHAR(255)'}[fldType])
                 proj.logger.debug(query)
                 cur.execute(query)
                 count[1] += 1  # new
@@ -1812,23 +1810,21 @@ def setFieldValue(proj, table, items, build):
             if all([x is not None for x in fldTypes]):
                 break
         #
-        if None in fldTypes:
-            raise ValueError('Cannot determine the type of the expression')
-        #
         count = [0]*3
         # if adding a new field
         cur_fields = proj.db.getHeaders(table)[3:]
         new_fields = [x.split('=', 1)[0] for x in items]
         for field, fldType in zip(new_fields, fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
+                if fldType is None:
+                    raise ValueError('Cannot determine the value of a new field {} because the values are all NULL'.format(field))
                 proj.checkFieldName(field, exclude=table)
                 proj.logger.info('Adding field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
                     {int: 'INT',
                      float: 'FLOAT',
                      str: 'VARCHAR(255)',
-                     unicode: 'VARCHAR(255)',
-                     None: 'FLOAT'}[fldType])
+                     unicode: 'VARCHAR(255)'}[fldType])
                 proj.logger.debug(query)
                 cur.execute(query)
                 count[1] += 1  # new
