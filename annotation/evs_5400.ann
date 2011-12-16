@@ -11,7 +11,7 @@ hg19=chr, pos, ref, alt
 [data sources]
 description=NHLBI GO Exome Sequencing Project (Exome Variant Server,  NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [5400 samples, December, 2011].)
 version=hg19_20111215
-source_url=http://vtools.houstonbioinformatics.org/annoDB/evs-esp5400-hg19_20111215.vcf.gz
+source_url=http://evs.gs.washington.edu/esp5500_bulk_data/ESP5400.snps.vcf.tar.gz
 direct_url=http://vtools.houstonbioinformatics.org/annoDB/evs-esp5400-hg19_20111215.DB.gz
 anno_type=variant
 source_type=txt
