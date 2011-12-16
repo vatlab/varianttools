@@ -109,12 +109,22 @@ class CSVFormatter:
         pass
 
     def __call__(self, item):
-        val = str(item)
-        if '"' in val:
-            return '"' + val.replace('"', '""') + '"'
-        if ',' in val or '\n' in val:
-            return '"' + val + '"'
-        return val
+        if type(item) == str:
+            if not item:
+                return ''
+            elif '"' in item:
+                return '"' + item.replace('"', '""') + '"'
+            # quote all strings, because sometimes excel will treat them differently.
+            else:
+                return '"' + item + '"'
+        else:
+            # not string...
+            val = str(item)
+            if '"' in val:
+                return '"' + val.replace('"', '""') + '"'
+            if ',' in val or '\n' in val:
+                return '"' + val + '"'
+            return val
 
 class Constant:
     def __init__(self, val=''):
