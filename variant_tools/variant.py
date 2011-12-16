@@ -366,28 +366,37 @@ def exclude(args):
     select(args, reverse=True)
 
 def compareArguments(parser):
-    parser.add_argument('table_A', help='''variant table A.''')
-    parser.add_argument('table_B', help='''variant table B.''')
-    parser.add_argument('--A_diff_B', metavar= 'TABLE',  
-        help='''Save variants in A but not in B to TABLE.''')
-    parser.add_argument('--B_diff_A', metavar= 'TABLE', 
-        help='''Save variants in B but not in A to TABLE.''')
-    parser.add_argument('--A_and_B', metavar= 'TABLE',
-        help='''Save variants in both tables A and B to TABLE.''')
-    parser.add_argument('--A_or_B', metavar= 'TABLE',
-        help='''Save variants in both tables A or B to TABLE.''')
+    parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
+    parser.add_argument('--A_diff_B', metavar= 'TABLE', nargs='?',
+        help='''deprecated, use --difference instead.''')
+    parser.add_argument('--B_diff_A', metavar= 'TABLE', nargs='?',
+        help='''deprecated, use --difference instead.''')
+    parser.add_argument('--A_and_B', metavar= 'TABLE', nargs='?',
+        help='''deprecated, use --intersect instead.''')
+    parser.add_argument('--A_or_B', metavar= 'TABLE', nargs='?',
+        help='''deprecated, use --union instead.''')
+    parser.add_argument('--intersect', metavar='TABLE', nargs='?',
+        help='''Save variants in all tables to TABLE''')
+    parser.add_argument('--union', metavar='TABLE', nargs='?',
+        help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name is specified.''')
+    parser.add_argument('--intersection', metavar='TABLE', nargs='?',
+        help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name is specified''')
+    parser.add_argument('--difference', metavar='TABLE', nargs='?',
+        help='''Save variants in the first, but in the others (T1 - T2 - T3...) to TABLE if a name is specified''')
     parser.add_argument('-c', '--count', action='store_true',
-        help='''Output number of variant that are only in A, only in B, in both A and B, and in A or B.''')
+        help='''Output number of variants for specified option (e.g. --union -c).''')
 
 def compare(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # table?
-            if not proj.isVariantTable(args.table_A):
-                raise ValueError('Variant table {} does not exist.'.format(args.table_A))
-            if not proj.isVariantTable(args.table_B):
-                raise ValueError('Variant table {} does not exist.'.format(args.table_B))
-            if not args.A_diff_B and not args.B_diff_A and not args.A_and_B and not args.A_or_B and not args.count:
+            if len(args.tables) < 2:
+                raise ValueError('At least two tables should be specified.')
+            for table in args.tables:
+                if not proj.isVariantTable(table):
+                    raise ValueError('Variant table {} does not exist.'.format(table))
+            if not args.A_diff_B and not args.B_diff_A and not args.A_and_B and \
+                not args.A_or_B and not args.intersect and not args.union and not args.count:
                 proj.logger.warning('No action parameter is specified. Nothing to do.')
                 return
             #
