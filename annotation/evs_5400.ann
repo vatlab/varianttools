@@ -88,19 +88,19 @@ comment=The observed ref allele counts for all populations. Allele counts only i
 [EuropeanAmericanMaf] 
 index=8
 type=FLOAT NOT NULL
-adj=ExtractValue('MAF=', ';'), ExtractField(1, ',')
+adj=ExtractValue('MAF=', ';'), ExtractField(1, ','), lambda x: float(x)/100.0
 comment=The European American minor-allele frequency in percent.
 
 [AfricanAmericanMaf] 
 index=8
 type=FLOAT NOT NULL
-adj=ExtractValue('MAF=', ';'), ExtractField(2, ',')
+adj=ExtractValue('MAF=', ';'), ExtractField(2, ','), lambda x: float(x)/100.0
 comment=The African American minor-allele frequency in percent.
 
 [AllMaf] 
 index=8
 type=FLOAT NOT NULL
-adj=ExtractValue('MAF=', ';'), ExtractField(3, ',')
+adj=ExtractValue('MAF=', ';'), ExtractField(3, ','), lambda x: float(x)/100.0
 comment=The minor-allele frequency in percent for all populations.
 
 [AvgSampleReadDepth]
