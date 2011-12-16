@@ -367,95 +367,168 @@ def exclude(args):
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
-    parser.add_argument('--A_diff_B', metavar= 'TABLE', nargs='?',
+    parser.add_argument('--A_diff_B', metavar= 'TABLE',
         help='''deprecated, use --difference instead.''')
-    parser.add_argument('--B_diff_A', metavar= 'TABLE', nargs='?',
+    parser.add_argument('--B_diff_A', metavar= 'TABLE',
         help='''deprecated, use --difference instead.''')
-    parser.add_argument('--A_and_B', metavar= 'TABLE', nargs='?',
+    parser.add_argument('--A_and_B', metavar= 'TABLE',
         help='''deprecated, use --intersect instead.''')
-    parser.add_argument('--A_or_B', metavar= 'TABLE', nargs='?',
+    parser.add_argument('--A_or_B', metavar= 'TABLE',
         help='''deprecated, use --union instead.''')
-    parser.add_argument('--intersect', metavar='TABLE', nargs='?',
-        help='''Save variants in all tables to TABLE''')
-    parser.add_argument('--union', metavar='TABLE', nargs='?',
+    parser.add_argument('--union', metavar='TABLE', nargs='?', default='',
         help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name is specified.''')
-    parser.add_argument('--intersection', metavar='TABLE', nargs='?',
+    parser.add_argument('--intersection', metavar='TABLE', nargs='?', default='',
         help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name is specified''')
-    parser.add_argument('--difference', metavar='TABLE', nargs='?',
+    parser.add_argument('--difference', metavar='TABLE', nargs='?', default='',
         help='''Save variants in the first, but in the others (T1 - T2 - T3...) to TABLE if a name is specified''')
     parser.add_argument('-c', '--count', action='store_true',
         help='''Output number of variants for specified option (e.g. --union -c).''')
+
+
+def compareTwoTables(proj, args):
+    # this is the old version of vtools compare, kept for compatibility reasons
+    #
+    # We can use a direct query to get diff/union/intersection of tables but we cannot
+    # display a progress bar during query. We therefore only use that faster method (3m38s
+    # instead of 2m33s) in the case of -v0.
+    direct_query = proj.verbosity is not None and proj.verbosity.startswith('0')
+    cur = proj.db.cursor()
+    variant_A = set()
+    variant_B = set()
+    if args.count or not direct_query:
+        # read variants in tables[0]
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.tables[0], exact=False), args.tables[0]))
+        cur.execute('SELECT variant_id from {};'.format(args.tables[0]))
+        variant_A = set([x[0] for x in cur.fetchall()])
+        # read variants in tables[1]
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.tables[1], exact=False), args.tables[1]))
+        cur.execute('SELECT variant_id from {};'.format(args.tables[1]))
+        variant_B = set([x[0] for x in cur.fetchall()])
+    #
+    if args.count:
+        proj.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
+        print('{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
+            len(variant_B - variant_A),
+            len(variant_A & variant_B),
+            len(variant_A | variant_B)
+            ))
+    #
+    for var, opt, table, tables_A, table_B in [
+            (set() if args.A_diff_B is None else variant_A - variant_B, 'EXCEPT', args.A_diff_B, args.tables[0], args.tables[1]), 
+            (set() if args.B_diff_A is None else variant_B - variant_A, 'EXCEPT', args.B_diff_A, args.tables[1], args.tables[0]), 
+            (set() if args.A_and_B is None else variant_A & variant_B, 'INTERSECT', args.A_and_B, args.tables[0], args.tables[1]), 
+            (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.tables[0], args.tables[1])]:
+        if table is None:
+            continue
+        if table == 'variant':
+            raise ValueError('Cannot overwrite master variant table')
+        if proj.db.hasTable(table):
+            new_table = proj.db.backupTable(table)
+            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
+        proj.createVariantTable(table)
+        if direct_query:
+            #proj.db.startProgress('Creating table {}'.format(table))
+            cur = proj.db.cursor()
+            query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=table, table_A=table_A, table_B=table_B)
+            proj.logger.debug(query)
+            cur.execute(query)
+            #proj.db.stopProgress()
+        else:
+            prog = ProgressBar('Writing to ' + table, len(var))
+            query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
+            # sort var so that variant_id will be in order, which might
+            # improve database performance
+            for count,id in enumerate(sorted(var)):
+                cur.execute(query, (id,))
+                if count % 10000 == 0:
+                    prog.update(count)
+            prog.done()       
+        proj.db.commit()
+
+def compareMultipleTables(proj, args):
+    # We can use a direct query to get diff/union/intersection of tables but we cannot
+    # display a progress bar during query. We therefore only use that faster method (3m38s
+    # instead of 2m33s) in the case of -v0.
+    if args.count and sum([args.difference != '', args.union != '', args.intersection != '']) > 1:
+        raise ValueError('Argument --count can be used only with one operation.')
+    #
+    cur = proj.db.cursor()
+    variants = []
+    for table in args.tables:
+        # read variants in tables[0]
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(table, exact=False), table))
+        cur.execute('SELECT variant_id from {};'.format(table))
+        variants.append(set([x[0] for x in cur.fetchall()]))
+    #
+    var_diff = set()
+    var_union = set()
+    var_intersect = set()
+    if args.difference is not None:
+        var_diff = variants[0]
+        for var in variants[1:]:
+           var_diff = var_diff - var 
+    if args.union is not None:
+        var_union = variants[0]
+        for var in variants[1:]:
+           var_union = var_union | var 
+    if args.intersection is not None:
+        var_intersect = variants[0]
+        for var in variants[1:]:
+           var_intersect = var_intersect & var 
+
+    # count
+    if args.count:
+        if args.difference is not None:
+            print(len(var_diff))
+        elif args.union is not None:
+            print(len(var_union))
+        elif args.intersection is not None:
+            print(len(var_intersect))
+    #
+    for var, table in [
+            (var_intersect, args.intersection),
+            (var_union, args.union),
+            (var_diff, args.difference)]:
+        if not table:
+            continue
+        if table == 'variant':
+            raise ValueError('Cannot overwrite master variant table')
+        if proj.db.hasTable(table):
+            new_table = proj.db.backupTable(table)
+            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
+        proj.createVariantTable(table)
+        prog = ProgressBar('Writing to ' + table, len(var))
+        query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
+        # sort var so that variant_id will be in order, which might
+        # improve database performance
+        for count,id in enumerate(sorted(var)):
+            cur.execute(query, (id,))
+            if count % 10000 == 0:
+                prog.update(count)
+        prog.done()       
+        proj.db.commit()
 
 def compare(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # table?
-            if len(args.tables) < 2:
-                raise ValueError('At least two tables should be specified.')
             for table in args.tables:
                 if not proj.isVariantTable(table):
                     raise ValueError('Variant table {} does not exist.'.format(table))
-            if not args.A_diff_B and not args.B_diff_A and not args.A_and_B and \
-                not args.A_or_B and not args.intersect and not args.union and not args.count:
-                proj.logger.warning('No action parameter is specified. Nothing to do.')
-                return
-            #
-            # We can use a direct query to get diff/union/intersection of tables but we cannot
-            # display a progress bar during query. We therefore only use that faster method (3m38s
-            # instead of 2m33s) in the case of -v0.
-            direct_query = proj.verbosity is not None and proj.verbosity.startswith('0')
-            cur = proj.db.cursor()
-            variant_A = set()
-            variant_B = set()
-            if args.count or not direct_query:
-                # read variants in table_A
-                proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_A, exact=False), args.table_A))
-                cur.execute('SELECT variant_id from {};'.format(args.table_A))
-                variant_A = set([x[0] for x in cur.fetchall()])
-                # read variants in table_B
-                proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.table_B, exact=False), args.table_B))
-                cur.execute('SELECT variant_id from {};'.format(args.table_B))
-                variant_B = set([x[0] for x in cur.fetchall()])
-            #
-            if args.count:
-                proj.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
-                print('{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
-                    len(variant_B - variant_A),
-                    len(variant_A & variant_B),
-                    len(variant_A | variant_B)
-                    ))
-            #
-            for var, opt, table, table_A, table_B in [
-                    (set() if args.A_diff_B is None else variant_A - variant_B, 'EXCEPT', args.A_diff_B, args.table_A, args.table_B), 
-                    (set() if args.B_diff_A is None else variant_B - variant_A, 'EXCEPT', args.B_diff_A, args.table_B, args.table_A), 
-                    (set() if args.A_and_B is None else variant_A & variant_B, 'INTERSECT', args.A_and_B, args.table_A, args.table_B), 
-                    (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.table_A, args.table_B)]:
-                if table is None:
-                    continue
-                if table == 'variant':
-                    raise ValueError('Cannot overwrite master variant table')
-                if proj.db.hasTable(table):
-                    new_table = proj.db.backupTable(table)
-                    proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
-                proj.createVariantTable(table)
-                if direct_query:
-                    #proj.db.startProgress('Creating table {}'.format(table))
-                    cur = proj.db.cursor()
-                    query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=table, table_A=table_A, table_B=table_B)
-                    proj.logger.debug(query)
-                    cur.execute(query)
-                    #proj.db.stopProgress()
-                else:
-                    prog = ProgressBar('Writing to ' + table, len(var))
-                    query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
-                    # sort var so that variant_id will be in order, which might
-                    # improve database performance
-                    for count,id in enumerate(sorted(var)):
-                        cur.execute(query, (id,))
-                        if count % 10000 == 0:
-                            prog.update(count)
-                    prog.done()       
-                proj.db.commit()
+            # this is the old behavior
+            if len(args.tables) == 2 and ((args.B_diff_A is None and args.A_diff_B is None and \
+                args.A_and_B is None and args.A_or_B is None and args.intersection == '' and \
+                args.union == '' and args.difference == '' and args.count) or args.B_diff_A is not None
+                or args.A_diff_B is not None or args.A_and_B is not None or args.A_or_B is not None):
+                if args.intersection != '' or args.union != '' or args.difference != '':
+                    raise ValueError('Parameters for the old and new interface cannot be mixed.')
+                compareTwoTables(proj, args)
+            else:
+                # new interface, ignores all the A_XX_B parameters
+                if args.intersection == '' and args.union == '' and args.difference == '':
+                    proj.logger.warning('No action parameter is specified. Nothing to do.')
+                    return
+                compareMultipleTables(proj, args)
     except Exception as e:
         sys.exit(e) 
 
