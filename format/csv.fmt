@@ -24,7 +24,7 @@ alt_col=4
 alt_col_comment=Column index for the alternative field
 
 pos_adj=0
-pos_adj_comment=Change this value to 1 if the input position is zero-based.
+pos_adj_comment=Set to 1 if the input position is zero-based.
 
 fields=chr,pos,ref,alt
 fields_comment=Fields to output, simple arithmetics are allowed (e.g. pos+1) but aggregation functions are not supported.
