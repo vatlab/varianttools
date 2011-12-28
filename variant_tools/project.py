@@ -1308,13 +1308,11 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            # FIXME: how to use bin here?
                             link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr AND {0}.range_id = {1}.rowid'
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            # FIXME: how to use bin here?
                             link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'
                                     .format(table, db.build[0], db.build[1], db.build[2]))
                             ]
@@ -1336,7 +1334,13 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
+                        binningTable = makeTableName([self.alt_build] + db.alt_build)
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, binningTable),
+                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                                    .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
@@ -1411,8 +1415,13 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        # FIXME: how to use bin?
+                        binningTable = makeTableName([self.alt_build] + db.alt_build)
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, binningTable),
+                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                                    .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
@@ -1436,8 +1445,13 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        # FIXME: how to use bin here?
+                        binningTable = makeTableName([self.alt_build] + db.alt_build)
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, binningTable),
+                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                                    .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
