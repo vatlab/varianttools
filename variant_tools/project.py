@@ -38,6 +38,7 @@ import argparse
 import threading
 import Queue
 import time
+import re
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
@@ -1138,7 +1139,7 @@ class Project:
             raise ValueError('Master variant table cannot be removed.')
         if not self.isVariantTable(table):
             raise ValueError('{} is not found or is not a variant table.'.format(table))
-        self.logger.info('Removing table {} (this might take a while)'.format(table))
+        self.logger.info('Removing table {}'.format(table))
         self.db.removeTable(table)
 
     def selectSampleByPhenotype(self, cond):
@@ -2471,10 +2472,10 @@ def removeArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'geno_fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
-        help='''Items to be removed, which should be, for 'project' the name of project to 
-            be removed (optional), for 'tables' names of one or more variant tables,
-            for 'samples' patterns using which matching samples are removed, for 'fields'
-            name of fields to be removed, for 'geno_fields' name of genotype fields to 
+        help='''Items to be removed, which should be, for 'project' the name of project to be
+            removed (optional), for 'tables' names of one or more variant tables (wildcard characters
+            ? and * are allowed), for 'samples' patterns using which matching samples are removed, for
+            'fields' name of fields to be removed, for 'geno_fields' name of genotype fields to 
             be removed (cf. 'vtools show genotypes'), for 'annotations' names of annotation databases,
             for 'variants' variant tables whose variants will be removed from all variant
             tables and genotypes, for 'genotypes' conditions using which matching genotypes
@@ -2492,8 +2493,17 @@ def remove(args):
                     raise ValueError('Cannot remove project: Incorrect project name')
                 proj.remove()
             elif args.type == 'tables':
+                allTables = proj.getVariantTables()
+                removed = []
                 for table in args.items:
-                    proj.removeVariantTable(table)
+                    if '?' in table or '*' in table:
+                        for tbl in allTables:
+                            if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
+                                proj.removeVariantTable(tbl)
+                                removed.append(table)
+                    else:
+                        proj.removeVariantTable(table)
+                        removed.append(table)
             elif args.type == 'samples':
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select samples to be removed')
