@@ -41,7 +41,8 @@ import time
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, filesInURL, downloadFile
+from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, \
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
@@ -150,6 +151,34 @@ class AnnoDB:
             s = delayedAction(proj.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
             self.indexLinkedField(proj, linked_by)
             del s
+        if self.anno_type == 'range':
+            s = delayedAction(proj.logger.info, 'Binning ranges')
+            if self.build is not None:
+                self.binningRanges(proj, proj.build, self.build)
+            elif self.alt_build is not None:
+                self.binningRanges(proj, proj.alt_build, self.alt_build)
+
+
+    def binningRanges(self, proj, build, keys):
+        cur = self.db.cursor()
+        tbl = makeTableName([build] + keys)
+        if self.db.hasTable(tbl):
+            return
+        cur.execute('SELECT rowid, {} FROM {}'.format(','.join(keys), self.name))
+        ranges = cur.fetchall()
+        cur.execute('CREATE TABLE {} (bin INT, chr VARCHAR(255), range_id INT)'.format(tbl))
+        insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1});'.format(tbl, self.db.PH)
+        for rowid, chr, start, end in ranges:
+            if start > end:
+                raise ValueError('Start position {} greater than ending position {} in database {}'.format(start, end, self.name))
+            sbin = getMaxUcscBin(start-1, start)
+            ebin = getMaxUcscBin(end-1, end)
+            if sbin > ebin:
+                raise SystemError('Start bin greater than end bin...')
+            cur.executemany(insert_query, [(bin, chr, rowid) for bin in range(sbin, ebin + 1)])
+        self.db.commit()          
+        cur.execute('CREATE INDEX {0}_idx ON {0} (bin ASC, chr ASC, range_id ASC);'.format(tbl))
+        self.db.commit()
 
     def indexLinkedField(self, proj, linked_fields):
         '''Create index for fields that are linked by'''
@@ -1274,13 +1303,21 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
+                        binningTable = makeTableName([self.build] + db.build)
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
+                            FieldConnection(
+                            field= '{}.{}'.format(table, field),
+                            table= '{}.{}'.format(table, binningTable),
+                            # FIXME: how to use bin here?
+                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                                    .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             # FIXME: how to use bin here?
                             link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'
-                                    .format(table, db.build[0], db.build[1], db.build[2]))]
+                                    .format(table, db.build[0], db.build[1], db.build[2]))
+                            ]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 if db.alt_build is not None:
