@@ -54,7 +54,8 @@ type=INTEGER
 comment=end position on chromosome
 
 [name]
-index=4
+index=1,4
+adj=lambda x: (x[0][3:] + x[1]) if x[0].startswith('chr') else (x[0] + x[1])
 type=VARCHAR(255)
 comment=name of cytogenic band
 

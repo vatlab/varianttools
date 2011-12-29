@@ -27,14 +27,14 @@
 #
 
 [linked fields]
-hg19=chr, begin, end
+hg18=chr, begin, end
 
 [data sources]
 anno_type=range
 description=Cyto Band
-version=hg19_20111216
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/cytoBand.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/cytoBand-hg19_20111216.DB.gz
+version=hg18_20111216
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/cytoBand.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/cytoBand-hg18_20111216.DB.gz
 source_type=txt
 
 [chr]
