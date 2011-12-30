@@ -114,7 +114,7 @@ class AnnoDB:
                 self.version = rec[1]
             elif rec[0] == 'anno_type':
                 if anno_type is None:
-                    self.anno_type = rec[1]
+                    self.anno_type = rec[1] if rec[1] != 'attribute' else 'field'
                 else:
                     self.anno_type = anno_type
             elif rec[0] == 'build':
@@ -146,7 +146,7 @@ class AnnoDB:
             proj.logger.warning('No description for annotation database {}'.format(annoDB))
         if self.build is None and self.alt_build is None:
             raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
-        if self.anno_type == 'attribute' and len(self.linked_by) != len(self.build):
+        if self.anno_type == 'field' and len(self.linked_by) != len(self.build):
             raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
         if self.linked_by:
             s = delayedAction(proj.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
@@ -1282,7 +1282,7 @@ class Project:
             # Annotation database
             if table.lower() in [x.name.lower() for x in self.annoDB]:
                 db = [x for x in self.annoDB if x.name.lower() == table][0]
-                if db.anno_type == 'attribute':
+                if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
                             field= '{}.{}'.format(table, field),
@@ -1394,7 +1394,7 @@ class Project:
         for db in self.annoDB:
             if field.lower() in [x.name.lower() for x in db.fields]:
                 table = db.name
-                if db.anno_type == 'attribute':
+                if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
                             field= '{}.{}'.format(table, field),

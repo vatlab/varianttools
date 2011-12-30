@@ -78,8 +78,8 @@ class AnnoDBConfiger:
         # some fields have to be determined.
         if self.name is None:
             raise ValueError('No valid name is set')
-        if self.anno_type not in ['position', 'variant', 'range', 'attribute']:
-            raise ValueError('vtools only support position, variant, range, and attribute types')
+        if self.anno_type not in ['position', 'variant', 'range', 'field']:
+            raise ValueError('vtools only support position, variant, range, and field types')
         if len(self.fields) == 0:
             raise ValueError('No valid field is located from database {}'.format(annoDB))
         if len(self.build) == 0:
@@ -151,7 +151,7 @@ class AnnoDBConfiger:
             elif item[0] == 'description':
                 self.description = item[1]
             elif item[0] == 'anno_type':
-                self.anno_type = item[1]
+                self.anno_type = item[1] if item[1] != 'attribute' else 'field'
             elif item[0] == 'delimiter':
                 self.delimiter = eval(item[1])
             elif item[0] == 'version':
@@ -465,7 +465,7 @@ def useArguments(parser):
     parser.add_argument('-l', '--linked_by', nargs='*', default=[],
         help='''A list of fields that are used to link the annotation database to
             tables in the existing project. This parameter is required only for
-            'attribute' type of annotation databases that link to fields of existing
+            'field' type of annotation databases that link to fields of existing
             tables.''')
     parser.add_argument('--anno_type', choices=['variant', 'position', 'range', 'field'],
         help='''This option overrides type of an existing annotation database when it
