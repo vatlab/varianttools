@@ -42,7 +42,8 @@ from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName
+    normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
+    downloadFile
 
 #
 #
@@ -377,6 +378,10 @@ class DiscardRecord:
 class SequenceExtractor:
     '''This sequence extractor extract subsequence from a pre-specified sequence'''
     def __init__(self, filename):
+        if not os.path.isfile(filename):
+            filename = downloadFile(filename)
+        if not os.path.isfile(filename):
+            raise valueError('Failed to obtain sequence file {}'.format(filename))
         # a dictionary for seq for each chromosome
         self.seq = {}
         # we assume that the input file has format
@@ -387,17 +392,29 @@ class SequenceExtractor:
         # seq
         #
         current_chr = None
-        with open(filename) as input:   
+        # openFile can open .gz file directly
+        cnt = lineCount(filename)
+        prog = ProgressBar('Reading ref genome sequences', cnt)
+        with openFile(filename) as input:   
             # for each chromosome? need to fix it here
-            for line in input.readlines():
+            for idx, line in enumerate(input):
+                line = line.decode()
                 if line.startswith('>'):
-                    chr = line[4:].rstrip()
-                    self.seq[chr] = array('c', [])
+                    chr = line[1:].split()[0]
+                    if chr.startswith('chr'):
+                        chr = chr[3:] 
+                    self.seq[chr] = array.array('b', [])
                 else:
-                    self.seq[chr].extend(line.rstrip())
+                    self.seq[chr].fromstring(line.rstrip())
+                if idx % 10000 == 0:
+                    prog.update(idx)
+        # use another key with 'chr' to point to the same item so that the dictionary 
+        # works with both ['2'] and ['chr2']
+        for key in self.seq:
+            self.seq['chr' + key] = self.seq[key]
+        prog.done()
 
     def __call__(self, item):
-        # need to handle 'chr' here (what is in faster, what is stored, and what is passed)
         return self.seq[item[0]][item[1]]
 
 # this is a dictionary to save extractors for each file used
@@ -405,7 +422,7 @@ g_SeqExtractor = {}
 def SeqAtLoc(filename):
     # return the same object for multiple instances of SeqAtLoc because
     # we do not want to read the fasta file multiple times
-    if filename in g_SeqExtractor:
+    if filename not in g_SeqExtractor:
         g_SeqExtractor[filename] = SequenceExtractor(filename)
     return g_SeqExtractor[filename]
     
@@ -540,8 +557,7 @@ class LineImporter:
                         self.columnRange[fIdx] = (cIdx, cIdx + count)
                         cIdx += count
                 except Exception as e:
-                    self.logger.debug(e)
-                    raise ValueError('Incorrect value adjustment functor or function: {}'.format(field.adj))
+                    raise ValueError('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
             self.first_time = False
         #
         try:
