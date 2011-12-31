@@ -130,11 +130,46 @@ rec_ref = '-'
 rec_alt = '-'
 
 class GenoFormatter:
-    def __init__(self, sep='\t', null='-'):
+    def __init__(self, style='genotype', sep='\t', null='-', base=0):
         self.sep = sep
         self.null = null
+        self.base = base
+        self.vcf_map = {
+              0: '0/0',
+              1: '0/1',
+              2: '1/1',
+              None: '.',
+              -1: './1',
+              (-1,-1): '1/2',
+              (0,1): '0/2',
+              (0,2): '2/2',
+              (None, None): '.',
+              (0, None): './0',
+              (None,0):'./0',
+              (1, None):'./1',
+              (None,1):'./2',
+              (None,2):'2/2',
+              (2,None):'1/1', 
+              (None, None, None):'.',
+              (1,None,None):'./1',
+              (None,1,None):'./2',
+              (2,None,None):'1/1',
+              (None,2,None):'2/2',
+              (None,None,1):'./3', 
+              (None,None,2):'3/3',
+              (None, -1, -1):'2/3',
+              (-1, None, -1):'1/3'
+            }
+        if style == 'genotype':
+            self.__call__ = self.fmt_genotype
+        elif style == 'numeric':
+            self.__call__ = self.fmt_numeric
+        elif style == 'vcf':
+            self.__call__ = self.fmt_vcf
+        else:
+            raise ValueError('Only genotype and numeric styles are allowed')
 
-    def __call__(self, item):
+    def fmt_genotype(self, item):
         global rec_ref, rec_alt
         if type(item) == int:
             ref = self.null if rec_ref == '-' else rec_ref
@@ -155,6 +190,23 @@ class GenoFormatter:
         else:
             return ref + self.sep + ref
 
+    def fmt_numeric(self, item):
+        if type(item) == int:
+            # 0, 1, 2 + base
+            return str(self.base + abs(item))
+        elif type(item) == tuple:
+            if item == (-1, -1):
+                return str(self.base + 2)
+            else:
+                raise ValueError('Do not know how to handle genotype {}'.format(item))
+        else:
+            raise ValueError('Do not know how to handle genotype {}'.format(item))
+
+    def fmt_vcf(self, item):
+        try:
+            return self.vcf_map[item]
+        except:
+            raise ValueError('Do not know how to output genotype {} in vcf style.'.format(item))
 
 class Constant:
     def __init__(self, val=''):

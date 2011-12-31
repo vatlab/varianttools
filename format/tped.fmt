@@ -25,7 +25,7 @@ name_comment=[export] Field for name of variants, can be dbSNP.name if dbSNP is 
 #    this format will assume the data are all from another database. 
 
 [field formatter]
-fmt_GT=GenoFormatter()
+fmt_GT=GenoFormatter(style='genotype')
 
 [chr]
 index=1
