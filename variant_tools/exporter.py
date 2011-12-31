@@ -126,6 +126,27 @@ class CSVFormatter:
                 return '"' + val + '"'
             return val
 
+rec_ref = '-'
+rec_alt = '-'
+
+class GenoFormatter:
+    def __init__(self, sep='\t', null='-'):
+        self.sep = sep
+        self.null = null
+
+    def __call__(self, item):
+        global rec_ref, rec_alt
+        ref = self.null if rec_ref == '-' else rec_ref
+        alt = self.null if rec_alt == '-' else rec_alt
+        if item == 1:
+            return ref + self.sep + alt
+        elif item == 2:
+            return alt + self.sep + alt
+        elif item == -1:
+            return alt + self.sep + self.null
+        else:
+            return ref + self.sep + ref
+
 class Constant:
     def __init__(self, val=''):
         self.val = val
@@ -225,7 +246,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
-        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT ref,alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getVariantQuery(self):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -250,7 +271,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
-        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT ref,alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getSampleQuery(self, IDs):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -295,6 +316,7 @@ class EmbeddedVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
 
     def records(self):
+        global rec_ref, rec_alt
         self.logger.debug('Running query {}'.format(self.getQuery()))
         cur = self.proj.db.cursor()
         try:
@@ -303,7 +325,9 @@ class EmbeddedVariantReader(BaseVariantReader):
             raise ValueError('Failed to generate output: {}\nIf your project misses one of the following fields {}, you might want to add them to the project (vtools update TABLE INPUT_FILE --var_info FIELDS) or stop exporting them using format parameters (if allowed).'\
                 .format(e, ', '.join(self.var_fields)))
         for rec in cur:
-            yield rec
+            # the first two items are always ref and alt
+            rec_ref, rec_alt = rec[0], rec[1]
+            yield rec[2:]
 
 
 class StandaloneVariantReader(BaseVariantReader):
@@ -334,12 +358,14 @@ class StandaloneVariantReader(BaseVariantReader):
         del s
         
     def records(self):
+        global rec_ref, rec_alt
         while True:
             rec = self.reader.recv()
             if rec is None:
                 break
             else:
-                yield rec
+                rec_ref, rec_alt = rec[0], rec[1]
+                yield rec[2:]
 
 class MultiVariantReader(BaseVariantReader):
     def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -404,6 +430,7 @@ class MultiVariantReader(BaseVariantReader):
         prog.done()
 
     def records(self):
+        global rec_ref, rec_alt
         #
         rec = []
         id = None
@@ -423,7 +450,8 @@ class MultiVariantReader(BaseVariantReader):
                         raise ValueError('Read different IDs from multiple processes')
                     rec.extend(val[1:])
                     if idx == last:
-                        yield rec
+                        rec_ref, rec_alt = rec[0], rec[1]
+                        yield rec[2:]
                         rec = []
                 if all_done:
                     break

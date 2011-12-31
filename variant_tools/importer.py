@@ -557,6 +557,7 @@ class LineImporter:
                         self.columnRange[fIdx] = (cIdx, cIdx + count)
                         cIdx += count
                 except Exception as e:
+                    sys.exit('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
                     raise ValueError('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
             self.first_time = False
         #

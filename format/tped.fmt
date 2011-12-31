@@ -5,12 +5,19 @@
 # a description of the format of this file.
 
 [format description]
-description=A basic variant input format with four columns: chr, pos, ref, alt.
+description=Output to TPED format with the first four columns chr name gen_pos pos, and the 
+    rest for genotypes. Variant tools cannot import from this format because it does not contain
+    information about reference genome.
 variant=chr,pos,ref,alt
 
 [DEFAULT]
-seq_file=hg19.fasta
-seq_file_comment=A fasta file of the reference genome to determine reference allele at specified location
+#seq_file=hg19.fasta
+#seq_file_comment=A fasta file of the reference genome to determine reference allele at specified location
+name=
+name_comment=Field for the name column, can be dbSNP.name if dbSNP is available
+
+[field formatter]
+fmt_GT=GenoFormatter()
 
 [chr]
 index=1
@@ -19,18 +26,48 @@ adj=RemoveLeading('chr')
 comment=Chromosome
 
 [pos]
-index=2
+index=4
 type=INTEGER NOT NULL
 comment=1-based position
+#
+#[ref]
+#index=1,4
+## chromosome and position will be passed
+#adj=SeqAtLoc('ftp://ftp.sanger.ac.uk/pub/1000genomes/tk2/main_project_reference/human_g1k_v37.fasta.gz')
+#type=VARCHAR(255)
+#comment=Reference allele, '-' for insertion.
+#
+#[alt]
+#index=3
+#type=VARCHAR(255)
+#comment=Alternative allele, '-' for deletion.
+#
+#[GT]
+#index=5:,6:
+#adj=lambda x: 1 if x[0] != x[1] else 2
+#type=INT
+#comment=Genotype, obtained from two columns
 
-[ref]
-index=1,2
-# chromosome and position will be passed
-adj=SeqAtLoc(filename)
-type=VARCHAR(255)
-comment=Reference allele, '-' for insertion.
 
-[alt]
-index=3
-type=VARCHAR(255)
-comment=Alternative allele, '-' for deletion.
+[col_1]
+field=chr
+comment=chromosome (without leading chr)
+
+[col_2]
+field=%(name)s
+adj=ValueOfNull('.')
+comment=Locus name
+
+[col_3]
+field=
+adj=ValueOfNull('.')
+comment=Genetic distance, left empty
+
+[col_4]
+field=pos
+comment=Physical position
+
+[col_5]
+field=GT
+comment=genotype
+
