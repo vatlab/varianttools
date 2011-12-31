@@ -9,6 +9,7 @@ description=Output to TPED format with the first four columns chr name gen_pos p
     rest for genotypes. Variant tools cannot import from this format because it does not contain
     information about reference genome.
 variant=chr,pos,ref,alt
+export_by=chr,pos,ref
 
 [DEFAULT]
 #seq_file=hg19.fasta

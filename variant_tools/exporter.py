@@ -136,16 +136,25 @@ class GenoFormatter:
 
     def __call__(self, item):
         global rec_ref, rec_alt
-        ref = self.null if rec_ref == '-' else rec_ref
-        alt = self.null if rec_alt == '-' else rec_alt
-        if item == 1:
-            return ref + self.sep + alt
-        elif item == 2:
-            return alt + self.sep + alt
-        elif item == -1:
-            return alt + self.sep + self.null
+        if type(item) == int:
+            ref = self.null if rec_ref == '-' else rec_ref
+            alt = self.null if rec_alt == '-' else rec_alt
+            if item == 1:
+                return ref + self.sep + alt
+            elif item == 2:
+                return alt + self.sep + alt
+            elif item == -1:
+                return alt + self.sep + self.null
+            else:
+                return ref + self.sep + ref
+        elif type(item) == tuple:
+            if item == (-1, -1):
+                return (self.null if rec_alt[0] == '-' else rec_alt[0]) + self.sep + (self.null if rec_alt[1] == '-' else rec_alt[1])
+            else:
+                raise ValueError('Do not know how to handle genotype {}'.format(item))
         else:
             return ref + self.sep + ref
+
 
 class Constant:
     def __init__(self, val=''):
@@ -316,7 +325,6 @@ class EmbeddedVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
 
     def records(self):
-        global rec_ref, rec_alt
         self.logger.debug('Running query {}'.format(self.getQuery()))
         cur = self.proj.db.cursor()
         try:
@@ -326,8 +334,7 @@ class EmbeddedVariantReader(BaseVariantReader):
                 .format(e, ', '.join(self.var_fields)))
         for rec in cur:
             # the first two items are always ref and alt
-            rec_ref, rec_alt = rec[0], rec[1]
-            yield rec[2:]
+            yield rec
 
 
 class StandaloneVariantReader(BaseVariantReader):
@@ -358,14 +365,12 @@ class StandaloneVariantReader(BaseVariantReader):
         del s
         
     def records(self):
-        global rec_ref, rec_alt
         while True:
             rec = self.reader.recv()
             if rec is None:
                 break
             else:
-                rec_ref, rec_alt = rec[0], rec[1]
-                yield rec[2:]
+                yield rec
 
 class MultiVariantReader(BaseVariantReader):
     def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -430,7 +435,6 @@ class MultiVariantReader(BaseVariantReader):
         prog.done()
 
     def records(self):
-        global rec_ref, rec_alt
         #
         rec = []
         id = None
@@ -450,8 +454,7 @@ class MultiVariantReader(BaseVariantReader):
                         raise ValueError('Read different IDs from multiple processes')
                     rec.extend(val[1:])
                     if idx == last:
-                        rec_ref, rec_alt = rec[0], rec[1]
-                        yield rec[2:]
+                        yield rec
                         rec = []
                 if all_done:
                     break
@@ -681,6 +684,7 @@ class Exporter:
         # write header
         if self.header:
             print >> output, self.header.rstrip()
+        global rec_ref, rec_alt
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False
             try:
@@ -689,19 +693,25 @@ class Exporter:
                         rec_stack.append(raw_rec)
                         continue
                     # if the same, wait for the next record
-                    elif rec_stack[-1][:nFieldBy] == raw_rec[:nFieldBy]:
+                    elif rec_stack[-1][2:(nFieldBy+2)] == raw_rec[2:(2+nFieldBy)]:
                         rec_stack.append(raw_rec)
                         continue
                     elif len(rec_stack) == 1:
-                        rec = rec_stack[0]
+                        rec_ref = rec_stack[0][0]
+                        rec_alt = rec_stack[0][1]
+                        rec = rec_stack[0][2:]
                         rec_stack = [raw_rec]
                     else:
                         n = len(rec_stack)
-                        rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(len(raw_rec))]
+                        rec_ref = [rec_stack[i][0] for i in range(n)]
+                        rec_alt = [rec_stack[i][1] for i in range(n)]
+                        rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(2, len(raw_rec))]
                         multi_records = True
                         rec_stack = [raw_rec]
                 else:
-                    rec = raw_rec
+                    rec_ref = raw_rec[0]
+                    rec_alt = raw_rec[1]
+                    rec = raw_rec[2:]
                 # step one: apply formatters 
                 # if there is no fmt, the item must be either empty or a single item
                 #
@@ -752,8 +762,12 @@ class Exporter:
             try:
                 n = len(rec_stack)
                 if n == 1:
-                    rec = rec_stack[0]
+                    rec_ref = rec_stack[0][0]
+                    rec_alt = rec_stack[0][1]
+                    rec = rec_stack[0][2:]
                 else:
+                    rec_ref = [rec_stack[i][0] for i in range(n)]
+                    rec_alt = [rec_stack[i][1] for i in range(n)]
                     rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
                 # step one: apply formatters
                 fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
