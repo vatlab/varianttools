@@ -34,8 +34,8 @@ __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
-VTOOLS_VERSION='1.0.1svn'
-VTOOLS_REVISION=812
+VTOOLS_VERSION='1.0.1'
+VTOOLS_REVISION=865
 
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
