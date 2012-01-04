@@ -55,6 +55,7 @@ class TestUpdate(ProcessTestCase):
         runCmd('vtools liftover hg19')
         # a variant can have multiple entries -- thus 175 variants in variant table are updated from the 198 imported records
         self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
+        self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --geno_info DP_geno')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175\n')
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
         

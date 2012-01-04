@@ -95,7 +95,7 @@ class GenotypeStatCalculator(threading.Thread):
                 if not where_clause:
                     where_clause = 'WHERE {0}.variant_id IN (SELECT {1}.variant_id FROM {1})'.format('genotype_{}'.format(ID), self.within_table)
                 else:
-                    where_clause += ' AND {0}.variant_id IN {0}'.format(self.within_table)
+                    where_clause += ' AND {0}.variant_id IN (SELECT {1}.variant_id FROM {1})'.format('genotype_{}'.format(ID), self.within_table)
             # if everything can be executed in a single query
             if all([x[1] is None for x in self.stat]):
                 # run query

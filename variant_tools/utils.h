@@ -132,7 +132,7 @@ namespace vtools {
       void setX(const std::vector<std::vector<double> > &x)
       { 
         if (x.size() == 0) {
-          throw ValueError("No input data");
+          throw RuntimeError("No input data");
         }
 
         if (m_nrow == 0) m_nrow = x.front().size();
@@ -146,7 +146,7 @@ namespace vtools {
         m_x = gsl_matrix_alloc(m_nrow, m_ncol);
         for (size_t j = 0; j < m_ncol; j++) {
           for (size_t i = 0; i < m_nrow; i++) {
-            gsl_matrix_set(m_x, i, j, x[j][i]);         
+            gsl_matrix_set(m_x, i, j, x[j][i]);
           }
         }
       }
