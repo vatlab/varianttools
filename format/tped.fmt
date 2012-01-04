@@ -20,12 +20,16 @@ export_by=chr,pos,ref
 name=
 name_comment=[export] Field for name of variants, can be dbSNP.name if dbSNP is available
 
+style=genotype
+style_comment=(export) Style of genotype format, can be 'genotype' for genotype separated by tab
+    (e.g. A C), or 'numeric' for 0, 1, or 2 for number of alternative alleles.
+
 #alt_field=
 #alt_field_comment=[import] Because the TPEF format does not specify ref and alternative allele,
 #    this format will assume the data are all from another database. 
 
 [field formatter]
-fmt_GT=GenoFormatter(style='genotype')
+fmt_GT=GenoFormatter(style="%(style)s")
 
 [chr]
 index=1
