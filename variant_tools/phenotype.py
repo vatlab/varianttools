@@ -50,7 +50,7 @@ class GenotypeStatStatus:
         return len(self.tasks)
 
 class GenotypeStatCalculator(threading.Thread):
-    def __init__(self, dbName, stat, idQueue, status, genotypes, logger):
+    def __init__(self, dbName, stat, idQueue, status, genotypes, within_table, logger):
         '''Use sql to process sample passed from queue, set results in status'''
         self.dbName = dbName
         # query, where, idx
@@ -71,6 +71,7 @@ class GenotypeStatCalculator(threading.Thread):
         self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
+        self.within_table = within_table
         self.logger = logger
         threading.Thread.__init__(self, name='Calculate genotype statistics')
 
@@ -84,14 +85,24 @@ class GenotypeStatCalculator(threading.Thread):
             if ID is None:
                 self.queue.task_done()
                 break
+            from_clause = 'genotype_{}'.format(ID)
+            if self.within_table:
+                from_clause += ', {}'.format(self.within_table)
+            where_clause = ''
+            if self.genotypes.strip():
+               where_clause = 'WHERE {}'.format(self.genotypes)
+            if self.within_table:
+                if not where_clause:
+                    where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(self.within_table)
+                else:
+                    where_clause += ' AND variant_id IN {}'.format(self.within_table)
             # if everything can be executed in a single query
             if all([x[1] is None for x in self.stat]):
                 # run query
                 res = [None] * len(self.stat)
                 # regular stat
-                query = 'SELECT {} FROM genotype_{} {};'\
-                    .format(', '.join([x[0] for x in self.stat]), ID,
-                        'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                query = 'SELECT {} FROM {} {};'\
+                    .format(', '.join([x[0] for x in self.stat]), from_clause, where_clause)
                 self.logger.debug(query)
                 try:
                     cur.execute(query)
@@ -99,9 +110,8 @@ class GenotypeStatCalculator(threading.Thread):
                 except Exception as e:
                     # some field might not exist, so we will have to run one by one
                     for idx, (expr, where) in enumerate(self.stat):
-                        query = 'SELECT {} FROM genotype_{} {};'\
-                            .format(expr, ID,
-                                'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                        query = 'SELECT {} FROM {} {};'\
+                            .format(expr, from_clause, where_clause)
                         self.logger.debug(query)
                         try:
                             cur.execute(query)
@@ -113,14 +123,13 @@ class GenotypeStatCalculator(threading.Thread):
             else:
                 res = [None] * len(self.stat)
                 for idx, (expr, where) in enumerate(self.stat):
-                    where_clause = 'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else ''
                     if where:
                         if where_clause:
                             where_clause += ' AND ({})'.format(where)
                         else:
                             where_clause = 'WHERE {}'.format(where)
-                    query = 'SELECT {} FROM genotype_{} {};'\
-                        .format(expr, ID, where_clause)
+                    query = 'SELECT {} FROM {} {};'\
+                        .format(expr, from_clause, where_clause)
                     self.logger.debug(query)
                     try:
                         cur.execute(query)
@@ -288,7 +297,7 @@ class Sample:
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
 
-    def fromSampleStat(self, stat, genotypes, samples):
+    def fromSampleStat(self, stat, genotypes, samples, within_table):
         '''Add a field using expression calculated from sample variant table'''
         IDs = self.proj.selectSampleByPhenotype(samples)
         if not IDs:
@@ -301,7 +310,7 @@ class Sample:
         status = GenotypeStatStatus()
         for j in range(nJobs):
             GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
-                stat, idQueue, status, genotypes, self.logger).start()
+                stat, idQueue, status, genotypes, within_table, self.logger).start()
         #
         # put all jobs to queue, the workers will work on them
         for ID in IDs:
@@ -364,22 +373,25 @@ class Sample:
                 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
-    parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
+    from_file = parser.add_argument_group('Import from file')
+    from_file.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
         help='''Import phenotype from a tab delimited file. The file should have
             a header, with either 'sample_name' as the first column, or 'filename'
             and 'sample_name' as the first two columns. In the former case, samples
             with the same 'sample_name' will share the imported phenotypes. If 
             a list of phenotypes (columns of the file) is specified after filename,
             only the specified phenotypes will be imported. Parameter --samples
-            could be used to limit the samples for which phenotypes are imported.'''),
-    parser.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
+            could be used to limit the samples for which phenotypes are imported.''')
+    from_phenotype = parser.add_argument_group('From other phenotype')
+    from_phenotype.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
             using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio
             of the number of high quality variants to the number of all variants, where
             high_qt and all_qt are obtained from sample statistics using parameter
             --from_stat). Parameter --samples could be used to limit the samples for
-            which genotypes will be set.'''),
-    parser.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
+            which genotypes will be set.''')
+    from_stat = parser.add_argument_group('From genotype statistics')
+    from_stat.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
             example, "num=count(*)" sets phenotype num to be the number of genotypes
             of a sample, "GD=avg(DP)" sets phenotype DP to be the average depth (if
@@ -389,17 +401,22 @@ def phenotypeArguments(parser):
             #(GT), #(alt), #(hom), #(het) and #(other), which calculates the number of
             genotypes (the same as count(*)), alternative alleles, homozygotes, 
             heterozygotes, and genotypes with two different alternative alleles.
-            Parameters --genotypes and --samples could be used to limit the genotypes
-            to be considered and the samples for which genotypes will be set.'''),
-    parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
+            Parameters --genotypes, --within and --samples could be used to limit the
+            genotypes to be considered (by genotype fields such as quality score),
+            variant table from which variants will be considered, and the samples whose
+            phenotype will be set.''')
+    from_stat.add_argument('-g', '--genotypes', nargs='*', metavar='COND', default=[],
+        help='''Limit the operation to genotypes that match specified conditions.
+            Use 'vtools show genotypes' to list usable fields for each sample.''')
+    from_stat.add_argument('-w', '--within', metavar='TABLE',
+        help='''Limit the operation to variants in specified variant table.''')
+    output = parser.add_argument_group('Output phenotype')
+    output.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
-            functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
+            functions such as "DP/DP_all" and "avg(DP)" are also allowed''')
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from_stat.''')
-    parser.add_argument('-g', '--genotypes', nargs='*', metavar='COND', default=[],
-        help='''Limit the operation to genotypes that match specified conditions.
-            Use 'vtools show genotypes' to list usable fields for each sample.'''),
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Update phenotype for samples that match specified conditions.
             Use 'vtools show samples' to list usable fields in the sample table.''')
@@ -429,7 +446,8 @@ def phenotype(args):
                     stat.append((field, expr))
                 p.fromSampleStat(stat,
                         ' AND '.join(['({})'.format(x) for x in args.genotypes]),
-                        ' AND '.join(['({})'.format(x) for x in args.samples]))
+                        ' AND '.join(['({})'.format(x) for x in args.samples]),
+                        args.within)
             if args.output:
                 p.output(args.output, ' AND '.join(['({})'.format(x) for x in args.samples]))
         proj.close()
