@@ -1192,7 +1192,7 @@ class Project:
         cur.execute('SELECT sample_id FROM sample;')
         IDs = [x[0] for x in cur.fetchall()]
         for ID in IDs:
-            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
+            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.name, ID)):
                 cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.name, ID))
             cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.name, ID, table))
