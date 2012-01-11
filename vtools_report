@@ -150,8 +150,8 @@ def transRatio(args):
         keys = values.keys()
         keys.sort()
         for k in keys:
-            print '{}\t{:,}\t{:,}\t{:.3f}'.format(k, int(values[k][0]), int(values[k][1]),
-                int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0)
+            print('{}\t{:,}\t{:,}\t{:.3f}'.format(k, int(values[k][0]), int(values[k][1]),
+                int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0))
     else:
         print('num_of_transition\tnum_of_transversion\tratio')
         transition = int(getoutput(['vtools', 'select', args.table, 
