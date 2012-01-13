@@ -75,7 +75,7 @@ def getoutput(cmd):
     logger.info(' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
-    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])}).strip()
+    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])}).strip().decode()
 
 #
 # These functions call vtools to extract information that are needed by other
@@ -147,7 +147,7 @@ def transRatio(args):
                 values[g][1] = v
             else:
                 values[g] = ['0', v]
-        keys = values.keys()
+        keys = list(values.keys())
         keys.sort()
         for k in keys:
             print('{}\t{:,}\t{:,}\t{:.3f}'.format(k, int(values[k][0]), int(values[k][1]),
