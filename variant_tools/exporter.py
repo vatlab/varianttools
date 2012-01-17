@@ -186,6 +186,16 @@ class GenoFormatter:
         elif type(item) == tuple:
             if item == (-1, -1):
                 return (self.null if rec_alt[0] == '-' else rec_alt[0]) + self.sep + (self.null if rec_alt[1] == '-' else rec_alt[1])
+            elif len(item) > 1 and item.count(item[0]) == len(item):
+                # assume duplicate entry caused by annotation database
+                ref = self.null if rec_ref[0] == '-' else rec_ref[0]
+                alt = self.null if rec_alt[0] == '-' else rec_alt[0]
+                if item[0] == 1:
+                    return ref + self.sep + alt
+                elif item[0] == 2:
+                    return alt + self.sep + alt
+                else:
+                    return ref + self.sep + ref
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
         else:
@@ -198,6 +208,8 @@ class GenoFormatter:
         elif type(item) == tuple:
             if item == (-1, -1):
                 return str(self.base + 2)
+            elif len(item) > 1 and item.count(item[0]) == len(item):
+                return str(self.base + abs(item[0]))
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
         else:
@@ -308,7 +320,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
-        return 'SELECT ref,alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT variant.ref,variant.alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getVariantQuery(self):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -333,7 +345,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
-        return 'SELECT ref,alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT variant.ref,variant.alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getSampleQuery(self, IDs):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -782,8 +794,8 @@ class Exporter:
                                 if fmt:
                                     fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
                             except Exception as e:
-                                raise ValueError('Failed to format value {} at col {}'.format(
-                                    rec[col] if type(col) is int else [rec[x] for x in col], col))
+                                raise ValueError('Failed to format value {} at col {}: {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 else:
                     try:
                         fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
@@ -794,8 +806,8 @@ class Exporter:
                                 if fmt:
                                     fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
                             except Exception as e:
-                                raise ValueError('Failed to format value {} at col {}'.format(
-                                    rec[col] if type(col) is int else [rec[x] for x in col], col))
+                                raise ValueError('Failed to format value {} at col {}: {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 # step two: apply adjusters
                 #
                 # adj: single or list
