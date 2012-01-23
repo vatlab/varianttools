@@ -73,18 +73,26 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
+    where_conditions = []
     fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
     #
     processed = set()
+    # the normal annotation databases that are 'LEFT OUTER JOIN'
     for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-        if (tbl.lower(), conn.lower()) not in processed:
+        if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
             processed.add((tbl.lower(), conn.lower()))
+    # temporary connection tables are appended as WHERE clause.
+    for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+        if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
+            from_clause += ' , {}'.format(tbl)
+            where_conditions.append(conn)
+            processed.add((tbl.lower(), conn.lower()))
     # WHERE clause
-    where_clause = ''
     if query is not None:
         # FIXME: if the query has a simple where clause, we should use that directly.
-        where_clause = ' WHERE {}.variant_id {} IN ({})'.format(table, 'NOT' if reverse else '', query)
+        where_conditions.append('{}.variant_id {} IN ({})'.format(table, 'NOT' if reverse else '', query))
+    where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
     # GROUP BY clause
     group_clause = ''
     if args.group_by:

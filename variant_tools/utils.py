@@ -219,11 +219,11 @@ def filesInURL(URL, ext=''):
             files.append(m.group(1))
     return files
 
-def makeTableName(data):
+def makeTableName(data, prefix = '__'):
     '''Make data a valid table name'''
     name = '_'.join([str(x) for x in data])
     name = name.replace('+', '_plus_').replace('-', '_minus_')
-    return re.sub('[\W]+', '_', name)
+    return prefix + re.sub('[\W]+', '_', name)
 
 from array import array
 try:
