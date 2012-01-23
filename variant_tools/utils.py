@@ -720,10 +720,10 @@ class DatabaseEngine:
             return cur.fetchall()
         else:
             if '.' not in table:
-                cur.execute('SELECT sql FROM sqlite_master WHERE name = "{}";'.format(table))
+                cur.execute('SELECT sql FROM sqlite_master WHERE UPPER(name) = "{}";'.format(table.upper()))
             else:
                 db, tbl = table.rsplit('.', 1)
-                cur.execute('SELECT sql FROM {}.sqlite_master WHERE name = "{}" COLLATE NOCASE;'.format(db, tbl))
+                cur.execute('SELECT sql FROM {}.sqlite_master WHERE UPPER(name) = "{}";'.format(db, tbl.upper()))
             try:
                 schema = cur.fetchone()[0]
             except:
