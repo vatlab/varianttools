@@ -375,6 +375,35 @@ class DiscardRecord:
             raise IgnoredRecord()
         return item
     
+class DatabaseQuerier:
+    '''This query a field from an annotation database'''
+    def __init__(self, dbfile, res_field, cond_fields, default=None):
+        '''Supose res_field is alt, cond_fields are chr,pos, this querier
+        will get alt using query
+          SELECT dbSNP.alt FROM dbSNP WHERE chr=VAL1 AND pos=VAL2
+        '''
+        self.table, self.res_field = res_fields.split('.', 1)
+        self.cond_fields = cond_fiels.split(',')
+        self.db = DatabaseEngine(dbfile)
+        self.db.connect()
+        self.default = default
+        self.cur = self.db.cursor()
+        self.query = 'SELECT {} FROM {} WHERE {}'.format(self.res_field,
+            self.db, ' AND '.join('='))
+
+    def __call__(self, item):
+        self.cur.execute(query, item)
+        res = self.fetchall()
+        if len(res) == 1:
+            return res[0][0]
+        elif len(res) > 1:
+            return tuple([x[0] for x in res])
+        else:
+            return self.default
+
+    def __del__(self):
+        self.db.close()
+
 class SequenceExtractor:
     '''This sequence extractor extract subsequence from a pre-specified sequence'''
     def __init__(self, filename):
