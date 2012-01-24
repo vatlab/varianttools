@@ -397,7 +397,12 @@ class fileFMT:
             if item[0] == 'description':
                 self.description = item[1]
             elif item[0] == 'delimiter':
-                self.delimiter = eval(item[1])
+                try:
+                    # for None, '\t' etc
+                    self.delimiter = eval(item[1])
+                except:
+                    # if failed, take things literally.
+                    self.delimiter = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
             elif item[0] == 'merge_by':
