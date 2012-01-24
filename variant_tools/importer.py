@@ -390,7 +390,6 @@ class _DatabaseQuerier:
             name, ' AND '.join(['{}=?'.format(x) for x in cond_fields]))
 
     def __call__(self, item):
-        print self.query, item
         self.cur.execute(self.query, item)
         res = self.cur.fetchall()
         if len(res) == 1:
@@ -423,7 +422,6 @@ def DatabaseQuerier(dbfile, res_field, cond_fields, default=None):
         __databases[dbfile] = (cur, name)
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
         res_field, cond_fields.split(','), default)
-
 
 class SequenceExtractor:
     '''This sequence extractor extract subsequence from a pre-specified sequence'''
