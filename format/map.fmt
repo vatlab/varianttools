@@ -5,10 +5,12 @@
 # a description of the format of this file.
 
 [format description]
-description=This is an input format that import variants from file in MAP format. Because
-	this format does not contain reference and alternative allele information, it queries
-	the dbSNP database using chr and pos. Record that does not exist in dbSNP will be
-	discarded. Records with multiple alternative alleles will lead to multiple records.
+description=This input format imports variants from files in MAP format (with columns chr, name
+        gen_dist, pos), or any delimiter-separated format with columns chr and pos. Because
+	these input files do not contain reference and alternative alleles of variants, this
+        format queries such information from the dbSNP database using chr and pos. Records that
+        does not exist in dbSNP will be discarded. Records with multiple alternative alleles will
+        lead to multiple records.
 variant=chr,pos,ref,alt
 delimiter=%(separator)s
 
