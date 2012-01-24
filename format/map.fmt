@@ -10,6 +10,7 @@ description=This is an input format that import variants from file in MAP format
 	the dbSNP database using chr and pos. Record that does not exist in dbSNP will be
 	discarded. Records with multiple alternative alleles will lead to multiple records.
 variant=chr,pos,ref,alt
+delimiter=%(separator)s
 
 [DEFAULT]
 db_file=dbSNP.DB
@@ -35,6 +36,8 @@ pos_field=start
 pos_field_comment=Name of pos field from the annotation database, used to locate
     variants from the dbSNP database.
 
+separator=None
+separator_comment=Separator of the input file, default to space or tab.
 
 [chr]
 index=1
