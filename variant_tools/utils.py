@@ -670,7 +670,7 @@ class DatabaseEngine:
             cur.execute("SELECT count(name) FROM {}.sqlite_master WHERE type='index' AND name={};".format(db, self.PH), (idx,))
             return cur.fetchone()[0] > 0
         else:
-            cur.execute("SELECT count(name) FROM sqlite_master WHERE type='index' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='index' AND name={};".format(self.PH), (index,))
+            cur.execute("SELECT count(name) FROM sqlite_master WHERE type='index' AND name={0} UNION ALL SELECT name FROM sqlite_temp_master WHERE type='index' AND name={0};".format(self.PH), (index,index))
             return cur.fetchone()[0] > 0
 
     def dropIndex(self, index, table):

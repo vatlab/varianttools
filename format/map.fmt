@@ -12,14 +12,28 @@ description=This is an input format that import variants from file in MAP format
 variant=chr,pos,ref,alt
 
 [DEFAULT]
-db_file=
-name_comment=[export] Field for name of variants, can be dbSNP.name if dbSNP is available
+db_file=dbSNP.DB
+name_comment=Database name for dbSNP.
 
-ref_field=
+pos_idx=4
+pos_idx_comment=Index of column for pyhysical location in the map file, should be 4
+    for a standard map file with chr, pos, gen_dist, pos.
 
-chr_field=
+ref_field=refNCBI
+ref_field_comment=Name of ref field from the annotation database, used to retrieve
+    reference allele at specified location.
 
-pos_field=
+alt_field=alt
+alt_field_comment=Name of alt field from the annotation database, used to retrieve
+    alternative allele at specified location.
+
+chr_field=chr
+chr_field_comment=Name of chr field from the annotation database, used to locate
+    variants from the dbSNP database.
+
+pos_field=start
+pos_field_comment=Name of pos field from the annotation database, used to locate
+    variants from the dbSNP database.
 
 
 [chr]
@@ -29,20 +43,21 @@ adj=RemoveLeading('chr')
 comment=Chromosome
 
 [pos]
-index=4
+index=%(pos_idx)s
 type=INTEGER NOT NULL
 comment=1-based position
 
 [ref]
-index=1,4
-adj=SeqAtLoc("%{seq_file}s")
+index=1,%(pos_idx)s
+adj=DatabaseQuerier("%(db_file)s", "%(ref_field)s", "%(chr_field)s,%(pos_field)s")
 type=VARCHAR(255)
 comment=Reference allele, '-' for insertion.
 
 
 [alt]
-index=
+index=1,%(pos_idx)s
 type=VARCHAR(255)
+adj=DatabaseQuerier("%(db_file)s", "%(alt_field)s", "%(chr_field)s,%(pos_field)s")
 comment=Alternative allele obtained from another database
 
 

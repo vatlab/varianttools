@@ -375,25 +375,24 @@ class DiscardRecord:
             raise IgnoredRecord()
         return item
     
-class DatabaseQuerier:
+__databases = {}
+
+class _DatabaseQuerier:
     '''This query a field from an annotation database'''
-    def __init__(self, dbfile, res_field, cond_fields, default=None):
+    def __init__(self, cursor, name, res_field, cond_fields, default=None):
         '''Supose res_field is alt, cond_fields are chr,pos, this querier
         will get alt using query
           SELECT dbSNP.alt FROM dbSNP WHERE chr=VAL1 AND pos=VAL2
         '''
-        self.table, self.res_field = res_fields.split('.', 1)
-        self.cond_fields = cond_fiels.split(',')
-        self.db = DatabaseEngine(dbfile)
-        self.db.connect()
         self.default = default
-        self.cur = self.db.cursor()
-        self.query = 'SELECT {} FROM {} WHERE {}'.format(self.res_field,
-            self.db, ' AND '.join('='))
+        self.cur = cursor
+        self.query = 'SELECT {} FROM {} WHERE {}'.format(res_field,
+            name, ' AND '.join(['{}=?'.format(x) for x in cond_fields]))
 
     def __call__(self, item):
-        self.cur.execute(query, item)
-        res = self.fetchall()
+        print self.query, item
+        self.cur.execute(self.query, item)
+        res = self.cur.fetchall()
         if len(res) == 1:
             return res[0][0]
         elif len(res) > 1:
@@ -401,8 +400,30 @@ class DatabaseQuerier:
         else:
             return self.default
 
-    def __del__(self):
-        self.db.close()
+def DatabaseQuerier(dbfile, res_field, cond_fields, default=None):
+    global __databases
+    if dbfile not in __databases:
+        db = DatabaseEngine()
+        if not os.path.isfile(dbfile):
+            raise ValueError('Database file {} does not exist'.format(dbfile))
+        db.connect(dbfile)
+        cur = db.cursor()
+        tables = db.tables()
+        try:
+            name = [x for x in tables if x.endswith('_info')][0][:-5]
+        except Exception as e:
+            raise ValueError('Incorrect database (missing info table): {}'.format(e))
+        if not name in tables:
+            raise ValueError('Incorrect database (missing table {})'.format(name))
+        if not name + '_field':
+            raise ValueError('Incorrect database (missing field table)')
+        for fld in cond_fields.split(','):
+            if not db.hasIndex('{}_idx'.format(fld)):
+                cur.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
+        __databases[dbfile] = (cur, name)
+    return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
+        res_field, cond_fields.split(','), default)
+
 
 class SequenceExtractor:
     '''This sequence extractor extract subsequence from a pre-specified sequence'''
