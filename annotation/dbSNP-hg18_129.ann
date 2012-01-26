@@ -47,6 +47,16 @@ index=7
 type=CHAR(1) NULL
 comment=which DNA strand contains the observed alleles
 
+[refNCBI]
+index=8
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from dbSNP
+
+[refUCSC]
+index=9
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from UCSC lookup of chrom,chromStart,chromEnd
+
 [observed]
 index=10
 type=VARCHAR(200) NULL
