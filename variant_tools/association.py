@@ -514,7 +514,7 @@ class LinearBurdenTest(NullTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--use_indicator', action='store_true',
-            help='''This option, if envoked, will apply binary coding to genotype groups
+            help='''This option, if evoked, will apply binary coding to genotype groups
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
@@ -524,14 +524,14 @@ class LinearBurdenTest(NullTest):
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
-            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommanded to
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if envoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
+            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight_by_maf', action='store_true',
-            help='''This option, if envoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to GENE based analysis. Note this option will be masked if --use_indicator is envoked''')
+            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
+            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))

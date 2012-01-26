@@ -31,7 +31,7 @@ import subprocess
 from testUtils import ProcessTestCase, runCmd, output2list 
 #from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd, getGenotypes, getSamplenames, output2list, getGenotypeInfo
 
-class TestImport(ProcessTestCase):
+class TestExport(ProcessTestCase):
     
     def setUp(self):
         'Create a project'
@@ -42,7 +42,11 @@ class TestImport(ProcessTestCase):
         try:
             dir = os.getcwd()
             vcf = os.path.join(dir, 'my.vcf')
+            annovar = os.path.join(dir, 'annovar.input')
+            tped = os.path.join(dir, 'my.tped')
+            os.remove(annovar)
             os.remove(vcf)
+            os.remove(tped)
         except Exception as e:
             pass
 
@@ -66,20 +70,25 @@ class TestImport(ProcessTestCase):
             self.assertEqual(variants, exported)
             # test output with samples
             # FIXME phase information is not properly handled
-            self.assertSucc('vtools export variant my.vcf --samples 1 --format_string GT')
-            self.assertSucc('vtools export variant my.vcf --samples 1 --format_string GT --phase_sep "|"')
+            self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT')
+            self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT --phase_sep "|"')
             self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --var_info id filter info --geno_info DP_geno')
-            self.assertSucc('vtools export variant my.vcf --id id --filter filter --info info')
-            self.assertSucc('vtools export variant my.vcf --id id --filter filter --info info --geno_info DP_geno --samples 1 --format_string GT:DP')
+            self.assertSucc('vtools export variant --format vcf --id id --filter filter --info info')
+            self.assertSucc('vtools export variant --format vcf --id id --filter filter --info info --geno_info DP_geno --samples 1 --format_string GT:DP')
             # export selected table with selected info field
             self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --var_info DP')
             self.assertSucc('vtools select variant "DP > 300" -t highDP')
-            self.assertSucc('vtools export highDP my.vcf --id id --filter filter --info DP --geno_info DP_geno --samples 1 --format_string GT:DP')
+            self.assertSucc('vtools export highDP --format vcf --id id --filter filter --info DP --geno_info DP_geno --samples 1 --format_string GT:DP')
             
     def testExportANNOVAR(self):
         'Test command export in annovar input format'
-        pass
-   
-        
+        self.assertSucc('vtools export variant --format ANNOVAR') 
+        self.assertSucc('vtools export variant --format ANNOVAR --comment_string DP')
+
+    def testTped(self):
+      'Test command export in tped format'
+      self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
+      self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
+
 if __name__ == '__main__':
     unittest.main()
