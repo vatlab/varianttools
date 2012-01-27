@@ -832,6 +832,7 @@ class Project:
         cur = self.db.cursor()
         s = delayedAction(self.logger.info, 'Analyzing project')
         for tbl in tables:
+            analyzed = True
             if not force:
                 # try to figure out if the table has been analyzed
                 try:
@@ -841,6 +842,7 @@ class Project:
                     analyzed = False
             if force or not analyzed:
                 cur.execute('ANALYZE {}'.format(tbl))
+        self.db.commit()
         del s
         
 

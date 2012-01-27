@@ -1302,6 +1302,9 @@ class BaseImporter:
         # this function will only be called from import
         cur = self.db.cursor()
         total_new = sum(self.total_count[3:7])
+        if total_new > 0:
+            # analyze project to get correct number of rows for the master variant table
+            self.proj.analyze(force=True)
         if total_new == 0 or self.proj.alt_build is None:
             # if no new variant, or no alternative reference genome, do nothing
             return
