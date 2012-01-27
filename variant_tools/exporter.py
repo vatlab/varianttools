@@ -332,7 +332,7 @@ class BaseVariantReader:
 
     def getVariantQuery(self):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
-            ','.join(['variant_id'] + self.var_fields), self.export_alt_build)
+            ','.join(['variant_id', 'variant.ref', 'variant.alt'] + self.var_fields), self.export_alt_build)
         # FROM clause
         from_clause = 'FROM {} '.format(self.table)
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
@@ -345,11 +345,11 @@ class BaseVariantReader:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
         # temporary connection tables are appended as WHERE clause.
-        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-            if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
-                from_clause += ' , {}'.format(tbl)
-                where_conditions.append(conn)
-                processed.add((tbl.lower(), conn.lower()))
+        #for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+        #    if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
+        #        from_clause += ' , {}'.format(tbl)
+        #        where_conditions.append(conn)
+        #        processed.add((tbl.lower(), conn.lower()))
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
@@ -361,7 +361,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
-        return 'SELECT variant.ref,variant.alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getSampleQuery(self, IDs):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
