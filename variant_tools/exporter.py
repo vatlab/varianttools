@@ -132,16 +132,17 @@ rec_alt = '-'
 class GenoFormatter:
     # representation for missing value is style dependent,
     # the default value None will cause each style to use its default value.
-    def __init__(self, style='genotype', sep='\t', null=None, base=0):
+    def __init__(self, style='genotype', sep='\t', null='-', base=0):
         self.sep = sep
         self.null = null
-        if null is None:
-            if style == 'numeric':
-                self.null = 'NA'
-            elif style == 'genotype':
-                # PED format seems to use ACTG, and 0 for missing.
-                # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
-                self.null = '0'
+        if style == 'numeric':
+            self.missing = 'NA'
+        elif style == 'genotype':
+            # PED format seems to use ACTG, and 0 for missing.
+            # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
+            self.missing = '0'
+        else:
+            self.missing = ''
         self.base = base
         self.vcf_map = {
               0: '0/0',
@@ -208,7 +209,7 @@ class GenoFormatter:
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
         elif item is None:
-            return self.null + self.sep + self.null
+            return self.missing + self.sep + self.missing
         else:
             raise ValueError('Do not know how to handle genotype {}'.format(item))
 
@@ -224,7 +225,7 @@ class GenoFormatter:
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
         elif item is None:
-            return self.null
+            return self.missing
         else:
             raise ValueError('Do not know how to handle genotype {}'.format(item))
 
