@@ -798,6 +798,8 @@ class Project:
         #
         if verify:
             self.checkIntegrity()
+        # 
+        self.analyze()
 
     def checkIntegrity(self):
         '''Check if the project is ok...(and try to fix it if possible)'''
@@ -819,6 +821,28 @@ class Project:
             self.createIndexOnMasterVariantTable()
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')
+
+    def analyze(self, force=False):
+        '''Automatically analyze project to make sure queries are executed optimally.
+        '''
+        if self.db.engine != 'sqlite3':
+            return
+        cur = self.db.cursor()
+        tables = self.db.tables()
+        cur = self.db.cursor()
+        s = delayedAction(self.logger.info, 'Analyzing project')
+        for tbl in tables:
+            if not force:
+                # try to figure out if the table has been analyzed
+                try:
+                    cur.execute('SELECT tbl FROM sqlite_stat1 WHERE tbl=?', (tbl,))
+                    analyzed = len(cur.fetchall()) == 1
+                except:
+                    analyzed = False
+            if force or not analyzed:
+                cur.execute('ANALYZE {}'.format(tbl))
+        del s
+        
 
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
