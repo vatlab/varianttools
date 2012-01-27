@@ -2758,7 +2758,7 @@ def execute(args):
             proj.db.attach('{}_genotype'.format(proj.name))
             cur = proj.db.cursor()
             query = ' '.join(args.query)
-            if query.startswith('SELECT'):
+            if query.upper().startswith('SELECT'):
                 proj.logger.debug('Analyze statement: "{}"'.format(query))
                 cur.execute('EXPLAIN QUERY PLAN ' + query)
                 for rec in cur:
