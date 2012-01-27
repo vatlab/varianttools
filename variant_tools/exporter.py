@@ -130,9 +130,18 @@ rec_ref = '-'
 rec_alt = '-'
 
 class GenoFormatter:
-    def __init__(self, style='genotype', sep='\t', null='-', base=0):
+    # representation for missing value is style dependent,
+    # the default value None will cause each style to use its default value.
+    def __init__(self, style='genotype', sep='\t', null=None, base=0):
         self.sep = sep
         self.null = null
+        if null is None:
+            if style == 'numeric':
+                self.null = 'NA'
+            elif style == 'genotype':
+                # PED format seems to use ACTG, and 0 for missing.
+                # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
+                self.null = '0'
         self.base = base
         self.vcf_map = {
               0: '0/0',
@@ -198,8 +207,10 @@ class GenoFormatter:
                     return ref + self.sep + ref
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
+        elif item is None:
+            return self.null + self.sep + self.null
         else:
-            return ref + self.sep + ref
+            raise ValueError('Do not know how to handle genotype {}'.format(item))
 
     def fmt_numeric(self, item):
         if type(item) == int:
@@ -212,6 +223,8 @@ class GenoFormatter:
                 return str(self.base + abs(item[0]))
             else:
                 raise ValueError('Do not know how to handle genotype {}'.format(item))
+        elif item is None:
+            return self.null
         else:
             raise ValueError('Do not know how to handle genotype {}'.format(item))
 
@@ -851,7 +864,30 @@ class Exporter:
                     rec_alt = [rec_stack[i][1] for i in range(n)]
                     rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
                 # step one: apply formatters
-                fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) if fmt else ('' if (col is None or rec[col] is None) else str(rec[col])) for fmt, col in formatters]
+                if multi_records:
+                    try:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
+                    except:
+                        for fmt, col in formatters:
+                            try:
+                                if fmt:
+                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                            except Exception as e:
+                                raise ValueError('Failed to format value {} at col {}: {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
+                else:
+                    try:
+                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col] is None) else default_formatter(rec[col])) for fmt, col in formatters]
+                    except:
+                        for fmt, col in formatters:
+                            try:
+                                if fmt:
+                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                            except Exception as e:
+                                raise ValueError('Failed to format value {} at col {}: {}'.format(
+                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 # step two: apply adjusters
                 columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
                 # step three: output columns
