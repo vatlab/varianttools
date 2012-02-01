@@ -462,7 +462,7 @@ class NullTest:
         return 0
 
 class ExternTest(NullTest):
-    '''A test that exports data in standard formats, call an external program and prase its output. 
+    '''A test that exports data in standard formats, call an external program and parse its output. 
     '''
     def __init__(self, logger=None, name=None, *method_args):
         pass

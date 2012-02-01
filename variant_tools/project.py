@@ -2774,8 +2774,9 @@ def show(args):
             elif args.type == 'tests':
                 # it is very bad idea to use circular import, but I have no choice
                 from .association import getAllTests
-                for test, obj in getAllTests():
-                    print '{:20s}\t{}'.format(test, obj.__doc__)
+                print('\n'.join(['{} {}'.format(test,
+                    '\n'.join(textwrap.wrap(obj.__doc__, initial_indent=' '*(27-len(test)),
+                        subsequent_indent=' '*28))) for test, obj in getAllTests()]))
             elif args.type == 'test':
                 from .association import getAllTests
                 if len(args.items) == 0:
@@ -2788,7 +2789,8 @@ def show(args):
                 # test
                 test = [y for x,y in tests if x.lower() == args.items[0].lower()][0]
                 print 'Name:          {}'.format(args.items[0])
-                print 'Description:   {}'.format(test.__doc__)
+                print 'Description:   {}'.format('\n'.join(textwrap.wrap(test.__doc__, initial_indent='',
+                        subsequent_indent=' '*15)))
                 # create an instance of the test and pass -h to it
                 test(None, args.items[0], ['-h']) 
     except Exception as e:
