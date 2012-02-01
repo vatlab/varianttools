@@ -34,7 +34,7 @@ from .project import Project
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine
 from .phenotype import Sample
 import argparse
-import variant_tools.assoTests as t
+import assoTests as t
 
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
@@ -51,8 +51,9 @@ def associateArguments(parser):
             --method "m --alternative 2" "m1 --permute 1000"), although
             the common method parameters can be specified separately, as long as
             they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000 
-            is equivalent to --method "m1 -p 1000" "m2 -p 1000".). Available statistical
-            tests are {}.'''.format(', '.join(getAllTests())))
+            is equivalent to --method "m1 -p 1000" "m2 -p 1000".). You can use
+            command 'vtools show tests' for a list of association tests, and
+            'vtools show test TST' for details about a test.''')
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -78,12 +79,11 @@ class AssociationTester(Sample):
         self.phenotype = None
         self.covariates = None
 
-
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
-            raise ValueError('Please specify at least one statistical test. Available statistical tests are {}'.format(', '.join(getAllTests())))
+            raise ValueError('Please specify at least one statistical test. Please use command "vtools show tests" for a list of tests')
         self.tests = []
         for m in methods:
             name = m.split()[0]
@@ -93,8 +93,7 @@ class AssociationTester(Sample):
                 self.tests.append(method(self.logger, name, args))
             except NameError as e:
                 self.logger.debug(e)
-                raise ValueError('Could not identify a statistical method {}. Please specify one of {}.'.format(name,
-                    ', '.join(getAllTests())))
+                raise ValueError('Could not identify association test {}. Please use command "vtools show tests" for a list of tests"')
 
     def getSamples(self, condition):
         '''Get a list of samples from specified condition. This function sets self.IDs'''
@@ -398,20 +397,11 @@ def associate(args, reverse=False):
 #
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest) in this module'''
-    return [name for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
+    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
 
 
 class NullTest:
-    '''A base class that defines a common interface for association
-    statistics calculator. Instances of these calculators will be created
-    by vtools during command 'vtools asscoaition'. The results will be
-    automatically inserted back to related variant tables. An association
-    statistics calculator will have several data structures that stores
-        1. phenotype
-        2. genotype
-        3. annotation
-    These structures should not be changed during the calculation.
-    '''
+    '''A base class that defines a common interface for association tests'''
     def __init__(self, logger=None, name=None, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to 
         parse it'''
@@ -421,7 +411,6 @@ class NullTest:
         self.parseArgs(*method_args)
         self.result = {}
         self.group = None
-        
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A base association test method
@@ -473,9 +462,7 @@ class NullTest:
         return 0
 
 class ExternTest(NullTest):
-    '''A test that exports data in standard formats, call an external program
-    and prase its output. This is the simplest, but also the slowest method
-    to utilize a third-party association test program.
+    '''A test that exports data in standard formats, call an external program and prase its output. 
     '''
     def __init__(self, logger=None, name=None, *method_args):
         pass
@@ -492,9 +479,7 @@ def freq(input):
 
 
 class LinearBurdenTest(NullTest):
-    '''Simple Linear regression score test on collapsed genotypes
-    within an association testing group
-    '''
+    '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
     def __init__(self, logger=None, name=None, *method_args):
         NullTest.__init__(self, logger, name, *method_args)
 

@@ -45,6 +45,7 @@ from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTO
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, \
     filesInURL, downloadFile, makeTableName, getMaxUcscBin
 
+
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
@@ -2770,7 +2771,26 @@ def show(args):
                 nAll = proj.db.numOfRows('sample')
                 if args.limit > 0 and args.limit < nAll:
                     print omitted.format(nAll - args.limit)
- 
+            elif args.type == 'tests':
+                # it is very bad idea to use circular import, but I have no choice
+                from .association import getAllTests
+                for test, obj in getAllTests():
+                    print '{:20s}\t{}'.format(test, obj.__doc__)
+            elif args.type == 'test':
+                from .association import getAllTests
+                if len(args.items) == 0:
+                    raise ValueError('Please specify the name of a test')
+                if len(args.items) > 1:
+                    raise ValueError('Please specify only one test')
+                tests = getAllTests()
+                if args.items[0].lower() not in [x[0].lower() for x in tests]:
+                    raise ValueError('Unrecognized test name {}. A list of tests can be obtained from command "vtools show tests"'.format(args.items[0]))
+                # test
+                test = [y for x,y in tests if x.lower() == args.items[0].lower()][0]
+                print 'Name:          {}'.format(args.items[0])
+                print 'Description:   {}'.format(test.__doc__)
+                # create an instance of the test and pass -h to it
+                test(None, args.items[0], ['-h']) 
     except Exception as e:
         sys.exit(e)
 
