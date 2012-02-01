@@ -2632,18 +2632,23 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format'],
-        nargs='?', default='project',
-        help='''Type of information to display, which can be project (summary
-            of a project, tables (all variant tables, or all tables if
-            verbosity=2), table (a specific table), samples (sample and
-            phenotype information), fields (from variant tables and all used
-            annotation databases), annotations (all available annotation
-            databases for variant tools), specified annotation, all supported
-            input formats, and details of specific format. Default to
-            project.''')
+        'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
+        'tests', 'test'], nargs='?', default='project',
+        help='''Type of information to display, which can be 'project' for
+            summary of a project, 'tables' for all variant tables (or all
+            tables if --verbosity=2), 'table TBL' for details of a specific
+            table TBL, 'samples' for a list of sample and associated phenotypes,
+            'fields' for fields from variant tables and all used annotation
+            databases, 'annotations' for a list of all available annotation
+            databases, 'annotation ANN' for details about annotation database ANN,
+            'formats' for all supported import and export formats, 'format FMT' for
+            details of format FMT, 'tests' for a list of all association tests, and
+            'test TST' for details of an associationt est TST. The default parameter
+            of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
-        help='''Items to display, which can be name of a table for type 'table'.''')
+        help='''Items to display, which can be names of tables for type 'table',
+            name of an annotation database for type 'annotation', name of a format
+            for type 'format', and name of an association test for type 'test'.''')
     parser.add_argument('-l', '--limit', default=10, type=int,
         help='''Number of record to display for option 'show table'. All
             records will be displayed if it is set to -1''')
