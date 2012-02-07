@@ -35,10 +35,25 @@ include variant_tools/project.py
 include variant_tools/phenotype.py
 include variant_tools/utils.py
 include variant_tools/variant.py
+include variant_tools/assoTests.i
+include variant_tools/config.h
+include variant_tools/config_mac.h
+include variant_tools/config_linux.h
+include variant_tools/config_solaris.h
+include variant_tools/config_win32.h
+include variant_tools/assoTests.h
+include variant_tools/assoConfig.h
+include variant_tools/assoData.h
+include variant_tools/action.h
+include variant_tools/permutator.h
+include variant_tools/assoData.cpp
+include variant_tools/utils.h
+include variant_tools/utils.cpp
 include variant_tools/assoTests_py2.py
 include variant_tools/assoTests_py3.py
 include variant_tools/assoTests_wrap_py2.cpp
 include variant_tools/assoTests_wrap_py3.cpp
+recursive-include variant_tools/gsl *.h *.c
 include test/vcf/*
 include test/txt/*
 include test/phenotype/*
