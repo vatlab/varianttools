@@ -49,10 +49,26 @@ else:
     WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py3.cpp'
     WRAPPER_PY_FILE = 'variant_tools/assoTests_py3.py'
 
+ASSO_FILES = [
+    'variant_tools/assoTests.i',
+    'variant_tools/config.h',
+    'variant_tools/config_mac.h',
+    'variant_tools/config_linux.h',
+    'variant_tools/config_solaris.h',
+    'variant_tools/config_win32.h',
+    'variant_tools/assoTests.h',
+    'variant_tools/assoConfig.h',
+    'variant_tools/assoData.h',
+    'variant_tools/action.h',
+    'variant_tools/permutator.h',
+    'variant_tools/assoData.cpp',
+    'variant_tools/utils.h',
+    'variant_tools/utils.cpp'
+]
 
 # generate wrapper files
 if not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) or os.path.getmtime(WRAPPER_CPP_FILE) < \
-        max([os.path.getmtime(x) for x in ('variant_tools/assoTests.i', 'variant_tools/association.py')]):
+        max([os.path.getmtime(x) for x in ASSO_FILES]):
     import subprocess
     print('Generating wrapper file')
     try:
