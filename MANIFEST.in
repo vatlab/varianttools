@@ -35,6 +35,10 @@ include variant_tools/project.py
 include variant_tools/phenotype.py
 include variant_tools/utils.py
 include variant_tools/variant.py
+include variant_tools/assoTests_py2.py
+include variant_tools/assoTests_py3.py
+include variant_tools/assoTests_wrap_py2.cpp
+include variant_tools/assoTests_wrap_py3.cpp
 include test/vcf/*
 include test/txt/*
 include test/phenotype/*

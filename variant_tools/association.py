@@ -34,7 +34,11 @@ from .project import Project
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine
 from .phenotype import Sample
 import argparse
-import assoTests as t
+
+if sys.version_info.major == 2:
+    import assoTests_py2 as t
+else:
+    import assoTests_py3 as t
 
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
