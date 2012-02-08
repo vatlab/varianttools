@@ -401,7 +401,7 @@ def associate(args, reverse=False):
 #
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest) in this module'''
-    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest)]
+    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest']
 
 
 class NullTest:
@@ -465,12 +465,6 @@ class NullTest:
         #self.logger.debug(self.data.raw_genotype())
         return 0
 
-class ExternTest(NullTest):
-    '''A test that exports data in standard formats, call an external program and parse its output. 
-    '''
-    def __init__(self, logger=None, name=None, *method_args):
-        pass
-    
 def freq(input):
     try:
         value = float(input)
