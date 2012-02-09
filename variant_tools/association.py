@@ -71,91 +71,122 @@ def associateArguments(parser):
         help='''File name to which results from association tests will be written''')        
 
 
-class AssociationTester(Sample):
-    '''Parse command line and get data for association testing'''
+class AssoParamParser(Sample):
+    '''Parse command line and get data for association testing. This class will provide
+    the following attributes for others to use:
+
+    tests:       a list of test objects
+    IDs:         sample IDs
+    table:       variant table (genotype)
+    phenotype:   phenotype 
+    covariates:  covariates
+    groups:      a list of groups
+    '''
     
-    def __init__(self, proj, table):
+    def __init__(self, proj, table, phenotype, covariates, methods, unknown_args, samples, group_by):
         Sample.__init__(self, proj)
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         self.table = table
-        self.phenotype = None
-        self.covariates = None
+        #
+        # step 0: get testers
+        self.tests = self.getAssoTests(methods, unknown_args)
+        # step 1: get samples
+        self.IDs = self.getSamples(samples)
+        # step 1.5: indexes genotype tables if needed
+        proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
+        unindexed_IDs = [x for x in self.IDs if \
+            not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(x))]
+        if unindexed_IDs:
+            cur = proj.db.cursor()
+            prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
+            for idx, ID in enumerate(unindexed_IDs):
+                cur.execute('CREATE INDEX __fromGeno.genotype_{0}_index ON genotype_{0} (variant_id ASC)'.format(ID))
+                prog.update(idx + 1)
+            prog.done()
+        #
+        # step 2: get phenotype and set it to everyone
+        self.phenotype = self.getPhenotype(samples, phenotype)           
+        self.covariates = self.getCovariate(samples, covariates)
+        # step 3: get groups
+        self.groups = self.identifyGroups(group_by)
 
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
             raise ValueError('Please specify at least one statistical test. Please use command "vtools show tests" for a list of tests')
-        self.tests = []
+        tests = []
         for m in methods:
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
                 method = eval(name)
-                self.tests.append(method(self.logger, name, args))
+                tests.append(method(self.logger, name, args))
             except NameError as e:
                 self.logger.debug(e)
                 raise ValueError('Could not identify association test {}. Please use command "vtools show tests" for a list of tests"')
+        return tests
 
     def getSamples(self, condition):
         '''Get a list of samples from specified condition. This function sets self.IDs'''
         if condition:
-            self.IDs = self.proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in condition]))
-            if len(self.IDs) == 0:
+            IDs = self.proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in condition]))
+            if len(IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
-                self.logger.info('{} condition are selected by condition: {}'.format(len(self.IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                self.logger.info('{} condition are selected by condition: {}'.format(len(IDs), ' AND '.join(['({})'.format(x) for x in condition])))
         else:
             # select all condition
-            self.IDs = self.proj.selectSampleByPhenotype('1')
+            IDs = self.proj.selectSampleByPhenotype('1')
+        return IDs
 
-    def getPhenotype(self, condition, phenotype):
+    def getPhenotype(self, condition, pheno):
         '''Get phenotype for specified samples (specified by condition).'''
         try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(phenotype)) + \
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(pheno)) + \
                 (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
             self.logger.debug('Select phenotype using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.phenotype = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
+            phenotype = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('''Failed to retrieve phenotype {}. Please 
                              make sure the specified phenotype names are correct and there 
-                             is no missing value'''.format(', '.join(phenotype)))
+                             is no missing value'''.format(', '.join(pheno)))
+        return phenotype
     
-    def getCovariate(self, condition, covariates):
+    def getCovariate(self, condition, covar):
         '''Get covariates for specified samples (specified by condition).'''
-        if not covariates:
+        if not covar:
             return
         try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(covariates)) + \
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(covar)) + \
                 (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
             self.logger.debug('Select phenotype covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            self.covariates = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
-            self.covariates.insert(0, array('d', [1]*len(self.covariates[0])))
+            covariates = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
+            covariates.insert(0, array('d', [1]*len(covariates[0])))
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('''Failed to retrieve phenotype covariates {}. Please 
                              make sure the specified phenotype covariates names are correct and 
-                             there is no missing value'''.format(', '.join(covariates)))
+                             there is no missing value'''.format(', '.join(covar)))
+        return covariates
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         # set default group_by to positions
         if not group_by:
-          self.group_by = ['chr','pos']
-        else:
-          self.group_by = group_by
+          group_by = ['chr','pos']
         #
-        table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in self.group_by]
+        table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields] 
-        fields_names = [x.replace('.', '_') for x in self.group_by]
-        fields_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(self.group_by, table_of_fields)]
+        fields_names = [x.replace('.', '_') for x in group_by]
+        fields_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(group_by, table_of_fields)]
         cur = self.db.cursor()
         # create a table that holds variant ids and groups, indexed for groups
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
@@ -166,7 +197,7 @@ class AssociationTester(Sample):
               {});
               '''.format(','.join(['{} {} NULL'.format(x,y) for x,y in zip(fields_names, fields_types)])))
         # select variant_id and groups for association testing
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(self.group_by))        
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))        
         from_clause = []
         from_clause.append(self.table)
         where_clause = []
@@ -194,9 +225,10 @@ class AssociationTester(Sample):
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(fields_names)))
-        self.groups = cur.fetchall() 
-        self.logger.info('Find {} groups'.format(len(self.groups)))
-        self.logger.debug('Group by: {}'.format(', '.join(map(str, self.groups))))
+        groups = cur.fetchall() 
+        self.logger.info('Find {} groups'.format(len(groups)))
+        self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
+        return groups
 
 
 class UpdateResult:
@@ -332,27 +364,9 @@ class GroupAssociationCalculator(Process):
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            asso = AssociationTester(proj, args.table)
-            # step 0: get testers
-            asso.getAssoTests(args.methods, args.unknown_args)
-            # step 1: get samples
-            asso.getSamples(args.samples)
+            asso = AssoParamParser(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
+                args.samples, args.group_by)
             #
-            proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
-            unindexed_IDs = [x for x in asso.IDs if \
-                not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(x))]
-            if unindexed_IDs:
-                cur = proj.db.cursor()
-                prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
-                for idx, ID in enumerate(unindexed_IDs):
-                    cur.execute('CREATE INDEX __fromGeno.genotype_{0}_index ON genotype_{0} (variant_id ASC)'.format(ID))
-                    prog.update(idx + 1)
-                prog.done()
-            # step 2: get phenotype and set it to everyone
-            asso.getPhenotype(args.samples, args.phenotype)           
-            asso.getCovariate(args.samples, args.covariates)
-            # step 3: handle group_by
-            asso.identifyGroups(args.group_by)
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
@@ -361,7 +375,7 @@ def associate(args, reverse=False):
             for j in range(nJobs):
                 r, w = Pipe(False)
                 GroupAssociationCalculator(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
-                    asso.tests, asso.group_by, grpQueue, w).start()
+                    asso.tests, args.group_by, grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
