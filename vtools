@@ -37,11 +37,7 @@ from variant_tools import liftOver
 from variant_tools import annotation
 from variant_tools import variant
 from variant_tools import exporter
-try:
-    from variant_tools import association
-    with_association = True
-except (ImportError, AttributeError):
-    with_association = False
+from variant_tools import association
 
 def addCommonArgs(parser):
     parser.add_argument('-v', '--verbosity', metavar='STD[LOG]',
@@ -170,27 +166,16 @@ if __name__ == '__main__':
     addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
     #
-    # command merge
-    #parser = subparsers.add_parser('merge',
-    #    help='Merge variants and genotypes from other projects',
-    #    description='''Merge variants and samples from specified projects that use the
-    #    same reference genomes. Variant info fields that do not exist in the current
-    #    project and samples that already exist in the project will be ignored.''')
-    #project.mergeArguments(parser)
-    #addCommonArgs(parser)
-    #parser.set_defaults(func=project.merge)
-    #
     # command associate
     #
     # This command is not ready and will not be displayed in a formal release
-    if with_association:
-        parser = subparsers.add_parser('associate',
-            help='''Test association between variants and phenotypes''',
-            description='''Call one or more statistical association tests and
-            return test results as fields to variants tested.''')
-        association.associateArguments(parser)
-        addCommonArgs(parser)
-        parser.set_defaults(func=association.associate)
+    parser = subparsers.add_parser('associate',
+        help='''Test association between variants and phenotypes''',
+        description='''Call one or more statistical association tests and
+        return test results as fields to variants tested.''')
+    association.associateArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=association.associate)
     #
     # command execute
     parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement')
@@ -202,8 +187,7 @@ if __name__ == '__main__':
     # separate them into argv
     args, argv = master_parser.parse_known_args()
     # only command associate and sample_stat accept arbitrary parameter
-    if (with_association and args.func == association.associate) or \
-        (args.func in [project.init, importer.importVariants, importer.update, exporter.export]):
+    if (args.func in [association.associate, project.init, importer.importVariants, importer.update, exporter.export]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

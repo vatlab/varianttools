@@ -29,13 +29,9 @@ import unittest
 import shlex, subprocess
 import sys
 
-if sys.version_info.major == 2:
-    # for python2, we execute ../vtools directly
-    test_env = {'PATH': os.pathsep.join(['..', os.environ['PATH']])}
-else:
-    # for python3, we will need to install vtools first, and we put /usr/local/bin
-    # before any system path that might have path to local vtools ...
-    test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']])}
+# we will need to install vtools first, and we put /usr/local/bin
+# before any system path that might have path to local vtools ...
+test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']])}
 
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
