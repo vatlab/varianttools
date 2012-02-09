@@ -186,6 +186,8 @@ class AnnoDB:
         '''Create index for fields that are linked by'''
         cur = proj.db.cursor()
         for linked_field in linked_fields:
+            if '.' not in linked_field:
+                linked_field = proj.linkFieldToTable(linked_field, 'variant')[-1].field
             table, field = linked_field.split('.')
             if proj.isVariantTable(table):
                 try:
