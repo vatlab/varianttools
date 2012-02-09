@@ -82,7 +82,6 @@ class AssoParamParser(Sample):
     covariates:  covariates
     groups:      a list of groups
     '''
-    
     def __init__(self, proj, table, phenotype, covariates, methods, unknown_args, samples, group_by):
         Sample.__init__(self, proj)
         # table?
@@ -268,7 +267,7 @@ class UpdateResult:
     def count(self):
         return len(self.grps)
         
-class GroupAssociationCalculator(Process):
+class AssoTestsWorker(Process):
     '''Association test calculator'''
     def __init__(self, proj, table, samples, phenotypes, covariates, tests, group_by, grpQueue, output):
         self.proj = proj
@@ -374,7 +373,7 @@ def associate(args, reverse=False):
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
-                GroupAssociationCalculator(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
+                AssoTestsWorker(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
                     asso.tests, args.group_by, grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
