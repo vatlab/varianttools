@@ -600,13 +600,11 @@ class Exporter:
         # samples
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
         if samples:
-            self.logger.info('{} samples are selected. filename and sample name for each sample is outputted in project log file.'.format(len(self.IDs)))
-            fields = self.db.getHeaders('sample')
-            self.logger.debug('filename\tsample_name{}'.format(''.join(['\t'+x for x in fields[3:]])))
+            self.logger.info('File and sample names of {} selected samples are outputted in project log file.'.format(len(self.IDs)))
             cur = self.db.cursor()
             for ID in self.IDs:
-                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\
-                    .format(', '.join(fields[2:]), self.db.PH), (ID,))
+                cur.execute('SELECT filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\
+                    .format(self.db.PH), (ID,))
                 for rec in cur:
                     self.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
         # 
