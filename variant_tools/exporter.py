@@ -293,8 +293,7 @@ class BaseVariantReader:
         self.var_fields = var_fields
         self.geno_fields = geno_fields
         self.export_alt_build = export_alt_build
-        self.IDs = list(IDs)
-        self.IDs.sort()
+        self.IDs = IDs
 
     def start(self):
         pass
@@ -601,7 +600,15 @@ class Exporter:
         # samples
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
         if samples:
-            self.logger.info('{} samples are selected'.format(len(self.IDs)))
+            self.logger.info('{} samples are selected. filename and sample name for each sample is outputted in project log file.'.format(len(self.IDs)))
+            fields = self.db.getHeaders('sample')
+            self.logger.debug('filename\tsample_name{}'.format(''.join(['\t'+x for x in fields[3:]])))
+            cur = self.db.cursor()
+            for ID in self.IDs:
+                cur.execute('SELECT filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\
+                    .format(', '.join(fields[2:]), self.db.PH), (ID,))
+                for rec in cur:
+                    self.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
         # 
         # build
         if build is None:

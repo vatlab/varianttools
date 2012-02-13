@@ -1177,13 +1177,16 @@ class Project:
         self.db.removeTable(table)
 
     def selectSampleByPhenotype(self, cond):
-        '''Select samples by conditions such as "aff=1"'''
+        '''Select samples by conditions such as "aff=1", return IDs as a sorted list'''
         cur = self.db.cursor()
         try:
             query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {};'.format(' WHERE {}'.format(cond) if cond.strip() else '')
             self.logger.debug('Select samples using query {}'.format(query))
             cur.execute(query)
-            return set([x[0] for x in cur.fetchall()])
+            IDs = [x[0] for x in cur.fetchall()]
+            IDs.sort()
+            # return a tuple to avoid future change of order
+            return tuple(IDs)
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))

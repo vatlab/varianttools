@@ -86,9 +86,10 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format ANNOVAR --comment_string DP')
 
     def testTped(self):
-      'Test command export in tped format'
-      self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
-      self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
+        'Test command export in tped format'
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
+        self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
 
 if __name__ == '__main__':
     unittest.main()
