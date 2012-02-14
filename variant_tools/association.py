@@ -93,9 +93,9 @@ class AssoParamParser:
         #
         # step 0: get testers
         self.tests = self.getAssoTests(methods, unknown_args)
-        # step 1: get samples
-        self.IDs = self.getSamples(samples)
-        # step 1.5: indexes genotype tables if needed
+        # step 1: get samples and related phenotypes
+        self.IDs, self.phenotype, self.covariates = self.getPhenotype(samples, phenotype, covariates)
+        # step 2: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = [x for x in self.IDs if \
             not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(x))]
@@ -107,9 +107,6 @@ class AssoParamParser:
                 prog.update(idx + 1)
             prog.done()
         #
-        # step 2: get phenotype and set it to everyone
-        self.phenotype = self.getPhenotype(samples, phenotype)           
-        self.covariates = self.getCovariate(samples, covariates)
         # step 3: get groups
         self.groups = self.identifyGroups(group_by)
 
@@ -130,53 +127,29 @@ class AssoParamParser:
                 raise ValueError('Could not identify association test {}. Please use command "vtools show tests" for a list of tests"')
         return tests
 
-    def getSamples(self, condition):
+    def getPhenotype(self, condition, pheno, covar):
         '''Get a list of samples from specified condition. This function sets self.IDs'''
-        if condition:
-            IDs = self.proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in condition]))
+        try:
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
+                ', '.join(pheno + (covar if covar is not None else []))) + \
+                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ' ORDER BY sample_id;'
+            self.logger.debug('Select phenotype and covariates using query {}'.format(query))
+            cur = self.db.cursor()
+            cur.execute(query)
+            data = list(zip(*cur.fetchall()))
+            IDs, phenotypes, covariates = data[0], data[1: (1 + len(pheno))], data[(1 + len(pheno)) : ]
             if len(IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
                 self.logger.info('{} condition are selected by condition: {}'.format(len(IDs), ' AND '.join(['({})'.format(x) for x in condition])))
-        else:
-            # select all condition
-            IDs = self.proj.selectSampleByPhenotype('1')
-        return IDs
-
-    def getPhenotype(self, condition, pheno):
-        '''Get phenotype for specified samples (specified by condition).'''
-        try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(pheno)) + \
-                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
-            self.logger.debug('Select phenotype using query {}'.format(query))
-            cur = self.db.cursor()
-            cur.execute(query)
-            phenotype = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
+            # add intersection
+            covariates.insert(0, array('d', [1]*len(IDs)))
+            return IDs, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('''Failed to retrieve phenotype {}. Please 
+            raise ValueError('''Failed to retrieve phenotype {} and covariate {}. Please 
                              make sure the specified phenotype names are correct and there 
-                             is no missing value'''.format(', '.join(pheno)))
-        return phenotype
-    
-    def getCovariate(self, condition, covar):
-        '''Get covariates for specified samples (specified by condition).'''
-        if not covar:
-            return
-        try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(', '.join(covar)) + \
-                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ';'
-            self.logger.debug('Select phenotype covariates using query {}'.format(query))
-            cur = self.db.cursor()
-            cur.execute(query)
-            covariates = [array('d', map(float, x)) for x in list(zip(*cur.fetchall()))[1:]]
-            covariates.insert(0, array('d', [1]*len(covariates[0])))
-        except Exception as e:
-            self.logger.debug(e)
-            raise ValueError('''Failed to retrieve phenotype covariates {}. Please 
-                             make sure the specified phenotype covariates names are correct and 
-                             there is no missing value'''.format(', '.join(covar)))
-        return covariates
+                             is no missing value'''.format(', '.join(pheno), ', '.join(covar)))
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
