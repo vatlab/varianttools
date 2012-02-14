@@ -31,7 +31,7 @@ import time
 from array import array
 from copy import copy, deepcopy
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine
+from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
 from .phenotype import Sample
 import argparse
 
@@ -141,7 +141,7 @@ class AssoParamParser:
             if len(IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
-                self.logger.info('{} condition are selected by condition: {}'.format(len(IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                self.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(['({})'.format(x) for x in condition])))
             # add intersection
             covariates.insert(0, array('d', [1]*len(IDs)))
             return IDs, phenotypes, covariates
@@ -153,25 +153,33 @@ class AssoParamParser:
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
-        # set default group_by to positions
-        #
+        # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields] 
+        # name the fields
         fields_names = [x.replace('.', '_') for x in group_by]
+        # type of the fields
         fields_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(group_by, table_of_fields)]
         cur = self.db.cursor()
-        # create a table that holds variant ids and groups, indexed for groups
+        #
+        # create a table that holds variant ids and groups, indexed for groups.
+        # The structure of this table will look like
+        # 
+        #   variant_id  INT NOT NULL,
+        #   chr VARCHAR(20),
+        #   pos INT
+        #
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
         cur.execute('''\
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL,
               {});
-              '''.format(','.join(['{} {} NULL'.format(x,y) for x,y in zip(fields_names, fields_types)])))
+              '''.format(','.join(['{} {}'.format(x,y) for x,y in zip(fields_names, fields_types)])))
+        #
         # select variant_id and groups for association testing
         group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))        
-        from_clause = []
-        from_clause.append(self.table)
+        from_clause = [self.table]
         where_clause = []
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
         #
@@ -187,18 +195,19 @@ class AssoParamParser:
         # This will be the tmp table to extract variant_id by groups
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
             self.from_clause, self.where_clause)
-        self.logger.info("Creating association test table (please be patient ...)")
+        s = delayedAction(self.logger.info, "Creating association test table (please be patient ...)")
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
             CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
             '''.format(','.join(['{} ASC'.format(x) for x in fields_names])))
+        del s
         # get group by
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(fields_names)))
-        groups = cur.fetchall() 
-        self.logger.info('Find {} groups'.format(len(groups)))
+        groups = cur.fetchall()
+        self.logger.info('{} groups are found'.format(len(groups)))
         self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
         return groups
 
@@ -545,7 +554,7 @@ class LinearBurdenTest(NullTest):
 class AliasTest(LinearBurdenTest):
     '''An example of a specialized linear burden test '''
     def __init__(self, logger=None, name=None, *method_args):
-        NullTest.__init__(self, logger, name, *method_args)
+        LinearBurdenTest.__init__(self, logger, name, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
