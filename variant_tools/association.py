@@ -71,7 +71,7 @@ def associateArguments(parser):
         help='''File name to which results from association tests will be written''')        
 
 
-class AssoParamParser(Sample):
+class AssoParamParser:
     '''Parse command line and get data for association testing. This class will provide
     the following attributes for others to use:
 
@@ -83,7 +83,9 @@ class AssoParamParser(Sample):
     groups:      a list of groups
     '''
     def __init__(self, proj, table, phenotype, covariates, methods, unknown_args, samples, group_by):
-        Sample.__init__(self, proj)
+        self.proj = proj
+        self.db = proj.db
+        self.logger = proj.logger
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -179,8 +181,6 @@ class AssoParamParser(Sample):
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         # set default group_by to positions
-        if not group_by:
-          group_by = ['chr','pos']
         #
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields] 
@@ -364,7 +364,7 @@ def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
             asso = AssoParamParser(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
-                args.samples, args.group_by)
+                args.samples, args.group_by if args.group_by else ['chr','pos'])
             #
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
@@ -374,7 +374,7 @@ def associate(args, reverse=False):
             for j in range(nJobs):
                 r, w = Pipe(False)
                 AssoTestsWorker(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
-                    asso.tests, args.group_by, grpQueue, w).start()
+                    asso.tests, args.group_by if args.group_by else ['chr', 'pos'], grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
