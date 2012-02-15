@@ -71,7 +71,7 @@ def associateArguments(parser):
         help='''File name to which results from association tests will be written''')        
 
 
-class AssoParamParser:
+class AssociationTestManager:
     '''Parse command line and get data for association testing. This class will provide
     the following attributes for others to use:
 
@@ -81,6 +81,7 @@ class AssoParamParser:
     phenotype:   phenotype 
     covariates:  covariates
     groups:      a list of groups
+    group_names: names of the group
     '''
     def __init__(self, proj, table, phenotype, covariates, methods, unknown_args, samples, group_by):
         self.proj = proj
@@ -108,7 +109,7 @@ class AssoParamParser:
             prog.done()
         #
         # step 3: get groups
-        self.groups = self.identifyGroups(group_by)
+        self.group_names, self.groups = self.identifyGroups(group_by)
 
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
@@ -153,13 +154,15 @@ class AssoParamParser:
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
+        if not group_by:
+            group_by = ['chr', 'pos']
         # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields] 
         # name the fields
-        fields_names = [x.replace('.', '_') for x in group_by]
+        field_names = [x.replace('.', '_') for x in group_by]
         # type of the fields
-        fields_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(group_by, table_of_fields)]
+        field_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(group_by, table_of_fields)]
         cur = self.db.cursor()
         #
         # create a table that holds variant ids and groups, indexed for groups.
@@ -175,7 +178,7 @@ class AssoParamParser:
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL,
               {});
-              '''.format(','.join(['{} {}'.format(x,y) for x,y in zip(fields_names, fields_types)])))
+              '''.format(','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)])))
         #
         # select variant_id and groups for association testing
         group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))        
@@ -200,17 +203,21 @@ class AssoParamParser:
         cur.execute(query)
         cur.execute('''\
             CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
-            '''.format(','.join(['{} ASC'.format(x) for x in fields_names])))
+            '''.format(','.join(['{} ASC'.format(x) for x in field_names])))
         del s
         # get group by
         cur.execute('''\
             SELECT DISTINCT {} FROM __asso_tmp;
-            '''.format(', '.join(fields_names)))
+            '''.format(', '.join(field_names)))
         groups = cur.fetchall()
         self.logger.info('{} groups are found'.format(len(groups)))
-        self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
-        return groups
+        #
+        # the output can be too long
+        #
+        #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
+        return field_names, groups
 
+    
 
 class UpdateResult:
     def __init__(self, db, logger, fn):
@@ -251,49 +258,39 @@ class UpdateResult:
         
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, proj, table, samples, phenotypes, covariates, tests, group_by, grpQueue, output):
-        self.proj = proj
-        self.table = table
-        self.IDs = samples
-        self.phenotypes = phenotypes
-        self.covariates = covariates
-        self.tests = tests
-        self.group_by = group_by
+    def __init__(self, param, grpQueue, output):
+        self.proj = param.proj
+        self.table = param.table
+        self.IDs = param.IDs
+        self.phenotypes = param.phenotype[0]
+        self.covariates = param.covariates
+        self.tests = param.tests
+        self.group_names = param.group_names
         self.queue = grpQueue
         self.output = output
-        self.logger = proj.logger
+        self.logger = self.proj.logger
         self.db = None
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
-    
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
-        #print 'Getting', group, self.table, self.group_by
-        fields_names = [x.replace('.', '_') for x in self.group_by]
-        where_clause =  'WHERE ' + \
-            ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in fields_names])
-        #
         # get variant_id
-        query = 'SELECT variant_id FROM __asso_tmp {}'.format(where_clause)
-        self.logger.debug('Running on group {0} query {1}'.format(group, query))
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause) 
+        #
+        #self.logger.debug('Running on group {0} query {1}'.format(group, query))
         cur = self.db.cursor()
         cur.execute(query, group)
         variant_id = [x[0] for x in cur.fetchall()]
         numSites = len(variant_id)
-        self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
+        #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
         #
         # get genotypes
-#        cur.execute('DROP TABLE IF EXISTS __id_of_group;')
-#        cur.execute('CREATE TEMPORARY TABLE __id_of_group (variant_id INT NOT NULL);')
-#        cur.execute('INSERT INTO __id_of_group SELECT variant_id FROM __asso_tmp {};'.format(where_clause), group)
         genotype = []
-        self.db.attach(self.proj.name+'_genotype.DB', '__fromGeno')
         for ID in self.IDs:
-#            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{} WHERE variant_id IN (SELECT variant_id FROM __id_of_group);'\
-            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp {1});'\
+            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID, where_clause)
             cur.execute(query, group)
-#            cur.execute(query)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
             # handle missing values
             gtmp = [gtmp.get(x, -9.0) for x in variant_id]
@@ -302,7 +299,6 @@ class AssoTestsWorker(Process):
             genotype.append(array('d', gtmp))
         #
         self.logger.debug('Retrieved genotypes for {} samples'.format(len(genotype)))
-        self.db.detach('__fromGeno')
         missing_counts = [x.count(-9.0) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
         # FIXME will pass it as an input arguement later
@@ -314,15 +310,13 @@ class AssoTestsWorker(Process):
 
     def run(self):
         self.db = DatabaseEngine()
-        self.db.connect(self.proj.name+'.proj', readonly=True)
-
+        self.db.connect(self.proj.name + '.proj', readonly=True)
+        self.db.attach(self.proj.name + '_genotype.DB', '__fromGeno')
         #
         while True:
-            self.logger.debug('Getting group ...') 
             grp = self.queue.get()
             self.logger.debug('Got group {}'.format(grp))
             if grp is None:
-                self.logger.debug('All groups are processed, terminating the queue')
                 self.output.send(None)
                 break
             # select variants from each group:
@@ -340,13 +334,14 @@ class AssoTestsWorker(Process):
                 self.logger.info('Error processing group {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
             self.output.send((grp, values))
+        self.db.detach('__fromGeno')
         
 
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            asso = AssoParamParser(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
-                args.samples, args.group_by if args.group_by else ['chr','pos'])
+            asso = AssociationTestManager(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
+                args.samples, args.group_by)
             #
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
@@ -355,12 +350,12 @@ def associate(args, reverse=False):
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
-                AssoTestsWorker(proj, args.table, asso.IDs, asso.phenotype[0], asso.covariates,
-                    asso.tests, args.group_by if args.group_by else ['chr', 'pos'], grpQueue, w).start()
+                AssoTestsWorker(asso, grpQueue, w).start()
                 readers.append(r)
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
+            # the worker will stop once all jobs are finished
             for j in range(nJobs):
                 grpQueue.put(None)
             count = 0
