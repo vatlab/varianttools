@@ -49,6 +49,7 @@ class TestInit(ProcessTestCase):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import vcf/SAMP1.vcf')
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
+        self.assertEqual(numOfVariant('ceu'), 288)
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         self.assertSucc('vtools init test --parent parent --variants ceu')
