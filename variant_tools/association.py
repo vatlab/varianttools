@@ -67,8 +67,6 @@ def associateArguments(parser):
             into groups and are tested one by one.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
-    parser.add_argument('--to_file', metavar='FILE', nargs=1,
-        help='''File name to which results from association tests will be written''')        
     parser.add_argument('--to_DB', metavar='annoDB', nargs=1,
         help='''Name of a database to which results from association tests will be written''')        
 
@@ -123,8 +121,8 @@ class AssociationTestManager:
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
-                method = eval(name)
-                tests.append(method(self.logger, args))
+                method = eval(name)(self.logger, args)
+                tests.append(method)
             except NameError as e:
                 self.logger.debug(e)
                 raise ValueError('Could not identify association test {}. Please use command "vtools show tests" for a list of tests"')
@@ -219,42 +217,33 @@ class AssociationTestManager:
         #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
         return field_names, groups
 
-    
 
-class UpdateResult:
-    def __init__(self, db, logger, fn):
-        self.grps = []
-        self.lock = Lock()
-        self.db = db
-        self.logger = logger
-        self.fn = fn[0] if fn else None
+class ResultRecorder:
+    def __init__(self, params, db_name=None):
+        self.completed = 0
+        #
+        self.group_names = params.group_names
+        self.fields = []
+        for test in params.tests:
+            if test.name:
+                self.fields.extend(['{}_{}'.format(x, test.name) for x in test.fields])
+            else:
+                self.fields.extend(test.fields)
+        if len(self.fields) != len(set(self.fields)):
+            raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
+        print('#' + '\t'.join(self.group_names + self.fields))
 
-    def set(self, table, res):
-        self.grps.append(res[0])
-
-        if not self.fn:
-            self.fn = 'vtoolsasso_{}.result'.format(time.strftime('%b%d_%H%M%S', time.gmtime()))
-        try:
-            #output = '[{0}]\ntest = {1}\np-value = {2}\nstatistic = {3}\nsamples = {4}\n'.format('__'.join(map(str, res[0])),
-            #            res[1][0][0][0][0].split('_')[0], res[1][0][1]['pvalue'], res[1][0][1]['statistic'], res[1][0][1]['samples'])
-            col_grp = '__'.join(map(str, res[0]))
-            col_test = res[1][0][0][0][0].split('_')[0]
-            cols_stat = res[1][0][1]
-            output = '\t'.join(map(str, [col_grp, col_test, cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']])) + '\n'
-            if len(self.grps) == 1:
-                output = '\t'.join(['#test_unit', 'method', 'pvalue', 'statistic', 'sample_size']) + '\n' + output
-            self.lock.acquire()
-            with open(self.fn, 'a') as out:
-                out.write(output)
-            self.lock.release()
-        except IndexError as e:
-            self.logger.warning('No association tests done for {}'.format(self.grps[-1]))
-            pass
-        return
+    def set(self, res):
+        self.completed += 1
+        col_grp = '__'.join(map(str, res[0]))
+        cols_stat = res[1][0][1]
+        output = '\t'.join(map(str, [col_grp, cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']]))
+        print(output)
         
     def count(self):
-        return len(self.grps)
+        return self.completed
         
+
 class AssoTestsWorker(Process):
     '''Association test calculator'''
     def __init__(self, param, grpQueue, output):
@@ -345,7 +334,7 @@ def associate(args, reverse=False):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
-            results = UpdateResult(proj.db, proj.logger, args.to_file)
+            results = ResultRecorder(asso)
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
@@ -369,7 +358,7 @@ def associate(args, reverse=False):
                     if res is None:
                         proc_status[idx] = False
                     else:
-                        results.set(args.table, res)
+                        results.set(res)
                 #
                 if results.count() > count:
                     count = results.count()
@@ -467,6 +456,8 @@ class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
+        self.name = 'LBT'
+        self.fields = ['p-value', 'statistic', 'sample_size']
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
