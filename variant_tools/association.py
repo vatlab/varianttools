@@ -393,11 +393,6 @@ class NullTest:
         #
         self.result = {}
         self.group = None
-        # suffix to output fields will be defined for all tests after parseArgs
-        self.name = ''
-        # fields should be defined for each test so that output objects
-        # can determine the fields to output
-        self.fields = []
 
     def parseArgs(self, method_args):
         # this function should never be called.
@@ -456,7 +451,6 @@ class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
-        self.name = 'LBT'
         self.fields = ['p-value', 'statistic', 'sample_size']
 
     def parseArgs(self, method_args):
