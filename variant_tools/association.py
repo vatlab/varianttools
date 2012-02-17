@@ -69,6 +69,8 @@ def associateArguments(parser):
         help='''Number of processes to carry out association tests.''')
     parser.add_argument('--to_file', metavar='FILE', nargs=1,
         help='''File name to which results from association tests will be written''')        
+    parser.add_argument('--to_DB', metavar='annoDB', nargs=1,
+        help='''Name of a database to which results from association tests will be written''')        
 
 
 class AssociationTestManager:
@@ -122,7 +124,7 @@ class AssociationTestManager:
             args = m.split()[1:] + common_args
             try:
                 method = eval(name)
-                tests.append(method(self.logger, name, args))
+                tests.append(method(self.logger, args))
             except NameError as e:
                 self.logger.debug(e)
                 raise ValueError('Could not identify association test {}. Please use command "vtools show tests" for a list of tests"')
@@ -250,9 +252,6 @@ class UpdateResult:
             pass
         return
         
-    def getgrp(self):
-        return self.grps
-    
     def count(self):
         return len(self.grps)
         
@@ -262,7 +261,7 @@ class AssoTestsWorker(Process):
         self.proj = param.proj
         self.table = param.table
         self.IDs = param.IDs
-        self.phenotypes = param.phenotype[0]
+        self.phenotypes = param.phenotype
         self.covariates = param.covariates
         self.tests = param.tests
         self.group_names = param.group_names
@@ -396,26 +395,24 @@ def getAllTests():
 
 class NullTest:
     '''A base class that defines a common interface for association tests'''
-    def __init__(self, logger=None, name=None, *method_args):
+    def __init__(self, logger=None, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to 
         parse it'''
         self.data = t.AssoData()
         self.logger = logger
-        self.name = name
         self.parseArgs(*method_args)
+        #
         self.result = {}
         self.group = None
+        # suffix to output fields will be defined for all tests after parseArgs
+        self.name = ''
+        # fields should be defined for each test so that output objects
+        # can determine the fields to output
+        self.fields = []
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''A base association test method
-            test does nothing, but can be used to measure the performance of 
-            retrieving data from vtools.''',
-            prog='vtools associate --method ' + self.name)
-        # no argumant is added
-        args = parser.parse_args(method_args)
-        # incorporate args to this class
-        self.__dict__.update(vars(args))
-        
+        # this function should never be called.
+        raise SystemError('All association tests should define their own parseArgs function')
     
     def getFields(self):
         '''Get updated fields for the association test.'''
@@ -433,7 +430,7 @@ class NullTest:
     
     def setPhenotype(self, which, data, covariates=None):
         '''Set phenotype data'''
-        phen = [x for idx, x in enumerate(data) if which[idx]]
+        phen = [x for idx, x in enumerate(data[0]) if which[idx]]
         if covariates:
           covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
           self.data.setPhenotype(phen, covt)
@@ -468,15 +465,20 @@ def freq(input):
 
 class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
-    def __init__(self, logger=None, name=None, *method_args):
-        NullTest.__init__(self, logger, name, *method_args)
+    def __init__(self, logger=None, *method_args):
+        NullTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
-            prog='vtools associate --method ' + self.name)
-        # no argumant is added
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='LBT',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
             will be included in analysis. Default set to 1.0''')  
@@ -548,14 +550,18 @@ class LinearBurdenTest(NullTest):
 
 class AliasTest(LinearBurdenTest):
     '''An example of a specialized linear burden test '''
-    def __init__(self, logger=None, name=None, *method_args):
-        LinearBurdenTest.__init__(self, logger, name, *method_args)
+    def __init__(self, logger=None, *method_args):
+        LinearBurdenTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
-            prog='vtools associate --method ' + self.name)
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='LBT',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
