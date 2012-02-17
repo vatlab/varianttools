@@ -40,6 +40,6 @@ VTOOLS_REVISION=893
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
 VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2012 Bo Peng'''.format(VTOOLS_VERSION)
-VTOOLS_CITATION = '''Reference: Anthony et al (2012) Bioinformatics 28(3):421-422'''
+VTOOLS_CITATION = '''San Lucas FA, Wang G, Scheet P, Peng B (2012) Bioinformatics 28(3):421-422'''
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
