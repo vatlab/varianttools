@@ -233,10 +233,9 @@ class ResultRecorder:
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
         print('#' + '\t'.join(self.group_names + self.fields))
 
-    def set(self, res):
+    def record(self, res):
         self.completed += 1
-        cols_stat = res[1][0]
-        output = '\t'.join(map(str, list(res[0]) + [ cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']]))
+        output = '\t'.join(map(str, res))
         print(output)
         
     def count(self):
@@ -308,19 +307,19 @@ class AssoTestsWorker(Process):
                 break
             # select variants from each group:
             genotype, which = self.getGenotype(grp)
-            values = []
+            values = list(grp)
             try:
                 for test in self.tests:
                     test.setPhenotype(which, self.phenotypes, self.covariates)
                     test.setGenotype(which, genotype)
                     test.setAttributes(grp)
-                    test.calculate()
+                    result = test.calculate()
                     self.logger.debug('Finish test')
-                    values.append(test.result)
+                    values.extend(result)
             except Exception as e:
                 self.logger.info('Error processing group {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
-            self.output.send((grp, values))
+            self.output.send(values)
         self.db.detach('__fromGeno')
         
 
@@ -357,7 +356,7 @@ def associate(args, reverse=False):
                     if res is None:
                         proc_status[idx] = False
                     else:
-                        results.set(res)
+                        results.record(res)
                 #
                 if results.count() > count:
                     count = results.count()
@@ -512,16 +511,7 @@ class LinearBurdenTest(NullTest):
             # permutation
             p.apply(data)
         
-        self.result['pvalue'] = data.pvalue()
-        self.result['statistic'] = data.statistic()
-        self.result['samples'] = data.samplecounts()
-        #print "TEST", self.__class__.__name__, '\n'
-        #print "PHENOTYPES", data.phenotype(), '\n'
-        #print "COVARIATES", data.covariates(), '\n'
-        #print "GENOTYPES", data.raw_genotype(), '\n'
-        #print "GROUP", self.group, '\n'
-        #print "RESULTS", self.result
-        return 0
+        return data.pvalue(), data.statistic(), data.samplecounts()
 
 class AliasTest(LinearBurdenTest):
     '''An example of a specialized linear burden test '''
