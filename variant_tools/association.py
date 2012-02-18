@@ -235,9 +235,8 @@ class ResultRecorder:
 
     def set(self, res):
         self.completed += 1
-        col_grp = '__'.join(map(str, res[0]))
-        cols_stat = res[1][0][1]
-        output = '\t'.join(map(str, [col_grp, cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']]))
+        cols_stat = res[1][0]
+        output = '\t'.join(map(str, list(res[0]) + [ cols_stat['pvalue'], cols_stat['statistic'], cols_stat['samples']]))
         print(output)
         
     def count(self):
@@ -317,7 +316,7 @@ class AssoTestsWorker(Process):
                     test.setAttributes(grp)
                     test.calculate()
                     self.logger.debug('Finish test')
-                    values.append([test.getFields(), test.result])
+                    values.append(test.result)
             except Exception as e:
                 self.logger.info('Error processing group {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
@@ -398,15 +397,6 @@ class NullTest:
         # this function should never be called.
         raise SystemError('All association tests should define their own parseArgs function')
     
-    def getFields(self):
-        '''Get updated fields for the association test.'''
-        fields = []
-        for key in self.result.keys():
-            if self.result[key] is not None:
-                fields.append(('_'.join([self.__class__.__name__, key]), 'FLOAT'))
-        return fields
-        
-        
     def setGenotype(self, which, data):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
