@@ -534,6 +534,131 @@ class fileFMT:
 
 
 
+class AnnoDBWriter:
+    '''
+    A class to initiate and insert annotation database
+    '''
+    def __init__(self, proj, name, fields, anno_type, description, version, build):
+        self.proj = proj
+        self.logger = proj.logger
+        self.name = name
+        self.fields = fields
+        self.anno_type = anno_type
+        self.description = description
+        self.version = version
+        self.build = build
+        # create database and import file
+        self.db = self.proj.db.newConnection()
+        # remove database if already exist
+        self.db.removeDatabase(self.name)
+        # create a new one
+        self.db.connect(self.name)
+        cur = self.db.cursor()
+        #
+        # creating the field table
+        self.logger.debug('Creating {}_field table'.format(self.name))
+        self.createFieldsTable()
+        #
+        for field in self.fields:
+            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
+                (field.name, field.index, field.type, field.comment))
+        self.db.commit()
+        #
+        # creating the info table
+        self.logger.debug('Creating {}_info table'.format(self.name))
+        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
+        self.createInfoTable()
+        cur.execute(query, ('name', self.name))
+        cur.execute(query, ('anno_type', self.anno_type))
+        cur.execute(query, ('description', self.description))
+        cur.execute(query, ('version', self.version))
+        cur.execute(query, ('build', str(self.build)))
+        self.db.commit()
+        self.logger.debug('Creating table {}'.format(self.name))
+        self.createAnnotationTable()
+
+    def createFieldsTable(self):
+        '''Create table name_fields'''
+        cur = self.db.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS {}_field (
+            name VARCHAR(40),
+            field INT,
+            type VARCHAR(80),
+            comment VARCHAR(256),
+            missing_entries INT,
+            distinct_entries INT,
+            min_value INT,
+            max_value INT
+        )'''.format(self.name))
+
+    def createInfoTable(self):
+        '''Create table name_fields'''
+        cur = self.db.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS {}_info (
+            name VARCHAR(40),
+            value VARCHAR(1024)
+        )'''.format(self.name)) 
+
+    def createAnnotationTable(self):
+        'Create an annotation table '
+        items = []
+        for build in self.build.keys():
+            if build != '*':
+                items.append('{0}_bin INTEGER'.format(build))
+        for field in self.fields:
+            items.append('{0} {1}'.format(field.name, field.type))
+        query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
+            ',\n'.join(items) + ');'
+        self.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
+        cur = self.db.cursor()
+        try:
+            cur.execute(query)
+        except Exception as e:
+            self.logger.debug(e)
+            raise ValueError('Failed to create table')
+    
+    def finalize(self):
+        '''Create index and get statistics of the database'''
+        cur = self.db.cursor()
+        # creating indexes
+        s = delayedAction(self.logger.info, 'Creating indexes (this can take quite a while)')
+        # creates index for each link method
+        for key in self.build.keys():
+            if key != '*':
+                cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
+                    .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+            else:
+                cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
+                    .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+        del s
+        s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
+        # This is only useful for sqlite
+        self.db.analyze()
+        # calculating database statistics
+        cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
+        count = cur.fetchone()[0]
+        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
+        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', self.db.numOfRows(self.name)))
+
+        del s
+        for field in self.fields:
+            s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))
+            cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
+            missing = cur.fetchone()[0]
+            cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
+                (missing,))
+            if 'int' in field.type.lower() or 'float' in field.type.lower():
+                cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
+                res = cur.fetchone()
+                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                    self.name, self.db.PH), (res[0], res[1], res[2], field.name))
+            else:
+                cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
+                res = cur.fetchone()
+                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
+                    self.name, self.db.PH), (res[0], field.name))
+            del s
+        self.db.commit()
 
 #  Project management
 #

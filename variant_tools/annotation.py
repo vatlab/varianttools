@@ -33,7 +33,7 @@ import gzip
 import zipfile
 from multiprocessing import Process, Pipe
 
-from .project import AnnoDB, Project, Field
+from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField
@@ -189,45 +189,6 @@ class AnnoDBConfiger:
         for field in self.fields:
             self.logger.debug("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
 
-    def createAnnotationTable(self, db):
-        'Create an annotation table '
-        items = []
-        for build in self.build.keys():
-            if build != '*':
-                items.append('{0}_bin INTEGER'.format(build))
-        for field in self.fields:
-            items.append('{0} {1}'.format(field.name, field.type))
-        query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
-            ',\n'.join(items) + ');'
-        self.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
-        cur = db.cursor()
-        try:
-            cur.execute(query)
-        except Exception as e:
-            self.logger.debug(e)
-            raise ValueError('Failed to create table')
-    
-    def createFieldsTable(self, db):
-        '''Create table name_fields'''
-        cur = db.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS {}_field (
-            name VARCHAR(40),
-            field INT,
-            type VARCHAR(80),
-            comment VARCHAR(256),
-            missing_entries INT,
-            distinct_entries INT,
-            min_value INT,
-            max_value INT
-        )'''.format(self.name))
-
-    def createInfoTable(self, db):
-        '''Create table name_fields'''
-        cur = db.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS {}_info (
-            name VARCHAR(40),
-            value VARCHAR(1024)
-        )'''.format(self.name))
 
     def getSourceFiles(self):
         '''Download a file from a URL and save to a directory. If it is a zip file,
@@ -336,83 +297,16 @@ class AnnoDBConfiger:
             source_files = self.getSourceFiles()
         #
         self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
-        # create database and import file
-        db = self.proj.db.newConnection()
-        # remove database if already exist
-        db.removeDatabase(self.name)
-        # create a new one
-        db.connect(self.name)
-        cur = db.cursor()
-        
         #
-        # creating the field table
-        self.logger.debug('Creating {}_field table'.format(self.name))
-        self.createFieldsTable(db)
-        for field in self.fields:
-            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
-                (field.name, field.index, field.type, field.comment))
-        db.commit()
-        #
-        # creating the info table
-        self.logger.debug('Creating {}_info table'.format(self.name))
-        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
-        self.createInfoTable(db)
-        cur.execute(query, ('name', self.name))
-        cur.execute(query, ('anno_type', self.anno_type))
-        cur.execute(query, ('description', self.description))
-        cur.execute(query, ('version', self.version))
-        cur.execute(query, ('build', str(self.build)))
-        db.commit()
-        self.logger.debug('Creating table {}'.format(self.name))
-        self.createAnnotationTable(db)
-        #
+        writer = AnnoDBWriter(self.proj, self.name, self.fields, self.anno_type, self.description,
+            self.version, self.build)
         # read records from files
         if self.source_type == 'txt':
-            self.importTxtRecords(db, source_files)
+            self.importTxtRecords(writer.db, source_files)
         else:
             raise ValueError('Unrecognizable source input type: {}'.format(self.source_type))
         #
-        # creating indexes
-        s = delayedAction(self.logger.info, 'Creating indexes (this can take quite a while)')
-        #
-        # creates index for each link method
-        for key in self.build.keys():
-            if key != '*':
-                cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
-                    .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
-            else:
-                cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
-                    .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
-        del s
-        s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
-        # This is only useful for sqlite
-        db.analyze()
-        # calculating database statistics
-        cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
-        count = cur.fetchone()[0]
-        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, db.PH), ('distinct_keys', str(count)))
-        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, db.PH), ('num_records', db.numOfRows(self.name)))
-
-        del s
-        for field in self.fields:
-            s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))
-            cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
-            missing = cur.fetchone()[0]
-            cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, db.PH, field.name),
-                (missing,))
-            if 'int' in field.type.lower() or 'float' in field.type.lower():
-                cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
-                res = cur.fetchone()
-                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                    self.name, db.PH), (res[0], res[1], res[2], field.name))
-            else:
-                cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
-                res = cur.fetchone()
-                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
-                    self.name, db.PH), (res[0], field.name))
-            del s
-        db.commit()
-        return db.dbName
+        writer.finalize()
 
     def prepareDB(self, source_files=[], linked_by=[], rebuild=False, anno_type=None, linked_fields=None):
         '''Importing data to database. If direct_url or source_url is specified,
