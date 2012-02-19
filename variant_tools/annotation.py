@@ -298,8 +298,8 @@ class AnnoDBConfiger:
         #
         self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
         #
-        writer = AnnoDBWriter(self.proj, self.name, self.fields, self.anno_type, self.description,
-            self.version, self.build)
+        writer = AnnoDBWriter(self.name, self.fields, self.anno_type, self.description,
+            self.version, self.build, self.logger)
         # read records from files
         if self.source_type == 'txt':
             self.importTxtRecords(writer.db, source_files)

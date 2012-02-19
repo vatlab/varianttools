@@ -538,9 +538,8 @@ class AnnoDBWriter:
     '''
     A class to initiate and insert annotation database
     '''
-    def __init__(self, proj, name, fields, anno_type, description, version, build):
-        self.proj = proj
-        self.logger = proj.logger
+    def __init__(self, name, fields, anno_type, description, version, build, logger):
+        self.logger = logger
         self.name = name
         self.fields = fields
         self.anno_type = anno_type
@@ -548,7 +547,7 @@ class AnnoDBWriter:
         self.version = version
         self.build = build
         # create database and import file
-        self.db = self.proj.db.newConnection()
+        self.db = DatabaseEngine()
         # remove database if already exist
         self.db.removeDatabase(self.name)
         # create a new one
@@ -560,13 +559,13 @@ class AnnoDBWriter:
         self.createFieldsTable()
         #
         for field in self.fields:
-            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.proj.db.PH),
+            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
                 (field.name, field.index, field.type, field.comment))
         self.db.commit()
         #
         # creating the info table
         self.logger.debug('Creating {}_info table'.format(self.name))
-        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.proj.db.PH)
+        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.db.PH)
         self.createInfoTable()
         cur.execute(query, ('name', self.name))
         cur.execute(query, ('anno_type', self.anno_type))

@@ -30,7 +30,7 @@ from multiprocessing import Process, Queue, Pipe, Lock
 import time
 from array import array
 from copy import copy, deepcopy
-from .project import Project
+from .project import Project, Field, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
 from .phenotype import Sample
 import argparse
@@ -67,7 +67,7 @@ def associateArguments(parser):
             into groups and are tested one by one.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
-    parser.add_argument('--to_DB', metavar='annoDB', nargs=1,
+    parser.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')        
 
 
@@ -109,7 +109,7 @@ class AssociationTestManager:
             prog.done()
         #
         # step 3: get groups
-        self.group_names, self.groups = self.identifyGroups(group_by)
+        self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
     def getAssoTests(self, methods, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
@@ -215,23 +215,37 @@ class AssociationTestManager:
         # the output can be too long
         #
         #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
-        return field_names, groups
+        return field_names, field_types, groups
 
 
 class ResultRecorder:
-    def __init__(self, params, db_name=None):
+    def __init__(self, params, db_name=None, logger=None):
         self.completed = 0
         #
         self.group_names = params.group_names
         self.fields = []
+        for n,t in zip(params.group_names, params.group_types):
+            self.fields.append(Field(name=n, index=None, type=t, adj=None, comment=n))
         for test in params.tests:
             if test.name:
-                self.fields.extend(['{}_{}'.format(x, test.name) for x in test.fields])
+                self.fields.extend([
+                    Field(name='{}_{}'.format(x.name, test.name), index=None,
+                        type=x.type, adj=None, comment=x.comment) for x in test.fields])
             else:
                 self.fields.extend(test.fields)
-        if len(self.fields) != len(set(self.fields)):
+        if len(self.fields) != len(set([x.name for x in self.fields])):
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
-        print('#' + '\t'.join(self.group_names + self.fields))
+        print('#' + '\t'.join(self.group_names + [x.name for x in self.fields]))
+        #
+        self.writer = None
+        if db_name:
+            self.writer = AnnoDBWriter(db_name, self.fields, 
+                'field',                       # field annotation databases 
+                'Annotation database used to record results of association tests. Created on {}'.format(
+                    time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
+                '1.0',                         # version 1.0 
+                {'*': self.group_names},     # link by group fields
+                logger)
 
     def record(self, res):
         self.completed += 1
@@ -240,6 +254,10 @@ class ResultRecorder:
         
     def count(self):
         return self.completed
+
+    def done(self):
+        if self.writer:
+            self.writer.finalize()
         
 
 class AssoTestsWorker(Process):
@@ -324,7 +342,7 @@ class AssoTestsWorker(Process):
         
 
 def associate(args, reverse=False):
-    try:
+    #try:
         with Project(verbosity=args.verbosity) as proj:
             asso = AssociationTestManager(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
                 args.samples, args.group_by)
@@ -332,7 +350,7 @@ def associate(args, reverse=False):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
-            results = ResultRecorder(asso)
+            results = ResultRecorder(asso, args.to_db, proj.logger)
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
@@ -367,8 +385,9 @@ def associate(args, reverse=False):
                     assert results.count() == len(asso.groups)
                     break
             prog.done()
-    except Exception as e:
-        sys.exit(e) 
+            results.done()
+    #except Exception as e:
+    #    sys.exit(e) 
 
 #
 # Statistical Association tests. The first one is a NullTest that provides
@@ -440,7 +459,10 @@ class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
-        self.fields = ['p-value', 'statistic', 'sample_size']
+        self.fields = [
+            Field(name='p_value', index=None, type='FLOAT', adj=None, comment='p-value'),
+            Field(name='statistic', index=None, type='FLOAT', adj=None, comment='statistic'),
+            Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')]
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
