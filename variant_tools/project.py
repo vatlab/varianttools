@@ -548,6 +548,14 @@ class AnnoDBWriter:
         self.build = build
         # create database and import file
         self.db = DatabaseEngine()
+        if not update or not os.path.isfile(self.name + '.DB'):
+            self.update_existing = False
+            self.createAnnoDB()
+        else:
+            self.update_existing = True
+            self.updateAnnoDB()
+
+    def createAnnoDB(self):
         # remove database if already exist
         self.db.removeDatabase(self.name)
         # create a new one
@@ -575,6 +583,39 @@ class AnnoDBWriter:
         self.db.commit()
         self.logger.debug('Creating table {}'.format(self.name))
         self.createAnnotationTable()
+    
+    def updateAnnoDB(self):
+        self.db.connect(self.name)
+        for table in [self.name, self.name + '_field', self.name + '_info']:
+            if not self.db.hasTable(table):
+                raise ValueError('Existing file {}.DB is not a valid annotation database.'.format(self.name))
+        # get linked fields
+        cur = self.db.cursor()
+        cur.execute('SELECT * from {}_info;'.format(self.name))
+        for rec in cur:
+            if rec[0] == 'anno_type':
+                if rec[1] != 'field':
+                    raise ValueError('Existing database is not field-based. Cannot add results to it.')
+            elif rec[0] == 'build':
+                if self.build != eval(rec[1]):
+                    raise ValueError('Existing database has different linking fields (existing: {}, required: {}).'.format(self.build, rec[1]))
+        # get existing fields
+        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
+        cur_fields = []
+        for rec in cur:
+            cur_fields.append(Field(*rec))
+        # add new fields
+        for field in self.fields:
+            # name already exist
+            if field.name in [x.name for x in cur_fields]:
+                cf = [x for x in cur_fields if x.name == field.name][0] 
+                if field.type != cf.type:
+                    raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
+            else:
+                # add new field
+                cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
+                    (field.name, field.index, field.type, field.comment))
+        self.db.commit()
 
     def createFieldsTable(self):
         '''Create table name_fields'''
@@ -624,11 +665,13 @@ class AnnoDBWriter:
         # creates index for each link method
         for key in self.build.keys():
             if key != '*':
-                cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
-                    .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+                if not self.db.hasIndex('{}_idx'.format(key)):
+                    cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
+                      .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
             else:
-                cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
-                    .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+                if not self.db.hasIndex('{}_idx'.format(self.name)):
+                    cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
+                        .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         del s
         s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
         # This is only useful for sqlite
@@ -638,7 +681,6 @@ class AnnoDBWriter:
         count = cur.fetchone()[0]
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', self.db.numOfRows(self.name)))
-
         del s
         for field in self.fields:
             s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))

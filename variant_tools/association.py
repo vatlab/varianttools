@@ -250,8 +250,17 @@ class ResultRecorder:
             )
             #
             self.cur = self.writer.db.cursor()
-            self.query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
-                ','.join([self.writer.db.PH] * len(self.fields)))
+            if self.writer.update_existing:
+                #
+                self.update_query = 'UPDATE {0} SET {1} WHERE {2};'.format(db_name,
+                    ', '.join(['{}={}'.format(x.name, self.writer.db.PH) for x in self.fields[len(self.group_names):]]),
+                    ' AND '.join(['{}={}'.format(x, self.writer.db.PH) for x in self.group_names]))
+                self.insert_query = 'INSERT INTO {0} ({1}) VALUES ({2});'.format(db_name,
+                    ','.join([x.name for x in self.fields]),
+                    ','.join([self.writer.db.PH] * len(self.fields)))
+            else:
+                self.insert_query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
+                    ','.join([self.writer.db.PH] * len(self.fields)))
 
     def record(self, res):
         self.completed += 1
@@ -259,7 +268,12 @@ class ResultRecorder:
         print(output)
         # also write to an annotation database?
         if self.writer:
-            self.cur.execute(self.query, res)
+            if self.writer.update_existing:
+                self.cur.execute(self.update_query, res[len(self.group_names):] + res[:len(self.group_names)])
+                if self.cur.rowcount == 0:
+                    self.cur.execute(self.insert_query, res)
+            else:
+                self.cur.execute(self.insert_query, res)
         
     def count(self):
         return self.completed
