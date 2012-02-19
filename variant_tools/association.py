@@ -244,13 +244,22 @@ class ResultRecorder:
                 'Annotation database used to record results of association tests. Created on {}'.format(
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
                 '1.0',                         # version 1.0 
-                {'*': self.group_names},     # link by group fields
-                logger)
+                {'*': self.group_names},       # link by group fields
+                logger, 
+                True                           # allow updating an existing database
+            )
+            #
+            self.cur = self.writer.db.cursor()
+            self.query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
+                ','.join([self.writer.db.PH] * len(self.fields)))
 
     def record(self, res):
         self.completed += 1
         output = '\t'.join(map(str, res))
         print(output)
+        # also write to an annotation database?
+        if self.writer:
+            self.cur.execute(self.query, res)
         
     def count(self):
         return self.completed
@@ -342,7 +351,7 @@ class AssoTestsWorker(Process):
         
 
 def associate(args, reverse=False):
-    #try:
+    try:
         with Project(verbosity=args.verbosity) as proj:
             asso = AssociationTestManager(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
                 args.samples, args.group_by)
@@ -386,8 +395,8 @@ def associate(args, reverse=False):
                     break
             prog.done()
             results.done()
-    #except Exception as e:
-    #    sys.exit(e) 
+    except Exception as e:
+        sys.exit(e) 
 
 #
 # Statistical Association tests. The first one is a NullTest that provides

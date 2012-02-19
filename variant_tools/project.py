@@ -538,7 +538,7 @@ class AnnoDBWriter:
     '''
     A class to initiate and insert annotation database
     '''
-    def __init__(self, name, fields, anno_type, description, version, build, logger):
+    def __init__(self, name, fields, anno_type, description, version, build, logger, update=False):
         self.logger = logger
         self.name = name
         self.fields = fields
