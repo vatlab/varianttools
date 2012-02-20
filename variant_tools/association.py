@@ -42,9 +42,9 @@ else:
 
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
-    parser.add_argument('phenotype', nargs='+',
+    parser.add_argument('phenotypes', nargs=1,
         help='''A list of phenotypes that will be passed to the association
-            statistics calculator''')
+            statistics calculator. Currently only a single phenotype is allowed.''')
     parser.add_argument('--covariates', nargs='*',
         help='''Optional phenotypes that will be passed to statistical
             tests as covariates. Values of these phenotypes should be integer
@@ -78,12 +78,12 @@ class AssociationTestManager:
     tests:       a list of test objects
     IDs:         sample IDs
     table:       variant table (genotype)
-    phenotype:   phenotype 
+    phenotypes:  phenotypes 
     covariates:  covariates
     groups:      a list of groups
     group_names: names of the group
     '''
-    def __init__(self, proj, table, phenotype, covariates, methods, unknown_args, samples, group_by):
+    def __init__(self, proj, table, phenotypes, covariates, methods, unknown_args, samples, group_by):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
@@ -95,7 +95,7 @@ class AssociationTestManager:
         # step 0: get testers
         self.tests = self.getAssoTests(methods, unknown_args)
         # step 1: get samples and related phenotypes
-        self.IDs, self.phenotype, self.covariates = self.getPhenotype(samples, phenotype, covariates)
+        self.IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
         # step 2: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = [x for x in self.IDs if \
@@ -122,6 +122,11 @@ class AssociationTestManager:
             args = m.split()[1:] + common_args
             try:
                 method = eval(name)(self.logger, args)
+                # check if method is valid
+                if not hasattr(method, 'fields'):
+                    raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
+                if not method.fields:
+                    raise ValueError('Invalid association test method {}: invalid attribute fields'.format(name))
                 tests.append(method)
             except NameError as e:
                 self.logger.debug(e)
@@ -148,9 +153,9 @@ class AssociationTestManager:
             return IDs, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('''Failed to retrieve phenotype {} and covariate {}. Please 
-                             make sure the specified phenotype names are correct and there 
-                             is no missing value'''.format(', '.join(pheno), ', '.join(covar)))
+            raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
+                '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno), 
+                '' if covar is None else (' and/or covariate' + ', '.join(covar))))
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
@@ -292,7 +297,7 @@ class AssoTestsWorker(Process):
         self.proj = param.proj
         self.table = param.table
         self.IDs = param.IDs
-        self.phenotypes = param.phenotype
+        self.phenotypes = param.phenotypes
         self.covariates = param.covariates
         self.tests = param.tests
         self.group_names = param.group_names
@@ -369,7 +374,7 @@ class AssoTestsWorker(Process):
 def associate(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            asso = AssociationTestManager(proj, args.table, args.phenotype, args.covariates, args.methods, args.unknown_args,
+            asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates, args.methods, args.unknown_args,
                 args.samples, args.group_by)
             #
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
@@ -447,9 +452,10 @@ class NullTest:
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
     
-    
     def setPhenotype(self, which, data, covariates=None):
         '''Set phenotype data'''
+        if len(data) > 1:
+            raise ValueError('Only a single phenotype is allowed at this point')
         phen = [x for idx, x in enumerate(data[0]) if which[idx]]
         if covariates:
           covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
