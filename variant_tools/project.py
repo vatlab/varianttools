@@ -605,17 +605,22 @@ class AnnoDBWriter:
         for rec in cur:
             cur_fields.append(Field(*rec))
         # add new fields
+        s = delayedAction(self.logger.info, 'Adding fields to existing result database')
         for field in self.fields:
             # name already exist
             if field.name in [x.name for x in cur_fields]:
                 cf = [x for x in cur_fields if x.name == field.name][0] 
                 if field.type != cf.type:
                     raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
+                self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
             else:
                 # add new field
                 cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
                     (field.name, field.index, field.type, field.comment))
+                cur.execute('ALTER TABLE {} ADD {} {};'.format(self.name, field.name, field.type))
+        #
         self.db.commit()
+        del s
 
     def createFieldsTable(self):
         '''Create table name_fields'''
@@ -1325,7 +1330,7 @@ class Project:
     # Project management
     #
     def isVariantTable(self, table):
-        return self.db.hasTable(table) and self.db.getHeaders(table)[0] == 'variant_id'
+        return (not table.startswith('__')) and self.db.hasTable(table) and self.db.getHeaders(table)[0] == 'variant_id'
         
     def getVariantTables(self):
         '''Return all variant tables'''

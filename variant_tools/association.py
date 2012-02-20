@@ -30,7 +30,7 @@ from multiprocessing import Process, Queue, Pipe, Lock
 import time
 from array import array
 from copy import copy, deepcopy
-from .project import Project, Field, AnnoDBWriter
+from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
 from .phenotype import Sample
 import argparse
@@ -233,6 +233,9 @@ class ResultRecorder:
                         type=x.type, adj=None, comment=x.comment) for x in test.fields])
             else:
                 self.fields.extend(test.fields)
+        for field in self.fields:
+            if '-' in field.name:
+                raise ValueError('"-" is not allowed in field name {}'.format(field.name))
         if len(self.fields) != len(set([x.name for x in self.fields])):
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
         print('#' + '\t'.join(self.group_names + [x.name for x in self.fields]))
@@ -333,7 +336,6 @@ class AssoTestsWorker(Process):
         toKeep = [(x<numSites) for x in missing_counts]
         self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.IDs)-sum(toKeep)))
         return genotype, toKeep
-    
 
     def run(self):
         self.db = DatabaseEngine()
@@ -409,6 +411,9 @@ def associate(args, reverse=False):
                     break
             prog.done()
             results.done()
+            # use the result database in the project
+            if args.to_db:
+                proj.useAnnoDB(AnnoDB(proj, args.to_db, asso.group_names))
     except Exception as e:
         sys.exit(e) 
 
