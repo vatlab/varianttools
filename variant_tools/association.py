@@ -483,6 +483,53 @@ def freq(input):
     return value
 
 
+class GroupStat(NullTest):
+    '''This 'test' calculate basic statistics for each testing group'''
+    def __init__(self, logger=None, *method_args):
+        #
+        NullTest.__init__(self, logger, *method_args)
+        # set fields according to parameter --stat
+        self.fields = []
+        if 'num_variants' in self.stat:
+            self.fields.append(
+                Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group')
+            )
+        if 'sample_size' in self.stat:
+            self.fields.append(
+                Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
+            )
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Group statistics calculator. This 'test'
+            is a statistics calculator based on the association-test framework. It is usually used
+            with other method to produce statistics for each testing group.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by this test
+        parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+',
+            help='''Statistics to calculate, which can be number of variants in this group,
+                total sample size.''')  
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+    def calculate(self):
+        res = []
+        for field in self.fields:
+            if field.name == 'num_variants':
+                # FIXME: this is inefficient because we do not have to create this object
+                # to count the number of variants
+                res.append(len(self.data.raw_genotype()))
+            elif field.name == 'sample_size':
+                # FIXME: this is inefficient because we do not have to create this object
+                # to count the number of variants
+                res.append(self.data.samplecounts())
+        return res
+
 class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
     def __init__(self, logger=None, *method_args):
