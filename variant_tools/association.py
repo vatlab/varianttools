@@ -46,7 +46,7 @@ def associateArguments(parser):
     parser.add_argument('phenotypes', nargs=1,
         help='''A list of phenotypes that will be passed to the association
             statistics calculator. Currently only a single phenotype is allowed.''')
-    parser.add_argument('--covariates', nargs='*',
+    parser.add_argument('--covariates', nargs='*', default=[],
         help='''Optional phenotypes that will be passed to statistical
             tests as covariates. Values of these phenotypes should be integer
             or float.''')
@@ -165,7 +165,7 @@ class AssociationTestManager:
             sample_IDs = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
-            for key, value in data.iteritems:
+            for key, value in data.iteritems():
                 sample_IDs.append(value[0])
                 [x.append(y) for x,y in zip(phenotypes, value[1])]
                 [x.append(y) for x,y in zip(covariates, value[2])]
@@ -375,13 +375,29 @@ class AssoTestsWorker(Process):
         # FIXME will pass it as an input arguement later
         #toKeep = [(x<0.5*numSites) for x in missing_counts]
         toKeep = [(x<numSites) for x in missing_counts]
-        self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.IDs)-sum(toKeep)))
+        self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.sample_IDs)-sum(toKeep)))
         return genotype, toKeep
+
+    def setGenotype(self, which, data):
+        geno = [x for idx, x in enumerate(data) if which[idx]]
+        self.data.setGenotype(geno)
+    
+    def setPhenotype(self, which, data, covariates=None):
+        '''Set phenotype data'''
+        if len(data) > 1:
+            raise ValueError('Only a single phenotype is allowed at this point')
+        phen = [x for idx, x in enumerate(data[0]) if which[idx]]
+        if covariates:
+          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
+          self.data.setPhenotype(phen, covt)
+        else:
+          self.data.setPhenotype(phen)
 
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.proj.name + '.proj', readonly=True)
         self.db.attach(self.proj.name + '_genotype.DB', '__fromGeno')
+        self.data = t.AssoData()
         #
         while True:
             grp = self.queue.get()
@@ -391,11 +407,12 @@ class AssoTestsWorker(Process):
                 break
             # select variants from each group:
             genotype, which = self.getGenotype(grp)
+            self.setGenotype(which, genotype)
+            self.setPhenotype(which, self.phenotypes, self.covariates)
             values = list(grp)
             try:
                 for test in self.tests:
-                    test.setPhenotype(which, self.phenotypes, self.covariates)
-                    test.setGenotype(which, genotype)
+                    test.setData(self.data)
                     test.setAttributes(grp)
                     result = test.calculate()
                     self.logger.debug('Finish test')
@@ -407,7 +424,7 @@ class AssoTestsWorker(Process):
         self.db.detach('__fromGeno')
         
 
-def associate(args, reverse=False):
+def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates, args.methods, args.unknown_args,
@@ -473,7 +490,6 @@ class NullTest:
     def __init__(self, logger=None, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to 
         parse it'''
-        self.data = t.AssoData()
         self.logger = logger
         self.parseArgs(*method_args)
         #
@@ -484,21 +500,9 @@ class NullTest:
         # this function should never be called.
         raise SystemError('All association tests should define their own parseArgs function')
     
-    def setGenotype(self, which, data):
-        geno = [x for idx, x in enumerate(data) if which[idx]]
-        self.data.setGenotype(geno)
-    
-    def setPhenotype(self, which, data, covariates=None):
-        '''Set phenotype data'''
-        if len(data) > 1:
-            raise ValueError('Only a single phenotype is allowed at this point')
-        phen = [x for idx, x in enumerate(data[0]) if which[idx]]
-        if covariates:
-          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
-          self.data.setPhenotype(phen, covt)
-        else:
-          self.data.setPhenotype(phen)
-        
+    def setData(self, data):
+        self.data = data.clone()
+
     def setAttributes(self, grp):
         self.group = '__'.join(map(str, grp))
 
@@ -558,6 +562,10 @@ class GroupStat(NullTest):
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
+
+    def setData(self, data):
+        # do not clone data because this test does not change data
+        self.data = data
 
     def calculate(self):
         res = []
