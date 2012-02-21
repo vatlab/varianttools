@@ -29,6 +29,7 @@ import threading
 from multiprocessing import Process, Queue, Pipe, Lock
 import time
 from array import array
+from collections import OrderedDict
 from copy import copy, deepcopy
 from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
@@ -61,7 +62,9 @@ def associateArguments(parser):
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%%"').''')
+            'filename like "MG%%"'). Units of associate tests are defined by
+            'sample_name' so samples with the same names should have identical
+            phenotype (if used for tests), and non-overlapping variants.''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
@@ -76,7 +79,7 @@ class AssociationTestManager:
     the following attributes for others to use:
 
     tests:       a list of test objects
-    IDs:         sample IDs
+    sample_IDs:  sample IDs
     table:       variant table (genotype)
     phenotypes:  phenotypes 
     covariates:  covariates
@@ -95,11 +98,14 @@ class AssociationTestManager:
         # step 0: get testers
         self.tests = self.getAssoTests(methods, unknown_args)
         # step 1: get samples and related phenotypes
-        self.IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
+        self.sample_IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
         # step 2: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
-        unindexed_IDs = [x for x in self.IDs if \
-            not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(x))]
+        unindexed_IDs = []
+        for IDs in self.sample_IDs:
+            for id in IDs:
+                if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
+                    unindexed_IDs.append(id)
         if unindexed_IDs:
             cur = proj.db.cursor()
             prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
@@ -134,23 +140,44 @@ class AssociationTestManager:
         return tests
 
     def getPhenotype(self, condition, pheno, covar):
-        '''Get a list of samples from specified condition. This function sets self.IDs'''
+        '''Get a list of samples from specified condition. This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
+            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
                 ', '.join(pheno + (covar if covar is not None else []))) + \
-                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ' ORDER BY sample_id;'
+                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ' ORDER BY sample_name, sample_id;'
             self.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            data = list(zip(*cur.fetchall()))
-            IDs, phenotypes, covariates = data[0], data[1: (1 + len(pheno))], data[(1 + len(pheno)) : ]
-            if len(IDs) == 0:
+            data = OrderedDict()
+            for rec in cur:
+                if rec[1] not in data:
+                    # for each name, get id, phenotype, and covariants
+                    data[rec[1]] = [[rec[0]], rec[2 : (2 + len(pheno))], rec[ (2 + len(pheno)) : ]]
+                else:
+                    if rec[2 : (2 + len(pheno))] != data[rec[1]][1]:
+                        raise ValueError('Samples for name {} has different phenotype. If they do not belong to the same '
+                            'individual, please use different sample names to differentiate them.'.format(rec[1]))
+                    elif rec[(2 + len(pheno)) : ] != data[rec[1]][2]:
+                        raise ValueError('Samples for name {} has different covariate. If they do not belong to the same '
+                            'individual, please use different sample names to differentiate them.'.format(rec[1]))
+                    else:
+                        data[rec[1]][0].append(rec[0])
+            sample_IDs = []
+            phenotypes = [[] for x in pheno]
+            covariates = [[] for x in covar]
+            for key, value in data.iteritems:
+                sample_IDs.append(value[0])
+                [x.append(y) for x,y in zip(phenotypes, value[1])]
+                [x.append(y) for x,y in zip(covariates, value[2])]
+            if len(sample_IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
-                self.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+            if len(data) != len(sample_IDs):
+                self.logger.warning('Variants associated with a total of {} sample ids will be merged to {} samples for association tests.'.format(len(data), len(sample_IDs)))
             # add intersection
-            covariates.insert(0, array('d', [1]*len(IDs)))
-            return IDs, phenotypes, covariates
+            covariates.insert(0, array('d', [1]*len(sample_IDs)))
+            return sample_IDs, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
@@ -296,7 +323,7 @@ class AssoTestsWorker(Process):
     def __init__(self, param, grpQueue, output):
         self.proj = param.proj
         self.table = param.table
-        self.IDs = param.IDs
+        self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
         self.tests = param.tests
@@ -322,11 +349,20 @@ class AssoTestsWorker(Process):
         #
         # get genotypes
         genotype = []
-        for ID in self.IDs:
+        for IDs in self.sample_IDs:
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID, where_clause)
+                .format(IDs[0], where_clause)
             cur.execute(query, group)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
+            for ID in IDs[1:]:
+                query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
+                    .format(ID, where_clause)
+                cur.execute(query, group)
+                for rec in cur:
+                    if rec[0] in gtmp:
+                        raise ValueError('Variant with id {} is associated with multiple sample ids with the same name (ids: {}). '
+                            'Please use different sample name if this variant exist in multiple individuals.'.format(rec[0], IDs))
+                    gtmp[rec[0]] = rec[1]
             # handle missing values
             gtmp = [gtmp.get(x, -9.0) for x in variant_id]
             # handle -1 coding (double heterozygotes)
