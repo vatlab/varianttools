@@ -300,7 +300,7 @@
 
 /* Use configure's best guess for CLOCKS_PER_SEC if it is unknown */
 #ifndef HAVE_CLOCKS_PER_SEC
-#define CLOCKS_PER_SEC HAVE_GUESSED_CLOCKS_PER_SEC
+#  define CLOCKS_PER_SEC HAVE_GUESSED_CLOCKS_PER_SEC
 #endif
 
 /* Defined if you have ansi EXIT_SUCCESS and EXIT_FAILURE in stdlib.h */
@@ -308,8 +308,8 @@
 
 /* Use 0 and 1 for EXIT_SUCCESS and EXIT_FAILURE if we don't have them */
 #ifndef HAVE_EXIT_SUCCESS_AND_FAILURE
-#define EXIT_SUCCESS 0
-#define EXIT_FAILURE 1
+#  define EXIT_SUCCESS 0
+#  define EXIT_FAILURE 1
 #endif
 
 /* Define one of these if you have a known IEEE arithmetic interface */
@@ -346,15 +346,15 @@
       if (q == GSL_COERCE_DBL(3.0/7.0)) { ... } ;
 
    It carries a penalty even when the program is running in double
-precision mode unless you compile a separate version of the
-library with HAVE_EXTENDED_PRECISION_REGISTERS turned off. */
+   precision mode unless you compile a separate version of the
+   library with HAVE_EXTENDED_PRECISION_REGISTERS turned off. */
 
 #define HAVE_EXTENDED_PRECISION_REGISTERS 1
 
 #ifdef HAVE_EXTENDED_PRECISION_REGISTERS
-#define GSL_COERCE_DBL(x) (gsl_coerce_double(x))
+#  define GSL_COERCE_DBL(x) (gsl_coerce_double(x))
 #else
-#define GSL_COERCE_DBL(x) (x)
+#  define GSL_COERCE_DBL(x) (x)
 #endif
 
 /* Define this if printf can handle %Lf for long double */
@@ -363,49 +363,49 @@ library with HAVE_EXTENDED_PRECISION_REGISTERS turned off. */
 /* Substitute gsl functions for missing system functions */
 
 #ifndef HAVE_HYPOT
-#ifndef _MSC_VER
-	#define hypot gsl_hypot
-#endif
+#  ifndef _MSC_VER
+#    define hypot gsl_hypot
+#  endif
 #endif
 
 #ifndef HAVE_LOG1P
-#define log1p gsl_log1p
+#  define log1p gsl_log1p
 #endif
 
 #ifndef HAVE_EXPM1
-#define expm1 gsl_expm1
+#  define expm1 gsl_expm1
 #endif
 
 #ifndef HAVE_ACOSH
-#define acosh gsl_acosh
+#  define acosh gsl_acosh
 #endif
 
 #ifndef HAVE_ASINH
-#define asinh gsl_asinh
+#  define asinh gsl_asinh
 #endif
 
 #ifndef HAVE_ATANH
-#define atanh gsl_atanh
+#  define atanh gsl_atanh
 #endif
 
 #ifndef HAVE_ISINF
-#define isinf gsl_isinf
+#  define isinf gsl_isinf
 #endif
 
 #ifndef HAVE_ISNAN
-#define isnan gsl_isnan
+#  define isnan gsl_isnan
 #endif
 
 #ifndef HAVE_FINITE
-#ifdef HAVE_ISFINITE
-#define finite isfinite
-#else
-#define finite gsl_finite
-#endif
+#  ifdef HAVE_ISFINITE
+#    define finite isfinite
+#  else
+#    define finite gsl_finite
+#  endif
 #endif
 
 #ifdef __GNUC__
-#define DISCARD_POINTER(p) do { ; } while(p ? 0 : 0);
+#  define DISCARD_POINTER(p) do { ; } while (p ? 0 : 0);
 #else
-#define DISCARD_POINTER(p)                        /* ignoring discarded pointer */
+#  define DISCARD_POINTER(p)                      /* ignoring discarded pointer */
 #endif

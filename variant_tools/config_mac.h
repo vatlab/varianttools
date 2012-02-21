@@ -235,68 +235,68 @@
 /* #undef volatile */
 
 #if HAVE_EXTENDED_PRECISION_REGISTERS
-#define GSL_COERCE_DBL(x) (gsl_coerce_double(x))
+#  define GSL_COERCE_DBL(x) (gsl_coerce_double(x))
 #else
-#define GSL_COERCE_DBL(x) (x)
+#  define GSL_COERCE_DBL(x) (x)
 #endif
 
 /* Substitute gsl functions for missing system functions */
 
 #if !HAVE_DECL_HYPOT
-#define hypot gsl_hypot
+#  define hypot gsl_hypot
 #endif
 
 #if !HAVE_DECL_LOG1P
-#define log1p gsl_log1p
+#  define log1p gsl_log1p
 #endif
 
 #if !HAVE_DECL_EXPM1
-#define expm1 gsl_expm1
+#  define expm1 gsl_expm1
 #endif
 
 #if !HAVE_DECL_ACOSH
-#define acosh gsl_acosh
+#  define acosh gsl_acosh
 #endif
 
 #if !HAVE_DECL_ASINH
-#define asinh gsl_asinh
+#  define asinh gsl_asinh
 #endif
 
 #if !HAVE_DECL_ATANH
-#define atanh gsl_atanh
+#  define atanh gsl_atanh
 #endif
 
 #if !HAVE_DECL_LDEXP
-#define ldexp gsl_ldexp
+#  define ldexp gsl_ldexp
 #endif
 
 #if !HAVE_DECL_FREXP
-#define frexp gsl_frexp
+#  define frexp gsl_frexp
 #endif
 
 #if !HAVE_DECL_ISINF
-#define isinf gsl_isinf
+#  define isinf gsl_isinf
 #endif
 
 #if !HAVE_DECL_FINITE
-#if HAVE_DECL_ISFINITE
-#define finite isfinite
-#else
-#define finite gsl_finite
-#endif
+#  if HAVE_DECL_ISFINITE
+#    define finite isfinite
+#  else
+#    define finite gsl_finite
+#  endif
 #endif
 
 #if !HAVE_DECL_ISNAN
-#define isnan gsl_isnan
+#  define isnan gsl_isnan
 #endif
 
 #ifdef __GNUC__
-#define DISCARD_POINTER(p) do { ; } while(p ? 0 : 0);
+#  define DISCARD_POINTER(p) do { ; } while (p ? 0 : 0);
 #else
-#define DISCARD_POINTER(p)                        /* ignoring discarded pointer */
+#  define DISCARD_POINTER(p)                      /* ignoring discarded pointer */
 #endif
 
 #if defined(GSL_RANGE_CHECK_OFF) || !defined(GSL_RANGE_CHECK)
-#define GSL_RANGE_CHECK 0                         /* turn off range checking by default internally */
+#  define GSL_RANGE_CHECK 0                       /* turn off range checking by default internally */
 #endif
 #define RETURN_IF_NULL(x) if (!x) { return ; }
