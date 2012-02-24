@@ -31,7 +31,8 @@ import sys
 
 # we will need to install vtools first, and we put /usr/local/bin
 # before any system path that might have path to local vtools ...
-test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']])}
+test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']]),
+   'PYTHONPATH': os.environ.get('PYTHONPATH', '')}
 
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
