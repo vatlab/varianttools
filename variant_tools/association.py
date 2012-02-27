@@ -175,7 +175,7 @@ class AssociationTestManager:
                 self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
             if len(data) != len(sample_IDs):
                 self.logger.warning('Variants associated with a total of {} sample ids will be merged to {} samples for association tests.'.format(len(data), len(sample_IDs)))
-            # add intersection
+            # add intercept
             covariates.insert(0, array('d', [1]*len(sample_IDs)))
             return sample_IDs, phenotypes, covariates
         except Exception as e:
@@ -481,8 +481,8 @@ def associate(args):
 # subclass from this class.
 #
 def getAllTests():
-    '''List all tests (all classes that subclasses of NullTest) in this module'''
-    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest']
+    '''List all tests (all classes that subclasses of NullTest/LinearBurdenTest) in this module'''
+    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest' and name != 'LinearBurdenTest']
 
 
 class NullTest:
@@ -521,7 +521,7 @@ class NullTest:
 def freq(input):
     try:
         value = float(input)
-        if not (value >=0 and value <= 1):
+        if not (value >= 0 and value <= 1):
             msg = "%r is not valid input. Valid input should fall in range [0, 1]" % input
             raise ValueError(msg)
     except Exception as e:
@@ -581,7 +581,7 @@ class GroupStat(NullTest):
         return res
 
 class LinearBurdenTest(NullTest):
-    '''Simple Linear regression score test on collapsed genotypes within an association testing group '''
+    '''Simple Linear regression score test on collapsed genotypes within an association testing group'''
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
         self.fields = [
@@ -595,7 +595,7 @@ class LinearBurdenTest(NullTest):
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='LBT',
+        parser.add_argument('--name', default='LNBT',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         #
@@ -660,52 +660,32 @@ class LinearBurdenTest(NullTest):
         
         return data.pvalue(), data.statistic(), data.samplecounts()
 
-class AliasTest(LinearBurdenTest):
-    '''An example of a specialized linear burden test '''
+class LNBT(LinearBurdenTest):
+    '''A versatile framework for association tests for quantitative traits'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
 
+class CollapseQt(LinearBurdenTest):
+    '''Collapsing method for quantitative traits, Li & Leal 2008'''
+    def __init__(self, logger=None, *method_args):
+        LinearBurdenTest.__init__(self, logger, *method_args)
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Linear regression test. p-value
-            is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+        parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for quantitative traits (Li & Leal 2008).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, variants within a group will be collapsed into a single binary coding using an indicator function
+            (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='LBT',
+        parser.add_argument('--name', default='CQt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
-        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+        parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
-        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
-            will be included in analysis. Default set to 0.0''')
+            will be included in analysis. Default set to 0.01''')  
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        #
-        # For example, if this parameter is fixed...
-        #
-        #parser.add_argument('--use_indicator', action='store_true',
-        #    help='''This option, if evoked, will apply binary coding to genotype groups
-        #    (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
-        # permutations arguments
-        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
-            help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
-        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
-            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
-            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
-            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
-            specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
-        parser.add_argument('--weight_by_maf', action='store_true',
-            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -713,5 +693,72 @@ class AliasTest(LinearBurdenTest):
         # We add the fixed parameter here ...
         # 
         self.use_indicator = True
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = False
 
-
+class BurdenQt(LinearBurdenTest):
+    '''Burden test for quantitative traits, Morris & Zeggini 2009'''
+    def __init__(self, logger=None, *method_args):
+        LinearBurdenTest.__init__(self, logger, *method_args)
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Fixed threshold burden test for quantitative traits (Morris & Zeggini 2009).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, the group of variants will be coded using the counts of variants within the group.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='BQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # no argumant is added
+        parser.add_argument('--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 0.01''')  
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.use_indicator = False
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = False
+        
+class WeightedSumQt(LinearBurdenTest):
+    '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
+    def __init__(self, logger=None, *method_args):
+        LinearBurdenTest.__init__(self, logger, *method_args)
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Weighted sum statistic for quantitative traits (in the spirit of Madsen & Browning 2009).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, variants will be weighted by 1/sqrt(P*(1-P)) and the weighted codings will be summed
+            up as one regressor''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='WBQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # no argumant is added
+        parser.add_argument('--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 0.01''')  
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.use_indicator = False
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = True
