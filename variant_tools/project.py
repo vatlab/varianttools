@@ -2873,8 +2873,7 @@ def show(args):
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
                 # headers are ID, file, sample, FIELDS
-                print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
-                cur.execute('SELECT sample_name, filename, {} FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'\
+                cur.execute('SELECT sample_name, filename {} FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'\
                     .format(', '.join(fields[3:]), limit_clause))
                 for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
