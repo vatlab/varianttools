@@ -538,7 +538,8 @@ class AnnoDBWriter:
     '''
     A class to initiate and insert annotation database
     '''
-    def __init__(self, name, fields, anno_type, description, version, build, logger, update=False):
+    def __init__(self, name, fields, anno_type, description, version, build, logger, use_existing_db=False,
+        overwrite_existing_fields=False):
         self.logger = logger
         self.name = name
         self.fields = fields
@@ -548,12 +549,12 @@ class AnnoDBWriter:
         self.build = build
         # create database and import file
         self.db = DatabaseEngine()
-        if not update or not os.path.isfile(self.name + '.DB'):
+        if not use_existing_db or not os.path.isfile(self.name + '.DB'):
             self.update_existing = False
             self.createAnnoDB()
         else:
             self.update_existing = True
-            self.updateAnnoDB()
+            self.updateAnnoDB(overwrite_existing_fields)
 
     def createAnnoDB(self):
         # remove database if already exist
@@ -584,7 +585,7 @@ class AnnoDBWriter:
         self.logger.debug('Creating table {}'.format(self.name))
         self.createAnnotationTable()
     
-    def updateAnnoDB(self):
+    def updateAnnoDB(self, overwrite_existing_fields):
         self.db.connect(self.name)
         for table in [self.name, self.name + '_field', self.name + '_info']:
             if not self.db.hasTable(table):
@@ -612,7 +613,11 @@ class AnnoDBWriter:
                 cf = [x for x in cur_fields if x.name == field.name][0] 
                 if field.type != cf.type:
                     raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
-                self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
+                if overwrite_existing_fields:
+                    self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
+                else:
+                    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
+                        raise ValueError('Cannot modify database {} because field {} already exists. Please use parameter --name to specify a new surfix for fields from this association test, or --to_db to create a new database, or --update to force updating the current database.'.format(self.name, field.name))
             else:
                 # add new field
                 cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),

@@ -72,6 +72,8 @@ def associateArguments(parser):
         help='''Number of processes to carry out association tests.''')
     parser.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')        
+    parser.add_argument('--update', action='store_true',
+        help='''When --to_db is specified, allow updating existing fields in the result database''')
 
 
 class AssociationTestManager:
@@ -251,7 +253,7 @@ class AssociationTestManager:
 
 
 class ResultRecorder:
-    def __init__(self, params, db_name=None, logger=None):
+    def __init__(self, params, db_name=None, update=False, logger=None):
         self.completed = 0
         #
         self.group_names = params.group_names
@@ -281,7 +283,8 @@ class ResultRecorder:
                 '1.0',                         # version 1.0 
                 {'*': self.group_names},       # link by group fields
                 logger, 
-                True                           # allow updating an existing database
+                True,                          # allow updating an existing database
+                update                    # allow updating an existing field
             )
             #
             self.cur = self.writer.db.cursor()
@@ -433,7 +436,7 @@ def associate(args):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
-            results = ResultRecorder(asso, args.to_db, proj.logger)
+            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             readers = []
             for j in range(nJobs):
                 r, w = Pipe(False)
