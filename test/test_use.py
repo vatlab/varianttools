@@ -37,6 +37,30 @@ class TestUse(ProcessTestCase):
     
     def removeProj(self):
         runCmd('vtools remove project')
+        
+        #The following code ended by __Long__ is added by Long
+    def testShow(self):
+        'Test vtools show command'
+        self.assertSucc('vtools show')
+        self.assertSucc('vtools show -h')
+        self.assertSucc('vtools show project')
+        self.assertFail('vtools show sample')
+        self.assertSucc('vtools show samples')
+        self.assertSucc('vtools show samples -l -1')
+        self.assertFail('vtools show table')
+        self.assertSucc('vtools show tables')
+        self.assertSucc('vtools show table sample')
+        self.assertSucc('vtools show table filename')
+        self.assertFail('vtools show genotype')
+        self.assertSucc('vtools show genotypes')
+        self.assertFail('vtools show variant')
+        self.assertSucc('vtools show table variant')
+        self.assertSucc('vtools show table variant -l -1')
+        self.assertSucc('vtools show fields')
+        self.assertSucc('vtools show formats')
+        self.assertSucc('vtools show annotation')
+        self.assertSucc('vtools show annotations')
+        #ended __Long__
 
     def testUse(self):
         'Test command vtools use'
