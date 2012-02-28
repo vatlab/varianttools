@@ -617,7 +617,10 @@ class AnnoDBWriter:
                     self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
                 else:
                     if field.name not in [x for tmp in self.build.values() for x in tmp]: 
-                        raise ValueError('Cannot modify database {} because field {} already exists. Please use parameter --name to specify a new surfix for fields from this association test, or --to_db to create a new database, or --update to force updating the current database.'.format(self.name, field.name))
+                        raise ValueError('Cannot modify database {} because field {} already exists. '
+                            'Please use test option --name to add a new suffix to this field, '
+                            'write the results to a different database (option --to_db), or use '
+                            'option --update to force updating the existing fields.'.format(self.name, field.name))
             else:
                 # add new field
                 cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
