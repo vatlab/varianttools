@@ -270,7 +270,7 @@ class ResultRecorder:
                 raise ValueError('"-" is not allowed in field name {}'.format(field.name))
         if len(self.fields) != len(set([x.name for x in self.fields])):
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
-        print('#' + '\t'.join(self.group_names + [x.name for x in self.fields]))
+        print('#' + '\t'.join([x.name for x in self.fields]))
         #
         self.writer = None
         if db_name:
@@ -471,7 +471,7 @@ def associate(args):
             results.done()
             # use the result database in the project
             if args.to_db:
-                proj.useAnnoDB(AnnoDB(proj, args.to_db, asso.group_names))
+                proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
     except Exception as e:
         sys.exit(e) 
 
