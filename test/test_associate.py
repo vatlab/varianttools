@@ -14,7 +14,7 @@ class TestAsso(ProcessTestCase):
 
   def testAssoSet1(self):
       'Test set1 for association module'
-      zip = ZipFile('txt/assoproj.zip')
+      zip = ZipFile('proj/assoproj.zip')
       dir = os.getcwd()
       zip.extractall(dir)
       # basic commands
@@ -41,12 +41,10 @@ class TestAsso(ProcessTestCase):
       
   def testAssoSet2(self):
       'Test set2 for association module'
-      zip = ZipFile('txt/assoproj2.zip')
+      zip = ZipFile('proj/assoproj2.zip')
       dir = os.getcwd()
       zip.extractall(dir)
       self.assertSucc('vtools associate variant BMI --samples "RACE=0" --covariate SEX -m "LNBT" -j8')
 
-      
-      
 if __name__ == '__main__':
     unittest.main()
