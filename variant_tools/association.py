@@ -577,7 +577,7 @@ class GroupStat(NullTest):
             if field.name == 'num_variants':
                 # FIXME: this is inefficient because we do not have to create this object
                 # to count the number of variants
-                res.append(len(self.data.raw_genotype()))
+                res.append(len(self.data.raw_genotype()[0]))
             elif field.name == 'sample_size':
                 # FIXME: this is inefficient because we do not have to create this object
                 # to count the number of variants
