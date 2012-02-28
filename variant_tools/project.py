@@ -1624,7 +1624,7 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = makeTableName([self.alt_build] + db.alt_build)
+                        binningTable = makeTableName([self.build] + db.build)
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
