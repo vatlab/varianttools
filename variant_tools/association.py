@@ -530,7 +530,7 @@ def freq(input):
 
 
 class GroupStat(NullTest):
-    '''This 'test' calculate basic statistics for each testing group'''
+    '''Calculates basic statistics for each testing group'''
     def __init__(self, logger=None, *method_args):
         #
         NullTest.__init__(self, logger, *method_args)
@@ -661,7 +661,7 @@ class LinearBurdenTest(NullTest):
         return data.pvalue(), data.statistic(), data.samplecounts()
 
 class LNBT(LinearBurdenTest):
-    '''A versatile framework for association tests for quantitative traits'''
+    '''A versatile framework of association tests for quantitative traits'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
 
@@ -762,3 +762,44 @@ class WeightedSumQt(LinearBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight_by_maf = True
+
+class VariableThresholdsQt(LinearBurdenTest):
+    '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
+    def __init__(self, logger=None, *method_args):
+        LinearBurdenTest.__init__(self, logger, *method_args)
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for quantitative traits (in the spirit of Price et al 2010).
+            The burden test statistic of a group of variants will be maximized over subsets of variants defined by applying different minor allele frequency
+            thresholds. Significance of the statistic obtained is evaluated via permutation''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='VTQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # arguments that are used by this test
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 1.0''')  
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To not using adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))        
+        self.variable_thresholds = True
+        self.use_indicator=False
+        self.weight_by_maf = False
