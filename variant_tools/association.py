@@ -408,12 +408,13 @@ class AssoTestsWorker(Process):
             if grp is None:
                 self.output.send(None)
                 break
-            # select variants from each group:
-            genotype, which = self.getGenotype(grp)
-            self.setGenotype(which, genotype)
-            self.setPhenotype(which, self.phenotypes, self.covariates)
+            #
             values = list(grp)
             try:
+                # select variants from each group:
+                genotype, which = self.getGenotype(grp)
+                self.setGenotype(which, genotype)
+                self.setPhenotype(which, self.phenotypes, self.covariates)
                 for test in self.tests:
                     test.setData(self.data)
                     test.setAttributes(grp)
@@ -421,7 +422,7 @@ class AssoTestsWorker(Process):
                     self.logger.debug('Finish test')
                     values.extend(result)
             except Exception as e:
-                self.logger.info('Error processing group {}, {}'.format(grp, e))
+                self.logger.info('Error processing data for group {}, {}'.format(grp, e))
             self.logger.debug('Finished group {}'.format(grp))
             self.output.send(values)
         self.db.detach('__fromGeno')
