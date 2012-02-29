@@ -254,7 +254,8 @@ class AssociationTestManager:
 
 class ResultRecorder:
     def __init__(self, params, db_name=None, update=False, logger=None):
-        self.completed = 0
+        self.succ_count = 0
+        self.failed_count = 0
         #
         self.group_names = params.group_names
         self.fields = []
@@ -301,7 +302,10 @@ class ResultRecorder:
                     ','.join([self.writer.db.PH] * len(self.fields)))
 
     def record(self, res):
-        self.completed += 1
+        self.succ_count += 1
+        if not res:
+            self.failed_count += 1
+            return
         output = '\t'.join(map(str, res))
         print(output)
         # also write to an annotation database?
@@ -313,8 +317,11 @@ class ResultRecorder:
             else:
                 self.cur.execute(self.insert_query, res)
         
-    def count(self):
-        return self.completed
+    def completed(self):
+        return self.succ_count
+
+    def failed(self):
+        return self.failed_count
 
     def done(self):
         if self.writer:
@@ -400,7 +407,6 @@ class AssoTestsWorker(Process):
         self.db = DatabaseEngine()
         self.db.connect(self.proj.name + '.proj', readonly=True)
         self.db.attach(self.proj.name + '_genotype.DB', '__fromGeno')
-        self.data = t.AssoData()
         #
         while True:
             grp = self.queue.get()
@@ -409,6 +415,7 @@ class AssoTestsWorker(Process):
                 self.output.send(None)
                 break
             #
+            self.data = t.AssoData()
             values = list(grp)
             try:
                 # select variants from each group:
@@ -422,7 +429,11 @@ class AssoTestsWorker(Process):
                     self.logger.debug('Finish test')
                     values.extend(result)
             except Exception as e:
-                self.logger.info('Error processing data for group {}, {}'.format(grp, e))
+                self.logger.debug('Error processing data for group {}, {}'.format(grp, e))
+                # self.data might have been messed up, create a new one
+                self.data = t.AssoData()
+                # return no result for any of the tests if a test fails.
+                values = []
             self.logger.debug('Finished group {}'.format(grp))
             self.output.send(values)
         self.db.detach('__fromGeno')
@@ -463,16 +474,18 @@ def associate(args):
                     else:
                         results.record(res)
                 #
-                if results.count() > count:
-                    count = results.count()
+                if results.completed() > count:
+                    count = results.completed()
                     prog.update(count)
                 #
                 if not any(proc_status):
                     # if everything is done
-                    assert results.count() == len(asso.groups)
+                    assert results.completed() == len(asso.groups)
                     break
             prog.done()
             results.done()
+            # summary
+            proj.logger.info('Association tests on {} groups have completed. {} failed.'.format(results.completed(), results.failed()))
             # use the result database in the project
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
@@ -637,7 +650,7 @@ class LinearBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def calculate(self):
-        data = self.data.clone()
+        data = self.data
         doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
         if self.permutations == 0:
