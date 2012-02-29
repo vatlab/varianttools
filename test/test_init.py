@@ -56,6 +56,62 @@ class TestInit(ProcessTestCase):
         self.assertEqual(numOfVariant(), 288)
         self.assertEqual(numOfSample(), 61)
         shutil.rmtree('parent')
+        
+        #The following code is wrotten by Long and will be ended __Long__
+    def testSample(self):
+        'Test command init --samples'
+        try:
+           os.mkdir('parent')
+        except OSError:
+           pass
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import vcf/SAMP1.vcf')
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
+        self.assertEqual(numOfVariant('ceu'), 288)
+        shutil.move('test.proj', 'parent/test.proj')
+        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
+        self.assertSucc('vtools init test --parent parent --samples "filename like \'%CEU%\'"')
+        self.assertEqual(numOfVariant(), 577)
+        self.assertEqual(numOfSample(), 60)
+        shutil.rmtree('parent')
+        #ended __Long__
+
+    def testVariantSample(self):
+        'Test command init --variants with --samples'
+        try:
+           os.mkdir('parent')
+        except OSError:
+           pass
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools import vcf/SAMP1.vcf')
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
+        self.assertEqual(numOfVariant('ceu'), 288)
+        shutil.move('test.proj', 'parent/test.proj')
+        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
+        self.assertSucc('vtools init test --parent parent --variants ceu --samples "filename like \'%CEU%\'"')
+        self.assertEqual(numOfVariant(), 288)
+        self.assertEqual(numOfSample(), 60)
+        shutil.rmtree('parent')
+
+    #def testGenotypes(self):
+        #'Test command init --genotypes'
+        #try:
+        #   os.mkdir('parent')
+        #except OSError:
+        #   pass
+        #runCmd('vtools init test -f')
+        #runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        #runCmd('vtools import vcf/SAMP1.vcf')
+        #runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
+        #self.assertEqual(numOfVariant('ceu'), 288)
+        #shutil.move('test.proj', 'parent/test.proj')
+        #shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
+        #self.assertSucc('vtools init test --parent parent --variants ceu --samples "filename like \'%CEU%\'"')
+        #self.assertEqual(numOfVariant(), 288)
+        #self.assertEqual(numOfSample(), 60)
+        #shutil.rmtree('parent')
 
 if __name__ == '__main__':
     unittest.main()
