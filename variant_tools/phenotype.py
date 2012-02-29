@@ -375,6 +375,24 @@ class Sample:
         for rec in cur:
             print(delimiter.join([na if x is None else str(x) for x in rec]))
                 
+
+def generalOutputArguments(parser):
+    grp = parser.add_argument_group('Output options')
+    grp.add_argument('--header', nargs='*',
+        help='''A complete header or a list of names that will be joined by a delimiter
+            (parameter --delimiter). If a special name - is specified, the header will
+            be read from the standard input, which is the preferred way to specify large
+            multi-line headers (e.g. cat myheader | vtools export --header -). If this
+            parameter is given without parameter, a default header will be derived from
+            field names.'''),
+    grp.add_argument('-d', '--delimiter', default='\t',
+        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
+    grp.add_argument('--na', default='NA',
+        help='Output string for missing value')
+    grp.add_argument('-l', '--limit', default=-1, type=int,
+        help='''Number of record to display. Default to all record.''')
+
+
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
@@ -407,19 +425,7 @@ def phenotypeArguments(parser):
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
-    parser.add_argument('--header', nargs='*',
-        help='''A complete header or a list of names that will be joined by a delimiter
-            (parameter --delimiter). If a special name - is specified, the header will
-            be read from the standard input, which is the preferred way to specify large
-            multi-line headers (e.g. cat myheader | vtools export --header -). If this
-            parameter is given without parameter, a default header will be derived from
-            field names.'''),
-    parser.add_argument('-d', '--delimiter', default='\t',
-        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
-    parser.add_argument('--na', default='NA',
-        help='Output string for missing value')
-    parser.add_argument('-l', '--limit', default=-1, type=int,
-        help='''Number of record to display. Default to all record.''')
+
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from_stat.''')

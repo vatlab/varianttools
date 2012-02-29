@@ -83,6 +83,7 @@ if __name__ == '__main__':
         description='''Import phenotypes from a file, or set phenotypes to constants, 
             or to summary statistics of sample genotype fields.''')
     phenotype.phenotypeArguments(parser)
+    phenotype.generalOutputArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=phenotype.phenotype)
     #
