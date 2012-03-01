@@ -44,10 +44,14 @@ SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
 if sys.version_info.major == 2:
     WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py2.cpp'
     WRAPPER_PY_FILE = 'variant_tools/assoTests_py2.py'
+    SQLITE_FOLDER = 'sqlite/py2'
+    SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py2'
 else:
     SWIG_OPTS.append('-py3')
     WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py3.cpp'
     WRAPPER_PY_FILE = 'variant_tools/assoTests_py3.py'
+    SQLITE_FOLDER = 'sqlite/py3'
+    SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py3'
 
 ASSO_FILES = [
     'variant_tools/assoTests.i',
@@ -64,6 +68,21 @@ ASSO_FILES = [
     'variant_tools/assoData.cpp',
     'variant_tools/utils.h',
     'variant_tools/utils.cpp'
+]
+
+SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
+        'cache.c',
+        'connection.c',
+        'cursor.c',
+        'microprotocols.c',
+        'module.c',
+        'prepare_protocol.c',
+        'row.c',
+        'statement.c',
+        'util.c'
+    ]
+] + [
+    'sqlite/sqlite3.c'
 ]
 
 # generate wrapper files
@@ -305,6 +324,13 @@ if sys.platform == 'linux2':
 else:
     libs = []
   
+# Enable support for loadable extensions in the sqlite3 module by not defining
+# SQLITE_OMIT_LOAD_EXTENSION
+SQLITE_DEFINES = []
+if sys.platform != "win32":
+   SQLITE_DEFINES.append(('MODULE_NAME', '"vt_sqlite3"'))
+else:
+   SQLITE_DEFINES.append(('MODULE_NAME', '\\"vt_sqlite3\\"'))
 
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
@@ -325,6 +351,7 @@ setup(name = "variant_tools",
         'variant_tools.annotation',
         'variant_tools.liftOver',
         'variant_tools.association',
+        SQLITE_PY_FILE,
         WRAPPER_PY_FILE[:-3]          # assotests_pyX.py file without extension
     ],
     scripts = [
@@ -334,6 +361,15 @@ setup(name = "variant_tools",
     cmdclass = {'build_py': build_py },
     package_dir = {'variant_tools': 'variant_tools'},
     ext_modules = [
+        Extension('variant_tools/_vt_sqlite3',
+            sources = SQLITE_FILES,
+            define_macros = SQLITE_DEFINES,
+            include_dirs = ['sqlite', SQLITE_FOLDER],
+        ),
+        Extension('variant_tools/_vt_sqlite3_ext',
+            sources = ['variant_tools/vt_sqlite3_ext.c'],
+            include_dirs = ['sqlite'],
+        ),
         Extension('variant_tools/_assoTests',
             sources = [
                 WRAPPER_CPP_FILE,

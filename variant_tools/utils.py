@@ -35,7 +35,6 @@ import logging
 import subprocess
 import urllib
 import urlparse
-import sqlite3
 import getpass
 import time
 import tokenize
@@ -45,6 +44,10 @@ import bz2
 import threading
 import re
 
+if sys.version_info.major == 2:
+    import vt_sqlite3_py2 as sqlite3
+else:
+    import vt_sqlite3_py3 as sqlite3
 
 runOptions = {
     'verbosity': '1',
@@ -539,11 +542,31 @@ class DatabaseEngine:
         else:
             self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
             self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
+            self.database.enable_load_extension(True)
             # set default cache size to a larger number to improve query performance
             if not readonly:
                 cur = self.database.cursor()
                 cur.execute('PRAGMA default_cache_size=2000;')
                 self.database.commit()
+            # trying to load extension
+            for path in sys.path:
+                ext = os.path.join(path, '_vt_sqlite3_ext.so')
+                if os.path.isfile(ext):
+                    cur = self.database.cursor()
+                    try:
+                        cur.execute('SELECT load_extension("{}");'.format(ext))
+                    except Exception as e:
+                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext, e))
+                    break
+                ext = os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.so')
+                if os.path.isfile(ext):
+                    cur = self.database.cursor()
+                    try:
+                        cur.execute('SELECT load_extension("{}");'.format(ext))
+                    except Exception as e:
+                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext, e))
+                    break
+
 
     def close(self):
         if self.engine == 'mysql':

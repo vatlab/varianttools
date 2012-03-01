@@ -53,6 +53,14 @@ include variant_tools/assoTests_py2.py
 include variant_tools/assoTests_py3.py
 include variant_tools/assoTests_wrap_py2.cpp
 include variant_tools/assoTests_wrap_py3.cpp
+include variant_tools/vt_sqlite3_py2.py
+include variant_tools/vt_sqlite3_py3.py
+include variant_tools/vt_sqlite3_ext.c
+include sqlite/sqlite3.c
+include sqlite/sqlite3.h
+include sqlite/sqlite3ext.h
+recursive-include sqlite/py2 *.h *.c
+recursive-include sqlite/py3 *.h *.c
 recursive-include variant_tools/gsl *.h *.c
 include test/vcf/*
 include test/txt/*
