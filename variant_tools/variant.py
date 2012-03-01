@@ -188,23 +188,28 @@ def select(args, reverse=False):
                         annoDB = [x for x in proj.annoDB if x.name.lower() == db.lower()][0]
                     except:
                         continue
-                    # db is one of the annotation database but fld has already been indexed
-                    if fld.lower() in [x.lower() for x in annoDB.linked_by] or \
-                        (annoDB.build is not None and fld.lower() in [x.lower() for x in annoDB.build]) or \
-                        (annoDB.alt_build is not None and fld.lower() in [x.lower() for x in annoDB.alt_build]) or \
-                        (fld.lower() not in [x.lower() for x in proj.db.getHeaders('{0}.{0}'.format(db))]) or \
-                        proj.db.hasIndex('{0}.{0}_{1}'.format(db, fld)):
-                        continue
                     #
-                    s = delayedAction(proj.logger.info, 'Indexing {}'.format(field))
-                    cur = proj.db.cursor()
-                    try:
-                        query = 'CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(db, fld)
-                        proj.logger.debug(query)
-                        cur.execute(query)
-                    except Exception as e:
-                        proj.logger.debug('Failed to create index: {}'.format(e))
-                    del s
+                    # STOP automatic indexing fields used in vtools select because creating indexes can be 
+                    # very time-consuming for sqlite databases, and the performance benefit is uncertain.
+                    #
+                    # db is one of the annotation database but fld has already been indexed
+                    #
+                    #if fld.lower() in [x.lower() for x in annoDB.linked_by] or \
+                    #    (annoDB.build is not None and fld.lower() in [x.lower() for x in annoDB.build]) or \
+                    #    (annoDB.alt_build is not None and fld.lower() in [x.lower() for x in annoDB.alt_build]) or \
+                    #    (fld.lower() not in [x.lower() for x in proj.db.getHeaders('{0}.{0}'.format(db))]) or \
+                    #    proj.db.hasIndex('{0}.{0}_{1}'.format(db, fld)):
+                    #    continue
+                    #
+                    #s = delayedAction(proj.logger.info, 'Indexing {}'.format(field))
+                    #cur = proj.db.cursor()
+                    #try:
+                    #    query = 'CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(db, fld)
+                    #    proj.logger.debug(query)
+                    #    cur.execute(query)
+                    #except Exception as e:
+                    #    proj.logger.debug('Failed to create index: {}'.format(e))
+                    #del s
                 # 
                 fields_info = sum([proj.linkFieldToTable(x, args.from_table) for x in fields], [])
                 # WHERE clause: () is important because OR in condition might go beyond condition
