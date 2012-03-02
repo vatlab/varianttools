@@ -550,21 +550,21 @@ class DatabaseEngine:
                 self.database.commit()
             # trying to load extension
             for path in sys.path:
-                ext = os.path.join(path, '_vt_sqlite3_ext.so')
-                if os.path.isfile(ext):
+                ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
+                if ext:
                     cur = self.database.cursor()
                     try:
-                        cur.execute('SELECT load_extension("{}");'.format(ext))
+                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
                     except Exception as e:
-                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext, e))
+                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
                     break
-                ext = os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.so')
-                if os.path.isfile(ext):
+                ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
+                if ext:
                     cur = self.database.cursor()
                     try:
-                        cur.execute('SELECT load_extension("{}");'.format(ext))
+                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
                     except Exception as e:
-                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext, e))
+                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
                     break
 
 

@@ -313,7 +313,7 @@ static struct PyModuleDef _sqlite3module = {
         NULL
 };
 
-PyMODINIT_FUNC PyInit__sqlite3(void)
+PyMODINIT_FUNC PyInit__vt_sqlite3(void)
 {
     PyObject *module, *dict;
     PyObject *tmp_obj;
