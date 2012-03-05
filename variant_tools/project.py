@@ -1771,10 +1771,17 @@ class ProjCopier:
                 self.logger.debug(e)
             # copying data over
             if self.vtable == 'variant':
-                # copy all variants
-                cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0};'.format(table))
+                if self.genotypes:
+                    # copy selected genotypes
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE {1};'.format(table, self.genotypes))
+                else:
+                    # copy all variants and genotypes
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0};'.format(table))
             else:
-                cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, self.vtable))
+                if self.genotypes:
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE ({2}) AND (__fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1}));'.format(table, self.vtable, self.genotypes))
+                else:
+                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, self.vtable))
             prog.update(idx + 1)
         # remove all annotations
         prog.done()
