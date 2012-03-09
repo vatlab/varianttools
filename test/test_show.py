@@ -36,6 +36,7 @@ class TestShow(ProcessTestCase):
         runCmd('vtools init test -f')
         runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools use ann/testNSFP.ann')
         
     def removeProj(self):
@@ -65,10 +66,21 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show table variant -l -1')
         self.assertSucc('vtools show samples')
         self.assertSucc('vtools show table testNSFP')
+        self.assertFail('vtools show field')
         self.assertSucc('vtools show fields')
+        self.assertFail('vtools show format')
         self.assertSucc('vtools show formats')
+        self.assertFail('vtools show formats ANNOVAR')
+        self.assertSucc('vtools show format ANNOVAR')
         self.assertSucc('vtools show genotypes')
         self.assertSucc('vtools show annotations')
+        self.assertFail('vtools show annotations testNSFP')
+        self.assertSucc('vtools show annotation testNSFP')
+        self.assertFail('vtools show test')
+        self.assertSucc('vtools show tests')
+        self.assertSucc('vtools show test LNBT')
+        self.assertFail('vtools show tests LNBT')
+
 
 if __name__ == '__main__':
     unittest.main()
