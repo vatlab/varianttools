@@ -44,37 +44,45 @@ class ProcessTestCase(unittest.TestCase):
     def tearDown(self):
         'Clear any existing project'
         runCmd('vtools remove project')
-## compare if the command output is what we want
-    def assertOutput(self, cmd, output):
-        cmd = shlex.split(cmd)
-        # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        with open('run_tests.log', 'a') as fnull:
-            self.assertEqual(
-                subprocess.check_output(cmd, stderr=fnull,
-                    env=test_env).decode(),
-                output)
 
 # compare if the command output is what we want
-    def assertOutput_test(self, cmd, output, numOfLines):
+    def assertOutput(self, cmd, output, numOfLines,file=None):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         with open('run_tests.log', 'a') as fnull: 
-             if numOfLines == 0:            
+             if numOfLines == 0:
+                   if file is None:            
                       self.assertEqual(
                            subprocess.check_output(cmd, stderr=fnull,
                                  env=test_env).decode(),
                                  output)
+                   elif file is not None:
+                      self.assertEqual(
+                           subprocess.check_output(cmd, stderr=fnull,
+                                 env=test_env).decode(),
+                                 open(file).read())
              elif numOfLines > 0:            
+                   if file is None:            
                       self.assertEqual(
-                           '\n'.join(list(map(str, ''.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode()).split('\n')))[:numOfLines]).split('\n\t'),
-                                output) 
+                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                 env=test_env).decode().split('\n')[:numOfLines]),
+                                 output)
+                   elif file is not None:
+                      self.assertEqual(
+                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                 env=test_env).decode().split('\n')[:numOfLines]),
+                                 '\n'.join(open(file).read().split('\n')[:numOfLines]))
              elif numOfLines < 0:            
+                   if file is None:            
                       self.assertEqual(
-                           '\n'.join(list(map(str, ''.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode()).split('\n')))[numOfLines:]).split('\n\t'),
-                                output) 
-
+                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                 env=test_env).decode().split('\n')[numOfLines:]),
+                                 output)
+                   elif file is not None:
+                      self.assertEqual(
+                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                 env=test_env).decode().split('\n')[numOfLines:]),
+                                 '\n'.join(open(file).read().split('\n')[numOfLines:]))
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
@@ -97,27 +105,10 @@ def outputOfCmd(cmd):
         return subprocess.check_output(cmd, stderr=fnull,
             env=test_env).decode()
         
+
 def output2list(cmd):
     return list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
         
-    #Whole list from the output
-def output2list_allLines(cmd):
-    allLines=list(map(str, ''.join(outputOfCmd(cmd)).split('\n')))
-    all_line='\n'.join(allLines).split('\n\t')
-    return all_line
-
-    #Top lines of the output, not include the header
-def output2list_topLines(cmd,numOfLines):
-    topLines=list(map(str, ''.join(outputOfCmd(cmd)).split('\n')))[:numOfLines]
-    top_line='\n'.join(topLines).split('\n\t')
-    return top_line
-
-    #Bottom lines of the output, not include the header
-def output2list_botLines(cmd,numOfLines):
-    botLines=list(map(str, ''.join(outputOfCmd(cmd)).split('\n')))[numOfLines:]
-    bot_line='\n'.join(botLines).split('\n\t')
-    return bot_line
-
 def runCmd(cmd):
     cmd = shlex.split(cmd)
     with open('run_tests.log', 'a') as fnull:
