@@ -2855,6 +2855,8 @@ def show(args):
             if args.type == 'project':
                 print(proj.summarize())
             elif args.type == 'tables':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show tables"'.format(', '.join(args.items)))
                 print('{:<20} {}'.format('table', '#variants'))
                 for table in proj.db.tables() if args.verbosity=='2' else proj.getVariantTables():
                     print('{:<20} {:,}'.format(table, proj.db.numOfRows(table)))
