@@ -2919,14 +2919,20 @@ def show(args):
                         raise IndexError('Database {} is not currently used in the project'.format(item))
                     annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show annotations"'.format(', '.join(args.items)))
                 DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
                 for db in DBs:
                     print(db)
             elif args.type == 'formats':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show formats"'.format(', '.join(args.items)))
                 FMTs = filesInURL('http://vtools.houstonbioinformatics.org/format', ext='.fmt')
                 for fmt in FMTs:
                     print(fmt)
             elif args.type == 'format':
+                if not args.items:
+                    raise ValueError('Please specify a format to display')
                 for item in args.items:
                     try:
                         fmt = fileFMT(item)
@@ -2935,6 +2941,8 @@ def show(args):
                         raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file "{}"'.format(e, item))
                     fmt.describe()
             elif args.type == 'genotypes':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show genotypes"'.format(', '.join(args.items)))
                 # get sample ids and attach the genotypes database
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
@@ -2966,6 +2974,8 @@ def show(args):
                     print omitted.format(nAll - args.limit)
             elif args.type == 'tests':
                 # it is very bad idea to use circular import, but I have no choice
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
                 print('\n'.join(['{} {}'.format(test,
                     '\n'.join(textwrap.wrap(obj.__doc__, initial_indent=' '*(27-len(test)),
