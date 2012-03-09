@@ -905,7 +905,7 @@ class Exporter:
         if self.filename is not None:
             output.close()
         prog.done()
-        self.logger.info('{} lines are exported {}'.format(count, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
+        self.logger.info('{} lines are exported from variant table {} {}'.format(count, self.table, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
 
 
 
