@@ -46,43 +46,44 @@ class ProcessTestCase(unittest.TestCase):
         runCmd('vtools remove project')
 
 # compare if the command output is what we want
-    def assertOutput(self, cmd, output, numOfLines=3,file=None):
+    def assertOutput(self, cmd, output=None, numOfLines=0,file=None):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         with open('run_tests.log', 'a') as fnull: 
+             if output is None and file is None:
+                raise ValueError('Please specify your OUTPUT or give your file name of the output')
              if numOfLines == 0:
-                   if file is None:            
-                      self.assertEqual(
-                           subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode(),
-                                 output)
-                   elif file is not None:
-                      self.assertEqual(
-                           subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode(),
-                                 open(file).read())
+                            if file is None:            
+                                    self.assertEqual(
+                                         subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode(), output)
+                            elif file is not None:
+                                    self.assertEqual(
+                                         subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode(),
+                                         open(file).read())
              elif numOfLines > 0:            
-                   if file is None:            
-                      self.assertEqual(
-                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode().split('\n')[:numOfLines]),
-                                 output)
-                   elif file is not None:
-                      self.assertEqual(
-                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode().split('\n')[:numOfLines]),
-                                 '\n'.join(open(file).read().split('\n')[:numOfLines]))
+                            if file is None:            
+                                    self.assertEqual(
+                                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode().split('\n')[:numOfLines]),
+                                         output)
+                            elif file is not None:
+                                    self.assertEqual(
+                                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode().split('\n')[:numOfLines]),
+                                         '\n'.join(open(file).read().split('\n')[:numOfLines]))
              elif numOfLines < 0:            
-                   if file is None:            
-                      self.assertEqual(
-                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode().split('\n')[numOfLines:]),
-                                 output)
-                   elif file is not None:
-                      self.assertEqual(
-                           '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                                 env=test_env).decode().split('\n')[numOfLines:]),
-                                 '\n'.join(open(file).read().split('\n')[numOfLines:]))
+                            if file is None:            
+                                    self.assertEqual(
+                                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode().split('\n')[numOfLines:]),
+                                         output)
+                            elif file is not None:
+                                    self.assertEqual(
+                                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
+                                         env=test_env).decode().split('\n')[numOfLines:]),
+                                         '\n'.join(open(file).read().split('\n')[numOfLines:]))
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
