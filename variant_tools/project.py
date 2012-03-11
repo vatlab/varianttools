@@ -2059,7 +2059,7 @@ class VariantProcessor(threading.Thread):
         cur.execute('CREATE INDEX __fromDB.__id_map_idx ON __id_map (old_id ASC);')
         # create tables
         cur.execute('''SELECT sql FROM __fromDB.sqlite_master WHERE type="table" 
-            AND name != "sqlite_sequence" AND name != "__id_map";''')
+            AND (NOT name LIKE "sqlite_%") AND name != "__id_map";''')
         for sql in cur.fetchall():
             # sql might be None
             if sql[0] is None:
