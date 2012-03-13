@@ -269,6 +269,78 @@ class TestImport(ProcessTestCase):
                                         '32', '0', '96', '255', 'None', 'None', 'None', '-1', '3', '2', 'None', \
                                         'None', 'None', '0', '6', '54', '-1', '3', '2', 'None', 'None', 'None', '6', \
                                         '54', '54']])
+
+    def testInsertDelete(self):
+        'Testing the number of insertions and deletions'
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
+        self.assertEqual(numOfVariant(), 137)
+        self.assertSucc('vtools select variant \'ref="-"\' --output chr pos ref alt')
+        self.assertOutput('vtools select variant \'ref="-"\' --output chr pos ref alt', '',  0, 'output/import_vcf_ref.txt')
+        self.assertOutput('vtools select variant \'ref="-"\' --output chr pos ref alt', '''1	10434	-	C\n1	54790	-	T\n1	81963	-	AA\n1	82135	-	AAAAAAAAAAAAAA\n1	83787	-	A''',  5, 'output/import_vcf_ref.txt')
+        self.assertOutput('vtools select variant \'ref="-"\' --output chr pos ref alt', '''1	10434	-	C\n1	54790	-	T\n1	81963	-	AA\n1	82135	-	AAAAAAAAAAAAAA\n1	83787	-	A\n''',  -5, 'output/import_vcf_ref.txt')
+        self.assertEqual(outputOfCmd('vtools select variant \'ref="-"\' --count'), '74\n') 
+        self.assertOutput('vtools select variant \'alt="-"\' --output chr pos ref alt', '',  0, 'output/import_vcf_alt.txt')
+        self.assertEqual(outputOfCmd('vtools select variant \'alt="-"\' --count'), '55\n') 
+
+    def testSampleName_single(self):
+        'Testing the import of sample names'
+        #Testing one sample per file with the default setting in vtools import
+        #sample name is given in file
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+        self.assertEqual(numOfSample(), 2)
+        self.assertEqual(numOfVariant(), 289 + 121)
+        self.assertOutput('vtools show genotypes', '',  0, 'output/vcf_single_sampleName_genotype.txt')
+
+    def testNo_SampleName(self):
+        #Testing one sample per file with the default setting(NO sample name)
+        #sample name was not given in file, then there is no information about sample name and genotypes except you assign one for it.
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
+        self.assertEqual(numOfSample(), 0)
+        self.assertEqual(numOfVariant(), 137)
         
+    def testSampleName_single_assign(self):
+        #Testing one sample per file with the --sample_name option
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18 --sample_name samp_vcf2')
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name samp_vcf3')
+        self.assertEqual(numOfSample(), 3)
+        self.assertEqual(numOfVariant(), 289 + 121 + 137)
+        self.assertOutput('vtools show genotypes', '',  0, 'output/vcf_assigned_sample_name_genotype.txt')
+        
+    def testSampleName_single_more_assign(self):
+        #If we assigned the multiple sample names after --sample_name, vtools will generate sample names that you
+        #give for the sample, but the genotype information will not be imported. The variant table will be imported.
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1 samp_vcf2 samp_vcf3')
+        self.assertEqual(numOfSample(), 3) #but there is only 1 sample
+        self.assertEqual(numOfVariant(), 289)
+        self.assertOutput('vtools show genotypes', '''sample_name	filename	num_genotypes	sample_genotype_fields\nsamp_vcf1	vcf/SAMP1.vcf	289	\nsamp_vcf2	vcf/SAMP1.vcf	289	\nsamp_vcf3	vcf/SAMP1.vcf	289	\n''')
+        
+    def testSampleName_multiple(self):
+        #Testing multiple samples in ONE vcf file with default setting
+        self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18')
+        self.assertEqual(numOfSample(), 501)
+        self.assertEqual(numOfVariant(),5)
+        self.maxDiff = None
+        self.assertOutput('vtools show genotypes -l -1', '',  0, 'output/vcf_multiple_samples_genotypes.txt')
+       
+    def testSampleName_multiple_assign(self):
+        #Testing multiple samples in ONE vcf file with --sample_name option
+        #Only one sample was generated, no genotype information were imported
+        self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18 --sample_name output/vcf_multiple_sample_name.txt')
+        self.assertEqual(numOfSample(), 1) #but there are 501 samples
+        self.assertEqual(numOfVariant(),5)
+        self.assertOutput('vtools show genotypes', '''sample_name	filename	num_genotypes	sample_genotype_fields\noutput/vcf_multiple_sample_name.txt	vcf/500SAMP.vcf	5	\n''')
+        #There should be 2101 genotypes
+
+    def testSampleName_multiple_more_assign(self):
+        #Testing multiple samples in ONE vcf file with multiple names after --sample_name option
+        #Only one sample was generated, no genotype information were imported
+        self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18 --sample_name n1 n2 n3 n4 n5')
+        self.assertEqual(numOfSample(), 5) #but there are 501 samples
+        self.assertEqual(numOfVariant(),5)
+        self.assertOutput('vtools show genotypes', '''sample_name	filename	num_genotypes	sample_genotype_fields\nn1	vcf/500SAMP.vcf	5	\nn2	vcf/500SAMP.vcf	5	\nn3	vcf/500SAMP.vcf	5	\nn4	vcf/500SAMP.vcf	5	\nn5	vcf/500SAMP.vcf	5	\n''')
+        #There should be 2101 genotypes
+
 if __name__ == '__main__':
     unittest.main()
