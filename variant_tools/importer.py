@@ -896,6 +896,9 @@ class TextWorker(Process):
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
                     skipped_lines += 1
+        # if still first (this thread has not read anything), still send the columnRange stuff
+        if first:
+            self.output.send(self.processor.columnRange)
         # everything is done, stop the pipe
         self.output.send(None)
         # and send the summary statistics
