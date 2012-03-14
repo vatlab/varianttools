@@ -1510,6 +1510,8 @@ class TextImporter(BaseImporter):
                     self.genotype_info = []
                     # remove genotype field from processor
                     self.processor.reset(validTill=self.ranges[2])
+                    if len(self.sample_name) > 1:
+                        raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 return self.recordFileAndSample(input_filename, self.sample_name)
  
     def importFromFile(self, input_filename):
