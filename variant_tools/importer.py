@@ -1502,8 +1502,6 @@ class TextImporter(BaseImporter):
             else:
                 try:
                     numSample, names = self.getSampleName(input_filename, self.prober)
-                    if len(self.sample_name) != numSample:
-                        raise ValueError('{} sample detected but only {} names are specified'.format(numSample, len(self.sample_name)))                        
                 except ValueError:
                     self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
                     self.genotype_field = []
@@ -1512,6 +1510,8 @@ class TextImporter(BaseImporter):
                     self.processor.reset(validTill=self.ranges[2])
                     if len(self.sample_name) > 1:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
+                if len(self.sample_name) != numSample:
+                    raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
                 return self.recordFileAndSample(input_filename, self.sample_name)
  
     def importFromFile(self, input_filename):
