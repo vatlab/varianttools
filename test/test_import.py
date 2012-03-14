@@ -298,6 +298,13 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertEqual(numOfSample(), 0)
         self.assertEqual(numOfVariant(), 137)
+    
+    def testNo_SampleName_assign(self):
+        #Assign a sample name if the sample name is not in file
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name vcf_test3')
+        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(), 137) 
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'vcf_test3\n')
         
     def testSampleName_single_assign(self):
         #Testing one sample per file with the --sample_name option
