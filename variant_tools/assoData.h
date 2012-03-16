@@ -50,7 +50,7 @@ class AssoData
 public:
 	AssoData() :
 		m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
-		m_statistic(0.0), m_pval(0.0), m_C(0), m_ncovar(0),
+		m_statistic(0), m_pval(0), m_C(0), m_ncovar(0),
 		m_sites(0), m_xbar(0.0), m_ybar(0.0), m_ncases(0),
 		m_nctrls(0), m_model()
 	{
@@ -272,27 +272,36 @@ public:
 	}
 
 
-	double pvalue()
+	vectorf pvalue()
 	{
 		return m_pval;
 	}
 
 
-	double setPvalue(double pval)
+	double setPvalue(vectorf pval)
 	{
 		m_pval = pval;
 		return 0.0;
 	}
 
+	double setPvalue(double pval)
+	{
+		m_pval.push_back(pval);
+		return 0.0;
+	}
 
-	double setStatistic(double stat)
+	double setStatistic(vectorf stat)
 	{
 		m_statistic = stat;
 		return 0.0;
 	}
+	double setStatistic(double stat)
+	{
+		m_statistic.push_back(stat);
+		return 0.0;
+	}
 
-
-	double statistic()
+	vectorf statistic()
 	{
 		return m_statistic;
 	}
@@ -424,8 +433,8 @@ public:
 				ysigma += pow(m_phenotype[i] - (b0 + b1 * m_X[i]), 2.0);
 			}
 			double varb = ysigma / (m_phenotype.size() - 2.0) / denominator;
-			m_statistic = b1 / sqrt(varb);
-		}else m_statistic = 0.0;
+			m_statistic.push_back(b1 / sqrt(varb));
+		}else m_statistic.push_back(0.0);
 	}
 
 
@@ -452,12 +461,13 @@ public:
 			vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
 		}
 
-		m_statistic = ss / sqrt(vm1);
+		ss = ss / sqrt(vm1);
 
 		//!-FIXME: (not sure why this happens)
 		//!- w/ rounding to 0 I get strange number such as 3.72397e-35
 		//!- this would lead to type I error problem
-		fRound(m_statistic, 0.0001);
+		fRound(ss, 0.0001);
+                m_statistic.push_back(ss);
 	}
 
 
@@ -476,16 +486,23 @@ public:
 		m_model.fit();
 		vectorf beta = m_model.getBeta();
 		vectorf seb = m_model.getSEBeta();
-		m_statistic = beta.back() / seb.back();
+		m_statistic.push_back(beta.back() / seb.back());
+                for (unsigned i = 1; i < beta.size() - 1; ++i) {
+                        m_statistic.push_back(beta[i]/seb[i]);
+                }
 	}
 
 
 	void gaussianP(unsigned sided = 1)
 	{
 		if (sided == 1) {
-			m_pval = gsl_cdf_ugaussian_Q(m_statistic);
+			for (unsigned i = 0; i < m_statistic.size(); ++i) {
+                                m_pval.push_back(gsl_cdf_ugaussian_Q(m_statistic[i]));
+                        }
 		}else if (sided == 2) {
-			m_pval = gsl_cdf_chisq_Q(m_statistic * m_statistic, 1.0);
+			for (unsigned i = 0; i < m_statistic.size(); ++i) {
+			        m_pval.push_back(gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0));
+                        }
 		}else  {
 			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
 		}
@@ -496,10 +513,14 @@ public:
 	{
 		// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
 		if (sided == 1) {
-			m_pval = gsl_cdf_tdist_Q(m_statistic, m_phenotype.size() - (m_ncovar + 2.0));
+			for (unsigned i = 0; i < m_statistic.size(); ++i) {
+			        m_pval.push_back(gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0)));
+                        }
 		}else if (sided == 2) {
-			double p = gsl_cdf_tdist_Q(m_statistic, m_phenotype.size() - (m_ncovar + 2.0));
-			m_pval = fmin(p, 1.0 - p) * 2.0;
+			for (unsigned i = 0; i < m_statistic.size(); ++i) {
+			        double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
+			        m_pval.push_back(fmin(p, 1.0 - p) * 2.0);
+                        }
 		}else  {
 			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
 		}
@@ -530,8 +551,8 @@ private:
 	double m_ybar;
 	unsigned m_ncases;
 	unsigned m_nctrls;
-	double m_pval;
-	double m_statistic;
+	vectorf m_pval;
+	vectorf m_statistic;
 	LinearM m_model;
 };
 

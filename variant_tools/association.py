@@ -98,7 +98,7 @@ class AssociationTestManager:
         self.table = table
         #
         # step 0: get testers
-        self.tests = self.getAssoTests(methods, unknown_args)
+        self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         # step 1: get samples and related phenotypes
         self.sample_IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
         # step 2: indexes genotype tables if needed
@@ -119,7 +119,7 @@ class AssociationTestManager:
         # step 3: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
-    def getAssoTests(self, methods, common_args):
+    def getAssoTests(self, methods, ncovariates, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common 
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
@@ -129,7 +129,7 @@ class AssociationTestManager:
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
-                method = eval(name)(self.logger, args)
+                method = eval(name)(ncovariates, self.logger, args)
                 # check if method is valid
                 if not hasattr(method, 'fields'):
                     raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
@@ -174,17 +174,30 @@ class AssociationTestManager:
             if len(sample_IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
-                self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                if len(condition) > 0:
+                    self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                else:
+                    self.logger.info('{} samples are found'.format(len(sample_IDs)))
             if len(data) != len(sample_IDs):
                 self.logger.warning('Variants associated with a total of {} sample ids will be merged to {} samples for association tests.'.format(len(data), len(sample_IDs)))
             # add intercept
-            covariates.insert(0, array('d', [1]*len(sample_IDs)))
+            covariates.insert(0, [1]*len(sample_IDs))
+            try:    
+                phenotypes = [map(float, x) for x in phenotypes]
+                covariates = [map(float, x) for x in covariates]
+            except ValueError:
+                raise ValueError('Invalid coding in phenotype/covariates values: '
+                                 'missing values should be removed from analysis or '
+                                 'inferred with numeric values')
             return sample_IDs, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
-            raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
-                '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno), 
-                '' if covar is None else (' and/or covariate' + ', '.join(covar))))
+            if str(e).startswith('Invalid coding'):
+                raise ValueError(e)
+            else:
+                raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
+                    '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno), 
+                    '' if covar is None else (' and/or covariate' + ', '.join(covar))))
     
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
@@ -396,9 +409,10 @@ class AssoTestsWorker(Process):
         '''Set phenotype data'''
         if len(data) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
-        phen = [float(x) for idx, x in enumerate(data[0]) if which[idx]]
+        phen = [x for idx, x in enumerate(data[0]) if which[idx]]
         if covariates:
-          covt = [[float(x) for idx, x in enumerate(y) if which[idx]] for y in covariates]
+          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
+        if covariates:
           self.data.setPhenotype(phen, covt)
         else:
           self.data.setPhenotype(phen)
@@ -424,9 +438,8 @@ class AssoTestsWorker(Process):
                 self.setPhenotype(which, self.phenotypes, self.covariates)
                 for test in self.tests:
                     test.setData(self.data)
-                    test.setAttributes(grp)
                     result = test.calculate()
-                    self.logger.debug('Finish test')
+                    self.logger.debug('Finished association test')
                     values.extend(result)
             except Exception as e:
                 self.logger.debug('Error processing data for group {}, {}'.format(grp, e))
@@ -510,8 +523,7 @@ class NullTest:
         self.logger = logger
         self.parseArgs(*method_args)
         #
-        self.result = {}
-        self.group = None
+        self.fields = []
 
     def parseArgs(self, method_args):
         # this function should never be called.
@@ -520,14 +532,11 @@ class NullTest:
     def setData(self, data):
         self.data = data.clone()
 
-    def setAttributes(self, grp):
-        self.group = '__'.join(map(str, grp))
-
     def calculate(self):
         '''Calculate and return p-values. It can be either a single value
         for all variants, or a list of p-values for each variant. Will print
         data if NullTest is called'''
-        self.logger.info('Currently no action is defined for NullTest')
+        self.logger.info('No action is defined for NullTest')
         #self.logger.debug('Printing out group name, phenotypes, covariates and genotypes')
         #self.logger.debug(self.group)
         #self.logger.debug(self.data.phenotype())
@@ -548,11 +557,10 @@ def freq(input):
 
 class GroupStat(NullTest):
     '''Calculates basic statistics for each testing group'''
-    def __init__(self, logger=None, *method_args):
+    def __init__(self, ncovariates, logger=None, *method_args):
         #
         NullTest.__init__(self, logger, *method_args)
         # set fields according to parameter --stat
-        self.fields = []
         if 'num_variants' in self.stat:
             self.fields.append(
                 Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group')
@@ -599,13 +607,16 @@ class GroupStat(NullTest):
 
 class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group'''
-    def __init__(self, logger=None, *method_args):
+    def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
-        self.fields = [
-            Field(name='p_value', index=None, type='FLOAT', adj=None, comment='p-value'),
-            Field(name='statistic', index=None, type='FLOAT', adj=None, comment='statistic'),
-            Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')]
-
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
+                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='statistic'), 
+                        Field(name='p_value', index=None, type='FLOAT', adj=None, comment='p-value')]
+        if self.permutations == 0:
+            for i in range(ncovariates):
+                self.fields.append(Field(name='beta{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='statistic beta{}'.format(str(i+2))))
+                self.fields.append(Field(name='beta{}_p_value'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for beta{}'.format(str(i+2))))
+                
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -651,7 +662,7 @@ class LinearBurdenTest(NullTest):
 
     def calculate(self):
         data = self.data
-        doRegression =  t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
+        doRegression = t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
         if self.permutations == 0:
             actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
@@ -674,8 +685,14 @@ class LinearBurdenTest(NullTest):
             a.apply(data)
             # permutation
             p.apply(data)
-        
-        return data.pvalue(), data.statistic(), data.samplecounts()
+        # get results
+        pvalues = data.pvalue()
+        regstats = data.statistic()
+        res = [data.samplecounts()]
+        for (x, y) in zip(regstats, pvalues):
+            res.append(x)
+            res.append(y)
+        return res
 
 class LNBT(LinearBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''

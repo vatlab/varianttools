@@ -22831,7 +22831,7 @@ SWIGINTERN PyObject *_wrap_AssoData_pvalue(PyObject *SWIGUNUSEDPARM(self), PyObj
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject *swig_obj[1] ;
-  double result;
+  vectorf result;
   
   if (!args) SWIG_fail;
   swig_obj[0] = args;
@@ -22843,7 +22843,63 @@ SWIGINTERN PyObject *_wrap_AssoData_pvalue(PyObject *SWIGUNUSEDPARM(self), PyObj
   {
     try
     {
-      result = (double)(arg1)->pvalue();
+      result = (arg1)->pvalue();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_AssoData_setPvalue__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+  PyObject *resultobj = 0;
+  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
+  vectorf arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double result;
+  
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_setPvalue" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
+  {
+    std::vector<double,std::allocator< double > > *ptr = (std::vector<double,std::allocator< double > > *)0;
+    int res = swig::asptr(swig_obj[1], &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "AssoData_setPvalue" "', argument " "2"" of type '" "vectorf""'"); 
+    }
+    arg2 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (double)(arg1)->setPvalue(arg2);
     }
     catch(vtools::IndexError e)
     {
@@ -22873,7 +22929,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_AssoData_setPvalue(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+SWIGINTERN PyObject *_wrap_AssoData_setPvalue__SWIG_1(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
   double arg2 ;
@@ -22881,20 +22937,15 @@ SWIGINTERN PyObject *_wrap_AssoData_setPvalue(PyObject *SWIGUNUSEDPARM(self), Py
   int res1 = 0 ;
   double val2 ;
   int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  char *  kwnames[] = {
-    (char *) "self",(char *) "pval", NULL 
-  };
   double result;
   
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:AssoData_setPvalue",kwnames,&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_setPvalue" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
   }
   arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
-  ecode2 = SWIG_AsVal_double(obj1, &val2);
+  ecode2 = SWIG_AsVal_double(swig_obj[1], &val2);
   if (!SWIG_IsOK(ecode2)) {
     SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "AssoData_setPvalue" "', argument " "2"" of type '" "double""'");
   } 
@@ -22932,7 +22983,95 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_AssoData_setStatistic(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+SWIGINTERN PyObject *_wrap_AssoData_setPvalue(PyObject *self, PyObject *args) {
+  int argc;
+  PyObject *argv[3];
+  
+  if (!(argc = SWIG_Python_UnpackTuple(args,"AssoData_setPvalue",0,2,argv))) SWIG_fail;
+  --argc;
+  if (argc == 2) {
+    int _v = 0;
+    {
+      {
+        int res = SWIG_AsVal_double(argv[1], NULL);
+        _v = SWIG_CheckState(res);
+      }
+    }
+    if (!_v) goto check_1;
+    return _wrap_AssoData_setPvalue__SWIG_1(self, argc, argv);
+  }
+check_1:
+  
+  if (argc == 2) {
+    return _wrap_AssoData_setPvalue__SWIG_0(self, argc, argv);
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'AssoData_setPvalue'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    vtools::AssoData::setPvalue(vectorf)\n"
+    "    vtools::AssoData::setPvalue(double)\n");
+  return 0;
+}
+
+
+SWIGINTERN PyObject *_wrap_AssoData_setStatistic__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+  PyObject *resultobj = 0;
+  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
+  vectorf arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double result;
+  
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_setStatistic" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
+  {
+    std::vector<double,std::allocator< double > > *ptr = (std::vector<double,std::allocator< double > > *)0;
+    int res = swig::asptr(swig_obj[1], &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "AssoData_setStatistic" "', argument " "2"" of type '" "vectorf""'"); 
+    }
+    arg2 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (double)(arg1)->setStatistic(arg2);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_From_double(static_cast< double >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_AssoData_setStatistic__SWIG_1(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
   double arg2 ;
@@ -22940,20 +23079,15 @@ SWIGINTERN PyObject *_wrap_AssoData_setStatistic(PyObject *SWIGUNUSEDPARM(self),
   int res1 = 0 ;
   double val2 ;
   int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  char *  kwnames[] = {
-    (char *) "self",(char *) "stat", NULL 
-  };
   double result;
   
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:AssoData_setStatistic",kwnames,&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_setStatistic" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
   }
   arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
-  ecode2 = SWIG_AsVal_double(obj1, &val2);
+  ecode2 = SWIG_AsVal_double(swig_obj[1], &val2);
   if (!SWIG_IsOK(ecode2)) {
     SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "AssoData_setStatistic" "', argument " "2"" of type '" "double""'");
   } 
@@ -22991,13 +23125,45 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_AssoData_setStatistic(PyObject *self, PyObject *args) {
+  int argc;
+  PyObject *argv[3];
+  
+  if (!(argc = SWIG_Python_UnpackTuple(args,"AssoData_setStatistic",0,2,argv))) SWIG_fail;
+  --argc;
+  if (argc == 2) {
+    int _v = 0;
+    {
+      {
+        int res = SWIG_AsVal_double(argv[1], NULL);
+        _v = SWIG_CheckState(res);
+      }
+    }
+    if (!_v) goto check_1;
+    return _wrap_AssoData_setStatistic__SWIG_1(self, argc, argv);
+  }
+check_1:
+  
+  if (argc == 2) {
+    return _wrap_AssoData_setStatistic__SWIG_0(self, argc, argv);
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'AssoData_setStatistic'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    vtools::AssoData::setStatistic(vectorf)\n"
+    "    vtools::AssoData::setStatistic(double)\n");
+  return 0;
+}
+
+
 SWIGINTERN PyObject *_wrap_AssoData_statistic(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject *swig_obj[1] ;
-  double result;
+  vectorf result;
   
   if (!args) SWIG_fail;
   swig_obj[0] = args;
@@ -23009,7 +23175,7 @@ SWIGINTERN PyObject *_wrap_AssoData_statistic(PyObject *SWIGUNUSEDPARM(self), Py
   {
     try
     {
-      result = (double)(arg1)->statistic();
+      result = (arg1)->statistic();
     }
     catch(vtools::IndexError e)
     {
@@ -23032,7 +23198,7 @@ SWIGINTERN PyObject *_wrap_AssoData_statistic(PyObject *SWIGUNUSEDPARM(self), Py
       SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
     }
   }
-  resultobj = SWIG_From_double(static_cast< double >(result));
+  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
   return resultobj;
 fail:
   return NULL;
@@ -26233,8 +26399,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"AssoData_covarcounts", (PyCFunction)_wrap_AssoData_covarcounts, METH_O, NULL},
 	 { (char *)"AssoData_samplecounts", (PyCFunction)_wrap_AssoData_samplecounts, METH_O, NULL},
 	 { (char *)"AssoData_pvalue", (PyCFunction)_wrap_AssoData_pvalue, METH_O, NULL},
-	 { (char *)"AssoData_setPvalue", (PyCFunction) _wrap_AssoData_setPvalue, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"AssoData_setStatistic", (PyCFunction) _wrap_AssoData_setStatistic, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"AssoData_setPvalue", _wrap_AssoData_setPvalue, METH_VARARGS, NULL},
+	 { (char *)"AssoData_setStatistic", _wrap_AssoData_setStatistic, METH_VARARGS, NULL},
 	 { (char *)"AssoData_statistic", (PyCFunction)_wrap_AssoData_statistic, METH_O, NULL},
 	 { (char *)"AssoData_permuteY", (PyCFunction)_wrap_AssoData_permuteY, METH_O, NULL},
 	 { (char *)"AssoData_permuteRawX", (PyCFunction)_wrap_AssoData_permuteRawX, METH_O, NULL},

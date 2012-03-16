@@ -180,7 +180,7 @@ public:
 			for (size_t j = 0; j < m_actions.size(); ++j) {
 				m_actions[j]->apply(d);
 			}
-			double statistic = d.statistic();
+			double statistic = d.statistic()[0];
 			if (i == 0) {
 				obstatistic = statistic;
 			} else{
@@ -303,7 +303,7 @@ public:
 				for (size_t j = 0; j < m_actions.size(); ++j) {
 					m_actions[j]->apply(d);
 				}
-				vt_statistic.push_back(d.statistic());
+				vt_statistic.push_back(d.statistic()[0]);
 			}
 			double max_statistic = *max_element(vt_statistic.begin(), vt_statistic.end());
 			double min_statistic = *min_element(vt_statistic.begin(), vt_statistic.end());
