@@ -83,6 +83,7 @@ public:
 
 		double n = current + 1.0;
 		double alpha = 0.05;
+        ////////////////////////////////////////////
 		// use 95CI for the adaptive procedure
 		// Discussions on CI see Alan AGRESTI and Brent A. COULL, 1998
 		// OPTION1: Clopper-Pearson interval, conservative
@@ -93,7 +94,7 @@ public:
 		//}
 		// FIXME the exact procedure, not usable now due to a bug in gsl_cdf_fdist_Pinv
 		//double plw = 1.0 / (1.0+(n-x+1.0)/(x*gsl_cdf_fdist_Pinv(alpha/2.0, 2.0*x, 2.0*(n-x+1.0))));
-		// OPTION2: Edwin B. Wilson interval, recommanded
+		// OPTION2: Edwin B. Wilson interval, not very useful because it is overly stringent
 		//wci <- function(n, x, alpha) {
 		// pval <- x/n
 		// z <- qnorm(1.0-alpha/2.0)
@@ -102,10 +103,15 @@ public:
 		// upper <- (pval + zsq / (2.0*n) + z * sqrt((pval*(1.0-pval)+zsq/(4.0*n))/(1.0*n))) / (1.0+zsq/(1.0*n))
 		// return(c(lower, upper))
 		//}
+        // OPTION3: simple Normal approximation interval
+        ////////////////////////////////////////////
 		double pval = x / n;
 		double z = gsl_cdf_gaussian_Pinv(1.0 - alpha / 2.0, 1.0);
-		double zsq = z * z;
-		double plw = (pval + zsq / (2.0 * n) - z * sqrt((pval * (1.0 - pval) + zsq / (4.0 * n)) / (1.0 * n))) / (1.0 + zsq / (1.0 * n));
+        // OPTION2 implementation:
+		//double zsq = z * z;
+		//double plw = (pval + zsq / (2.0 * n) - z * sqrt((pval * (1.0 - pval) + zsq / (4.0 * n)) / (1.0 * n))) / (1.0 + zsq / (1.0 * n));
+        // OPTION3 implementation:
+        double plw = pval - z * sqrt(pval * (1.0 - pval) / n);
 		plw = (alt == 1) ? plw : plw * 2.0;
 
 		if (plw > sig) {
