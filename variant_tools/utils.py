@@ -181,6 +181,7 @@ def openFile(filename):
 
 def typeOfValues(vals):
     '''Figure out type of values and return INT, FLOAT or VARCHAR(maxLength)'''
+    vals = [x for x in vals if x.lower() not in ('na', 'null', 'none', '')]
     if len(vals) == 0:
         # a good default value?
         return 'VARCHAR(10)'
