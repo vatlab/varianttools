@@ -330,5 +330,29 @@ class TestImport(ProcessTestCase):
         self.assertFail('vtools import vcf/500SAMP.vcf --build hg18 --sample_name n1 n2 n3 n4 n5')
         self.assertFail('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1 samp_vcf2 samp_vcf3')
 
+    def testCsvImport1(self):
+        self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg18 --sample_name samp_csv')
+        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(),687)
+        self.maxDiff = None
+        variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
+        with open('txt/test.csv') as inputfile:
+            input = [x.split(',') for x in inputfile.readlines()]
+        input = [x[:4] for x in input]
+        self.assertEqual(variants, input)
+
+    def testCGAImport(self):
+        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg18 --sample_name samp_csv')
+        self.assertEqual(numOfSample(), 1)
+        self.assertEqual(numOfVariant(),95)
+        self.maxDiff = None
+        variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
+        with open('output/CGA_variant.txt') as inputfile:
+            input = [x.split(',') for x in inputfile.readlines()]
+        input = [x[:4] for x in input]
+        self.assertEqual(variants, input) 
+        self.assertOutput('vtools show genotypes', '''sample_name	filename	num_genotypes	sample_genotype_fields\nsamp_csv	txt/CGA.tsv.bz2	95	GT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF\n''')
+
+
 if __name__ == '__main__':
     unittest.main()
