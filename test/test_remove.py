@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, numOfSample
 
 class TestRemove(ProcessTestCase):
     def setUp(self):
@@ -37,21 +37,72 @@ class TestRemove(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
         runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
+        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
+
     def testRemove(self):
         'Test command vtools remove'
         self.assertFail('vtools remove')
         self.assertSucc('vtools remove -h')
+
+        #remove tables
+        self.assertFail('vtools remove table')
         self.assertFail('vtools remove tables')
-        # Removing table unaffected
         self.assertSucc('vtools remove tables unaffected')
         self.assertFail('vtools show table unaffected')
+        
         # Removing field CEU_num from variant table CEU
         count1 = len(outputOfCmd('vtools show fields').split('\n'))
         self.assertSucc('vtools remove fields CEU_cases_num')
         count2 = len(outputOfCmd('vtools show fields').split('\n'))
         self.assertEqual(count1-count2, 1)
+
+        #remove annotation
+        self.assertFail('vtools remove annotation')
+        self.assertFail('vtools remove annotations')
         self.assertSucc('vtools remove annotations testNSFP')
         self.assertFail('vtools show annotation testNSFP')
+
+    def testRemoveSample(self):
+        #remove samples
+        self.assertFail('vtools remove sample')
+        self.assertFail('vtools remove samples')
+        self.assertEqual(numOfSample(), 63)
+        self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
+        self.assertEqual(numOfSample(), 60) 
+        self.assertSucc('vtools remove samples "BMI > "40""')
+        self.assertEqual(numOfSample(), 59) 
+
+        #remove variant
+    def testRemoveVar(self):
+        self.assertFail('vtools remove variant')
+        self.assertFail('vtools remove variants')
+        str1 =''.join(outputOfCmd('vtools show tables').split(','))
+        self.assertEqual(str1, '''table                #variants\nvariant              1036\nCEU                  288\nunaffected           577\n''') 
+        self.assertSucc('vtools remove variants CEU')
+        str2 =''.join(outputOfCmd('vtools show tables').split(','))
+        self.assertEqual(str2, '''table                #variants\nvariant              748\nunaffected           289\n''') 
+
+    def testRemovePheno(self):
+        #remove genotype 
+        self.assertFail('vtools remove phenotype')
+        self.assertFail('vtools remove phenotypes')
+        self.assertFail('vtools remove phenotypes sample_name')
+        self.assertFail('vtools remove phenotypes filename')
+        self.assertFail('vtools remove phenotypes "sex = "F""')
+        self.assertSucc('vtools remove phenotypes sex')
+        self.assertOutput('vtools show samples','sample_name	filename	aff	BMI',1) 
+    
+    def testRemoveGenofield(self):
+        #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
+        self.maxDiff=None
+        self.assertOutput('vtools show genotypes -l -1','''SAMP2	vcf/SAMP2.vcf	288	GT,DP_geno\n''',-2)
+        self.assertFail('vtools remove geno_fields')
+        self.assertFail('vtools remove geno_fields variant_id')
+        self.assertFail('vtools remove geno_fields gt')
+        self.assertSucc('vtools remove geno_fields DP_geno')
+        self.assertOutput('vtools show genotypes -l -1','''SAMP2	vcf/SAMP2.vcf	288	GT\n''',-2)
+
+        self.assertFail('vtools remove projects')
         self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':
