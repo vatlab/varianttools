@@ -2716,6 +2716,8 @@ def remove(args):
                     raise ValueError('Cannot remove project: Incorrect project name')
                 proj.remove()
             elif args.type == 'tables':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify conditions to select tables to be removed')
                 allTables = proj.getVariantTables()
                 removed = []
                 for table in args.items:
@@ -2736,6 +2738,8 @@ def remove(args):
                     proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(['({})'.format(x) for x in args.items])))
                 proj.removeSamples(IDs)
             elif args.type == 'fields':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify conditions to select fields to be removed')
                 from_table = defaultdict(list)
                 for item in args.items:
                     if item.lower() in ['variant_id', 'chr', 'pos', 'alt']:
@@ -2781,6 +2785,8 @@ def remove(args):
                         proj.logger.info('Removing fields {} from genotype table {}'.format(', '.join(items), table.split('_')[-1]))
                         proj.db.removeFields(table, items)
             elif args.type == 'annotations':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify conditions to select annotation table to be removed')
                 for item in args.items:
                     removed = False
                     for i in range(len(proj.annoDB)):
