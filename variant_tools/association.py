@@ -392,13 +392,14 @@ class AssoTestsWorker(Process):
             gtmp = [2.0 if int(x) == -1 else x for x in gtmp]
             genotype.append(array('d', gtmp))
         #
-        self.logger.debug('Retrieved genotypes for {} samples'.format(len(genotype)))
         missing_counts = [x.count(-9.0) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
         # FIXME will pass it as an input arguement later
         #toKeep = [(x<0.5*numSites) for x in missing_counts]
         toKeep = [(x<numSites) for x in missing_counts]
-        self.logger.debug('{} samples will be removed due to missing genotypes'.format(len(self.sample_IDs)-sum(toKeep)))
+        numtoRemove = len(self.sample_IDs)-sum(toKeep)
+        if numtoRemove > 0:
+            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
         return genotype, toKeep
 
     def setGenotype(self, which, data):
@@ -424,7 +425,8 @@ class AssoTestsWorker(Process):
         #
         while True:
             grp = self.queue.get()
-            self.logger.debug('Got group {}'.format(grp))
+            grpname = '"' + ", ".join(map(str, grp)) + '"'
+            self.logger.debug('Retrieved association test unit {}'.format(grpname))
             if grp is None:
                 self.output.send(None)
                 break
@@ -439,15 +441,14 @@ class AssoTestsWorker(Process):
                 for test in self.tests:
                     test.setData(self.data)
                     result = test.calculate()
-                    self.logger.debug('Finished association test')
+                    self.logger.debug('Finished association test on {}'.format(grpname))
                     values.extend(result)
             except Exception as e:
-                self.logger.debug('Error processing data for group {}, {}'.format(grp, e))
+                self.logger.debug('An ERROR has occured while processing {}: {}'.format(grpname, e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 # return no result for any of the tests if a test fails.
                 values = []
-            self.logger.debug('Finished group {}'.format(grp))
             self.output.send(values)
         self.db.detach('__fromGeno')
         
@@ -490,6 +491,7 @@ def associate(args):
                 if results.completed() > count:
                     count = results.completed()
                     prog.update(count)
+                    proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
                 #
                 if not any(proc_status):
                     # if everything is done
