@@ -425,11 +425,14 @@ class AssoTestsWorker(Process):
         #
         while True:
             grp = self.queue.get()
-            grpname = '"' + ", ".join(map(str, grp)) + '"'
-            self.logger.debug('Retrieved association test unit {}'.format(grpname))
+            try:
+                grpname = '"' + ", ".join(map(str, grp)) + '"'
+            except TypeError:
+                grpname = None
             if grp is None:
                 self.output.send(None)
                 break
+            self.logger.debug('Retrieved association unit {}'.format(grpname))
             #
             self.data = t.AssoData()
             values = list(grp)

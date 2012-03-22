@@ -116,7 +116,7 @@ public:
 
 		if (plw > sig) {
 			return (alt == 1) ? pval : pval * 2.0;
-		} else{
+		} else {
 			return 9.0;
 		}
 	}
@@ -343,7 +343,7 @@ public:
 		//
 		if (pvalue <= 1.0) {
 			d.setPvalue(pvalue);
-		} else{
+		} else {
 			if (m_alternative == 1) {
 				pvalue = (permcount1 + 1.0) / (m_times + 1.0);
 			} else{
@@ -356,7 +356,7 @@ public:
 		// set statistic, a bit involved
 		if (m_alternative == 1) {
 			d.setStatistic(max_obstatistic);
-		} else{
+		} else {
 			(permcount1 >= permcount2) ? d.setStatistic(min_obstatistic) : d.setStatistic(max_obstatistic);
 		}
 

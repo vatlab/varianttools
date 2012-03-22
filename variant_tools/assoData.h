@@ -85,6 +85,8 @@ public:
 		//    std::bind2nd(std::equal_to<double>(),1.0));
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
+        m_statistic.resize(1);
+        m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
 
@@ -107,6 +109,8 @@ public:
 		//    std::bind2nd(std::equal_to<double>(),1.0));
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
+        m_statistic.resize((m_ncovar+1));
+        m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
 
@@ -286,7 +290,8 @@ public:
 
 	double setPvalue(double pval)
 	{
-		m_pval.push_back(pval);
+        m_pval.resize(1);
+		m_pval[0] = pval;
 		return 0.0;
 	}
 
@@ -297,7 +302,8 @@ public:
 	}
 	double setStatistic(double stat)
 	{
-		m_statistic.push_back(stat);
+        m_statistic.resize(1);
+		m_statistic[0] = stat;
 		return 0.0;
 	}
 
@@ -339,7 +345,9 @@ public:
 					if (m_sites[j] == 0) continue;
 				}
 
-				if (m_genotype[i][j] > 0) m_X[i] += m_genotype[i][j];
+				if (m_genotype[i][j] > 0) {
+                    m_X[i] += m_genotype[i][j];
+                }
 			}
 		}
 	}
@@ -347,10 +355,14 @@ public:
 
 	void weightX()
 	{
-		if (m_weight.size() == 0) return;
+		if (m_weight.size() == 0) {
+            return;
+        }
 		for (size_t i = 0; i < m_genotype.size(); ++i) {
 			for (size_t j = 0; j < m_genotype[i].size(); ++j) {
-				if (m_genotype[i][j] > 0) m_genotype[i][j] *= m_weight[j];
+                if (m_genotype[i][j] > 0) {
+                    m_genotype[i][j] *= m_weight[j];
+                }
 			}
 		}
 	}
@@ -372,9 +384,9 @@ public:
 				if (m_genotype[i][j] >= 1.0) {
 					m_X[i] = 1.0;
 					break;
-				}else if (m_genotype[i][j] > 0.0) {
+				} else if (m_genotype[i][j] > 0.0) {
 					pnovar *= (1.0 - m_genotype[i][j]);
-				}else ;
+				} else ;
 			}
 			if (pnovar < 1.0 && m_X[i] < 1.0) {
 				m_X[i] = 1.0 - pnovar;
@@ -409,8 +421,6 @@ public:
 	void simpleLinear()
 	{
 		// simple linear regression score test
-		// FIXME: may later need other output fields such as beta, CI, etc
-		//!- Statistic: LSE (MLE) for beta, centered and scaled (bcz E[b] = 0 and sigma = 1 by simulation)
 		//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
 		//
 		if (m_X.size() != m_phenotype.size()) {
@@ -433,98 +443,98 @@ public:
 				ysigma += pow(m_phenotype[i] - (b0 + b1 * m_X[i]), 2.0);
 			}
 			double varb = ysigma / (m_phenotype.size() - 2.0) / denominator;
-			m_statistic.push_back(b1 / sqrt(varb));
-		}else m_statistic.push_back(0.0);
+			m_statistic[0] = b1 / sqrt(varb);
+		} else m_statistic[0] = 0.0;
 	}
 
 
 	void simpleLogit()
-	{
-		//!- Score test implementation for logistic regression model logit(p) = b0 + b1x
-		//!- labnotes vol.2 page 3
-		//!- input phenotypes have to be binary values 0 or 1
-		if (m_X.size() != m_phenotype.size()) {
-			throw ValueError("Genotype/Phenotype length not equal!");
-		}
-		//double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
-		//double bo = log(ebo);
+    {
+        //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
+        //!- labnotes vol.2 page 3
+        //!- input phenotypes have to be binary values 0 or 1
+        if (m_X.size() != m_phenotype.size()) {
+            throw ValueError("Genotype/Phenotype length not equal!");
+        }
+        //double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
+        //double bo = log(ebo);
 
-		double po = (1.0 * m_ncases) / (1.0 * m_phenotype.size());
-		double ss = 0.0;
-		// the score
-		for (size_t i = 0; i != m_X.size(); ++i) {
-			ss += (m_X[i] - m_xbar) * (m_phenotype[i] - po);
-		}
-		double vm1 = 0.0;
-		// variance of score, under the null
-		for (size_t i = 0; i != m_X.size(); ++i) {
-			vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
-		}
+        double po = (1.0 * m_ncases) / (1.0 * m_phenotype.size());
+        double ss = 0.0;
+        // the score
+        for (size_t i = 0; i != m_X.size(); ++i) {
+            ss += (m_X[i] - m_xbar) * (m_phenotype[i] - po);
+        }
+        double vm1 = 0.0;
+        // variance of score, under the null
+        for (size_t i = 0; i != m_X.size(); ++i) {
+            vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
+        }
 
-		ss = ss / sqrt(vm1);
+        ss = ss / sqrt(vm1);
 
-		//!-FIXME: (not sure why this happens)
-		//!- w/ rounding to 0 I get strange number such as 3.72397e-35
-		//!- this would lead to type I error problem
-		fRound(ss, 0.0001);
-                m_statistic.push_back(ss);
-	}
+        //!-FIXME: (not sure why this happens)
+        //!- w/ rounding to 0 I get strange number such as 3.72397e-35
+        //!- this would lead to type I error problem
+        fRound(ss, 0.0001);
+        m_statistic[0] = ss;
+    }
 
 
 	void multipleLinear()
-	{
-		//!- multiple linear regression parameter estimate
-		//!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
-		//!- Solve the system via gsl_linalg_SV_solve()
-		if (m_X.size() != m_phenotype.size()) {
-			throw ValueError("Genotype/Phenotype length not equal!");
-		}
-		// reset phenotype data
-		m_model.replaceCol(m_phenotype, 0);
-		// reset genotype data
-		m_model.replaceCol(m_X, m_C.size() - 1);
-		m_model.fit();
-		vectorf beta = m_model.getBeta();
-		vectorf seb = m_model.getSEBeta();
-		m_statistic.push_back(beta.back() / seb.back());
-                for (unsigned i = 1; i < beta.size() - 1; ++i) {
-                        m_statistic.push_back(beta[i]/seb[i]);
-                }
-	}
+    {
+        //!- multiple linear regression parameter estimate
+        //!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
+        //!- Solve the system via gsl_linalg_SV_solve()
+        if (m_X.size() != m_phenotype.size()) {
+            throw ValueError("Genotype/Phenotype length not equal!");
+        }
+        // reset phenotype data
+        m_model.replaceCol(m_phenotype, 0);
+        // reset genotype data
+        m_model.replaceCol(m_X, m_C.size() - 1);
+        m_model.fit();
+        vectorf beta = m_model.getBeta();
+        vectorf seb = m_model.getSEBeta();
+        m_statistic[0] = beta.back() / seb.back();
+        for (unsigned i = 1; i < beta.size() - 1; ++i) {
+            m_statistic[i] = beta[i]/seb[i];
+        }
+    }
 
 
 	void gaussianP(unsigned sided = 1)
-	{
-		if (sided == 1) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-                                m_pval.push_back(gsl_cdf_ugaussian_Q(m_statistic[i]));
-                        }
-		}else if (sided == 2) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			        m_pval.push_back(gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0));
-                        }
-		}else  {
-			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
-		}
-	}
+    {
+        if (sided == 1) {
+            for (unsigned i = 0; i < m_statistic.size(); ++i) {
+                m_pval[i] = gsl_cdf_ugaussian_Q(m_statistic[i]);
+            }
+        }else if (sided == 2) {
+            for (unsigned i = 0; i < m_statistic.size(); ++i) {
+                m_pval[i] = gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0);
+            }
+        }else  {
+            throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
+        }
+    }
 
 
 	void studentP(unsigned sided = 1)
-	{
-		// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
-		if (sided == 1) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			        m_pval.push_back(gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0)));
-                        }
-		}else if (sided == 2) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			        double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
-			        m_pval.push_back(fmin(p, 1.0 - p) * 2.0);
-                        }
-		}else  {
-			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
-		}
-	}
+    {
+        // df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
+        if (sided == 1) {
+            for (unsigned i = 0; i < m_statistic.size(); ++i) {
+                m_pval[i] = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
+            }
+        } else if (sided == 2) {
+            for (unsigned i = 0; i < m_statistic.size(); ++i) {
+                double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
+                m_pval[i] = fmin(p, 1.0 - p) * 2.0;
+            }
+        } else  {
+            throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
+        }
+    }
 
 
 private:
