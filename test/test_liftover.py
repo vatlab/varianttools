@@ -67,6 +67,20 @@ class TestLiftover(ProcessTestCase):
         self.assertEqual(out1, out2)
         os.remove('temp_input.txt')
 
-        
+    def testLiftoverFlip(self):
+        self.assertFail('vtools liftover hg18')
+        self.assertFail('vtools liftover hg18 --flip')
+        self.assertSucc('vtools liftover hg19')
+        self.assertFail('vtools liftover hg18')
+        self.assertSucc('vtools liftover hg19 --flip')
+        self.assertSucc('vtools liftover hg18 --flip')   
+        var_tab18  = outputOfCmd('vtools output variant bin chr pos')
+        var_tab18 = '\n'.join([x for x in var_tab18.split('\n') if 'NA' not in x])
+        runCmd('vtools liftover hg19 --flip')   
+        var_tab19  = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos')
+        var_tab19 = '\n'.join([x for x in var_tab19.split('\n') if 'NA' not in x])
+        self.assertEqual(var_tab18, var_tab19)
+
+ 
 if __name__ == '__main__':
     unittest.main()
