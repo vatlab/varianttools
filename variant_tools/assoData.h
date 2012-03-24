@@ -51,7 +51,7 @@ public:
 	AssoData() :
 		m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
 		m_statistic(0), m_pval(0), m_C(0), m_ncovar(0),
-		m_sites(0), m_xbar(0.0), m_ybar(0.0), m_ncases(0),
+		m_xbar(0.0), m_ybar(0.0), m_ncases(0),
 		m_nctrls(0), m_model()
 	{
 	}
@@ -258,12 +258,6 @@ public:
 	}
 
 
-	vectori sites()
-	{
-		return m_sites;
-	}
-
-
 	unsigned covarcounts()
 	{
 		return m_ncovar;
@@ -334,23 +328,18 @@ public:
 
 	// manipulate data
 	void sumToX()
-	{
-		m_X.resize(m_genotype.size());
-		std::fill(m_X.begin(), m_X.end(), 0.0);
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			//m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
-			for (size_t j = 0; j < m_genotype[i].size(); ++j) {
-				// check if we should skip this site
-				if (m_sites.size() != 0) {
-					if (m_sites[j] == 0) continue;
-				}
-
-				if (m_genotype[i][j] > 0) {
+    {
+        m_X.resize(m_genotype.size());
+        std::fill(m_X.begin(), m_X.end(), 0.0);
+        for (size_t i = 0; i < m_genotype.size(); ++i) {
+            //m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
+            for (size_t j = 0; j < m_genotype[i].size(); ++j) {
+                if (m_genotype[i][j] > 0) {
                     m_X[i] += m_genotype[i][j];
                 }
-			}
-		}
-	}
+            }
+        }
+    }
 
 
 	void weightX()
@@ -375,19 +364,14 @@ public:
 		std::fill(m_X.begin(), m_X.end(), 0.0);
 		for (size_t i = 0; i < m_genotype.size(); ++i) {
 			double pnovar = 1.0;
-			for (size_t j = 0; j != m_genotype[i].size(); ++j) {
-				// check if we should skip this site
-				if (m_sites.size() != 0) {
-					if (m_sites[j] == 0) continue;
-				}
-
-				if (m_genotype[i][j] >= 1.0) {
-					m_X[i] = 1.0;
-					break;
-				} else if (m_genotype[i][j] > 0.0) {
-					pnovar *= (1.0 - m_genotype[i][j]);
-				} else ;
-			}
+            for (size_t j = 0; j != m_genotype[i].size(); ++j) {
+                if (m_genotype[i][j] >= 1.0) {
+                    m_X[i] = 1.0;
+                    break;
+                } else if (m_genotype[i][j] > 0.0) {
+                    pnovar *= (1.0 - m_genotype[i][j]);
+                } else ;
+            }
 			if (pnovar < 1.0 && m_X[i] < 1.0) {
 				m_X[i] = 1.0 - pnovar;
 			}
@@ -396,26 +380,27 @@ public:
 
 
 	void setSitesByMaf(double upper, double lower)
-	{
-		//Will update m_sites with 0 = sites not to be analyzed; 1 = sites to be analyzed
-		m_sites.clear();
-		if (upper > 1.0) {
-			throw ValueError("Minor allele frequency value should not exceed 1");
-		}
-		if (lower < 0.0) {
-			throw ValueError("Minor allele frequency should be a positive value");
-		}
+    {
+        if (upper > 1.0) {
+            throw ValueError("Minor allele frequency value should not exceed 1");
+        }
+        if (lower < 0.0) {
+            throw ValueError("Minor allele frequency should be a positive value");
+        }
 
-		if (fEqual(upper, 1.0) && fEqual(lower, 0.0)) return;
+        if (fEqual(upper, 1.0) && fEqual(lower, 0.0)) return;
 
-		for (size_t j = 0; j != m_maf.size(); ++j) {
-			if (m_maf[j] <= lower || m_maf[j] > upper) {
-				m_sites.push_back(0);
-			}else  {
-				m_sites.push_back(1);
-			}
-		}
-	}
+        for (size_t j = 0; j != m_maf.size(); ++j) {
+            if (m_maf[j] <= lower || m_maf[j] > upper) {
+                m_maf.erase(m_maf.begin() + j);
+                for (size_t i = 0; i < m_genotype.size(); ++i) {
+                    m_genotype[i].erase(m_genotype[i].begin() + j);
+                }
+                --j;
+            }
+        }
+        return;
+    }
 
 
 	void simpleLinear()
@@ -550,9 +535,6 @@ private:
 	vectorf m_maf;
 	/// translated genotype
 	vectorf m_X;
-
-	// sites that are involved in the association test
-	vectori m_sites;
 
 	// weights
 	vectorf m_weight;

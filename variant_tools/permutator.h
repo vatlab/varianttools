@@ -189,7 +189,12 @@ public:
 			double statistic = d.statistic()[0];
 			if (i == 0) {
 				obstatistic = statistic;
-			} else{
+                if (obstatistic != obstatistic) {
+                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+                    d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+                    return 0;
+                }
+			} else {
 				if (statistic > obstatistic) {
 					++permcount1;
 				} else if (statistic < obstatistic) {
@@ -269,17 +274,7 @@ public:
 		gsl_rng * gslr = rng.get();
 
 		// obtain proper thresholds cutoffs
-		vectorf maf;
-		if (d.sites().size() == 0) {
-			maf = d.maf();
-		} else{
-			maf.resize(0);
-			vectorf mafall = d.maf();
-			vectori sites = d.sites();
-			for (size_t i = 0; i < mafall.size(); ++i) {
-				if (sites[i] == 1) maf.push_back(mafall[i]);
-			}
-		}
+		vectorf maf = d.maf();
 		std::sort(maf.begin(), maf.end());
 		std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
 		maf.resize(it - maf.begin());
@@ -291,6 +286,7 @@ public:
 		}
 		if (maf.size() == 0) {
 			// nothing to do
+            // FIXME should throw a Python message
 			d.setPvalue(std::numeric_limits<double>::quiet_NaN());
 			d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 			return 0.0;
@@ -316,6 +312,11 @@ public:
 			if (i == 0) {
 				max_obstatistic = max_statistic;
 				min_obstatistic = min_statistic;
+                if (max_obstatistic != max_obstatistic) {
+                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+                    d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+                    return 0;
+                }
 			} else{
 				if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
 					if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
