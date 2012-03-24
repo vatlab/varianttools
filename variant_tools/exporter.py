@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
 # $File: exporter.py $
-# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
-# $Rev: 4234 $
+# $LastChangedDate$
+# $Rev$
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.

@@ -1,7 +1,7 @@
 /**
  *  $File: config.h $
- *  $LastChangedDate: 2010-11-17 23:23:30 -0600 (Wed, 17 Nov 2010) $
- *  $Rev: 3896 $
+ *  $LastChangedDate$
+ *  $Rev$
  *
  *  This file is part of simuPOP, a forward-time population genetics
  *  simulation environment. Please visit http://simupop.sourceforge.net

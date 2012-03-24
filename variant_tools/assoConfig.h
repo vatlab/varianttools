@@ -1,7 +1,7 @@
 /**
  *  $File: assoTests.h $
- *  $LastChangedDate: 2011-07-06 23:27:10 -0500 (Wed, 06 Jul 2011) $
- *  $Rev: 4256 $
+ *  $LastChangedDate$
+ *  $Rev$
  *
  *  This file is part of variant_tools, a software application to annotate,
  *  summarize, and filter variants for next-gen sequencing ananlysis.
