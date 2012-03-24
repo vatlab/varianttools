@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
 # $File: __init__.py $
-# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
-# $Rev: 4234 $
+# $LastChangedDate$
+# $Rev$
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
@@ -35,7 +35,7 @@ __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
 VTOOLS_VERSION='1.0.3svn'
-VTOOLS_REVISION='$Rev: 893 $'
+VTOOLS_REVISION='$Rev$'
 VTOOLS_REVISION=VTOOLS_REVISION[VTOOLS_REVISION.find(" ")+1:-2]
 
 #
