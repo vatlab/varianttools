@@ -336,7 +336,9 @@ public:
             if (choice) {
                 // quick VT method as is originally implemented
                 for (size_t m = 0; m < genotypes.size(); ++m) {
-                    reorder(gindex.begin(), gindex.end(), genotypes[m].begin());
+                    if (m_permute->name() != "PermuteY") {
+                        reorder(gindex.begin(), gindex.end(), genotypes[m].begin());
+                    }
                     dtmp->setX(genotypes[m]);
                     m_actions[1]->apply(*dtmp);
                     vt_statistic.push_back(dtmp->statistic()[0]);
@@ -384,7 +386,7 @@ public:
 				break;
 			}
             // permutation
-            if (choice) {
+            if (choice && m_permute->name() != "PermuteY") {
                 random_shuffle(gindex.begin(), gindex.end());
             } else {
                 m_permute->apply(d);

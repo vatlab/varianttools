@@ -140,6 +140,10 @@ public:
 		return 0;
 	}
 
+    std::string name()
+    {
+        return "PermuteX";
+    }
 
 };
 
@@ -163,6 +167,10 @@ public:
 		return 0;
 	}
 
+    std::string name()
+    {
+        return "PermuteRawX";
+    }
 
 };
 
@@ -186,7 +194,10 @@ public:
 		return 0;
 	}
 
-
+    std::string name()
+    {
+        return "PermuteY";
+    }
 };
 
 
