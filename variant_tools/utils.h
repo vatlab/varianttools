@@ -39,6 +39,8 @@
 #include "gsl/gsl_errno.h"
 
 #include "assoConfig.h"
+bool fEqual(double a, double b);
+void fRound(double & myValue, double PRECISION);
 
 struct VPlus
 {
@@ -50,15 +52,53 @@ struct VPlus
 		}
 		return x;
 	}
-
-
 };
 
-bool fEqual(double a, double b);
-
-void fRound(double & myValue, double PRECISION);
-
 namespace std {
+template< typename order_iterator, typename value_iterator >
+void reorder( order_iterator order_begin, order_iterator order_end, value_iterator v )  {   
+    typedef typename iterator_traits< value_iterator >::value_type value_t;
+    typedef typename iterator_traits< order_iterator >::value_type index_t;
+    typedef typename iterator_traits< order_iterator >::difference_type diff_t;
+
+    diff_t remaining = order_end - 1 - order_begin;
+    for ( index_t s = index_t(), d; remaining > 0; ++ s ) {
+        for ( d = order_begin[s]; d > s; d = order_begin[d] ) ;
+        if ( d == s ) {
+                -- remaining;
+                value_t temp = v[s];
+                while ( d = order_begin[d], d != s ) {
+                        swap( temp, v[d] );
+                        -- remaining;
+                }
+                v[s] = temp;
+        }
+    }
+}
+
+
+template< typename order_iterator, typename value_iterator >
+void reorder_destructive( order_iterator order_begin, order_iterator order_end, value_iterator v )  {
+    typedef typename iterator_traits< value_iterator >::value_type value_t;
+    typedef typename iterator_traits< order_iterator >::value_type index_t;
+    typedef typename iterator_traits< order_iterator >::difference_type diff_t;
+
+    diff_t remaining = order_end - 1 - order_begin;
+    for ( index_t s = index_t(); remaining > 0; ++ s ) {
+        index_t d = order_begin[s];
+        if ( d == (diff_t) -1 ) continue;
+        -- remaining;
+        value_t temp = v[s];
+        for ( index_t d2; d != s; d = d2 ) {
+                swap( temp, v[d] );
+                swap( order_begin[d], d2 = (diff_t) -1 );
+                -- remaining;
+        }
+        v[s] = temp;
+    }
+}
+
+
 //!- stdout for vector
 template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 {
@@ -70,7 +110,6 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 	}
 	return out;
 }
-
 
 }
 

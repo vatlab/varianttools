@@ -51,6 +51,10 @@ public:
 		return 0;
 	}
 
+    virtual std::string name()
+    {
+        return "";
+    }
 
 };
 
@@ -79,6 +83,10 @@ public:
 		return 0;
 	}
 
+    std::string name()
+    {
+        return "SumToX";
+    }
 
 };
 
@@ -103,7 +111,11 @@ public:
 		d.meanOfX();
 		return 0;
 	}
-
+    
+    std::string name()
+    {
+        return "BinToX";
+    }
 
 };
 
@@ -277,6 +289,10 @@ public:
 		return 0;
 	}
 
+    std::string name()
+    {
+        return "LinearRegression";
+    }
 
 };
 
@@ -301,7 +317,10 @@ public:
 		return 0;
 	}
 
-
+    std::string name()
+    {
+        return "LinearRegression";
+    }
 };
 
 
@@ -327,6 +346,10 @@ public:
 		return 0;
 	}
 
+    std::string name()
+    {
+        return "LogisticRegression";
+    }
 
 };
 

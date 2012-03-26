@@ -24,7 +24,6 @@
  */
 #include "utils.h"
 
-
 bool fEqual(double a, double b)
 {
 	return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
@@ -42,5 +41,3 @@ void fRound(double & myValue, double PRECISION)
 	}
 	return;
 }
-
-

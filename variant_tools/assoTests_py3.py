@@ -366,6 +366,14 @@ class RuntimeError(Exception):
 RuntimeError_swigregister = _assoTests.RuntimeError_swigregister
 RuntimeError_swigregister(RuntimeError)
 
+
+def fEqual(*args, **kwargs) -> "bool" :
+  return _assoTests.fEqual(*args, **kwargs)
+fEqual = _assoTests.fEqual
+
+def fRound(*args, **kwargs) -> "void" :
+  return _assoTests.fRound(*args, **kwargs)
+fRound = _assoTests.fRound
 class VPlus(object):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
@@ -375,14 +383,6 @@ class VPlus(object):
 VPlus_swigregister = _assoTests.VPlus_swigregister
 VPlus_swigregister(VPlus)
 
-
-def fEqual(*args, **kwargs) -> "bool" :
-  return _assoTests.fEqual(*args, **kwargs)
-fEqual = _assoTests.fEqual
-
-def fRound(*args, **kwargs) -> "void" :
-  return _assoTests.fRound(*args, **kwargs)
-fRound = _assoTests.fRound
 class RNG(object):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
@@ -428,6 +428,7 @@ class AssoData(object):
     __swig_destroy__ = _assoTests.delete_AssoData
 AssoData.clone = new_instancemethod(_assoTests.AssoData_clone,None,AssoData)
 AssoData.setGenotype = new_instancemethod(_assoTests.AssoData_setGenotype,None,AssoData)
+AssoData.setX = new_instancemethod(_assoTests.AssoData_setX,None,AssoData)
 AssoData.setPhenotype = new_instancemethod(_assoTests.AssoData_setPhenotype,None,AssoData)
 AssoData.setMaf = new_instancemethod(_assoTests.AssoData_setMaf,None,AssoData)
 AssoData.setMafWeight = new_instancemethod(_assoTests.AssoData_setMafWeight,None,AssoData)
@@ -437,7 +438,6 @@ AssoData.genotype = new_instancemethod(_assoTests.AssoData_genotype,None,AssoDat
 AssoData.raw_genotype = new_instancemethod(_assoTests.AssoData_raw_genotype,None,AssoData)
 AssoData.covariates = new_instancemethod(_assoTests.AssoData_covariates,None,AssoData)
 AssoData.maf = new_instancemethod(_assoTests.AssoData_maf,None,AssoData)
-AssoData.sites = new_instancemethod(_assoTests.AssoData_sites,None,AssoData)
 AssoData.covarcounts = new_instancemethod(_assoTests.AssoData_covarcounts,None,AssoData)
 AssoData.samplecounts = new_instancemethod(_assoTests.AssoData_samplecounts,None,AssoData)
 AssoData.pvalue = new_instancemethod(_assoTests.AssoData_pvalue,None,AssoData)
@@ -467,6 +467,7 @@ class BaseAction(object):
     __swig_destroy__ = _assoTests.delete_BaseAction
 BaseAction.clone = new_instancemethod(_assoTests.BaseAction_clone,None,BaseAction)
 BaseAction.apply = new_instancemethod(_assoTests.BaseAction_apply,None,BaseAction)
+BaseAction.name = new_instancemethod(_assoTests.BaseAction_name,None,BaseAction)
 BaseAction_swigregister = _assoTests.BaseAction_swigregister
 BaseAction_swigregister(BaseAction)
 

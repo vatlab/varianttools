@@ -74,6 +74,11 @@ public:
 		return 0.0;
 	}
 
+	double setX(const vectorf & g)
+	{
+		m_X = g;
+		return 0.0;
+	}
 
 	double setPhenotype(const vectorf & p)
 	{

@@ -266,6 +266,7 @@ public:
 
 	double apply(AssoData & d)
 	{
+
 		if (d.maf().size() == 0) {
 			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
 		}
@@ -293,20 +294,64 @@ public:
 		}
 
 		double maflower = maf.front() - std::numeric_limits<double>::epsilon();
-		// apply variable thresholds w/i permutation test
+        
+        matrixf genotypes(0);
+        std::vector<size_t> gindex(0);
+        //
+        // determine whether to use a quicker permutation routine if the actions are simply "codeX + doRegression"
+        // ... there does not seem a big difference in efficiency ... (reduced by 21.7%) 
+        // 
+        unsigned choice = 0;
+        
+        if (m_actions.size() == 2) {
+            if ((m_actions[0]->name() == "BinToX" || 
+                m_actions[0]->name() == "SumToX") && 
+                (m_actions[1]->name() == "LinearRegression" || 
+                m_actions[1]->name() == "LogisticRegression")) 
+            {
+                choice = 1;
+            }
+        }
+        if (choice) {
+            // obtain genotype codings by maf cut-offs
+            AssoData* dtmp = d.clone();
+            for (size_t m = 0; m < maf.size(); ++m) {
+                dtmp->setSitesByMaf(maf[(maf.size()-m-1)], maflower);
+                m_actions[0]->apply(*dtmp);
+                genotypes.push_back(dtmp->genotype());
+            }
+            for (size_t i = 0; i < genotypes[0].size(); ++i) {
+                gindex.push_back(i);
+            }
+            delete dtmp;
+        }
+        // apply variable thresholds w/i permutation test
 		unsigned permcount1 = 0, permcount2 = 0;
 		double max_obstatistic = 0.0, min_obstatistic = 0.0;
 		double pvalue = 9.0;
 
 		for (size_t i = 0; i < m_times; ++i) {
 			vectorf vt_statistic(0);
-			for (size_t m = 0; m < maf.size(); ++m) {
-				d.setSitesByMaf(maf[m], maflower);
-				for (size_t j = 0; j < m_actions.size(); ++j) {
-					m_actions[j]->apply(d);
-				}
-				vt_statistic.push_back(d.statistic()[0]);
-			}
+            AssoData* dtmp = d.clone();
+            if (choice) {
+                // quick VT method as is originally implemented
+                for (size_t m = 0; m < genotypes.size(); ++m) {
+                    reorder(gindex.begin(), gindex.end(), genotypes[m].begin());
+                    dtmp->setX(genotypes[m]);
+                    m_actions[1]->apply(*dtmp);
+                    vt_statistic.push_back(dtmp->statistic()[0]);
+                }
+            } else {
+                // regular VT method
+                for (size_t m = 0; m < maf.size(); ++m) {
+                    dtmp->setSitesByMaf(maf[(maf.size()-m-1)], maflower);
+                    for (size_t j = 0; j < m_actions.size(); ++j) {
+                        m_actions[j]->apply(*dtmp);
+                    }
+                    vt_statistic.push_back(dtmp->statistic()[0]);
+                }
+            }
+            delete dtmp;
 			double max_statistic = *max_element(vt_statistic.begin(), vt_statistic.end());
 			double min_statistic = *min_element(vt_statistic.begin(), vt_statistic.end());
 			if (i == 0) {
@@ -317,11 +362,11 @@ public:
                     d.setPvalue(std::numeric_limits<double>::quiet_NaN());
                     return 0;
                 }
-			} else{
+			} else {
 				if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
 					if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
 					else ++permcount2;
-				} else{
+				} else {
 					if (max_statistic >= max_obstatistic) {
 						++permcount1;
 					}
@@ -338,7 +383,12 @@ public:
 			if (pvalue <= 1.0) {
 				break;
 			}
-			m_permute->apply(d);
+            // permutation
+            if (choice) {
+                random_shuffle(gindex.begin(), gindex.end());
+            } else {
+                m_permute->apply(d);
+            }
 		}
 
 		//
@@ -347,7 +397,7 @@ public:
 		} else {
 			if (m_alternative == 1) {
 				pvalue = (permcount1 + 1.0) / (m_times + 1.0);
-			} else{
+			} else {
 				double permcount = fmin(permcount1, permcount2);
 				pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
 			}
@@ -360,7 +410,6 @@ public:
 		} else {
 			(permcount1 >= permcount2) ? d.setStatistic(min_obstatistic) : d.setStatistic(max_obstatistic);
 		}
-
 		return 0.0;
 	}
 
