@@ -464,6 +464,8 @@ def phenotype(args):
                         ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.output:
                 p.output(args.output, args.header, args.delimiter, args.na, args.limit, ' AND '.join(['({})'.format(x) for x in args.samples]))
+            if not (args.from_file or args.set or args.from_stat or args.output):
+                raise ValueError('Please add "-h" after phenotype to get more help for this command')
         proj.close()
     except Exception as e:
         sys.exit(e)
