@@ -1,0 +1,47 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Output from ANNOVAR for files of type "*.variant_function", generated from command "path/to/annovar/annotate_variation.pl annovar.txt path/to/annovar/humandb/". This format imports chr, pos, ref, alt and ANNOVAR annotations. For details please refer to http://www.openbioinformatics.org/annovar/annovar_gene.html
+variant=chr, pos, ref, alt
+variant_info=%(var_info)s
+
+[DEFAULT]
+var_info=region_type
+var_info_comment=Fields to be outputted, can be one or both of region_type and region_name.
+
+[chr]
+index=3
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=4
+type=INTEGER NOT NULL
+comment=1-based position, hg18
+
+[ref]
+index=6
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=7
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
+
+[region_type]
+index=1
+type=VARCHAR(255)
+comment=The genomic region type (i.e., intergenic, ncRNA_intronic, etc) where this variant lies.
+
+[region_name]
+index=2
+type=VARCHAR(255)
+comment=Genomic region name that corresponds to the region_type.  If the variant lies in an intergenic region, this field will specify the closest known regions upstream and downstream of this variant. 
+
