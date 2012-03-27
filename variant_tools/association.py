@@ -29,6 +29,7 @@ import threading
 from multiprocessing import Process, Queue, Pipe, Lock
 import time
 from array import array
+import math
 from collections import OrderedDict
 from copy import copy, deepcopy
 from .project import Project, Field, AnnoDB, AnnoDBWriter
@@ -621,6 +622,8 @@ class LinearBurdenTest(NullTest):
             for i in range(ncovariates):
                 self.fields.append(Field(name='beta{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='statistic beta{}'.format(str(i+2))))
                 self.fields.append(Field(name='beta{}_p_value'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for beta{}'.format(str(i+2))))
+        else:
+            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
                 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
@@ -694,9 +697,17 @@ class LinearBurdenTest(NullTest):
         pvalues = data.pvalue()
         regstats = data.statistic()
         res = [data.samplecounts()]
-        for (x, y) in zip(regstats, pvalues):
-            res.append(x)
-            res.append(y)
+        if len(pvalues) == len(regstats):
+            for (x, y) in zip(regstats, pvalues):
+                res.append(x)
+                res.append(y)
+        elif len(pvalues) == 1 and len(regstats) == 2:
+            res.append(regstats[0])
+            res.append(pvalues[0])
+            if math.isnan(regstats[1]): res.append(regstats[1])
+            else: res.append(int(regstats[1]))
+        else:
+            raise ValueError('p-values and statistics length not equal')
         return res
 
 class LNBT(LinearBurdenTest):

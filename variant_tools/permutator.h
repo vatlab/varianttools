@@ -76,7 +76,7 @@ public:
 		double x;
 		if (alt == 1) {
 			x = 1.0 + pcount1;
-		} else{
+		} else {
 			x = fmin(pcount1 + 1.0, pcount2 + 1.0);
 		}
 
@@ -179,8 +179,10 @@ public:
 		gsl_rng * gslr = rng.get();
 
 		unsigned permcount1 = 0, permcount2 = 0;
-		double obstatistic = 0.0;
 		double pvalue = 9.0;
+        // statistics[0] for statistic
+        // statistics[1] for actual number of permutations (informative on standard error)
+        vectorf statistics(2); 
 
 		for (size_t i = 0; i < m_times; ++i) {
 			for (size_t j = 0; j < m_actions.size(); ++j) {
@@ -188,16 +190,18 @@ public:
 			}
 			double statistic = d.statistic()[0];
 			if (i == 0) {
-				obstatistic = statistic;
-                if (obstatistic != obstatistic) {
-                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+				statistics[0] = statistic;
+                if (statistics[0] != statistics[0]) {
+                    statistics[0] = std::numeric_limits<double>::quiet_NaN();
+                    statistics[1] = std::numeric_limits<double>::quiet_NaN();
+                    d.setStatistic(statistics);
                     d.setPvalue(std::numeric_limits<double>::quiet_NaN());
                     return 0;
                 }
 			} else {
-				if (statistic > obstatistic) {
+				if (statistic > statistics[0]) {
 					++permcount1;
-				} else if (statistic < obstatistic) {
+				} else if (statistic < statistics[0]) {
 					++permcount2;
 				} else{
 					if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
@@ -209,6 +213,7 @@ public:
 				pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
 			}
 			if (pvalue <= 1.0) {
+                statistics[1] = double(i);
 				break;
 			}
 			m_permute->apply(d);
@@ -225,8 +230,9 @@ public:
 			}
 			d.setPvalue(pvalue);
 		}
-
-		d.setStatistic(obstatistic);
+        
+        statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
+		d.setStatistic(statistics);
 		return 0.0;
 		//return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
 	}
@@ -265,36 +271,39 @@ public:
 
 
 	double apply(AssoData & d)
-	{
+    {
 
-		if (d.maf().size() == 0) {
-			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
-		}
+        if (d.maf().size() == 0) {
+            throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
+        }
 
-		RNG rng;
-		gsl_rng * gslr = rng.get();
+        RNG rng;
+        gsl_rng * gslr = rng.get();
 
-		// obtain proper thresholds cutoffs
-		vectorf maf = d.maf();
-		std::sort(maf.begin(), maf.end());
-		std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
-		maf.resize(it - maf.begin());
-		if (fEqual(maf.front(), 0.0)) {
-			maf.erase(maf.begin());
-		}
-		if (fEqual(maf.back(), 1.0)) {
-			maf.erase(maf.end());
-		}
-		if (maf.size() == 0) {
-			// nothing to do
+        // obtain proper thresholds cutoffs
+        vectorf maf = d.maf();
+        std::sort(maf.begin(), maf.end());
+        std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
+        maf.resize(it - maf.begin());
+        if (fEqual(maf.front(), 0.0)) {
+            maf.erase(maf.begin());
+        }
+        if (fEqual(maf.back(), 1.0)) {
+            maf.erase(maf.end());
+        }
+        if (maf.size() == 0) {
+            // nothing to do
             // FIXME should throw a Python message
-			d.setPvalue(std::numeric_limits<double>::quiet_NaN());
-			d.setStatistic(std::numeric_limits<double>::quiet_NaN());
-			return 0.0;
-		}
+            vectorf statistics(2); 
+            statistics[0] = std::numeric_limits<double>::quiet_NaN();
+            statistics[1] = std::numeric_limits<double>::quiet_NaN();
+            d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+            d.setStatistic(statistics);
+            return 0.0;
+        }
 
-		double maflower = maf.front() - std::numeric_limits<double>::epsilon();
-        
+        double maflower = maf.front() - std::numeric_limits<double>::epsilon();
+
         matrixf genotypes(0);
         std::vector<size_t> gindex(0);
         //
@@ -302,7 +311,7 @@ public:
         // ... there does not seem a big difference in efficiency ... (reduced by 21.7%) 
         // 
         unsigned choice = 0;
-        
+
         if (m_actions.size() == 2) {
             if ((m_actions[0]->name() == "BinToX" || 
                 m_actions[0]->name() == "SumToX") && 
@@ -320,18 +329,21 @@ public:
                 m_actions[0]->apply(*dtmp);
                 genotypes.push_back(dtmp->genotype());
             }
+            delete dtmp;
             for (size_t i = 0; i < genotypes[0].size(); ++i) {
                 gindex.push_back(i);
             }
-            delete dtmp;
         }
         // apply variable thresholds w/i permutation test
-		unsigned permcount1 = 0, permcount2 = 0;
-		double max_obstatistic = 0.0, min_obstatistic = 0.0;
-		double pvalue = 9.0;
+        unsigned permcount1 = 0, permcount2 = 0;
+        double max_obstatistic = 0.0, min_obstatistic = 0.0;
+        double pvalue = 9.0;
+        // statistics[0] for statistic
+        // statistics[1] for actual number of permutations (informative on standard error)
+        vectorf statistics(2); 
 
-		for (size_t i = 0; i < m_times; ++i) {
-			vectorf vt_statistic(0);
+        for (size_t i = 0; i < m_times; ++i) {
+            vectorf vt_statistic(0);
             AssoData* dtmp = d.clone();
             if (choice) {
                 // quick VT method as is originally implemented
@@ -354,66 +366,70 @@ public:
                 }
             }
             delete dtmp;
-			double max_statistic = *max_element(vt_statistic.begin(), vt_statistic.end());
-			double min_statistic = *min_element(vt_statistic.begin(), vt_statistic.end());
-			if (i == 0) {
-				max_obstatistic = max_statistic;
-				min_obstatistic = min_statistic;
+            double max_statistic = *max_element(vt_statistic.begin(), vt_statistic.end());
+            double min_statistic = *min_element(vt_statistic.begin(), vt_statistic.end());
+            if (i == 0) {
+                max_obstatistic = max_statistic;
+                min_obstatistic = min_statistic;
                 if (max_obstatistic != max_obstatistic) {
-                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+                    statistics[0] = std::numeric_limits<double>::quiet_NaN();
+                    statistics[1] = std::numeric_limits<double>::quiet_NaN();
+                    d.setStatistic(statistics);
                     d.setPvalue(std::numeric_limits<double>::quiet_NaN());
                     return 0;
                 }
-			} else {
-				if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
-					if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
-					else ++permcount2;
-				} else {
-					if (max_statistic >= max_obstatistic) {
-						++permcount1;
-					}
-					if (min_statistic <= min_obstatistic) {
-						++permcount2;
-					}
-				}
-			}
+            } else {
+                if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
+                    if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
+                    else ++permcount2;
+                } else {
+                    if (max_statistic >= max_obstatistic) {
+                        ++permcount1;
+                    }
+                    if (min_statistic <= min_obstatistic) {
+                        ++permcount2;
+                    }
+                }
+            }
 
-			// adaptive p-value calculation
-			if (m_sig < 1.0) {
-				pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
-			}
-			if (pvalue <= 1.0) {
-				break;
-			}
+            // adaptive p-value calculation
+            if (m_sig < 1.0) {
+                pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
+            }
+            if (pvalue <= 1.0) {
+                statistics[1] = double(i);
+                break;
+            }
             // permutation
             if (choice && m_permute->name() != "PermuteY") {
                 random_shuffle(gindex.begin(), gindex.end());
             } else {
                 m_permute->apply(d);
             }
-		}
+        }
+        //
+        if (pvalue <= 1.0) {
+            d.setPvalue(pvalue);
+        } else {
+            if (m_alternative == 1) {
+                pvalue = (permcount1 + 1.0) / (m_times + 1.0);
+            } else {
+                double permcount = fmin(permcount1, permcount2);
+                pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
+            }
+            d.setPvalue(pvalue);
+        }
 
-		//
-		if (pvalue <= 1.0) {
-			d.setPvalue(pvalue);
-		} else {
-			if (m_alternative == 1) {
-				pvalue = (permcount1 + 1.0) / (m_times + 1.0);
-			} else {
-				double permcount = fmin(permcount1, permcount2);
-				pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
-			}
-			d.setPvalue(pvalue);
-		}
-
-		// set statistic, a bit involved
-		if (m_alternative == 1) {
-			d.setStatistic(max_obstatistic);
-		} else {
-			(permcount1 >= permcount2) ? d.setStatistic(min_obstatistic) : d.setStatistic(max_obstatistic);
-		}
-		return 0.0;
-	}
+        // set statistic, a bit involved
+        if (m_alternative == 1) {
+            statistics[0] = max_obstatistic;
+        } else {
+            statistics[0] = (permcount1 >= permcount2) ? min_obstatistic : max_obstatistic;
+        }
+        statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
+        d.setStatistic(statistics);
+        return 0.0;
+    }
 
 
 private:
