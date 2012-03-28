@@ -207,7 +207,7 @@ class GenoFormatter:
                 else:
                     return ref + self.sep + ref
             else:
-                raise ValueError('Do not know how to handle genotype {}'.format(item))
+                raise ValueError('Failed to handle genotype {}. This format only handles bi-allelic variants'.format(item))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
@@ -223,7 +223,7 @@ class GenoFormatter:
             elif len(item) > 1 and item.count(item[0]) == len(item):
                 return str(self.base + abs(item[0]))
             else:
-                raise ValueError('Do not know how to handle genotype {}'.format(item))
+                raise ValueError('Failed to handle genotype {}. This format only handles bi-allelic variants'.format(item))
         elif item is None:
             return self.missing
         else:
