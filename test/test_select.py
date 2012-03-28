@@ -52,10 +52,14 @@ class TestSelect(ProcessTestCase):
         self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
         self.assertOutput("vtools select variant -c", '915\n')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output chr pos ref alt')
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output variant_id testNSFP.CHBJPT_total_lc')
+
         # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
         #the follosing test should add --output (or -o)
         self.assertSucc('vtools select variant -o \'max(testNSFP.polyphen2_score)\'')
+        self.assertSucc('vtools select variant -o \'max(testNSFP.polyphen2_score)\' --header max')
         self.assertOutput("vtools execute 'select count(*) from ns'", '7\n')
         self.assertOutput("vtools select ns -c", '7\n')
         
