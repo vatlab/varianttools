@@ -2771,9 +2771,11 @@ def remove(args):
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of genotype fields to be removed')
                 if 'variant_id' in [x.lower() for x in args.items]:
-                    proj.logger.warning('Genotype id variant_id cannot be removed')
+                    raise ValueError('Genotypes id variant_id cannot be removed')
+                    #proj.logger.warning('Genotype id variant_id cannot be removed')
                 if 'gt' in [x.lower() for x in args.items]:
-                    proj.logger.warning('Genotype field GT cannot be removed')
+                    raise ValueError('Genotypes field GT cannot be removed')
+                    #proj.logger.warning('Genotype field GT cannot be removed')
                 proj.db.attach(proj.name + '_genotype')
                 cur = proj.db.cursor()
                 cur.execute('SELECT sample_id FROM sample;')
@@ -2917,6 +2919,8 @@ def show(args):
                             '\n'.join(textwrap.wrap(x.comment, initial_indent=' '*(27-len(db.name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
             elif args.type == 'annotation':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify the annotation(s) to display')
                 for item in args.items:
                     try:
                         annoDB = [x for x in proj.annoDB if x.name.lower() == item.lower()][0]
