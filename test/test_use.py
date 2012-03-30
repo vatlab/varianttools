@@ -38,7 +38,6 @@ class TestUse(ProcessTestCase):
     def removeProj(self):
         runCmd('vtools remove project')
         
-        #The following code ended by __Long__ is added by Long
     def testShow(self):
         'Test vtools show command'
         self.assertSucc('vtools show')
@@ -58,9 +57,8 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools show table variant -l -1')
         self.assertSucc('vtools show fields')
         self.assertSucc('vtools show formats')
-        self.assertSucc('vtools show annotation')
+        self.assertFail('vtools show annotation')
         self.assertSucc('vtools show annotations')
-        #ended __Long__
 
     def testUse(self):
         'Test command vtools use'
@@ -69,6 +67,7 @@ class TestUse(ProcessTestCase):
         self.assertFail('vtools use non_existing_file.ann')
         self.assertSucc('vtools use ann/testNSFP.ann')
         self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')
+        self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip --rebuild')
         self.assertFail('vtools use ann/testNSFP.ann --files ann/non_existing_file.zip')
         self.assertSucc('vtools use ann/testNSFP.DB.gz')
 
@@ -98,6 +97,14 @@ class TestUse(ProcessTestCase):
         # do we have all the variants matched up?
         self.assertOutput('vtools select variant -c', '146\n')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')
+
+    def testEvs(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+        self.assertSucc('vtools use evs')
+        self.assertSucc('vtools show annotation evs')
+        self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
+        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM', '', 0,'output/evsVariantTest.txt')
 
     def testNSFP(self):
         'Test variants in dbNSFP'
