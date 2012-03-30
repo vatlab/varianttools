@@ -320,8 +320,8 @@ class ResultRecorder:
         if not res:
             self.failed_count += 1
             return
-        output = '\t'.join(map(str, res))
-        print(output)
+        str_output = '\t'.join(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
+        print(str_output)
         # also write to an annotation database?
         if self.writer:
             if self.writer.update_existing:
@@ -701,11 +701,11 @@ class LinearBurdenTest(NullTest):
         regse = data.se()
         res = [data.samplecounts()]
         for (x, y, z) in zip(regstats, pvalues, regse):
-            res.append(round(x,5))
-            res.append(round(y,5))
+            res.append(x)
+            res.append(y)
             if self.permutations == 0:
                 # beta estimate
-                res.append(round(x*z,5))
+                res.append(x*z)
             else:
                 # actual number of permutations
                 if math.isnan(z): res.append(z)
