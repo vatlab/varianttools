@@ -37,6 +37,7 @@ typedef std::vector<std::vector<int> > matrixi;
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include "assoConfig.h"
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
@@ -50,7 +51,7 @@ class AssoData
 public:
 	AssoData() :
 		m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
-		m_statistic(0), m_pval(0), m_C(0), m_ncovar(0),
+		m_statistic(0), m_se(0), m_pval(0), m_C(0), m_ncovar(0),
 		m_xbar(0.0), m_ybar(0.0), m_ncases(0),
 		m_nctrls(0), m_model()
 	{
@@ -91,6 +92,7 @@ public:
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
         m_statistic.resize(1);
+        m_se.resize(1);
         m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
@@ -115,6 +117,7 @@ public:
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
         m_statistic.resize((m_ncovar+1));
+        m_se.resize((m_ncovar+1));
         m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
@@ -299,10 +302,24 @@ public:
 		m_statistic = stat;
 		return 0.0;
 	}
+
+	double setSE(vectorf se)
+	{
+		m_se = se;
+		return 0.0;
+	}
+
 	double setStatistic(double stat)
 	{
         m_statistic.resize(1);
 		m_statistic[0] = stat;
+		return 0.0;
+	}
+
+	double setSE(double se)
+	{
+        m_se.resize(1);
+		m_se[0] = se;
 		return 0.0;
 	}
 
@@ -311,6 +328,10 @@ public:
 		return m_statistic;
 	}
 
+	vectorf se()
+	{
+		return m_se;
+	}
 
 public:
 	void permuteY()
@@ -434,7 +455,11 @@ public:
 			}
 			double varb = ysigma / (m_phenotype.size() - 2.0) / denominator;
 			m_statistic[0] = b1 / sqrt(varb);
-		} else m_statistic[0] = 0.0;
+			m_se[0] = sqrt(varb);
+		} else {
+            m_statistic[0] = 0.0;
+            m_se[0] = std::numeric_limits<double>::quiet_NaN();
+        }
 	}
 
 
@@ -468,6 +493,7 @@ public:
         //!- this would lead to type I error problem
         fRound(ss, 0.0001);
         m_statistic[0] = ss;
+        m_se[0] = sqrt(vm1);
     }
 
 
@@ -487,8 +513,10 @@ public:
         vectorf beta = m_model.getBeta();
         vectorf seb = m_model.getSEBeta();
         m_statistic[0] = beta.back() / seb.back();
+        m_se[0] = seb.back();
         for (unsigned i = 1; i < beta.size() - 1; ++i) {
             m_statistic[i] = beta[i]/seb[i];
+            m_se[i] = seb[i];
         }
     }
 
@@ -499,11 +527,11 @@ public:
             for (unsigned i = 0; i < m_statistic.size(); ++i) {
                 m_pval[i] = gsl_cdf_ugaussian_Q(m_statistic[i]);
             }
-        }else if (sided == 2) {
+        } else if (sided == 2) {
             for (unsigned i = 0; i < m_statistic.size(); ++i) {
                 m_pval[i] = gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0);
             }
-        }else  {
+        } else {
             throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
         }
     }
@@ -550,6 +578,7 @@ private:
 	unsigned m_nctrls;
 	vectorf m_pval;
 	vectorf m_statistic;
+    vectorf m_se;
 	LinearM m_model;
 };
 

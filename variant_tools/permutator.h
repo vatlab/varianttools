@@ -192,9 +192,8 @@ public:
 			if (i == 0) {
 				statistics[0] = statistic;
                 if (statistics[0] != statistics[0]) {
-                    statistics[0] = std::numeric_limits<double>::quiet_NaN();
-                    statistics[1] = std::numeric_limits<double>::quiet_NaN();
-                    d.setStatistic(statistics);
+                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+                    d.setSE(std::numeric_limits<double>::quiet_NaN());
                     d.setPvalue(std::numeric_limits<double>::quiet_NaN());
                     return 0;
                 }
@@ -232,7 +231,8 @@ public:
 		}
         
         statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
-		d.setStatistic(statistics);
+		d.setStatistic(statistics[0]);
+		d.setSE(statistics[1]);
 		return 0.0;
 		//return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
 	}
@@ -294,11 +294,9 @@ public:
         if (maf.size() == 0) {
             // nothing to do
             // FIXME should throw a Python message
-            vectorf statistics(2); 
-            statistics[0] = std::numeric_limits<double>::quiet_NaN();
-            statistics[1] = std::numeric_limits<double>::quiet_NaN();
             d.setPvalue(std::numeric_limits<double>::quiet_NaN());
-            d.setStatistic(statistics);
+            d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+            d.setSE(std::numeric_limits<double>::quiet_NaN());
             return 0.0;
         }
 
@@ -372,9 +370,8 @@ public:
                 max_obstatistic = max_statistic;
                 min_obstatistic = min_statistic;
                 if (max_obstatistic != max_obstatistic) {
-                    statistics[0] = std::numeric_limits<double>::quiet_NaN();
-                    statistics[1] = std::numeric_limits<double>::quiet_NaN();
-                    d.setStatistic(statistics);
+                    d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+                    d.setSE(std::numeric_limits<double>::quiet_NaN());
                     d.setPvalue(std::numeric_limits<double>::quiet_NaN());
                     return 0;
                 }
@@ -427,7 +424,8 @@ public:
             statistics[0] = (permcount1 >= permcount2) ? min_obstatistic : max_obstatistic;
         }
         statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
-        d.setStatistic(statistics);
+        d.setStatistic(statistics[0]);
+        d.setSE(statistics[1]);
         return 0.0;
     }
 

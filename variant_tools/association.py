@@ -616,12 +616,14 @@ class LinearBurdenTest(NullTest):
     def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
-                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='statistic'), 
-                        Field(name='p_value', index=None, type='FLOAT', adj=None, comment='p-value')]
+                        Field(name='statistic_x', index=None, type='FLOAT', adj=None, comment='statistic for x'), 
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         if self.permutations == 0:
+            self.fields.append(Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='estimate of effect size'))
             for i in range(ncovariates):
-                self.fields.append(Field(name='beta{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='statistic beta{}'.format(str(i+2))))
-                self.fields.append(Field(name='beta{}_p_value'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for beta{}'.format(str(i+2))))
+                self.fields.extend([Field(name='statistic_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='statistic for covariate {}'.format(str(i+2))),
+                                    Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for covariate {}'.format(str(i+2))),
+                                    Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta_{}'.format(str(i+2)))])
         else:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
                 
@@ -696,18 +698,18 @@ class LinearBurdenTest(NullTest):
         # get results
         pvalues = data.pvalue()
         regstats = data.statistic()
+        regse = data.se()
         res = [data.samplecounts()]
-        if len(pvalues) == len(regstats):
-            for (x, y) in zip(regstats, pvalues):
-                res.append(x)
-                res.append(y)
-        elif len(pvalues) == 1 and len(regstats) == 2:
-            res.append(regstats[0])
-            res.append(pvalues[0])
-            if math.isnan(regstats[1]): res.append(regstats[1])
-            else: res.append(int(regstats[1]))
-        else:
-            raise ValueError('p-values and statistics length not equal')
+        for (x, y, z) in zip(regstats, pvalues, regse):
+            res.append(round(x,5))
+            res.append(round(y,5))
+            if self.permutations == 0:
+                # beta estimate
+                res.append(round(x*z,5))
+            else:
+                # actual number of permutations
+                if math.isnan(z): res.append(z)
+                else: res.append(int(z))                
         return res
 
 class LNBT(LinearBurdenTest):
