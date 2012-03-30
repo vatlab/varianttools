@@ -474,7 +474,7 @@ def downloadFile(URL, dest_dir = None, quiet = False):
         if error_code[1] == 404:
             raise RuntimeError('ERROR 404: Not Found.')
         else:
-            raise RuntimeError(':'.join(error_code[0], error_code[1]))
+            raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
     else:
         urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
     if not quiet:
