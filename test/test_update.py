@@ -100,8 +100,21 @@ class TestUpdate(ProcessTestCase):
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
         self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
-        
-        
+
+        #Add fields based on other variants or annotation fields( --set)
+    def testGenoAnnoSet(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
+        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
+        self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
+        self.assertSucc('vtools output variant chr pos total num maf -l 10')
+        #we can set the fields from the annotation file
+        self.assertSucc('vtools liftover hg19')
+        self.assertSucc('vtools use evs')
+        self.assertSucc('vtools update variant --set evs_gene=evs.Genes')
+        self.assertOutput(('vtools execute "select chr,pos, ref, alt, evs_gene from variant\
+                         where evs_gene is not null"'), '22\t49524956\tG\tA\tACR\n')
+        self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '1\n')
         
 if __name__ == '__main__':
     unittest.main()
