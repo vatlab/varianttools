@@ -450,8 +450,9 @@ def downloadFile(URL, dest_dir = None, quiet = False):
         pass
     # use wget? Almost universally available under linux
     try:
+        from subprocess import Popen, PIPE
         # for some strange reason, passing wget without shell=True can fail silently.
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), stdout=PIPE, stderr=PIPE, shell=True)
         ret = p.wait()
         if ret == 0 and os.path.isfile(dest):
             return dest
