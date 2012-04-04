@@ -451,7 +451,7 @@ def downloadFile(URL, dest_dir = None, quiet = False):
     # use wget? Almost universally available under linux
     try:
         # for some strange reason, passing wget without shell=True can fail silently.
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+        p = subprocess.Popen('wget {} -mv -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
         ret = p.wait()
         if ret == 0 and os.path.isfile(dest):
             return dest
@@ -464,7 +464,7 @@ def downloadFile(URL, dest_dir = None, quiet = False):
     except OSError:
         # no wget command
         pass
-    #
+    
     # use python urllib?
     if not quiet:
         prog = ProgressBar(filename)
