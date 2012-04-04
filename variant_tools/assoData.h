@@ -138,7 +138,7 @@ public:
 
 		m_maf.resize(m_genotype.front().size());
 		std::fill(m_maf.begin(), m_maf.end(), 0.0);
-		vectorf valid_all = m_maf, valid_alt = m_maf;
+		vectorf valid_all = m_maf;
 
 		for (size_t j = 0; j < m_maf.size(); ++j) {
 			unsigned cnt1 = 0, cnt2 = 0;
@@ -150,7 +150,6 @@ public:
 					if (m_genotype[i][j] > 0.0) {
 						if (fEqual(m_genotype[i][j], 1.0)) cnt1 += 1;
 						if (fEqual(m_genotype[i][j], 2.0)) cnt2 += 1;
-						valid_alt[j] += 1.0;
 						m_maf[j] += m_genotype[i][j];
 					}
 				}
@@ -165,7 +164,7 @@ public:
 			// if #1>#2 (2111100) then have to put as (0000011)
 			// otherwise (1222200) should actually be (1000022)
 			//
-			if (valid_all[j] < 2.0 * valid_alt[j]) {
+			if (valid_all[j] * 2 - (cnt1 + cnt2 * 2) < (cnt1 + cnt2 * 2)) {
 				// recoding is needed
 				m_maf[j] = 0.0;
 				// recode and re-calculate maf
@@ -176,7 +175,7 @@ public:
 							// recode (1111100) to (0000011)
 							// force cases of (2111100) to be (0000011)
 							m_genotype[i][j] = (m_genotype[i][j] > 0.0) ? 0.0 : 1.0;
-						} else{
+						} else {
 							// for (2222200) or (1222200) just flip the coding
 							m_genotype[i][j] = 2.0 - m_genotype[i][j];
 						}
