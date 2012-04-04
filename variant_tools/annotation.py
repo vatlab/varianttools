@@ -295,6 +295,8 @@ class AnnoDBConfiger:
             # trick the program to handle the file as one that has been downloaded.
             self.source_url = source_files[0]
             source_files = self.getSourceFiles()
+        if self.source_pattern is not None:
+            source_files = [x for x in source_files if self.source_pattern in x]
         #
         self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
         #
