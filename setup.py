@@ -376,6 +376,7 @@ setup(name = "variant_tools",
                 'variant_tools/assoData.cpp',
                 'variant_tools/utils.cpp'
                 ] + LIB_GSL,
+            #extra_compile_args=["-O3", "-march=native"],
             library_dirs = [],
             libraries = libs,
             include_dirs = [".", "variant_tools", "variant_tools/gsl"],

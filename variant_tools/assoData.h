@@ -127,6 +127,7 @@ public:
 	{
 		//get this field directly from the variant table
 		m_maf = maf;
+
 	}
 
 
@@ -141,57 +142,31 @@ public:
 		vectorf valid_all = m_maf;
 
 		for (size_t j = 0; j < m_maf.size(); ++j) {
-			unsigned cnt1 = 0, cnt2 = 0;
 			// calc maf and loci counts for site j
 			for (size_t i = 0; i < m_genotype.size(); ++i) {
 				// genotype not missing
 				if (!(m_genotype[i][j] < 0.0)) {
 					valid_all[j] += 1.0;
 					if (m_genotype[i][j] > 0.0) {
-						if (fEqual(m_genotype[i][j], 1.0)) cnt1 += 1;
-						if (fEqual(m_genotype[i][j], 2.0)) cnt2 += 1;
-						m_maf[j] += m_genotype[i][j];
+					    m_maf[j] += m_genotype[i][j];
 					}
 				}
 			}
-			//
-			//
-			// RECODING
-			// FIXME : currently it is an awkward re-coding approach,
-			// will recode sites where #alt>#ref alleles,
-			// assumes either excess of homo (2222200) only or heter (1111100 for male chrX) only,
-			// not like (1222200) or (2111100), which, if happens, will check if there are more 1's than 2's
-			// if #1>#2 (2111100) then have to put as (0000011)
-			// otherwise (1222200) should actually be (1000022)
-			//
-			if (valid_all[j] * 2 - (cnt1 + cnt2 * 2) < (cnt1 + cnt2 * 2)) {
-				// recoding is needed
-				m_maf[j] = 0.0;
-				// recode and re-calculate maf
-				for (size_t i = 0; i < m_genotype.size(); ++i) {
-					// genotype not missing
-					if (!(m_genotype[i][j] < 0.0)) {
-						if (cnt1 >= cnt2) {
-							// recode (1111100) to (0000011)
-							// force cases of (2111100) to be (0000011)
-							m_genotype[i][j] = (m_genotype[i][j] > 0.0) ? 0.0 : 1.0;
-						} else {
-							// for (2222200) or (1222200) just flip the coding
-							m_genotype[i][j] = 2.0 - m_genotype[i][j];
-						}
-						if (m_genotype[i][j] > 0.0) {
-							m_maf[j] += m_genotype[i][j];
-						}
-					}
-				}
-			}
-			//
-			// count maf, will be incorrect for male chrX,
-			// but will not matter for our purpose
-			//
-			if (valid_all[j] > 0.0) {
+            
+            if (valid_all[j] > 0.0) {
 				m_maf[j] = m_maf[j] / (valid_all[j] * 2.0);
 			}
+            //  FIXME : re-code genotype.  will be incorrect for male chrX
+            if (m_maf[j] > 0.5) {    
+                m_maf[j] = 1.0 - m_maf[j];
+                // recode genotypes 
+                for (size_t i = 0; i < m_genotype.size(); ++i) {
+                    // genotype not missing
+                    if (!(m_genotype[i][j] < 0.0)) {
+                        m_genotype[i][j] = 2.0 - m_genotype[i][j];
+                    }
+                }
+            }
 		}
 		/*
 		   m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(),
