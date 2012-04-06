@@ -31,6 +31,7 @@
 #include <vector>
 #include <iostream>
 #include <ctime>
+#include <unistd.h>
 #include "gsl/gsl_rng.h"
 #include "gsl/gsl_vector.h"
 #include "gsl/gsl_matrix.h"
