@@ -23,7 +23,7 @@ anno_type=position
 description=GWAS Catalog
 version=hg19_20111220
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gwasCatalog.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/gwasCatalog_hg19-20111220.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/gwasCatalog-hg19_20111220.DB.gz
 source_type=txt
 encoding=ISO-8859-1
 
