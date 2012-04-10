@@ -45,10 +45,36 @@ typedef std::vector<std::vector<int> > matrixi;
 
 
 namespace vtools {
-
+/*  Association data object
+ *  This class define memembers for all association data storage as well as simple methods on memeber data
+ */
 class AssoData
 {
 public:
+
+/*
+ *  members include
+ *  m_phenotype: phenotype vector (n X 1)
+ *  m_genotype: genotype matrix (n samples X p loci) -- raw genotypes
+ *  m_X: genotype vector (n X 1) -- genotype scores
+ *      Each element is a score combining information from an individual's p loci 
+ *  m_maf: minor allele frequency vector (p X 1) for the p loci
+ *  m_statistic: statistics for all predictor variables from association tests. 
+ *      For permutation based tests only genotype statistics is calculated (m_statistic.size() == 1)
+ *  m_se: standard error (or measures reflecting standard error) for m_statistic
+ *  m_pval: p-values for m_statistic
+ *  m_C: covariates matrix (n X m). 
+ *      The first column of m_C is a vector of 1's (reserved for intercept estimate) 
+ *      The last column of m_C will be filled with m_X
+ *  m_ncovar: number of covariates
+ *  m_xbar: mean(m_X)
+ *  m_ybar: mean(m_phenotype)
+ *  m_ncases: number of cases for case/ctrl data
+ *  m_nctrls: number of ctrls for case/ctrl data
+ *  m_model: model data object
+ *      Will be linear model for quantitative traits, logistic regression model for disease traits
+ */
+
 	AssoData() :
 		m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
 		m_statistic(0), m_se(0), m_pval(0), m_C(0), m_ncovar(0),
@@ -67,7 +93,7 @@ public:
 	}
 
 
-	// set data
+	// set raw genotypes
 	double setGenotype(const matrixf & g)
 	{
 		//codings are 0, 1, 2, -9 and U(0,1) number for "expected" genotype
@@ -75,54 +101,68 @@ public:
 		return 0.0;
 	}
 
+    // set genotype scores
 	double setX(const vectorf & g)
 	{
 		m_X = g;
 		return 0.0;
 	}
 
+    // set phenotypes
+    // input is a vector, i.e., no there is no other phenotype covariates and genotype will be the only predictor in the statistical model
+    // As a result it re-sets the size of statistics, pvalues, etc, to 1
 	double setPhenotype(const vectorf & p)
 	{
 		m_phenotype = p;
-		// set phenotype statistics
+		// set phenotype mean
 		m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
 		m_ybar /= (1.0 * m_phenotype.size());
-		//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
+		// set case/ctrl counts
+        //m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),1.0));
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
+        //
+        // re-size statistics vector, etc, for there is only one predictor
         m_statistic.resize(1);
         m_se.resize(1);
         m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
 
-
+    // set phenotypes and phenotype covariates
+    // input is a phenotype vector and a covariates matrix
 	double setPhenotype(const vectorf & p, const matrixf & c)
 	{
 		m_phenotype = p;
 		m_C = c;
+        // number of covariates. (need to subtract by 1 because first column of m_C is reserved with a vector of 1's)
 		m_ncovar = c.size() - 1;
 		vectorf one(p.size());
 		std::fill(one.begin(), one.end(), 1.0);
+        // reserve the last column to be a column of 1's, a placeholder for m_X which will be calculated and assigned to the last column of m_C 
 		m_C.push_back(one);
+        // initialize the statistical model
 		m_model.clear();
 		m_model.setY(m_phenotype);
 		m_model.setX(m_C);
-		// set phenotype statistics
+		// set phenotype mean
 		m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
 		m_ybar /= (1.0 * m_phenotype.size());
 		//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),1.0));
 		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
 		//    std::bind2nd(std::equal_to<double>(),0.0));
+        //
+        // re-size statistics vector, etc
         m_statistic.resize((m_ncovar+1));
         m_se.resize((m_ncovar+1));
         m_pval.resize(m_statistic.size());
 		return m_ybar;
 	}
 
-
+    // set minor allele frequency from an external field
+    // FIXME this function is not currently being used
 	void setMaf(const vectorf & maf)
 	{
 		//get this field directly from the variant table
@@ -131,9 +171,9 @@ public:
 	}
 
 
+	// set sample maf from data
 	void setMaf()
 	{
-		//sample maf from data
 		//is problematic for variants on male chrX
 		//but should be Ok if only use the relative mafs (e.g., weightings)
 
@@ -176,10 +216,10 @@ public:
 		 */
 	}
 
-
+    // compute weight w = 1 / sqrt(p*(1-p))
+    // using the entire sample
 	void setMafWeight()
 	{
-		// compute w = 1 / sqrt(p*(1-p))
 		if (m_maf.size() == 0) {
 			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
 		}
@@ -194,13 +234,14 @@ public:
 		}
 	}
 
-
+		
+    // compute weight by maf from selected samples (ctrls, low QT samples, etc)
+    // FIXME not yet implemented
 	void setMafWeight(const std::vector<size_t> & idx)
 	{
-		// FIXME weight by maf from selected samples (ctrls, low QT samples, etc)
 	}
 
-
+    // calculate mean of m_X (genotype scores)
 	double meanOfX()
 	{
 		m_xbar = std::accumulate(m_X.begin(), m_X.end(), 0.0);
@@ -208,8 +249,10 @@ public:
 		return m_xbar;
 	}
 
-
-	// return some information
+    /*
+	 * get various data
+     *
+     * */
 	vectorf phenotype()
 	{
 		return m_phenotype;
@@ -257,6 +300,20 @@ public:
 		return m_pval;
 	}
 
+    vectorf statistic()
+	{
+		return m_statistic;
+	}
+
+	vectorf se()
+	{
+		return m_se;
+	}
+    
+    /*
+     * set p-value, etc
+     *
+     * */
 
 	double setPvalue(vectorf pval)
 	{
@@ -297,36 +354,30 @@ public:
 		return 0.0;
 	}
 
-	vectorf statistic()
-	{
-		return m_statistic;
-	}
 
-	vectorf se()
-	{
-		return m_se;
-	}
 
 public:
+    // permute phenotype data
 	void permuteY()
 	{
 		random_shuffle(m_phenotype.begin(), m_phenotype.end());
 	}
 
-
+    // permute genotype matrix by samples
 	void permuteRawX()
 	{
 		random_shuffle(m_genotype.begin(), m_genotype.end());
 	}
 
-
+    // permute genotype scores
 	void permuteX()
 	{
 		random_shuffle(m_X.begin(), m_X.end());
 	}
 
 
-	// manipulate data
+	// calculate genotype scores from raw genotype
+    // m_X = rowSum(m_genotype)
 	void sumToX()
     {
         m_X.resize(m_genotype.size());
@@ -340,8 +391,33 @@ public:
             }
         }
     }
+	
+    // calculate genotype scores from raw genotype
+    // m_X = (rowSum(m_genotype) > 0) 
+    // m_X is binary: 0 for all wildtype, 1 for having at least one mutation
+	void binToX()
+	{
+		m_X.resize(m_genotype.size());
+		std::fill(m_X.begin(), m_X.end(), 0.0);
+		for (size_t i = 0; i < m_genotype.size(); ++i) {
+			double pnovar = 1.0;
+            for (size_t j = 0; j != m_genotype[i].size(); ++j) {
+                if (m_genotype[i][j] >= 1.0) {
+                    m_X[i] = 1.0;
+                    break;
+                } else if (m_genotype[i][j] > 0.0) {
+		            // binning the data with proper handling of missing genotype
+                    pnovar *= (1.0 - m_genotype[i][j]);
+                } else ;
+            }
+            // all genotypes are missing: have to be represented as Pr(#mutation>=1)
+			if (pnovar < 1.0 && m_X[i] < 1.0) {
+				m_X[i] = 1.0 - pnovar;
+			}
+		}
+	}
 
-
+    // weight the raw genotypes by m_weight 
 	void weightX()
 	{
 		if (m_weight.size() == 0) {
@@ -356,29 +432,7 @@ public:
 		}
 	}
 
-
-	void binToX()
-	{
-		// binning the data with proper handling of missing genotype
-		m_X.resize(m_genotype.size());
-		std::fill(m_X.begin(), m_X.end(), 0.0);
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			double pnovar = 1.0;
-            for (size_t j = 0; j != m_genotype[i].size(); ++j) {
-                if (m_genotype[i][j] >= 1.0) {
-                    m_X[i] = 1.0;
-                    break;
-                } else if (m_genotype[i][j] > 0.0) {
-                    pnovar *= (1.0 - m_genotype[i][j]);
-                } else ;
-            }
-			if (pnovar < 1.0 && m_X[i] < 1.0) {
-				m_X[i] = 1.0 - pnovar;
-			}
-		}
-	}
-
-
+    // remove variant sites having MAF <= lower_bound or MAF > upper_bound
 	void setSitesByMaf(double upper, double lower)
     {
         if (upper > 1.0) {
@@ -402,7 +456,7 @@ public:
         return;
     }
 
-
+    // Wald's statistic for simple linear model Y = b0 + b1x
 	void simpleLinear()
 	{
 		// simple linear regression score test
@@ -437,9 +491,9 @@ public:
 	}
 
 
+    //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
 	void simpleLogit()
     {
-        //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
         //!- labnotes vol.2 page 3
         //!- input phenotypes have to be binary values 0 or 1
         if (m_X.size() != m_phenotype.size()) {
@@ -470,7 +524,8 @@ public:
         m_se[0] = sqrt(vm1);
     }
 
-
+    // fitting / calculating wald's statistic for multiple linear regression model
+    // Y = b0 + b1x1 + b2x2 + ... + bnxn
 	void multipleLinear()
     {
         //!- multiple linear regression parameter estimate
@@ -483,7 +538,9 @@ public:
         m_model.replaceCol(m_phenotype, 0);
         // reset genotype data
         m_model.replaceCol(m_X, m_C.size() - 1);
+        // fit the linear regression model
         m_model.fit();
+        // get statistics and set values to assoData object
         vectorf beta = m_model.getBeta();
         vectorf seb = m_model.getSEBeta();
         m_statistic[0] = beta.back() / seb.back();
@@ -494,7 +551,7 @@ public:
         }
     }
 
-
+    // get p-value from statistic, assuming standard normal distribution 
 	void gaussianP(unsigned sided = 1)
     {
         if (sided == 1) {
@@ -510,7 +567,8 @@ public:
         }
     }
 
-
+    // get p-value from statistic, assuming t distribution
+    // degree of freedom will be calculated from data automatically 
 	void studentP(unsigned sided = 1)
     {
         // df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
@@ -545,14 +603,16 @@ private:
 
 	// weights
 	vectorf m_weight;
-
+    // genotype/phenotype data summaries
 	double m_xbar;
 	double m_ybar;
 	unsigned m_ncases;
 	unsigned m_nctrls;
+    // statistics from association tests
 	vectorf m_pval;
 	vectorf m_statistic;
     vectorf m_se;
+    // statistical model object
 	LinearM m_model;
 };
 
