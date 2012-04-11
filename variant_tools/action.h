@@ -30,7 +30,11 @@
 
 namespace vtools {
 
-
+/*
+ * action classes
+ * wrappers of assoData member methods that can be used in association.py
+ *
+ */
 class BaseAction
 {
 public:
@@ -50,7 +54,8 @@ public:
 		throw RuntimeError("The base action class should not be called");
 		return 0;
 	}
-
+    
+    // return a string of the class name
     virtual std::string name()
     {
         return "";

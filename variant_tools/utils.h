@@ -40,9 +40,12 @@
 #include "gsl/gsl_errno.h"
 
 #include "assoConfig.h"
+// check if float numbers are equal
 bool fEqual(double a, double b);
+// round() float numbers
 void fRound(double & myValue, double PRECISION);
 
+// pairwise sum of vector elements. can be used in std::accumulate for vector2f objects 
 struct VPlus
 {
 	template<typename T> std::vector<T> operator()(std::vector<T> x, std::vector<T> y)
@@ -56,6 +59,8 @@ struct VPlus
 };
 
 namespace std {
+// order a vector by index specified in another vector
+// this will not destruct the index vector
 template< typename order_iterator, typename value_iterator >
 void reorder( order_iterator order_begin, order_iterator order_end, value_iterator v )  {   
     typedef typename iterator_traits< value_iterator >::value_type value_t;
@@ -77,7 +82,8 @@ void reorder( order_iterator order_begin, order_iterator order_end, value_iterat
     }
 }
 
-
+// order a vector by index specified in another vector
+// this is more efficient but will destruct the index vector
 template< typename order_iterator, typename value_iterator >
 void reorder_destructive( order_iterator order_begin, order_iterator order_end, value_iterator v )  {
     typedef typename iterator_traits< value_iterator >::value_type value_t;
@@ -100,7 +106,7 @@ void reorder_destructive( order_iterator order_begin, order_iterator order_end, 
 }
 
 
-//!- stdout for vector
+// stdout for vector
 template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 {
 	if (!vec.empty()) {
@@ -116,6 +122,7 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 
 namespace vtools {
 
+// random number generator from gsl
 class RNG
 {
 public:
@@ -144,6 +151,12 @@ private:
 	unsigned long __seed;
 };
 
+
+// linear model class
+// members are
+// m_ncol, m_nrow: dimensions
+// m_x: predictor matrix
+// m_y: respond vector
 class BaseLm
 {
 public:
@@ -182,7 +195,7 @@ public:
 		return new BaseLm(*this);
 	}
 
-
+    // initialize X, the predictor matrix
 	void setX(const std::vector<std::vector<double> > & x)
 	{
 		if (x.size() == 0) {
@@ -214,7 +227,7 @@ public:
 		if (m_x) gsl_matrix_free(m_x);
 	}
 
-
+    // initialize Y, the respond vector
 	void setY(const std::vector<double> & y)
 	{
 		if (y.size() == 0) {
@@ -233,7 +246,7 @@ public:
 		}
 	}
 
-
+    // return X
 	std::vector<std::vector<double> > getX()
 	{
 		std::vector<std::vector<double> > xout(m_ncol);
@@ -245,7 +258,7 @@ public:
 		return xout;
 	}
 
-
+    // replace certain column in X, or replace the entire Y (when "which==0")
 	void replaceCol(const std::vector<double> & col, int which)
 	{
 		if (which < 0 || which >= m_ncol) {
@@ -260,7 +273,7 @@ public:
 			for (size_t i = 0; i < m_nrow; ++i) {
 				gsl_matrix_set(m_x, i, which, col[i]);
 			}
-		} else{
+		} else {
 			// set m_y
 			if (!m_y) {
 				throw RuntimeError("m_y vector not initialized");
@@ -279,6 +292,12 @@ protected:
 	int m_ncol;
 };
 
+
+// fit the linear model
+// via SVD technique
+// members are 
+// m_beta: fitted model parameters (LSE)
+// m_svd_: intermediate data from the SVD procedure
 class LinearM : public BaseLm
 {
 public:
@@ -385,7 +404,7 @@ public:
 		gsl_vector_free(work);
 	}
 
-
+    // obtain estimates for coefficients
 	std::vector<double> getBeta()
 	{
 		std::vector<double> beta(m_ncol);
@@ -395,7 +414,7 @@ public:
 		return beta;
 	}
 
-
+    // obtain standard error for the LSE
 	std::vector<double> getSEBeta()
 	{
 		if (!m_beta) {
