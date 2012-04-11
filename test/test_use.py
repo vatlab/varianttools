@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase, runCmd, initTest, output2list
 
 class TestUse(ProcessTestCase):
     def setUp(self):
@@ -112,6 +112,90 @@ class TestUse(ProcessTestCase):
         # see if YRI=10/118 is correctly extracted
         self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '10\t118\n')
         self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9\t118\n')
+
+    def testUseRange_1(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #the annotation file of "knownGene" is a range based database
+        self.assertSucc('vtools use knownGene --anno_type range --linked_fields chr txStart txEnd')
+        self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
+        range_out = output2list('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"')
+        #using another way to export this table
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #this is the default method. the linked_fields have to be in the order in the test below.
+        self.assertSucc('vtools use knownGene')
+        self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
+        def_out = output2list('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"')
+        self.assertEqual(range_out, def_out)
         
+
+    def testUseRange_2(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #runCmd('vtools use gwasCatalog')
+        #self.assertSucc('vtools show annotation gwasCatalog -v2')
+        #the annotation file of "gwasCatalog" is a position-based, but we can use it as range-based as below:
+        self.assertSucc('vtools use gwasCatalog --anno_type range --linked_fields chr position-5000 position+5000')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        range_out2=len(output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"'))
+        self.assertSucc('vtools select variant "gwasCatalog.genes == \'RERE\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
+        #narrow the range of position
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.assertSucc('vtools use gwasCatalog --anno_type range --linked_fields chr position-500 position+500')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        range_out3=len(output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"'))
+        self.assertNotEqual(range_out2, range_out3)
+       
+
+    def testUseField(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        runCmd('vtools use cytoBand')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by cytoBand.name')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
+
+        
+    def testUseVariant(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #this is the default method. the linked_fields have to be in the order in the test below.
+        self.assertSucc('vtools use evs --anno_type variant --linked_fields chr pos ref alt')
+        #it is same with
+        self.assertSucc('vtools use evs')
+        # --linked_by option will be ignored if you use the option of --anno_type variant
+        self.assertFail('vtools use evs --anno_type variant --linked_fields chr')
+        self.assertFail('vtools use evs --anno_type variant --linked_fields chr pos')
+        self.assertFail('vtools use evs --anno_type variant --linked_fields chr pos ref')
+        self.assertSucc('vtools update variant --set gene_name=evs.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+
+    def testUsePosition(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #If we use the option of positon, the linked_fields have to be "chr" and "position"
+        #the following command is current, but no variant was linked to the annotation database
+        self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
+        #the output is none from the command below. in order to get the output, create gene_name in variant first
+        self.assertSucc('vtools update variant --set gene_name=1')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        pos_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertEqual(pos_out,[])
+        #using another way to export this table
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.assertSucc('vtools use gwasCatalog')
+        #the output is none from the command too
+        self.assertSucc('vtools update variant --set gene_name=1')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        def_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertEqual(def_out, [])
+    
+    
 if __name__ == '__main__':
     unittest.main()
