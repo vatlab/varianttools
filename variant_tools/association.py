@@ -626,6 +626,9 @@ class LinearBurdenTest(NullTest):
                                     Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta_{}'.format(str(i+2)))])
         else:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+        #
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        self.algorithm = _determine_algorithm(self)
                 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
@@ -670,31 +673,45 @@ class LinearBurdenTest(NullTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def calculate(self):
-        data = self.data
+    def _determine_algorithm(self):
         doRegression = t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
         codeX = t.BinToX() if self.use_indicator else t.SumToX()
         if self.permutations == 0:
-            actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), codeX, doRegression, t.StudentPval(self.alternative)]
+            #
+            # FIXME: explain each step of the algorithm
+            #
+            self.algorithm = t.AssoAlgorithm([
+                t.SetMaf(),
+                t.SetSites(self.mafupper, self.maflower),
+                codeX,
+                doRegression,
+                t.StudentPval(self.alternative)
+            ])
             if self.weight_by_maf and not self.use_indicator:
-                actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower), t.WeightByAllMaf(), codeX, doRegression, t.StudentPval(self.alternative)]
-            a = t.ActionExecutor(actions)
-            a.apply(data)
+                self.algorithm = t.AssoAlgorithm([
+                    t.SetMaf(),
+                    t.SetSites(self.mafupper, self.maflower),
+                    t.WeightByAllMaf(),
+                    codeX,
+                    doRegression,
+                    t.StudentPval(self.alternative)])
         else:
-            actions = [t.SetMaf(), t.SetSites(self.mafupper, self.maflower)]
+            self.algorithm = t.AssoAlgorithm([
+                t.SetMaf(),
+                t.SetSites(self.mafupper, self.maflower)
+            ])
             if self.weight_by_maf and not self.use_indicator:
-                actions.append(t.WeightByAllMaf())
+                self.algorithm.append(t.WeightByAllMaf())
             permute_actions = [codeX, doRegression]
             p = t.VariablePermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
             if not self.variable_thresholds:
                 permute_actions = [doRegression]
                 p = t.FixedPermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
-                actions.append(codeX)
-            # pre-processing data
-            a = t.ActionExecutor(actions)
-            a.apply(data)
-            # permutation
-            p.apply(data)
+                self.algorithm.append(codeX)
+            self.algorithm.append(p)
+
+    def calculate(self):
+        self.algorithm.apply(self.data)
         # get results
         pvalues = data.pvalue()
         regstats = data.statistic()
@@ -711,7 +728,7 @@ class LinearBurdenTest(NullTest):
                 if math.isnan(z): res.append(z)
                 else: res.append(int(z))                
         return res
-
+        
 class LNBT(LinearBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''
     def __init__(self, logger=None, *method_args):
@@ -721,6 +738,7 @@ class CollapseQt(LinearBurdenTest):
     '''Collapsing method for quantitative traits, Li & Leal 2008'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for quantitative traits (Li & Leal 2008).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -754,6 +772,7 @@ class BurdenQt(LinearBurdenTest):
     '''Burden test for quantitative traits, Morris & Zeggini 2009'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for quantitative traits (Morris & Zeggini 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -786,6 +805,7 @@ class WeightedSumQt(LinearBurdenTest):
     '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted sum statistic for quantitative traits (in the spirit of Madsen & Browning 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -819,6 +839,7 @@ class VariableThresholdsQt(LinearBurdenTest):
     '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
     def __init__(self, logger=None, *method_args):
         LinearBurdenTest.__init__(self, logger, *method_args)
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for quantitative traits (in the spirit of Price et al 2010).
             The burden test statistic of a group of variants will be maximized over subsets of variants defined by applying different minor allele frequency

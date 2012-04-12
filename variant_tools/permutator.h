@@ -36,10 +36,10 @@ namespace vtools {
 /** Permutator class
  *
  **/
-class BasePermutator
+class BasePermutator : public BaseAction
 {
 public:
-	BasePermutator(const vectora & actions)
+	BasePermutator(const vectora & actions = vectora()) : BaseAction()
 	{
 		for (size_t i = 0; i < actions.size(); ++i)
 			m_actions.push_back(actions[i]->clone());
@@ -59,6 +59,19 @@ public:
 			delete m_actions[i];
 		for (size_t i = 0; i < rhs.m_actions.size(); ++i)
 			m_actions.push_back(rhs.m_actions[i]->clone());
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new BasePermutator(*this);
+	}
+
+
+	// append another action to the end of the action list
+	void append(const BaseAction & action)
+	{
+		m_actions.push_back(action.clone());
 	}
 
 
@@ -139,13 +152,29 @@ protected:
 };
 
 // Action executor. simply execute a sequence of actions one by on AssoData object
-class ActionExecutor : public BasePermutator
+class AssoAlgorithm : public BasePermutator
 {
 
 public:
-	ActionExecutor(const vectora & actions)
+	// algorithm with a single action (most likely a permutator)
+	// in which case this wrapper is actually not needed.
+	AssoAlgorithm(const BaseAction & action)
+		: BasePermutator()
+	{
+		append(action);
+	}
+
+
+	// algorithm with a series of actions
+	AssoAlgorithm(const vectora & actions)
 		: BasePermutator(actions)
 	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new AssoAlgorithm(*this);
 	}
 
 
@@ -163,6 +192,8 @@ public:
 		}
 		return true;
 	}
+
+
 };
 
 /* permutator class
@@ -196,6 +227,12 @@ public:
 	~FixedPermutator()
 	{
 		delete m_permute;
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new FixedPermutator(*this);
 	}
 
 
@@ -310,6 +347,12 @@ public:
 	~VariablePermutator()
 	{
 		delete m_permute;
+	}
+
+
+	VariablePermutator * clone()
+	{
+		return new VariablePermutator(*this);
 	}
 
 

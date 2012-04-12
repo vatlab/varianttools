@@ -43,7 +43,7 @@ public:
 	}
 
 
-	virtual BaseAction * clone()
+	virtual BaseAction * clone() const
 	{
 		return new BaseAction(*this);
 	}
@@ -77,7 +77,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new SumToX(*this);
 	}
@@ -108,7 +108,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new BinToX(*this);
 	}
@@ -139,7 +139,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new PermuteX(*this);
 	}
@@ -168,7 +168,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new PermuteRawX(*this);
 	}
@@ -197,7 +197,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new PermuteY(*this);
 	}
@@ -227,7 +227,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new SetMaf(*this);
 	}
@@ -253,7 +253,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new WeightByAllMaf(*this);
 	}
@@ -279,7 +279,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new SetSites(*this);
 	}
@@ -306,7 +306,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new SimpleLinearRegression(*this);
 	}
@@ -336,7 +336,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new MultipleLinearRegression(*this);
 	}
@@ -366,7 +366,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new SimpleLogisticRegression(*this);
 	}
@@ -399,7 +399,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new GaussianPval(*this);
 	}
@@ -426,7 +426,7 @@ public:
 	}
 
 
-	BaseAction * clone()
+	BaseAction * clone() const
 	{
 		return new StudentPval(*this);
 	}
