@@ -38,7 +38,7 @@ typedef std::vector<std::vector<int> > matrixi;
 #include <functional>
 #include <iostream>
 #include <limits>
-#include "assoConfig.h"
+#include "assoTests.h"
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"

@@ -26,22 +26,84 @@
 #ifndef _ASSOTESTS_H
 #define _ASSOTESTS_H
 
-#include "assoConfig.h"
+#include <string>
+using std::string;
 
 namespace vtools {
 
-// initialize C++ module, currently does nothing
-void initialize()
+/// exception handler. Exceptions will be passed to Python.
+class Exception
 {
-}
+public:
+	/// constructor
+	/// \param msg error message
+	Exception(const string & msg) : m_msg(msg)
+	{
+	}
 
 
-/*
+	/// return error message
+	const char * message()
+	{
+		return m_msg.c_str();
+	}
 
-   we do not really need a asso test class here because
-   we can implement everything in python. We will see.
 
- */
+	virtual ~Exception()
+	{
+	};
+
+private:
+	/// error message
+	string m_msg;
+};
+
+/// exception, thrown if out of memory
+class StopIteration : public Exception
+{
+public:
+	StopIteration(const string msg) : Exception(msg)
+	{
+	};
+};
+
+
+/// exception, thrown if index out of range
+class IndexError : public Exception
+{
+public:
+	IndexError(const string msg) : Exception(msg)
+	{
+	};
+};
+
+/// exception, thrown if value of range etc
+class ValueError : public Exception
+{
+public:
+	ValueError(const string msg) : Exception(msg)
+	{
+	};
+};
+
+/// exception, thrown if system error occurs
+class SystemError : public Exception
+{
+public:
+	SystemError(const string msg) : Exception(msg)
+	{
+	};
+};
+
+/// exception, thrown if a runtime error occurs
+class RuntimeError : public Exception
+{
+public:
+	RuntimeError(const string msg) : Exception(msg)
+	{
+	};
+};
+
 
 }
 

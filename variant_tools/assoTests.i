@@ -28,7 +28,6 @@
 %module assoTests
 
 %{
-#include "assoConfig.h"
 #include "utils.h"
 #include "assoData.h"
 #include "action.h"
@@ -95,7 +94,6 @@ namespace std
     %template(vectora)    vector<vtools::BaseAction * >; 
 }
 
-%include "assoConfig.h"
 %include "utils.h"
 %include "assoData.h"
 %include "action.h"

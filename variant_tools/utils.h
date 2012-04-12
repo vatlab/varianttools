@@ -39,7 +39,7 @@
 #include "gsl/gsl_linalg.h"
 #include "gsl/gsl_errno.h"
 
-#include "assoConfig.h"
+#include "assoTests.h"
 // check if float numbers are equal
 bool fEqual(double a, double b);
 
@@ -128,6 +128,9 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 }
 
 namespace vtools {
+
+// initialize C++ module, currently does nothing
+void initialize();
 
 // random number generator from gsl
 class RNG

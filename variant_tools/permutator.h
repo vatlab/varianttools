@@ -26,7 +26,7 @@
 #ifndef _PERMUTATOR_H
 #define _PERMUTATOR_H
 
-#include "assoConfig.h"
+#include "assoTests.h"
 #include "assoData.h"
 #include "action.h"
 #include <limits>

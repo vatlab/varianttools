@@ -43,3 +43,12 @@ void fRound(double & myValue, double PRECISION)
 }
 
 
+namespace vtools {
+// currently initialization does not do anything
+void initialize()
+{
+}
+
+
+}
+
