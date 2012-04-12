@@ -33,10 +33,9 @@
 
 namespace vtools {
 
-/*
- * Permutator class
+/** Permutator class
  *
- * */
+ **/
 class BasePermutator
 {
 public:
@@ -63,10 +62,10 @@ public:
 	}
 
 
-	virtual double apply(AssoData & d)
+	virtual bool apply(AssoData & d)
 	{
 		throw RuntimeError("The base permutation class should not be called");
-		return 0;
+		return true;
 	}
 
 
@@ -150,15 +149,20 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		for (size_t j = 0; j < m_actions.size(); ++j) {
-			m_actions[j]->apply(d);
+			try {
+				// an action can throw StopIteration to stop the rest of actions to be applied
+				if (!m_actions[j]->apply(d))
+					break;
+			} catch (...) {
+				std::cerr << "Operator " << m_actions[j]->name() << " raises an exception";
+				throw;
+			}
 		}
-		return 0;
+		return true;
 	}
-
-
 };
 
 /* permutator class
@@ -195,7 +199,7 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		RNG rng;
 		gsl_rng * gslr = rng.get();
@@ -220,7 +224,7 @@ public:
 					d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 					d.setSE(std::numeric_limits<double>::quiet_NaN());
 					d.setPvalue(std::numeric_limits<double>::quiet_NaN());
-					return 0;
+					return true;
 				}
 			} else {
 				if (statistic > statistics[0]) {
@@ -259,7 +263,7 @@ public:
 		statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
 		d.setStatistic(statistics[0]);
 		d.setSE(statistics[1]);
-		return 0.0;
+		return true;
 		//return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
 	}
 
@@ -309,7 +313,7 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 
 		if (d.maf().size() == 0) {
@@ -339,7 +343,7 @@ public:
 			d.setPvalue(std::numeric_limits<double>::quiet_NaN());
 			d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 			d.setSE(std::numeric_limits<double>::quiet_NaN());
-			return 0.0;
+			return true;
 		}
 
 		double maflower = maf.front() - std::numeric_limits<double>::epsilon();
@@ -441,7 +445,7 @@ public:
 					d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 					d.setSE(std::numeric_limits<double>::quiet_NaN());
 					d.setPvalue(std::numeric_limits<double>::quiet_NaN());
-					return 0;
+					return true;
 				}
 			} else {
 				if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
@@ -499,7 +503,7 @@ public:
 		statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
 		d.setStatistic(statistics[0]);
 		d.setSE(statistics[1]);
-		return 0.0;
+		return true;
 	}
 
 

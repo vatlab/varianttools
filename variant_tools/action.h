@@ -49,10 +49,10 @@ public:
 	}
 
 
-	virtual double apply(AssoData & d)
+	virtual bool apply(AssoData & d)
 	{
 		throw RuntimeError("The base action class should not be called");
-		return 0;
+		return true;
 	}
 
 
@@ -83,11 +83,11 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.sumToX();
 		d.meanOfX();
-		return 0;
+		return true;
 	}
 
 
@@ -114,11 +114,11 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.binToX();
 		d.meanOfX();
-		return 0;
+		return true;
 	}
 
 
@@ -145,10 +145,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.permuteX();
-		return 0;
+		return true;
 	}
 
 
@@ -174,10 +174,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.permuteRawX();
-		return 0;
+		return true;
 	}
 
 
@@ -203,10 +203,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.permuteY();
-		return 0;
+		return true;
 	}
 
 
@@ -233,10 +233,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.setMaf();
-		return 0;
+		return true;
 	}
 
 
@@ -259,11 +259,11 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.setMafWeight();
 		d.weightX();
-		return 0;
+		return true;
 	}
 
 
@@ -285,10 +285,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.setSitesByMaf(m_upper, m_lower);
-		return 0;
+		return true;
 	}
 
 
@@ -312,10 +312,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.simpleLinear();
-		return 0;
+		return true;
 	}
 
 
@@ -342,10 +342,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.multipleLinear();
-		return 0;
+		return true;
 	}
 
 
@@ -372,12 +372,12 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		//assert(m_phenotype.size() == m_X.size());
 		//check for binary
 		d.simpleLogit();
-		return 0;
+		return true;
 	}
 
 
@@ -405,10 +405,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.gaussianP(m_sided);
-		return 0;
+		return true;
 	}
 
 
@@ -432,10 +432,10 @@ public:
 	}
 
 
-	double apply(AssoData & d)
+	bool apply(AssoData & d)
 	{
 		d.studentP(m_sided);
-		return 0;
+		return true;
 	}
 
 
