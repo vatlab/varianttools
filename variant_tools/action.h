@@ -54,12 +54,14 @@ public:
 		throw RuntimeError("The base action class should not be called");
 		return 0;
 	}
-    
-    // return a string of the class name
-    virtual std::string name()
-    {
-        return "";
-    }
+
+
+	// return a string of the class name
+	virtual std::string name()
+	{
+		return "";
+	}
+
 
 };
 
@@ -88,10 +90,12 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "SumToX";
-    }
+
+	std::string name()
+	{
+		return "SumToX";
+	}
+
 
 };
 
@@ -116,11 +120,13 @@ public:
 		d.meanOfX();
 		return 0;
 	}
-    
-    std::string name()
-    {
-        return "BinToX";
-    }
+
+
+	std::string name()
+	{
+		return "BinToX";
+	}
+
 
 };
 
@@ -145,10 +151,12 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "PermuteX";
-    }
+
+	std::string name()
+	{
+		return "PermuteX";
+	}
+
 
 };
 
@@ -172,10 +180,12 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "PermuteRawX";
-    }
+
+	std::string name()
+	{
+		return "PermuteRawX";
+	}
+
 
 };
 
@@ -199,10 +209,13 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "PermuteY";
-    }
+
+	std::string name()
+	{
+		return "PermuteY";
+	}
+
+
 };
 
 
@@ -305,10 +318,12 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "LinearRegression";
-    }
+
+	std::string name()
+	{
+		return "LinearRegression";
+	}
+
 
 };
 
@@ -333,10 +348,13 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "LinearRegression";
-    }
+
+	std::string name()
+	{
+		return "LinearRegression";
+	}
+
+
 };
 
 
@@ -362,10 +380,12 @@ public:
 		return 0;
 	}
 
-    std::string name()
-    {
-        return "LogisticRegression";
-    }
+
+	std::string name()
+	{
+		return "LogisticRegression";
+	}
+
 
 };
 

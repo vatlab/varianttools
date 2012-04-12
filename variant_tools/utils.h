@@ -42,10 +42,11 @@
 #include "assoConfig.h"
 // check if float numbers are equal
 bool fEqual(double a, double b);
+
 // round() float numbers
 void fRound(double & myValue, double PRECISION);
 
-// pairwise sum of vector elements. can be used in std::accumulate for vector2f objects 
+// pairwise sum of vector elements. can be used in std::accumulate for vector2f objects
 struct VPlus
 {
 	template<typename T> std::vector<T> operator()(std::vector<T> x, std::vector<T> y)
@@ -56,53 +57,58 @@ struct VPlus
 		}
 		return x;
 	}
+
+
 };
 
 namespace std {
 // order a vector by index specified in another vector
 // this will not destruct the index vector
 template< typename order_iterator, typename value_iterator >
-void reorder( order_iterator order_begin, order_iterator order_end, value_iterator v )  {   
-    typedef typename iterator_traits< value_iterator >::value_type value_t;
-    typedef typename iterator_traits< order_iterator >::value_type index_t;
-    typedef typename iterator_traits< order_iterator >::difference_type diff_t;
+void reorder(order_iterator order_begin, order_iterator order_end, value_iterator v)
+{
+	typedef typename iterator_traits< value_iterator >::value_type value_t;
+	typedef typename iterator_traits< order_iterator >::value_type index_t;
+	typedef typename iterator_traits< order_iterator >::difference_type diff_t;
 
-    diff_t remaining = order_end - 1 - order_begin;
-    for ( index_t s = index_t(), d; remaining > 0; ++ s ) {
-        for ( d = order_begin[s]; d > s; d = order_begin[d] ) ;
-        if ( d == s ) {
-                -- remaining;
-                value_t temp = v[s];
-                while ( d = order_begin[d], d != s ) {
-                        swap( temp, v[d] );
-                        -- remaining;
-                }
-                v[s] = temp;
-        }
-    }
+	diff_t remaining = order_end - 1 - order_begin;
+	for (index_t s = index_t(), d; remaining > 0; ++s) {
+		for (d = order_begin[s]; d > s; d = order_begin[d]) ;
+		if (d == s) {
+			--remaining;
+			value_t temp = v[s];
+			while (d = order_begin[d], d != s) {
+				swap(temp, v[d]);
+				--remaining;
+			}
+			v[s] = temp;
+		}
+	}
 }
+
 
 // order a vector by index specified in another vector
 // this is more efficient but will destruct the index vector
 template< typename order_iterator, typename value_iterator >
-void reorder_destructive( order_iterator order_begin, order_iterator order_end, value_iterator v )  {
-    typedef typename iterator_traits< value_iterator >::value_type value_t;
-    typedef typename iterator_traits< order_iterator >::value_type index_t;
-    typedef typename iterator_traits< order_iterator >::difference_type diff_t;
+void reorder_destructive(order_iterator order_begin, order_iterator order_end, value_iterator v)
+{
+	typedef typename iterator_traits< value_iterator >::value_type value_t;
+	typedef typename iterator_traits< order_iterator >::value_type index_t;
+	typedef typename iterator_traits< order_iterator >::difference_type diff_t;
 
-    diff_t remaining = order_end - 1 - order_begin;
-    for ( index_t s = index_t(); remaining > 0; ++ s ) {
-        index_t d = order_begin[s];
-        if ( d == (diff_t) -1 ) continue;
-        -- remaining;
-        value_t temp = v[s];
-        for ( index_t d2; d != s; d = d2 ) {
-                swap( temp, v[d] );
-                swap( order_begin[d], d2 = (diff_t) -1 );
-                -- remaining;
-        }
-        v[s] = temp;
-    }
+	diff_t remaining = order_end - 1 - order_begin;
+	for (index_t s = index_t(); remaining > 0; ++s) {
+		index_t d = order_begin[s];
+		if (d == (diff_t)-1) continue;
+		--remaining;
+		value_t temp = v[s];
+		for (index_t d2; d != s; d = d2) {
+			swap(temp, v[d]);
+			swap(order_begin[d], d2 = (diff_t)-1);
+			--remaining;
+		}
+		v[s] = temp;
+	}
 }
 
 
@@ -117,6 +123,7 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 	}
 	return out;
 }
+
 
 }
 
@@ -195,7 +202,8 @@ public:
 		return new BaseLm(*this);
 	}
 
-    // initialize X, the predictor matrix
+
+	// initialize X, the predictor matrix
 	void setX(const std::vector<std::vector<double> > & x)
 	{
 		if (x.size() == 0) {
@@ -227,7 +235,8 @@ public:
 		if (m_x) gsl_matrix_free(m_x);
 	}
 
-    // initialize Y, the respond vector
+
+	// initialize Y, the respond vector
 	void setY(const std::vector<double> & y)
 	{
 		if (y.size() == 0) {
@@ -246,7 +255,8 @@ public:
 		}
 	}
 
-    // return X
+
+	// return X
 	std::vector<std::vector<double> > getX()
 	{
 		std::vector<std::vector<double> > xout(m_ncol);
@@ -258,7 +268,8 @@ public:
 		return xout;
 	}
 
-    // replace certain column in X, or replace the entire Y (when "which==0")
+
+	// replace certain column in X, or replace the entire Y (when "which==0")
 	void replaceCol(const std::vector<double> & col, int which)
 	{
 		if (which < 0 || which >= m_ncol) {
@@ -295,7 +306,7 @@ protected:
 
 // fit the linear model
 // via SVD technique
-// members are 
+// members are
 // m_beta: fitted model parameters (LSE)
 // m_svd_: intermediate data from the SVD procedure
 class LinearM : public BaseLm
@@ -404,7 +415,8 @@ public:
 		gsl_vector_free(work);
 	}
 
-    // obtain estimates for coefficients
+
+	// obtain estimates for coefficients
 	std::vector<double> getBeta()
 	{
 		std::vector<double> beta(m_ncol);
@@ -414,7 +426,8 @@ public:
 		return beta;
 	}
 
-    // obtain standard error for the LSE
+
+	// obtain standard error for the LSE
 	std::vector<double> getSEBeta()
 	{
 		if (!m_beta) {
