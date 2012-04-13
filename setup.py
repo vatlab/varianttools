@@ -88,7 +88,7 @@ SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
 if not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) or os.path.getmtime(WRAPPER_CPP_FILE) < \
         max([os.path.getmtime(x) for x in ASSO_FILES]):
     import subprocess
-    print('Generating wrapper file')
+    print('Generating wrapper files')
     try:
         ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'variant_tools/assoTests.i'], shell=False)
         if ret != 0:
@@ -321,7 +321,8 @@ LIB_GSL = [
 if sys.platform == 'linux2':
     libs = ['stdc++']
     # gcc optimizations
-    gccargs = ["-O3", "-march=native"]
+    # gccargs = ["-O3", "-march=native"]
+    gccargs = ["-O3"]
 else:
     libs = []
     gccargs = []
