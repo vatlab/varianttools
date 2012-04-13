@@ -254,6 +254,8 @@ public:
 		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
 		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
+		delete m_permute;
+		m_permute = rhs.m_permute->clone();
 	}
 
 
@@ -271,8 +273,8 @@ public:
 
 	bool apply(AssoData & d)
 	{
-        std::cout << "fixed action SIZE: " << m_actions.size();
-        for (size_t j = 0; j < m_actions.size(); ++j) {
+		std::cout << "fixed action SIZE: " << m_actions.size();
+		for (size_t j = 0; j < m_actions.size(); ++j) {
 			std::cout << m_actions[j]->name() << std::endl;
 		}
 
@@ -392,6 +394,8 @@ public:
 		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
 		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
+		delete m_permute;
+		m_permute = rhs.m_permute->clone();
 	}
 
 
@@ -409,8 +413,8 @@ public:
 
 	bool apply(AssoData & d)
 	{
-        std::cout << "variable action SIZE: " << m_actions.size();
-        for (size_t j = 0; j < m_actions.size(); ++j) {
+		std::cout << "variable action SIZE: " << m_actions.size();
+		for (size_t j = 0; j < m_actions.size(); ++j) {
 			std::cout << m_actions[j]->name() << std::endl;
 		}
 
