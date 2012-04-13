@@ -239,10 +239,12 @@ public:
 		return true;
 	}
 
+
 	std::string name()
 	{
 		return "SetMaf";
 	}
+
 
 };
 
@@ -269,6 +271,7 @@ public:
 		d.weightX();
 		return true;
 	}
+
 
 	std::string name()
 	{
@@ -299,6 +302,7 @@ public:
 		d.setSitesByMaf(m_upper, m_lower);
 		return true;
 	}
+
 
 	std::string name()
 	{
@@ -431,6 +435,7 @@ public:
 		return "GaussianPval";
 	}
 
+
 private:
 	unsigned m_sided;
 };
@@ -456,6 +461,7 @@ public:
 		d.studentP(m_sided);
 		return true;
 	}
+
 
 	std::string name()
 	{

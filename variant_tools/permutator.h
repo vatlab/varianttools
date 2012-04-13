@@ -30,6 +30,7 @@
 #include "assoData.h"
 #include "action.h"
 #include <limits>
+#include <string>
 
 namespace vtools {
 
@@ -74,11 +75,13 @@ public:
 		m_actions.push_back(action.clone());
 	}
 
+
 	void extend(const vectora & actions)
 	{
-        for (size_t i = 0; i < actions.size(); ++i)
+		for (size_t i = 0; i < actions.size(); ++i)
 			m_actions.push_back(actions[i]->clone());
 	}
+
 
 	virtual bool apply(AssoData & d)
 	{
@@ -191,8 +194,8 @@ public:
 				if (!m_actions[j]->apply(d))
 					break;
 			} catch (...) {
-				std::cerr << "Operator " << m_actions[j]->name() << " raises an exception";
-				throw;
+				std::string msg = "Operator " + m_actions[j]->name() + " raises an exception";
+				throw RuntimeError(msg);
 			}
 		}
 		return true;
@@ -232,6 +235,13 @@ public:
 	~FixedPermutator()
 	{
 		delete m_permute;
+	}
+
+
+	FixedPermutator(const FixedPermutator & rhs) :
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_sig(rhs.m_sig), BasePermutator(rhs.m_actions)
+	{
 	}
 
 
@@ -352,6 +362,13 @@ public:
 	~VariablePermutator()
 	{
 		delete m_permute;
+	}
+
+
+	VariablePermutator(const VariablePermutator & rhs) :
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_sig(rhs.m_sig), BasePermutator(rhs.m_actions)
+	{
 	}
 
 
