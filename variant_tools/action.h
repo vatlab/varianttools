@@ -59,7 +59,7 @@ public:
 	// return a string of the class name
 	virtual std::string name()
 	{
-		return "";
+		return "BASEACTION";
 	}
 
 
@@ -239,6 +239,10 @@ public:
 		return true;
 	}
 
+	std::string name()
+	{
+		return "SetMaf";
+	}
 
 };
 
@@ -266,6 +270,11 @@ public:
 		return true;
 	}
 
+	std::string name()
+	{
+		return "WeightByAllMaf";
+	}
+
 
 };
 
@@ -289,6 +298,11 @@ public:
 	{
 		d.setSitesByMaf(m_upper, m_lower);
 		return true;
+	}
+
+	std::string name()
+	{
+		return "SetSites";
 	}
 
 
@@ -412,6 +426,11 @@ public:
 	}
 
 
+	std::string name()
+	{
+		return "GaussianPval";
+	}
+
 private:
 	unsigned m_sided;
 };
@@ -436,6 +455,11 @@ public:
 	{
 		d.studentP(m_sided);
 		return true;
+	}
+
+	std::string name()
+	{
+		return "StudentPval";
 	}
 
 
