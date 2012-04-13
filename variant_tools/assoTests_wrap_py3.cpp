@@ -25103,7 +25103,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+SWIGINTERN PyObject *_wrap_BasePermutator_append(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
   PyObject *resultobj = 0;
   vtools::BasePermutator *arg1 = (vtools::BasePermutator *) 0 ;
   vtools::BaseAction *arg2 = 0 ;
@@ -25111,14 +25111,19 @@ SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_0(PyObject *SWIGUNUSEDPAR
   int res1 = 0 ;
   void *argp2 = 0 ;
   int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  char *  kwnames[] = {
+    (char *) "self",(char *) "action", NULL 
+  };
   
-  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:BasePermutator_append",kwnames,&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_append" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
   }
   arg1 = reinterpret_cast< vtools::BasePermutator * >(argp1);
-  res2 = SWIG_ConvertPtr(swig_obj[1], &argp2, SWIGTYPE_p_vtools__BaseAction,  0  | 0);
+  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_vtools__BaseAction,  0  | 0);
   if (!SWIG_IsOK(res2)) {
     SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::BaseAction const &""'"); 
   }
@@ -25159,35 +25164,40 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_1(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+SWIGINTERN PyObject *_wrap_BasePermutator_extend(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
   PyObject *resultobj = 0;
   vtools::BasePermutator *arg1 = (vtools::BasePermutator *) 0 ;
   vtools::vectora *arg2 = 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   int res2 = SWIG_OLDOBJ ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  char *  kwnames[] = {
+    (char *) "self",(char *) "actions", NULL 
+  };
   
-  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:BasePermutator_extend",kwnames,&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_append" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_extend" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
   }
   arg1 = reinterpret_cast< vtools::BasePermutator * >(argp1);
   {
     std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
-    res2 = swig::asptr(swig_obj[1], &ptr);
+    res2 = swig::asptr(obj1, &ptr);
     if (!SWIG_IsOK(res2)) {
-      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_extend" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
     }
     if (!ptr) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "BasePermutator_extend" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
     }
     arg2 = ptr;
   }
   {
     try
     {
-      (arg1)->append((vtools::vectora const &)*arg2);
+      (arg1)->extend((vtools::vectora const &)*arg2);
     }
     catch(vtools::IndexError e)
     {
@@ -25216,36 +25226,6 @@ SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_1(PyObject *SWIGUNUSEDPAR
 fail:
   if (SWIG_IsNewObj(res2)) delete arg2;
   return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_BasePermutator_append(PyObject *self, PyObject *args) {
-  int argc;
-  PyObject *argv[3];
-  
-  if (!(argc = SWIG_Python_UnpackTuple(args,"BasePermutator_append",0,2,argv))) SWIG_fail;
-  --argc;
-  if (argc == 2) {
-    int _v = 0;
-    {
-      int res = SWIG_ConvertPtr(argv[1], 0, SWIGTYPE_p_vtools__BaseAction, 0);
-      _v = SWIG_CheckState(res);
-    }
-    if (!_v) goto check_1;
-    return _wrap_BasePermutator_append__SWIG_0(self, argc, argv);
-  }
-check_1:
-  
-  if (argc == 2) {
-    return _wrap_BasePermutator_append__SWIG_1(self, argc, argv);
-  }
-  
-fail:
-  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'BasePermutator_append'.\n"
-    "  Possible C/C++ prototypes are:\n"
-    "    vtools::BasePermutator::append(vtools::BaseAction const &)\n"
-    "    vtools::BasePermutator::append(vtools::vectora const &)\n");
-  return 0;
 }
 
 
@@ -26929,7 +26909,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"StudentPval_swiginit", StudentPval_swiginit, METH_VARARGS, NULL},
 	 { (char *)"delete_BasePermutator", (PyCFunction)_wrap_delete_BasePermutator, METH_O, NULL},
 	 { (char *)"new_BasePermutator", _wrap_new_BasePermutator, METH_VARARGS, NULL},
-	 { (char *)"BasePermutator_append", _wrap_BasePermutator_append, METH_VARARGS, NULL},
+	 { (char *)"BasePermutator_append", (PyCFunction) _wrap_BasePermutator_append, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"BasePermutator_extend", (PyCFunction) _wrap_BasePermutator_extend, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"BasePermutator_check", (PyCFunction) _wrap_BasePermutator_check, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"BasePermutator_swigregister", BasePermutator_swigregister, METH_VARARGS, NULL},
 	 { (char *)"BasePermutator_swiginit", BasePermutator_swiginit, METH_VARARGS, NULL},

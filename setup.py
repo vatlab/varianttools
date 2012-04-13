@@ -61,7 +61,6 @@ ASSO_FILES = [
     'variant_tools/config_solaris.h',
     'variant_tools/config_win32.h',
     'variant_tools/assoTests.h',
-    'variant_tools/assoConfig.h',
     'variant_tools/assoData.h',
     'variant_tools/action.h',
     'variant_tools/permutator.h',
@@ -321,8 +320,11 @@ LIB_GSL = [
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
     libs = ['stdc++']
+    # gcc optimizations
+    gccargs = ["-O3", "-march=native"]
 else:
     libs = []
+    gccargs = []
   
 # Enable support for loadable extensions in the sqlite3 module by not defining
 # SQLITE_OMIT_LOAD_EXTENSION
@@ -376,7 +378,7 @@ setup(name = "variant_tools",
                 'variant_tools/assoData.cpp',
                 'variant_tools/utils.cpp'
                 ] + LIB_GSL,
-            #extra_compile_args=["-O3", "-march=native"],
+            extra_compile_args = gccargs,
             library_dirs = [],
             libraries = libs,
             include_dirs = [".", "variant_tools", "variant_tools/gsl"],

@@ -74,7 +74,7 @@ public:
 		m_actions.push_back(action.clone());
 	}
 
-	void append(const vectora & actions)
+	void extend(const vectora & actions)
 	{
         for (size_t i = 0; i < actions.size(); ++i)
 			m_actions.push_back(actions[i]->clone());

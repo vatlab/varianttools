@@ -695,7 +695,7 @@ class LinearBurdenTest(NullTest):
                 ])
         # association testing using analytic p-value
         if self.permutations == 0:
-            algorithm.append([
+            algorithm.extend([
                 # calculate genotype score for a set of variants
                 a_scoregene,
                 # fit regression model
@@ -713,7 +713,7 @@ class LinearBurdenTest(NullTest):
                         self.adaptive, 
                         [a_regression]
                         )
-                algorithm.append([
+                algorithm.extend([
                         a_scoregene, 
                         a_permutationtest
                         ])
