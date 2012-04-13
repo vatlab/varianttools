@@ -63,9 +63,22 @@ public:
 	}
 
 
-	BaseAction * clone() const
+	virtual BaseAction * clone() const
 	{
 		return new BasePermutator(*this);
+	}
+
+
+	virtual std::string name()
+	{
+		return "BASEPERMUTATOR";
+	}
+
+
+	virtual bool apply(AssoData & d)
+	{
+		throw RuntimeError("The base permutation class should not be called");
+		return true;
 	}
 
 
@@ -80,13 +93,6 @@ public:
 	{
 		for (size_t i = 0; i < actions.size(); ++i)
 			m_actions.push_back(actions[i]->clone());
-	}
-
-
-	virtual bool apply(AssoData & d)
-	{
-		throw RuntimeError("The base permutation class should not be called");
-		return true;
 	}
 
 
@@ -186,6 +192,12 @@ public:
 	}
 
 
+	std::string name()
+	{
+		return "AssoAlgorithm";
+	}
+
+
 	bool apply(AssoData & d)
 	{
 		for (size_t j = 0; j < m_actions.size(); ++j) {
@@ -240,7 +252,7 @@ public:
 
 	FixedPermutator(const FixedPermutator & rhs) :
 		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
-		m_sig(rhs.m_sig), BasePermutator(rhs.m_actions)
+		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
 	}
 
@@ -251,8 +263,19 @@ public:
 	}
 
 
+	std::string name()
+	{
+		return "FixedPermutator";
+	}
+
+
 	bool apply(AssoData & d)
 	{
+        std::cout << "fixed action SIZE: " << m_actions.size();
+        for (size_t j = 0; j < m_actions.size(); ++j) {
+			std::cout << m_actions[j]->name() << std::endl;
+		}
+
 		RNG rng;
 		gsl_rng * gslr = rng.get();
 
@@ -367,7 +390,7 @@ public:
 
 	VariablePermutator(const VariablePermutator & rhs) :
 		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
-		m_sig(rhs.m_sig), BasePermutator(rhs.m_actions)
+		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
 	}
 
@@ -378,8 +401,18 @@ public:
 	}
 
 
+	std::string name()
+	{
+		return "VariablePermutator";
+	}
+
+
 	bool apply(AssoData & d)
 	{
+        std::cout << "variable action SIZE: " << m_actions.size();
+        for (size_t j = 0; j < m_actions.size(); ++j) {
+			std::cout << m_actions[j]->name() << std::endl;
+		}
 
 		if (d.maf().size() == 0) {
 			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");

@@ -12,8 +12,8 @@ class TestAsso(ProcessTestCase):
   def removeProj(self):
       runCmd('vtools remove project')
 
-  def testAssoSet1(self):
-      'Test set1 for association module'
+  def testInterface(self):
+      'Test association module interface'
       zip = ZipFile('proj/assoproj.zip')
       dir = os.getcwd()
       zip.extractall(dir)
