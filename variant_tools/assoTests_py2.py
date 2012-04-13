@@ -311,61 +311,6 @@ vectora.capacity = new_instancemethod(_assoTests.vectora_capacity,None,vectora)
 vectora_swigregister = _assoTests.vectora_swigregister
 vectora_swigregister(vectora)
 
-class Exception(object):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.Exception_swiginit(self,_assoTests.new_Exception(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_Exception
-Exception.message = new_instancemethod(_assoTests.Exception_message,None,Exception)
-Exception_swigregister = _assoTests.Exception_swigregister
-Exception_swigregister(Exception)
-
-class StopIteration(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.StopIteration_swiginit(self,_assoTests.new_StopIteration(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_StopIteration
-StopIteration_swigregister = _assoTests.StopIteration_swigregister
-StopIteration_swigregister(StopIteration)
-
-class IndexError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.IndexError_swiginit(self,_assoTests.new_IndexError(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_IndexError
-IndexError_swigregister = _assoTests.IndexError_swigregister
-IndexError_swigregister(IndexError)
-
-class ValueError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.ValueError_swiginit(self,_assoTests.new_ValueError(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_ValueError
-ValueError_swigregister = _assoTests.ValueError_swigregister
-ValueError_swigregister(ValueError)
-
-class SystemError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.SystemError_swiginit(self,_assoTests.new_SystemError(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_SystemError
-SystemError_swigregister = _assoTests.SystemError_swigregister
-SystemError_swigregister(SystemError)
-
-class RuntimeError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.RuntimeError_swiginit(self,_assoTests.new_RuntimeError(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_RuntimeError
-RuntimeError_swigregister = _assoTests.RuntimeError_swigregister
-RuntimeError_swigregister(RuntimeError)
-
 
 def fEqual(*args, **kwargs):
   return _assoTests.fEqual(*args, **kwargs)
@@ -383,6 +328,10 @@ class VPlus(object):
 VPlus_swigregister = _assoTests.VPlus_swigregister
 VPlus_swigregister(VPlus)
 
+
+def initialize():
+  return _assoTests.initialize()
+initialize = _assoTests.initialize
 class RNG(object):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
@@ -590,25 +539,25 @@ class StudentPval(BaseAction):
 StudentPval_swigregister = _assoTests.StudentPval_swigregister
 StudentPval_swigregister(StudentPval)
 
-class BasePermutator(object):
+class BasePermutator(BaseAction):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
     __swig_destroy__ = _assoTests.delete_BasePermutator
     def __init__(self, *args): 
         _assoTests.BasePermutator_swiginit(self,_assoTests.new_BasePermutator(*args))
-BasePermutator.apply = new_instancemethod(_assoTests.BasePermutator_apply,None,BasePermutator)
+BasePermutator.append = new_instancemethod(_assoTests.BasePermutator_append,None,BasePermutator)
 BasePermutator.check = new_instancemethod(_assoTests.BasePermutator_check,None,BasePermutator)
 BasePermutator_swigregister = _assoTests.BasePermutator_swigregister
 BasePermutator_swigregister(BasePermutator)
 
-class ActionExecutor(BasePermutator):
+class AssoAlgorithm(BasePermutator):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
-    def __init__(self, *args, **kwargs): 
-        _assoTests.ActionExecutor_swiginit(self,_assoTests.new_ActionExecutor(*args, **kwargs))
-    __swig_destroy__ = _assoTests.delete_ActionExecutor
-ActionExecutor_swigregister = _assoTests.ActionExecutor_swigregister
-ActionExecutor_swigregister(ActionExecutor)
+    def __init__(self, *args): 
+        _assoTests.AssoAlgorithm_swiginit(self,_assoTests.new_AssoAlgorithm(*args))
+    __swig_destroy__ = _assoTests.delete_AssoAlgorithm
+AssoAlgorithm_swigregister = _assoTests.AssoAlgorithm_swigregister
+AssoAlgorithm_swigregister(AssoAlgorithm)
 
 class FixedPermutator(BasePermutator):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
@@ -625,12 +574,64 @@ class VariablePermutator(BasePermutator):
     def __init__(self, *args, **kwargs): 
         _assoTests.VariablePermutator_swiginit(self,_assoTests.new_VariablePermutator(*args, **kwargs))
     __swig_destroy__ = _assoTests.delete_VariablePermutator
+VariablePermutator.clone = new_instancemethod(_assoTests.VariablePermutator_clone,None,VariablePermutator)
 VariablePermutator_swigregister = _assoTests.VariablePermutator_swigregister
 VariablePermutator_swigregister(VariablePermutator)
 
+class Exception(object):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.Exception_swiginit(self,_assoTests.new_Exception(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_Exception
+Exception.message = new_instancemethod(_assoTests.Exception_message,None,Exception)
+Exception_swigregister = _assoTests.Exception_swigregister
+Exception_swigregister(Exception)
 
-def initialize():
-  return _assoTests.initialize()
-initialize = _assoTests.initialize
+class StopIteration(Exception):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.StopIteration_swiginit(self,_assoTests.new_StopIteration(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_StopIteration
+StopIteration_swigregister = _assoTests.StopIteration_swigregister
+StopIteration_swigregister(StopIteration)
+
+class IndexError(Exception):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.IndexError_swiginit(self,_assoTests.new_IndexError(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_IndexError
+IndexError_swigregister = _assoTests.IndexError_swigregister
+IndexError_swigregister(IndexError)
+
+class ValueError(Exception):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.ValueError_swiginit(self,_assoTests.new_ValueError(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_ValueError
+ValueError_swigregister = _assoTests.ValueError_swigregister
+ValueError_swigregister(ValueError)
+
+class SystemError(Exception):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.SystemError_swiginit(self,_assoTests.new_SystemError(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_SystemError
+SystemError_swigregister = _assoTests.SystemError_swigregister
+SystemError_swigregister(SystemError)
+
+class RuntimeError(Exception):
+    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+    def __init__(self, *args, **kwargs): 
+        _assoTests.RuntimeError_swiginit(self,_assoTests.new_RuntimeError(*args, **kwargs))
+    __swig_destroy__ = _assoTests.delete_RuntimeError
+RuntimeError_swigregister = _assoTests.RuntimeError_swigregister
+RuntimeError_swigregister(RuntimeError)
+
 
 

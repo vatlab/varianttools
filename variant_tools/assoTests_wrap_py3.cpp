@@ -2967,7 +2967,7 @@ SWIG_Python_NonDynamicSetAttr(PyObject *obj, PyObject *name, PyObject *value) {
 #define SWIGTYPE_p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t swig_types[21]
 #define SWIGTYPE_p_swig__SwigPyIterator swig_types[22]
 #define SWIGTYPE_p_value_type swig_types[23]
-#define SWIGTYPE_p_vtools__ActionExecutor swig_types[24]
+#define SWIGTYPE_p_vtools__AssoAlgorithm swig_types[24]
 #define SWIGTYPE_p_vtools__AssoData swig_types[25]
 #define SWIGTYPE_p_vtools__BaseAction swig_types[26]
 #define SWIGTYPE_p_vtools__BaseLm swig_types[27]
@@ -3106,7 +3106,6 @@ namespace swig {
 }
 
 
-#include "assoConfig.h"
 #include "utils.h"
 #include "assoData.h"
 #include "action.h"
@@ -5004,6 +5003,29 @@ SWIGINTERN void std_vector_Sl_vtools_BaseAction_Sm__Sg__append(std::vector< vtoo
       self->push_back(x);
     }
 
+SWIGINTERNINLINE PyObject *
+SWIG_From_unsigned_SS_int  (unsigned int value)
+{    
+  return SWIG_From_unsigned_SS_long  (value);
+}
+
+
+SWIGINTERN int
+SWIG_AsVal_unsigned_SS_int (PyObject * obj, unsigned int *val)
+{
+  unsigned long v;
+  int res = SWIG_AsVal_unsigned_SS_long (obj, &v);
+  if (SWIG_IsOK(res)) {
+    if ((v > UINT_MAX)) {
+      return SWIG_OverflowError;
+    } else {
+      if (val) *val = static_cast< unsigned int >(v);
+    }
+  }  
+  return res;
+}
+
+
 SWIGINTERN swig_type_info*
 SWIG_pchar_descriptor(void)
 {
@@ -5014,6 +5036,34 @@ SWIG_pchar_descriptor(void)
     init = 1;
   }
   return info;
+}
+
+
+SWIGINTERNINLINE PyObject *
+SWIG_FromCharPtrAndSize(const char* carray, size_t size)
+{
+  if (carray) {
+    if (size > INT_MAX) {
+      swig_type_info* pchar_descriptor = SWIG_pchar_descriptor();
+      return pchar_descriptor ? 
+	SWIG_InternalNewPointerObj(const_cast< char * >(carray), pchar_descriptor, 0) : SWIG_Py_Void();
+    } else {
+#if PY_VERSION_HEX >= 0x03000000
+      return PyUnicode_FromStringAndSize(carray, static_cast< int >(size));
+#else
+      return PyString_FromStringAndSize(carray, static_cast< int >(size));
+#endif
+    }
+  } else {
+    return SWIG_Py_Void();
+  }
+}
+
+
+SWIGINTERNINLINE PyObject *
+SWIG_From_std_string  (const std::string& s)
+{
+  return SWIG_FromCharPtrAndSize(s.data(), s.size());
 }
 
 
@@ -5094,95 +5144,6 @@ SWIG_AsCharPtrAndSize(PyObject *obj, char** cptr, size_t* psize, int *alloc)
 
 
 SWIGINTERN int
-SWIG_AsPtr_std_string (PyObject * obj, std::string **val) 
-{
-  char* buf = 0 ; size_t size = 0; int alloc = SWIG_OLDOBJ;
-  if (SWIG_IsOK((SWIG_AsCharPtrAndSize(obj, &buf, &size, &alloc)))) {
-    if (buf) {
-      if (val) *val = new std::string(buf, size - 1);
-      if (alloc == SWIG_NEWOBJ) delete[] buf;
-      return SWIG_NEWOBJ;
-    } else {
-      if (val) *val = 0;
-      return SWIG_OLDOBJ;
-    }
-  } else {
-    static int init = 0;
-    static swig_type_info* descriptor = 0;
-    if (!init) {
-      descriptor = SWIG_TypeQuery("std::string" " *");
-      init = 1;
-    }
-    if (descriptor) {
-      std::string *vptr;
-      int res = SWIG_ConvertPtr(obj, (void**)&vptr, descriptor, 0);
-      if (SWIG_IsOK(res) && val) *val = vptr;
-      return res;
-    }
-  }
-  return SWIG_ERROR;
-}
-
-
-SWIGINTERNINLINE PyObject *
-SWIG_FromCharPtrAndSize(const char* carray, size_t size)
-{
-  if (carray) {
-    if (size > INT_MAX) {
-      swig_type_info* pchar_descriptor = SWIG_pchar_descriptor();
-      return pchar_descriptor ? 
-	SWIG_InternalNewPointerObj(const_cast< char * >(carray), pchar_descriptor, 0) : SWIG_Py_Void();
-    } else {
-#if PY_VERSION_HEX >= 0x03000000
-      return PyUnicode_FromStringAndSize(carray, static_cast< int >(size));
-#else
-      return PyString_FromStringAndSize(carray, static_cast< int >(size));
-#endif
-    }
-  } else {
-    return SWIG_Py_Void();
-  }
-}
-
-
-SWIGINTERNINLINE PyObject * 
-SWIG_FromCharPtr(const char *cptr)
-{ 
-  return SWIG_FromCharPtrAndSize(cptr, (cptr ? strlen(cptr) : 0));
-}
-
-
-SWIGINTERNINLINE PyObject *
-SWIG_From_unsigned_SS_int  (unsigned int value)
-{    
-  return SWIG_From_unsigned_SS_long  (value);
-}
-
-
-SWIGINTERN int
-SWIG_AsVal_unsigned_SS_int (PyObject * obj, unsigned int *val)
-{
-  unsigned long v;
-  int res = SWIG_AsVal_unsigned_SS_long (obj, &v);
-  if (SWIG_IsOK(res)) {
-    if ((v > UINT_MAX)) {
-      return SWIG_OverflowError;
-    } else {
-      if (val) *val = static_cast< unsigned int >(v);
-    }
-  }  
-  return res;
-}
-
-
-SWIGINTERNINLINE PyObject *
-SWIG_From_std_string  (const std::string& s)
-{
-  return SWIG_FromCharPtrAndSize(s.data(), s.size());
-}
-
-
-SWIGINTERN int
 SWIG_AsCharArray(PyObject * obj, char *val, size_t size)
 { 
   char* cptr = 0; size_t csize = 0; int alloc = SWIG_OLDOBJ;
@@ -5222,6 +5183,44 @@ SWIG_AsVal_char (PyObject * obj, char *val)
     }
   }
   return res;
+}
+
+
+SWIGINTERN int
+SWIG_AsPtr_std_string (PyObject * obj, std::string **val) 
+{
+  char* buf = 0 ; size_t size = 0; int alloc = SWIG_OLDOBJ;
+  if (SWIG_IsOK((SWIG_AsCharPtrAndSize(obj, &buf, &size, &alloc)))) {
+    if (buf) {
+      if (val) *val = new std::string(buf, size - 1);
+      if (alloc == SWIG_NEWOBJ) delete[] buf;
+      return SWIG_NEWOBJ;
+    } else {
+      if (val) *val = 0;
+      return SWIG_OLDOBJ;
+    }
+  } else {
+    static int init = 0;
+    static swig_type_info* descriptor = 0;
+    if (!init) {
+      descriptor = SWIG_TypeQuery("std::string" " *");
+      init = 1;
+    }
+    if (descriptor) {
+      std::string *vptr;
+      int res = SWIG_ConvertPtr(obj, (void**)&vptr, descriptor, 0);
+      if (SWIG_IsOK(res) && val) *val = vptr;
+      return res;
+    }
+  }
+  return SWIG_ERROR;
+}
+
+
+SWIGINTERNINLINE PyObject * 
+SWIG_FromCharPtr(const char *cptr)
+{ 
+  return SWIG_FromCharPtrAndSize(cptr, (cptr ? strlen(cptr) : 0));
 }
 
 #ifdef __cplusplus
@@ -19821,719 +19820,6 @@ SWIGINTERN PyObject *vectora_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *
   return SWIG_Python_InitShadowInstance(args);
 }
 
-SWIGINTERN PyObject *_wrap_new_Exception(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string *arg1 = 0 ;
-  int res1 = SWIG_OLDOBJ ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::Exception *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_Exception",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    res1 = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res1)) {
-      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_Exception" "', argument " "1"" of type '" "string const &""'"); 
-    }
-    if (!ptr) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_Exception" "', argument " "1"" of type '" "string const &""'"); 
-    }
-    arg1 = ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::Exception *)new vtools::Exception((string const &)*arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__Exception, SWIG_POINTER_NEW |  0 );
-  if (SWIG_IsNewObj(res1)) delete arg1;
-  return resultobj;
-fail:
-  if (SWIG_IsNewObj(res1)) delete arg1;
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_Exception_message(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::Exception *arg1 = (vtools::Exception *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  char *result = 0 ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__Exception, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "Exception_message" "', argument " "1"" of type '" "vtools::Exception *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::Exception * >(argp1);
-  {
-    try
-    {
-      result = (char *)(arg1)->message();
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_FromCharPtr((const char *)result);
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_Exception(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::Exception *arg1 = (vtools::Exception *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__Exception, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_Exception" "', argument " "1"" of type '" "vtools::Exception *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::Exception * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *Exception_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__Exception, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *Exception_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
-SWIGINTERN PyObject *_wrap_new_StopIteration(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string arg1 ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::StopIteration *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_StopIteration",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    int res = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res) || !ptr) {
-      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_StopIteration" "', argument " "1"" of type '" "string const""'"); 
-    }
-    arg1 = *ptr;
-    if (SWIG_IsNewObj(res)) delete ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::StopIteration *)new vtools::StopIteration(arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__StopIteration, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_StopIteration(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::StopIteration *arg1 = (vtools::StopIteration *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__StopIteration, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_StopIteration" "', argument " "1"" of type '" "vtools::StopIteration *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::StopIteration * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *StopIteration_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__StopIteration, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *StopIteration_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
-SWIGINTERN PyObject *_wrap_new_IndexError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string arg1 ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::IndexError *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_IndexError",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    int res = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res) || !ptr) {
-      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_IndexError" "', argument " "1"" of type '" "string const""'"); 
-    }
-    arg1 = *ptr;
-    if (SWIG_IsNewObj(res)) delete ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::IndexError *)new vtools::IndexError(arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__IndexError, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_IndexError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::IndexError *arg1 = (vtools::IndexError *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__IndexError, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_IndexError" "', argument " "1"" of type '" "vtools::IndexError *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::IndexError * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *IndexError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__IndexError, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *IndexError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
-SWIGINTERN PyObject *_wrap_new_ValueError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string arg1 ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::ValueError *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_ValueError",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    int res = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res) || !ptr) {
-      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_ValueError" "', argument " "1"" of type '" "string const""'"); 
-    }
-    arg1 = *ptr;
-    if (SWIG_IsNewObj(res)) delete ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::ValueError *)new vtools::ValueError(arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__ValueError, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_ValueError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::ValueError *arg1 = (vtools::ValueError *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__ValueError, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_ValueError" "', argument " "1"" of type '" "vtools::ValueError *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::ValueError * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *ValueError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__ValueError, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *ValueError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
-SWIGINTERN PyObject *_wrap_new_SystemError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string arg1 ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::SystemError *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_SystemError",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    int res = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res) || !ptr) {
-      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_SystemError" "', argument " "1"" of type '" "string const""'"); 
-    }
-    arg1 = *ptr;
-    if (SWIG_IsNewObj(res)) delete ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::SystemError *)new vtools::SystemError(arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__SystemError, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_SystemError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::SystemError *arg1 = (vtools::SystemError *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__SystemError, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_SystemError" "', argument " "1"" of type '" "vtools::SystemError *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::SystemError * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *SystemError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__SystemError, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *SystemError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
-SWIGINTERN PyObject *_wrap_new_RuntimeError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
-  PyObject *resultobj = 0;
-  string arg1 ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "msg", NULL 
-  };
-  vtools::RuntimeError *result = 0 ;
-  
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_RuntimeError",kwnames,&obj0)) SWIG_fail;
-  {
-    std::string *ptr = (std::string *)0;
-    int res = SWIG_AsPtr_std_string(obj0, &ptr);
-    if (!SWIG_IsOK(res) || !ptr) {
-      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_RuntimeError" "', argument " "1"" of type '" "string const""'"); 
-    }
-    arg1 = *ptr;
-    if (SWIG_IsNewObj(res)) delete ptr;
-  }
-  {
-    try
-    {
-      result = (vtools::RuntimeError *)new vtools::RuntimeError(arg1);
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__RuntimeError, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_delete_RuntimeError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::RuntimeError *arg1 = (vtools::RuntimeError *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__RuntimeError, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_RuntimeError" "', argument " "1"" of type '" "vtools::RuntimeError *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::RuntimeError * >(argp1);
-  {
-    try
-    {
-      delete arg1;
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *RuntimeError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *obj;
-  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__RuntimeError, SWIG_NewClientData(obj));
-  return SWIG_Py_Void();
-}
-
-SWIGINTERN PyObject *RuntimeError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  return SWIG_Python_InitShadowInstance(args);
-}
-
 SWIGINTERN PyObject *_wrap_fEqual(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
   PyObject *resultobj = 0;
   double arg1 ;
@@ -20749,6 +20035,43 @@ SWIGINTERN PyObject *VPlus_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject
 SWIGINTERN PyObject *VPlus_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   return SWIG_Python_InitShadowInstance(args);
 }
+
+SWIGINTERN PyObject *_wrap_initialize(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  
+  if (!SWIG_Python_UnpackTuple(args,"initialize",0,0,0)) SWIG_fail;
+  {
+    try
+    {
+      vtools::initialize();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
 
 SWIGINTERN PyObject *_wrap_new_RNG(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
@@ -22898,6 +22221,102 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_AssoData_statistic(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  vectorf result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_statistic" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
+  {
+    try
+    {
+      result = (arg1)->statistic();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_AssoData_se(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  vectorf result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_se" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
+  {
+    try
+    {
+      result = (arg1)->se();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_AssoData_setPvalue__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
@@ -23324,102 +22743,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_AssoData_statistic(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  vectorf result;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_statistic" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
-  {
-    try
-    {
-      result = (arg1)->statistic();
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_AssoData_se(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject *swig_obj[1] ;
-  vectorf result;
-  
-  if (!args) SWIG_fail;
-  swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_se" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
-  }
-  arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
-  {
-    try
-    {
-      result = (arg1)->se();
-    }
-    catch(vtools::IndexError e)
-    {
-      SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-      SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-      SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-      SWIG_exception(SWIG_RuntimeError, e.message());
-    }
-    catch(...)
-    {
-      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
-    }
-  }
-  resultobj = swig::from(static_cast< std::vector<double,std::allocator< double > > >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_AssoData_permuteY(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
@@ -23608,7 +22931,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_AssoData_weightX(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_AssoData_binToX(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
   void *argp1 = 0 ;
@@ -23619,13 +22942,13 @@ SWIGINTERN PyObject *_wrap_AssoData_weightX(PyObject *SWIGUNUSEDPARM(self), PyOb
   swig_obj[0] = args;
   res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_weightX" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_binToX" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
   }
   arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
   {
     try
     {
-      (arg1)->weightX();
+      (arg1)->binToX();
     }
     catch(vtools::IndexError e)
     {
@@ -23655,7 +22978,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_AssoData_binToX(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_AssoData_weightX(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   vtools::AssoData *arg1 = (vtools::AssoData *) 0 ;
   void *argp1 = 0 ;
@@ -23666,13 +22989,13 @@ SWIGINTERN PyObject *_wrap_AssoData_binToX(PyObject *SWIGUNUSEDPARM(self), PyObj
   swig_obj[0] = args;
   res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoData, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_binToX" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AssoData_weightX" "', argument " "1"" of type '" "vtools::AssoData *""'"); 
   }
   arg1 = reinterpret_cast< vtools::AssoData * >(argp1);
   {
     try
     {
-      (arg1)->binToX();
+      (arg1)->weightX();
     }
     catch(vtools::IndexError e)
     {
@@ -24091,13 +23414,13 @@ SWIGINTERN PyObject *_wrap_BaseAction_clone(PyObject *SWIGUNUSEDPARM(self), PyOb
   swig_obj[0] = args;
   res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__BaseAction, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BaseAction_clone" "', argument " "1"" of type '" "vtools::BaseAction *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BaseAction_clone" "', argument " "1"" of type '" "vtools::BaseAction const *""'"); 
   }
   arg1 = reinterpret_cast< vtools::BaseAction * >(argp1);
   {
     try
     {
-      result = (vtools::BaseAction *)(arg1)->clone();
+      result = (vtools::BaseAction *)((vtools::BaseAction const *)arg1)->clone();
     }
     catch(vtools::IndexError e)
     {
@@ -24140,7 +23463,7 @@ SWIGINTERN PyObject *_wrap_BaseAction_apply(PyObject *SWIGUNUSEDPARM(self), PyOb
   char *  kwnames[] = {
     (char *) "self",(char *) "d", NULL 
   };
-  double result;
+  bool result;
   
   if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:BaseAction_apply",kwnames,&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__BaseAction, 0 |  0 );
@@ -24159,7 +23482,7 @@ SWIGINTERN PyObject *_wrap_BaseAction_apply(PyObject *SWIGUNUSEDPARM(self), PyOb
   {
     try
     {
-      result = (double)(arg1)->apply(*arg2);
+      result = (bool)(arg1)->apply(*arg2);
     }
     catch(vtools::IndexError e)
     {
@@ -24182,7 +23505,7 @@ SWIGINTERN PyObject *_wrap_BaseAction_apply(PyObject *SWIGUNUSEDPARM(self), PyOb
       SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
     }
   }
-  resultobj = SWIG_From_double(static_cast< double >(result));
+  resultobj = SWIG_From_bool(static_cast< bool >(result));
   return resultobj;
 fail:
   return NULL;
@@ -25598,21 +24921,24 @@ SWIGINTERN PyObject *StudentPval_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObje
 
 SWIGINTERN PyObject *_wrap_new_BasePermutator__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
-  vtools::vectora *arg1 = 0 ;
+  vtools::vectora const &arg1_defvalue = vtools::vectora() ;
+  vtools::vectora *arg1 = (vtools::vectora *) &arg1_defvalue ;
   int res1 = SWIG_OLDOBJ ;
   vtools::BasePermutator *result = 0 ;
   
-  if ((nobjs < 1) || (nobjs > 1)) SWIG_fail;
-  {
-    std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
-    res1 = swig::asptr(swig_obj[0], &ptr);
-    if (!SWIG_IsOK(res1)) {
-      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_BasePermutator" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
+  if ((nobjs < 0) || (nobjs > 1)) SWIG_fail;
+  if (swig_obj[0]) {
+    {
+      std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
+      res1 = swig::asptr(swig_obj[0], &ptr);
+      if (!SWIG_IsOK(res1)) {
+        SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_BasePermutator" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
+      }
+      if (!ptr) {
+        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_BasePermutator" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
+      }
+      arg1 = ptr;
     }
-    if (!ptr) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_BasePermutator" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
-    }
-    arg1 = ptr;
   }
   {
     try
@@ -25751,19 +25077,21 @@ SWIGINTERN PyObject *_wrap_new_BasePermutator(PyObject *self, PyObject *args) {
   
   if (!(argc = SWIG_Python_UnpackTuple(args,"new_BasePermutator",0,1,argv))) SWIG_fail;
   --argc;
-  if (argc == 1) {
+  if ((argc >= 0) && (argc <= 1)) {
     int _v = 0;
-    {
-      int res = SWIG_ConvertPtr(argv[0], 0, SWIGTYPE_p_vtools__BasePermutator, 0);
-      _v = SWIG_CheckState(res);
+    if (argc > 0) {
+      {
+        int res = swig::asptr(argv[0], (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > >**)(0));
+        _v = SWIG_CheckState(res);
+      }
+      if (!_v) goto check_1;
     }
-    if (!_v) goto check_1;
-    return _wrap_new_BasePermutator__SWIG_1(self, argc, argv);
+    return _wrap_new_BasePermutator__SWIG_0(self, argc, argv);
   }
 check_1:
   
   if (argc == 1) {
-    return _wrap_new_BasePermutator__SWIG_0(self, argc, argv);
+    return _wrap_new_BasePermutator__SWIG_1(self, argc, argv);
   }
   
 fail:
@@ -25775,39 +25103,33 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_BasePermutator_apply(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
   vtools::BasePermutator *arg1 = (vtools::BasePermutator *) 0 ;
-  vtools::AssoData *arg2 = 0 ;
+  vtools::BaseAction *arg2 = 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   void *argp2 = 0 ;
   int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  char *  kwnames[] = {
-    (char *) "self",(char *) "d", NULL 
-  };
-  double result;
   
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"OO:BasePermutator_apply",kwnames,&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_apply" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_append" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
   }
   arg1 = reinterpret_cast< vtools::BasePermutator * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_vtools__AssoData,  0 );
+  res2 = SWIG_ConvertPtr(swig_obj[1], &argp2, SWIGTYPE_p_vtools__BaseAction,  0  | 0);
   if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_apply" "', argument " "2"" of type '" "vtools::AssoData &""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::BaseAction const &""'"); 
   }
   if (!argp2) {
-    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "BasePermutator_apply" "', argument " "2"" of type '" "vtools::AssoData &""'"); 
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::BaseAction const &""'"); 
   }
-  arg2 = reinterpret_cast< vtools::AssoData * >(argp2);
+  arg2 = reinterpret_cast< vtools::BaseAction * >(argp2);
   {
     try
     {
-      result = (double)(arg1)->apply(*arg2);
+      (arg1)->append((vtools::BaseAction const &)*arg2);
     }
     catch(vtools::IndexError e)
     {
@@ -25830,10 +25152,100 @@ SWIGINTERN PyObject *_wrap_BasePermutator_apply(PyObject *SWIGUNUSEDPARM(self), 
       SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
     }
   }
-  resultobj = SWIG_From_double(static_cast< double >(result));
+  resultobj = SWIG_Py_Void();
   return resultobj;
 fail:
   return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_BasePermutator_append__SWIG_1(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+  PyObject *resultobj = 0;
+  vtools::BasePermutator *arg1 = (vtools::BasePermutator *) 0 ;
+  vtools::vectora *arg2 = 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int res2 = SWIG_OLDOBJ ;
+  
+  if ((nobjs < 2) || (nobjs > 2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__BasePermutator, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "BasePermutator_append" "', argument " "1"" of type '" "vtools::BasePermutator *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::BasePermutator * >(argp1);
+  {
+    std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
+    res2 = swig::asptr(swig_obj[1], &ptr);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
+    }
+    if (!ptr) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "BasePermutator_append" "', argument " "2"" of type '" "vtools::vectora const &""'"); 
+    }
+    arg2 = ptr;
+  }
+  {
+    try
+    {
+      (arg1)->append((vtools::vectora const &)*arg2);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  if (SWIG_IsNewObj(res2)) delete arg2;
+  return resultobj;
+fail:
+  if (SWIG_IsNewObj(res2)) delete arg2;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_BasePermutator_append(PyObject *self, PyObject *args) {
+  int argc;
+  PyObject *argv[3];
+  
+  if (!(argc = SWIG_Python_UnpackTuple(args,"BasePermutator_append",0,2,argv))) SWIG_fail;
+  --argc;
+  if (argc == 2) {
+    int _v = 0;
+    {
+      int res = SWIG_ConvertPtr(argv[1], 0, SWIGTYPE_p_vtools__BaseAction, 0);
+      _v = SWIG_CheckState(res);
+    }
+    if (!_v) goto check_1;
+    return _wrap_BasePermutator_append__SWIG_0(self, argc, argv);
+  }
+check_1:
+  
+  if (argc == 2) {
+    return _wrap_BasePermutator_append__SWIG_1(self, argc, argv);
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'BasePermutator_append'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    vtools::BasePermutator::append(vtools::BaseAction const &)\n"
+    "    vtools::BasePermutator::append(vtools::vectora const &)\n");
+  return 0;
 }
 
 
@@ -25943,32 +25355,26 @@ SWIGINTERN PyObject *BasePermutator_swiginit(PyObject *SWIGUNUSEDPARM(self), PyO
   return SWIG_Python_InitShadowInstance(args);
 }
 
-SWIGINTERN PyObject *_wrap_new_ActionExecutor(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+SWIGINTERN PyObject *_wrap_new_AssoAlgorithm__SWIG_0(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
   PyObject *resultobj = 0;
-  vtools::vectora *arg1 = 0 ;
-  int res1 = SWIG_OLDOBJ ;
-  PyObject * obj0 = 0 ;
-  char *  kwnames[] = {
-    (char *) "actions", NULL 
-  };
-  vtools::ActionExecutor *result = 0 ;
+  vtools::BaseAction *arg1 = 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  vtools::AssoAlgorithm *result = 0 ;
   
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_ActionExecutor",kwnames,&obj0)) SWIG_fail;
-  {
-    std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
-    res1 = swig::asptr(obj0, &ptr);
-    if (!SWIG_IsOK(res1)) {
-      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_ActionExecutor" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
-    }
-    if (!ptr) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_ActionExecutor" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
-    }
-    arg1 = ptr;
+  if ((nobjs < 1) || (nobjs > 1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1, SWIGTYPE_p_vtools__BaseAction,  0  | 0);
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_AssoAlgorithm" "', argument " "1"" of type '" "vtools::BaseAction const &""'"); 
   }
+  if (!argp1) {
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_AssoAlgorithm" "', argument " "1"" of type '" "vtools::BaseAction const &""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::BaseAction * >(argp1);
   {
     try
     {
-      result = (vtools::ActionExecutor *)new vtools::ActionExecutor((vtools::vectora const &)*arg1);
+      result = (vtools::AssoAlgorithm *)new vtools::AssoAlgorithm((vtools::BaseAction const &)*arg1);
     }
     catch(vtools::IndexError e)
     {
@@ -25991,7 +25397,58 @@ SWIGINTERN PyObject *_wrap_new_ActionExecutor(PyObject *SWIGUNUSEDPARM(self), Py
       SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
     }
   }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__ActionExecutor, SWIG_POINTER_NEW |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__AssoAlgorithm, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_new_AssoAlgorithm__SWIG_1(PyObject *SWIGUNUSEDPARM(self), int nobjs, PyObject **swig_obj) {
+  PyObject *resultobj = 0;
+  vtools::vectora *arg1 = 0 ;
+  int res1 = SWIG_OLDOBJ ;
+  vtools::AssoAlgorithm *result = 0 ;
+  
+  if ((nobjs < 1) || (nobjs > 1)) SWIG_fail;
+  {
+    std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *ptr = (std::vector<vtools::BaseAction*,std::allocator< vtools::BaseAction * > > *)0;
+    res1 = swig::asptr(swig_obj[0], &ptr);
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_AssoAlgorithm" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
+    }
+    if (!ptr) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_AssoAlgorithm" "', argument " "1"" of type '" "vtools::vectora const &""'"); 
+    }
+    arg1 = ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::AssoAlgorithm *)new vtools::AssoAlgorithm((vtools::vectora const &)*arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__AssoAlgorithm, SWIG_POINTER_NEW |  0 );
   if (SWIG_IsNewObj(res1)) delete arg1;
   return resultobj;
 fail:
@@ -26000,20 +25457,50 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_delete_ActionExecutor(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_new_AssoAlgorithm(PyObject *self, PyObject *args) {
+  int argc;
+  PyObject *argv[2];
+  
+  if (!(argc = SWIG_Python_UnpackTuple(args,"new_AssoAlgorithm",0,1,argv))) SWIG_fail;
+  --argc;
+  if (argc == 1) {
+    int _v = 0;
+    {
+      int res = SWIG_ConvertPtr(argv[0], 0, SWIGTYPE_p_vtools__BaseAction, 0);
+      _v = SWIG_CheckState(res);
+    }
+    if (!_v) goto check_1;
+    return _wrap_new_AssoAlgorithm__SWIG_0(self, argc, argv);
+  }
+check_1:
+  
+  if (argc == 1) {
+    return _wrap_new_AssoAlgorithm__SWIG_1(self, argc, argv);
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'new_AssoAlgorithm'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    vtools::AssoAlgorithm::AssoAlgorithm(vtools::BaseAction const &)\n"
+    "    vtools::AssoAlgorithm::AssoAlgorithm(vtools::vectora const &)\n");
+  return 0;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_AssoAlgorithm(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
-  vtools::ActionExecutor *arg1 = (vtools::ActionExecutor *) 0 ;
+  vtools::AssoAlgorithm *arg1 = (vtools::AssoAlgorithm *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject *swig_obj[1] ;
   
   if (!args) SWIG_fail;
   swig_obj[0] = args;
-  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__ActionExecutor, SWIG_POINTER_DISOWN |  0 );
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__AssoAlgorithm, SWIG_POINTER_DISOWN |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_ActionExecutor" "', argument " "1"" of type '" "vtools::ActionExecutor *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_AssoAlgorithm" "', argument " "1"" of type '" "vtools::AssoAlgorithm *""'"); 
   }
-  arg1 = reinterpret_cast< vtools::ActionExecutor * >(argp1);
+  arg1 = reinterpret_cast< vtools::AssoAlgorithm * >(argp1);
   {
     try
     {
@@ -26047,14 +25534,14 @@ fail:
 }
 
 
-SWIGINTERN PyObject *ActionExecutor_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *AssoAlgorithm_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *obj;
   if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
-  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__ActionExecutor, SWIG_NewClientData(obj));
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__AssoAlgorithm, SWIG_NewClientData(obj));
   return SWIG_Py_Void();
 }
 
-SWIGINTERN PyObject *ActionExecutor_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *AssoAlgorithm_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   return SWIG_Python_InitShadowInstance(args);
 }
 
@@ -26349,6 +25836,54 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_VariablePermutator_clone(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::VariablePermutator *arg1 = (vtools::VariablePermutator *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  vtools::VariablePermutator *result = 0 ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__VariablePermutator, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "VariablePermutator_clone" "', argument " "1"" of type '" "vtools::VariablePermutator *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::VariablePermutator * >(argp1);
+  {
+    try
+    {
+      result = (vtools::VariablePermutator *)(arg1)->clone();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__VariablePermutator, SWIG_POINTER_OWN |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *VariablePermutator_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *obj;
   if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
@@ -26360,14 +25895,129 @@ SWIGINTERN PyObject *VariablePermutator_swiginit(PyObject *SWIGUNUSEDPARM(self),
   return SWIG_Python_InitShadowInstance(args);
 }
 
-SWIGINTERN PyObject *_wrap_initialize(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_new_Exception(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
   PyObject *resultobj = 0;
+  string *arg1 = 0 ;
+  int res1 = SWIG_OLDOBJ ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::Exception *result = 0 ;
   
-  if (!SWIG_Python_UnpackTuple(args,"initialize",0,0,0)) SWIG_fail;
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_Exception",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    res1 = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "new_Exception" "', argument " "1"" of type '" "string const &""'"); 
+    }
+    if (!ptr) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "new_Exception" "', argument " "1"" of type '" "string const &""'"); 
+    }
+    arg1 = ptr;
+  }
   {
     try
     {
-      vtools::initialize();
+      result = (vtools::Exception *)new vtools::Exception((string const &)*arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__Exception, SWIG_POINTER_NEW |  0 );
+  if (SWIG_IsNewObj(res1)) delete arg1;
+  return resultobj;
+fail:
+  if (SWIG_IsNewObj(res1)) delete arg1;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_Exception_message(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::Exception *arg1 = (vtools::Exception *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  char *result = 0 ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__Exception, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "Exception_message" "', argument " "1"" of type '" "vtools::Exception *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::Exception * >(argp1);
+  {
+    try
+    {
+      result = (char *)(arg1)->message();
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_FromCharPtr((const char *)result);
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_Exception(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::Exception *arg1 = (vtools::Exception *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__Exception, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_Exception" "', argument " "1"" of type '" "vtools::Exception *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::Exception * >(argp1);
+  {
+    try
+    {
+      delete arg1;
     }
     catch(vtools::IndexError e)
     {
@@ -26396,6 +26046,567 @@ fail:
   return NULL;
 }
 
+
+SWIGINTERN PyObject *Exception_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__Exception, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *Exception_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
+SWIGINTERN PyObject *_wrap_new_StopIteration(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  string arg1 ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::StopIteration *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_StopIteration",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_StopIteration" "', argument " "1"" of type '" "string const""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::StopIteration *)new vtools::StopIteration(arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__StopIteration, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_StopIteration(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::StopIteration *arg1 = (vtools::StopIteration *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__StopIteration, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_StopIteration" "', argument " "1"" of type '" "vtools::StopIteration *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::StopIteration * >(argp1);
+  {
+    try
+    {
+      delete arg1;
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *StopIteration_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__StopIteration, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *StopIteration_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
+SWIGINTERN PyObject *_wrap_new_IndexError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  string arg1 ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::IndexError *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_IndexError",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_IndexError" "', argument " "1"" of type '" "string const""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::IndexError *)new vtools::IndexError(arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__IndexError, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_IndexError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::IndexError *arg1 = (vtools::IndexError *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__IndexError, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_IndexError" "', argument " "1"" of type '" "vtools::IndexError *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::IndexError * >(argp1);
+  {
+    try
+    {
+      delete arg1;
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *IndexError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__IndexError, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *IndexError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
+SWIGINTERN PyObject *_wrap_new_ValueError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  string arg1 ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::ValueError *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_ValueError",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_ValueError" "', argument " "1"" of type '" "string const""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::ValueError *)new vtools::ValueError(arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__ValueError, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_ValueError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::ValueError *arg1 = (vtools::ValueError *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__ValueError, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_ValueError" "', argument " "1"" of type '" "vtools::ValueError *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::ValueError * >(argp1);
+  {
+    try
+    {
+      delete arg1;
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *ValueError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__ValueError, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *ValueError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
+SWIGINTERN PyObject *_wrap_new_SystemError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  string arg1 ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::SystemError *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_SystemError",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_SystemError" "', argument " "1"" of type '" "string const""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::SystemError *)new vtools::SystemError(arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__SystemError, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_SystemError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::SystemError *arg1 = (vtools::SystemError *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__SystemError, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_SystemError" "', argument " "1"" of type '" "vtools::SystemError *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::SystemError * >(argp1);
+  {
+    try
+    {
+      delete arg1;
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *SystemError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__SystemError, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *SystemError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
+SWIGINTERN PyObject *_wrap_new_RuntimeError(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  string arg1 ;
+  PyObject * obj0 = 0 ;
+  char *  kwnames[] = {
+    (char *) "msg", NULL 
+  };
+  vtools::RuntimeError *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O:new_RuntimeError",kwnames,&obj0)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "new_RuntimeError" "', argument " "1"" of type '" "string const""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    try
+    {
+      result = (vtools::RuntimeError *)new vtools::RuntimeError(arg1);
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_vtools__RuntimeError, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_RuntimeError(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  vtools::RuntimeError *arg1 = (vtools::RuntimeError *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_vtools__RuntimeError, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_RuntimeError" "', argument " "1"" of type '" "vtools::RuntimeError *""'"); 
+  }
+  arg1 = reinterpret_cast< vtools::RuntimeError * >(argp1);
+  {
+    try
+    {
+      delete arg1;
+    }
+    catch(vtools::IndexError e)
+    {
+      SWIG_exception(SWIG_IndexError, e.message());
+    }
+    catch(vtools::ValueError e)
+    {
+      SWIG_exception(SWIG_ValueError, e.message());
+    }
+    catch(vtools::SystemError e)
+    {
+      SWIG_exception(SWIG_SystemError, e.message());
+    }
+    catch(vtools::RuntimeError e)
+    {
+      SWIG_exception(SWIG_RuntimeError, e.message());
+    }
+    catch(...)
+    {
+      SWIG_exception(SWIG_UnknownError, "Unknown runtime error happened.");
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *RuntimeError_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args,(char*)"swigregister", 1, 1,&obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_vtools__RuntimeError, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *RuntimeError_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
 
 static PyMethodDef SwigMethods[] = {
 	 { (char *)"SWIG_PyInstanceMethod_New", (PyCFunction)SWIG_PyInstanceMethod_New, METH_O, NULL},
@@ -26592,37 +26803,13 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"delete_vectora", (PyCFunction)_wrap_delete_vectora, METH_O, NULL},
 	 { (char *)"vectora_swigregister", vectora_swigregister, METH_VARARGS, NULL},
 	 { (char *)"vectora_swiginit", vectora_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_Exception", (PyCFunction) _wrap_new_Exception, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"Exception_message", (PyCFunction)_wrap_Exception_message, METH_O, NULL},
-	 { (char *)"delete_Exception", (PyCFunction)_wrap_delete_Exception, METH_O, NULL},
-	 { (char *)"Exception_swigregister", Exception_swigregister, METH_VARARGS, NULL},
-	 { (char *)"Exception_swiginit", Exception_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_StopIteration", (PyCFunction) _wrap_new_StopIteration, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_StopIteration", (PyCFunction)_wrap_delete_StopIteration, METH_O, NULL},
-	 { (char *)"StopIteration_swigregister", StopIteration_swigregister, METH_VARARGS, NULL},
-	 { (char *)"StopIteration_swiginit", StopIteration_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_IndexError", (PyCFunction) _wrap_new_IndexError, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_IndexError", (PyCFunction)_wrap_delete_IndexError, METH_O, NULL},
-	 { (char *)"IndexError_swigregister", IndexError_swigregister, METH_VARARGS, NULL},
-	 { (char *)"IndexError_swiginit", IndexError_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_ValueError", (PyCFunction) _wrap_new_ValueError, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_ValueError", (PyCFunction)_wrap_delete_ValueError, METH_O, NULL},
-	 { (char *)"ValueError_swigregister", ValueError_swigregister, METH_VARARGS, NULL},
-	 { (char *)"ValueError_swiginit", ValueError_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_SystemError", (PyCFunction) _wrap_new_SystemError, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_SystemError", (PyCFunction)_wrap_delete_SystemError, METH_O, NULL},
-	 { (char *)"SystemError_swigregister", SystemError_swigregister, METH_VARARGS, NULL},
-	 { (char *)"SystemError_swiginit", SystemError_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_RuntimeError", (PyCFunction) _wrap_new_RuntimeError, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_RuntimeError", (PyCFunction)_wrap_delete_RuntimeError, METH_O, NULL},
-	 { (char *)"RuntimeError_swigregister", RuntimeError_swigregister, METH_VARARGS, NULL},
-	 { (char *)"RuntimeError_swiginit", RuntimeError_swiginit, METH_VARARGS, NULL},
 	 { (char *)"fEqual", (PyCFunction) _wrap_fEqual, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"fRound", (PyCFunction) _wrap_fRound, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"new_VPlus", (PyCFunction)_wrap_new_VPlus, METH_NOARGS, NULL},
 	 { (char *)"delete_VPlus", (PyCFunction)_wrap_delete_VPlus, METH_O, NULL},
 	 { (char *)"VPlus_swigregister", VPlus_swigregister, METH_VARARGS, NULL},
 	 { (char *)"VPlus_swiginit", VPlus_swiginit, METH_VARARGS, NULL},
+	 { (char *)"initialize", (PyCFunction)_wrap_initialize, METH_NOARGS, NULL},
 	 { (char *)"new_RNG", (PyCFunction)_wrap_new_RNG, METH_NOARGS, NULL},
 	 { (char *)"delete_RNG", (PyCFunction)_wrap_delete_RNG, METH_O, NULL},
 	 { (char *)"RNG_get", _wrap_RNG_get, METH_VARARGS, NULL},
@@ -26662,17 +26849,17 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"AssoData_covarcounts", (PyCFunction)_wrap_AssoData_covarcounts, METH_O, NULL},
 	 { (char *)"AssoData_samplecounts", (PyCFunction)_wrap_AssoData_samplecounts, METH_O, NULL},
 	 { (char *)"AssoData_pvalue", (PyCFunction)_wrap_AssoData_pvalue, METH_O, NULL},
+	 { (char *)"AssoData_statistic", (PyCFunction)_wrap_AssoData_statistic, METH_O, NULL},
+	 { (char *)"AssoData_se", (PyCFunction)_wrap_AssoData_se, METH_O, NULL},
 	 { (char *)"AssoData_setPvalue", _wrap_AssoData_setPvalue, METH_VARARGS, NULL},
 	 { (char *)"AssoData_setStatistic", _wrap_AssoData_setStatistic, METH_VARARGS, NULL},
 	 { (char *)"AssoData_setSE", _wrap_AssoData_setSE, METH_VARARGS, NULL},
-	 { (char *)"AssoData_statistic", (PyCFunction)_wrap_AssoData_statistic, METH_O, NULL},
-	 { (char *)"AssoData_se", (PyCFunction)_wrap_AssoData_se, METH_O, NULL},
 	 { (char *)"AssoData_permuteY", (PyCFunction)_wrap_AssoData_permuteY, METH_O, NULL},
 	 { (char *)"AssoData_permuteRawX", (PyCFunction)_wrap_AssoData_permuteRawX, METH_O, NULL},
 	 { (char *)"AssoData_permuteX", (PyCFunction)_wrap_AssoData_permuteX, METH_O, NULL},
 	 { (char *)"AssoData_sumToX", (PyCFunction)_wrap_AssoData_sumToX, METH_O, NULL},
-	 { (char *)"AssoData_weightX", (PyCFunction)_wrap_AssoData_weightX, METH_O, NULL},
 	 { (char *)"AssoData_binToX", (PyCFunction)_wrap_AssoData_binToX, METH_O, NULL},
+	 { (char *)"AssoData_weightX", (PyCFunction)_wrap_AssoData_weightX, METH_O, NULL},
 	 { (char *)"AssoData_setSitesByMaf", (PyCFunction) _wrap_AssoData_setSitesByMaf, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"AssoData_simpleLinear", (PyCFunction)_wrap_AssoData_simpleLinear, METH_O, NULL},
 	 { (char *)"AssoData_simpleLogit", (PyCFunction)_wrap_AssoData_simpleLogit, METH_O, NULL},
@@ -26742,23 +26929,48 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"StudentPval_swiginit", StudentPval_swiginit, METH_VARARGS, NULL},
 	 { (char *)"delete_BasePermutator", (PyCFunction)_wrap_delete_BasePermutator, METH_O, NULL},
 	 { (char *)"new_BasePermutator", _wrap_new_BasePermutator, METH_VARARGS, NULL},
-	 { (char *)"BasePermutator_apply", (PyCFunction) _wrap_BasePermutator_apply, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"BasePermutator_append", _wrap_BasePermutator_append, METH_VARARGS, NULL},
 	 { (char *)"BasePermutator_check", (PyCFunction) _wrap_BasePermutator_check, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"BasePermutator_swigregister", BasePermutator_swigregister, METH_VARARGS, NULL},
 	 { (char *)"BasePermutator_swiginit", BasePermutator_swiginit, METH_VARARGS, NULL},
-	 { (char *)"new_ActionExecutor", (PyCFunction) _wrap_new_ActionExecutor, METH_VARARGS | METH_KEYWORDS, NULL},
-	 { (char *)"delete_ActionExecutor", (PyCFunction)_wrap_delete_ActionExecutor, METH_O, NULL},
-	 { (char *)"ActionExecutor_swigregister", ActionExecutor_swigregister, METH_VARARGS, NULL},
-	 { (char *)"ActionExecutor_swiginit", ActionExecutor_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_AssoAlgorithm", _wrap_new_AssoAlgorithm, METH_VARARGS, NULL},
+	 { (char *)"delete_AssoAlgorithm", (PyCFunction)_wrap_delete_AssoAlgorithm, METH_O, NULL},
+	 { (char *)"AssoAlgorithm_swigregister", AssoAlgorithm_swigregister, METH_VARARGS, NULL},
+	 { (char *)"AssoAlgorithm_swiginit", AssoAlgorithm_swiginit, METH_VARARGS, NULL},
 	 { (char *)"new_FixedPermutator", (PyCFunction) _wrap_new_FixedPermutator, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"delete_FixedPermutator", (PyCFunction)_wrap_delete_FixedPermutator, METH_O, NULL},
 	 { (char *)"FixedPermutator_swigregister", FixedPermutator_swigregister, METH_VARARGS, NULL},
 	 { (char *)"FixedPermutator_swiginit", FixedPermutator_swiginit, METH_VARARGS, NULL},
 	 { (char *)"new_VariablePermutator", (PyCFunction) _wrap_new_VariablePermutator, METH_VARARGS | METH_KEYWORDS, NULL},
 	 { (char *)"delete_VariablePermutator", (PyCFunction)_wrap_delete_VariablePermutator, METH_O, NULL},
+	 { (char *)"VariablePermutator_clone", (PyCFunction)_wrap_VariablePermutator_clone, METH_O, NULL},
 	 { (char *)"VariablePermutator_swigregister", VariablePermutator_swigregister, METH_VARARGS, NULL},
 	 { (char *)"VariablePermutator_swiginit", VariablePermutator_swiginit, METH_VARARGS, NULL},
-	 { (char *)"initialize", (PyCFunction)_wrap_initialize, METH_NOARGS, NULL},
+	 { (char *)"new_Exception", (PyCFunction) _wrap_new_Exception, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"Exception_message", (PyCFunction)_wrap_Exception_message, METH_O, NULL},
+	 { (char *)"delete_Exception", (PyCFunction)_wrap_delete_Exception, METH_O, NULL},
+	 { (char *)"Exception_swigregister", Exception_swigregister, METH_VARARGS, NULL},
+	 { (char *)"Exception_swiginit", Exception_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_StopIteration", (PyCFunction) _wrap_new_StopIteration, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"delete_StopIteration", (PyCFunction)_wrap_delete_StopIteration, METH_O, NULL},
+	 { (char *)"StopIteration_swigregister", StopIteration_swigregister, METH_VARARGS, NULL},
+	 { (char *)"StopIteration_swiginit", StopIteration_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_IndexError", (PyCFunction) _wrap_new_IndexError, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"delete_IndexError", (PyCFunction)_wrap_delete_IndexError, METH_O, NULL},
+	 { (char *)"IndexError_swigregister", IndexError_swigregister, METH_VARARGS, NULL},
+	 { (char *)"IndexError_swiginit", IndexError_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_ValueError", (PyCFunction) _wrap_new_ValueError, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"delete_ValueError", (PyCFunction)_wrap_delete_ValueError, METH_O, NULL},
+	 { (char *)"ValueError_swigregister", ValueError_swigregister, METH_VARARGS, NULL},
+	 { (char *)"ValueError_swiginit", ValueError_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_SystemError", (PyCFunction) _wrap_new_SystemError, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"delete_SystemError", (PyCFunction)_wrap_delete_SystemError, METH_O, NULL},
+	 { (char *)"SystemError_swigregister", SystemError_swigregister, METH_VARARGS, NULL},
+	 { (char *)"SystemError_swiginit", SystemError_swiginit, METH_VARARGS, NULL},
+	 { (char *)"new_RuntimeError", (PyCFunction) _wrap_new_RuntimeError, METH_VARARGS | METH_KEYWORDS, NULL},
+	 { (char *)"delete_RuntimeError", (PyCFunction)_wrap_delete_RuntimeError, METH_O, NULL},
+	 { (char *)"RuntimeError_swigregister", RuntimeError_swigregister, METH_VARARGS, NULL},
+	 { (char *)"RuntimeError_swiginit", RuntimeError_swiginit, METH_VARARGS, NULL},
 	 { NULL, NULL, 0, NULL }
 };
 
@@ -26768,26 +26980,17 @@ static PyMethodDef SwigMethods[] = {
 static void *_p_vtools__LinearMTo_p_vtools__BaseLm(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseLm *)  ((vtools::LinearM *) x));
 }
-static void *_p_vtools__GaussianPvalTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::GaussianPval *) x));
+static void *_p_vtools__AssoAlgorithmTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *) (vtools::BasePermutator *) ((vtools::AssoAlgorithm *) x));
 }
 static void *_p_vtools__BinToXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseAction *)  ((vtools::BinToX *) x));
 }
-static void *_p_vtools__StudentPvalTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::StudentPval *) x));
-}
-static void *_p_vtools__PermuteRawXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::PermuteRawX *) x));
-}
-static void *_p_vtools__SetSitesTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::SetSites *) x));
-}
 static void *_p_vtools__PermuteXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseAction *)  ((vtools::PermuteX *) x));
 }
-static void *_p_vtools__WeightByAllMafTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::WeightByAllMaf *) x));
+static void *_p_vtools__SetSitesTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::SetSites *) x));
 }
 static void *_p_vtools__PermuteYTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseAction *)  ((vtools::PermuteY *) x));
@@ -26795,17 +26998,38 @@ static void *_p_vtools__PermuteYTo_p_vtools__BaseAction(void *x, int *SWIGUNUSED
 static void *_p_vtools__SetMafTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseAction *)  ((vtools::SetMaf *) x));
 }
-static void *_p_vtools__SumToXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::SumToX *) x));
+static void *_p_vtools__WeightByAllMafTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::WeightByAllMaf *) x));
 }
-static void *_p_vtools__SimpleLinearRegressionTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::SimpleLinearRegression *) x));
+static void *_p_vtools__SimpleLogisticRegressionTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::SimpleLogisticRegression *) x));
 }
 static void *_p_vtools__MultipleLinearRegressionTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BaseAction *)  ((vtools::MultipleLinearRegression *) x));
 }
-static void *_p_vtools__SimpleLogisticRegressionTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BaseAction *)  ((vtools::SimpleLogisticRegression *) x));
+static void *_p_vtools__SimpleLinearRegressionTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::SimpleLinearRegression *) x));
+}
+static void *_p_vtools__GaussianPvalTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::GaussianPval *) x));
+}
+static void *_p_vtools__PermuteRawXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::PermuteRawX *) x));
+}
+static void *_p_vtools__StudentPvalTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::StudentPval *) x));
+}
+static void *_p_vtools__SumToXTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::SumToX *) x));
+}
+static void *_p_vtools__BasePermutatorTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *)  ((vtools::BasePermutator *) x));
+}
+static void *_p_vtools__FixedPermutatorTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *) (vtools::BasePermutator *) ((vtools::FixedPermutator *) x));
+}
+static void *_p_vtools__VariablePermutatorTo_p_vtools__BaseAction(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BaseAction *) (vtools::BasePermutator *) ((vtools::VariablePermutator *) x));
 }
 static void *_p_vtools__FixedPermutatorTo_p_vtools__BasePermutator(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BasePermutator *)  ((vtools::FixedPermutator *) x));
@@ -26813,8 +27037,8 @@ static void *_p_vtools__FixedPermutatorTo_p_vtools__BasePermutator(void *x, int 
 static void *_p_vtools__VariablePermutatorTo_p_vtools__BasePermutator(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::BasePermutator *)  ((vtools::VariablePermutator *) x));
 }
-static void *_p_vtools__ActionExecutorTo_p_vtools__BasePermutator(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((vtools::BasePermutator *)  ((vtools::ActionExecutor *) x));
+static void *_p_vtools__AssoAlgorithmTo_p_vtools__BasePermutator(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((vtools::BasePermutator *)  ((vtools::AssoAlgorithm *) x));
 }
 static void *_p_vtools__StopIterationTo_p_vtools__Exception(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((vtools::Exception *)  ((vtools::StopIteration *) x));
@@ -26855,7 +27079,7 @@ static swig_type_info _swigt__p_std__vectorT_std__vectorT_int_std__allocatorT_in
 static swig_type_info _swigt__p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t = {"_p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t", "vtools::vectora *|std::vector< vtools::BaseAction * > *|std::vector< vtools::BaseAction *,std::allocator< vtools::BaseAction * > > *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_swig__SwigPyIterator = {"_p_swig__SwigPyIterator", "swig::SwigPyIterator *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_value_type = {"_p_value_type", "value_type *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_vtools__ActionExecutor = {"_p_vtools__ActionExecutor", "vtools::ActionExecutor *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_vtools__AssoAlgorithm = {"_p_vtools__AssoAlgorithm", "vtools::AssoAlgorithm *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_vtools__AssoData = {"_p_vtools__AssoData", "vtools::AssoData *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_vtools__BaseAction = {"_p_vtools__BaseAction", "vtools::BaseAction *|std::vector< vtools::BaseAction * >::value_type", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_vtools__BaseLm = {"_p_vtools__BaseLm", "vtools::BaseLm *", 0, 0, (void*)0, 0};
@@ -26909,7 +27133,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t,
   &_swigt__p_swig__SwigPyIterator,
   &_swigt__p_value_type,
-  &_swigt__p_vtools__ActionExecutor,
+  &_swigt__p_vtools__AssoAlgorithm,
   &_swigt__p_vtools__AssoData,
   &_swigt__p_vtools__BaseAction,
   &_swigt__p_vtools__BaseLm,
@@ -26963,11 +27187,11 @@ static swig_cast_info _swigc__p_std__vectorT_std__vectorT_int_std__allocatorT_in
 static swig_cast_info _swigc__p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t[] = {  {&_swigt__p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_swig__SwigPyIterator[] = {  {&_swigt__p_swig__SwigPyIterator, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_value_type[] = {  {&_swigt__p_value_type, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_vtools__ActionExecutor[] = {  {&_swigt__p_vtools__ActionExecutor, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_vtools__AssoAlgorithm[] = {  {&_swigt__p_vtools__AssoAlgorithm, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_vtools__AssoData[] = {  {&_swigt__p_vtools__AssoData, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_vtools__BaseAction[] = {  {&_swigt__p_vtools__SetMaf, _p_vtools__SetMafTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteX, _p_vtools__PermuteXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SetSites, _p_vtools__SetSitesTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteY, _p_vtools__PermuteYTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__WeightByAllMaf, _p_vtools__WeightByAllMafTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SimpleLinearRegression, _p_vtools__SimpleLinearRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__MultipleLinearRegression, _p_vtools__MultipleLinearRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SimpleLogisticRegression, _p_vtools__SimpleLogisticRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__BaseAction, 0, 0, 0},  {&_swigt__p_vtools__GaussianPval, _p_vtools__GaussianPvalTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SumToX, _p_vtools__SumToXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteRawX, _p_vtools__PermuteRawXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__StudentPval, _p_vtools__StudentPvalTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__BinToX, _p_vtools__BinToXTo_p_vtools__BaseAction, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_vtools__BaseAction[] = {  {&_swigt__p_vtools__AssoAlgorithm, _p_vtools__AssoAlgorithmTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SetMaf, _p_vtools__SetMafTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteX, _p_vtools__PermuteXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SetSites, _p_vtools__SetSitesTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteY, _p_vtools__PermuteYTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__WeightByAllMaf, _p_vtools__WeightByAllMafTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SimpleLogisticRegression, _p_vtools__SimpleLogisticRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__MultipleLinearRegression, _p_vtools__MultipleLinearRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SimpleLinearRegression, _p_vtools__SimpleLinearRegressionTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__BaseAction, 0, 0, 0},  {&_swigt__p_vtools__GaussianPval, _p_vtools__GaussianPvalTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__SumToX, _p_vtools__SumToXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__PermuteRawX, _p_vtools__PermuteRawXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__StudentPval, _p_vtools__StudentPvalTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__BinToX, _p_vtools__BinToXTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__BasePermutator, _p_vtools__BasePermutatorTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__FixedPermutator, _p_vtools__FixedPermutatorTo_p_vtools__BaseAction, 0, 0},  {&_swigt__p_vtools__VariablePermutator, _p_vtools__VariablePermutatorTo_p_vtools__BaseAction, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_vtools__BaseLm[] = {  {&_swigt__p_vtools__BaseLm, 0, 0, 0},  {&_swigt__p_vtools__LinearM, _p_vtools__LinearMTo_p_vtools__BaseLm, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_vtools__BasePermutator[] = {  {&_swigt__p_vtools__BasePermutator, 0, 0, 0},  {&_swigt__p_vtools__FixedPermutator, _p_vtools__FixedPermutatorTo_p_vtools__BasePermutator, 0, 0},  {&_swigt__p_vtools__VariablePermutator, _p_vtools__VariablePermutatorTo_p_vtools__BasePermutator, 0, 0},  {&_swigt__p_vtools__ActionExecutor, _p_vtools__ActionExecutorTo_p_vtools__BasePermutator, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_vtools__BasePermutator[] = {  {&_swigt__p_vtools__BasePermutator, 0, 0, 0},  {&_swigt__p_vtools__FixedPermutator, _p_vtools__FixedPermutatorTo_p_vtools__BasePermutator, 0, 0},  {&_swigt__p_vtools__VariablePermutator, _p_vtools__VariablePermutatorTo_p_vtools__BasePermutator, 0, 0},  {&_swigt__p_vtools__AssoAlgorithm, _p_vtools__AssoAlgorithmTo_p_vtools__BasePermutator, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_vtools__BinToX[] = {  {&_swigt__p_vtools__BinToX, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_vtools__Exception[] = {  {&_swigt__p_vtools__Exception, 0, 0, 0},  {&_swigt__p_vtools__StopIteration, _p_vtools__StopIterationTo_p_vtools__Exception, 0, 0},  {&_swigt__p_vtools__ValueError, _p_vtools__ValueErrorTo_p_vtools__Exception, 0, 0},  {&_swigt__p_vtools__RuntimeError, _p_vtools__RuntimeErrorTo_p_vtools__Exception, 0, 0},  {&_swigt__p_vtools__SystemError, _p_vtools__SystemErrorTo_p_vtools__Exception, 0, 0},  {&_swigt__p_vtools__IndexError, _p_vtools__IndexErrorTo_p_vtools__Exception, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_vtools__FixedPermutator[] = {  {&_swigt__p_vtools__FixedPermutator, 0, 0, 0},{0, 0, 0, 0}};
@@ -27017,7 +27241,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_std__vectorT_vtools__BaseAction_p_std__allocatorT_vtools__BaseAction_p_t_t,
   _swigc__p_swig__SwigPyIterator,
   _swigc__p_value_type,
-  _swigc__p_vtools__ActionExecutor,
+  _swigc__p_vtools__AssoAlgorithm,
   _swigc__p_vtools__AssoData,
   _swigc__p_vtools__BaseAction,
   _swigc__p_vtools__BaseLm,

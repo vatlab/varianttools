@@ -8,7 +8,7 @@
 # summarize, and filter variants for next-gen sequencing ananlysis.
 # Please visit http://varianttools.sourceforge.net for details.
 #
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -628,7 +628,7 @@ class LinearBurdenTest(NullTest):
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
         #
         # NullTest.__init__ will call parseArgs to get the parameters we need
-        self.algorithm = _determine_algorithm(self)
+        self.algorithm = self._determine_algorithm(ncovariates)
                 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
@@ -673,50 +673,68 @@ class LinearBurdenTest(NullTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def _determine_algorithm(self):
-        doRegression = t.MultipleLinearRegression() if data.covarcounts() > 0 else t.SimpleLinearRegression()
-        codeX = t.BinToX() if self.use_indicator else t.SumToX()
-        if self.permutations == 0:
-            #
-            # FIXME: explain each step of the algorithm
-            #
-            self.algorithm = t.AssoAlgorithm([
+    def _determine_algorithm(self, ncovariates):
+        a_regression = t.MultipleLinearRegression() if ncovariates > 0 else t.SimpleLinearRegression()
+        a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
+        # data pre-processing
+        if self.weight_by_maf and not self.use_indicator:
+            algorithm = t.AssoAlgorithm([
+                # calculate sample MAF
                 t.SetMaf(),
+                # filter out variants having MAF > mafupper or MAF <= maflower
                 t.SetSites(self.mafupper, self.maflower),
-                codeX,
-                doRegression,
-                t.StudentPval(self.alternative)
-            ])
-            if self.weight_by_maf and not self.use_indicator:
-                self.algorithm = t.AssoAlgorithm([
-                    t.SetMaf(),
-                    t.SetSites(self.mafupper, self.maflower),
-                    t.WeightByAllMaf(),
-                    codeX,
-                    doRegression,
-                    t.StudentPval(self.alternative)])
+                # weight genotype codings by w(MAF)
+                t.WeightByAllMaf()
+                ])
         else:
-            self.algorithm = t.AssoAlgorithm([
+            algorithm = t.AssoAlgorithm([
+                # calculate sample MAF
                 t.SetMaf(),
+                # filter out variants having MAF > mafupper or MAF <= maflower
                 t.SetSites(self.mafupper, self.maflower)
-            ])
-            if self.weight_by_maf and not self.use_indicator:
-                self.algorithm.append(t.WeightByAllMaf())
-            permute_actions = [codeX, doRegression]
-            p = t.VariablePermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
+                ])
+        # association testing using analytic p-value
+        if self.permutations == 0:
+            algorithm.append([
+                # calculate genotype score for a set of variants
+                a_scoregene,
+                # fit regression model
+                a_regression,
+                # evaluate p-value for the Wald's statistic
+                t.StudentPval(self.alternative)
+                ])
+        # association testing using permutation-based p-value
+        else:
             if not self.variable_thresholds:
-                permute_actions = [doRegression]
-                p = t.FixedPermutator(self.permute_by.upper(), self.alternative, self.permutations, self.adaptive, permute_actions)
-                self.algorithm.append(codeX)
-            self.algorithm.append(p)
+                a_permutationtest = t.FixedPermutator(
+                        self.permute_by.upper(), 
+                        self.alternative, 
+                        self.permutations, 
+                        self.adaptive, 
+                        [a_regression]
+                        )
+                algorithm.append([
+                        a_scoregene, 
+                        a_permutationtest
+                        ])
+            else:
+                a_permutationtest = t.VariablePermutator(
+                        self.permute_by.upper(), 
+                        self.alternative, 
+                        self.permutations, 
+                        self.adaptive, 
+                        [a_scoregene, a_regression]
+                        )
+                algorithm.append(a_permutationtest)
+        return algorithm
 
     def calculate(self):
         self.algorithm.apply(self.data)
         # get results
-        pvalues = data.pvalue()
-        regstats = data.statistic()
-        regse = data.se()
-        res = [data.samplecounts()]
+        pvalues = self.data.pvalue()
+        regstats = self.data.statistic()
+        regse = self.data.se()
+        res = [self.data.samplecounts()]
         for (x, y, z) in zip(regstats, pvalues, regse):
             res.append(x)
             res.append(y)

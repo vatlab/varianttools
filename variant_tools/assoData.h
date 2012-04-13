@@ -51,7 +51,7 @@ namespace vtools {
 class AssoData
 {
 public:
-	/*
+    /*
 	 *  members include
 	 *  m_phenotype: phenotype vector (n X 1)
 	 *  m_genotype: genotype matrix (n samples X p loci) -- raw genotypes
@@ -170,7 +170,6 @@ public:
 	{
 		//get this field directly from the variant table
 		m_maf = maf;
-
 	}
 
 
