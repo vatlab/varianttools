@@ -51,7 +51,7 @@ namespace vtools {
 class AssoData
 {
 public:
-    /*
+	/*
 	 *  members include
 	 *  m_phenotype: phenotype vector (n X 1)
 	 *  m_genotype: genotype matrix (n samples X p loci) -- raw genotypes
@@ -112,56 +112,12 @@ public:
 	// set phenotypes
 	// input is a vector, i.e., no there is no other phenotype covariates and genotype will be the only predictor in the statistical model
 	// As a result it re-sets the size of statistics, pvalues, etc, to 1
-	double setPhenotype(const vectorf & p)
-	{
-		m_phenotype = p;
-		// set phenotype mean
-		m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-		m_ybar /= (1.0 * m_phenotype.size());
-		// set case/ctrl counts
-		//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-		//    std::bind2nd(std::equal_to<double>(),1.0));
-		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-		//    std::bind2nd(std::equal_to<double>(),0.0));
-		//
-		// re-size statistics vector, etc, for there is only one predictor
-		m_statistic.resize(1);
-		m_se.resize(1);
-		m_pval.resize(m_statistic.size());
-		return m_ybar;
-	}
+	double setPhenotype(const vectorf & p);
 
 
 	// set phenotypes and phenotype covariates
 	// input is a phenotype vector and a covariates matrix
-	double setPhenotype(const vectorf & p, const matrixf & c)
-	{
-		m_phenotype = p;
-		m_C = c;
-		// number of covariates. (need to subtract by 1 because first column of m_C is reserved with a vector of 1's)
-		m_ncovar = c.size() - 1;
-		vectorf one(p.size());
-		std::fill(one.begin(), one.end(), 1.0);
-		// reserve the last column to be a column of 1's, a placeholder for m_X which will be calculated and assigned to the last column of m_C
-		m_C.push_back(one);
-		// initialize the statistical model
-		m_model.clear();
-		m_model.setY(m_phenotype);
-		m_model.setX(m_C);
-		// set phenotype mean
-		m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-		m_ybar /= (1.0 * m_phenotype.size());
-		//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-		//    std::bind2nd(std::equal_to<double>(),1.0));
-		//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-		//    std::bind2nd(std::equal_to<double>(),0.0));
-		//
-		// re-size statistics vector, etc
-		m_statistic.resize((m_ncovar + 1));
-		m_se.resize((m_ncovar + 1));
-		m_pval.resize(m_statistic.size());
-		return m_ybar;
-	}
+	double setPhenotype(const vectorf & p, const matrixf & c);
 
 
 	// set minor allele frequency from an external field
@@ -174,68 +130,11 @@ public:
 
 
 	// set sample maf from data
-	void setMaf()
-	{
-		//is problematic for variants on male chrX
-		//but should be Ok if only use the relative mafs (e.g., weightings)
-
-		m_maf.resize(m_genotype.front().size());
-		std::fill(m_maf.begin(), m_maf.end(), 0.0);
-		vectorf valid_all = m_maf;
-
-		for (size_t j = 0; j < m_maf.size(); ++j) {
-			// calc maf and loci counts for site j
-			for (size_t i = 0; i < m_genotype.size(); ++i) {
-				// genotype not missing
-				if (!(m_genotype[i][j] < 0.0)) {
-					valid_all[j] += 1.0;
-					if (m_genotype[i][j] > 0.0) {
-						m_maf[j] += m_genotype[i][j];
-					}
-				}
-			}
-
-			if (valid_all[j] > 0.0) {
-				m_maf[j] = m_maf[j] / (valid_all[j] * 2.0);
-			}
-			//  FIXME : re-code genotype.  will be incorrect for male chrX
-			if (m_maf[j] > 0.5) {
-				m_maf[j] = 1.0 - m_maf[j];
-				// recode genotypes
-				for (size_t i = 0; i < m_genotype.size(); ++i) {
-					// genotype not missing
-					if (!(m_genotype[i][j] < 0.0)) {
-						m_genotype[i][j] = 2.0 - m_genotype[i][j];
-					}
-				}
-			}
-		}
-		/*
-		   m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(),
-		    m_genotype.front(), vplus);
-		   std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
-		    std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
-		 */
-	}
-
+	void setMaf();
 
 	// compute weight w = 1 / sqrt(p*(1-p))
 	// using the entire sample
-	void setMafWeight()
-	{
-		if (m_maf.size() == 0) {
-			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
-		}
-		//
-		m_weight.clear();
-		for (size_t i = 0; i < m_maf.size(); ++i) {
-			if (fEqual(m_maf[i], 0.0) || fEqual(m_maf[i], 1.0)) {
-				m_weight.push_back(0.0);
-			} else{
-				m_weight.push_back(1.0 / sqrt(m_maf[i] * (1.0 - m_maf[i])));
-			}
-		}
-	}
+	void setMafWeight();
 
 
 	// compute weight by maf from selected samples (ctrls, low QT samples, etc)
@@ -246,13 +145,7 @@ public:
 
 
 	// calculate mean of m_X (genotype scores)
-	double meanOfX()
-	{
-		m_xbar = std::accumulate(m_X.begin(), m_X.end(), 0.0);
-		m_xbar /= (1.0 * m_X.size());
-		return m_xbar;
-	}
-
+	double meanOfX();
 
 	/*
 	 * get various data
@@ -392,221 +285,35 @@ public:
 
 	// calculate genotype scores from raw genotype
 	// m_X = rowSum(m_genotype)
-	void sumToX()
-	{
-		m_X.resize(m_genotype.size());
-		std::fill(m_X.begin(), m_X.end(), 0.0);
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			//m_X[i] = std::accumulate(m_genotype[i].begin(), m_genotype[i].end(), 0.0);
-			for (size_t j = 0; j < m_genotype[i].size(); ++j) {
-				if (m_genotype[i][j] > 0) {
-					m_X[i] += m_genotype[i][j];
-				}
-			}
-		}
-	}
-
+	void sumToX();
 
 	// calculate genotype scores from raw genotype
 	// m_X = (rowSum(m_genotype) > 0)
 	// m_X is binary: 0 for all wildtype, 1 for having at least one mutation
-	void binToX()
-	{
-		m_X.resize(m_genotype.size());
-		std::fill(m_X.begin(), m_X.end(), 0.0);
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			double pnovar = 1.0;
-			for (size_t j = 0; j != m_genotype[i].size(); ++j) {
-				if (m_genotype[i][j] >= 1.0) {
-					m_X[i] = 1.0;
-					break;
-				} else if (m_genotype[i][j] > 0.0) {
-					// binning the data with proper handling of missing genotype
-					pnovar *= (1.0 - m_genotype[i][j]);
-				} else ;
-			}
-			// all genotypes are missing: have to be represented as Pr(#mutation>=1)
-			if (pnovar < 1.0 && m_X[i] < 1.0) {
-				m_X[i] = 1.0 - pnovar;
-			}
-		}
-	}
-
+	void binToX();
 
 	// weight the raw genotypes by m_weight
-	void weightX()
-	{
-		if (m_weight.size() == 0) {
-			return;
-		}
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			for (size_t j = 0; j < m_genotype[i].size(); ++j) {
-				if (m_genotype[i][j] > 0) {
-					m_genotype[i][j] *= m_weight[j];
-				}
-			}
-		}
-	}
-
+	void weightX();
 
 	// remove variant sites having MAF <= lower_bound or MAF > upper_bound
-	void setSitesByMaf(double upper, double lower)
-	{
-		if (upper > 1.0) {
-			throw ValueError("Minor allele frequency value should not exceed 1");
-		}
-		if (lower < 0.0) {
-			throw ValueError("Minor allele frequency should be a positive value");
-		}
-
-		if (fEqual(upper, 1.0) && fEqual(lower, 0.0)) return;
-
-		for (size_t j = 0; j != m_maf.size(); ++j) {
-			if (m_maf[j] <= lower || m_maf[j] > upper) {
-				m_maf.erase(m_maf.begin() + j);
-				for (size_t i = 0; i < m_genotype.size(); ++i) {
-					m_genotype[i].erase(m_genotype[i].begin() + j);
-				}
-				--j;
-			}
-		}
-		return;
-	}
-
+	void setSitesByMaf(double upper, double lower);
 
 	// Wald's statistic for simple linear model Y = b0 + b1x
-	void simpleLinear()
-	{
-		// simple linear regression score test
-		//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
-		//
-		if (m_X.size() != m_phenotype.size()) {
-			throw ValueError("Genotype/Phenotype length not equal!");
-		}
-		double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
-		for (size_t i = 0; i != m_X.size(); ++i) {
-			numerator += (m_X[i] - m_xbar) * m_phenotype[i];
-			denominator += pow(m_X[i] - m_xbar, 2.0);
-		}
-
-		if (!fEqual(numerator, 0.0)) {
-			//!- Compute MSE and V[\hat{beta}]
-			//!- V[\hat{beta}] = MSE / denominator
-			double b1 = numerator / denominator;
-			double b0 = m_ybar - b1 * m_xbar;
-
-			//SSE
-			for (size_t i = 0; i != m_X.size(); ++i) {
-				ysigma += pow(m_phenotype[i] - (b0 + b1 * m_X[i]), 2.0);
-			}
-			double varb = ysigma / (m_phenotype.size() - 2.0) / denominator;
-			m_statistic[0] = b1 / sqrt(varb);
-			m_se[0] = sqrt(varb);
-		} else {
-			m_statistic[0] = 0.0;
-			m_se[0] = std::numeric_limits<double>::quiet_NaN();
-		}
-	}
-
+	void simpleLinear();
 
 	//!- Score test implementation for logistic regression model logit(p) = b0 + b1x
-	void simpleLogit()
-	{
-		//!- labnotes vol.2 page 3
-		//!- input phenotypes have to be binary values 0 or 1
-		if (m_X.size() != m_phenotype.size()) {
-			throw ValueError("Genotype/Phenotype length not equal!");
-		}
-		//double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
-		//double bo = log(ebo);
-
-		double po = (1.0 * m_ncases) / (1.0 * m_phenotype.size());
-		double ss = 0.0;
-		// the score
-		for (size_t i = 0; i != m_X.size(); ++i) {
-			ss += (m_X[i] - m_xbar) * (m_phenotype[i] - po);
-		}
-		double vm1 = 0.0;
-		// variance of score, under the null
-		for (size_t i = 0; i != m_X.size(); ++i) {
-			vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
-		}
-
-		ss = ss / sqrt(vm1);
-
-		//!-FIXME: (not sure why this happens)
-		//!- w/ rounding to 0 I get strange number such as 3.72397e-35
-		//!- this would lead to type I error problem
-		fRound(ss, 0.0001);
-		m_statistic[0] = ss;
-		m_se[0] = sqrt(vm1);
-	}
-
+	void simpleLogit();
 
 	// fitting / calculating wald's statistic for multiple linear regression model
 	// Y = b0 + b1x1 + b2x2 + ... + bnxn
-	void multipleLinear()
-	{
-		//!- multiple linear regression parameter estimate
-		//!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
-		//!- Solve the system via gsl_linalg_SV_solve()
-		if (m_X.size() != m_phenotype.size()) {
-			throw ValueError("Genotype/Phenotype length not equal!");
-		}
-		// reset phenotype data
-		m_model.replaceCol(m_phenotype, 0);
-		// reset genotype data
-		m_model.replaceCol(m_X, m_C.size() - 1);
-		// fit the linear regression model
-		m_model.fit();
-		// get statistics and set values to assoData object
-		vectorf beta = m_model.getBeta();
-		vectorf seb = m_model.getSEBeta();
-		m_statistic[0] = beta.back() / seb.back();
-		m_se[0] = seb.back();
-		for (unsigned i = 1; i < beta.size() - 1; ++i) {
-			m_statistic[i] = beta[i] / seb[i];
-			m_se[i] = seb[i];
-		}
-	}
-
+	void multipleLinear();
 
 	// get p-value from statistic, assuming standard normal distribution
-	void gaussianP(unsigned sided = 1)
-	{
-		if (sided == 1) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-				m_pval[i] = gsl_cdf_ugaussian_Q(m_statistic[i]);
-			}
-		} else if (sided == 2) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-				m_pval[i] = gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0);
-			}
-		} else {
-			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
-		}
-	}
-
+	void gaussianP(unsigned sided = 1);
 
 	// get p-value from statistic, assuming t distribution
 	// degree of freedom will be calculated from data automatically
-	void studentP(unsigned sided = 1)
-	{
-		// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
-		if (sided == 1) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-				m_pval[i] = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
-			}
-		} else if (sided == 2) {
-			for (unsigned i = 0; i < m_statistic.size(); ++i) {
-				double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
-				m_pval[i] = fmin(p, 1.0 - p) * 2.0;
-			}
-		} else {
-			throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
-		}
-	}
-
+	void studentP(unsigned sided = 1);
 
 private:
 	/// raw phenotype and gneotype data
