@@ -37,7 +37,6 @@ __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 VTOOLS_VERSION='1.0.3svn'
 VTOOLS_REVISION='$Rev$'
 VTOOLS_REVISION=VTOOLS_REVISION[VTOOLS_REVISION.find(" ")+1:-2]
-
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
 VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2012 Bo Peng'''.format(VTOOLS_VERSION)

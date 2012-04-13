@@ -546,6 +546,7 @@ class BasePermutator(BaseAction):
     def __init__(self, *args): 
         _assoTests.BasePermutator_swiginit(self,_assoTests.new_BasePermutator(*args))
 BasePermutator.append = new_instancemethod(_assoTests.BasePermutator_append,None,BasePermutator)
+BasePermutator.extend = new_instancemethod(_assoTests.BasePermutator_extend,None,BasePermutator)
 BasePermutator.check = new_instancemethod(_assoTests.BasePermutator_check,None,BasePermutator)
 BasePermutator_swigregister = _assoTests.BasePermutator_swigregister
 BasePermutator_swigregister(BasePermutator)
