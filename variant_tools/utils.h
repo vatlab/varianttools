@@ -308,7 +308,7 @@ protected:
 
 
 // fit the linear model
-// via SVD technique
+// via gsl
 // members are
 // m_beta: fitted model parameters (LSE)
 // m_svd_: intermediate data from the SVD procedure

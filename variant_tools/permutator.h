@@ -63,13 +63,13 @@ public:
 	}
 
 
-	virtual BaseAction * clone() const
+	BaseAction * clone() const
 	{
 		return new BasePermutator(*this);
 	}
 
 
-	virtual std::string name()
+	std::string name()
 	{
 		return "BASEPERMUTATOR";
 	}
@@ -273,10 +273,6 @@ public:
 
 	bool apply(AssoData & d)
 	{
-		std::cout << "fixed action SIZE: " << m_actions.size();
-		for (size_t j = 0; j < m_actions.size(); ++j) {
-			std::cout << m_actions[j]->name() << std::endl;
-		}
 
 		RNG rng;
 		gsl_rng * gslr = rng.get();
@@ -413,10 +409,6 @@ public:
 
 	bool apply(AssoData & d)
 	{
-		std::cout << "variable action SIZE: " << m_actions.size();
-		for (size_t j = 0; j < m_actions.size(); ++j) {
-			std::cout << m_actions[j]->name() << std::endl;
-		}
 
 		if (d.maf().size() == 0) {
 			throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
