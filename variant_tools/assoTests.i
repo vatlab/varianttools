@@ -75,10 +75,7 @@
 }
 
 
-%newobject vtools::AssoData::clone;
-%newobject vtools::BaseAction::clone;
-%newobject vtools::AssoTest::clone;
-%newobject vtools::BaseLm::clone;
+%newobject *::clone;
 
 %include "std_vector.i"
 %include "std_string.i"
