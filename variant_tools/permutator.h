@@ -51,6 +51,7 @@ public:
 	{
 		for (size_t i = 0; i < m_actions.size(); ++i)
 			delete m_actions[i];
+		m_actions.clear();
 	}
 
 
@@ -58,6 +59,7 @@ public:
 	{
 		for (size_t i = 0; i < m_actions.size(); ++i)
 			delete m_actions[i];
+		m_actions.clear();
 		for (size_t i = 0; i < rhs.m_actions.size(); ++i)
 			m_actions.push_back(rhs.m_actions[i]->clone());
 	}
@@ -234,13 +236,7 @@ public:
 		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
 	{
 		// permute phenotypes or permute genotype scores
-		if (pm == 'Y') {
-			PermuteY * permute = new PermuteY();
-			m_permute = permute->clone();
-		} else{
-			PermuteX * permute = new PermuteX();
-			m_permute = permute->clone();
-		}
+		m_permute = pm == 'Y' ? (BaseAction*)(new PermuteY()) : (BaseAction*)(new PermuteX());
 	}
 
 
@@ -251,11 +247,10 @@ public:
 
 
 	FixedPermutator(const FixedPermutator & rhs) :
-		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
+		m_alternative(rhs.m_alternative),
 		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
-		delete m_permute;
-		m_permute = rhs.m_permute->clone();
 	}
 
 
@@ -369,14 +364,8 @@ public:
 	VariablePermutator(char pm, unsigned alternative, size_t times, double sig, const vectora & actions)
 		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
 	{
-		// permute phenotypes or permute raw genotype
-		if (pm == 'Y') {
-			PermuteY * permute = new PermuteY();
-			m_permute = permute->clone();
-		} else{
-			PermuteRawX * permute = new PermuteRawX();
-			m_permute = permute->clone();
-		}
+		// permute phenotypes or permute genotype scores
+		m_permute = pm == 'Y' ? (BaseAction*)(new PermuteY()) : (BaseAction*)(new PermuteRawX());
 	}
 
 
@@ -387,11 +376,10 @@ public:
 
 
 	VariablePermutator(const VariablePermutator & rhs) :
-		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
+		m_alternative(rhs.m_alternative),
 		m_sig(rhs.m_sig), BasePermutator(rhs)
 	{
-		delete m_permute;
-		m_permute = rhs.m_permute->clone();
 	}
 
 
