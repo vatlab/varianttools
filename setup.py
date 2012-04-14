@@ -63,7 +63,7 @@ ASSO_FILES = [
     'variant_tools/assoTests.h',
     'variant_tools/assoData.h',
     'variant_tools/action.h',
-    'variant_tools/permutator.h',
+    'variant_tools/action.cpp',
     'variant_tools/assoData.cpp',
     'variant_tools/utils.h',
     'variant_tools/utils.cpp'
@@ -377,6 +377,7 @@ setup(name = "variant_tools",
             sources = [
                 WRAPPER_CPP_FILE,
                 'variant_tools/assoData.cpp',
+                'variant_tools/action.cpp',
                 'variant_tools/utils.cpp'
                 ] + LIB_GSL,
             extra_compile_args = gccargs,

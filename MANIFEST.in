@@ -44,7 +44,7 @@ include variant_tools/config_win32.h
 include variant_tools/assoTests.h
 include variant_tools/assoData.h
 include variant_tools/action.h
-include variant_tools/permutator.h
+include variant_tools/action.cpp
 include variant_tools/assoData.cpp
 include variant_tools/utils.h
 include variant_tools/utils.cpp

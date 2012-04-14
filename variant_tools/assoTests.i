@@ -31,7 +31,6 @@
 #include "utils.h"
 #include "assoData.h"
 #include "action.h"
-#include "permutator.h"
 #include "assoTests.h"
 %}
 
@@ -94,5 +93,4 @@ namespace std
 %include "utils.h"
 %include "assoData.h"
 %include "action.h"
-%include "permutator.h"
 %include "assoTests.h"

@@ -42,9 +42,11 @@ public:
 	{
 	}
 
+
 	virtual ~BaseAction()
 	{
 	}
+
 
 	virtual BaseAction * clone() const
 	{
@@ -474,6 +476,235 @@ public:
 
 private:
 	unsigned m_sided;
+};
+
+
+/** Permutator class
+ *
+ **/
+class BasePermutator : public BaseAction
+{
+public:
+	BasePermutator(const vectora & actions = vectora()) : BaseAction(), m_actions()
+	{
+		for (size_t i = 0; i < actions.size(); ++i)
+			m_actions.push_back(actions[i]->clone());
+	}
+
+
+	~BasePermutator()
+	{
+		for (size_t i = 0; i < m_actions.size(); ++i)
+			delete m_actions[i];
+		m_actions.clear();
+	}
+
+
+	BasePermutator(const BasePermutator & rhs) : m_actions()
+	{
+		for (size_t i = 0; i < rhs.m_actions.size(); ++i)
+			m_actions.push_back(rhs.m_actions[i]->clone());
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new BasePermutator(*this);
+	}
+
+
+	std::string name()
+	{
+		return "BASEPERMUTATOR";
+	}
+
+
+	virtual bool apply(AssoData & d)
+	{
+		throw RuntimeError("The base permutation class should not be called");
+		return true;
+	}
+
+
+	// append action(s) to the end of the action list
+	void append(const BaseAction & action)
+	{
+		m_actions.push_back(action.clone());
+	}
+
+
+	void extend(const vectora & actions)
+	{
+		for (size_t i = 0; i < actions.size(); ++i)
+			m_actions.push_back(actions[i]->clone());
+	}
+
+
+	// implementation of adaptive permutation
+	// for every 1000 permutations this function will calculate a p-value
+	// and check if its 95% confidence interval would capture the required significance level "sig"
+	// will continue permutation if the required "sig" is captured by the 95% CI
+	// otherwise will quit permutation and use this p-value as the final p-value to report
+	double check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const;
+
+protected:
+	vectora m_actions;
+
+};
+
+// Action executor. simply execute a sequence of actions one by on AssoData object
+class AssoAlgorithm : public BasePermutator
+{
+
+public:
+	// algorithm with a single action (most likely a permutator)
+	// in which case this wrapper is actually not needed.
+	AssoAlgorithm(const BaseAction & action)
+		: BasePermutator()
+	{
+		append(action);
+	}
+
+
+	// algorithm with a series of actions
+	AssoAlgorithm(const vectora & actions)
+		: BasePermutator(actions)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new AssoAlgorithm(*this);
+	}
+
+
+	std::string name()
+	{
+		return "AssoAlgorithm";
+	}
+
+
+	bool apply(AssoData & d);
+
+};
+
+/* permutator class
+ * a "fixed" set of variant sites will be involved in permutation test
+ * i.e., will apply actions / permutation test on all variant sites in AssoData
+ *
+ * data members
+ * m_times: number of permutations
+ * m_alternative: 1 or 2, for 1-sided or 2-sided tests
+ * m_sig: required significance level "alpha"
+ * m_actions: a sequence of actions to be applied to AssoData
+ */
+class FixedPermutator : public BasePermutator
+{
+
+public:
+	FixedPermutator(char pm, unsigned alternative, size_t times, double sig, const vectora & actions)
+		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
+	{
+		// permute phenotypes or permute genotype scores
+		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteX());
+	}
+
+
+	~FixedPermutator()
+	{
+		delete m_permute;
+	}
+
+
+	FixedPermutator(const FixedPermutator & rhs) :
+		BasePermutator(rhs),
+		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
+		m_alternative(rhs.m_alternative), m_sig(rhs.m_sig)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new FixedPermutator(*this);
+	}
+
+
+	std::string name()
+	{
+		return "FixedPermutator";
+	}
+
+
+	bool apply(AssoData & d);
+
+private:
+	size_t m_times;
+	BaseAction * m_permute;
+	unsigned m_alternative;
+	double m_sig;
+};
+
+/* permutator class
+ * a "variable" set of variant sites will be involved in permutation test
+ * i.e., will apply actions on a number of subsets of variant sites
+ * and use minimized p-value from these multiple tests
+ * family-wise error rate is properly controlled in permutation procedure
+ * currently, subsets of variant sites are defined by MAF on the sites
+ *
+ * data members
+ * m_times: number of permutations
+ * m_alternative: 1 or 2, for 1-sided or 2-sided tests
+ * m_sig: required significance level "alpha"
+ * m_actions: a sequence of actions to be applied to AssoData
+ */
+class VariablePermutator : public BasePermutator
+{
+	// permutator for variable thresholds methods
+
+public:
+	VariablePermutator(char pm, unsigned alternative, size_t times, double sig, const vectora & actions)
+		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
+	{
+		// permute phenotypes or permute genotype scores
+		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteRawX());
+	}
+
+
+	~VariablePermutator()
+	{
+		delete m_permute;
+	}
+
+
+	VariablePermutator(const VariablePermutator & rhs) :
+		BasePermutator(rhs),
+		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
+		m_alternative(rhs.m_alternative), m_sig(rhs.m_sig)
+	{
+	}
+
+
+	VariablePermutator * clone()
+	{
+		return new VariablePermutator(*this);
+	}
+
+
+	std::string name()
+	{
+		return "VariablePermutator";
+	}
+
+
+	bool apply(AssoData & d);
+
+private:
+	size_t m_times;
+	BaseAction * m_permute;
+	unsigned m_alternative;
+	double m_sig;
 };
 
 }
