@@ -42,6 +42,9 @@ public:
 	{
 	}
 
+	virtual ~BaseAction()
+	{
+	}
 
 	virtual BaseAction * clone() const
 	{
