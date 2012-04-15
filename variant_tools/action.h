@@ -238,12 +238,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.setMaf();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -254,6 +249,10 @@ public:
 };
 
 
+// compute weight w = 1 / sqrt(p*(1-p))
+// using the entire sample
+// compute weight by maf from selected samples (ctrls, low QT samples, etc)
+// FIXME not yet implemented
 class WeightByAllMaf : public BaseAction
 {
 	// this will change the raw genotypes directly!
@@ -270,13 +269,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.setMafWeight();
-		d.weightX();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -287,6 +280,7 @@ public:
 };
 
 
+// remove variant sites having MAF <= lower_bound or MAF > upper_bound
 class SetSites : public BaseAction
 {
 public:
@@ -302,12 +296,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.setSitesByMaf(m_upper, m_lower);
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{

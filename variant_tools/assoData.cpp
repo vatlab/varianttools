@@ -84,68 +84,6 @@ double AssoData::setPhenotype(const vectorf & p, const matrixf & c)
 }
 
 
-void AssoData::setMaf()
-{
-	//is problematic for variants on male chrX
-	//but should be Ok if only use the relative mafs (e.g., weightings)
-
-	m_maf.resize(m_genotype.front().size());
-	std::fill(m_maf.begin(), m_maf.end(), 0.0);
-	vectorf valid_all = m_maf;
-
-	for (size_t j = 0; j < m_maf.size(); ++j) {
-		// calc maf and loci counts for site j
-		for (size_t i = 0; i < m_genotype.size(); ++i) {
-			// genotype not missing
-			if (!(m_genotype[i][j] < 0.0)) {
-				valid_all[j] += 1.0;
-				if (m_genotype[i][j] > 0.0) {
-					m_maf[j] += m_genotype[i][j];
-				}
-			}
-		}
-
-		if (valid_all[j] > 0.0) {
-			m_maf[j] = m_maf[j] / (valid_all[j] * 2.0);
-		}
-		//  FIXME : re-code genotype.  will be incorrect for male chrX
-		if (m_maf[j] > 0.5) {
-			m_maf[j] = 1.0 - m_maf[j];
-			// recode genotypes
-			for (size_t i = 0; i < m_genotype.size(); ++i) {
-				// genotype not missing
-				if (!(m_genotype[i][j] < 0.0)) {
-					m_genotype[i][j] = 2.0 - m_genotype[i][j];
-				}
-			}
-		}
-	}
-	/*
-	   m_maf = std::accumulate(m_genotype.begin() + 1, m_genotype.end(),
-	    m_genotype.front(), vplus);
-	   std::transform(m_maf.begin(), m_maf.end(), m_maf.begin(),
-	    std::bind2nd(std::divides<double>(), 2.0*m_genotype.size()));
-	 */
-}
-
-
-void AssoData::setMafWeight()
-{
-	if (m_maf.size() == 0) {
-		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
-	}
-	//
-	m_weight.clear();
-	for (size_t i = 0; i < m_maf.size(); ++i) {
-		if (fEqual(m_maf[i], 0.0) || fEqual(m_maf[i], 1.0)) {
-			m_weight.push_back(0.0);
-		} else{
-			m_weight.push_back(1.0 / sqrt(m_maf[i] * (1.0 - m_maf[i])));
-		}
-	}
-}
-
-
 void AssoData::sumToX()
 {
 	m_X.resize(m_genotype.size());
@@ -184,42 +122,18 @@ void AssoData::binToX()
 }
 
 
-void AssoData::weightX()
+void AssoData::weightX(const vectorf & weight)
 {
-	if (m_weight.size() == 0) {
+	if (weight.size() == 0) {
 		return;
 	}
 	for (size_t i = 0; i < m_genotype.size(); ++i) {
 		for (size_t j = 0; j < m_genotype[i].size(); ++j) {
 			if (m_genotype[i][j] > 0) {
-				m_genotype[i][j] *= m_weight[j];
+				m_genotype[i][j] *= weight[j];
 			}
 		}
 	}
-}
-
-
-void AssoData::setSitesByMaf(double upper, double lower)
-{
-	if (upper > 1.0) {
-		throw ValueError("Minor allele frequency value should not exceed 1");
-	}
-	if (lower < 0.0) {
-		throw ValueError("Minor allele frequency should be a positive value");
-	}
-
-	if (fEqual(upper, 1.0) && fEqual(lower, 0.0)) return;
-
-	for (size_t j = 0; j != m_maf.size(); ++j) {
-		if (m_maf[j] <= lower || m_maf[j] > upper) {
-			m_maf.erase(m_maf.begin() + j);
-			for (size_t i = 0; i < m_genotype.size(); ++i) {
-				m_genotype[i].erase(m_genotype[i].begin() + j);
-			}
-			--j;
-		}
-	}
-	return;
 }
 
 

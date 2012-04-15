@@ -27,6 +27,95 @@
 
 namespace vtools {
 
+bool SetMaf::apply(AssoData & d)
+{
+	matrixf & genotype = d.raw_genotype();
+
+	//is problematic for variants on male chrX
+	//but should be Ok if only use the relative mafs (e.g., weightings)
+	vectorf maf(genotype.front().size(), 0.0);
+	vectorf valid_all = maf;
+
+	for (size_t j = 0; j < maf.size(); ++j) {
+		// calc maf and loci counts for site j
+		for (size_t i = 0; i < genotype.size(); ++i) {
+			// genotype not missing
+			if (!(genotype[i][j] < 0.0)) {
+				valid_all[j] += 1.0;
+				if (genotype[i][j] > 0.0) {
+					maf[j] += genotype[i][j];
+				}
+			}
+		}
+
+		if (valid_all[j] > 0.0) {
+			maf[j] = maf[j] / (valid_all[j] * 2.0);
+		}
+		//  FIXME : re-code genotype.  will be incorrect for male chrX
+		if (maf[j] > 0.5) {
+			maf[j] = 1.0 - maf[j];
+			// recode genotypes
+			for (size_t i = 0; i < genotype.size(); ++i) {
+				// genotype not missing
+				if (!(genotype[i][j] < 0.0)) {
+					genotype[i][j] = 2.0 - genotype[i][j];
+				}
+			}
+		}
+	}
+	d.setVar("maf", maf);
+	return true;
+}
+
+bool WeightByAllMaf(AssoData & d)
+{
+	if (!d.hasVar("maf"))
+		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+	vectorf & maf = d.getArrayVar("maf");
+	//
+	vectorf weight;
+	for (size_t i = 0; i < maf.size(); ++i) {
+		if (fEqual(maf[i], 0.0) || fEqual(maf[i], 1.0)) {
+			weight.push_back(0.0);
+		} else{
+			weight.push_back(1.0 / sqrt(maf[i] * (1.0 - maf[i])));
+		}
+	}
+
+	d.weightX(weight);
+	return true;
+}
+
+
+bool SetSites::apply(AssoData & d)
+{
+	if (!d.hasVar("maf"))
+		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+	vectorf & maf = d.getArrayVar("maf");
+	matrixf & genotype = d.raw_genotype();
+
+	if (m_upper > 1.0) {
+		throw ValueError("Minor allele frequency value should not exceed 1");
+	}
+	if (m_lower < 0.0) {
+		throw ValueError("Minor allele frequency should be a positive value");
+	}
+
+	if (fEqual(m_upper, 1.0) && fEqual(m_lower, 0.0))
+		return true;
+
+	for (size_t j = 0; j != maf.size(); ++j) {
+		if (maf[j] <= m_lower || maf[j] > m_upper) {
+			maf.erase(maf.begin() + j);
+			for (size_t i = 0; i < genotype.size(); ++i) {
+				genotype[i].erase(genotype[i].begin() + j);
+			}
+			--j;
+		}
+	}
+	return true;
+}
+
 double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
 {
 	// the adaptive p-value technique
@@ -175,16 +264,15 @@ bool FixedPermutator::apply(AssoData & d)
 bool VariablePermutator::apply(AssoData & d)
 {
 
-	if (d.maf().size() == 0) {
+	if (!d.hasVar("maf"))
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
-	}
+	vectorf & maf = d.getArrayVar("maf");
 
 	RNG rng;
 	gsl_rng * gslr = rng.get();
 
 	// obtain proper MAF thresholds
 	// each element in this vector of MAF thresholds will define one subset of variant sites
-	vectorf maf = d.maf();
 	std::sort(maf.begin(), maf.end());
 	std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
 	maf.resize(it - maf.begin());
@@ -234,7 +322,7 @@ bool VariablePermutator::apply(AssoData & d)
 		// and store them in "genotypes"
 		AssoData * dtmp = d.clone();
 		for (size_t m = 0; m < maf.size(); ++m) {
-			dtmp->setSitesByMaf(maf[(maf.size() - m - 1)], maflower);
+			SetSites(maf[(maf.size() - m - 1)], maflower).apply(*dtmp);
 			// m_actions[0] is some coding theme, which will generate genotype scores
 			m_actions[0]->apply(*dtmp);
 			genotypes.push_back(dtmp->genotype());
@@ -286,7 +374,7 @@ bool VariablePermutator::apply(AssoData & d)
 			// eliminate sites that are not confined in the thresholds
 			// and apply actions on them
 			for (size_t m = 0; m < maf.size(); ++m) {
-				dtmp->setSitesByMaf(maf[(maf.size() - m - 1)], maflower);
+				SetSites(maf[(maf.size() - m - 1)], maflower).apply(*dtmp);
 				for (size_t j = 0; j < m_actions.size(); ++j) {
 					m_actions[j]->apply(*dtmp);
 				}

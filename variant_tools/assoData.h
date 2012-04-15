@@ -38,6 +38,8 @@ typedef std::vector<std::vector<int> > matrixi;
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <string>
 #include "assoTests.h"
 #include "utils.h"
 #include "gsl/gsl_cdf.h"
@@ -50,6 +52,10 @@ namespace vtools {
  */
 class AssoData
 {
+private:
+	typedef std::map<std::string, double> DoubleVars;
+	typedef std::map<std::string, vectorf> ArrayVars;
+
 public:
 	/*
 	 *  members include
@@ -57,7 +63,6 @@ public:
 	 *  m_genotype: genotype matrix (n samples X p loci) -- raw genotypes
 	 *  m_X: genotype vector (n X 1) -- genotype scores
 	 *      Each element is a score combining information from an individual's p loci
-	 *  m_maf: minor allele frequency vector (p X 1) for the p loci
 	 *  m_statistic: statistics for all predictor variables from association tests.
 	 *      For permutation based tests only genotype statistics is calculated (m_statistic.size() == 1)
 	 *  m_se: standard error (or measures reflecting standard error) for m_statistic
@@ -75,7 +80,7 @@ public:
 	 */
 
 	AssoData() :
-		m_phenotype(0), m_genotype(0), m_maf(0), m_X(0),
+		m_phenotype(0), m_genotype(0), m_X(0),
 		m_statistic(0), m_se(0), m_pval(0), m_C(0), m_ncovar(0),
 		m_xbar(0.0), m_ybar(0.0), m_ncases(0),
 		m_nctrls(0), m_model()
@@ -120,30 +125,6 @@ public:
 	double setPhenotype(const vectorf & p, const matrixf & c);
 
 
-	// set minor allele frequency from an external field
-	// FIXME this function is not currently being used
-	void setMaf(const vectorf & maf)
-	{
-		//get this field directly from the variant table
-		m_maf = maf;
-	}
-
-
-	// set sample maf from data
-	void setMaf();
-
-	// compute weight w = 1 / sqrt(p*(1-p))
-	// using the entire sample
-	void setMafWeight();
-
-
-	// compute weight by maf from selected samples (ctrls, low QT samples, etc)
-	// FIXME not yet implemented
-	void setMafWeight(const std::vector<size_t> & idx)
-	{
-	}
-
-
 	// calculate mean of m_X (genotype scores)
 	double meanOfX();
 
@@ -163,7 +144,7 @@ public:
 	}
 
 
-	matrixf raw_genotype()
+	matrixf & raw_genotype()
 	{
 		return m_genotype;
 	}
@@ -172,12 +153,6 @@ public:
 	matrixf covariates()
 	{
 		return m_model.getX();
-	}
-
-
-	vectorf maf()
-	{
-		return m_maf;
 	}
 
 
@@ -292,11 +267,8 @@ public:
 	// m_X is binary: 0 for all wildtype, 1 for having at least one mutation
 	void binToX();
 
-	// weight the raw genotypes by m_weight
-	void weightX();
-
-	// remove variant sites having MAF <= lower_bound or MAF > upper_bound
-	void setSitesByMaf(double upper, double lower);
+	// weight the raw genotypes by given weight
+	void weightX(const vectorf & weight);
 
 	// Wald's statistic for simple linear model Y = b0 + b1x
 	void simpleLinear();
@@ -315,6 +287,40 @@ public:
 	// degree of freedom will be calculated from data automatically
 	void studentP(unsigned sided = 1);
 
+	// store a double value with name 'name'
+	void setVar(const string & name, const double value)
+	{
+		m_doubleVars[name] = value;
+	}
+
+	// store an array with name 'name'
+	void setVar(const string & name, const vectorf & value)
+	{
+		m_arrayVars[name] = value;
+	}
+
+	bool hasVar(const string & name)
+	{
+		return (m_doubleVars.find(name) != m_doubleVars.end() ||
+			m_arrayVars.find(name) != m_arrayVars.end());
+	}
+
+	double & getDoubleVar(const string & name)
+	{
+		DoubleVars::iterator it = m_doubleVars.find(name);
+		if (it == m_doubleVars.end())
+			throw ValueError("No double variable with name " + name + " can be found");
+		return it->second;
+	}
+
+	vectorf & getArrayVar(const string & name)
+	{
+		ArrayVars::iterator it = m_arrayVars.find(name);
+		if (it == m_arrayVars.end())
+			throw ValueError("No array with name " + name + " can be found");
+		return it->second;
+	}
+
 private:
 	/// raw phenotype and gneotype data
 	vectorf m_phenotype;
@@ -324,13 +330,9 @@ private:
 	matrixf m_C;
 	unsigned m_ncovar;
 
-	// observed minor allele frequencies
-	vectorf m_maf;
 	/// translated genotype
 	vectorf m_X;
 
-	// weights
-	vectorf m_weight;
 	// genotype/phenotype data summaries
 	double m_xbar;
 	double m_ybar;
@@ -342,6 +344,11 @@ private:
 	vectorf m_se;
 	// statistical model object
 	LinearM m_model;
+
+	// arbitrary double type of variables
+	DoubleVars m_doubleVars;
+	// arbitrary vectorf type of variables.
+	ArrayVars m_arrayVars;
 };
 
 }
