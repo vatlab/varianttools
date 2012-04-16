@@ -67,7 +67,7 @@ bool SetMaf::apply(AssoData & d)
 	return true;
 }
 
-bool WeightByAllMaf(AssoData & d)
+bool WeightByAllMaf::apply(AssoData & d)
 {
 	if (!d.hasVar("maf"))
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
