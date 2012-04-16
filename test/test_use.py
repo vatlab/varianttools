@@ -151,15 +151,47 @@ class TestUse(ProcessTestCase):
         self.assertNotEqual(range_out2, range_out3)
        
 
-    def testUseField(self):
+    def testUseField_1(self):
         runCmd('vtools init test -f')
         runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region')
+        #under the option of field in --anno_type, the variable for linked_fields have be in the annotation database that you want to use
+        #and --linked_by field in the variant or annotation(already imported) table. 
+        #without --linked_by or use the fields that are not in annotation, you will get an error.
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields pos')
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields pos --linked_by genes')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields position --linked_by pos')
+        #one record was outputed
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        #if you use two fields to link the annotation and variant table, the output is different
+        #because you added more conditions. The number of linked_fields have to be equal to the number of linked_by
+        #nothing was outputed
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr pos')
+        self.assertFail('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+    
+    def testUseField_2(self):
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #import the first annotation database
         runCmd('vtools use cytoBand')
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by genes')
         self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by cytoBand.name')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
-
+        #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.  
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        runCmd('vtools use cytoBand')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields name --linked_by cytoBand.name')
+        self.assertSucc('vtools update variant --set gene_name=1')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        comp = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertEqual(comp, [])
+        
         
     def testUseVariant(self):
         runCmd('vtools init test -f')
