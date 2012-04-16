@@ -468,8 +468,8 @@ private:
 };
 
 
-/** Permutator class
- *
+/** 
+ * Permutator class
  **/
 class BasePermutator : public BaseAction
 {
@@ -702,7 +702,7 @@ public:
 	}
 
 
-	VariablePermutator * clone()
+	BaseAction * clone() const
 	{
 		return new VariablePermutator(*this);
 	}

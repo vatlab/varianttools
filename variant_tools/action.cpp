@@ -91,7 +91,7 @@ bool WeightByAllMaf::apply(AssoData & d)
 bool SetSites::apply(AssoData & d)
 {
 	if (!d.hasVar("maf"))
-		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to setting variant sites.");
 	vectorf & maf = d.getArrayVar("maf");
 	matrixf & genotype = d.raw_genotype();
 
@@ -285,7 +285,6 @@ bool FixedPermutator::apply(AssoData & d)
 
 bool VariablePermutator::apply(AssoData & d)
 {
-
 	if (!d.hasVar("maf"))
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
 	vectorf & maf = d.getArrayVar("maf");
