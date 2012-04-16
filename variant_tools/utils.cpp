@@ -77,6 +77,7 @@ string PyObj_AsString(PyObject * str)
 
 PyFunc::PyFunc(PyObject * func) : m_func(func), m_numArgs(0)
 {
+	Py_XINCREF(m_func);
 	if (m_func == NULL)
 		return;
 
@@ -182,6 +183,8 @@ PyFunc::PyFunc(PyObject * func) : m_func(func), m_numArgs(0)
 void initialize()
 {
 	g_assoDataType = SWIG_TypeQuery("vtools::AssoData *");
+	if (!g_assoDataType)
+		throw RuntimeError("Cannot determine AssoData type from the python interface.");
 }
 
 

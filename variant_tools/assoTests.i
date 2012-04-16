@@ -90,6 +90,8 @@ namespace std
     %template(vectora)    vector<vtools::BaseAction * >; 
 }
 
+%ignore vtools::PyAction::PyAction(const PyAction & rhs);
+
 %include "utils.h"
 %include "assoData.h"
 %include "action.h"

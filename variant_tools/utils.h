@@ -145,7 +145,8 @@ public:
 	}
 
 
-	PyFunc(const PyFunc & rhs) : m_func(rhs.m_func)
+	PyFunc(const PyFunc & rhs) : m_func(rhs.m_func), m_name(rhs.m_name),
+		m_numArgs(rhs.m_numArgs), m_args(rhs.m_args), m_flags(rhs.m_flags)
 	{
 		Py_XINCREF(m_func);
 	}

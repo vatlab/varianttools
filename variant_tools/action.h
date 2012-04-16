@@ -468,7 +468,7 @@ private:
 };
 
 
-/** 
+/**
  * Permutator class
  **/
 class BasePermutator : public BaseAction
@@ -541,10 +541,18 @@ protected:
 
 };
 
+/** This action accepts a user-provided function and will pass the AssoData
+ *  object to this function when the action is applied.
+ */
 class PyAction : public BaseAction
 {
 public:
 	PyAction(PyObject * func) : BaseAction(), m_func(func)
+	{
+	}
+
+
+	PyAction(const PyAction & rhs) : m_func(rhs.m_func)
 	{
 	}
 
