@@ -59,7 +59,10 @@ def associateArguments(parser):
             they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000 
             is equivalent to --method "m1 -p 1000" "m2 -p 1000".). You can use
             command 'vtools show tests' for a list of association tests, and
-            'vtools show test TST' for details about a test.''')
+            'vtools show test TST' for details about a test. Customized association
+            tests can be specified as mod_name.test_name where mod_name should
+            be a Python module (system wide or in the current directory), and
+            test_name should be a subclass of NullTest.''')
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -130,12 +133,25 @@ class AssociationTestManager:
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
-                method = eval(name)(ncovariates, self.logger, args)
+                if '.' in name:
+                    # if the method is defined elsewhere
+                    m_module, m_name = name.split('.', 1)
+                    # also search current working directory
+                    my_dir = os.getcwd()
+                    if my_dir not in sys.path:
+                        sys.path.append(my_dir)
+                        _temp = __import__(m_module, globals(), locals(), [m_name], -1)
+                        sys.path.pop()
+                    else:
+                        _temp = __import__(m_module, globals(), locals(), [m_name], -1)
+                    method = getattr(_temp, m_name)(ncovariates, self.logger, args)
+                else:
+                    method = eval(name)(ncovariates, self.logger, args)
                 # check if method is valid
                 if not hasattr(method, 'fields'):
                     raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
                 if not method.fields:
-                    raise ValueError('Invalid association test method {}: invalid attribute fields'.format(name))
+                    self.logger.warning('Association test {} has invalid  or empty fields. No result will be generated.'.format(name))
                 tests.append(method)
             except NameError as e:
                 self.logger.debug(e)
