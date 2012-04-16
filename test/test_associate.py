@@ -99,7 +99,7 @@ class TestAsso(ProcessTestCase):
         zip = ZipFile('proj/assoproj.zip')
         dir = os.getcwd()
         zip.extractall(dir)
-        self.assertSuc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
+        self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
 
 if __name__ == '__main__':
     unittest.main()
