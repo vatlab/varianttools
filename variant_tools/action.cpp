@@ -201,6 +201,9 @@ bool AssoAlgorithm::apply(AssoData & d)
 			// an action can throw StopIteration to stop the rest of actions to be applied
 			if (!m_actions[j]->apply(d))
 				break;
+		} catch (RuntimeError & e) {
+			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception:" + e.message();
+			throw RuntimeError(msg);
 		} catch (...) {
 			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception";
 			throw RuntimeError(msg);
