@@ -40,6 +40,9 @@
 #include "gsl/gsl_errno.h"
 
 #include "assoTests.h"
+
+#include "Python.h"
+
 // check if float numbers are equal
 bool fEqual(double a, double b);
 
@@ -128,9 +131,107 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 }
 
 namespace vtools {
+/** A wrapper to a python function
+ *  CPPONLY
+ */
+class PyFunc
+{
+public:
+	PyFunc(PyObject * func);
+
+	~PyFunc()
+	{
+		Py_XDECREF(m_func);
+	}
+
+
+	PyFunc(const PyFunc & rhs) : m_func(rhs.m_func)
+	{
+		Py_XINCREF(m_func);
+	}
+
+
+	/// return number of arguments this function accepts.
+	/// This function does not count tuple parameters.
+	size_t numArgs() const
+	{
+		return m_numArgs;
+	}
+
+
+	string name() const
+	{
+		return m_name;
+	}
+
+
+	string arg(size_t arg) const
+	{
+		return m_args[arg];
+	}
+
+
+	bool isValid() const
+	{
+		return m_func != NULL;
+	}
+
+
+	PyObject * func() const
+	{
+		return m_func;
+	}
+
+
+	PyObject * operator()(const char * format, ...) const
+	{
+		va_list argptr;
+
+		va_start(argptr, format);
+		PyObject * arglist = Py_VaBuildValue(const_cast<char *>(format), argptr);
+		va_end(argptr);
+		PyObject * pyResult = PyEval_CallObject(m_func, arglist);
+
+		Py_XDECREF(arglist);
+		if (pyResult == NULL) {
+			PyErr_Print();
+			PyErr_Clear();
+			throw ValueError("Function call failed\n");
+		}
+		return pyResult;
+	}
+
+
+	PyObject * operator()(PyObject * args) const
+	{
+		PyObject * pyResult = PyEval_CallObject(m_func, args);
+
+		if (pyResult == NULL) {
+			PyErr_Print();
+			PyErr_Clear();
+			throw ValueError("Function call failed\n");
+		}
+		return pyResult;
+	}
+
+
+private:
+	PyObject * m_func;
+
+	std::string m_name;
+
+	size_t m_numArgs;
+
+	std::vector<std::string> m_args;
+
+	int m_flags;
+};
+
 
 // initialize C++ module, currently does nothing
 void initialize();
+
+PyObject * pyAssoDataObj(void * p);
 
 // random number generator from gsl
 class RNG

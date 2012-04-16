@@ -90,6 +90,9 @@ if not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) o
     import subprocess
     print('Generating wrapper files')
     try:
+        ret = subprocess.call(['swig', '-python', '-external-runtime', 'variant_tools/swigpyrun.h'], shell=False)
+        if ret != 0:
+            sys.exit('Failed to generate swig runtime header file. Please install swig.')
         ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'variant_tools/assoTests.i'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate wrapper file. Please install swig.')

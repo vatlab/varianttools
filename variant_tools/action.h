@@ -541,6 +541,33 @@ protected:
 
 };
 
+class PyAction : public BaseAction
+{
+public:
+	PyAction(PyObject * func) : BaseAction(), m_func(func)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new PyAction(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "Calling python function";
+	}
+
+
+private:
+	PyFunc m_func;
+};
+
+
 // Action executor. simply execute a sequence of actions one by on AssoData object
 class AssoAlgorithm : public BasePermutator
 {

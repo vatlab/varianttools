@@ -67,6 +67,7 @@ bool SetMaf::apply(AssoData & d)
 	return true;
 }
 
+
 bool WeightByAllMaf::apply(AssoData & d)
 {
 	if (!d.hasVar("maf"))
@@ -115,6 +116,24 @@ bool SetSites::apply(AssoData & d)
 	}
 	return true;
 }
+
+
+bool PyAction::apply(AssoData & d)
+{
+	// Passing d to the function
+	PyObject * args = PyTuple_New(m_func.numArgs());
+
+	for (size_t i = 0; i < m_func.numArgs(); ++i) {
+		const string & arg = m_func.arg(i);
+		if (arg == "data")
+			PyTuple_SET_ITEM(args, i, pyAssoDataObj(&d));
+		else
+			throw ValueError("Callback function for action PyAction only accept parameter data:");
+	}
+	PyObject * res = m_func(args);
+	return PyObject_IsTrue(res) == 1;
+}
+
 
 double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
 {
