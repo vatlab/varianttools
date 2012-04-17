@@ -65,8 +65,17 @@ else
 	vtools update $1 --from_file vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby
 	# vtools association by group
 	vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2" -g grpby -j8 |\
-	    cut -f 1,3,4,5 | grep -v -P "\tNA|pval" | sort > vtools.res
-	
+	    cut -f 1,3,4,5 | grep -v -P "\tNA|pval" | sort -g > vtools.res
+        # permutation based approach for empirical p-values
+        vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby -j8 |\
+            grep -v -P "\tNA|pval" | cut -f 1,3 | sort -g > vtools2.res	
+        # vtools association by variable threshold method
+        vtools associate $1 BMI --covariate aff sex -m "VariableThresholdsQt --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby -j8 |\
+            grep -v -P "\tNA|pval" | cut -f 1,3 | awk '{if ($2>=0) $2=$2; else $2=0-$2; print $0}' | sed 's/\s/\t/g' | sort -g > vtools3.res
+        #compare t values
+        cut -f1,2 vtools.res > vtools1.res
+        diff vtools1.res vtools2.res
+        join vtools3.res vtools2.res | sed 's/\s/\t/g' | awk '{if ($2>$3) exit; else if($2=$3) exit; else if($2<$3) print $1}'
 	###
 	# group analysis by R
 	###
@@ -75,7 +84,7 @@ else
 	join group.tmp geno.tmp | sed 's/\s/\t/g' | Rscript $4 scoreRegion |\
         awk '{if(NR ==1) print "sample_name\t" $0; else print "" $0}' > R.group.tmp
 	join phenotype.tmp R.group.tmp | sed 's/\s/\t/g' | Rscript $4 testRegion | sed 's/^X//g' |\
-        ./gw_round.py | grep -v -P "\tNA|pval" | sort > R.res
+        ./gw_round.py | grep -v -P "\tNA|pval" | sort -g > R.res
 fi
 
 #compare R result to vtools result
