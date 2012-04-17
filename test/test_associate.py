@@ -7,7 +7,7 @@ import subprocess
 from testUtils import ProcessTestCase, runCmd, outputOfCmd
 from zipfile import ZipFile
 import argparse
-
+from random import choice
 from variant_tools.association import NullTest, t
 
 class ActionTester(NullTest):
@@ -36,7 +36,7 @@ class PyActionTester(ActionTester):
         )
 
     def func(self, data):
-        print data
+        print(data)
         return True
 
 class SetMafTester(ActionTester):
@@ -49,7 +49,7 @@ class SetMafTester(ActionTester):
 
     def func(self, data):
         # here to test if maf is correctly set...
-        print data
+        print(data)
         return True
 
 
@@ -100,6 +100,18 @@ class TestAsso(ProcessTestCase):
         dir = os.getcwd()
         zip.extractall(dir)
         self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
+
+    def testResultRand(self):
+        'Test association results with R'
+        totest = True
+        try:
+            runCmd('Rscript --help')
+            runCmd('awk --help')
+        except:
+            totest = False
+        if totest:
+            self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip 0', '')
+
 
 if __name__ == '__main__':
     unittest.main()
