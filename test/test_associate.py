@@ -4,7 +4,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, output2list
 from zipfile import ZipFile
 import argparse
 from random import choice
@@ -85,13 +85,16 @@ class TestAsso(ProcessTestCase):
         
     def testResult(self):
         'Test association results'
-        zip = ZipFile('proj/assoproj2.zip')
+        zip = ZipFile('proj/assoproj.zip')
         dir = os.getcwd()
         zip.extractall(dir)
-        for i in range(3):
-          runCmd('vtools update variant --from_file assodat/grp{}.txt --format assodat/addcol.fmt --var_info grpby'.format(str(i+1)))
-          self.assertOutput('vtools associate variant_ex BMI --samples 1 --covariate aff sex -m "LNBT --alternative 2"', '', 0,'assodat/assores{}1.txt'.format(str(i+1)))
-          self.assertOutput('vtools associate variant_ex BMI --samples 1 --covariate aff sex -m "LNBT --alternative 2" -g grpby', '', 0,'assodat/assores{}2.txt'.format(str(i+1)))
+        for i in range(8):
+          runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
+          vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LNBT --alternative 2" -g grpby')
+          vtoolsout.sort()
+          vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
+          self.assertOutput('sort output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
+          
 
     def testPyAction(self):
         'Test action pyaction'
@@ -113,8 +116,7 @@ class TestAsso(ProcessTestCase):
             nums = set([choice(range(100)) for x in range(4)])
             nums = [0] + list(nums)
             for item in nums:
-                self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip {}'.format(str(item)), '')
-
+                self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip test_associate.R {}'.format(str(item)), '')
 
 if __name__ == '__main__':
     unittest.main()
