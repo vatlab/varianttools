@@ -110,7 +110,10 @@ class TestAsso(ProcessTestCase):
         except:
             totest = False
         if totest:
-            self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip 0', '')
+            nums = set([choice(range(100)) for x in range(4)])
+            nums = [0] + list(nums)
+            for item in nums:
+                self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip {}'.format(str(item)), '')
 
 
 if __name__ == '__main__':

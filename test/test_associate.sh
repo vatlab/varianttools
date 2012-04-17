@@ -59,12 +59,12 @@ then
 	# By R
 	join phenotype.tmp tgeno.tmp | sed 's/\s/\t/g' | Rscript test_associate.R testSnv |\
 	  # trim the output format 
-	  sed 's/^X//g' | ./gw_round.py | sort -r | grep -v -P "\tNA\t" | sed 1d > R.res
+	  sed 's/^X//g' | ./gw_round.py | grep -v -P "\tNA\t|pval" | sort > R.res
 	
 	# By vtools 
 	vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2" -j8 | \
 	    awk '{if(NR ==1) print "ID\t" $0; else print $1"_"$2"\t" $0}' | sed 's/#chr/chr/g' | \
-	    sort -r | cut -f 1,5,6,7 | grep -v -P "\tNAN" | sed 1d > vtools.res
+	    cut -f 1,5,6,7 | grep -v -P "\tNAN|pval" | sort > vtools.res
 
 else
 
@@ -80,7 +80,7 @@ else
 	vtools update $1 --from_file vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby
 	# vtools association by group
 	vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2" -g grpby -j8 |\
-	    cut -f 1,3,4,5 | sort -r | grep -v -P "\tNA" | sed 1d > vtools.res
+	    cut -f 1,3,4,5 | grep -v -P "\tNA|pval" | sort > vtools.res
 	
 	###
 	# group analysis by R
@@ -90,7 +90,7 @@ else
 	join group.tmp geno.tmp | sed 's/\s/\t/g' | Rscript test_associate.R scoreRegion |\
         awk '{if(NR ==1) print "sample_name\t" $0; else print "" $0}' > R.group.tmp
 	join phenotype.tmp R.group.tmp | sed 's/\s/\t/g' | Rscript test_associate.R testRegion | sed 's/^X//g' |\
-        ./gw_round.py | sort -r | grep -v -P "\tNA" | sed 1d > R.res
+        ./gw_round.py | grep -v -P "\tNA|pval" | sort > R.res
 fi
 
 #compare R result to vtools result
