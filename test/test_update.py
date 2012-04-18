@@ -43,9 +43,15 @@ class TestUpdate(ProcessTestCase):
         runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
         self.assertFail('vtools update --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
+        #need a format file if you want to add field(s) into the variant table using --from_file
+        self.assertFail('vtools update variant --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update variant --format ../format/ANNOVAR_output')
         self.assertSucc('vtools update variant --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
-        
+        #for different version of genome
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function --build hg19')
+        self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '81\n')
+
     def testUpdate(self):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         runCmd('vtools import vcf/SAMP1.vcf --build hg18')
@@ -55,7 +61,11 @@ class TestUpdate(ProcessTestCase):
         runCmd('vtools liftover hg19')
         # a variant can have multiple entries -- thus 175 variants in variant table are updated from the 198 imported records
         self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
+        #If the file is already imported and you can add field(s) using the orginal file without --format
+        self.assertFail('vtools')   
         self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --geno_info DP_geno')
+        #you could not use another file which is not loaded into the project to update the current variant table 
+        self.assertFail('vtools update variant --from_file vcf/SAMP4_complex_variants.vcf --geno_info DP_geno')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175\n')
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
         
