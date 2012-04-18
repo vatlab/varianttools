@@ -536,7 +536,7 @@ public:
 	std::vector<double> getSEBeta()
 	{
 		if (!m_beta) {
-			throw ValueError("Error in getSEBeta(): meed to fit the model first");
+			throw ValueError("Error in getSEBeta(): need to fit the model first");
 		}
 		// compute (X'X)^-1 = V(diag(1/s))U'
 		// diagnal matrix

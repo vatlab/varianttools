@@ -91,7 +91,6 @@ public:
 	bool apply(AssoData & d)
 	{
 		d.sumToX();
-		d.meanOfX();
 		return true;
 	}
 
@@ -122,7 +121,6 @@ public:
 	bool apply(AssoData & d)
 	{
 		d.binToX();
-		d.meanOfX();
 		return true;
 	}
 

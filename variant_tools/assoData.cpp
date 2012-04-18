@@ -28,38 +28,32 @@
 
 namespace vtools {
 
-double AssoData::meanOfX()
-{
-	m_xbar = std::accumulate(m_X.begin(), m_X.end(), 0.0);
-}
 
-
-double AssoData::setPhenotype(const vectorf & p)
+bool AssoData::setPhenotype(const vectorf & p)
 {
 	m_phenotype = p;
 	// set phenotype mean
-	m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-	m_ybar /= (1.0 * m_phenotype.size());
+	setVar("ybar", (double)std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0) / (1.0 * m_phenotype.size()));
 	// set case/ctrl counts
-	//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),1.0));
-	//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),0.0));
+	//setVar("ncases", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
+	//    std::bind2nd(std::equal_to<double>(),1.0)));
+	//setVar("nctrls", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
+	//    std::bind2nd(std::equal_to<double>(),0.0)));
 	//
 	// re-size statistics vector, etc, for there is only one predictor
 	m_statistic.resize(1);
 	m_se.resize(1);
 	m_pval.resize(m_statistic.size());
-	return m_ybar;
+	return true;
 }
 
 
-double AssoData::setPhenotype(const vectorf & p, const matrixf & c)
+bool AssoData::setPhenotype(const vectorf & p, const matrixf & c)
 {
 	m_phenotype = p;
 	m_C = c;
 	// number of covariates. (need to subtract by 1 because first column of m_C is reserved with a vector of 1's)
-	m_ncovar = c.size() - 1;
+	setVar("ncovar", int(c.size() - 1));
 	vectorf one(p.size());
 	std::fill(one.begin(), one.end(), 1.0);
 	// reserve the last column to be a column of 1's, a placeholder for m_X which will be calculated and assigned to the last column of m_C
@@ -69,18 +63,17 @@ double AssoData::setPhenotype(const vectorf & p, const matrixf & c)
 	m_model.setY(m_phenotype);
 	m_model.setX(m_C);
 	// set phenotype mean
-	m_ybar = std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0);
-	m_ybar /= (1.0 * m_phenotype.size());
-	//m_ncases = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),1.0));
-	//m_nctrls = (unsigned) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),0.0));
-	//
+	setVar("ybar", (double)std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0) / (1.0 * m_phenotype.size()));
+	// set case/ctrl counts
+	//setVar("ncases", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
+	//    std::bind2nd(std::equal_to<double>(),1.0)));
+	//setVar("nctrls", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
+	//    std::bind2nd(std::equal_to<double>(),0.0)));
 	// re-size statistics vector, etc
-	m_statistic.resize((m_ncovar + 1));
-	m_se.resize((m_ncovar + 1));
+	m_statistic.resize(c.size());
+	m_se.resize(m_statistic.size());
 	m_pval.resize(m_statistic.size());
-	return m_ybar;
+	return true;
 }
 
 
@@ -96,6 +89,7 @@ void AssoData::sumToX()
 			}
 		}
 	}
+	setVar("xbar", (double)std::accumulate(m_X.begin(), m_X.end(), 0.0) / (1.0 * m_X.size()));
 }
 
 
@@ -119,6 +113,7 @@ void AssoData::binToX()
 			m_X[i] = 1.0 - pnovar;
 		}
 	}
+	setVar("xbar", (double)std::accumulate(m_X.begin(), m_X.end(), 0.0) / (1.0 * m_X.size()));
 }
 
 
@@ -142,20 +137,24 @@ void AssoData::simpleLinear()
 	// simple linear regression score test
 	//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
 	//
+
+	double xbar = getDoubleVar("xbar");
+	double ybar = getDoubleVar("ybar");
+
 	if (m_X.size() != m_phenotype.size()) {
 		throw ValueError("Genotype/Phenotype length not equal!");
 	}
 	double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
 	for (size_t i = 0; i != m_X.size(); ++i) {
-		numerator += (m_X[i] - m_xbar) * m_phenotype[i];
-		denominator += pow(m_X[i] - m_xbar, 2.0);
+		numerator += (m_X[i] - xbar) * m_phenotype[i];
+		denominator += pow(m_X[i] - xbar, 2.0);
 	}
 
 	if (!fEqual(numerator, 0.0)) {
 		//!- Compute MSE and V[\hat{beta}]
 		//!- V[\hat{beta}] = MSE / denominator
 		double b1 = numerator / denominator;
-		double b0 = m_ybar - b1 * m_xbar;
+		double b0 = ybar - b1 * xbar;
 
 		//SSE
 		for (size_t i = 0; i != m_X.size(); ++i) {
@@ -180,17 +179,17 @@ void AssoData::simpleLogit()
 	}
 	//double ebo = (1.0 * n1) / (1.0 * (m_phenotype.size()-n1));
 	//double bo = log(ebo);
-
-	double po = (1.0 * m_ncases) / (1.0 * m_phenotype.size());
+	double xbar = getDoubleVar("xbar");
+	double po = (1.0 * getIntVar("ncases")) / (1.0 * m_phenotype.size());
 	double ss = 0.0;
 	// the score
 	for (size_t i = 0; i != m_X.size(); ++i) {
-		ss += (m_X[i] - m_xbar) * (m_phenotype[i] - po);
+		ss += (m_X[i] - xbar) * (m_phenotype[i] - po);
 	}
 	double vm1 = 0.0;
 	// variance of score, under the null
 	for (size_t i = 0; i != m_X.size(); ++i) {
-		vm1 += (m_X[i] - m_xbar) * (m_X[i] - m_xbar) * po * (1.0 - po);
+		vm1 += (m_X[i] - xbar) * (m_X[i] - xbar) * po * (1.0 - po);
 	}
 
 	ss = ss / sqrt(vm1);
@@ -248,14 +247,16 @@ void AssoData::gaussianP(unsigned sided)
 
 void AssoData::studentP(unsigned sided)
 {
-	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = m_ncovar+2
+	int ncovar = getIntVar("ncovar");
+
+	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
 	if (sided == 1) {
 		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			m_pval[i] = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
+			m_pval[i] = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (ncovar + 2.0));
 		}
 	} else if (sided == 2) {
 		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (m_ncovar + 2.0));
+			double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (ncovar + 2.0));
 			m_pval[i] = fmin(p, 1.0 - p) * 2.0;
 		}
 	} else {
