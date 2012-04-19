@@ -48,6 +48,8 @@ include variant_tools/action.cpp
 include variant_tools/assoData.cpp
 include variant_tools/utils.h
 include variant_tools/utils.cpp
+include variant_tools/lm.h
+include variant_tools/lm.cpp
 include variant_tools/assoTests_py2.py
 include variant_tools/assoTests_py3.py
 include variant_tools/assoTests_wrap_py2.cpp
