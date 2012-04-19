@@ -93,7 +93,7 @@ class TestAsso(ProcessTestCase):
           vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LNBT --alternative 2" -g grpby')
           vtoolsout.sort()
           vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
-          self.assertOutput('sort output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
+          self.assertOutput('cat output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
           
 
     def testPyAction(self):
