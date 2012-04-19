@@ -29,14 +29,14 @@
 #include <algorithm>
 #include <functional>
 #include <vector>
+#include <string>
 #include <iostream>
 #include <ctime>
 #include <unistd.h>
 #include "gsl/gsl_rng.h"
+#include "Python.h"
 
 #include "assoTests.h"
-
-#include "Python.h"
 
 // check if float numbers are equal
 bool fEqual(double a, double b);
@@ -185,13 +185,13 @@ public:
 	}
 
 
-	string name() const
+	std::string name() const
 	{
 		return m_name;
 	}
 
 
-	string arg(size_t arg) const
+	std::string arg(size_t arg) const
 	{
 		return m_args[arg];
 	}

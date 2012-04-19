@@ -34,7 +34,6 @@ typedef std::vector<int> vectori;
 typedef std::vector<std::vector<int> > matrixi;
 #include <numeric>
 #include <algorithm>
-#include <functional>
 #include <iostream>
 #include <map>
 #include <string>
@@ -42,8 +41,6 @@ typedef std::vector<std::vector<int> > matrixi;
 #include "assoTests.h"
 #include "utils.h"
 #include "lm.h"
-#include "gsl/gsl_cdf.h"
-#include "gsl/gsl_randist.h"
 
 
 namespace vtools {
@@ -71,14 +68,14 @@ public:
 	 *  m_C: covariates matrix (n X m).
 	 *      The first column of m_C is a vector of 1's (reserved for intercept estimate)
 	 *      The last column of m_C will be filled with m_X
+	 *  m_model: model data object
+	 *      Will be linear model for quantitative traits, logistic regression model for disease traits
 	 *      *   *   *
 	 *  intVar ncovar: number of covariates
 	 *  DoubleVar xbar: mean(m_X)
 	 *  DoubleVar ybar: mean(m_phenotype)
 	 *  intVar ncases: number of cases for case/ctrl data
 	 *  intVar nctrls: number of ctrls for case/ctrl data
-	 *  m_model: model data object
-	 *      Will be linear model for quantitative traits, logistic regression model for disease traits
 	 */
 
 	AssoData() :
@@ -96,6 +93,7 @@ public:
 	{
 		return new AssoData(*this);
 	}
+
 
 	// set raw genotypes
 	bool setGenotype(const matrixf & g)
@@ -129,11 +127,12 @@ public:
 	 * get various data
 	 *
 	 * */
-    // use & here, i.e., can be accessed/modified by action classes
+	// use & here, i.e., can be accessed/modified by action classes
 	vectorf & phenotype()
 	{
 		return m_phenotype;
 	}
+
 
 	vectorf & genotype()
 	{
@@ -149,13 +148,15 @@ public:
 
 	matrixf & covariates()
 	{
-        return m_C;
+		return m_C;
 	}
 
-    LMData & modeldata()
-    {
-        return m_model;
-    }
+
+	LMData & modeldata()
+	{
+		return m_model;
+	}
+
 
 	unsigned samplecounts()
 	{
@@ -163,19 +164,19 @@ public:
 	}
 
 
-	vectorf pvalue()
+	vectorf & pvalue()
 	{
 		return m_pval;
 	}
 
 
-	vectorf statistic()
+	vectorf & statistic()
 	{
 		return m_statistic;
 	}
 
 
-	vectorf se()
+	vectorf & se()
 	{
 		return m_se;
 	}
@@ -255,12 +256,6 @@ public:
 	// weight the raw genotypes by given weight
 	void weightX(const vectorf & weight);
 
-	// get p-value from statistic, assuming standard normal distribution
-	void gaussianP(unsigned sided = 1);
-
-	// get p-value from statistic, assuming t distribution
-	// degree of freedom will be calculated from data automatically
-	void studentP(unsigned sided = 1);
 
 	// store a double value with name 'name'
 	void setVar(const string & name, const double value)

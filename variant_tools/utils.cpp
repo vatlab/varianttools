@@ -55,7 +55,7 @@ PyObject * pyAssoDataObj(void * p)
 }
 
 
-string PyObj_AsString(PyObject * str)
+std::string PyObj_AsString(PyObject * str)
 {
 #if PY_VERSION_HEX >= 0x03000000
 	char * cstr;
@@ -66,11 +66,11 @@ string PyObj_AsString(PyObject * str)
 	newstr = (char *)malloc(len + 1);
 	memcpy(newstr, cstr, len + 1);
 	Py_XDECREF(str);
-	string res(newstr);
+	std::string res(newstr);
 	free(newstr);
 	return res;
 #else
-	return string(PyString_AsString(str));
+	return std::string(PyString_AsString(str));
 #endif
 }
 
@@ -189,4 +189,3 @@ void initialize()
 
 
 }
-

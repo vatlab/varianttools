@@ -76,6 +76,7 @@ bool AssoData::setPhenotype(const vectorf & p, const matrixf & c)
 	return true;
 }
 
+
 void AssoData::weightX(const vectorf & weight)
 {
 	if (weight.size() == 0) {
@@ -87,42 +88,6 @@ void AssoData::weightX(const vectorf & weight)
 				m_genotype[i][j] *= weight[j];
 			}
 		}
-	}
-}
-
-
-void AssoData::gaussianP(unsigned sided)
-{
-	if (sided == 1) {
-		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			m_pval[i] = gsl_cdf_ugaussian_Q(m_statistic[i]);
-		}
-	} else if (sided == 2) {
-		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			m_pval[i] = gsl_cdf_chisq_Q(m_statistic[i] * m_statistic[i], 1.0);
-		}
-	} else {
-		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
-	}
-}
-
-
-void AssoData::studentP(unsigned sided)
-{
-	int ncovar = getIntVar("ncovar");
-
-	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
-	if (sided == 1) {
-		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			m_pval[i] = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (ncovar + 2.0));
-		}
-	} else if (sided == 2) {
-		for (unsigned i = 0; i < m_statistic.size(); ++i) {
-			double p = gsl_cdf_tdist_Q(m_statistic[i], m_phenotype.size() - (ncovar + 2.0));
-			m_pval[i] = fmin(p, 1.0 - p) * 2.0;
-		}
-	} else {
-		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
 	}
 }
 

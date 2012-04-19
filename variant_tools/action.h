@@ -27,6 +27,8 @@
 #define _ACTION_H
 
 #include <limits>
+#include <numeric>
+#include <functional>
 #include "assoData.h"
 
 namespace vtools {
@@ -350,6 +352,8 @@ public:
 	{
 		return "LinearRegression";
 	}
+
+
 };
 
 //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
@@ -378,7 +382,7 @@ public:
 
 };
 
-
+// get p-value from statistic, assuming standard normal distribution
 class GaussianPval : public BaseAction
 {
 public:
@@ -394,12 +398,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.gaussianP(m_sided);
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -412,6 +411,8 @@ private:
 };
 
 
+// get p-value from statistic, assuming t distribution
+// degree of freedom will be calculated from data automatically
 class StudentPval : public BaseAction
 {
 public:
@@ -427,12 +428,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.studentP(m_sided);
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{

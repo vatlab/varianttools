@@ -24,6 +24,8 @@
  */
 
 #include "action.h"
+#include "gsl/gsl_cdf.h"
+#include "gsl/gsl_randist.h"
 
 namespace vtools {
 
@@ -117,158 +119,210 @@ bool SetSites::apply(AssoData & d)
 	return true;
 }
 
-bool SumToX::apply(AssoData & d) 
+
+bool SumToX::apply(AssoData & d)
 {
-    vectorf & X = d.genotype();
+	vectorf & X = d.genotype();
 	matrixf & genotype = d.raw_genotype();
-    X.resize(genotype.size());
-    std::fill(X.begin(), X.end(), 0.0);
-    for (size_t i = 0; i < genotype.size(); ++i) {
-        //X[i] = std::accumulate(genotype[i].begin(), genotype[i].end(), 0.0);
-        for (size_t j = 0; j < genotype[i].size(); ++j) {
-            if (genotype[i][j] > 0) {
-                X[i] += genotype[i][j];
-            }
-        }
-    }
-    d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
-    return true;
+
+	X.resize(genotype.size());
+	std::fill(X.begin(), X.end(), 0.0);
+	for (size_t i = 0; i < genotype.size(); ++i) {
+		//X[i] = std::accumulate(genotype[i].begin(), genotype[i].end(), 0.0);
+		for (size_t j = 0; j < genotype[i].size(); ++j) {
+			if (genotype[i][j] > 0) {
+				X[i] += genotype[i][j];
+			}
+		}
+	}
+	d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
+	return true;
 }
+
 
 bool BinToX::apply(AssoData & d)
 {
-    vectorf & X = d.genotype();
-    matrixf & genotype = d.raw_genotype();
-    X.resize(genotype.size());
-    std::fill(X.begin(), X.end(), 0.0);
-    for (size_t i = 0; i < genotype.size(); ++i) {
-        double pnovar = 1.0;
-        for (size_t j = 0; j != genotype[i].size(); ++j) {
-            if (genotype[i][j] >= 1.0) {
-                X[i] = 1.0;
-                break;
-            } else if (genotype[i][j] > 0.0) {
-                // binning the data with proper handling of missing genotype
-                pnovar *= (1.0 - genotype[i][j]);
-            } else ;
-        }
-        // all genotypes are missing: have to be represented as Pr(#mutation>=1)
-        if (pnovar < 1.0 && X[i] < 1.0) {
-            X[i] = 1.0 - pnovar;
-        }
-    }
-    d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
-    return true;
+	vectorf & X = d.genotype();
+	matrixf & genotype = d.raw_genotype();
+
+	X.resize(genotype.size());
+	std::fill(X.begin(), X.end(), 0.0);
+	for (size_t i = 0; i < genotype.size(); ++i) {
+		double pnovar = 1.0;
+		for (size_t j = 0; j != genotype[i].size(); ++j) {
+			if (genotype[i][j] >= 1.0) {
+				X[i] = 1.0;
+				break;
+			} else if (genotype[i][j] > 0.0) {
+				// binning the data with proper handling of missing genotype
+				pnovar *= (1.0 - genotype[i][j]);
+			} else ;
+		}
+		// all genotypes are missing: have to be represented as Pr(#mutation>=1)
+		if (pnovar < 1.0 && X[i] < 1.0) {
+			X[i] = 1.0 - pnovar;
+		}
+	}
+	d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
+	return true;
 }
+
 
 bool SimpleLinearRegression::apply(AssoData & d)
 {
-    // simple linear regression score test
-    //!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
+	// simple linear regression score test
+	//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
 
-    double xbar = d.getDoubleVar("xbar");
-    double ybar = d.getDoubleVar("ybar");
-    vectorf & X = d.genotype();
-    vectorf & Y = d.phenotype();
-    if (X.size() != Y.size()) {
-        throw ValueError("Genotype/Phenotype length not equal!");
-    }
-    double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
-    for (size_t i = 0; i != X.size(); ++i) {
-        numerator += (X[i] - xbar) * Y[i];
-        denominator += pow(X[i] - xbar, 2.0);
-    }
+	double xbar = d.getDoubleVar("xbar");
+	double ybar = d.getDoubleVar("ybar");
+	vectorf & X = d.genotype();
+	vectorf & Y = d.phenotype();
 
-    if (!fEqual(numerator, 0.0)) {
-        //!- Compute MSE and V[\hat{beta}]
-        //!- V[\hat{beta}] = MSE / denominator
-        double b1 = numerator / denominator;
-        double b0 = ybar - b1 * xbar;
+	if (X.size() != Y.size()) {
+		throw ValueError("Genotype/Phenotype length not equal!");
+	}
+	double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
+	for (size_t i = 0; i != X.size(); ++i) {
+		numerator += (X[i] - xbar) * Y[i];
+		denominator += pow(X[i] - xbar, 2.0);
+	}
 
-        //SSE
-        for (size_t i = 0; i != X.size(); ++i) {
-            ysigma += pow(Y[i] - (b0 + b1 * X[i]), 2.0);
-        }
-        double varb = ysigma / (Y.size() - 2.0) / denominator;
-        d.setStatistic(b1 / sqrt(varb));
-        d.setSE(sqrt(varb));
-    } else {
-        d.setStatistic(0.0);
-        d.setSE(std::numeric_limits<double>::quiet_NaN());
-    }
-    return true;
+	if (!fEqual(numerator, 0.0)) {
+		//!- Compute MSE and V[\hat{beta}]
+		//!- V[\hat{beta}] = MSE / denominator
+		double b1 = numerator / denominator;
+		double b0 = ybar - b1 * xbar;
+
+		//SSE
+		for (size_t i = 0; i != X.size(); ++i) {
+			ysigma += pow(Y[i] - (b0 + b1 * X[i]), 2.0);
+		}
+		double varb = ysigma / (Y.size() - 2.0) / denominator;
+		d.setStatistic(b1 / sqrt(varb));
+		d.setSE(sqrt(varb));
+	} else {
+		d.setStatistic(0.0);
+		d.setSE(std::numeric_limits<double>::quiet_NaN());
+	}
+	return true;
 }
+
 
 bool SimpleLogisticRegression::apply(AssoData & d)
 {
-    //!- labnotes vol.2 page 3
-    // FIXME: binary check: input phenotypes have to be binary values 0 or 1
-    double xbar = d.getDoubleVar("xbar");
-    vectorf & X = d.genotype();
-    vectorf & Y = d.phenotype();
-    if (X.size() != Y.size()) {
-        throw ValueError("Genotype/Phenotype length not equal!");
-    }
+	//!- labnotes vol.2 page 3
+	// FIXME: binary check: input phenotypes have to be binary values 0 or 1
+	double xbar = d.getDoubleVar("xbar");
+	vectorf & X = d.genotype();
+	vectorf & Y = d.phenotype();
 
-    //double ebo = (1.0 * n1) / (1.0 * (Y.size()-n1));
-    //double bo = log(ebo);
-    double po = (1.0 * d.getIntVar("ncases")) / (1.0 * Y.size());
-    double ss = 0.0;
-    // the score
-    for (size_t i = 0; i != X.size(); ++i) {
-        ss += (X[i] - xbar) * (Y[i] - po);
-    }
-    double vm1 = 0.0;
-    // variance of score, under the null
-    for (size_t i = 0; i != X.size(); ++i) {
-        vm1 += (X[i] - xbar) * (X[i] - xbar) * po * (1.0 - po);
-    }
+	if (X.size() != Y.size()) {
+		throw ValueError("Genotype/Phenotype length not equal!");
+	}
 
-    ss = ss / sqrt(vm1);
+	//double ebo = (1.0 * n1) / (1.0 * (Y.size()-n1));
+	//double bo = log(ebo);
+	double po = (1.0 * d.getIntVar("ncases")) / (1.0 * Y.size());
+	double ss = 0.0;
+	// the score
+	for (size_t i = 0; i != X.size(); ++i) {
+		ss += (X[i] - xbar) * (Y[i] - po);
+	}
+	double vm1 = 0.0;
+	// variance of score, under the null
+	for (size_t i = 0; i != X.size(); ++i) {
+		vm1 += (X[i] - xbar) * (X[i] - xbar) * po * (1.0 - po);
+	}
 
-    //!-FIXME: (not sure why this happens)
-    //!- w/ rounding to 0 I get strange number such as 3.72397e-35
-    //!- this would lead to type I error problem
-    fRound(ss, 0.0001);
-    d.setStatistic(ss);
-    d.setSE(sqrt(vm1));
-    return true;
+	ss = ss / sqrt(vm1);
+
+	//!-FIXME: (not sure why this happens)
+	//!- w/ rounding to 0 I get strange number such as 3.72397e-35
+	//!- this would lead to type I error problem
+	fRound(ss, 0.0001);
+	d.setStatistic(ss);
+	d.setSE(sqrt(vm1));
+	return true;
 }
 
 
-bool MultipleLinearRegression::apply(AssoData & d) 
+bool MultipleLinearRegression::apply(AssoData & d)
 {
-    //!- multiple linear regression parameter estimate
-    //!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
-    //!- Solve the system via gsl_linalg_SV_solve()
-    vectorf & X = d.genotype();
-    vectorf & Y = d.phenotype();
-    matrixf & C = d.covariates();
-    if (X.size() != Y.size()) {
-        throw ValueError("Genotype/Phenotype length not equal!");
-    }
-    LMData & mdata = d.modeldata();
-    // reset phenotype data
-    mdata.replaceColumn(Y, 0);
-    // reset genotype data
-    mdata.replaceColumn(X, C.size() - 1);
-    // fit the linear regression model
-    LinearM model;
-    model.fit(mdata);
-    model.evalSE(mdata);
-    // get statistics 
-    vectorf beta = mdata.getBeta();
-    vectorf seb = mdata.getSEBeta();
-    beta.erase(beta.begin()); seb.erase(seb.begin());
-    std::transform (beta.begin(), beta.end(), seb.begin(), beta.begin(), std::divides<double>());
-    // move the last element to first
-    std::rotate(beta.begin(),beta.end()-1,beta.end());
-    std::rotate(seb.begin(),seb.end()-1,seb.end());
-    // set statistic
-    d.setStatistic(beta);
-    d.setSE(seb);
-    return true;
-} 
+	//!- multiple linear regression parameter estimate
+	//!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
+	//!- Solve the system via gsl_linalg_SV_solve()
+	vectorf & X = d.genotype();
+	vectorf & Y = d.phenotype();
+	matrixf & C = d.covariates();
+	vectorf & beta = d.statistic();
+	vectorf & seb = d.se();
+
+	if (X.size() != Y.size()) {
+		throw ValueError("Genotype/Phenotype length not equal!");
+	}
+	LMData & mdata = d.modeldata();
+	// reset phenotype data
+	mdata.replaceColumn(Y, 0);
+	// reset genotype data
+	mdata.replaceColumn(X, C.size() - 1);
+	// fit the linear regression model
+	LinearM model;
+	model.fit(mdata);
+	model.evalSE(mdata);
+	// get statistics
+	beta = mdata.getBeta();
+	seb = mdata.getSEBeta();
+	beta.erase(beta.begin()); seb.erase(seb.begin());
+	std::transform(beta.begin(), beta.end(), seb.begin(), beta.begin(), std::divides<double>());
+	// move the last element to first
+	std::rotate(beta.begin(), beta.end() - 1, beta.end());
+	std::rotate(seb.begin(), seb.end() - 1, seb.end());
+	return true;
+}
+
+
+bool GaussianPval::apply(AssoData & d)
+{
+	vectorf & statistic = d.statistic();
+	vectorf & pval = d.pvalue();
+
+	if (m_sided == 1) {
+		for (unsigned i = 0; i < statistic.size(); ++i) {
+			pval[i] = gsl_cdf_ugaussian_Q(statistic[i]);
+		}
+	} else if (m_sided == 2) {
+		for (unsigned i = 0; i < statistic.size(); ++i) {
+			pval[i] = gsl_cdf_chisq_Q(statistic[i] * statistic[i], 1.0);
+		}
+	} else {
+		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
+	}
+	return true;
+}
+
+
+bool StudentPval::apply(AssoData & d)
+{
+	int ncovar = d.getIntVar("ncovar");
+	vectorf & statistic = d.statistic();
+	vectorf & pval = d.pvalue();
+
+	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
+	if (m_sided == 1) {
+		for (unsigned i = 0; i < statistic.size(); ++i) {
+			pval[i] = gsl_cdf_tdist_Q(statistic[i], d.samplecounts() - (ncovar + 2.0));
+		}
+	} else if (m_sided == 2) {
+		for (unsigned i = 0; i < statistic.size(); ++i) {
+			double p = gsl_cdf_tdist_Q(statistic[i], d.samplecounts() - (ncovar + 2.0));
+			pval[i] = fmin(p, 1.0 - p) * 2.0;
+		}
+	} else {
+		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
+	}
+	return true;
+}
+
 
 bool PyAction::apply(AssoData & d)
 {
