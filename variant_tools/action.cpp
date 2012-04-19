@@ -266,19 +266,19 @@ bool MultipleLinearRegression::apply(AssoData & d)
 	LinearM model;
 	model.fit(mdata);
 	// get statistics
-    beta = mdata.getBeta();
-    beta.erase(beta.begin());
-    // move the last element to first
+	beta = mdata.getBeta();
+	beta.erase(beta.begin());
+	// move the last element to first
 	std::rotate(beta.begin(), beta.end() - 1, beta.end());
 
-    // get/set standard error
-    if (m_iSE) {
-        vectorf & seb = d.se();
-    	model.evalSE(mdata);
-	    seb = mdata.getSEBeta();
-	    seb.erase(seb.begin());
+	// get/set standard error
+	if (m_iSE) {
+		vectorf & seb = d.se();
+		model.evalSE(mdata);
+		seb = mdata.getSEBeta();
+		seb.erase(seb.begin());
 		std::rotate(seb.begin(), seb.end() - 1, seb.end());
-    }
+	}
 	return true;
 }
 
@@ -291,11 +291,11 @@ bool GaussianPval::apply(AssoData & d)
 
 	if (m_sided == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
-			pval[i] = gsl_cdf_ugaussian_Q(statistic[i]/se[i]);
+			pval[i] = gsl_cdf_ugaussian_Q(statistic[i] / se[i]);
 		}
 	} else if (m_sided == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
-			pval[i] = gsl_cdf_chisq_Q(statistic[i]/se[i] * statistic[i]/se[i], 1.0);
+			pval[i] = gsl_cdf_chisq_Q(statistic[i] / se[i] * statistic[i] / se[i], 1.0);
 		}
 	} else {
 		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
@@ -314,11 +314,11 @@ bool StudentPval::apply(AssoData & d)
 	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
 	if (m_sided == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
-			pval[i] = gsl_cdf_tdist_Q(statistic[i]/se[i], d.samplecounts() - (ncovar + 2.0));
+			pval[i] = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 		}
 	} else if (m_sided == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
-			double p = gsl_cdf_tdist_Q(statistic[i]/se[i], d.samplecounts() - (ncovar + 2.0));
+			double p = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 			pval[i] = fmin(p, 1.0 - p) * 2.0;
 		}
 	} else {

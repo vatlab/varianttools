@@ -335,8 +335,8 @@ public:
 class MultipleLinearRegression : public BaseAction
 {
 public:
-	MultipleLinearRegression(bool iSE = true) : 
-        BaseAction(), m_iSE(iSE)
+	MultipleLinearRegression(bool iSE = true) :
+		BaseAction(), m_iSE(iSE)
 	{
 	}
 
@@ -354,8 +354,9 @@ public:
 		return "LinearRegression";
 	}
 
+
 private:
-    bool m_iSE;
+	bool m_iSE;
 };
 
 //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
@@ -707,5 +708,4 @@ private:
 };
 
 }
-
 #endif

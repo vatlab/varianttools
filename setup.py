@@ -303,6 +303,7 @@ LIB_GSL = [
    'variant_tools/gsl/cblas/ztrsv.c',
    #
    'variant_tools/gsl/linalg/svd.c',
+   'variant_tools/gsl/linalg/lu.c',
    'variant_tools/gsl/linalg/bidiag.c',
    'variant_tools/gsl/linalg/householder.c',
    'variant_tools/gsl/matrix/matrix.c',
@@ -321,7 +322,10 @@ LIB_GSL = [
    'variant_tools/gsl/matrix/copy.c',
    'variant_tools/gsl/block/init.c',
    #
-   'variant_tools/gsl/permutation/permutation.c'
+   'variant_tools/gsl/permutation/init.c',
+   'variant_tools/gsl/permutation/inline.c',
+   'variant_tools/gsl/permutation/permutation.c',
+   'variant_tools/gsl/permutation/permute.c'
     ] 
     
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
