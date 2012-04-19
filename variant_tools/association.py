@@ -631,15 +631,15 @@ class LinearBurdenTest(NullTest):
     '''Simple Linear regression score test on collapsed genotypes within an association testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
-                        Field(name='statistic_x', index=None, type='FLOAT', adj=None, comment='statistic for x'), 
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression, this is estimate of effect size for x'), 
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         if self.permutations == 0:
-            self.fields.append(Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='estimate of effect size'))
+            self.fields.append(Field(name='wald_x', index=None, type='FLOAT', adj=None, comment='Wald statistic for x (beta_x/SE(beta_x))'))
             for i in range(ncovariates):
-                self.fields.extend([Field(name='statistic_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='statistic for covariate {}'.format(str(i+2))),
+                self.fields.extend([Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta for covariate {}'.format(str(i+2))),
                                     Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for covariate {}'.format(str(i+2))),
-                                    Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta_{}'.format(str(i+2)))])
+                                    Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
         else:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
         #
@@ -690,7 +690,7 @@ class LinearBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self, ncovariates):
-        a_regression = t.MultipleLinearRegression() if ncovariates > 0 else t.SimpleLinearRegression()
+        a_regression = t.MultipleLinearRegression(self.permutations==0) if ncovariates > 0 else t.SimpleLinearRegression()
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         # data pre-processing
         if self.weight_by_maf and not self.use_indicator:
@@ -755,8 +755,8 @@ class LinearBurdenTest(NullTest):
             res.append(x)
             res.append(y)
             if self.permutations == 0:
-                # beta estimate
-                res.append(x*z)
+                # Wald statistic
+                res.append(x/z)
             else:
                 # actual number of permutations
                 if math.isnan(z): res.append(z)
