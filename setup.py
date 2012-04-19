@@ -319,7 +319,9 @@ LIB_GSL = [
    'variant_tools/gsl/vector/oper.c',
    'variant_tools/gsl/matrix/oper.c',
    'variant_tools/gsl/matrix/copy.c',
-   'variant_tools/gsl/block/init.c'
+   'variant_tools/gsl/block/init.c',
+   #
+   'variant_tools/gsl/permutation/permutation.c'
     ] 
     
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.

@@ -25,6 +25,7 @@
 #ifndef _LM_H
 #define _LM_H
 #include <vector>
+#include "gsl/gsl_permutation.h"
 #include "gsl/gsl_vector.h"
 #include "gsl/gsl_matrix.h"
 #include "gsl/gsl_blas.h"
@@ -256,6 +257,68 @@ private:
 	gsl_vector * m_svdS;
 	gsl_matrix * m_svdV;
 	gsl_matrix * m_svdU;
+};
+
+
+// fit the binary logistic regression model
+// via gsl
+// members are
+// m_HI: Hessian matrix
+// m_pi: fitted probability
+// m_iterations: number of iterations used in Newton method
+class LogisticM : public BaseLM
+{
+public:
+	LogisticM() : BaseLM(), m_iterations(0),
+		m_HI(NULL), m_pi(NULL)
+	{
+	}
+
+
+	~LogisticM()
+	{
+		if (m_pi) {
+			gsl_vector_free(m_pi);
+		}
+		if (m_HI) {
+			gsl_matrix_free(m_HI);
+		}
+	}
+
+
+	LogisticM(const LogisticM & rhs) : BaseLM(rhs),
+		m_iterations(rhs.m_iterations), m_pi(NULL), m_HI(NULL)
+	{
+		if (rhs.m_pi) {
+			m_pi = gsl_vector_alloc(rhs.m_pi->size);
+			gsl_vector_memcpy(m_pi, rhs.m_pi);
+		}
+		if (rhs.m_HI) {
+			m_HI = gsl_matrix_alloc(rhs.m_HI->size1, rhs.m_HI->size2);
+			gsl_matrix_memcpy(m_HI, rhs.m_HI);
+		}
+	}
+
+
+	BaseLM * clone() const
+	{
+		return new LogisticM(*this);
+	}
+
+
+	// fit logisitic regression model via MLE
+	bool fit(LMData & d);
+
+	// obtain standard error for the MLE
+	bool evalSE(LMData & d);
+
+	// number of iterations
+	bool niterations() { return m_iterations; }
+
+private:
+	gsl_vector * m_pi;
+	gsl_matrix * m_HI;
+	unsigned m_iterations;
 };
 
 }
