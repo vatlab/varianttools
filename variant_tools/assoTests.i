@@ -29,6 +29,7 @@
 
 %{
 #include "utils.h"
+#include "lm.h"
 #include "assoData.h"
 #include "action.h"
 #include "assoTests.h"
@@ -93,6 +94,7 @@ namespace std
 %ignore vtools::PyAction::PyAction(const PyAction & rhs);
 
 %include "utils.h"
+%include "lm.h"
 %include "assoData.h"
 %include "action.h"
 %include "assoTests.h"

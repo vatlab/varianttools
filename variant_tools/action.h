@@ -26,6 +26,7 @@
 #ifndef _ACTION_H
 #define _ACTION_H
 
+#include <limits>
 #include "assoData.h"
 
 namespace vtools {
@@ -73,7 +74,8 @@ public:
 
 typedef std::vector<BaseAction *> vectora;
 
-
+// calculate genotype scores from raw genotype
+// m_X = rowSum(m_genotype)
 class SumToX : public BaseAction
 {
 public:
@@ -88,12 +90,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.sumToX();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -104,6 +101,9 @@ public:
 };
 
 
+// calculate genotype scores from raw genotype
+// m_X = (rowSum(m_genotype) > 0)
+// m_X is binary: 0 for all wildtype, 1 for having at least one mutation
 class BinToX : public BaseAction
 {
 public:
@@ -118,12 +118,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.binToX();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -308,6 +303,7 @@ private:
 };
 
 
+// Wald's statistic for simple linear model Y = b0 + b1x
 class SimpleLinearRegression : public BaseAction
 {
 public:
@@ -322,12 +318,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.simpleLinear();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
@@ -337,7 +328,8 @@ public:
 
 };
 
-
+// fitting / calculating wald's statistic for multiple linear regression model
+// Y = b0 + b1x1 + b2x2 + ... + bnxn
 class MultipleLinearRegression : public BaseAction
 {
 public:
@@ -352,22 +344,15 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		d.multipleLinear();
-		return true;
-	}
-
+	bool apply(AssoData & d);
 
 	std::string name()
 	{
 		return "LinearRegression";
 	}
-
-
 };
 
-
+//!- Score test implementation for logistic regression model logit(p) = b0 + b1x
 class SimpleLogisticRegression : public BaseAction
 {
 public:
@@ -382,13 +367,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d)
-	{
-		//assert(m_phenotype.size() == m_X.size());
-		//check for binary
-		d.simpleLogit();
-		return true;
-	}
+	bool apply(AssoData & d);
 
 
 	std::string name()

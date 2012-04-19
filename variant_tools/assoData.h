@@ -32,16 +32,16 @@ typedef std::vector<double> vectorf;
 typedef std::vector<std::vector<double> > matrixf;
 typedef std::vector<int> vectori;
 typedef std::vector<std::vector<int> > matrixi;
-#include <cassert>
 #include <numeric>
 #include <algorithm>
 #include <functional>
 #include <iostream>
-#include <limits>
 #include <map>
 #include <string>
+
 #include "assoTests.h"
 #include "utils.h"
+#include "lm.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
 
@@ -89,14 +89,13 @@ public:
 	}
 
 
-	~AssoData(){}
+	virtual ~AssoData(){}
 
 	// make a copy of the data
 	virtual AssoData * clone() const
 	{
 		return new AssoData(*this);
 	}
-
 
 	// set raw genotypes
 	bool setGenotype(const matrixf & g)
@@ -130,13 +129,13 @@ public:
 	 * get various data
 	 *
 	 * */
-	vectorf phenotype()
+    // use & here, i.e., can be accessed/modified by action classes
+	vectorf & phenotype()
 	{
 		return m_phenotype;
 	}
 
-
-	vectorf genotype()
+	vectorf & genotype()
 	{
 		return m_X;
 	}
@@ -148,11 +147,15 @@ public:
 	}
 
 
-	matrixf covariates()
+	matrixf & covariates()
 	{
-		return m_model.getX();
+        return m_C;
 	}
 
+    LMData & modeldata()
+    {
+        return m_model;
+    }
 
 	unsigned samplecounts()
 	{
@@ -228,7 +231,6 @@ public:
 	}
 
 
-public:
 	// permute phenotype data
 	void permuteY()
 	{
@@ -250,27 +252,8 @@ public:
 	}
 
 
-	// calculate genotype scores from raw genotype
-	// m_X = rowSum(m_genotype)
-	void sumToX();
-
-	// calculate genotype scores from raw genotype
-	// m_X = (rowSum(m_genotype) > 0)
-	// m_X is binary: 0 for all wildtype, 1 for having at least one mutation
-	void binToX();
-
 	// weight the raw genotypes by given weight
 	void weightX(const vectorf & weight);
-
-	// Wald's statistic for simple linear model Y = b0 + b1x
-	void simpleLinear();
-
-	//!- Score test implementation for logistic regression model logit(p) = b0 + b1x
-	void simpleLogit();
-
-	// fitting / calculating wald's statistic for multiple linear regression model
-	// Y = b0 + b1x1 + b2x2 + ... + bnxn
-	void multipleLinear();
 
 	// get p-value from statistic, assuming standard normal distribution
 	void gaussianP(unsigned sided = 1);
@@ -353,8 +336,8 @@ private:
 	vectorf m_pval;
 	vectorf m_statistic;
 	vectorf m_se;
-	// statistical model object
-	LinearM m_model;
+	// statistical model data
+	LMData m_model;
 
 	// arbitrary double type of variables
 	DoubleVars m_doubleVars;
