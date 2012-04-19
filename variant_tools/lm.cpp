@@ -235,5 +235,4 @@ bool LinearM::evalSE(LMData & d)
 	return true;
 }
 
-
 }

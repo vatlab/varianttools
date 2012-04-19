@@ -66,7 +66,9 @@ ASSO_FILES = [
     'variant_tools/action.cpp',
     'variant_tools/assoData.cpp',
     'variant_tools/utils.h',
-    'variant_tools/utils.cpp'
+    'variant_tools/utils.cpp',
+    'variant_tools/lm.h',
+    'variant_tools/lm.cpp'
 ]
 
 SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
@@ -381,7 +383,8 @@ setup(name = "variant_tools",
                 WRAPPER_CPP_FILE,
                 'variant_tools/assoData.cpp',
                 'variant_tools/action.cpp',
-                'variant_tools/utils.cpp'
+                'variant_tools/utils.cpp',
+                'variant_tools/lm.cpp'
                 ] + LIB_GSL,
             extra_compile_args = gccargs,
             library_dirs = [],
