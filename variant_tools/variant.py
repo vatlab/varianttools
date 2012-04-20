@@ -464,6 +464,12 @@ def compareMultipleTables(proj, args):
     # instead of 2m33s) in the case of -v0.
     if args.count and sum([args.difference != '', args.union != '', args.intersection != '']) > 1:
         raise ValueError('Argument --count can be used only with one operation.')
+    # args.difference is
+    #    None  for --difference
+    #    value for --difference value
+    #    ''    for not specified
+    if not args.count and (args.difference is None or args.union is None or args.intersection is None):
+        raise ValueError('Please specify either a table to output variants, or --count')
     #
     cur = proj.db.cursor()
     variants = []
