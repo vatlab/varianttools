@@ -619,8 +619,8 @@ public:
 
 	FixedPermutator(const FixedPermutator & rhs) :
 		BasePermutator(rhs),
-		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
-		m_alternative(rhs.m_alternative), m_sig(rhs.m_sig)
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative), 
+        m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
 	{
 	}
 
@@ -680,8 +680,8 @@ public:
 
 	VariablePermutator(const VariablePermutator & rhs) :
 		BasePermutator(rhs),
-		m_times(rhs.m_times), m_permute(rhs.m_permute->clone()),
-		m_alternative(rhs.m_alternative), m_sig(rhs.m_sig)
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative), 
+        m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
 	{
 	}
 

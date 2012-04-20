@@ -82,7 +82,7 @@ std::vector<std::vector<double> > LMData::getX()
 }
 
 
-bool LMData::replaceColumn(const std::vector<double> & col, int which)
+bool LMData::replaceColumn(const std::vector<double> & col, size_t which)
 {
 
 	if (which != 0) {
@@ -90,7 +90,7 @@ bool LMData::replaceColumn(const std::vector<double> & col, int which)
 		if (!m_x) {
 			throw RuntimeError("m_x matrix not initialized");
 		}
-		if (which < 0 || which >= m_x->size2) {
+		if (which >= m_x->size2) {
 			throw IndexError("Invalid column index");
 		}
 		// will never replace the 0th col since it is (1...1)'
@@ -404,7 +404,7 @@ bool LogisticM::fit(LMData & d)
 	}
 
 
-	for (int i = 0; i != nrow; ++i) {
+	for (size_t i = 0; i < nrow; ++i) {
 		// check if fitted value is 0 or 1 (generate warning messages)
 
 		if (fEqual(gsl_vector_get(m_pi, i), 0.0) ||

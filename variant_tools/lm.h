@@ -99,7 +99,7 @@ public:
 	std::vector<std::vector<double> > getX();
 
 	// replace certain column in X, or replace the entire Y (when "which==0")
-	bool replaceColumn(const std::vector<double> & col, int which);
+	bool replaceColumn(const std::vector<double> & col, size_t which);
 
 	// set estimates for coefficients
 	bool setBeta(gsl_vector * rhs)
@@ -287,7 +287,7 @@ public:
 
 
 	LogisticM(const LogisticM & rhs) : BaseLM(rhs),
-		m_iterations(rhs.m_iterations), m_pi(NULL), m_HI(NULL)
+		m_iterations(rhs.m_iterations), m_HI(NULL), m_pi(NULL)
 	{
 		if (rhs.m_pi) {
 			m_pi = gsl_vector_alloc(rhs.m_pi->size);
@@ -316,9 +316,9 @@ public:
 	bool niterations() { return m_iterations; }
 
 private:
-	gsl_vector * m_pi;
-	gsl_matrix * m_HI;
 	unsigned m_iterations;
+	gsl_matrix * m_HI;
+	gsl_vector * m_pi;
 };
 
 }
