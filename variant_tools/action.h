@@ -604,7 +604,7 @@ class FixedPermutator : public BasePermutator
 
 public:
 	FixedPermutator(char pm, unsigned alternative, size_t times, double sig, const vectora & actions)
-		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
+		: BasePermutator(actions), m_times(times), m_alternative(alternative), m_sig(sig)
 	{
 		// permute phenotypes or permute genotype scores
 		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteX());
@@ -641,9 +641,9 @@ public:
 
 private:
 	size_t m_times;
-	BaseAction * m_permute;
 	unsigned m_alternative;
 	double m_sig;
+	BaseAction * m_permute;
 };
 
 /* permutator class
@@ -665,7 +665,7 @@ class VariablePermutator : public BasePermutator
 
 public:
 	VariablePermutator(char pm, unsigned alternative, size_t times, double sig, const vectora & actions)
-		: m_times(times), m_alternative(alternative), m_sig(sig), BasePermutator(actions)
+		: BasePermutator(actions), m_times(times), m_alternative(alternative), m_sig(sig)
 	{
 		// permute phenotypes or permute genotype scores
 		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteRawX());
@@ -702,9 +702,9 @@ public:
 
 private:
 	size_t m_times;
-	BaseAction * m_permute;
 	unsigned m_alternative;
 	double m_sig;
+	BaseAction * m_permute;
 };
 
 }
