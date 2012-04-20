@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd
+from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
 
 class TestExclude(ProcessTestCase):
     def setUp(self):
@@ -56,6 +56,19 @@ class TestExclude(ProcessTestCase):
         # select "sift_score >= 0.94" will result in 6 variants
         self.assertEqual(outputOfCmd('vtools select ns "sift_score > 0.94" -c'), outputOfCmd('vtools exclude ns "sift_score <= 0.94" -c'))
         self.assertEqual(outputOfCmd('vtools exclude ns "variant_id=604" -c'), '6\n')
+
+
+    def testExcludeAnno(self):
+        runCmd('vtools liftover hg19')
+        runCmd('vtools use dbSNP')
+        self.assertSucc('vtools exclude variant "dbSNP.locType=\'exact\'" -t no_exact')
+        self.assertSucc('vtools output no_exact variant_id chr pos ref alt')
+        out1 = output2list('vtools output no_exact variant_id chr pos ref alt')
+        self.assertSucc('vtools update variant --set locType=dbSNP.locType')
+        self.assertSucc('vtools execute "select variant_id, chr, pos, ref, alt from variant where locType is not \'exact\'"')
+        out2 = output2list('vtools execute "select variant_id, chr, pos, ref, alt from variant where locType is not \'exact\'"')
+        self.assertEqual(out1, out2)
+
 
 if __name__ == '__main__':
     unittest.main()
