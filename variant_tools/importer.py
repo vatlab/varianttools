@@ -538,6 +538,7 @@ class LineImporter:
         if self.first_time:
             self.nColumns = len(tokens)
             cIdx = 0
+            num_sample = -1
             for fIdx, field in enumerate(self.raw_fields):
                 if self.valid_till is not None and fIdx >= self.valid_till:
                     continue
@@ -593,6 +594,10 @@ class LineImporter:
                         cols = range(len(tokens))[indexes[0]]
                         for c in cols:
                             self.fields.append((c, True, e))
+                        if num_sample == -1:
+                            num_sample = len(cols)
+                        elif num_sample != len(cols):
+                            sys.exit('The first line of input has inconsistent number of fields for samples, perhaps due to incorrect use of delimiters.')
                         self.columnRange[fIdx] = (cIdx, cIdx + len(cols))
                         cIdx += len(cols)
                     else:
@@ -602,6 +607,10 @@ class LineImporter:
                         for c in izip(*indexes):
                             count += 1
                             self.fields.append((tuple(c), False, e))
+                        if num_sample == -1:
+                            num_sample = count
+                        elif num_sample != count:
+                            sys.exit('The first line of input has inconsistent number of fields for samples, perhaps due to incorrect use of delimiters.')
                         self.columnRange[fIdx] = (cIdx, cIdx + count)
                         cIdx += count
                 except Exception as e:
@@ -1562,9 +1571,13 @@ class TextImporter(BaseImporter):
                         self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
                             col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
                 for idx, id in enumerate(sample_ids):
-                    if rec[self.ranges[2] + idx] is not None:
-                        self.count[1] += 1
-                        writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
+                    try:
+                        if rec[self.ranges[2] + idx] is not None:
+                            self.count[1] += 1
+                            writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
+                    except IndexError:
+                        self.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
+                            len(rec), fld_cols[-1][-1] + 1, rec))
             elif genotype_status == 2:
                 # should have only one sample
                 for id in sample_ids:
