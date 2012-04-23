@@ -562,7 +562,7 @@ class LineImporter:
                                 start,end = map(str.strip, x.split(':'))
                                 step = None
                             else:
-                                start,end,step = map(str,strip, x.split(':'))
+                                start,end,step = map(str.strip, x.split(':'))
                                 step = int(step) if step else None
                             start = int(start) - 1 if start else None
                             if end.strip():
