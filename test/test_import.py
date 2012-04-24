@@ -364,7 +364,7 @@ class TestImport(ProcessTestCase):
         #based on the files format, Dr. Peng modified the format file: new_format.fmt
         #the origianl file contains spaces in lines and the default deliminator is "tab"
         #and then the numbers of columns per line are not equal, and then could not be imported 
-        self.assertSucc('vtools import --format fmt/new_format.fmt txt/sample_chr22.txt  --build hg18')
+        self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.maxDiff=None
         self.assertOutput('vtools show table variant', '''variant_id, bin, chr, pos, ref, alt\n1, 707, 22, 16060527, -, CT\n2, 707, 22, 16078617, TG, -\n3, 708, 22, 16123379, A, G\n4, 708, 22, 16123409, -, G\n5, 708, 22, 16123425, T, C\n6, 710, 22, 16404838, -, GA\n''')
@@ -374,7 +374,7 @@ class TestImport(ProcessTestCase):
         #the files are coming from one custmer
         runCmd('vtools init test -f')
         #based on the files format, Dr. Peng modified the format file: new_format.fmt
-        self.assertSucc('vtools import --format fmt/new_format.fmt txt/sample_1_chr22.txt  --build hg18')
+        self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.assertOutput('vtools show table variant', '''variant_id, bin, chr, pos, ref, alt\n1, 708, 22, 16123379, A, G\n2, 708, 22, 16123425, T, C\n3, 708, 22, 16123469, T, G\n4, 708, 22, 16123488, G, T\n5, 708, 22, 16123496, G, A\n6, 708, 22, 16123524, A, C\n7, 708, 22, 16123531, G, T\n8, 708, 22, 16123762, C, G\n9, 708, 22, 16123793, G, A\n''')
         self.assertOutput('vtools show samples', '''sample_name	filename\nSMP1	txt/sample_1_chr22.txt\nSMP2	txt/sample_1_chr22.txt\nSMP3	txt/sample_1_chr22.txt\n''') 
