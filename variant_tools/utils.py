@@ -461,7 +461,7 @@ def downloadFile(URL, dest_dir = None, quiet = False):
             except OSError:
                 pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
-    except OSError:
+    except (RuntimeError, ValueError, OSError):
         # no wget command
         pass
     
