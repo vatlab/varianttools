@@ -815,6 +815,8 @@ class Project:
                 raise ValueError('A project name cannot have extension or path')
             elif name[0].isdigit():
                 raise ValueError('A project name cannot start with a number.')
+            elif not name.replace('_', '').isalnum():
+                raise ValueError('A project name can only contain alpha-numeric characters and underscores.')
         else: # exisitng project
             if len(files) == 0:
                 raise ValueError('Cannot find any project in the current directory.')
