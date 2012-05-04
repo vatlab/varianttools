@@ -77,7 +77,8 @@ class GenotypeStatCalculator(threading.Thread):
     def run(self):
         db = DatabaseEngine()
         db.connect(self.dbName, readonly=True)
-        projName = self.dbName.split('_')[0]
+        # dbName can be a_1_genotype so we have to split from the end
+        projName = self.dbName.rsplit('_', 1)[0]
         db.attach(projName +'.proj', 'proj')
         cur = db.cursor()
         while True:
