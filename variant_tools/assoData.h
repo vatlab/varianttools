@@ -80,7 +80,7 @@ public:
 
 	AssoData() :
 		m_phenotype(0), m_genotype(0), m_C(0), m_X(0),
-		m_pval(0), m_statistic(0), m_se(0), m_model(), 
+		m_pval(0), m_statistic(0), m_se(0), m_model(),
 		m_doubleVars(), m_intVars(), m_arrayVars()
 	{
 	}
@@ -121,6 +121,32 @@ public:
 	// set phenotypes and phenotype covariates
 	// input is a phenotype vector and a covariates matrix
 	bool setPhenotype(const vectorf & p, const matrixf & c);
+
+	// return true if phenotype is coded as 0 and 1
+	bool isYBinary()
+	{
+		vectorf su = m_phenotype;
+
+		std::sort(su.begin(), su.end());
+		std::vector<double>::iterator it = std::unique(su.begin(), su.end());
+		su.resize(it - su.begin());
+		if (su.size() != 2 || !fEqual(su[0], 0.0) || !fEqual(su[1], 1.0)) {
+			return false;
+		} else return true;
+	}
+
+
+	// set number of cases/ctrls
+	bool countCaseCtrl()
+	{
+		// set case/ctrl counts
+		setVar("ncases", (int)std::count_if(m_phenotype.begin(), m_phenotype.end(),
+				std::bind2nd(std::equal_to<double>(), 1.0)));
+		setVar("nctrls", (int)std::count_if(m_phenotype.begin(), m_phenotype.end(),
+				std::bind2nd(std::equal_to<double>(), 0.0)));
+		return true;
+
+	}
 
 
 	/*

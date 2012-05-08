@@ -34,12 +34,6 @@ bool AssoData::setPhenotype(const vectorf & p)
 	m_phenotype = p;
 	// set phenotype mean
 	setVar("ybar", (double)std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0) / (1.0 * m_phenotype.size()));
-	// set case/ctrl counts
-	//setVar("ncases", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),1.0)));
-	//setVar("nctrls", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),0.0)));
-	//
 	// re-size statistics vector, etc, for there is only one predictor
 	m_statistic.resize(1);
 	m_se.resize(1);
@@ -64,11 +58,6 @@ bool AssoData::setPhenotype(const vectorf & p, const matrixf & c)
 	m_model.setX(m_C);
 	// set phenotype mean
 	setVar("ybar", (double)std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0) / (1.0 * m_phenotype.size()));
-	// set case/ctrl counts
-	//setVar("ncases", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),1.0)));
-	//setVar("nctrls", (int) std::count_if(m_phenotype.begin(), m_phenotype.end(),
-	//    std::bind2nd(std::equal_to<double>(),0.0)));
 	// re-size statistics vector, etc
 	m_statistic.resize(c.size());
 	m_se.resize(m_statistic.size());

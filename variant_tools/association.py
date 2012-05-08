@@ -105,7 +105,16 @@ class AssociationTestManager:
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         # step 1: get samples and related phenotypes
         self.sample_IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
-        # step 2: indexes genotype tables if needed
+        # step 2: check if tests are compatible with phenotypes
+        for idx, item in enumerate([list(set(x)) for x in self.phenotypes]):
+            if (list(map(float, item)) == [2.0, 1.0] or list(map(float, item)) == [1.0, 2.0]):
+                self.phenotypes[idx] = [i - 1.0 for i in self.phenotypes[idx]]
+                item = [i - 1.0 for i in item]
+            if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
+                for test in self.tests:
+                    if test.model == 1:
+                        raise ValueError("Cannot perform logistic regression on non-binary coding phenotype")
+        # step 3: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = []
         for IDs in self.sample_IDs:
@@ -120,7 +129,7 @@ class AssociationTestManager:
                 prog.update(idx + 1)
             prog.done()
         #
-        # step 3: get groups
+        # step 4: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
     def getAssoTests(self, methods, ncovariates, common_args):
@@ -463,10 +472,6 @@ class AssoTestsWorker(Process):
                     result = test.calculate()
                     self.logger.debug('Finished association test on {}'.format(grpname))
                     values.extend(result)
-            except FatalError as e:
-                self.logger.debug(e)
-                self.db.detach('__fromGeno')
-                sys.exit(1)
             except Exception as e:
                 self.logger.debug('An ERROR has occured while processing {}: {}'.format(grpname, e))
                 # self.data might have been messed up, create a new one
@@ -480,8 +485,11 @@ class AssoTestsWorker(Process):
 def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates, args.methods, args.unknown_args,
+            try:
+                asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates, args.methods, args.unknown_args,
                 args.samples, args.group_by)
+            except ValueError as e:
+                sys.exit(e)
             #
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
@@ -537,8 +545,8 @@ def associate(args):
 # subclass from this class.
 #
 def getAllTests():
-    '''List all tests (all classes that subclasses of NullTest/GlmBurdenTest) in this module'''
-    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest' and name != 'GlmBurdenTest']
+    '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
+    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest' and name != 'GLMBurdenTest']
 
 
 class NullTest:
@@ -631,8 +639,8 @@ class GroupStat(NullTest):
                 res.append(self.data.samplecounts())
         return res
 
-class GlmBurdenTest(NullTest):
-    '''Simple Linear regression score test on collapsed genotypes within an association testing group'''
+class GLMBurdenTest(NullTest):
+    '''Generalized Linear regression test on collapsed genotypes within an association testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
@@ -651,12 +659,12 @@ class GlmBurdenTest(NullTest):
         self.algorithm = self._determine_algorithm(ncovariates)
                 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Linear regression test. p-value
+        parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='LNBT',
+        parser.add_argument('--name', default='GLMTest',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         #
@@ -698,11 +706,12 @@ class GlmBurdenTest(NullTest):
 
     def _determine_algorithm(self, ncovariates):
         if ncovariates > 0:
-            a_regression = t.MultipleRegression(self.permutations == 0, self.model)  
+            a_regression = t.MultipleRegression(self.permutations == 0, self.model)
         else:
             a_regression = t.SimpleLinearRegression() if self.model == 0 else t.SimpleLogisticRegression()
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         # data pre-processing
+        # FIXME have to implement WeightByCtrlMaf()
         if self.weight_by_maf and not self.use_indicator:
             algorithm = t.AssoAlgorithm([
                 # calculate sample MAF
@@ -755,6 +764,8 @@ class GlmBurdenTest(NullTest):
         return algorithm
 
     def calculate(self):
+        if self.model == 1:
+            self.data.countCaseCtrl()
         self.algorithm.apply(self.data)
         # get results
         pvalues = self.data.pvalue()
@@ -772,18 +783,24 @@ class GlmBurdenTest(NullTest):
                 if math.isnan(z): res.append(z)
                 else: res.append(int(z))                
         return res
-        
-class LNBT(GlmBurdenTest):
+
+
+#
+# Derived statistical Association tests. 
+#
+
+# quantitative traits
+class LinRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''
     def __init__(self, logger=None, *method_args):
-        GlmBurdenTest.__init__(self, logger, *method_args)
+        GLMBurdenTest.__init__(self, logger, *method_args)
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='LNBT',
+        parser.add_argument('--name', default='LinRegBurden',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         #
@@ -824,11 +841,10 @@ class LNBT(GlmBurdenTest):
         # 
         self.model = 0
 
-
-class CollapseQt(GlmBurdenTest):
+class CollapseQt(GLMBurdenTest):
     '''Collapsing method for quantitative traits, Li & Leal 2008'''
     def __init__(self, logger=None, *method_args):
-        GlmBurdenTest.__init__(self, logger, *method_args)
+        GLMBurdenTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for quantitative traits (Li & Leal 2008).
@@ -860,10 +876,10 @@ class CollapseQt(GlmBurdenTest):
         self.weight_by_maf = False
         self.model = 0
 
-class BurdenQt(GlmBurdenTest):
+class BurdenQt(GLMBurdenTest):
     '''Burden test for quantitative traits, Morris & Zeggini 2009'''
     def __init__(self, logger=None, *method_args):
-        GlmBurdenTest.__init__(self, logger, *method_args)
+        GLMBurdenTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for quantitative traits (Morris & Zeggini 2009).
@@ -894,10 +910,10 @@ class BurdenQt(GlmBurdenTest):
         self.weight_by_maf = False
         self.model = 0
         
-class WeightedSumQt(GlmBurdenTest):
+class WeightedSumQt(GLMBurdenTest):
     '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
     def __init__(self, logger=None, *method_args):
-        GlmBurdenTest.__init__(self, logger, *method_args)
+        GLMBurdenTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted sum statistic for quantitative traits (in the spirit of Madsen & Browning 2009).
@@ -929,10 +945,10 @@ class WeightedSumQt(GlmBurdenTest):
         self.weight_by_maf = True
         self.model = 0
 
-class VariableThresholdsQt(GlmBurdenTest):
+class VariableThresholdsQt(GLMBurdenTest):
     '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
     def __init__(self, logger=None, *method_args):
-        GlmBurdenTest.__init__(self, logger, *method_args)
+        GLMBurdenTest.__init__(self, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for quantitative traits (in the spirit of Price et al 2010).
@@ -974,3 +990,205 @@ class VariableThresholdsQt(GlmBurdenTest):
         self.use_indicator=False
         self.weight_by_maf = False
         self.model = 0
+
+# binary traits
+class LogitRegBurden(GLMBurdenTest):
+    '''A versatile framework of association tests for binary traits'''
+    def __init__(self, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, logger, *method_args)
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Logistic regression test. p-value
+            is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='LogitRegBurden',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by this test
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 1.0''')  
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        parser.add_argument('--use_indicator', action='store_true',
+            help='''This option, if evoked, will apply binary coding to genotype groups
+            (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To not using adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--variable_thresholds', action='store_true',
+            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
+        parser.add_argument('--weight_by_maf', action='store_true',
+            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
+            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.model = 1
+
+class CollapseBt(GLMBurdenTest):
+    '''Collapsing method for binary traits, Li & Leal 2008'''
+    def __init__(self, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, logger, *method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for binary traits (Li & Leal 2008).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, variants within a group will be collapsed into a single binary coding using an indicator function
+            (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='CQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # no argumant is added
+        parser.add_argument('--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 0.01''')  
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.use_indicator = True
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = False
+        self.model = 1
+
+class BurdenBt(GLMBurdenTest):
+    '''Burden test for binary traits, Morris & Zeggini 2009'''
+    def __init__(self, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, logger, *method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Fixed threshold burden test for binary traits (Morris & Zeggini 2009).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, the group of variants will be coded using the counts of variants within the group.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='BQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # no argumant is added
+        parser.add_argument('--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 0.01''')  
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.use_indicator = False
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = False
+        self.model = 1
+        
+class WeightedSumBt(GLMBurdenTest):
+    '''Weighted sum statistic for binary traits, in the spirit of Madsen & Browning 2009'''
+    def __init__(self, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, logger, *method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Weighted sum statistic for binary traits (in the spirit of Madsen & Browning 2009).
+            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
+            option is specified, variants will be weighted by 1/sqrt(P*(1-P)) and the weighted codings will be summed
+            up as one regressor''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='WBQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # no argumant is added
+        parser.add_argument('--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 0.01''')  
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        # 
+        self.use_indicator = False
+        self.maflower = 0.0
+        self.permutations = 0
+        self.variable_thresholds = False
+        self.weight_by_maf = True
+        self.model = 1
+
+class VariableThresholdsBt(GLMBurdenTest):
+    '''Variable thresholds method for binary traits, in the spirit of Price et al 2010'''
+    def __init__(self, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, logger, *method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for binary traits (in the spirit of Price et al 2010).
+            The burden test statistic of a group of variants will be maximized over subsets of variants defined by applying different minor allele frequency
+            thresholds. Significance of the statistic obtained is evaluated via permutation''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='VTQt',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        # arguments that are used by this test
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
+            will be included in analysis. Default set to 1.0''')  
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To not using adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))        
+        #
+        # We add the fixed parameter here ...
+        #
+        self.variable_thresholds = True
+        self.use_indicator=False
+        self.weight_by_maf = False
+        self.model = 1

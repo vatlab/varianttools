@@ -218,16 +218,6 @@ bool SimpleLogisticRegression::apply(AssoData & d)
 	if (X.size() != Y.size()) {
 		throw ValueError("Genotype/Phenotype length not equal");
 	}
-	// check for phenotype binary. better do it on more upstream stepts (on python level)
-	/*
-	   vectorf su = Y;
-	   std::sort(su.begin(), su.end());
-	   std::vector<double>::iterator it = std::unique(su.begin(), su.end());
-	   su.resize(it - su.begin());
-	   if (su.size() != 2 || !fEqual(su[0], 0.0) || !fEqual(su[1], 1.0)) {
-	    throw ValueError("Input phenotypes have to be binary values 0 or 1")
-	   }
-	 */
 	//
 	//double ebo = (1.0 * n1) / (1.0 * (Y.size()-n1));
 	//double bo = log(ebo);

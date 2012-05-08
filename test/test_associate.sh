@@ -47,7 +47,7 @@ then
 	  sed 's/^X//g' | ./gw_round.py | grep -v -P "\tNA\t|pval" | sort > R.res
 	
 	# By vtools 
-	vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2" -j8 | \
+	vtools associate $1 BMI --covariate aff sex -m "LinRegBurden --alternative 2" -j8 | \
 	    awk '{if(NR ==1) print "ID\t" $0; else print $1"_"$2"\t" $0}' | sed 's/#chr/chr/g' | \
 	    cut -f 1,5,6,7 | grep -v -P "\tNAN|pval" | sort > vtools.res
 
@@ -64,10 +64,10 @@ else
 	  # add new group in vtools
 	vtools update $1 --from_file vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby
 	# vtools association by group
-	vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2" -g grpby -j8 |\
+	vtools associate $1 BMI --covariate aff sex -m "LinRegBurden --alternative 2" -g grpby -j8 |\
 	    cut -f 1,3,4,5 | grep -v -P "\tNA|pval" | sort -g | grep -v -P "\t0\t1\t0$" > vtools.res
         # permutation based approach for empirical p-values
-        vtools associate $1 BMI --covariate aff sex -m "LNBT --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby -j8 |\
+        vtools associate $1 BMI --covariate aff sex -m "LinRegBurden --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby -j8 |\
             grep -v -P "pval" | cut -f 1,3 | grep -v -P "\tNA" | sort -g | grep -v -P "\t0$" > vtools2.res	
         # vtools association by variable threshold method
         vtools associate $1 BMI --covariate aff sex -m "VariableThresholdsQt --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby -j8 |\
