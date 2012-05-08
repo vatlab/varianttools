@@ -1055,7 +1055,7 @@ class CollapseBt(GLMBurdenTest):
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='CQt',
+        parser.add_argument('--name', default='CBt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
@@ -1089,7 +1089,7 @@ class BurdenBt(GLMBurdenTest):
             option is specified, the group of variants will be coded using the counts of variants within the group.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='BQt',
+        parser.add_argument('--name', default='BBt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
@@ -1124,7 +1124,7 @@ class WeightedSumBt(GLMBurdenTest):
             up as one regressor''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='WBQt',
+        parser.add_argument('--name', default='WBBt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
@@ -1158,7 +1158,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             thresholds. Significance of the statistic obtained is evaluated via permutation''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='VTQt',
+        parser.add_argument('--name', default='VTBt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # arguments that are used by this test
