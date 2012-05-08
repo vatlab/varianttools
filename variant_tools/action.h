@@ -324,39 +324,10 @@ public:
 
 	std::string name()
 	{
-		return "LinearRegression";
+		return "SimpleLinear";
 	}
 
 
-};
-
-// fitting / calculating wald's statistic for multiple linear regression model
-// Y = b0 + b1x1 + b2x2 + ... + bnxn
-class MultipleLinearRegression : public BaseAction
-{
-public:
-	MultipleLinearRegression(bool iSE = true) :
-		BaseAction(), m_iSE(iSE)
-	{
-	}
-
-
-	BaseAction * clone() const
-	{
-		return new MultipleLinearRegression(*this);
-	}
-
-
-	bool apply(AssoData & d);
-
-	std::string name()
-	{
-		return "LinearRegression";
-	}
-
-
-private:
-	bool m_iSE;
 };
 
 //!- Score test implementation for logistic regression model logit(p) = b0 + b1x
@@ -379,11 +350,54 @@ public:
 
 	std::string name()
 	{
-		return "LogisticRegression";
+		return "SimpleLogistic";
 	}
 
 
 };
+
+
+// fitting / calculating wald's statistic for multiple linear/logistic regression model
+// Y = b0 + b1x1 + b2x2 + ... + bnxn
+class MultipleRegression : public BaseAction
+{
+public:
+	MultipleRegression(bool iSE = true, unsigned method = 0) :
+		BaseAction(), m_iSE(iSE), m_method(method)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new MultipleRegression(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "MultipleRegression";
+	}
+
+
+private:
+	bool m_iSE;
+	unsigned m_method;
+
+	BaseLM * m_getModel()
+	{
+		switch (m_method) {
+		case 0: return new LinearM;
+		case 1: return new LogisticM;
+		default: return NULL;
+		}
+	}
+
+
+};
+
 
 // get p-value from statistic, assuming standard normal distribution
 class GaussianPval : public BaseAction
@@ -619,8 +633,8 @@ public:
 
 	FixedPermutator(const FixedPermutator & rhs) :
 		BasePermutator(rhs),
-		m_times(rhs.m_times), m_alternative(rhs.m_alternative), 
-        m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
 	{
 	}
 
@@ -680,8 +694,8 @@ public:
 
 	VariablePermutator(const VariablePermutator & rhs) :
 		BasePermutator(rhs),
-		m_times(rhs.m_times), m_alternative(rhs.m_alternative), 
-        m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
+		m_times(rhs.m_times), m_alternative(rhs.m_alternative),
+		m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
 	{
 	}
 

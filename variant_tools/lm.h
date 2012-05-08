@@ -196,8 +196,9 @@ protected:
 };
 
 
-// fit the linear model
-// via gsl
+//!- multiple linear regression parameter estimate
+//!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
+//!- Solve the system via gsl_linalg_SV_solve()
 // members are
 // m_svd_: intermediate data from the SVD procedure
 class LinearM : public BaseLM

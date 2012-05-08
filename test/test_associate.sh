@@ -94,5 +94,5 @@ diff R.res vtools.res
 # clear up history
 ###
 cd ..
-rm -r tmp
+rm -rf tmp
 #rm tmp/$logfile

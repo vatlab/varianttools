@@ -107,7 +107,7 @@ bool SetSites::apply(AssoData & d)
 	if (fEqual(m_upper, 1.0) && fEqual(m_lower, 0.0))
 		return true;
 
-	for (size_t j = 0; j != maf.size(); ++j) {
+	for (size_t j = 0; j < maf.size(); ++j) {
 		if (maf[j] <= m_lower || maf[j] > m_upper) {
 			maf.erase(maf.begin() + j);
 			for (size_t i = 0; i < genotype.size(); ++i) {
@@ -211,44 +211,48 @@ bool SimpleLinearRegression::apply(AssoData & d)
 bool SimpleLogisticRegression::apply(AssoData & d)
 {
 	//!- labnotes vol.2 page 3
-	// FIXME: binary check: input phenotypes have to be binary values 0 or 1
 	double xbar = d.getDoubleVar("xbar");
 	vectorf & X = d.genotype();
 	vectorf & Y = d.phenotype();
 
 	if (X.size() != Y.size()) {
-		throw ValueError("Genotype/Phenotype length not equal!");
+		throw ValueError("Genotype/Phenotype length not equal");
 	}
-
+	// check for phenotype binary. better do it on more upstream stepts (on python level)
+	/*
+	   vectorf su = Y;
+	   std::sort(su.begin(), su.end());
+	   std::vector<double>::iterator it = std::unique(su.begin(), su.end());
+	   su.resize(it - su.begin());
+	   if (su.size() != 2 || !fEqual(su[0], 0.0) || !fEqual(su[1], 1.0)) {
+	    throw ValueError("Input phenotypes have to be binary values 0 or 1")
+	   }
+	 */
+	//
 	//double ebo = (1.0 * n1) / (1.0 * (Y.size()-n1));
 	//double bo = log(ebo);
 	double po = (1.0 * d.getIntVar("ncases")) / (1.0 * Y.size());
-	double ss = 0.0;
-	// the score
+	double ss = 0.0, vm1 = 0.0;
+	// the score, and variance of score under the null
 	for (size_t i = 0; i != X.size(); ++i) {
 		ss += (X[i] - xbar) * (Y[i] - po);
-	}
-	double vm1 = 0.0;
-	// variance of score, under the null
-	for (size_t i = 0; i != X.size(); ++i) {
 		vm1 += (X[i] - xbar) * (X[i] - xbar) * po * (1.0 - po);
 	}
 
-	//!-FIXME: (not sure why this happens)
-	//!- w/ rounding to 0 I get strange number such as 3.72397e-35
-	//!- this would lead to type I error problem
-	fRound(ss, 0.0001);
-	d.setStatistic(ss);
-	d.setSE(sqrt(vm1));
+	if (!fEqual(ss, 0.0)) {
+		d.setStatistic(ss);
+		d.setSE(sqrt(vm1));
+	} else {
+		d.setStatistic(0.0);
+		d.setSE(std::numeric_limits<double>::quiet_NaN());
+	}
 	return true;
 }
 
 
-bool MultipleLinearRegression::apply(AssoData & d)
+bool MultipleRegression::apply(AssoData & d)
 {
-	//!- multiple linear regression parameter estimate
-	//!- BETA= (X'X)^{-1}X'Y => (X'X)BETA = X'Y
-	//!- Solve the system via gsl_linalg_SV_solve()
+
 	vectorf & X = d.genotype();
 	vectorf & Y = d.phenotype();
 	matrixf & C = d.covariates();
@@ -262,9 +266,9 @@ bool MultipleLinearRegression::apply(AssoData & d)
 	mdata.replaceColumn(Y, 0);
 	// reset genotype data
 	mdata.replaceColumn(X, C.size() - 1);
-	// fit the linear regression model
-	LinearM model;
-	model.fit(mdata);
+	// fit the multiple regression model
+	BaseLM * model = m_getModel();
+	model->fit(mdata);
 	// get statistics
 	beta = mdata.getBeta();
 	beta.erase(beta.begin());
@@ -274,11 +278,12 @@ bool MultipleLinearRegression::apply(AssoData & d)
 	// get/set standard error
 	if (m_iSE) {
 		vectorf & seb = d.se();
-		model.evalSE(mdata);
+		model->evalSE(mdata);
 		seb = mdata.getSEBeta();
 		seb.erase(seb.begin());
 		std::rotate(seb.begin(), seb.end() - 1, seb.end());
 	}
+	delete model;
 	return true;
 }
 
