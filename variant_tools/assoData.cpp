@@ -34,6 +34,7 @@ bool AssoData::setPhenotype(const vectorf & p)
 	m_phenotype = p;
 	// set phenotype mean
 	setVar("ybar", (double)std::accumulate(m_phenotype.begin(), m_phenotype.end(), 0.0) / (1.0 * m_phenotype.size()));
+	setVar("ncovar", 0);
 	// re-size statistics vector, etc, for there is only one predictor
 	m_statistic.resize(1);
 	m_se.resize(1);

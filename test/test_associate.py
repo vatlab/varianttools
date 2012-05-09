@@ -65,40 +65,40 @@ class TestAsso(ProcessTestCase):
         zip.extractall(dir)
         # basic commands
         self.assertSucc('vtools associate -h')
-        self.assertSucc('vtools associate variant filename --method LNBT -h')
-        self.assertSucc('vtools associate variant phen2 -m "LNBT"')
-        self.assertSucc('vtools associate variant phen2 -m "LNBT" -g chr')
+        self.assertSucc('vtools associate variant filename --method LinRegBurden -h')
+        self.assertSucc('vtools associate variant phen2 -m "LinRegBurden"')
+        self.assertSucc('vtools associate variant phen2 -m "LinRegBurden" -g chr')
         # regression methods
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 -m "LNBT --alternative 2"')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT" -g chr')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -q1 0.05 -q2 0.001" -g chr')
-        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -q1 5 -q2 0.001" -g chr')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT --use_indicator" -g chr')
-        self.assertFail('vtools associate variant phen2 -m "LNBT --alternative 8" -g chr')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 -m "LinRegBurden --alternative 2"')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden" -g chr')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -q1 0.05 -q2 0.001" -g chr')
+        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -q1 5 -q2 0.001" -g chr')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden --use_indicator" -g chr')
+        self.assertFail('vtools associate variant phen2 -m "LinRegBurden --alternative 8" -g chr')
         # permutation based tests
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 100" -g chr')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 100 --permute_by x" -g chr')
-        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 100 --permute_by M" -g chr')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 10000000 --adaptive 0.000001"')
-        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 10000000 --adaptive 24"')
-        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LNBT -p 100 --variable_thresholds"')
-        
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 100" -g chr')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 100 --permute_by x" -g chr')
+        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 100 --permute_by M" -g chr')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 10000000 --adaptive 0.000001"')
+        self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 10000000 --adaptive 24"')
+        self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 100 --variable_thresholds"')
+
     def testResult(self):
         'Test association results'
         zip = ZipFile('proj/assoproj.zip')
         dir = os.getcwd()
         zip.extractall(dir)
         for i in range(8):
-          runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
-          vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LNBT --alternative 2" -g grpby')
-          vtoolsout.sort()
-          vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
-          self.assertOutput('cat output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
-          
+            runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
+            vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby')
+            vtoolsout.sort()
+            vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
+            self.assertOutput('cat output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
+
 
     def testPyAction(self):
         'Test action pyaction'
-        # 
+        #
         zip = ZipFile('proj/assoproj.zip')
         dir = os.getcwd()
         zip.extractall(dir)
