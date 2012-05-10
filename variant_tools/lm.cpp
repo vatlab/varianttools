@@ -135,6 +135,9 @@ bool LinearM::fit(LMData & d)
 	gsl_vector * b = gsl_vector_alloc(ncol);
 	m_err = gsl_blas_dgemv(CblasTrans, 1.0, x, y, 0.0, b);
 	if (m_err) {
+		gsl_vector_set_all(m_beta, 0.0);
+		d.setBeta(m_beta);
+		gsl_vector_free(b);
 		throw ValueError("Error in gsl_blas_dgemv(CblasTrans, 1.0, x, y, 0.0, b)");
 	}
 	//compute X'X
@@ -142,6 +145,9 @@ bool LinearM::fit(LMData & d)
 	m_svdU = gsl_matrix_alloc(ncol, ncol);
 	m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, x, x, 0.0, m_svdU);
 	if (m_err) {
+		gsl_vector_set_all(m_beta, 0.0);
+		d.setBeta(m_beta);
+		gsl_vector_free(b);
 		throw ValueError("Error in gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, x, x, 0.0, A)");
 	}
 	//svd for X'X
@@ -151,6 +157,10 @@ bool LinearM::fit(LMData & d)
 	gsl_vector * work = gsl_vector_alloc(ncol);
 	m_err = gsl_linalg_SV_decomp(m_svdU, m_svdV, m_svdS, work);
 	if (m_err) {
+		gsl_vector_set_all(m_beta, 0.0);
+		d.setBeta(m_beta);
+		gsl_vector_free(b);
+		gsl_vector_free(work);
 		throw ValueError("Error in gsl_linalg_SV_decomp(A, V, s, work)");
 	}
 
@@ -158,6 +168,10 @@ bool LinearM::fit(LMData & d)
 	//solve system Ax=b where x is beta
 	m_err = gsl_linalg_SV_solve(m_svdU, m_svdV, m_svdS, b, m_beta);
 	if (m_err) {
+		gsl_vector_set_all(m_beta, 0.0);
+		d.setBeta(m_beta);
+		gsl_vector_free(b);
+		gsl_vector_free(work);
 		throw ValueError("Error in gsl_linalg_SV_solve(A, V, s, b, m_beta)");
 	}
 
@@ -208,10 +222,18 @@ bool LinearM::evalSE(LMData & d)
 	gsl_matrix * V = gsl_matrix_alloc(ncol, ncol);
 	m_err = gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, m_svdV, D, 0.0, V);
 	if (m_err) {
+		gsl_vector_set_all(m_sebeta, 0.0);
+		d.setBeta(m_sebeta);
+		gsl_matrix_free(V);
+		gsl_matrix_free(D);
 		throw ValueError("Error in gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, m_svdV, D, 0.0, V)");
 	}
 	m_err = gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, V, m_svdU, 0.0, D);
 	if (m_err) {
+		gsl_vector_set_all(m_sebeta, 0.0);
+		d.setBeta(m_sebeta);
+		gsl_matrix_free(V);
+		gsl_matrix_free(D);
 		throw ValueError("Error in gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, V, m_svdU, 0.0, D)");
 	}
 	gsl_matrix_free(V);
@@ -220,6 +242,10 @@ bool LinearM::evalSE(LMData & d)
 	gsl_vector * fitted = gsl_vector_alloc(nrow);
 	m_err = gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, fitted);
 	if (m_err) {
+		gsl_vector_set_all(m_sebeta, 0.0);
+		d.setBeta(m_sebeta);
+		gsl_vector_free(fitted);
+		gsl_matrix_free(D);
 		throw ValueError("Error in gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, fitted)");
 	}
 	double mse = 0.0;
@@ -288,8 +314,13 @@ bool LogisticM::fit(LMData & d)
 
 		gsl_vector * tmpv = gsl_vector_alloc(nrow);
 		gsl_vector_set_all(tmpv, 0.0);
-		gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, tmpv);
-
+		m_err = gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, tmpv);
+		if (m_err) {
+			gsl_vector_set_all(m_beta, 0.0);
+			d.setBeta(m_beta);
+			gsl_vector_free(tmpv);
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, tmpv)");
+		}
 
 		for (size_t i = 0; i != nrow; ++i) {
 			double tmpf = gsl_vector_get(tmpv, i);
@@ -345,13 +376,29 @@ bool LogisticM::fit(LMData & d)
 
 		gsl_matrix * tmpm = gsl_matrix_alloc(ncol, nrow);
 		gsl_matrix_set_all(tmpm, 0.0);
-		gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, x, diagnpq, 0.0, tmpm);
+		m_err = gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, x, diagnpq, 0.0, tmpm);
+		if (m_err) {
+			gsl_vector_set_all(m_beta, 0.0);
+			d.setBeta(m_beta);
+			gsl_matrix_free(diagnpq);
+			gsl_matrix_free(tmpm);
+			gsl_vector_free(yMmu);
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, x, diagnpq, 0.0, tmpm)");
+		}
+
 		gsl_matrix_free(diagnpq);
 
 		gsl_matrix * H = gsl_matrix_alloc(ncol, ncol);
 		gsl_matrix_set_all(H, 0.0);
-		gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, tmpm, x, 0.0, H);
+		m_err = gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, tmpm, x, 0.0, H);
 		gsl_matrix_free(tmpm);
+		if (m_err) {
+			gsl_vector_set_all(m_beta, 0.0);
+			d.setBeta(m_beta);
+			gsl_matrix_free(H);
+			gsl_vector_free(yMmu);
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " gsl_blas_dgemv(CblasNoTrans, 1.0, x, m_beta, 0.0, tmpv)");
+		}
 
 
 		////
@@ -374,7 +421,7 @@ bool LogisticM::fit(LMData & d)
 			gsl_vector_free(yMmu);
 			gsl_vector_set_all(m_beta, 0.0);
 			d.setBeta(m_beta);
-			throw ValueError("Error in inverting Hessian matrix: matrix is singular");
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " inverting Hessian matrix: matrix is singular");
 		}
 
 
@@ -384,8 +431,22 @@ bool LogisticM::fit(LMData & d)
 
 		tmpm = gsl_matrix_alloc(ncol, nrow);
 		gsl_matrix_set_all(tmpm, 0.0);
-		gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, m_HI, x, 0.0, tmpm);
-		gsl_blas_dgemv(CblasNoTrans, 1.0, tmpm, yMmu, 0.0, beta_delta);
+		m_err = gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, m_HI, x, 0.0, tmpm);
+		if (m_err) {
+			gsl_vector_set_all(m_beta, 0.0);
+			d.setBeta(m_beta);
+			gsl_vector_free(yMmu);
+			gsl_matrix_free(tmpm);
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, m_HI, x, 0.0, tmpm)");
+		}
+		m_err = gsl_blas_dgemv(CblasNoTrans, 1.0, tmpm, yMmu, 0.0, beta_delta);
+		if (m_err) {
+			gsl_vector_set_all(m_beta, 0.0);
+			d.setBeta(m_beta);
+			gsl_vector_free(yMmu);
+			gsl_matrix_free(tmpm);
+			throw ValueError("Error in iteration " + n2s(m_iterations) + " gsl_blas_dgemv(CblasNoTrans, 1.0, tmpm, yMmu, 0.0, beta_delta)");
+		}
 		gsl_matrix_free(tmpm);
 		gsl_vector_free(yMmu);
 

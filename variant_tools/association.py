@@ -973,7 +973,7 @@ class VariableThresholdsQt(GLMBurdenTest):
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
@@ -982,7 +982,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
-        self.__dict__.update(vars(args))        
+        self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
         #
@@ -996,6 +996,7 @@ class LogitRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for binary traits'''
     def __init__(self, logger=None, *method_args):
         GLMBurdenTest.__init__(self, logger, *method_args)
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Logistic regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -1008,10 +1009,10 @@ class LogitRegBurden(GLMBurdenTest):
         #
         # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -1023,7 +1024,7 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
@@ -1040,7 +1041,7 @@ class LogitRegBurden(GLMBurdenTest):
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.model = 1
 
 class CollapseBt(GLMBurdenTest):
@@ -1060,8 +1061,8 @@ class CollapseBt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
@@ -1070,7 +1071,7 @@ class CollapseBt(GLMBurdenTest):
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = True
         self.maflower = 0.0
         self.permutations = 0

@@ -31,6 +31,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <ctime>
 #include <unistd.h>
 #include "gsl/gsl_rng.h"
@@ -59,6 +60,13 @@ struct VPlus
 
 };
 
+template <typename T> std::string n2s(T Number)
+{
+	std::stringstream ss;
+	ss << Number;
+	return ss.str();
+}
+
 namespace std {
 // order a vector by index specified in another vector
 // this will not destruct the index vector
@@ -83,7 +91,6 @@ void reorder(order_iterator order_begin, order_iterator order_end, value_iterato
 		}
 	}
 }
-
 
 // order a vector by index specified in another vector
 // this is more efficient but will destruct the index vector
@@ -121,7 +128,6 @@ template<class T> ostream & operator<<(ostream & out, const vector<T> & vec)
 	}
 	return out;
 }
-
 
 }
 

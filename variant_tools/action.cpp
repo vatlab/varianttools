@@ -407,11 +407,11 @@ bool AssoAlgorithm::apply(AssoData & d)
 			if (!m_actions[j]->apply(d))
 				break;
 		} catch (RuntimeError & e) {
-			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception:" + e.message();
+			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception (" + e.message() + ")";
 			throw RuntimeError(msg);
-		} catch (...) {
-			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception";
-			throw RuntimeError(msg);
+		} catch (ValueError & e) {
+			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception (" + e.message() + ")";
+			throw ValueError(msg);
 		}
 	}
 	return true;
