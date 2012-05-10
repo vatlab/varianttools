@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-import os
-import glob
+import os, sys, shlex, re
 from variant_tools.association import t
 import unittest
-import subprocess
+from subprocess import Popen, PIPE
+from zipfile import ZipFile
+from random import choice
 from array import array
-from testUtils import ProcessTestCase
+from testUtils import ProcessTestCase, outputOfCmd, output2list
 
 class TestAssoFnct(ProcessTestCase):
 
@@ -163,8 +164,143 @@ class TestAssoFnct(ProcessTestCase):
             10000000, 0.002, [t.SumToX(), t.SimpleLinearRegression()])])
         a.apply(data)
         self.assertEqual(round(data.statistic()[0], 5), 98.22222)
+###
+###
+###
+class RandomAssocTest(ProcessTestCase):
 
-#class RandomAssocTest:
+    def setUp(self):
+        z = ZipFile('proj/Rtest.zip')
+        wdir = os.getcwd()
+        z.extractall(wdir)
+        z.close()
+        self.sname_pattern = "CEU"
+        self.proj_name = "unitest"
+        self.table = "variant_ex"
+        self.rfile = "cache/test_associate.R"
+
+    def testResultRand(self):
+        'Test association results with R'
+        # check if required R software is available
+        totest = True
+        try:
+            Popen(['Rscript','--help'], shell = False, stdout = PIPE, stderr = PIPE)
+        except:
+            sys.stderr.write("Nothing done for 'testResultRand': Rscript program is required for this test\n")
+            return
+
+        ###
+        # prepare input
+        ###
+        # get genotype information from vtools tped
+        geno_tmp = output2list('vtools export {0} --format tped --samples 1 --style\
+        numeric'.format(self.table))
+        #print(geno_tmp)
+        geno_tmp = [[y for idx, y in enumerate(x.split('\t')) if idx != 2 and idx != 1] for x in geno_tmp]
+        geno_tmp = [['_'.join(x[:2])] + x[2:] for x in geno_tmp]
+        #print(geno_tmp)
+        # add sample names && generate header line
+        with open(self.proj_name + ".log", 'r') as f:
+            logtxt = f.readlines()
+        snames = [x.split()[-1] for x in logtxt if self.sname_pattern in x]
+        #print(snames)
+        geno_tmp.insert(0, ['sample_name'] + snames)
+        #print(geno_tmp)
+        tgeno_tmp = list(zip(*geno_tmp))
+        #print(tgeno_tmp)
+        ###
+        # SNV analysis
+        ###
+        # By R
+        with open('cache/phenotype.txt', 'r') as f:
+            for i in range(len(tgeno_tmp)):
+                tgeno_tmp[i] = f.readline().rstrip() + '\t' + '\t'.join(tgeno_tmp[i][1:])
+        tgeno_tmp = '\n'.join(tgeno_tmp)
+        #print(tgeno_tmp)
+        p = Popen(shlex.split("Rscript {0} testSnv".format(self.rfile)), shell = False, stdout =
+                PIPE, stderr = PIPE, stdin = PIPE)
+        (cout, cerr) = p.communicate(tgeno_tmp.encode(sys.getdefaultencoding()))
+        p = Popen(['python', 'cache/gw_round.py'], shell=False, stdout = PIPE,
+                stderr = PIPE, stdin = PIPE)
+        (cout, cerr) = p.communicate(cout)
+        Rres = cout.decode(sys.getdefaultencoding()).rstrip().replace('\nX','\n')
+        Rres = [x.replace('_', '\t') for x in Rres.split('\n')[1:] if not 'NA' in x]
+        Rres.sort()
+        Rres = '\n'.join(Rres)
+        #print(Rres)
+        # By vtools
+        (cout, cerr) = Popen(shlex.split('vtools associate {0} BMI --covariate aff sex -m "LinRegBurden --alternative 2"'.format(self.table)),
+                shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE).communicate()
+        vtoolsres = ['\t'.join([y for idx, y in enumerate(x.split('\t')) if idx in [0,1,3,4,5]]) for x in cout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not 'NA' in x]
+        vtoolsres.sort()
+        vtoolsres = '\n'.join(vtoolsres)
+        #print(vtoolsres)
+        self.assertEqual(vtoolsres==Rres, True)
+	    ###
+	    # association for groupby
+	    ###
+        # generate random grouping theme numbers
+        nums = list(set([choice(range(100)) for x in range(4)]))
+        # output allele information
+        (cout, cerr) = Popen(shlex.split('vtools output {0} chr pos ref alt --header'.format(self.table)), shell = False, stdout = PIPE, stderr = PIPE, stdin =
+                PIPE).communicate()
+        for num in nums:
+            # add random group
+            (ncout, ncerr) = Popen(['python','cache/fakecols.py',
+                '{0}'.format(num)], shell = False, stdout = PIPE, stderr = PIPE, stdin =
+                PIPE).communicate(cout)
+            grping = ncout.decode(sys.getdefaultencoding()).rstrip()
+            with open('vtools.group.tmp', 'w') as f:
+                f.write(grping)
+            # add new group in vtools
+            Popen(shlex.split('''vtools update {0} --from_file vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby'''.format(self.table)),
+                shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE)
+            # vtools association by group
+            (ncout, ncerr) = Popen(shlex.split('vtools associate {0} BMI --covariate aff sex -m "LinRegBurden --alternative 2" -g grpby'.format(self.table)),
+                    shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE).communicate()
+            vtoolsres = ['\t'.join([y for idx, y in enumerate(x.split('\t')) if idx in [0,2,3,4]]) for x in ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not 'NA' in x]
+            vtoolsres = [x for x in vtoolsres if not '\t0\t1\t0' in x]
+            vtoolsres.sort()
+            # permutation based approach for empirical p-values
+            (ncout, ncerr) = Popen(shlex.split('vtools associate {0} BMI --covariate aff sex -m "LinRegBurden --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby'.format(self.table)),
+                shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE).communicate()
+            vtoolsres2 = ['\t'.join([y for idx, y in enumerate(x.split('\t')) if idx in [0,2]]) for x in ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not ('NA' in x or x.endswith('\t0'))]
+            vtoolsres2.sort()
+            # vtools association by variable threshold method
+            (ncout, ncerr) = Popen(shlex.split('vtools associate {0} BMI --covariate aff sex -m "VariableThresholdsQt --alternative 2 -p 5000 --permute_by X --adaptive 0.00001" -g grpby'.format(self.table)), shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE).communicate()
+            vtoolsres3 = ['\t'.join([y for idx, y in enumerate(x.split('\t')) if idx in [0,2]]) for x in ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not ('NA' in x or x.endswith('\t0'))]
+            vtoolsres3.sort()
+            #print(vtoolsres3)
+            #compare t values
+            vtoolsres1 = [x.split()[0]+'\t'+x.split()[1] for x in vtoolsres]
+            self.assertEqual(vtoolsres1 == vtoolsres2, 1)
+            res2 = [float(x.split()[1]) for x in vtoolsres2]
+            res3 = [float(x.split()[1]) for x in vtoolsres3]
+            #print([[x,y] for x, y in zip(res2, res3) if abs(x) > abs(y)])
+            self.assertEqual(len([x for x, y in zip(res2, res3) if abs(x) > abs(y)]), 0)
+            ###
+            # group analysis by R
+            ###
+            grping = ['_'.join(x.split()[0:2]) + '\t' + x.split()[4] for x in grping.split('\n')]
+            geno_grped = '\n'.join([x + '\t' + '\t'.join(y[1:]) for x, y in zip(grping, geno_tmp)])
+            (ncout,ncerr) = Popen(shlex.split("Rscript {0} scoreRegion".format(self.rfile)), shell = False, stdout =
+                PIPE, stderr = PIPE, stdin = PIPE).communicate(geno_grped.encode(sys.getdefaultencoding()))
+            tgeno_score = ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')
+            #print(tgeno_score)
+            with open('cache/phenotype.txt', 'r') as f:
+                for i in range(len(tgeno_score)):
+                    tgeno_score[i] = f.readline().rstrip() + '\t' + '\t'.join(tgeno_score[i].split('\t')[1:])
+            (ncout,ncerr) = Popen(shlex.split("Rscript {0} testRegion".format(self.rfile)), shell = False, stdout =
+                PIPE, stderr = PIPE, stdin = PIPE).communicate('\n'.join(tgeno_score).encode(sys.getdefaultencoding()))
+            (ncout,ncerr) = Popen(['python', 'cache/gw_round.py'], shell=False, stdout = PIPE,
+                stderr = PIPE, stdin = PIPE).communicate(ncout)
+            Rres = [x for x in ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not ('NA' in x or x.endswith("\t0\t1\t0"))]
+            Rres = [x.replace('X','') for x in Rres]
+            Rres.sort()
+            print('\n'.join(vtoolsres))
+            print('-------------')
+            print('\n'.join(Rres))
+            self.assertEqual('\n'.join(vtoolsres) == '\n'.join(Rres), 1)
 
 if __name__ == '__main__':
     unittest.main()
