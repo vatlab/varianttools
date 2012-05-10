@@ -250,10 +250,10 @@ class RandomAssocTest(ProcessTestCase):
                 '{0}'.format(num)], shell = False, stdout = PIPE, stderr = PIPE, stdin =
                 PIPE).communicate(cout)
             grping = ncout.decode(sys.getdefaultencoding()).rstrip()
-            with open('vtools.group.tmp', 'w') as f:
+            with open('cache/vtools.group.tmp', 'w') as f:
                 f.write(grping)
             # add new group in vtools
-            Popen(shlex.split('''vtools update {0} --from_file vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby'''.format(self.table)),
+            Popen(shlex.split('''vtools update {0} --from_file cache/vtools.group.tmp --format cache/vtools_randcol.fmt --var_info grpby'''.format(self.table)),
                 shell = False, stdout = PIPE, stderr = PIPE, stdin = PIPE)
             # vtools association by group
             (ncout, ncerr) = Popen(shlex.split('vtools associate {0} BMI --covariate aff sex -m "LinRegBurden --alternative 2" -g grpby'.format(self.table)),
@@ -283,9 +283,11 @@ class RandomAssocTest(ProcessTestCase):
             ###
             grping = ['_'.join(x.split()[0:2]) + '\t' + x.split()[4] for x in grping.split('\n')]
             geno_grped = '\n'.join([x + '\t' + '\t'.join(y[1:]) for x, y in zip(grping, geno_tmp)])
+            #print(geno_grped)
             (ncout,ncerr) = Popen(shlex.split("Rscript {0} scoreRegion".format(self.rfile)), shell = False, stdout =
                 PIPE, stderr = PIPE, stdin = PIPE).communicate(geno_grped.encode(sys.getdefaultencoding()))
             tgeno_score = ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')
+            tgeno_score[0] = 'sample_name\t' + tgeno_score[0]
             #print(tgeno_score)
             with open('cache/phenotype.txt', 'r') as f:
                 for i in range(len(tgeno_score)):
@@ -297,9 +299,9 @@ class RandomAssocTest(ProcessTestCase):
             Rres = [x for x in ncout.decode(sys.getdefaultencoding()).rstrip().split('\n')[1:] if not ('NA' in x or x.endswith("\t0\t1\t0"))]
             Rres = [x.replace('X','') for x in Rres]
             Rres.sort()
-            print('\n'.join(vtoolsres))
-            print('-------------')
-            print('\n'.join(Rres))
+            #print('\n'.join(vtoolsres))
+            #print('###')
+            #print('\n'.join(Rres))
             self.assertEqual('\n'.join(vtoolsres) == '\n'.join(Rres), 1)
 
 if __name__ == '__main__':

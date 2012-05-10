@@ -104,19 +104,5 @@ class TestAsso(ProcessTestCase):
         zip.extractall(dir)
         self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
 
-    def testResultRand(self):
-        'Test association results with R'
-        totest = True
-        try:
-            runCmd('Rscript --help')
-            runCmd('awk --help')
-        except:
-            totest = False
-        if totest:
-            nums = set([choice(range(100)) for x in range(4)])
-            nums = [0] + list(nums)
-            for item in nums:
-                self.assertOutput('bash test_associate.sh variant_ex CEU proj/Rtest.zip test_associate.R {}'.format(str(item)), '')
-
 if __name__ == '__main__':
     unittest.main()
