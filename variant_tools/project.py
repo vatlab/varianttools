@@ -3007,7 +3007,7 @@ def show(args):
                 print 'Description:   {}'.format('\n'.join(textwrap.wrap(test.__doc__, initial_indent='',
                         subsequent_indent=' '*15)))
                 # create an instance of the test and pass -h to it
-                test(None, ['-h']) 
+                test(1, None, ['-h']) 
     except Exception as e:
         sys.exit(e)
 
