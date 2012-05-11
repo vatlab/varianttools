@@ -546,7 +546,9 @@ def associate(args):
 #
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
-    return [(name, obj) for name, obj in globals().iteritems() if type(obj) == type(NullTest) and issubclass(obj, NullTest) and name != 'NullTest' and name != 'GLMBurdenTest']
+    return sorted([(name, obj) for name, obj in globals().iteritems() \
+        if type(obj) == type(NullTest) and issubclass(obj, NullTest) \
+            and name not in ('NullTest', 'GLMBurdenTest')], key=lambda x: x[0])
 
 
 class NullTest:
