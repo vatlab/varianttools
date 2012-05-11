@@ -189,11 +189,13 @@ class AssociationTestManager:
                         raise ValueError('Samples for name {} has different covariate. If they do not belong to the same '
                             'individual, please use different sample names to differentiate them.'.format(rec[1]))
                     else:
+                        # rec[1] is sample name, data[name][0] is a list of IDs for the same sample name
                         data[rec[1]][0].append(rec[0])
             sample_IDs = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
             for key, value in data.iteritems():
+                # sample_IDs is a nested list
                 sample_IDs.append(value[0])
                 [x.append(y) for x,y in zip(phenotypes, value[1])]
                 [x.append(y) for x,y in zip(covariates, value[2])]
@@ -204,6 +206,7 @@ class AssociationTestManager:
                     self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
                 else:
                     self.logger.info('{} samples are found'.format(len(sample_IDs)))
+            # this should not happen, ... 
             if len(data) != len(sample_IDs):
                 self.logger.warning('Variants associated with a total of {} sample ids will be merged to {} samples for association tests.'.format(len(data), len(sample_IDs)))
             # add intercept
@@ -399,10 +402,12 @@ class AssoTestsWorker(Process):
         # get genotypes
         genotype = []
         for IDs in self.sample_IDs:
+            # handle the first ID
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(IDs[0], where_clause)
             cur.execute(query, group)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
+            # handle the rest of the sample IDs
             for ID in IDs[1:]:
                 query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                     .format(ID, where_clause)
@@ -412,6 +417,9 @@ class AssoTestsWorker(Process):
                         raise ValueError('Variant with id {} is associated with multiple sample ids with the same name (ids: {}). '
                             'Please use different sample name if this variant exist in multiple individuals.'.format(rec[0], IDs))
                     gtmp[rec[0]] = rec[1]
+            #
+            # genotype belonging to the same sample name are put together 
+            # 
             # handle missing values
             gtmp = [gtmp.get(x, -9.0) for x in variant_id]
             # handle -1 coding (double heterozygotes)
