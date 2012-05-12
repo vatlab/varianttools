@@ -999,9 +999,8 @@ class Project:
                 self.alt_build = None
                 self.saveProperty('alt_build', None)
         #
-        # missing index on master variant table
+        # missing index on master variant table, this will happen after all data is imported
         if not self.db.hasIndex('variant_index'):
-            self.logger.warning('Missing index on master variant table. Trying to rebuild it.')
             self.createIndexOnMasterVariantTable()
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')

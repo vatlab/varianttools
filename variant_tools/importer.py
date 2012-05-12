@@ -1173,7 +1173,9 @@ class BaseImporter:
 
     def __del__(self):
         if self.mode == 'insert':
-            self.proj.createIndexOnMasterVariantTable()
+            # remove existing indexes, which will be created when the project is open
+            # by a non-import command
+            self.proj.dropIndexOnMasterVariantTable()
 
     def guessBuild(self, file):
         # by default, reference genome cannot be determined from file
@@ -1838,7 +1840,10 @@ def importVariantsArguments(parser):
 
 def importVariants(args):
     try:
-        with Project(verbosity=args.verbosity) as proj:
+        # the project is opened with verify=False so index on the master
+        # variant table will not be created if it does not exist (because the
+        # last command was a vtools import command)
+        with Project(verbosity=args.verbosity, verify=False) as proj:
             importer = TextImporter(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
