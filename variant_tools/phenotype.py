@@ -411,7 +411,7 @@ def phenotypeArguments(parser):
             high_qt and all_qt are obtained from sample statistics using parameter
             --from_stat). Parameter --samples could be used to limit the samples for
             which genotypes will be set. This option can also be used to update
-            sample_name (e.g. --set sample_name="s1" --samples 'filename like "s1%"').'''),
+            sample_name (e.g. --set sample_name="s1" --samples 'filename like "s1%%"').'''),
     parser.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For 
             example, "num=count(*)" sets phenotype num to be the number of genotypes
