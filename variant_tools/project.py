@@ -1443,6 +1443,104 @@ class Project:
             self.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
+    def mergeSamples(self):
+        '''Merge samples with the same name to the same samples'''
+        cur = self.db.cursor()
+        query = 'SELECT sample_name, sample_id FROM sample ORDER BY sample_name'
+        self.logger.debug('Executing {}'.format(query))
+        cur.execute(query)
+        # a map of sample_name to multiple sample ids
+        samples = {}
+        for rec in cur:
+            if rec[0] in samples:
+                samples[rec[0]].append(rec[1])
+            else:
+                samples[rec[0]] = [rec[1]]
+        # who is going to be merged?
+        merged = {}
+        count = 0
+        for name, ids in samples.iteritems():
+            if len(ids) > 1:
+                merged[name] = sorted(ids)
+                count += len(ids)
+        #
+        if len(merged) == 0:
+            self.logger.info('No sample is merged because all samples have unique names')
+            return
+        #
+        self.logger.info('{} samples that share identical names are merged to {} samples'.format(count, len(merged)))
+        for name, ids in merged.iteritems():
+            # merge genotypes
+            prog = ProgressBar('Merging {}'.format(name), len(ids) * 2 + 1)
+            # we could use a single query by something like
+            #    INSERT INTO ... SELECT ... UNION SELECT .... UNION SELECT ...
+            # but we may have too many sample tables and blow up the query.
+            #
+            # we could insert directly to ids[0] but it is safer to create a temporary table first
+            # 
+            # step 1: get schema of sample_ids[0]
+            try:
+                # remove existing temporary table if exists
+                self.db.removeTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]))
+            except:
+                pass
+            cur.execute('SELECT sql FROM {}_genotype.sqlite_master WHERE type="table" AND name="genotype_{}"'.format(self.name,
+                ids[0]))
+            sql = cur.fetchone()[0].replace('genotype_{}'.format(ids[0]), '{}_genotype.__tmp_{}'.format(self.name, ids[0]))
+            self.logger.debug('Executing {}'.format(sql))
+            # step 2: create temp table
+            try:
+                cur.execute(sql)
+            except Exception as e:
+                raise RuntimeError('Failed to create new genotype table: {}'.format(e))
+            for idx, id in enumerate(ids):
+                try:
+                    cur.execute('INSERT INTO {0}_genotype.__tmp_{1} SELECT * FROM {0}_genotype.genotype_{2};'.format(
+                        self.name, ids[0], id))
+                except Exception as e:
+                    raise RuntimeError('Failed to merge genotype tables. Either the tables have identical '
+                        'variants, or have different genotype information fields.: {}'.format(e))
+                    prog.done()
+                    return
+                prog.update(idx+1)
+            #
+            # step 3: collect filenames
+            #
+            filenames = []
+            header = ''
+            for id in ids:
+                cur.execute('SELECT filename, header FROM sample JOIN filename ON sample.file_id = filename.file_id WHERE sample_id = {}'.format(self.db.PH), (id,))
+                rec = cur.fetchone()
+                filenames.extend(rec[0].split(','))
+                if rec[1] is not None:
+                    header = rec[1]
+            #
+            filenames = ','.join(sorted(list(set(filenames))))
+            try:
+                cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(
+                    self.db.PH), (filenames, header))
+                file_id = cur.lastrowid
+            except:
+                # existing file id??
+                cur.execute('SELECT file_id FROM filename WHERE filename = {};'.format(
+                    self.db.PH), (filenames,))
+                file_id = cur.fetchone()[0]
+            prog.update(len(ids) + 1)
+            #
+            # step 4: if things are doing all right, remove/update existing tables
+            for idx, id in enumerate(ids):
+                if idx > 0:
+                    cur.execute('DELETE FROM sample WHERE sample_id = {}'.format(self.db.PH), (id,))
+                else:
+                    cur.execute('UPDATE sample SET file_id={0} WHERE sample_id = {0}'.format(self.db.PH),
+                        (file_id, ids[0]))
+                self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, id))
+                prog.update(len(ids) + 2 + idx) 
+            #
+            # step 5, rename genotype back
+            self.db.renameTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]), 'genotype_{}'.format(ids[0]))
+            prog.done()
+
 
     def summarize(self):
         '''Summarize key features of the project
@@ -3075,7 +3173,9 @@ def admin(args):
                 changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
                 proj.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
             if args.merge_samples:
-                proj.merge_samples()
+                # need to merge genotype tables
+                proj.db.attach(proj.name + '_genotype')
+                proj.mergeSamples()
     except Exception as e:
         sys.exit(e)
 
