@@ -3040,6 +3040,30 @@ def execute(args):
         sys.exit(e)
 
 
+def adminArguments(parser):
+    merge = parser.add_argument_group('Merge samples')
+    merge.add_argument('--merge_samples', action='store_true',
+        help='''Merge samples with the same sample names by combining genotypes
+        beloning to these samples. Phenotypes related to individual samples will
+        be merged.''')
+    rename = parser.add_argument_group('Rename samples')
+    rename.add_argument('--rename_samples', nargs=2, metavar=('COND', 'NAME'),
+        help='''Rename samples that match specified COND to a new NAME.''')
+
+def admin(args):
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            if not args.merge_samples:
+                proj.logger.warning('Please specify one of --merge_samples ....')
+            if args.rename_samples:
+                proj.rename_samples(args.rename_samples[0], args.rename_samples[1])
+            if args.merge_samples:
+                proj.merge_samples()
+    except Exception as e:
+        sys.exit(e)
+
+
+
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools.py
     pass

@@ -177,6 +177,17 @@ if __name__ == '__main__':
     association.associateArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=association.associate)
+    # 
+    # command admin
+    #
+    parser = subparsers.add_parser('admin',
+        help='''Perform various administrative tasks including merge and
+            rename samples.''',
+        description='''Optimize or modify projects. Currently supports merging
+        and rename of samples''')
+    project.adminArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=project.admin)
     #
     # command execute
     parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement')
