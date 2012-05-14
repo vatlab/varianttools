@@ -1430,6 +1430,20 @@ class Project:
                 .format(self.name, ID, cond))
             self.logger.info('Removing {} genotypes from sample {}'.format(cur.rowcount, ID))
 
+    def renameSamples(self, cond, name):
+        '''Rename selected samples to specified name, return the number of rows changed'''
+        cur = self.db.cursor()
+        try:
+            query = 'UPDATE sample SET sample_name={} WHERE sample_id IN (SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {});'.format(self.db.PH, 
+                ' WHERE {}'.format(cond) if cond.strip() else '')
+            self.logger.debug('Update samples using query {}'.format(query))
+            cur.execute(query, (name, ))
+            return cur.rowcount
+        except Exception as e:
+            self.logger.debug(e)
+            raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
+
+
     def summarize(self):
         '''Summarize key features of the project
         '''
@@ -3053,10 +3067,13 @@ def adminArguments(parser):
 def admin(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if not args.merge_samples:
-                proj.logger.warning('Please specify one of --merge_samples ....')
+            if not args.merge_samples and not args.rename_samples:
+                proj.logger.warning('Please specify one of --merge_samples and --rename_samples')
+            if args.merge_samples and args.rename_samples:
+                raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
-                proj.rename_samples(args.rename_samples[0], args.rename_samples[1])
+                changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
+                proj.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
             if args.merge_samples:
                 proj.merge_samples()
     except Exception as e:
