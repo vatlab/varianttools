@@ -3058,7 +3058,7 @@ def adminArguments(parser):
     merge = parser.add_argument_group('Merge samples')
     merge.add_argument('--merge_samples', action='store_true',
         help='''Merge samples with the same sample names by combining genotypes
-        beloning to these samples. Phenotypes related to individual samples will
+        belonging to these samples. Phenotypes related to individual samples will
         be merged.''')
     rename = parser.add_argument_group('Rename samples')
     rename.add_argument('--rename_samples', nargs=2, metavar=('COND', 'NAME'),
