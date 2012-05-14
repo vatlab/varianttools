@@ -66,9 +66,10 @@ def associateArguments(parser):
     parser.add_argument('-s', '--samples', nargs='*', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%%"'). Units of associate tests are defined by
-            'sample_name' so samples with the same names should have identical
-            phenotype (if used for tests), and non-overlapping variants.''')
+            'filename like "MG%%"'). Each line of the sample table (vtools show
+            samples) is considered as samples. If genotype of a physical sample
+            is scattered into multiple samples (e.g. imported chromosome by 
+            chromosome), they should be merged using command vtools admin.''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
@@ -170,35 +171,23 @@ class AssociationTestManager:
     def getPhenotype(self, condition, pheno, covar):
         '''Get a list of samples from specified condition. This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
-            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
+            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
                 ', '.join(pheno + (covar if covar is not None else []))) + \
-                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '') + ' ORDER BY sample_name, sample_id;'
+                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '')
             self.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
-            data = OrderedDict()
+            data = []
             for rec in cur:
-                if rec[1] not in data:
-                    # for each name, get id, phenotype, and covariants
-                    data[rec[1]] = [[rec[0]], rec[2 : (2 + len(pheno))], rec[ (2 + len(pheno)) : ]]
-                else:
-                    if rec[2 : (2 + len(pheno))] != data[rec[1]][1]:
-                        raise ValueError('Samples for name {} has different phenotype. If they do not belong to the same '
-                            'individual, please use different sample names to differentiate them.'.format(rec[1]))
-                    elif rec[(2 + len(pheno)) : ] != data[rec[1]][2]:
-                        raise ValueError('Samples for name {} has different covariate. If they do not belong to the same '
-                            'individual, please use different sample names to differentiate them.'.format(rec[1]))
-                    else:
-                        # rec[1] is sample name, data[name][0] is a list of IDs for the same sample name
-                        data[rec[1]][0].append(rec[0])
+                # get id, phenotype, and covariants
+                data.append([[rec[0]], rec[1 : (1 + len(pheno))], rec[ (1 + len(pheno)) : ]])
             sample_IDs = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
-            for key, value in data.iteritems():
-                # sample_IDs is a nested list
-                sample_IDs.append(value[0])
-                [x.append(y) for x,y in zip(phenotypes, value[1])]
-                [x.append(y) for x,y in zip(covariates, value[2])]
+            for i, p, c in data:
+                sample_IDs.append(i)
+                [x.append(y) for x,y in zip(phenotypes, p)]
+                [x.append(y) for x,y in zip(covariates, c)]
             if len(sample_IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
@@ -206,9 +195,6 @@ class AssociationTestManager:
                     self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
                 else:
                     self.logger.info('{} samples are found'.format(len(sample_IDs)))
-            # this should not happen, ... 
-            if len(data) != len(sample_IDs):
-                self.logger.warning('Variants associated with a total of {} sample ids will be merged to {} samples for association tests.'.format(len(data), len(sample_IDs)))
             # add intercept
             covariates.insert(0, [1]*len(sample_IDs))
             try:    
@@ -401,22 +387,12 @@ class AssoTestsWorker(Process):
         #
         # get genotypes
         genotype = []
-        for IDs in self.sample_IDs:
+        for ID in self.sample_IDs:
             # handle the first ID
             query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(IDs[0], where_clause)
+                .format(ID, where_clause)
             cur.execute(query, group)
             gtmp = {x[0]:x[1] for x in cur.fetchall()}
-            # handle the rest of the sample IDs
-            for ID in IDs[1:]:
-                query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                    .format(ID, where_clause)
-                cur.execute(query, group)
-                for rec in cur:
-                    if rec[0] in gtmp:
-                        raise ValueError('Variant with id {} is associated with multiple sample ids with the same name (ids: {}). '
-                            'Please use different sample name if this variant exist in multiple individuals.'.format(rec[0], IDs))
-                    gtmp[rec[0]] = rec[1]
             #
             # genotype belonging to the same sample name are put together 
             # 
