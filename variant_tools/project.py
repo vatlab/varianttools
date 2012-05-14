@@ -1508,21 +1508,26 @@ class Project:
                     cur.execute('INSERT INTO {0}_genotype.__tmp_{1} SELECT * FROM {0}_genotype.genotype_{2};'.format(
                         self.name, ids[0], id))
                 except Exception as e:
-                    raise RuntimeError('Failed to merge genotype tables. Either the tables have identical '
-                        'variants, or have different genotype information fields.: {}'.format(e))
                     try:
                         # remove existing temporary table if exists
                         self.db.removeTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]))
                     except:
                         pass
                     prog.done()
-                    return
+                    raise RuntimeError('Failed to merge genotype tables. Either the tables have identical '
+                        'variants, or have different genotype information fields.: {}'.format(e))
                 prog.update(idx+1)
             #
             # step 2.5: verify table
             cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {0}_genotype.__tmp_{1};'.format(self.name, ids[0]))
             counts = cur.fetchone()
             if counts[0] != counts[1]:
+                try:
+                    # remove existing temporary table if exists
+                    self.db.removeTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]))
+                except:
+                    pass
+                prog.done()
                 raise ValueError('Failed to merge samples with name {} because there are {} genotypes for {} unique variants.'.format(name, counts[0], counts[1]))
             prog.update(len(ids) + 1)
             #
