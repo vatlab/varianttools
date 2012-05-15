@@ -61,5 +61,12 @@ class TestAdmin(ProcessTestCase):
          self.assertEqual(numOfVariant(),577)
          self.assertEqual(numOfSample(), 60)
 
+     def TestMerge_DiffTableFail(self):
+         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+         self.assertSucc('vtools import vcf/SAMP1.vcf  --build hg18')
+         self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
+         self.assertFail('vtools admin --merge_samples')
+         #the reason is that the two samepls have some identical variants. If you want to merge them, the samples should have different unique variant information.
+
 if __name__ == '__main__':
     unittest.main()
