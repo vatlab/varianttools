@@ -51,6 +51,17 @@ def associateArguments(parser):
         help='''Optional phenotypes that will be passed to statistical
             tests as covariates. Values of these phenotypes should be integer
             or float.''')
+    parser.add_argument('--var_info', nargs='*', default=[],
+        help='''Optional variant information fields (e.g. minor allele frequency
+            from 1000 genomes project) that will be passed to statistical tests.
+            The fields could be any annotation fields of with integer or float
+            values, including those from used annotation databases (use "vtools
+            show fields" to see a list of usable fields). ''')
+    parser.add_argument('--geno_info', nargs='*', default=[],
+        help='''Optional genotype fields (e.g. quality score of genotype calls,
+            c.f. "vtools show genotypes") that will be passed to statistical
+            tests. Note that the fields should exist for all samples that are
+            tested.''')
     parser.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
@@ -90,13 +101,18 @@ class AssociationTestManager:
     table:       variant table (genotype)
     phenotypes:  phenotypes 
     covariates:  covariates
+    var_info:    variant information fields
+    geno_info:   genotype information fields
     groups:      a list of groups
     group_names: names of the group
     '''
-    def __init__(self, proj, table, phenotypes, covariates, methods, unknown_args, samples, group_by):
+    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, methods,
+        unknown_args, samples, group_by):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
+        self.var_info = var_info
+        self.geno_info = geno_info
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -364,6 +380,8 @@ class AssoTestsWorker(Process):
         self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
+        self.var_info = param.var_info
+        self.geno_info = param.geno_info
         self.tests = param.tests
         self.group_names = param.group_names
         self.queue = grpQueue
@@ -385,22 +403,58 @@ class AssoTestsWorker(Process):
         numSites = len(variant_id)
         #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
         #
+        # get annotation
+        var_info = {x:[] for x in self.var_info}
+        if self.var_info:
+            select_clause, fields = consolidateFieldName(self.proj, 'variant', ','.join(['variant_id' + self.var_info]),
+                self.proj.build)
+            #
+            # FROM clause
+            from_clause = 'FROM variant '
+            fields_info = sum([self.proj.linkFieldToTable(x, table) for x in fields], [])
+            #
+            processed = set()
+            # the normal annotation databases that are 'LEFT OUTER JOIN'
+            for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
+                    from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                    processed.add((tbl.lower(), conn.lower()))
+            #
+            # query
+            query = 'SELECT {} {} WHERE variant.variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {})'.format(select_clause, from_clause, where_clause)
+            self.logger.debug('Running query: {}'.format(query))
+            cur.execute(query)
+            #
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+            for idx, key in enumerate(self.var_info):
+                var_info[key] = [data[x][idx] for x in variant_id]
+        #
         # get genotypes
         genotype = []
+        geno_info = {x:[] for x in self.geno_info}
         for ID in self.sample_IDs:
             # handle the first ID
-            query = 'SELECT variant_id, GT FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID, where_clause)
-            cur.execute(query, group)
-            gtmp = {x[0]:x[1] for x in cur.fetchall()}
+            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
+                .format(ID, where_clause, ' '.join([', ' + x for x in self.var_info]))
+            try:
+                cur.execute(query, group)
+            except Exception as e:
+                raise ValueError('Failed to retrieve genotype and genotype info ({}) for sample with ID {}: {}'.format(self.var_info, ID, e))
+            data = {x[0]:x[1:] for x in cur.fetchall()}
             #
             # genotype belonging to the same sample name are put together 
             # 
             # handle missing values
-            gtmp = [gtmp.get(x, -9.0) for x in variant_id]
+            gtmp = [data.get(x, -9.0)[0] for x in variant_id]
             # handle -1 coding (double heterozygotes)
             gtmp = [2.0 if int(x) == -1 else x for x in gtmp]
             genotype.append(array('d', gtmp))
+            #
+            # handle genotype_info
+            for idx, key in enumerate(self.geno_info):
+                # FIXME: use -9.0 as missing data for genotype info?
+                val = [data.get(x, -9.0)[idx + 1] for x in variant_id]
+                geno_info[key].append(array('d', val))
         #
         missing_counts = [x.count(-9.0) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
@@ -410,7 +464,7 @@ class AssoTestsWorker(Process):
         numtoRemove = len(self.sample_IDs)-sum(toKeep)
         if numtoRemove > 0:
             self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
-        return genotype, toKeep
+        return genotype, toKeep, var_info, geno_info
 
     def setGenotype(self, which, data):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -448,9 +502,13 @@ class AssoTestsWorker(Process):
             values = list(grp)
             try:
                 # select variants from each group:
-                genotype, which = self.getGenotype(grp)
+                genotype, which, var_info, geno_info = self.getGenotype(grp)
                 self.setGenotype(which, genotype)
                 self.setPhenotype(which, self.phenotypes, self.covariates)
+                for field in var_info.keys():
+                    self.data.setArrayVar(field, var_info[field])
+                for field in geno_info.keys():
+                    self.data.setMatrixVar(field, geno_info[field])
                 for test in self.tests:
                     test.setData(self.data)
                     result = test.calculate()
@@ -470,8 +528,9 @@ def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             try:
-                asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates, args.methods, args.unknown_args,
-                args.samples, args.group_by)
+                asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
+                    args.var_info, args.geno_info, args.methods, args.unknown_args,
+                    args.samples, args.group_by)
             except ValueError as e:
                 sys.exit(e)
             #

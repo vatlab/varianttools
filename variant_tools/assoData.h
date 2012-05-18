@@ -53,6 +53,7 @@ private:
 	typedef std::map<std::string, double> DoubleVars;
 	typedef std::map<std::string, int> IntVars;
 	typedef std::map<std::string, vectorf> ArrayVars;
+	typedef std::map<std::string, matrixf> MatrixVars;
 
 public:
 	/*
@@ -304,11 +305,19 @@ public:
 	}
 
 
+	// store a matrix with name 'name'
+	void setVar(const string & name, const matrixf & value)
+	{
+		m_matrixVars[name] = value;
+	}
+
+
 	bool hasVar(const string & name)
 	{
 		return (m_doubleVars.find(name) != m_doubleVars.end() ||
 		        m_arrayVars.find(name) != m_arrayVars.end()) ||
-		       m_intVars.find(name) != m_intVars.end();
+		       m_intVars.find(name) != m_intVars.end() ||
+		       m_matrixVars.find(name) != m_matrixVars.end();
 	}
 
 
@@ -342,6 +351,16 @@ public:
 	}
 
 
+	matrixf & getMatrixVar(const string & name)
+	{
+		MatrixVars::iterator it = m_matrixVars.find(name);
+
+		if (it == m_matrixVars.end())
+			throw ValueError("No matrix with name " + name + " can be found");
+		return it->second;
+	}
+
+
 private:
 	/// raw phenotype and gneotype data
 	vectorf m_phenotype;
@@ -366,6 +385,8 @@ private:
 	IntVars m_intVars;
 	// arbitrary vectorf type of variables.
 	ArrayVars m_arrayVars;
+	//
+	MatrixVars m_matrixVars;
 };
 
 }
