@@ -453,6 +453,8 @@ def phenotype(args):
                         field, expr = [x.strip() for x in item.split('=', 1)]
                     except Exception as e:
                         raise ValueError('Invalid parameter {}, which should have format field=expr_of_phenotype: {}'.format(item, e))
+                    if field == "sample_name" or field == "filename":
+                        raise ValueError('Cannot alter phenotype field: {}'.format(field))
                     p.setPhenotype(field, expr, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.from_stat:
                 stat = []
@@ -472,5 +474,3 @@ def phenotype(args):
         proj.close()
     except Exception as e:
         sys.exit(e)
-                
-
