@@ -134,10 +134,9 @@ class AssociationTestManager:
         # step 3: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = []
-        for IDs in self.sample_IDs:
-            for id in IDs:
-                if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
-                    unindexed_IDs.append(id)
+        for id in self.sample_IDs:
+            if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
+                unindexed_IDs.append(id)
         if unindexed_IDs:
             cur = proj.db.cursor()
             prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
@@ -196,7 +195,7 @@ class AssociationTestManager:
             data = []
             for rec in cur:
                 # get id, phenotype, and covariants
-                data.append([[rec[0]], rec[1 : (1 + len(pheno))], rec[ (1 + len(pheno)) : ]])
+                data.append([rec[0], rec[1 : (1 + len(pheno))], rec[ (1 + len(pheno)) : ]])
             sample_IDs = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
@@ -406,12 +405,11 @@ class AssoTestsWorker(Process):
         # get annotation
         var_info = {x:[] for x in self.var_info}
         if self.var_info:
-            select_clause, fields = consolidateFieldName(self.proj, 'variant', ','.join(['variant_id' + self.var_info]),
-                self.proj.build)
+            select_clause, fields = consolidateFieldName(self.proj, 'variant', ','.join(['variant_id'] + self.var_info))
             #
             # FROM clause
             from_clause = 'FROM variant '
-            fields_info = sum([self.proj.linkFieldToTable(x, table) for x in fields], [])
+            fields_info = sum([self.proj.linkFieldToTable(x, 'variant') for x in fields], [])
             #
             processed = set()
             # the normal annotation databases that are 'LEFT OUTER JOIN'
@@ -421,9 +419,10 @@ class AssoTestsWorker(Process):
                     processed.add((tbl.lower(), conn.lower()))
             #
             # query
-            query = 'SELECT {} {} WHERE variant.variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {})'.format(select_clause, from_clause, where_clause)
-            self.logger.debug('Running query: {}'.format(query))
-            cur.execute(query)
+            query = 'SELECT {} {} WHERE variant.variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {})'.format(
+                select_clause, from_clause, where_clause)
+            #self.logger.debug('Running query: {}'.format(query))
+            cur.execute(query, group)
             #
             data = {x[0]:x[1:] for x in cur.fetchall()}
             for idx, key in enumerate(self.var_info):
@@ -435,7 +434,7 @@ class AssoTestsWorker(Process):
         for ID in self.sample_IDs:
             # handle the first ID
             query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID, where_clause, ' '.join([', ' + x for x in self.var_info]))
+                .format(ID, where_clause, ' '.join([', ' + x for x in self.geno_info]))
             try:
                 cur.execute(query, group)
             except Exception as e:
@@ -506,9 +505,9 @@ class AssoTestsWorker(Process):
                 self.setGenotype(which, genotype)
                 self.setPhenotype(which, self.phenotypes, self.covariates)
                 for field in var_info.keys():
-                    self.data.setArrayVar(field, var_info[field])
+                    self.data.setVar(field, var_info[field])
                 for field in geno_info.keys():
-                    self.data.setMatrixVar(field, geno_info[field])
+                    self.data.setVar(field, geno_info[field])
                 for test in self.tests:
                     test.setData(self.data)
                     result = test.calculate()
