@@ -505,9 +505,9 @@ class AssoTestsWorker(Process):
                 self.setGenotype(which, genotype)
                 self.setPhenotype(which, self.phenotypes, self.covariates)
                 for field in var_info.keys():
-                    self.data.setVar(field, var_info[field])
+                    self.data.setVar('__var_' + field, var_info[field])
                 for field in geno_info.keys():
-                    self.data.setVar(field, geno_info[field])
+                    self.data.setVar('__geno_' + field, geno_info[field])
                 for test in self.tests:
                     test.setData(self.data)
                     result = test.calculate()
