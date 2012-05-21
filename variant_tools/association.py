@@ -453,7 +453,7 @@ class AssoTestsWorker(Process):
                 val = [data.get(x, [float('NaN')]*(len(self.geno_info)+1))[idx + 1] for x in variant_id]
                 geno_info[key].append(array('d', val))
         #
-        missing_counts = [len([y for y in x if y != y]) for x in genotype]
+        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
         # FIXME will pass it as an input arguement later
         #toKeep = [(x<0.5*numSites) for x in missing_counts]
@@ -823,7 +823,7 @@ class GLMBurdenTest(NullTest):
             else:
                 # actual number of permutations
                 if math.isnan(z): res.append(z)
-                else: res.append(int(z))                
+                else: res.append(int(z))
         return res
 
 

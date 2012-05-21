@@ -102,8 +102,26 @@ if not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) o
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig: {}'.format(e))
 
-
-LIB_GSL = [ 
+SQLITE_GSL = [
+    'variant_tools/gsl/error.c',
+    'variant_tools/gsl/sys/infnan.c',
+    'variant_tools/gsl/sys/coerce.c',
+    'variant_tools/gsl/sys/fdiv.c',
+    'variant_tools/gsl/sys/pow_int.c',
+    'variant_tools/gsl/sys/fcmp.c',
+    'variant_tools/gsl/sys/log1p.c',
+    'variant_tools/gsl/sys/invhyp.c',
+    'variant_tools/gsl/complex/math.c',
+    'variant_tools/gsl/specfunc/log.c',
+    'variant_tools/gsl/specfunc/exp.c',
+    'variant_tools/gsl/specfunc/expint.c',
+    'variant_tools/gsl/specfunc/gamma.c',
+    'variant_tools/gsl/specfunc/zeta.c',
+    'variant_tools/gsl/specfunc/trig.c',
+    'variant_tools/gsl/specfunc/elementary.c',
+    'variant_tools/gsl/specfunc/psi.c'
+    ]
+LIB_GSL = [
    'variant_tools/gsl/error.c',
    'variant_tools/gsl/sys/infnan.c',
    'variant_tools/gsl/sys/coerce.c',
@@ -381,8 +399,8 @@ setup(name = "variant_tools",
             include_dirs = ['sqlite', SQLITE_FOLDER],
         ),
         Extension('variant_tools/_vt_sqlite3_ext',
-            sources = ['variant_tools/vt_sqlite3_ext.c'],
-            include_dirs = ['sqlite'],
+            sources = ['variant_tools/vt_sqlite3_ext.c'] + SQLITE_GSL,
+            include_dirs = ['sqlite', "variant_tools", "variant_tools/gsl"],
         ),
         Extension('variant_tools/_assoTests',
             sources = [
