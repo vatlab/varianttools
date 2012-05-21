@@ -42,7 +42,7 @@ bool SetMaf::apply(AssoData & d)
 		// calc maf and loci counts for site j
 		for (size_t i = 0; i < genotype.size(); ++i) {
 			// genotype not missing
-			if (!(genotype[i][j] < 0.0)) {
+			if (genotype[i][j] == genotype[i][j]) {
 				valid_all[j] += 1.0;
 				if (genotype[i][j] > 0.0) {
 					maf[j] += genotype[i][j];
@@ -59,7 +59,7 @@ bool SetMaf::apply(AssoData & d)
 			// recode genotypes
 			for (size_t i = 0; i < genotype.size(); ++i) {
 				// genotype not missing
-				if (!(genotype[i][j] < 0.0)) {
+				if (genotype[i][j] == genotype[i][j]) {
 					genotype[i][j] = 2.0 - genotype[i][j];
 				}
 			}
@@ -130,7 +130,7 @@ bool SumToX::apply(AssoData & d)
 	for (size_t i = 0; i < genotype.size(); ++i) {
 		//X[i] = std::accumulate(genotype[i].begin(), genotype[i].end(), 0.0);
 		for (size_t j = 0; j < genotype[i].size(); ++j) {
-			if (genotype[i][j] > 0) {
+			if (genotype[i][j] > 0.0) {
 				X[i] += genotype[i][j];
 			}
 		}

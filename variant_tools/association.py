@@ -67,7 +67,7 @@ def associateArguments(parser):
             method should be specified together as a quoted long argument (e.g.
             --method "m --alternative 2" "m1 --permute 1000"), although
             the common method parameters can be specified separately, as long as
-            they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000 
+            they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000
             is equivalent to --method "m1 -p 1000" "m2 -p 1000".). You can use
             command 'vtools show tests' for a list of association tests, and
             'vtools show test TST' for details about a test. Customized association
@@ -79,7 +79,7 @@ def associateArguments(parser):
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"'). Each line of the sample table (vtools show
             samples) is considered as samples. If genotype of a physical sample
-            is scattered into multiple samples (e.g. imported chromosome by 
+            is scattered into multiple samples (e.g. imported chromosome by
             chromosome), they should be merged using command vtools admin.''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
@@ -87,7 +87,7 @@ def associateArguments(parser):
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
     parser.add_argument('--to_db', metavar='annoDB',
-        help='''Name of a database to which results from association tests will be written''')        
+        help='''Name of a database to which results from association tests will be written''')
     parser.add_argument('--update', action='store_true',
         help='''When --to_db is specified, allow updating existing fields in the result database''')
 
@@ -99,7 +99,7 @@ class AssociationTestManager:
     tests:       a list of test objects
     sample_IDs:  sample IDs
     table:       variant table (genotype)
-    phenotypes:  phenotypes 
+    phenotypes:  phenotypes
     covariates:  covariates
     var_info:    variant information fields
     geno_info:   genotype information fields
@@ -149,7 +149,7 @@ class AssociationTestManager:
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
     def getAssoTests(self, methods, ncovariates, common_args):
-        '''Get a list of methods from parameter methods, passing method specific and common 
+        '''Get a list of methods from parameter methods, passing method specific and common
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
             raise ValueError('Please specify at least one statistical test. Please use command "vtools show tests" for a list of tests')
@@ -212,7 +212,7 @@ class AssociationTestManager:
                     self.logger.info('{} samples are found'.format(len(sample_IDs)))
             # add intercept
             covariates.insert(0, [1]*len(sample_IDs))
-            try:    
+            try:
                 phenotypes = [map(float, x) for x in phenotypes]
                 covariates = [map(float, x) for x in covariates]
             except ValueError:
@@ -226,16 +226,16 @@ class AssociationTestManager:
                 raise ValueError(e)
             else:
                 raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
-                    '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno), 
+                    '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno),
                     '' if covar is None else (' and/or covariate' + ', '.join(covar))))
-    
+
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         if not group_by:
             group_by = ['chr', 'pos']
         # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
-        table_of_fields = [x if x else self.table for x in table_of_fields] 
+        table_of_fields = [x if x else self.table for x in table_of_fields]
         # name the fields
         field_names = [x.replace('.', '_') for x in group_by]
         # type of the fields
@@ -244,7 +244,7 @@ class AssociationTestManager:
         #
         # create a table that holds variant ids and groups, indexed for groups.
         # The structure of this table will look like
-        # 
+        #
         #   variant_id  INT NOT NULL,
         #   chr VARCHAR(20),
         #   pos INT
@@ -258,7 +258,7 @@ class AssociationTestManager:
               '''.format(','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)])))
         #
         # select variant_id and groups for association testing
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))        
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
         from_clause = [self.table]
         where_clause = []
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
@@ -270,7 +270,7 @@ class AssociationTestManager:
                 where_clause.append('({})'.format(conn))
                 processed.add((tbl.lower(), conn.lower()))
         #
-        self.from_clause = ', '.join(from_clause) 
+        self.from_clause = ', '.join(from_clause)
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
@@ -320,13 +320,13 @@ class ResultRecorder:
         #
         self.writer = None
         if db_name:
-            self.writer = AnnoDBWriter(db_name, self.fields, 
-                'field',                       # field annotation databases 
+            self.writer = AnnoDBWriter(db_name, self.fields,
+                'field',                       # field annotation databases
                 'Annotation database used to record results of association tests. Created on {}'.format(
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
-                '1.0',                         # version 1.0 
+                '1.0',                         # version 1.0
                 {'*': self.group_names},       # link by group fields
-                logger, 
+                logger,
                 True,                          # allow updating an existing database
                 update                    # allow updating an existing field
             )
@@ -359,7 +359,7 @@ class ResultRecorder:
                     self.cur.execute(self.insert_query, res)
             else:
                 self.cur.execute(self.insert_query, res)
-        
+
     def completed(self):
         return self.succ_count
 
@@ -369,7 +369,7 @@ class ResultRecorder:
     def done(self):
         if self.writer:
             self.writer.finalize()
-        
+
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
@@ -393,7 +393,7 @@ class AssoTestsWorker(Process):
         '''Get genotype for variants in specified group'''
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause) 
+        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause)
         #
         #self.logger.debug('Running on group {0} query {1}'.format(group, query))
         cur = self.db.cursor()
@@ -432,35 +432,33 @@ class AssoTestsWorker(Process):
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         for ID in self.sample_IDs:
-            # handle the first ID
             query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID, where_clause, ' '.join([', ' + x for x in self.geno_info]))
             try:
                 cur.execute(query, group)
             except Exception as e:
-                raise ValueError('Failed to retrieve genotype and genotype info ({}) for sample with ID {}: {}'.format(self.var_info, ID, e))
+                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
             data = {x[0]:x[1:] for x in cur.fetchall()}
             #
-            # genotype belonging to the same sample name are put together 
-            # 
+            # genotype belonging to the same sample name are put together
+            #
             # handle missing values
-            gtmp = [data.get(x, -9.0)[0] for x in variant_id]
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1))[0] for x in variant_id]
             # handle -1 coding (double heterozygotes)
-            gtmp = [2.0 if int(x) == -1 else x for x in gtmp]
+            gtmp = [2.0 if x == -1.0 else x for x in gtmp]
             genotype.append(array('d', gtmp))
             #
             # handle genotype_info
             for idx, key in enumerate(self.geno_info):
-                # FIXME: use -9.0 as missing data for genotype info?
-                val = [data.get(x, -9.0)[idx + 1] for x in variant_id]
+                val = [data.get(x, [float('NaN')]*(len(self.geno_info)+1))[idx + 1] for x in variant_id]
                 geno_info[key].append(array('d', val))
         #
-        missing_counts = [x.count(-9.0) for x in genotype]
+        missing_counts = [len([y for y in x if y != y]) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
         # FIXME will pass it as an input arguement later
         #toKeep = [(x<0.5*numSites) for x in missing_counts]
-        toKeep = [(x<numSites) for x in missing_counts]
-        numtoRemove = len(self.sample_IDs)-sum(toKeep)
+        toKeep = [(x < numSites) for x in missing_counts]
+        numtoRemove = len(self.sample_IDs) - sum(toKeep)
         if numtoRemove > 0:
             self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
         return genotype, toKeep, var_info, geno_info
@@ -468,7 +466,7 @@ class AssoTestsWorker(Process):
     def setGenotype(self, which, data):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
-    
+
     def setPhenotype(self, which, data, covariates=None):
         '''Set phenotype data'''
         if len(data) > 1:
@@ -521,7 +519,7 @@ class AssoTestsWorker(Process):
                 values = []
             self.output.send(values)
         self.db.detach('__fromGeno')
-        
+
 
 def associate(args):
     try:
@@ -579,7 +577,7 @@ def associate(args):
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
     except Exception as e:
-        sys.exit(e) 
+        sys.exit(e)
 
 #
 # Statistical Association tests. The first one is a NullTest that provides
@@ -596,7 +594,7 @@ def getAllTests():
 class NullTest:
     '''A base class that defines a common interface for association tests'''
     def __init__(self, logger=None, *method_args):
-        '''Args is arbitrary arguments, might need an additional parser to 
+        '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
         self.logger = logger
         self.parseArgs(*method_args)
@@ -606,7 +604,7 @@ class NullTest:
     def parseArgs(self, method_args):
         # this function should never be called.
         raise SystemError('All association tests should define their own parseArgs function')
-    
+
     def setData(self, data):
         self.data = data.clone()
 
@@ -661,7 +659,7 @@ class GroupStat(NullTest):
         # arguments that are used by this test
         parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+',
             help='''Statistics to calculate, which can be number of variants in this group,
-                total sample size.''')  
+                total sample size.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -701,7 +699,7 @@ class GLMBurdenTest(NullTest):
         #
         # NullTest.__init__ will call parseArgs to get the parameters we need
         self.algorithm = self._determine_algorithm(ncovariates)
-                
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by

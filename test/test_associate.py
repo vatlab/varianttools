@@ -93,7 +93,9 @@ class TestAsso(ProcessTestCase):
             vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby')
             vtoolsout.sort()
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
-            self.assertOutput('cat output/assores{}.txt'.format(str(i+1)), '\n'.join(vtoolsout)+'\n')
+            with open('output/assores'+str(i+1)+'.txt','r') as f:
+                infile = f.readlines()
+            self.assertEqual([x.rstrip() for x in infile], vtoolsout)
 
 
     def testPyAction(self):
