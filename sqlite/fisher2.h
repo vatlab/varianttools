@@ -25,8 +25,8 @@
     to use it from the rest of my code (adjusted10.cpp and
     adj-fast.cpp).
      Ramón Díaz-Uriarte (rdiaz@cnio.es). May 2003.
-	http://ligarto.org/rdiaz/
-*/
+    http://ligarto.org/rdiaz/
+ */
 
 #ifndef GUARD_fisher2
 #define GUARD_fisher2
