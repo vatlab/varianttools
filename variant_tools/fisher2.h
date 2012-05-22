@@ -1,9 +1,3 @@
-//  Fisher Exact test by Ramón Díaz-Uriarte (http://ligarto.org/rdiaz/) who borrowed the fexact.c in R.
-
-
-#ifndef GUARD_fisher2
-#define GUARD_fisher2
-
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
@@ -23,6 +17,19 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+/*  fisher2.c: this is fexact.c, part of the R
+    (http://cran.r-project.org) distribution
+    (package ctest).
+    I have just made a few changes to make it easier
+    to use it from the rest of my code (adjusted10.cpp and
+    adj-fast.cpp).
+     Ramón Díaz-Uriarte (rdiaz@cnio.es). May 2003.
+	http://ligarto.org/rdiaz/
+*/
+
+#ifndef GUARD_fisher2
+#define GUARD_fisher2
 
 /*Constant.h*/
 #ifndef M_PI

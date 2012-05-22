@@ -2287,8 +2287,9 @@ def updateArguments(parser):
             (e.g. mark=1) or an expression using other fields (e.g. freq=num/120,
             refgene=refGene.name). If multiple values are returned for a variant, only
             one of them will be used. Parameter samples could be used to limit the
-            affected variants. In addition, special function 'HWE_exact' is provided to
-            perform exact test of Hardy-Weinberg Equilibrium.''')
+            affected variants. In addition, special function are provided, including
+            'HWE_exact' (exact test of Hardy-Weinberg Equilibrium) and
+            'Fisher_exact' (Fisher's exact test for case/ctrl association).''')
     #field.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
     #    help='''Limiting variants from samples that match conditions that
     #        use columns shown in command 'vtools show sample' (e.g. 'aff=1',

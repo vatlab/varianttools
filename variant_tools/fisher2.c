@@ -1,17 +1,35 @@
-/*  fisher2.c: this is fexact.c, part of the R 
+/*
+ *  R : A Computer Language for Statistical Data Analysis
+ *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
+ *  Copyright (C) 1998-2001   The R Development Core Team.
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU Lesser General Public License as published by
+ *  the Free Software Foundation; either version 2.1 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+/*  fisher2.c: this is fexact.c, part of the R
     (http://cran.r-project.org) distribution
     (package ctest).
     I have just made a few changes to make it easier
     to use it from the rest of my code (adjusted10.cpp and
     adj-fast.cpp).
-    Ram�n D�az-Uriarte (rdiaz@cnio.es). May 2003.
+     Ramón Díaz-Uriarte (rdiaz@cnio.es). May 2003.
+	http://ligarto.org/rdiaz/
 */
 
 
-
-
-
-/* [Notice from the original fexact.c] 
+/* [Notice from the original fexact.c]
    Fisher's exact test for contingency tables -- usage see below
 
    fexact.f -- translated by f2c (version 19971204).
@@ -19,15 +37,15 @@
    Heavily hand-edited by KH and MM.
  */
 
-//#include <R.h> 
+//#include <R.h>
 
 #include "fisher2.h"
 #include <stdlib.h>
-#include <stdio.h> 
-#include <math.h> 
-//#include "ctest.h" 
+#include <stdio.h>
+#include <math.h>
+//#include "ctest.h"
 
-#include <limits.h> 
+#include <limits.h>
 #define SINT_MAX INT_MAX
 
 #undef min

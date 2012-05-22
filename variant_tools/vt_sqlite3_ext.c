@@ -96,12 +96,12 @@ static void fisher_exact(
 
     /* This is specific for 2x2 tables. contingency_table = matrix(twotwoTable, 2, 2, byrow = T)
        case       ctrl
-   alt n1*p1      n2*p2
-   ref n1*(1-p1)  n2*(1-p2)
+   alt m1         m2
+   ref n1-m1      n2-m2
        */
     double contingency_table[4] = { 0, 0, 0, 0 };
-    contingency_table[0] = (int)(sqlite3_value_double(argv[0]) * sqlite3_value_double(argv[2]));
-    contingency_table[1] = (int)(sqlite3_value_double(argv[1]) * sqlite3_value_double(argv[3]));
+    contingency_table[0] = (int)(sqlite3_value_double(argv[0]));
+    contingency_table[1] = (int)(sqlite3_value_double(argv[1]));
     contingency_table[2] = (int)(sqlite3_value_double(argv[2])) - contingency_table[0];
     contingency_table[3] = (int)(sqlite3_value_double(argv[3])) - contingency_table[1];
     int nrow = 2;
