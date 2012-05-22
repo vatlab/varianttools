@@ -49,31 +49,38 @@ static void hwe_exact(
 ){
     /*
        consider this 2X2 table for exact HWE test
-           C  A
-        C 10 20
-        A  0  8
+           C       A
+        C  n11     n12_1
+        A  n12_2   n22
         then n11 = #(CC); n12 = #(CA) + #(AC); n22 = #(AA)
     */
+    //http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1199378/
+    //implements equation 2 below
     double n11 = sqlite3_value_double(argv[0]);
     double n12 = sqlite3_value_double(argv[1]);
     double n22 = sqlite3_value_double(argv[2]);
     double n1 = 2.0 * n11 + n12;
     double n2 = 2.0 * n22 + n12;
-    double total = 0.0;
+    double n = n11 + n12 + n22;
+    double pn12 = exp(log(2.0) * (n12) + gsl_sf_lngamma(n+1) -
+                gsl_sf_lngamma(n11+1) - gsl_sf_lngamma(n12+1) -
+                gsl_sf_lngamma(n22+1) - gsl_sf_lngamma(2.0 * n + 1) +
+                gsl_sf_lngamma(n1+1) + gsl_sf_lngamma(n2+1));
+    //
+    double pval = 0.0;
     double x12;
     for (x12 = fmod(n1, 2.0); x12 <= fmin(n1, n2); x12 = x12 + 2.0) {
         double x11 = (n1 - x12) / 2.0;
         double x22 = (n2 - x12) / 2.0;
-        double x = x11 + x12 + x22;
         double x1 = 2.0 * x11 + x12;
-        double x2 = 2 * x22 + x12;
-        total += exp(log(2.0) * (x12) + gsl_sf_lngamma(x+1) -
+        double x2 = 2.0 * x22 + x12;
+        double px12 = exp(log(2.0) * (x12) + gsl_sf_lngamma(n+1) -
                 gsl_sf_lngamma(x11+1) - gsl_sf_lngamma(x12+1) -
-                gsl_sf_lngamma(x22+1) - gsl_sf_lngamma(2.0 * x + 1) +
+                gsl_sf_lngamma(x22+1) - gsl_sf_lngamma(2.0 * n + 1) +
                 gsl_sf_lngamma(x1+1) + gsl_sf_lngamma(x2+1));
+        if (pn12>=px12) pval += px12;
     }
-
-    sqlite3_result_double(context, total);
+    sqlite3_result_double(context, pval);
 }
 
 

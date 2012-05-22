@@ -2482,8 +2482,7 @@ class MergeStatus:
 
     def report(self):
         for key in self.tasks:
-            print key, self.tasks[key]['completed'],
-        print
+            print (key, self.tasks[key]['completed'])
         #print self.tasks
 
 class ProjectsMerger:
