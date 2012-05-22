@@ -2286,7 +2286,8 @@ def updateArguments(parser):
             (e.g. mark=1) or an expression using other fields (e.g. freq=num/120,
             refgene=refGene.name). If multiple values are returned for a variant, only
             one of them will be used. Parameter samples could be used to limit the
-            affected variants.''')
+            affected variants. In addition, special function 'HWE_exact' is provided to
+            perform exact test of Hardy-Weinberg Equilibrium.''')
     #field.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
     #    help='''Limiting variants from samples that match conditions that
     #        use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -2315,7 +2316,7 @@ def update(args):
         with Project(verbosity=args.verbosity) as proj:
             if not args.from_file and not args.from_stat and not args.set:
                 proj.logger.warning('Please specify one of --from_file, --set and --from_stat for command vtools upate')
-            if args.from_file: 
+            if args.from_file:
                 proj.db.attach(proj.name + '_genotype')
                 importer = TextUpdater(proj=proj, table=args.table, files=args.from_file,
                     build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)

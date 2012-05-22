@@ -54,14 +54,18 @@ static void hwe_exact(
         A  n12_2   n22
         then n11 = #(CC); n12 = #(CA) + #(AC); n22 = #(AA)
     */
+    double n = sqlite3_value_double(argv[0]);
+    double n12 = sqlite3_value_double(argv[1]);
+    // collapse double homozygotes to simply homozygote
+    double n22 = sqlite3_value_double(argv[2]);
+    if (argc == 4) {
+        n22 += sqlite3_value_double(argv[3]);
+    }
+    double n11 = n - n12 - n22;
     //http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1199378/
     //implements equation 2 below
-    double n11 = sqlite3_value_double(argv[0]);
-    double n12 = sqlite3_value_double(argv[1]);
-    double n22 = sqlite3_value_double(argv[2]);
     double n1 = 2.0 * n11 + n12;
     double n2 = 2.0 * n22 + n12;
-    double n = n11 + n12 + n22;
     double pn12 = exp(log(2.0) * (n12) + gsl_sf_lngamma(n+1) -
                 gsl_sf_lngamma(n11+1) - gsl_sf_lngamma(n12+1) -
                 gsl_sf_lngamma(n22+1) - gsl_sf_lngamma(2.0 * n + 1) +
@@ -104,6 +108,6 @@ int sqlite3_extension_init(
   //The fourth parameter, eTextRep, specifies what text encoding this SQL function prefers for its parameters.
   //The fifth parameter is an arbitrary pointer.
   //The sixth, seventh and eighth parameters, xFunc, xStep and xFinal, are pointers to C-language functions that implement the SQL function or aggregate.
-  sqlite3_create_function(db, "HWE_exact", 3, SQLITE_ANY, 0, hwe_exact, 0, 0);
+  sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
   return 0;
 }
