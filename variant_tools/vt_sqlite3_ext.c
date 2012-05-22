@@ -87,7 +87,34 @@ static void hwe_exact(
     sqlite3_result_double(context, pval);
 }
 
+#include "fisher2.h"
+static void fisher_exact(
+  sqlite3_context *context,
+  int argc,
+  sqlite3_value **argv
+  ){
 
+    /* This is specific for 2x2 tables. contingency_table = matrix(twotwoTable, 2, 2, byrow = T)
+       case       ctrl
+   alt n1*p1      n2*p2
+   ref n1*(1-p1)  n2*(1-p2)
+       */
+    double contingency_table[4] = { 0, 0, 0, 0 };
+    contingency_table[0] = (int)(sqlite3_value_double(argv[0]) * sqlite3_value_double(argv[2]));
+    contingency_table[1] = (int)(sqlite3_value_double(argv[1]) * sqlite3_value_double(argv[3]));
+    contingency_table[2] = (int)(sqlite3_value_double(argv[2])) - contingency_table[0];
+    contingency_table[3] = (int)(sqlite3_value_double(argv[3])) - contingency_table[1];
+    int nrow = 2;
+    int ncol = 2;
+    double expected = -1.0;
+    double percnt = 100.0;
+    double emin = 0.0;
+    double prt = 0.0;
+    double pval = 0.0;
+    int workspace = 300000;
+    fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pval, &workspace);
+    sqlite3_result_double(context, pval);
+}
 /* SQLite invokes this routine once when it loads the extension.
 ** Create new functions, collating sequences, and virtual table
 ** modules here.  This is usually the only exported symbol in
@@ -109,5 +136,6 @@ int sqlite3_extension_init(
   //The fifth parameter is an arbitrary pointer.
   //The sixth, seventh and eighth parameters, xFunc, xStep and xFinal, are pointers to C-language functions that implement the SQL function or aggregate.
   sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
+  sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
   return 0;
 }
