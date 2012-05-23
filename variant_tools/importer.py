@@ -1962,6 +1962,7 @@ def setFieldValue(proj, table, items, build):
                 count[1] += 1  # new
             else:
                 # FIXME: check the case for type mismatch
+                proj.logger.info('Updating field {}'.format(field))
                 count[2] += 1  # updated
         proj.db.commit()
         # really update things

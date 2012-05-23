@@ -42,6 +42,16 @@ if sys.version_info.major == 2:
 else:
     import assoTests_py3 as t
 
+def freq(input):
+    try:
+        value = float(input)
+        if not (value >= 0 and value <= 1):
+            msg = "%r is not valid input. Valid input should fall in range [0, 1]" % input
+            raise ValueError(msg)
+    except Exception as e:
+        raise argparse.ArgumentTypeError(e)
+    return value
+
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
     parser.add_argument('phenotypes', nargs=1,
@@ -59,7 +69,7 @@ def associateArguments(parser):
             show fields" to see a list of usable fields). ''')
     parser.add_argument('--geno_info', nargs='*', default=[],
         help='''Optional genotype fields (e.g. quality score of genotype calls,
-            c.f. "vtools show genotypes") that will be passed to statistical
+            cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
     parser.add_argument('-m', '--methods', nargs='+',
@@ -84,13 +94,15 @@ def associateArguments(parser):
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
-    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
-        help='''Number of processes to carry out association tests.''')
+    parser.add_argument('--missing_filter', metavar='proportion', type=freq, default=1.0,
+           help='''When -g is specified, will remove samples having missing genotypes
+           exceeding the given proportion within a group''' )
     parser.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')
     parser.add_argument('--update', action='store_true',
         help='''When --to_db is specified, allow updating existing fields in the result database''')
-
+    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
+        help='''Number of processes to carry out association tests.''')
 
 class AssociationTestManager:
     '''Parse command line and get data for association testing. This class will provide
@@ -107,12 +119,13 @@ class AssociationTestManager:
     group_names: names of the group
     '''
     def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, methods,
-        unknown_args, samples, group_by):
+        unknown_args, samples, group_by, missing_filter):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
         self.var_info = var_info
         self.geno_info = geno_info
+        self.missing_filter = missing_filter
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -383,6 +396,7 @@ class AssoTestsWorker(Process):
         self.geno_info = param.geno_info
         self.tests = param.tests
         self.group_names = param.group_names
+        self.missing_filter = param.missing_filter
         self.queue = grpQueue
         self.output = output
         self.logger = self.proj.logger
@@ -455,9 +469,7 @@ class AssoTestsWorker(Process):
         #
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
-        # FIXME will pass it as an input arguement later
-        #toKeep = [(x<0.5*numSites) for x in missing_counts]
-        toKeep = [(x < numSites) for x in missing_counts]
+        toKeep = [(x < (self.missing_filter * numSites)) for x in missing_counts]
         numtoRemove = len(self.sample_IDs) - sum(toKeep)
         if numtoRemove > 0:
             self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
@@ -527,7 +539,7 @@ def associate(args):
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.methods, args.unknown_args,
-                    args.samples, args.group_by)
+                    args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
             #
@@ -620,15 +632,6 @@ class NullTest:
         #self.logger.debug(self.data.raw_genotype())
         return 0
 
-def freq(input):
-    try:
-        value = float(input)
-        if not (value >= 0 and value <= 1):
-            msg = "%r is not valid input. Valid input should fall in range [0, 1]" % input
-            raise ValueError(msg)
-    except Exception as e:
-        raise argparse.ArgumentTypeError(e)
-    return value
 
 
 class GroupStat(NullTest):
@@ -730,7 +733,7 @@ class GLMBurdenTest(NullTest):
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
