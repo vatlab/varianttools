@@ -433,10 +433,10 @@ class AssoTestsWorker(Process):
                     processed.add((tbl.lower(), conn.lower()))
             #
             # query
-            query = 'SELECT {} {} WHERE variant.variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {})'.format(
-                select_clause, from_clause, where_clause)
+            query = 'SELECT {0} {1} WHERE variant.variant_id IN ({2})'.format(
+                select_clause, from_clause, ','.join([self.db.PH]*len(variant_id)))
             #self.logger.debug('Running query: {}'.format(query))
-            cur.execute(query, group)
+            cur.execute(query, variant_id)
             #
             data = {x[0]:x[1:] for x in cur.fetchall()}
             for idx, key in enumerate(self.var_info):
@@ -446,10 +446,10 @@ class AssoTestsWorker(Process):
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         for ID in self.sample_IDs:
-            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID, where_clause, ' '.join([', ' + x for x in self.geno_info]))
+            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN ({1});'\
+                .format(ID, ','.join([self.db.PH]*len(variant_id)), ' '.join([', ' + x for x in self.geno_info]))
             try:
-                cur.execute(query, group)
+                cur.execute(query, variant_id)
             except Exception as e:
                 raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
             data = {x[0]:x[1:] for x in cur.fetchall()}
