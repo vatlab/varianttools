@@ -112,23 +112,24 @@ static void fisher_exact(
 	contingency_table[2] = (int)(sqlite3_value_double(argv[2])) - contingency_table[0];
 	contingency_table[3] = (int)(sqlite3_value_double(argv[3])) - contingency_table[1];
 	double pval = 1.0;
-	int ok = (
-					contingency_table[0] >= 0 &&
-					contingency_table[1] >= 0 &&
-					contingency_table[2] >= 0 &&
-					contingency_table[3] >= 0 &&
-					(contingency_table[0] + contingency_table[1] +
-					 contingency_table[2] + contingency_table[0] > 0)
-			   );
+	int ok = (contingency_table[0] + contingency_table[1] +
+	           contingency_table[2] + contingency_table[0]) > 0;
+	if (!(contingency_table[0] >= 0 &&
+	    contingency_table[1] >= 0 &&
+	    contingency_table[2] >= 0 &&
+	    contingency_table[3] >= 0)) {
+		ok = 0;
+		pval = -99.0;
+	}
 	if (ok) {
-			int nrow = 2;
-			int ncol = 2;
-			double expected = -1.0;
-			double percnt = 100.0;
-			double emin = 0.0;
-			double prt = 0.0;
-			int workspace = 300000;
-			fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pval, &workspace);
+		int nrow = 2;
+		int ncol = 2;
+		double expected = -1.0;
+		double percnt = 100.0;
+		double emin = 0.0;
+		double prt = 0.0;
+		int workspace = 300000;
+		fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pval, &workspace);
 	}
 	sqlite3_result_double(context, pval);
 }
