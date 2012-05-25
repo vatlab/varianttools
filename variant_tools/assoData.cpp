@@ -75,7 +75,22 @@ void AssoData::weightX(const vectorf & weight)
 	for (size_t i = 0; i < m_genotype.size(); ++i) {
 		for (size_t j = 0; j < m_genotype[i].size(); ++j) {
 			if (m_genotype[i][j] > 0) {
-				m_genotype[i][j] *= weight[j];
+				m_genotype[i][j] *= (weight[j] == weight[j]) ? weight[j] : 1.0;
+			}
+		}
+	}
+}
+
+
+void AssoData::weightX(const matrixf & weight)
+{
+	if (weight.size() != m_genotype.size() || weight.front() != m_genotype.front()) {
+		throw ValueError("Genotype and genotype information data do not match in scale");
+	}
+	for (size_t i = 0; i < m_genotype.size(); ++i) {
+		for (size_t j = 0; j < m_genotype[i].size(); ++j) {
+			if (m_genotype[i][j] > 0) {
+				m_genotype[i][j] *= (weight[i][j] == weight[i][j]) ? weight[i][j] : 1.0;
 			}
 		}
 	}

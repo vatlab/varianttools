@@ -83,7 +83,7 @@
 
 namespace std
 {
-    /* %template(vectors)    vector<string>; */
+    %template(vectors)    vector<string>;
     %template(vectorf)    vector<double>; 
     %template(vectori)    vector<int>; 
     %template(matrixi)    vector<vector<int> >;

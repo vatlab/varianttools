@@ -90,6 +90,23 @@ bool SetGMissingToMaf::apply(AssoData & d)
 }
 
 
+bool WeightByInfo::apply(AssoData & d)
+{
+	for (size_t i = 0; i < m_info.size(); ++i) {
+		if (d.hasVar("__var_" + m_info[i])) {
+			// get var_info
+			d.weightX(d.getArrayVar("__var_" + m_info[i]));
+		} else if (d.hasVar("__geno_" + m_info[i])) {
+			// get geno_info
+			d.weightX(d.getMatrixVar("__geno_" + m_info[i]));
+		} else {
+			throw ValueError("Cannot find genotype/phenotype information: " + m_info[i]);
+		}
+	}
+	return true;
+}
+
+
 bool WeightByAllMaf::apply(AssoData & d)
 {
 	if (!d.hasVar("maf")) {

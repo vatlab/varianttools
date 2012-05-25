@@ -773,9 +773,12 @@ class GLMBurdenTest(NullTest):
         if self.nan_adjust:
             algorithm.append(t.SetGMissingToMaf())
         # weight genotype codings by w(MAF)
-        # FIXME have to implement a more general weighting with var_info
         if 'MadsenBrowning' in self.weight and not self.use_indicator:
             algorithm.append(t.WeightByAllMaf())
+        # weight with var_info/geno_info
+        otherweights = [x for x in self.weight if not x.startswith('MadsenBrowning')]
+        if len(otherweights) > 0:
+            algorithm.append(t.WeightByInfo(otherweights))
         # association testing using analytic p-value
         if self.permutations == 0:
             algorithm.extend([

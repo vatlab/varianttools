@@ -32,11 +32,12 @@ typedef std::vector<double> vectorf;
 typedef std::vector<std::vector<double> > matrixf;
 typedef std::vector<int> vectori;
 typedef std::vector<std::vector<int> > matrixi;
+#include <string>
+typedef std::vector<std::string> vectors;
 #include <numeric>
 #include <algorithm>
 #include <iostream>
 #include <map>
-#include <string>
 
 #include "assoTests.h"
 #include "utils.h"
@@ -282,6 +283,8 @@ public:
 
 	// weight the raw genotypes by given weight
 	void weightX(const vectorf & weight);
+
+	void weightX(const matrixf & weight);
 
 
 	// store a double value with name 'name'

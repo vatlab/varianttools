@@ -298,6 +298,33 @@ public:
 
 };
 
+class WeightByInfo : public BaseAction
+{
+	// this will change the raw genotypes directly!
+
+public:
+	WeightByInfo(const vectors & info) : BaseAction(), m_info(info)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new WeightByInfo(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "WeightByInfo";
+	}
+
+
+private:
+	vectors m_info;
+};
 
 // remove variant sites having MAF <= lower_bound or MAF > upper_bound
 class SetSites : public BaseAction
