@@ -457,15 +457,13 @@ class AssoTestsWorker(Process):
             # genotype belonging to the same sample name are put together
             #
             # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1))[0] for x in variant_id]
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
             # handle -1 coding (double heterozygotes)
-            gtmp = [2.0 if x == -1.0 else x for x in gtmp]
-            genotype.append(array('d', gtmp))
+            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
             #
             # handle genotype_info
             for idx, key in enumerate(self.geno_info):
-                val = [data.get(x, [float('NaN')]*(len(self.geno_info)+1))[idx + 1] for x in variant_id]
-                geno_info[key].append(array('d', val))
+                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
         #
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
@@ -475,9 +473,11 @@ class AssoTestsWorker(Process):
             self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
         return genotype, toKeep, var_info, geno_info
 
-    def setGenotype(self, which, data):
+    def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
+        for field in info.keys():
+            self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
     def setPhenotype(self, which, data, covariates=None):
         '''Set phenotype data'''
@@ -490,6 +490,10 @@ class AssoTestsWorker(Process):
           self.data.setPhenotype(phen, covt)
         else:
           self.data.setPhenotype(phen)
+
+    def setVarInfo(self, data)
+        for field in data.keys():
+            self.data.setVar('__var_' + field, data[field])
 
     def run(self):
         self.db = DatabaseEngine()
@@ -512,12 +516,9 @@ class AssoTestsWorker(Process):
             try:
                 # select variants from each group:
                 genotype, which, var_info, geno_info = self.getGenotype(grp)
-                self.setGenotype(which, genotype)
+                self.setGenotype(which, genotype, geno_info)
                 self.setPhenotype(which, self.phenotypes, self.covariates)
-                for field in var_info.keys():
-                    self.data.setVar('__var_' + field, var_info[field])
-                for field in geno_info.keys():
-                    self.data.setVar('__geno_' + field, geno_info[field])
+                self.setVarInfo(var_info)
                 for test in self.tests:
                     test.setData(self.data)
                     result = test.calculate()
@@ -715,10 +716,10 @@ class GLMBurdenTest(NullTest):
         #
         # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--model', type=int, choices = [0,1], default=0,
             help='''Fit linear regression model ("0") or logistic regression model ("1").
