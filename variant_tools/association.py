@@ -1216,7 +1216,7 @@ class WeightedSumBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-         parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
