@@ -26,8 +26,6 @@
 
 import os
 import sys
-import gzip
-import bz2
 import re
 import array
 import threading

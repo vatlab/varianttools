@@ -40,9 +40,14 @@ import time
 import tokenize
 import cStringIO
 import gzip
-import bz2
 import threading
 import re
+try:
+    # not all platforms/installations of python support bz2
+    import bz2
+    bz2_support = True
+except:
+    bz2_support = False
 
 if sys.version_info.major == 2:
     import vt_sqlite3_py2 as sqlite3
@@ -118,6 +123,8 @@ def lineCount(filename, encoding='UTF-8'):
         if filename.endswith('.gz'):
             return len(gzip.open(filename, 'rb').readlines())
         elif filename.endswith('.bz2'):
+            if not bz2_support:
+                raise ValueError('Direct reading of bz2 files is not supported. Please update your python installation or uncompress the file before processing')
             return len(bz2.BZ2File(filename).readlines())
         else:
             return len(open(filename, 'rb').readlines())
@@ -131,6 +138,8 @@ def lineCount(filename, encoding='UTF-8'):
         # assuming an arbitrary compression ratio of 5. :-)
         return int(lineCount * (5 * totalSize / 500000.))
     elif filename.endswith('.bz2'):
+        if not bz2_support:
+            raise ValueError('Direct reading of bz2 files is not supported. Please update your python installation or uncompress the file before processing')
         input = bz2.BZ2File(filename, 'rb')
         input.seek(50000, 0)
         content = input.read(500000).decode(encoding)
