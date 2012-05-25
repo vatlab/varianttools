@@ -44,7 +44,7 @@ bool SetMaf::apply(AssoData & d)
 			// genotype not missing
 			if (genotype[i][j] == genotype[i][j]) {
 				valid_all[j] += 1.0;
-				if (genotype[i][j] > 0.0) {
+				if (genotype[i][j] >= 1.0) {
 					maf[j] += genotype[i][j];
 				}
 			}
@@ -70,10 +70,31 @@ bool SetMaf::apply(AssoData & d)
 }
 
 
+bool SetGMissingToMaf::apply(AssoData & d)
+{
+	if (!d.hasVar("maf")) {
+		throw RuntimeError("Sample MAF, which has not been calculated, is required for this operation.");
+	}
+	vectorf & maf = d.getArrayVar("maf");
+	matrixf & genotype = d.raw_genotype();
+	for (size_t j = 0; j < maf.size(); ++j) {
+		// scan for site j
+		for (size_t i = 0; i < genotype.size(); ++i) {
+			// genotype missing; replace with maf
+			if (genotype[i][j] != genotype[i][j]) {
+				genotype[i][j] = maf[j] * 2.0; // times 2 here with the additive assumption of dosage
+			}
+		}
+	}
+	return true;
+}
+
+
 bool WeightByAllMaf::apply(AssoData & d)
 {
-	if (!d.hasVar("maf"))
+	if (!d.hasVar("maf")) {
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+	}
 	vectorf & maf = d.getArrayVar("maf");
 	//
 	vectorf weight;
@@ -155,7 +176,7 @@ bool BinToX::apply(AssoData & d)
 				break;
 			} else if (genotype[i][j] > 0.0) {
 				// binning the data with proper handling of missing genotype
-				pnovar *= (1.0 - genotype[i][j]);
+				pnovar *= (1.0 - genotype[i][j] / 2.0); // genotype[i][j]/2.0 would be the maf
 			} else ;
 		}
 		// all genotypes are missing: have to be represented as Pr(#mutation>=1)

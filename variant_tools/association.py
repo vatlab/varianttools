@@ -747,7 +747,7 @@ class GLMBurdenTest(NullTest):
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -760,23 +760,19 @@ class GLMBurdenTest(NullTest):
             a_regression = t.SimpleLinearRegression() if self.model == 0 else t.SimpleLogisticRegression()
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         # data pre-processing
-        # FIXME have to implement WeightByCtrlMaf()
+        algorithm = t.AssoAlgorithm([
+            # calculate sample MAF
+            t.SetMaf(),
+            # filter out variants having MAF > mafupper or MAF <= maflower
+            t.SetSites(self.mafupper, self.maflower)
+            ])
+        # recode missing data
+        if self.nan_adjust:
+            algorithm.append(t.SetGMissingToMaf())
+        # weight genotype codings by w(MAF)
+        # FIXME have to implement a more general weighting with var_info
         if self.weight_by_maf and not self.use_indicator:
-            algorithm = t.AssoAlgorithm([
-                # calculate sample MAF
-                t.SetMaf(),
-                # filter out variants having MAF > mafupper or MAF <= maflower
-                t.SetSites(self.mafupper, self.maflower),
-                # weight genotype codings by w(MAF)
-                t.WeightByAllMaf()
-                ])
-        else:
-            algorithm = t.AssoAlgorithm([
-                # calculate sample MAF
-                t.SetMaf(),
-                # filter out variants having MAF > mafupper or MAF <= maflower
-                t.SetSites(self.mafupper, self.maflower)
-                ])
+            algorithm.append(t.WeightByAllMaf())
         # association testing using analytic p-value
         if self.permutations == 0:
             algorithm.extend([
@@ -791,22 +787,22 @@ class GLMBurdenTest(NullTest):
         else:
             if not self.variable_thresholds:
                 a_permutationtest = t.FixedPermutator(
-                        self.permute_by.upper(), 
-                        self.alternative, 
-                        self.permutations, 
-                        self.adaptive, 
+                        self.permute_by.upper(),
+                        self.alternative,
+                        self.permutations,
+                        self.adaptive,
                         [a_regression]
                         )
                 algorithm.extend([
-                        a_scoregene, 
+                        a_scoregene,
                         a_permutationtest
                         ])
             else:
                 a_permutationtest = t.VariablePermutator(
-                        self.permute_by.upper(), 
-                        self.alternative, 
-                        self.permutations, 
-                        self.adaptive, 
+                        self.permute_by.upper(),
+                        self.alternative,
+                        self.permutations,
+                        self.adaptive,
                         [a_scoregene, a_regression]
                         )
                 algorithm.append(a_permutationtest)
@@ -883,7 +879,7 @@ class LinRegBurden(GLMBurdenTest):
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -917,7 +913,7 @@ class CollapseQt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -955,7 +951,7 @@ class BurdenQt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -994,7 +990,7 @@ class WeightedSumQt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1046,7 +1042,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1106,7 +1102,7 @@ class LogitRegBurden(GLMBurdenTest):
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1140,7 +1136,7 @@ class CollapseBt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1178,7 +1174,7 @@ class BurdenBt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1217,7 +1213,7 @@ class WeightedSumBt(GLMBurdenTest):
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
@@ -1269,7 +1265,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
-            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)

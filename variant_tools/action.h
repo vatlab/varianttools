@@ -244,6 +244,30 @@ public:
 };
 
 
+class SetGMissingToMaf : public BaseAction
+{
+public:
+	SetGMissingToMaf() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new SetGMissingToMaf(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "SetGMissingToMaf";
+	}
+
+
+};
+
 // compute weight w = 1 / sqrt(p*(1-p))
 // using the entire sample
 // compute weight by maf from selected samples (ctrls, low QT samples, etc)
