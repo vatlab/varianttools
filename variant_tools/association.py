@@ -491,7 +491,7 @@ class AssoTestsWorker(Process):
         else:
           self.data.setPhenotype(phen)
 
-    def setVarInfo(self, data)
+    def setVarInfo(self, data):
         for field in data.keys():
             self.data.setVar('__var_' + field, data[field])
 
@@ -746,6 +746,9 @@ class GLMBurdenTest(NullTest):
         parser.add_argument('--weight_by_maf', action='store_true',
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -832,7 +835,7 @@ class GLMBurdenTest(NullTest):
 
 
 #
-# Derived statistical Association tests. 
+# Derived statistical Association tests.
 #
 
 # quantitative traits
@@ -852,10 +855,10 @@ class LinRegBurden(GLMBurdenTest):
         #
         # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -867,7 +870,7 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
@@ -879,12 +882,16 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('--weight_by_maf', action='store_true',
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.model = 0
 
 class CollapseQt(GLMBurdenTest):
@@ -904,17 +911,21 @@ class CollapseQt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = True
         self.maflower = 0.0
         self.permutations = 0
@@ -938,24 +949,28 @@ class BurdenQt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = False
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
         self.weight_by_maf = False
         self.model = 0
-        
+
 class WeightedSumQt(GLMBurdenTest):
     '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
     def __init__(self, logger=None, *method_args):
@@ -973,17 +988,21 @@ class WeightedSumQt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = False
         self.maflower = 0.0
         self.permutations = 0
@@ -1007,10 +1026,10 @@ class VariableThresholdsQt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -1026,6 +1045,10 @@ class VariableThresholdsQt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -1082,6 +1105,10 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('--weight_by_maf', action='store_true',
             help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
             to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -1112,6 +1139,10 @@ class CollapseBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -1141,24 +1172,28 @@ class BurdenBt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = False
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
         self.weight_by_maf = False
         self.model = 1
-        
+
 class WeightedSumBt(GLMBurdenTest):
     '''Weighted sum statistic for binary traits, in the spirit of Madsen & Browning 2009'''
     def __init__(self, logger=None, *method_args):
@@ -1176,17 +1211,21 @@ class WeightedSumBt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
         parser.add_argument('--mafupper', type=freq, default=0.01,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 0.01''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+         parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
-        # 
+        #
         self.use_indicator = False
         self.maflower = 0.0
         self.permutations = 0
@@ -1210,10 +1249,10 @@ class VariableThresholdsBt(GLMBurdenTest):
                 differentiate output of different tests, or the same test with different parameters.''')
         # arguments that are used by this test
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1 
-            will be included in analysis. Default set to 1.0''')  
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2 
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -1222,16 +1261,20 @@ class VariableThresholdsBt(GLMBurdenTest):
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
         parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
-            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')        
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To not using adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--nan_adjust', action='store_true',
+            help='''This option, if evoked, will recode missing genotype values by sample allele frequencies. The association test will
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+
         args = parser.parse_args(method_args)
         # incorporate args to this class
-        self.__dict__.update(vars(args))        
+        self.__dict__.update(vars(args))
         #
         # We add the fixed parameter here ...
         #
