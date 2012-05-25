@@ -743,9 +743,12 @@ class GLMBurdenTest(NullTest):
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
-        parser.add_argument('--weight_by_maf', action='store_true',
-            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--weight', nargs='*', default=[],
+        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
+            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
+            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+            ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -771,7 +774,7 @@ class GLMBurdenTest(NullTest):
             algorithm.append(t.SetGMissingToMaf())
         # weight genotype codings by w(MAF)
         # FIXME have to implement a more general weighting with var_info
-        if self.weight_by_maf and not self.use_indicator:
+        if 'MadsenBrowning' in self.weight and not self.use_indicator:
             algorithm.append(t.WeightByAllMaf())
         # association testing using analytic p-value
         if self.permutations == 0:
@@ -875,9 +878,12 @@ class LinRegBurden(GLMBurdenTest):
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
-        parser.add_argument('--weight_by_maf', action='store_true',
-            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--weight', nargs='*', default=[],
+        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
+            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
+            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+            ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -926,7 +932,6 @@ class CollapseQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = False
         self.model = 0
 
 class BurdenQt(GLMBurdenTest):
@@ -964,7 +969,6 @@ class BurdenQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = False
         self.model = 0
 
 class WeightedSumQt(GLMBurdenTest):
@@ -1003,7 +1007,7 @@ class WeightedSumQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = True
+        self.weight.append('MadsenBrowning')
         self.model = 0
 
 class VariableThresholdsQt(GLMBurdenTest):
@@ -1053,7 +1057,6 @@ class VariableThresholdsQt(GLMBurdenTest):
         #
         self.variable_thresholds = True
         self.use_indicator=False
-        self.weight_by_maf = False
         self.model = 0
 
 # binary traits
@@ -1098,9 +1101,12 @@ class LogitRegBurden(GLMBurdenTest):
             To not using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
-        parser.add_argument('--weight_by_maf', action='store_true',
-            help='''This option, if evoked, will apply Madsen&Browning weighting (based on observed allele frequencies in all samples)
-            to GENE based analysis. Note this option will be masked if --use_indicator is evoked''')
+        parser.add_argument('--weight', nargs='*', default=[],
+        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
+            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
+            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+            ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -1149,7 +1155,6 @@ class CollapseBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = False
         self.model = 1
 
 class BurdenBt(GLMBurdenTest):
@@ -1187,7 +1192,6 @@ class BurdenBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = False
         self.model = 1
 
 class WeightedSumBt(GLMBurdenTest):
@@ -1226,7 +1230,7 @@ class WeightedSumBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight_by_maf = True
+        self.weight.append('MadsenBrowning')
         self.model = 1
 
 class VariableThresholdsBt(GLMBurdenTest):
@@ -1276,5 +1280,4 @@ class VariableThresholdsBt(GLMBurdenTest):
         #
         self.variable_thresholds = True
         self.use_indicator=False
-        self.weight_by_maf = False
         self.model = 1

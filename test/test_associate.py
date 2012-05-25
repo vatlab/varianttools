@@ -83,8 +83,8 @@ class TestAsso(ProcessTestCase):
         self.assertFail('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 10000000 --adaptive 24"')
         self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden -p 100 --variable_thresholds"')
 
-    def testResult(self):
-        'Test association results'
+    def testBasic(self):
+        'Test basic association results'
         zip = ZipFile('proj/assoproj.zip')
         dir = os.getcwd()
         zip.extractall(dir)
@@ -97,6 +97,19 @@ class TestAsso(ProcessTestCase):
                 infile = f.readlines()
             self.assertEqual([x.rstrip() for x in infile], vtoolsout)
 
+    def testWeights(self):
+        'Test for weighting theme'
+        zip = ZipFile('proj/assoproj.zip')
+        dir = os.getcwd()
+        zip.extractall(dir)
+        for i in range(8):
+            runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
+            vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2 --weight MadsenBrowning" -g grpby')
+            vtoolsout.sort()
+            vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
+            with open('output/assores_wss'+str(i+1)+'.txt','r') as f:
+                infile = f.readlines()
+            self.assertEqual([x.rstrip() for x in infile], vtoolsout)
 
     def testPyAction(self):
         'Test action pyaction'
