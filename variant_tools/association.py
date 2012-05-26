@@ -935,6 +935,7 @@ class CollapseQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
+        self.weight = []
         self.model = 0
 
 class BurdenQt(GLMBurdenTest):
@@ -972,6 +973,7 @@ class BurdenQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
+        self.weight = []
         self.model = 0
 
 class WeightedSumQt(GLMBurdenTest):
@@ -1010,7 +1012,7 @@ class WeightedSumQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight.append('MadsenBrowning')
+        self.weight = ['MadsenBrowning']
         self.model = 0
 
 class VariableThresholdsQt(GLMBurdenTest):
@@ -1060,6 +1062,7 @@ class VariableThresholdsQt(GLMBurdenTest):
         #
         self.variable_thresholds = True
         self.use_indicator=False
+        self.weight = []
         self.model = 0
 
 # binary traits
@@ -1158,6 +1161,7 @@ class CollapseBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
+        self.weight = []
         self.model = 1
 
 class BurdenBt(GLMBurdenTest):
@@ -1195,6 +1199,7 @@ class BurdenBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
+        self.weight = []
         self.model = 1
 
 class WeightedSumBt(GLMBurdenTest):
@@ -1233,7 +1238,7 @@ class WeightedSumBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight.append('MadsenBrowning')
+        self.weight = 'MadsenBrowning_ctrl'
         self.model = 1
 
 class VariableThresholdsBt(GLMBurdenTest):
@@ -1282,5 +1287,6 @@ class VariableThresholdsBt(GLMBurdenTest):
         # We add the fixed parameter here ...
         #
         self.variable_thresholds = True
+        self.weight = []
         self.use_indicator=False
         self.model = 1
