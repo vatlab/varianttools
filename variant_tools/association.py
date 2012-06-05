@@ -142,7 +142,7 @@ class AssociationTestManager:
                 item = [i - 1.0 for i in item]
             if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
                 for test in self.tests:
-                    if not test.trait_type == 'disease':
+                    if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
         # step 3: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
@@ -610,10 +610,10 @@ class NullTest:
         '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
         self.logger = logger
-        self.parseArgs(*method_args)
-        #
         self.trait_type = None
         self.fields = []
+        self.parseArgs(*method_args)
+        #
 
     def parseArgs(self, method_args):
         # this function should never be called.
@@ -703,8 +703,8 @@ class GLMBurdenTest(NullTest):
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
         #
         # NullTest.__init__ will call parseArgs to get the parameters we need
-        self.algorithm = self._determine_algorithm(ncovariates)
         self.regression_model = {'quantitative':0, 'disease':1}
+        self.algorithm = self._determine_algorithm(ncovariates)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
