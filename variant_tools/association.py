@@ -142,9 +142,8 @@ class AssociationTestManager:
                 item = [i - 1.0 for i in item]
             if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
                 for test in self.tests:
-                    if not test.__class__.__name__ == 'GroupStat':
-                        if test.model == 1:
-                            raise ValueError("Cannot perform logistic regression on non-binary coding phenotype")
+                    if not test.trait_type == 'disease':
+                        raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
         # step 3: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = []
@@ -613,6 +612,7 @@ class NullTest:
         self.logger = logger
         self.parseArgs(*method_args)
         #
+        self.trait_type = None
         self.fields = []
 
     def parseArgs(self, method_args):
@@ -722,9 +722,9 @@ class GLMBurdenTest(NullTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--model', type=int, choices = [0,1], default=0,
-            help='''Fit linear regression model ("0") or logistic regression model ("1").
-            Default set to 0''')
+        parser.add_argument('--trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
+            help='''Phenotype is quantitative trait or disease trait (0/1 coding).
+            Default set to quantitative''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
@@ -759,9 +759,9 @@ class GLMBurdenTest(NullTest):
 
     def _determine_algorithm(self, ncovariates):
         if ncovariates > 0:
-            a_regression = t.MultipleRegression(self.permutations == 0, self.model)
+            a_regression = t.MultipleRegression(self.permutations == 0, self.trait_type)
         else:
-            a_regression = t.SimpleLinearRegression() if self.model == 0 else t.SimpleLogisticRegression()
+            a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         # data pre-processing
         algorithm = t.AssoAlgorithm([
@@ -816,7 +816,7 @@ class GLMBurdenTest(NullTest):
         return algorithm
 
     def calculate(self):
-        if self.model == 1:
+        if self.trait_type == 'disease':
             self.data.countCaseCtrl()
         self.algorithm.apply(self.data)
         # get results
@@ -898,7 +898,7 @@ class LinRegBurden(GLMBurdenTest):
         #
         # We add the fixed parameter here ...
         #
-        self.model = 0
+        self.trait_type = 'quantitative'
 
 class CollapseQt(GLMBurdenTest):
     '''Collapsing method for quantitative traits, Li & Leal 2008'''
@@ -937,7 +937,7 @@ class CollapseQt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = []
-        self.model = 0
+        self.trait_type = 'quantitative'
 
 class BurdenQt(GLMBurdenTest):
     '''Burden test for quantitative traits, Morris & Zeggini 2009'''
@@ -975,7 +975,7 @@ class BurdenQt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = []
-        self.model = 0
+        self.trait_type = 'quantitative'
 
 class WeightedSumQt(GLMBurdenTest):
     '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
@@ -1014,7 +1014,7 @@ class WeightedSumQt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = ['MadsenBrowning']
-        self.model = 0
+        self.trait_type = 'quantitative'
 
 class VariableThresholdsQt(GLMBurdenTest):
     '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
@@ -1064,7 +1064,7 @@ class VariableThresholdsQt(GLMBurdenTest):
         self.variable_thresholds = True
         self.use_indicator=False
         self.weight = []
-        self.model = 0
+        self.trait_type = 'quantitative'
 
 # binary traits
 class LogitRegBurden(GLMBurdenTest):
@@ -1124,7 +1124,7 @@ class LogitRegBurden(GLMBurdenTest):
         #
         # We add the fixed parameter here ...
         #
-        self.model = 1
+        self.trait_type = 'disease'
 
 class CollapseBt(GLMBurdenTest):
     '''Collapsing method for binary traits, Li & Leal 2008'''
@@ -1163,7 +1163,7 @@ class CollapseBt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = []
-        self.model = 1
+        self.trait_type = 'disease'
 
 class BurdenBt(GLMBurdenTest):
     '''Burden test for binary traits, Morris & Zeggini 2009'''
@@ -1201,7 +1201,7 @@ class BurdenBt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = []
-        self.model = 1
+        self.trait_type = 'disease'
 
 class WeightedSumBt(GLMBurdenTest):
     '''Weighted sum statistic for binary traits, in the spirit of Madsen & Browning 2009'''
@@ -1240,7 +1240,7 @@ class WeightedSumBt(GLMBurdenTest):
         self.permutations = 0
         self.variable_thresholds = False
         self.weight = 'MadsenBrowning_ctrl'
-        self.model = 1
+        self.trait_type = 'disease'
 
 class VariableThresholdsBt(GLMBurdenTest):
     '''Variable thresholds method for binary traits, in the spirit of Price et al 2010'''
@@ -1290,4 +1290,4 @@ class VariableThresholdsBt(GLMBurdenTest):
         self.variable_thresholds = True
         self.weight = []
         self.use_indicator=False
-        self.model = 1
+        self.trait_type = 'disease'
