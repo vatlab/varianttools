@@ -704,6 +704,7 @@ class GLMBurdenTest(NullTest):
         #
         # NullTest.__init__ will call parseArgs to get the parameters we need
         self.algorithm = self._determine_algorithm(ncovariates)
+        self.regression_model = {'quantitative':0, 'disease':1}
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
@@ -759,7 +760,7 @@ class GLMBurdenTest(NullTest):
 
     def _determine_algorithm(self, ncovariates):
         if ncovariates > 0:
-            a_regression = t.MultipleRegression(self.permutations == 0, self.trait_type)
+            a_regression = t.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
         else:
             a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
