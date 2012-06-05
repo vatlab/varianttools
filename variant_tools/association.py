@@ -142,8 +142,9 @@ class AssociationTestManager:
                 item = [i - 1.0 for i in item]
             if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
                 for test in self.tests:
-                    if test.model == 1:
-                        raise ValueError("Cannot perform logistic regression on non-binary coding phenotype")
+                    if not test.__class__.__name__ == 'GroupStat':
+                        if test.model == 1:
+                            raise ValueError("Cannot perform logistic regression on non-binary coding phenotype")
         # step 3: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = []
@@ -229,7 +230,7 @@ class AssociationTestManager:
                 phenotypes = [map(float, x) for x in phenotypes]
                 covariates = [map(float, x) for x in covariates]
             except ValueError:
-                raise ValueError('Invalid coding in phenotype/covariates values: '
+                raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values: '
                                  'missing values should be removed from analysis or '
                                  'inferred with numeric values')
             return sample_IDs, phenotypes, covariates
@@ -419,11 +420,11 @@ class AssoTestsWorker(Process):
         # get annotation
         var_info = {x:[] for x in self.var_info}
         if self.var_info:
-            select_clause, fields = consolidateFieldName(self.proj, 'variant', ','.join(['variant_id'] + self.var_info))
+            select_clause, fields = consolidateFieldName(self.proj, self.table, ','.join(['variant_id'] + self.var_info))
             #
             # FROM clause
-            from_clause = 'FROM variant '
-            fields_info = sum([self.proj.linkFieldToTable(x, 'variant') for x in fields], [])
+            from_clause = 'FROM {} '.format(self.table)
+            fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
             #
             processed = set()
             # the normal annotation databases that are 'LEFT OUTER JOIN'
@@ -610,7 +611,6 @@ class NullTest:
         '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
         self.logger = logger
-        self.model = 0   # Gao, could you have a look?
         self.parseArgs(*method_args)
         #
         self.fields = []
