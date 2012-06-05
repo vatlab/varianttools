@@ -193,7 +193,7 @@ class Sample:
                 for f in allowed_fields:
                     if f.lower() not in [x.lower() for x in new_fields]:
                         raise ValueError('Field {} is not in specified input file {}'.format(f, filename))
-        # 
+        #
         # get allowed samples
         cur = self.db.cursor()
         allowed_samples = self.proj.selectSampleByPhenotype(samples)
@@ -206,6 +206,9 @@ class Sample:
         for idx, field in enumerate(new_fields):
             if field.lower() == 'sample_name':
                 raise ValueError('Command vtools phenotype cannot be used to update sample names. Please use command "vtools admin" for this purpose.')
+            if by_sample and field.lower() == 'filename':
+                self.logger.debug('Ignoring field {}'.format(field))
+                continue
             if allowed_fields and field.lower() not in [x.lower() for x in allowed_fields]:
                 self.logger.debug('Ignoring field {}'.format(field))
                 continue
@@ -241,7 +244,7 @@ class Sample:
                         count[0] += 1
                         cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
         self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
-            count[1]+count[2], count[1], count[2], count[0]/(count[1] + count[2])))
+            count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
         self.db.commit()
 
     def setPhenotype(self, field, expression, samples):
