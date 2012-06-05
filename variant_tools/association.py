@@ -610,6 +610,7 @@ class NullTest:
         '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
         self.logger = logger
+        self.model = 0   # Gao, could you have a look?
         self.parseArgs(*method_args)
         #
         self.fields = []
