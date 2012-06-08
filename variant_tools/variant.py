@@ -538,7 +538,7 @@ def compareMultipleTables(proj, args):
             cur.execute(query, (id,))
             if count % 10000 == 0:
                 prog.update(count)
-        prog.describeTable(table, desc, True, True)
+        proj.describeTable(table, desc, True, True)
         prog.done()       
         proj.db.commit()
 
