@@ -776,12 +776,20 @@ class TextWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-class TextReader:
+def TextReader(processor, input, varIdx, jobs, encoding, logger):
+    if jobs == 0:
+        return EmbeddedTextReader(processor, input, varIdx, encoding, logger)
+    elif jobs == 1:
+        return StandaloneTextReader(processor, input, varIdx, encoding, logger)
+    else:
+        return MultiTextReader(processor, input, varIdx, jobs, encoding, logger)
+
+class EmbeddedTextReader:
     #
     # This processor uses the passed line processor to process input
     # in the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, jobs, encoding, logger):
+    def __init__(self, processor, input, varIdx, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
         self.processor = processor
@@ -813,6 +821,129 @@ class TextReader:
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
                     self.skipped_lines += 1
+
+class StandaloneTextReader:
+    #
+    # This processor fire up 1 worker to read an input file
+    # and gather their outputs
+    #
+    def __init__(self, processor, input, varIdx, encoding, logger):
+        self.num_records = 0
+        self.skipped_lines = 0
+        #
+        self.reader, w = Pipe(False)
+        self.worker = TextWorker(processor, input, varIdx, w, 1, 0, encoding, logger)
+        self.worker.start()
+        # the send value is columnRange
+        self.columnRange = self.reader.recv()
+        
+    def records(self):
+        while True:
+            val = self.reader.recv()
+            if val is None:
+                self.num_records, self.skipped_lines = self.reader.recv()
+                break
+            else:
+                yield val
+        self.worker.join()
+
+class MultiTextReader:
+    #
+    # This processor fire up num workers to read an input file
+    # and gather their outputs
+    #
+    def __init__(self, processor, input, varIdx, jobs, encoding, logger):
+        self.readers = []
+        self.workers = []
+        self.num_records = 0
+        self.skipped_lines = 0
+        for i in range(jobs):
+            r, w = Pipe(False)
+            p = TextWorker(processor, input, varIdx, w, jobs, i, encoding, logger)
+            self.readers.append(r)
+            self.workers.append(p)
+            p.start()
+        # the send value is columnRange
+        for reader in self.readers:
+            self.columnRange = reader.recv()
+        
+    def records(self):
+        all_workers = len(self.readers)
+        still_working = len(self.readers)
+        #
+        # we need a heap to keep records read from multiple processes in order
+        # we can not really guarantee this if there are large trunks of ignored
+        # records but a heap size = 4 * number of readers should work in most cases
+        #
+        heap = []
+        filled = False
+        while True:
+            for idx, reader in enumerate(self.readers):
+                val = reader.recv()
+                if val is None:
+                    # one thread died ...
+                    still_working -= 1
+                    nr, sl = reader.recv()
+                    self.num_records += nr
+                    self.skipped_lines += sl
+                    self.readers[idx] = None
+                elif filled:
+                    yield heappushpop(heap, val)
+                else:
+                    heappush(heap, val)
+                    filled = len(heap) == 4 * len(self.readers)
+            if still_working < all_workers:
+                self.readers = [x for x in self.readers if x is not None]
+                all_workers = len(self.readers)
+                if all_workers == 0:
+                    # return all things in the heap
+                    for i in range(len(heap)):
+                        yield heappop(heap)
+                    break
+        for p in self.workers:
+            p.join()
+
+#     def run1(self):
+#         # this is a hold for the merge_by_col feature which is disabled for now
+#         rec_key = []
+#         rec_stack = []
+#         for line in input_file:
+#             line = line.decode()
+#             try:
+#                 if line.startswith('#'):
+#                     continue
+#                 self.processed_lines += 1
+#                 tokens = [x.strip() for x in line.split(self.delimiter)]
+#                 key = [tokens(x) for x in self.merge_by_cols]
+#                 if not rec_stack:
+#                     rec_key = key
+#                     rec_stack.append(tokens)
+#                     continue
+#                 # if the same, wait fot the next record
+#                 elif rec_key == key:
+#                     rec_stack.append(tokens)
+#                     continue
+#                 # if not the same, ...
+#                 elif len(rec_stack) == 1:
+#                     # use the value in stack
+#                     line = rec_stack[0]
+#                     rec_stack[0] = tokens
+#                     rec_key = key
+#                 # if multiple
+#                 else:
+#                     n = len(rec_stack)
+#                     # merge values
+#                     line = [rec_stack[0][x] if x in self.merge_by_cols else \
+#                         ','.join([rec_stack[i][x] for i in range(n)]) for x in range(len(tokens))]
+#                     rec_stack[0] = tokens
+#                     rec_key = key
+#                 #
+#                 for bins,rec in self.process(line):
+#                     self.num_records += 1
+#                     yield bins, rec
+#             except Exception as e:
+#                 self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+#                 self.skipped_lines += 1
 
 #
 # Import data
