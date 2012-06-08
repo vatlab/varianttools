@@ -705,14 +705,25 @@ class DirectGenotypeWriter:
         self.db.commit()
         del s
         self.count = 0
+        self.cache = {}
 
     def write(self, id, rec):
-        self.cur.execute(self.query.format(id), rec)
-        self.count += 1
-        if self.count % 500000 == 0:
+        try:
+            if len(self.cache[id]) == 1000:
+                self.cur.executemany(self.query.format(id), self.cache[id])
+                self.cache[id] = [rec]
+                self.count += 1
+            else:
+                self.cache[id].append(rec)
+        except KeyError:
+            self.cache[id] = [rec]
+        if self.count % 10000 == 0:
             self.db.commit()
     
     def close(self):
+        for id, val in self.cache.iteritems():
+            if len(val) > 0:
+                self.cur.executemany(self.query.format(id), val)
         self.db.commit()
         self.db.close()
 
