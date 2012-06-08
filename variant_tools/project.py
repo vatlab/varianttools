@@ -3210,24 +3210,38 @@ def adminArguments(parser):
         help='''Merge samples with the same sample names by combining genotypes
         belonging to these samples. Phenotypes related to individual samples will
         be merged.''')
-    rename = parser.add_argument_group('Rename samples')
-    rename.add_argument('--rename_samples', nargs=2, metavar=('COND', 'NAME'),
+    rename_samples = parser.add_argument_group('Rename samples')
+    rename_samples.add_argument('--rename_samples', nargs=2, metavar=('COND', 'NAME'),
         help='''Rename samples that match specified COND to a new NAME.''')
+    rename_table = parser.add_argument_group('Rename/describe tables')
+    rename_table.add_argument('--rename_table', nargs=2, metavar=('NAME', 'NEW_NAME'),
+        help='''Change table NAME to a NEW_NAME.''')
+    rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
+        help='''Update description for TABLE with a NEW_DESCRIPTION.''')
 
 def admin(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if not args.merge_samples and not args.rename_samples:
-                proj.logger.warning('Please specify one of --merge_samples and --rename_samples')
             if args.merge_samples and args.rename_samples:
                 raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
                 changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
                 proj.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
-            if args.merge_samples:
+            elif args.merge_samples:
                 # need to merge genotype tables
                 proj.db.attach(proj.name + '_genotype')
                 proj.mergeSamples()
+            elif args.rename_table:
+                proj.db.renameTable(args.rename_table[0], args.rename_table[1])
+                proj.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
+            elif args.describe_table:
+                if not proj.db.hasTable(args.describe_table[0]):
+                    raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
+                proj.describeTable(args.describe_table[0], args.describe_table[1])
+                proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
+            else:
+                proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
+
     except Exception as e:
         sys.exit(e)
 
