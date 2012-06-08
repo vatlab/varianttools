@@ -156,7 +156,7 @@ def selectArguments(parser):
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
-    parser.add_argument('-t', '--to_table',
+    parser.add_argument('-t', '--to_table', nargs='*', metavar=('TABLE', 'DESC'),
         help='''Destination variant table. ''')
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('-c', '--count', action='store_true',
@@ -169,6 +169,12 @@ def selectArguments(parser):
 def select(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            # separate table and message
+            if args.to_table:
+                if len(args.to_table) > 2:
+                    raise ValueError('Only a table name and an optional message is allowed for parameter to_table')
+                args.table_desc = args.to_table[1] if len(args.to_table) == 2 else ''
+                args.to_table = args.to_table[0]
             # table?
             if not proj.isVariantTable(args.from_table):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
@@ -327,6 +333,7 @@ def select(args, reverse=False):
                     proj.logger.warning('Existing table {} is renamed to {}.'.format(args.to_table, new_table))
                 #
                 proj.createVariantTable(args.to_table)
+                proj.describeTable(args.to_table, args.table_desc, True, True)
                 if not reverse:
                     query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id {2} {3};'.format(args.to_table, args.from_table,
                         from_clause, where_clause)
@@ -388,12 +395,15 @@ def compareArguments(parser):
         help='''deprecated, use --intersect instead.''')
     parser.add_argument('--A_or_B', metavar= 'TABLE',
         help='''deprecated, use --union instead.''')
-    parser.add_argument('--union', metavar='TABLE', nargs='?', default='',
-        help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name is specified.''')
-    parser.add_argument('--intersection', metavar='TABLE', nargs='?', default='',
-        help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name is specified''')
-    parser.add_argument('--difference', metavar='TABLE', nargs='?', default='',
-        help='''Save variants in the first, but in the others (T1 - T2 - T3...) to TABLE if a name is specified''')
+    parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+        help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name
+             is specified. An optional message can be added to describe the table.''')
+    parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+        help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name
+             is specified. An optional message can be added to describe the table.''')
+    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+        help='''Save variants in the first, but in the others (T1 - T2 - T3...) to TABLE
+              if a name is specified. An optional message can be added to describe the table.''')
     parser.add_argument('-c', '--count', action='store_true',
         help='''Output number of variants for specified option (e.g. --union -c).''')
 
@@ -504,12 +514,16 @@ def compareMultipleTables(proj, args):
         elif args.intersection is not None:
             print(len(var_intersect))
     #
-    for var, table in [
+    for var, table_with_desc in [
             (var_intersect, args.intersection),
             (var_union, args.union),
             (var_diff, args.difference)]:
-        if not table:
+        if not table_with_desc:
             continue
+        table = table_with_desc[0]
+        desc = table_with_desc[1] if len(table_with_desc) == 2 else ''
+        if len(table_with_desc) > 2:
+            raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
         if table == 'variant':
             raise ValueError('Cannot overwrite master variant table')
         if proj.db.hasTable(table):
@@ -524,6 +538,7 @@ def compareMultipleTables(proj, args):
             cur.execute(query, (id,))
             if count % 10000 == 0:
                 prog.update(count)
+        prog.describeTable(table, desc, True, True)
         prog.done()       
         proj.db.commit()
 

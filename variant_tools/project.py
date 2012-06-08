@@ -43,7 +43,7 @@ from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, getCommandLine
 
 
 # define a field type
@@ -874,6 +874,9 @@ class Project:
         ch.setLevel(logging.DEBUG if self.verbosity is None or len(self.verbosity) == 1 else levels[self.verbosity[1]])
         ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
         self.logger.addHandler(ch)
+        # start a new session
+        self.logger.debug('')
+        self.logger.debug(getCommandLine())
         if new:
             self.create(build=build, **kwargs)
         else:
@@ -1055,8 +1058,8 @@ class Project:
         try:
             return cur.fetchone()[0]
         except Exception as e:
-            self.logger.debug(e)
-            self.logger.warning('Failed to retrieve value for project property {}'.format(key))
+            #self.logger.debug(e)
+            #self.logger.warning('Failed to retrieve value for project property {}'.format(key))
             self.saveProperty(key, default)
             return default
 
@@ -1248,6 +1251,21 @@ class Project:
             );'''.format('TEMPORARY' if temporary else '', table))
         self.db.commit()
 
+    def describeTable(self, table, message, save_date=False, save_cmd=False):
+        '''Attach a message to a table, optional date and command
+        to create the table can also be saved.'''
+        self.saveProperty('__desc_of_{}'.format(table), message)
+        if save_date:
+            self.saveProperty('__date_of_{}'.format(table), time.strftime('%b%d', time.gmtime()))
+        if save_cmd:
+            self.saveProperty('__cmd_of_{}'.format(table), getCommandLine())
+
+    def descriptionOfTable(self, table):
+        '''Get description of table'''
+        return (self.loadProperty('__desc_of_{}'.format(table), ''),
+            self.loadProperty('__date_of_{}'.format(table), ''),
+            self.loadProperty('__cmd_of_{}'.format(table), '') )
+            
     def createSampleTableIfNeeded(self, fields=[], table='sample'):
         if self.db.hasTable(table):
             return
@@ -3004,9 +3022,11 @@ def show(args):
             elif args.type == 'tables':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'.format(', '.join(args.items)))
-                print('{:<20} {}'.format('table', '#variants'))
-                for table in proj.db.tables() if args.verbosity=='2' else proj.getVariantTables():
-                    print('{:<20} {:,}'.format(table, proj.db.numOfRows(table)))
+                print('{:<20} {:>10} {:>8}  {}'.format('table', '#variants', 'date', 'message'))
+                for table in proj.getVariantTables():
+                    desc, date, cmd = proj.descriptionOfTable(table) 
+                    print('{:<20} {: >10,} {:>8}  {}'.format(table, proj.db.numOfRows(table), date, 
+                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=50))))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
@@ -3020,6 +3040,12 @@ def show(args):
                         table = '{}_genotype.{}'.format(proj.name, table)
                     else:
                         raise ValueError('Table {} does not exist'.format(table))
+                # print description of table
+                desc, date, cmd = proj.descriptionOfTable(table)
+                if date:  # if date is available, project has such information
+                    print('# Description:  {}'.format(desc))
+                    print('# Create date:  {}'.format(date))
+                    print('# From command: {}'.format(cmd))
                 # print content of table
                 headers = proj.db.getHeaders(table)
                 print(', '.join(headers))

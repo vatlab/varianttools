@@ -56,7 +56,9 @@ else:
 
 runOptions = {
     'verbosity': '1',
-    'temp_dir': None
+    'temp_dir': None,
+    # this will be the raw command that will be saved to log file
+    'command_line': ''
 }
 
 SQL_KEYWORDS = set([
@@ -104,11 +106,16 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
-def setOptions(verbosity=None, temp_dir=None):
+def setOptions(verbosity=None, temp_dir=None, command_line=''):
     if verbosity is not None:
         runOptions['verbosity'] = verbosity[0]
     if temp_dir:
         runOptions['temp_dir'] = temp_dir
+    if command_line:
+        runOptions['command_line'] = command_line
+
+def getCommandLine():
+    return runOptions['command_line']
 
 #
 # Utility functions
