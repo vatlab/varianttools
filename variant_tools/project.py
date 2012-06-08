@@ -3043,9 +3043,9 @@ def show(args):
                 # print description of table
                 desc, date, cmd = proj.descriptionOfTable(table)
                 if date:  # if date is available, project has such information
-                    print('# Description:  {}'.format(desc))
-                    print('# Create date:  {}'.format(date))
-                    print('# From command: {}'.format(cmd))
+                    print('# Description:   {}'.format(desc))
+                    print('# Creation date: {}'.format(date))
+                    print('# From command:  {}'.format(cmd))
                 # print content of table
                 headers = proj.db.getHeaders(table)
                 print(', '.join(headers))
