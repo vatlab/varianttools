@@ -1283,7 +1283,7 @@ class Project:
         self.db.commit()
 
     def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
-        '''Create a table ``sample_variant`` to store vcf data'''
+        '''Create a table ``genotype_??`` to store genotype data'''
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
