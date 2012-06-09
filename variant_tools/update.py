@@ -40,7 +40,7 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField, openFile, \
     consolidateFieldName
-from .importer import LineImporter, TextReader
+from .importer import LineImporter, TextReader, getSampleName
 
 #
 #
@@ -161,7 +161,7 @@ class Updater:
         self.update_range_query = 'UPDATE variant SET {1} WHERE variant.{2} = {0} AND variant.{3} = {0} AND variant.{4} >= {0} AND variant.{4} <= {0} {5};'\
             .format(self.db.PH, ', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), fbin, fchr, fpos, from_table)
         #
-        self.createLocalVariantIndex(table)
+        self.variantIndex = self.proj.createVariantMap(table, self.import_alt_build)
         self.table = table
 
 
@@ -190,51 +190,6 @@ class Updater:
             if count % self.db.batch == 0:
                 prog.update(count)
         prog.done()
-
-    def getSampleName(self, filename, prober):
-        '''Prove text file for sample name'''
-        header_line = None
-        count = 0
-        with openFile(filename) as input:
-            for line in input:
-                line = line.decode(self.encoding)
-                # the last # line
-                if line.startswith('#'):
-                    header_line = line
-                else:
-                    try:
-                        for bins, rec in prober.process(line):
-                            if header_line is None:
-                                return len(rec), []
-                            elif len(rec) == 0:
-                                return 0, []
-                            else:
-                                cols = [x[0] for x in prober.fields]
-                                if type(cols[0]) is tuple:
-                                    fixed = False
-                                    # mutiple ones, need to figure out the moving one
-                                    for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
-                                        if ':' in idx:
-                                            cols = [x[i] for x in cols]
-                                            fixed = True
-                                            break
-                                    if not fixed:
-                                        cols = [x[-1] for x in cols]
-                                header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
-                                if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
-                                    return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
-                                else:
-                                    return len(rec), []
-                    except IgnoredRecord:
-                        continue
-                    except Exception as e:
-                        # perhaps not start with #, if we have no header, use it anyway
-                        if header_line is None:
-                            header_line = line
-                        count += 1
-                        if count == 100:
-                            raise ValueError('No genotype column could be determined after 1000 lines.')
-                        self.logger.debug(e)
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
@@ -274,7 +229,7 @@ class Updater:
             sample_ids.append(rec[0])
             sample_names.append(rec[1])
         # what is the sample names get from this file?
-        nSample, names = self.getSampleName(filename, self.prober)
+        nSample, names = getSampleName(filename, self.prober, self.encoding, self.logger)
         if nSample != len(sample_ids):
             self.logger.warning('Number of samples mismatch. Cannot update genotype')
             return []
@@ -288,8 +243,7 @@ class Updater:
             self.logger.warning('Sample names mismatch. Cannot update genotype.')
             return []
         
-    def importFromFile(self, input_filename):
-        '''Import a TSV file to sample_variant'''
+    def updateFromFile(self, input_filename):
         self.processor.reset()
         if self.genotype_field and self.genotype_info:
             self.prober.reset()
@@ -366,7 +320,7 @@ class Updater:
         '''Start updating'''
         for count,f in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Updating', f, count + 1, len(self.files)))
-            self.importFromFile(f)
+            self.updateFromFile(f)
             self.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
                     '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
             for i in range(len(self.count)):

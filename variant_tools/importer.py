@@ -905,6 +905,58 @@ class MultiTextReader:
 
 #
 #
+# utility function to get sample name
+#
+def getSampleName(filename, prober, encoding, logger):
+    '''Prove text file for sample name'''
+    header_line = None
+    count = 0
+    with openFile(filename) as input:
+        for line in input:
+            line = line.decode(encoding)
+            # the last # line
+            if line.startswith('#'):
+                header_line = line
+            else:
+                try:
+                    for bins, rec in prober.process(line):
+                        if header_line is None:
+                            return len(rec), []
+                        elif len(rec) == 0:
+                            return 0, []
+                        else:
+                            cols = [x[0] for x in prober.fields]
+                            if type(cols[0]) is tuple:
+                                fixed = False
+                                # mutiple ones, need to figure out the moving one
+                                for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
+                                    if ':' in idx:
+                                        cols = [x[i] for x in cols]
+                                        fixed = True
+                                        break
+                                if not fixed:
+                                    cols = [x[-1] for x in cols]
+                            header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
+                            if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
+                                return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+                            else:
+                                return len(rec), []
+                except IgnoredRecord:
+                    continue
+                except Exception as e:
+                    # perhaps not start with #, if we have no header, use it anyway
+                    if header_line is None:
+                        header_line = line
+                    count += 1
+                    if count == 100:
+                        raise ValueError('No genotype column could be determined after 1000 lines.')
+                    logger.debug(e)
+
+
+
+
+#
+#
 #  Command import
 #
 #
@@ -1036,7 +1088,7 @@ class Importer:
         self.variant_insert_query = 'INSERT INTO variant ({0}, {1}, {2}, ref, alt {3}) VALUES ({4});'\
             .format(fbin, fchr, fpos, ' '.join([', ' + x for x in self.variant_info]), ', '.join([self.db.PH]*(len(self.variant_info) + 5)))
         #
-        self.createLocalVariantIndex()
+        self.variantIndex = self.proj.createVariantMap('variant', self.import_alt_build)
         # drop index here after all possible exceptions have been raised.
         self.proj.dropIndexOnMasterVariantTable()
 
@@ -1045,77 +1097,6 @@ class Importer:
         # remove existing indexes, which will be created when the project is open
         # by a non-import command
         self.proj.dropIndexOnMasterVariantTable()
-
-    def createLocalVariantIndex(self, table='variant'):
-        '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
-        self.variantIndex = {}
-        cur = self.db.cursor()
-        numVariants = self.db.numOfRows(table)
-        if numVariants == 0:
-            return
-        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
-        if self.import_alt_build:
-            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
-        else:
-            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant {};'.format(where_clause))
-        prog = ProgressBar('Getting existing variants', numVariants)
-        for count, rec in enumerate(cur):
-            # zero for existing loci
-            key = (rec[1], rec[3], rec[4])
-            if key in self.variantIndex:
-                self.variantIndex[key][rec[2]] = (rec[0], 0)
-            else:
-                self.variantIndex[key] = {rec[2]: (rec[0], 0)}
-            #self.variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
-            if count % self.db.batch == 0:
-                prog.update(count)
-        prog.done()
-
-    def getSampleName(self, filename, prober):
-        '''Prove text file for sample name'''
-        header_line = None
-        count = 0
-        with openFile(filename) as input:
-            for line in input:
-                line = line.decode(self.encoding)
-                # the last # line
-                if line.startswith('#'):
-                    header_line = line
-                else:
-                    try:
-                        for bins, rec in prober.process(line):
-                            if header_line is None:
-                                return len(rec), []
-                            elif len(rec) == 0:
-                                return 0, []
-                            else:
-                                cols = [x[0] for x in prober.fields]
-                                if type(cols[0]) is tuple:
-                                    fixed = False
-                                    # mutiple ones, need to figure out the moving one
-                                    for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
-                                        if ':' in idx:
-                                            cols = [x[i] for x in cols]
-                                            fixed = True
-                                            break
-                                    if not fixed:
-                                        cols = [x[-1] for x in cols]
-                                header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
-                                if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
-                                    return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
-                                else:
-                                    return len(rec), []
-                    except IgnoredRecord:
-                        continue
-                    except Exception as e:
-                        # perhaps not start with #, if we have no header, use it anyway
-                        if header_line is None:
-                            header_line = line
-                        count += 1
-                        if count == 100:
-                            raise ValueError('No genotype column could be determined after 1000 lines.')
-                        self.logger.debug(e)
 
     def recordFileAndSample(self, filename, sampleNames):
         cur = self.db.cursor()
@@ -1141,100 +1122,6 @@ class Importer:
         del s
         return sample_ids
 
-    def importData(self):
-        '''Start importing'''
-        sample_in_files = []
-        for count,f in enumerate(self.files):
-            self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
-            self.importFromFile(f)
-            total_var = sum(self.count[3:7])
-            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
-                .format(total_var, self.count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.count[0],
-                    'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
-                        self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
-            for i in range(len(self.count)):
-                self.total_count[i] += self.count[i]
-                self.count[i] = 0
-            sample_in_files.extend(self.sample_in_file)
-        if len(self.files) > 1:
-            total_var = sum(self.total_count[3:7])
-            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
-                .format(total_var, self.total_count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.total_count[0],
-                    'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
-                        self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
-
-    def finalize(self):
-        # this function will only be called from import
-        cur = self.db.cursor()
-        total_new = sum(self.total_count[3:7])
-        if total_new > 0:
-            # analyze project to get correct number of rows for the master variant table
-            self.proj.analyze(force=True)
-        if total_new == 0 or self.proj.alt_build is None:
-            # if no new variant, or no alternative reference genome, do nothing
-            return
-        # we need to run lift over to convert coordinates before importing data.
-        tool = LiftOverTool(self.proj)
-        to_be_mapped = os.path.join(self.proj.temp_dir, 'var_in.bed')
-        loci_count = 0
-        with open(to_be_mapped, 'w') as output:
-            for key in self.variantIndex:
-                for pos, status in self.variantIndex[key].iteritems():
-                    if status[1] == 1:
-                        output.write('{0}\t{1}\t{2}\t{3}/{4}/{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
-                           pos - 1, pos, key[1], key[2], status[0]))
-                        loci_count += 1
-        # free some RAM
-        self.variantIndex.clear()
-        #
-        if self.import_alt_build:
-            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
-            query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
-            mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
-        else:
-            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
-            query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
-            # this should not really happen, but people (like me) might manually mess up with the database
-            s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
-            headers = self.db.getHeaders('variant')
-            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-                if fldName in headers:
-                    continue
-                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
-            del s
-            mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.build, self.proj.alt_build)
-        # update records
-        prog = ProgressBar('Updating coordinates', total_new)
-        # 1: succ mapped
-        count = 0
-        with open(mapped_file) as var_mapped:
-            for line in var_mapped.readlines():
-                try:
-                    chr, start, end, name = line.strip().split()
-                    ref, alt, var_id = name.split('/')
-                    if chr.startswith('chr'):
-                        chr = chr[3:]
-                    pos = int(start) + 1
-                    var_id = int(var_id)
-                except:
-                    continue
-                cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
-                count += 1
-                if count % self.db.batch == 0:
-                    self.db.commit()
-                    prog.update(count)
-        self.db.commit()
-        prog.done()
-        self.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
-            .format(count, total_new, err_count))
-            
-                    
     def addVariant(self, cur, rec):
         #
         if rec[4] == '-':
@@ -1274,7 +1161,7 @@ class Importer:
                 return []
             else:
                 try:
-                    numSample, names = self.getSampleName(input_filename, self.prober)
+                    numSample, names = getSampleName(input_filename, self.prober, self.encoding, self.logger)
                     if not names:
                         if numSample == 1:
                             self.logger.debug('Missing sample name (name None is used)'.format(numSample))
@@ -1302,7 +1189,7 @@ class Importer:
                 return self.recordFileAndSample(input_filename, self.sample_name)
             else:
                 try:
-                    numSample, names = self.getSampleName(input_filename, self.prober)
+                    numSample, names = getSampleName(input_filename, self.prober, self.encoding, self.logger)
                 except ValueError as e:
                     self.logger.debug(e)
                     numSample = 0
@@ -1385,6 +1272,100 @@ class Importer:
             writer.close()
         self.db.commit()
        
+    def finalize(self):
+        # this function will only be called from import
+        cur = self.db.cursor()
+        total_new = sum(self.total_count[3:7])
+        if total_new > 0:
+            # analyze project to get correct number of rows for the master variant table
+            self.proj.analyze(force=True)
+        if total_new == 0 or self.proj.alt_build is None:
+            # if no new variant, or no alternative reference genome, do nothing
+            return
+        # we need to run lift over to convert coordinates before importing data.
+        tool = LiftOverTool(self.proj)
+        to_be_mapped = os.path.join(self.proj.temp_dir, 'var_in.bed')
+        loci_count = 0
+        with open(to_be_mapped, 'w') as output:
+            for key in self.variantIndex:
+                for pos, status in self.variantIndex[key].iteritems():
+                    if status[1] == 1:
+                        output.write('{0}\t{1}\t{2}\t{3}/{4}/{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
+                           pos - 1, pos, key[1], key[2], status[0]))
+                        loci_count += 1
+        # free some RAM
+        self.variantIndex.clear()
+        #
+        if self.import_alt_build:
+            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.alt_build, self.proj.build))
+            query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.alt_build, self.proj.build)
+        else:
+            self.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
+            query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
+            # this should not really happen, but people (like me) might manually mess up with the database
+            s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
+            headers = self.db.getHeaders('variant')
+            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                if fldName in headers:
+                    continue
+                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+            del s
+            mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.build, self.proj.alt_build)
+        # update records
+        prog = ProgressBar('Updating coordinates', total_new)
+        # 1: succ mapped
+        count = 0
+        with open(mapped_file) as var_mapped:
+            for line in var_mapped.readlines():
+                try:
+                    chr, start, end, name = line.strip().split()
+                    ref, alt, var_id = name.split('/')
+                    if chr.startswith('chr'):
+                        chr = chr[3:]
+                    pos = int(start) + 1
+                    var_id = int(var_id)
+                except:
+                    continue
+                cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
+                count += 1
+                if count % self.db.batch == 0:
+                    self.db.commit()
+                    prog.update(count)
+        self.db.commit()
+        prog.done()
+        self.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
+            .format(count, total_new, err_count))
+            
+    def importData(self):
+        '''Start importing'''
+        sample_in_files = []
+        for count,f in enumerate(self.files):
+            self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
+            self.importFromFile(f)
+            total_var = sum(self.count[3:7])
+            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
+                .format(total_var, self.count[2],
+                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                    self.count[0],
+                    'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
+                        self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
+            for i in range(len(self.count)):
+                self.total_count[i] += self.count[i]
+                self.count[i] = 0
+            sample_in_files.extend(self.sample_in_file)
+        if len(self.files) > 1:
+            total_var = sum(self.total_count[3:7])
+            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
+                .format(total_var, self.total_count[2],
+                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                    self.total_count[0],
+                    'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
+                        self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
+
+                    
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',

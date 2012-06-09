@@ -1586,6 +1586,35 @@ class Project:
             self.db.renameTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]), 'genotype_{}'.format(ids[0]))
             prog.done()
 
+    def createVariantMap(self, table='variant', alt_build=False):
+        '''Create a map of all variants from specified table.
+        The dictionary looks like dict[(chr, ref, alt)][pos] = (id, 0)
+        to avoid repeating ref, alt all the time.
+        '''
+        variantIndex = {}
+        cur = self.db.cursor()
+        numVariants = self.db.numOfRows(table)
+        if numVariants == 0:
+            return variantIndex
+        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
+        if alt_build:
+            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
+        else:
+            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant {};'.format(where_clause))
+        prog = ProgressBar('Getting existing variants', numVariants)
+        for count, rec in enumerate(cur):
+            # zero for existing loci
+            key = (rec[1], rec[3], rec[4])
+            if key in variantIndex:
+                variantIndex[key][rec[2]] = (rec[0], 0)
+            else:
+                variantIndex[key] = {rec[2]: (rec[0], 0)}
+            #variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
+            if count % self.db.batch == 0:
+                prog.update(count)
+        prog.done()
+        return variantIndex
 
     def summarize(self):
         '''Summarize key features of the project
