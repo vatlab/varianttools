@@ -503,7 +503,7 @@ class SequentialExtractor:
 #
 class LineImporter:
     '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, merge_by_cols, logger):
+    def __init__(self, fields, build, delimiter, merge_by_cols, GT_start, logger):
         '''Fields: a list of fields with index, adj (other items are not used)
         builds: index(es) of position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
@@ -518,17 +518,20 @@ class LineImporter:
         self.merge_by_cols = merge_by_cols
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
-        self.valid_till = None  # genotype fields might be disabled
+        self.GT_start = GT_start
+        self.sample_range = None  # genotype fields might be disabled
         # used to report result
         self.processed_lines = 0
         self.skipped_lines = 0
         self.num_records = 0
 
-    def reset(self, validTill=None):
+    def reset(self, sample_range = None):
+        ''' sample might not be imported
+        '''
         self.first_time = True
         self.fields = []
         self.nColumns = 0
-        self.valid_till = validTill
+        self.sample_range = sample_range
 
     def process(self, tokens):
         if type(tokens) is not list:
@@ -538,7 +541,8 @@ class LineImporter:
             cIdx = 0
             num_sample = -1
             for fIdx, field in enumerate(self.raw_fields):
-                if self.valid_till is not None and fIdx >= self.valid_till:
+                if self.sample_range is not None and fIdx >= self.GT_start \
+                    and (fIdx < self.sample_range[0] or fIdx >= self.sample_range[1]): 
                     continue
                 try:
                     # get an instance of an extractor, or a function
@@ -1059,12 +1063,12 @@ class Importer:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.logger)
+            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.ranges[2], self.logger)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of sample
         if self.genotype_field:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.logger)
+            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.ranges[2], self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -1199,14 +1203,14 @@ class Importer:
                     self.genotype_field = []
                     self.genotype_info = []
                     # remove genotype field from processor
-                    self.processor.reset(validTill=self.ranges[2])
+                    self.processor.reset([self.ranges[2], self.ranges[2]])
                     if len(self.sample_name) > 1:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
                     raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
                 return self.recordFileAndSample(input_filename, self.sample_name)
  
-    def importFromFile(self, input_filename):
+    def importVariantAndGenotype(self, input_filename):
         '''Import a TSV file to sample_variant'''
         # reset text processor to allow the input of files with different number of columns
         self.processor.reset()
@@ -1272,6 +1276,31 @@ class Importer:
             writer.close()
         self.db.commit()
        
+    def importVariant(self, input_filename):
+        # reset text processor to allow the input of files with different number of columns
+        self.processor.reset([self.ranges[2], self.ranges[2]])
+        #
+        cur = self.db.cursor()
+        lc = lineCount(input_filename, self.encoding)
+        update_after = min(max(lc//200, 100), 100000)
+        # one process is for the main program, the
+        # other threads will handle input
+        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.encoding, self.logger)
+        # preprocess data
+        prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+        last_count = 0
+        fld_cols = None
+        for self.count[0], bins, rec in reader.records():
+            variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+            if (last_count == 0 and self.count[0] > 200) or (self.count[0] - last_count > update_after):
+                self.db.commit()
+                last_count = self.count[0]
+                prog.update(self.count[0])
+        prog.done()
+        self.count[7] = reader.skipped_lines
+        self.db.commit()
+
+
     def finalize(self):
         # this function will only be called from import
         cur = self.db.cursor()
@@ -1337,12 +1366,12 @@ class Importer:
         self.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
             .format(count, total_new, err_count))
             
-    def importData(self):
-        '''Start importing'''
+    def importFilesSequentially(self):
+        '''import files one by one, adding variants along the way'''
         sample_in_files = []
         for count,f in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
-            self.importFromFile(f)
+            self.importVariantAndGenotype(f)
             total_var = sum(self.count[3:7])
             self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
                 .format(total_var, self.count[2],
@@ -1365,7 +1394,28 @@ class Importer:
                     'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                         self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
 
-                    
+    def importVariants(self):
+        '''Import variants from all files'''
+        for count,f in enumerate(self.files):
+            self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
+            self.importVariant(f)
+            total_var = sum(self.count[3:7])
+            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported.'\
+                .format(total_var, self.count[2],
+                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                    self.count[0]))
+            for i in range(len(self.count)):
+                self.total_count[i] += self.count[i]
+                self.count[i] = 0
+        if len(self.files) > 1:
+            total_var = sum(self.total_count[3:7])
+            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported.'\
+                .format(total_var, self.total_count[2],
+                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                    self.total_count[0]))
+
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
@@ -1415,7 +1465,17 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            importer.importData()
+            if args.jobs == 1:
+                # if jobs == 1, use the old algorithm that insert variant and
+                # genotype together ...
+                importer.importFilesSequentially()
+            elif len(importer.files) > 1:
+                # if jobs > 1, use processes to import samples simultaneously
+                importer.importVariants()
+                #importer.importGenotypesInParallel()
+            else:  # if multiple processes are used to import one large file
+                importer.importVariants()
+                #importer.importGenotypesInPieces()
             importer.finalize()
         proj.close()
     except Exception as e:
