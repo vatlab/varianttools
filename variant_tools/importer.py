@@ -977,46 +977,51 @@ class ImportWorker(Process):
     # to process input line. If multiple works are started,
     # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     #
-    def __init__(self, reader, writer, variantIndex):
-        self.reader = reader
-        self.writer = writer
-        self.variantIndex = variantIndex
+    def __init__(self, processor, input_filename, encoding,
+        genotype_file, genotype_field, genotype_info, 
+        variantIndex, genotype_status, ranges, sample_ids, logger):
         Process.__init__(self)
+        self.reader = TextReader(processor, input_filename, None, 0, encoding, logger)
+        self.writer = GenotypeWriter(genotype_file, genotype_field,
+            genotype_info, sample_ids)
+        self.variantIndex = variantIndex
+        self.genotype_status = genotype_status
+        self.ranges = ranges
+        self.sample_ids = sample_ids
+        self.logger = logger
+        self.count = [0, 0]
 
-    def close(self):
-        writer.close()
-        self.db.commit()
 
     def run(self): 
-        return
-        last_count = 0
         fld_cols = None
-        for self.count[0], bins, rec in reader.records():
-            variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-            if genotype_status == 1:
+        for self.count[0], bins, rec in self.reader.records():
+            try:
+                variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+            except KeyError:
+                self.logger.debug('Variant {} {} {} {} not found'.format(rec[0], rec[1], rec[2], rec[3]))
+                continue
+            if self.genotype_status == 1:
                 if fld_cols is None:
-                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                    col_rngs = [self.reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
-                    for idx in range(len(sample_ids)):
+                    for idx in range(len(self.sample_ids)):
                         fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-                    if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
+                    if col_rngs[0][1] - col_rngs[0][0] != len(self.sample_ids):
                         self.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
-                            col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
-                for idx, id in enumerate(sample_ids):
+                            col_rngs[0][1] - col_rngs[0][0], len(self.sample_ids)))
+                for idx, id in enumerate(self.sample_ids):
                     try:
                         if rec[self.ranges[2] + idx] is not None:
                             self.count[1] += 1
-                            writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
+                            self.writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
                     except IndexError:
                         self.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
                             len(rec), fld_cols[-1][-1] + 1, rec))
-            elif genotype_status == 2:
+            elif self.genotype_status == 2:
                 # should have only one sample
-                for id in sample_ids:
-                    writer.write(id, [variant_id])
-            if (last_count == 0 and self.count[0] > 200) or (self.count[0] - last_count > update_after):
-                self.db.commit()
-                last_count = self.count[0]
+                for id in self.sample_ids:
+                    self.writer.write(id, [variant_id])
+        self.writer.close()
        
 #
 #
@@ -1433,7 +1438,7 @@ class Importer:
         '''import files one by one, adding variants along the way'''
         sample_in_files = []
         for count,f in enumerate(self.files):
-            self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
+            self.logger.info('{} variants and genotypes from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
             self.importVariantAndGenotype(f)
             total_var = sum(self.count[3:7])
             self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
@@ -1479,7 +1484,7 @@ class Importer:
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                     self.total_count[0]))
 
-    def importGenotype(self, input_filename):
+    def importGenotype(self, input_filename, genotype_file):
         '''Import a TSV file to sample_variant'''
         # reset text processor to allow the input of files with different number of columns
         self.processor.reset()
@@ -1500,9 +1505,8 @@ class Importer:
             return
         #
         #lc = lineCount(input_filename, self.encoding)
-        reader = TextReader(self.processor, input_filename, None, 1, self.encoding, self.logger)
-        writer = GenotypeWriter(self.proj, self.genotype_field, self.genotype_info, sample_ids)
-        worker = ImportWorker(reader, writer, self.variantIndex)
+        worker = ImportWorker(self.processor, input_filename, self.encoding, genotype_file, self.genotype_field, self.genotype_info,
+            self.variantIndex, genotype_status, self.ranges, sample_ids, self.logger)
         worker.start()
         #
         #self.count[7] = reader.skipped_lines
@@ -1511,7 +1515,10 @@ class Importer:
     def importGenotypesInParallel(self):
         '''import files one by one, adding variants along the way'''
         for count,f in enumerate(self.files):
-            self.importGenotype(f)
+            tmp_file = os.path.join('cache', 'tmp_{}_genotype'.format(count))
+            if os.path.isfile(tmp_file):
+                os.remove(tmp_file)
+            self.importGenotype(f, tmp_file)
         if len(self.files) > 1:
             pass
 
