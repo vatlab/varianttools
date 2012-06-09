@@ -503,7 +503,7 @@ class SequentialExtractor:
 #
 class LineImporter:
     '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, merge_by_cols, GT_start, logger):
+    def __init__(self, fields, build, delimiter, merge_by_cols, ranges, logger):
         '''Fields: a list of fields with index, adj (other items are not used)
         builds: index(es) of position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
@@ -518,20 +518,22 @@ class LineImporter:
         self.merge_by_cols = merge_by_cols
         self.columnRange = [None] * len(self.raw_fields)
         self.first_time = True
-        self.GT_start = GT_start
-        self.sample_range = None  # genotype fields might be disabled
+        self.ranges = ranges
+        self.import_var_info = True
+        self.import_sample_range = None  # genotype fields might be disabled
         # used to report result
         self.processed_lines = 0
         self.skipped_lines = 0
         self.num_records = 0
 
-    def reset(self, sample_range = None):
+    def reset(self, import_var_info = True, import_sample_range = None):
         ''' sample might not be imported
         '''
         self.first_time = True
         self.fields = []
         self.nColumns = 0
-        self.sample_range = sample_range
+        self.import_var_info = import_var_info
+        self.import_sample_range = import_sample_range
 
     def process(self, tokens):
         if type(tokens) is not list:
@@ -541,8 +543,14 @@ class LineImporter:
             cIdx = 0
             num_sample = -1
             for fIdx, field in enumerate(self.raw_fields):
-                if self.sample_range is not None and fIdx >= self.GT_start \
-                    and (fIdx < self.sample_range[0] or fIdx >= self.sample_range[1]): 
+                if not self.import_var_info:
+                    # if sample range is not None, we do not import variant information either
+                    if fIdx >= self.ranges[1] and fIdx < self.ranges[2]:
+                        continue
+                # if do not import any sample
+                if self.import_sample_range is not None and \
+                    self.import_sample_range[0] == self.import_sample_range[1] and \
+                    fIdx >= self.ranges[2]:
                     continue
                 try:
                     # get an instance of an extractor, or a function
@@ -558,6 +566,11 @@ class LineImporter:
                     if hasattr(e, '__call__'):
                         e = e.__call__
                     indexes = []
+                    # indexes gives the real indexes, for example
+                    # 8,8::2
+                    #
+                    # indexes = [8, [8,10,12,14]]
+                    #
                     for x in field.index.split(','):
                         if ':' in x:
                             # a slice
@@ -581,19 +594,30 @@ class LineImporter:
                             indexes.append(int(x) - 1)
                     #
                     if ':' not in field.index:
+                        # case of 'index=10'
                         if len(indexes) == 1:
                             # int, True means 'not a tuple'
                             self.fields.append((indexes[0], True, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
                             cIdx += 1
+                        # case of index=7,8,9
                         else:
                             # a tuple
                             self.fields.append((tuple(indexes), False, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
                             cIdx += 1
+                    # if there is only one slice
+                    # case of index=8::2
                     elif len(indexes) == 1:
                         # single slice
                         cols = range(len(tokens))[indexes[0]]
+                        if self.import_sample_range is not None:
+                            # limiting the columns to import
+                            if self.import_sample_range[0] >= len(cols) or self.import_sample_range[1] > len(cols):
+                                raise ValueError('ERROR PROCESSING subset of samples.')
+                            print cols
+                            cols = cols[self.import_sample_range[0]:self.import_sample_range[1]]
+                            print 'SEL to ', cols
                         for c in cols:
                             self.fields.append((c, True, e))
                         if num_sample == -1:
@@ -606,7 +630,10 @@ class LineImporter:
                         # we need to worry about mixing integer and slice
                         indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
                         count = 0
-                        for c in izip(*indexes):
+                        for idx, c in enumerate(izip(*indexes)):
+                            if self.import_sample_range is not None:
+                                if idx < self.import_sample_range[0] or idx >= self.import_sample_range[1]:
+                                    continue
                             count += 1
                             self.fields.append((tuple(c), False, e))
                         if num_sample == -1:
@@ -993,6 +1020,7 @@ class ImportWorker(Process):
 
 
     def run(self): 
+        print 'Job started ', self.sample_ids
         fld_cols = None
         for self.count[0], bins, rec in self.reader.records():
             try:
@@ -1130,7 +1158,7 @@ class Importer:
             self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.ranges[2], self.logger)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
-        # probe number of sample
+        # probe number of samples
         if self.genotype_field:
             self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.ranges[2], self.logger)
         # there are variant_info
@@ -1267,7 +1295,7 @@ class Importer:
                     self.genotype_field = []
                     self.genotype_info = []
                     # remove genotype field from processor
-                    self.processor.reset([self.ranges[2], self.ranges[2]])
+                    self.processor.reset(import_var_info=True, import_sample_range=[0,0])
                     if len(self.sample_name) > 1:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
@@ -1275,8 +1303,8 @@ class Importer:
                 return self.recordFileAndSample(input_filename, self.sample_name)
  
     def importVariantAndGenotype(self, input_filename):
-        '''Import a TSV file to sample_variant'''
-        # reset text processor to allow the input of files with different number of columns
+        '''Input variant and genotype at the same time, appropriate for cases with
+        no or one sample in a file'''
         self.processor.reset()
         if self.genotype_field:
             self.prober.reset()
@@ -1345,7 +1373,7 @@ class Importer:
        
     def importVariant(self, input_filename):
         # reset text processor to allow the input of files with different number of columns
-        self.processor.reset([self.ranges[2], self.ranges[2]])
+        self.processor.reset(import_var_info=True, import_sample_range=[0,0])
         #
         cur = self.db.cursor()
         lc = lineCount(input_filename, self.encoding)
@@ -1366,8 +1394,6 @@ class Importer:
         prog.done()
         self.count[7] = reader.skipped_lines
         self.db.commit()
-
-
 
     def finalize(self):
         # this function will only be called from import
@@ -1484,45 +1510,42 @@ class Importer:
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                     self.total_count[0]))
 
-    def importGenotype(self, input_filename, genotype_file):
-        '''Import a TSV file to sample_variant'''
-        # reset text processor to allow the input of files with different number of columns
-        self.processor.reset()
-        if self.genotype_field:
-            self.prober.reset()
-        #
-        sample_ids = self.getSampleIDs(input_filename)
-        #
-        # cache genotype status
-        if len(sample_ids) > 0 and len(self.genotype_field) > 0:
-            # has genotype
-            genotype_status = 1
-        elif len(sample_ids) > 0:
-            # no genotype but with sample
-            genotype_status = 2
-        else:
-            # no genotype no sample
-            return
-        #
-        #lc = lineCount(input_filename, self.encoding)
-        worker = ImportWorker(self.processor, input_filename, self.encoding, genotype_file, self.genotype_field, self.genotype_info,
-            self.variantIndex, genotype_status, self.ranges, sample_ids, self.logger)
-        worker.start()
-        #
-        #self.count[7] = reader.skipped_lines
-
-
     def importGenotypesInParallel(self):
         '''import files one by one, adding variants along the way'''
-        for count,f in enumerate(self.files):
-            tmp_file = os.path.join('cache', 'tmp_{}_genotype'.format(count))
-            if os.path.isfile(tmp_file):
-                os.remove(tmp_file)
-            self.importGenotype(f, tmp_file)
-        if len(self.files) > 1:
-            pass
-
-
+        for count, input_filename in enumerate(self.files):
+            if self.genotype_field:
+                self.prober.reset()
+            #
+            sample_ids = self.getSampleIDs(input_filename)
+            #
+            # cache genotype status
+            if len(sample_ids) > 0 and len(self.genotype_field) > 0:
+                # has genotype
+                genotype_status = 1
+            elif len(sample_ids) > 0:
+                # no genotype but with sample
+                genotype_status = 2
+            else:
+                # no genotype no sample
+                return
+            # number of process to be used
+            trunk_size = 100
+            for piece in range(len(sample_ids) / trunk_size + 1):
+                start_sample = piece * trunk_size
+                end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
+                # small sample size, use a single process
+                self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
+                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype'.format(count, piece))
+                if os.path.isfile(tmp_file):
+                    os.remove(tmp_file)
+                #lc = lineCount(input_filename, self.encoding)
+                worker = ImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
+                    self.genotype_field, self.genotype_info,
+                    self.variantIndex, genotype_status, self.ranges,
+                    sample_ids[start_sample : end_sample], self.logger)
+                worker.start()
+            #
+            #self.count[7] = reader.skipped_lines
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
@@ -1576,13 +1599,10 @@ def importVariants(args):
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
-            elif len(importer.files) > 1:
+            else:
                 # if jobs > 1, use processes to import samples simultaneously
                 importer.importVariants()
                 importer.importGenotypesInParallel()
-            else:  # if multiple processes are used to import one large file
-                importer.importVariants()
-                #importer.importGenotypesInPieces()
             importer.finalize()
         proj.close()
     except Exception as e:
