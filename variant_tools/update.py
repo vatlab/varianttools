@@ -164,33 +164,6 @@ class Updater:
         self.variantIndex = self.proj.createVariantMap(table, self.import_alt_build)
         self.table = table
 
-
-    def createLocalVariantIndex(self, table='variant'):
-        '''Create index on variant (chr, pos, ref, alt) -> variant_id'''
-        self.variantIndex = {}
-        cur = self.db.cursor()
-        numVariants = self.db.numOfRows(table)
-        if numVariants == 0:
-            return
-        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
-        where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
-        if self.import_alt_build:
-            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
-        else:
-            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant {};'.format(where_clause))
-        prog = ProgressBar('Getting existing variants', numVariants)
-        for count, rec in enumerate(cur):
-            # zero for existing loci
-            key = (rec[1], rec[3], rec[4])
-            if key in self.variantIndex:
-                self.variantIndex[key][rec[2]] = (rec[0], 0)
-            else:
-                self.variantIndex[key] = {rec[2]: (rec[0], 0)}
-            #self.variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
-            if count % self.db.batch == 0:
-                prog.update(count)
-        prog.done()
-
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
             var_key = (rec[0], rec[2], rec[3])
@@ -329,8 +302,6 @@ class Updater:
         if len(self.files) > 1:
             self.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
                     '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
-
-
 
 
 def setFieldValue(proj, table, items, build):
