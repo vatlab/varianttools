@@ -1031,8 +1031,9 @@ class GenotypeImportWorker(Process):
         variantIndex, genotype_status, ranges, sample_ids, status, logger):
         Process.__init__(self)
         self.reader = TextReader(processor, input_filename, None, 0, encoding, logger)
-        self.writer = GenotypeWriter(genotype_file, genotype_field,
-            genotype_info, sample_ids)
+        self.genotype_file = genotype_file
+        self.genotype_field = genotype_field
+        self.genotype_info = genotype_info
         self.variantIndex = variantIndex
         self.genotype_status = genotype_status
         self.ranges = ranges
@@ -1042,6 +1043,8 @@ class GenotypeImportWorker(Process):
         self.count = [0, 0]
 
     def run(self): 
+        writer = GenotypeWriter(self.genotype_file, self.genotype_field,
+            self.genotype_info, self.sample_ids)
         fld_cols = None
         last_count = 0
         for self.count[0], bins, rec in self.reader.records():
@@ -1063,18 +1066,18 @@ class GenotypeImportWorker(Process):
                     try:
                         if rec[self.ranges[2] + idx] is not None:
                             self.count[1] += 1
-                            self.writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
+                            writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
                     except IndexError:
                         self.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
                             len(rec), fld_cols[-1][-1] + 1, rec))
             elif self.genotype_status == 2:
                 # should have only one sample
                 for id in self.sample_ids:
-                    self.writer.write(id, [variant_id])
+                    writer.write(id, [variant_id])
             if self.count[0] - last_count > 100:
                 self.status.value = self.count[0]
                 last_count = self.count[0]
-        self.writer.close()
+        writer.close()
         
 #
 #
@@ -1581,7 +1584,7 @@ class Importer:
                 nSample[piece] = end_sample - start_sample
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
-                file_sample.append([tmp_file, sample_ids])
+                file_sample.append([tmp_file, sample_ids[start_sample : end_sample]])
                 worker = GenotypeImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, genotype_status, self.ranges,
@@ -1589,6 +1592,7 @@ class Importer:
                     status_array[piece], self.logger)
                 worker.start()
                 workers.append(worker)
+            #
             while True:
                 prog.update(sum([x*y for x,y in zip([x.value for x in status_array], nSample)]))
                 time.sleep(5)
@@ -1602,10 +1606,10 @@ class Importer:
             db.connect('{}_genotype'.format(self.proj.name))
             prog = ProgressBar('Copying samples', len(sample_ids))
             count = 0
-            for file, sample_ids in file_sample:
+            for file, file_sample_ids in file_sample:
                 db.attach(file, '__from')
                 cur = db.cursor()
-                for idx, ID in enumerate(sorted(sample_ids)):
+                for idx, ID in enumerate(sorted(file_sample_ids)):
                     table = 'genotype_{}'.format(ID)
                     # get schema
                     cur.execute('SELECT sql FROM __from.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
