@@ -1668,6 +1668,8 @@ def importVariantsArguments(parser):
             dedicated reader processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
+    parser.add_argument('--old', action='store_true',
+        help='''If set, use the old import method that import variants and genotype together.''')
 
 def importVariants(args):
     #try:
@@ -1678,7 +1680,7 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            if args.jobs == 1:
+            if args.jobs == 1 or args.old:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
