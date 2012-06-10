@@ -717,6 +717,61 @@ class LineProcessor:
 #
 # Read record from disk file
 #
+
+def TextReader(processor, input, varIdx, jobs, encoding, logger):
+    '''
+    input: input file
+    varIdx: variant index, if specified, only matching variants will be returned
+        used by updater
+    jobs: number of jobs
+    encoding: file encoding
+    '''
+    if jobs == 0:
+        return EmbeddedTextReader(processor, input, varIdx, encoding, logger)
+    elif jobs == 1:
+        return StandaloneTextReader(processor, input, varIdx, encoding, logger)
+    else:
+        return MultiTextReader(processor, input, varIdx, jobs, encoding, logger)
+
+class EmbeddedTextReader:
+    #
+    # This processor uses the passed line processor to process input
+    # in the main process. No separate process is spawned.
+    #
+    def __init__(self, processor, input, varIdx, encoding, logger):
+        self.num_records = 0
+        self.skipped_lines = 0
+        self.processor = processor
+        self.input = input
+        self.varIdx = varIdx
+        self.encoding = encoding
+        self.logger = logger
+
+    def records(self): 
+        first = True
+        line_no = 0
+        with openFile(self.input) as input_file:
+            for line in input_file:
+                line_no += 1
+                line = line.decode(self.encoding)
+                try:
+                    if line.startswith('#'):
+                        continue
+                    for bins,rec in self.processor.process(line):
+                        if first:
+                            self.columnRange = self.processor.columnRange
+                            first = False
+                        self.num_records += 1
+                        if self.varIdx is not None:
+                            var_key = (rec[0], rec[2], rec[3])
+                            if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                continue
+                        yield (line_no, bins, rec)
+                except Exception as e:
+                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    self.skipped_lines += 1
+
+
 class ReaderWorker(Process):
     #
     # This class starts a process and use passed LineProcessor
@@ -770,51 +825,6 @@ class ReaderWorker(Process):
         self.output.send((num_records, skipped_lines))
         self.output.close()
 
-def TextReader(processor, input, varIdx, jobs, encoding, logger):
-    if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, encoding, logger)
-    elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, encoding, logger)
-    else:
-        return MultiTextReader(processor, input, varIdx, jobs, encoding, logger)
-
-class EmbeddedTextReader:
-    #
-    # This processor uses the passed line processor to process input
-    # in the main process. No separate process is spawned.
-    #
-    def __init__(self, processor, input, varIdx, encoding, logger):
-        self.num_records = 0
-        self.skipped_lines = 0
-        self.processor = processor
-        self.input = input
-        self.varIdx = varIdx
-        self.encoding = encoding
-        self.logger = logger
-
-    def records(self): 
-        first = True
-        line_no = 0
-        with openFile(self.input) as input_file:
-            for line in input_file:
-                line_no += 1
-                line = line.decode(self.encoding)
-                try:
-                    if line.startswith('#'):
-                        continue
-                    for bins,rec in self.processor.process(line):
-                        if first:
-                            self.columnRange = self.processor.columnRange
-                            first = False
-                        self.num_records += 1
-                        if self.varIdx is not None:
-                            var_key = (rec[0], rec[2], rec[3])
-                            if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
-                                continue
-                        yield (line_no, bins, rec)
-                except Exception as e:
-                    self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    self.skipped_lines += 1
 
 class StandaloneTextReader:
     #
@@ -853,7 +863,7 @@ class MultiTextReader:
         self.skipped_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = TextWorker(processor, input, varIdx, w, jobs, i, encoding, logger)
+            p = ReaderWorker(processor, input, varIdx, w, jobs, i, encoding, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1009,7 +1019,7 @@ def getSampleName(filename, prober, encoding, logger):
 #   and write to a temporary genotype database.
 #
 # 
-class ImportWorker(Process):
+class GenotypeImportWorker(Process):
     #
     # This class starts a process and use passed LineProcessor
     # to process input line. If multiple works are started,
@@ -1029,9 +1039,7 @@ class ImportWorker(Process):
         self.logger = logger
         self.count = [0, 0]
 
-
     def run(self): 
-        print 'Job started ', self.sample_ids
         fld_cols = None
         for self.count[0], bins, rec in self.reader.records():
             try:
@@ -1166,12 +1174,12 @@ class Importer:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges[2], self.logger)
+            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges, self.logger)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of samples
         if self.genotype_field:
-            self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.ranges[2], self.logger)
+            self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.ranges, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -1540,7 +1548,14 @@ class Importer:
                 # no genotype no sample
                 return
             # number of process to be used
-            trunk_size = 100
+            # for example, there are 811 samples,
+            #   self.jobs = 4, trunk_size = 202 + 1
+            #   piece = 811 / 203 + 1 = 3 + 1 = 4
+            #
+            # if there are 800 samples,
+            #   self.jobs = 4, trunk_size = 200 + 1
+            #   piece = 800 / 201 + 1 = 3 + 1 = 4
+            trunk_size = max(100, len(sample_ids) / self.jobs + 1)
             for piece in range(len(sample_ids) / trunk_size + 1):
                 start_sample = piece * trunk_size
                 end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
@@ -1550,7 +1565,7 @@ class Importer:
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 #lc = lineCount(input_filename, self.encoding)
-                worker = ImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
+                worker = GenotypeImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, genotype_status, self.ranges,
                     sample_ids[start_sample : end_sample], self.logger)
