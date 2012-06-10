@@ -531,6 +531,7 @@ class LineProcessor:
         self.nColumns = 0     # number of columns 
         self.import_var_info = True
         self.import_sample_range = None  # genotype fields might be disabled
+        self.maxInputCol = 0      # sometimes processor do not have to split input all the way through
         # used to report result
         self.processed_lines = 0
         self.skipped_lines = 0
@@ -549,9 +550,15 @@ class LineProcessor:
         self.import_sample_range = import_sample_range
 
     def process(self, tokens):
-        if type(tokens) is not list:
-            tokens = [x.strip() for x in tokens.split(self.delimiter)]
-        if self.first_time:
+        if not self.first_time:
+            # if not first time, we know the maximum fields we need, if
+            # self.maxInputCol is n, we need to have n+2 fields to guarantee that
+            # the piece n+1 (index of n) is a properly split one
+            if type(tokens) is not list:
+                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol + 1)][:-1]
+        else:
+            if type(tokens) is not list:
+                tokens = [x.strip() for x in tokens.split(self.delimiter)]
             self.nColumns = len(tokens)
             cIdx = 0             # column index
             num_sample = -1      # number of samples ...
@@ -612,12 +619,14 @@ class LineProcessor:
                             # int, True means 'not a tuple'
                             self.fields.append((indexes[0], True, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
+                            self.maxInputCol = max(self.maxInputCol, indexes[0])
                             cIdx += 1
                         # case of index=7,8,9
                         else:
                             # a tuple
                             self.fields.append((tuple(indexes), False, e))
                             self.columnRange[fIdx] = (cIdx, cIdx+1)
+                            self.maxInputCol = max(self.maxInputCol, max(indexes))
                             cIdx += 1
                     # if there is only one slice
                     # case of index=8::2
@@ -631,6 +640,7 @@ class LineProcessor:
                             cols = cols[self.import_sample_range[0]:self.import_sample_range[1]]
                         for c in cols:
                             self.fields.append((c, True, e))
+                            self.maxInputCol = max(self.maxInputCol, c)
                         if num_sample == -1:
                             num_sample = len(cols)
                         elif num_sample != len(cols):
@@ -647,6 +657,7 @@ class LineProcessor:
                                     continue
                             count += 1
                             self.fields.append((tuple(c), False, e))
+                            self.maxInputCol = max(self.maxInputCol, max(c))
                         if num_sample == -1:
                             num_sample = count
                         elif num_sample != count:
