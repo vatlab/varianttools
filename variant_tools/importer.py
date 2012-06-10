@@ -30,11 +30,12 @@ import re
 import array
 import threading
 import Queue
+import time
 from heapq import heappush, heappop, heappushpop
 from cPickle import dumps, loads, HIGHEST_PROTOCOL
 from binascii import a2b_base64, b2a_base64
 from subprocess import Popen, PIPE
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Value
 from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
@@ -1027,7 +1028,7 @@ class GenotypeImportWorker(Process):
     #
     def __init__(self, processor, input_filename, encoding,
         genotype_file, genotype_field, genotype_info, 
-        variantIndex, genotype_status, ranges, sample_ids, logger):
+        variantIndex, genotype_status, ranges, sample_ids, status, logger):
         Process.__init__(self)
         self.reader = TextReader(processor, input_filename, None, 0, encoding, logger)
         self.writer = GenotypeWriter(genotype_file, genotype_field,
@@ -1036,11 +1037,13 @@ class GenotypeImportWorker(Process):
         self.genotype_status = genotype_status
         self.ranges = ranges
         self.sample_ids = sample_ids
+        self.status = status
         self.logger = logger
         self.count = [0, 0]
 
     def run(self): 
         fld_cols = None
+        last_count = 0
         for self.count[0], bins, rec in self.reader.records():
             try:
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
@@ -1068,8 +1071,11 @@ class GenotypeImportWorker(Process):
                 # should have only one sample
                 for id in self.sample_ids:
                     self.writer.write(id, [variant_id])
+            if self.count[0] - last_count > 100:
+                self.status.value = self.count[0]
+                last_count = self.count[0]
         self.writer.close()
-       
+        
 #
 #
 #  Command import
@@ -1556,20 +1562,37 @@ class Importer:
             #   self.jobs = 4, trunk_size = 200 + 1
             #   piece = 800 / 201 + 1 = 3 + 1 = 4
             trunk_size = max(100, len(sample_ids) / self.jobs + 1)
+            # 
+            # array will be passed so that subprocesses can know the
+            # status 
+            lc = lineCount(input_filename, self.encoding)
+            prog = ProgressBar('Importing genotype', lc * len(sample_ids))
+            status_array = [Value('i', 0) for x in range(self.jobs)]
+            nSample = [0] * self.jobs
+            workers = []
+            #
             for piece in range(len(sample_ids) / trunk_size + 1):
                 start_sample = piece * trunk_size
                 end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
                 # small sample size, use a single process
                 self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
                 tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype'.format(count, piece))
+                nSample[piece] = end_sample - start_sample
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
-                #lc = lineCount(input_filename, self.encoding)
                 worker = GenotypeImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, genotype_status, self.ranges,
-                    sample_ids[start_sample : end_sample], self.logger)
+                    sample_ids[start_sample : end_sample],
+                    status_array[piece], self.logger)
                 worker.start()
+                workers.append(worker)
+            while True:
+                prog.update(sum([x*y for x,y in zip([x.value for x in status_array], nSample)]))
+                time.sleep(5)
+                if True not in [x.is_alive() for x in workers]:
+                    prog.done()
+                    break
             #
             #self.count[7] = reader.skipped_lines
 
