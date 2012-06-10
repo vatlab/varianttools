@@ -40,7 +40,7 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField, openFile, \
     consolidateFieldName
-from .importer import LineImporter, TextReader, getSampleName
+from .importer import *
 
 #
 #
@@ -130,12 +130,12 @@ class Updater:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.logger)
+            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges, self.logger)
         else:  # position or range type
-            self.processor = LineImporter(fmt.fields, [(1,)], fmt.delimiter, fmt.merge_by_cols, self.logger)
+            self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges, self.logger)
         # probe number of sample
         if self.genotype_field and self.genotype_info:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.logger)
+            self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()
@@ -257,7 +257,7 @@ class Updater:
             # do not import genotype even if the input file has them
             self.genotype_field = []
             self.genotype_info = []
-            self.processor.reset(validTill=self.ranges[2])
+            self.processor.reset(import_var_info=True, import_sample_range=[self.ranges[2], self.ranges[2]])
         #
         cur = self.db.cursor()
         lc = lineCount(input_filename, self.encoding)

@@ -501,24 +501,33 @@ class SequentialExtractor:
 #
 # Process each line using the above functors
 #
-class LineImporter:
-    '''An intepreter that read a record, process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, merge_by_cols, ranges, logger):
-        '''Fields: a list of fields with index, adj (other items are not used)
+#
+class LineProcessor:
+    '''An intepreter that read a record (a line), process it and return processed records.'''
+    def __init__(self, fields, build, delimiter, ranges, logger):
+        '''
+        fields: a list of fields with index, adj (other items are not used)
         builds: index(es) of position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
             and alternative alleles are available, the records are processed for correct
             format of ref and alt alleles.
+        delimiter: how to split line
+        ranges: range of fields (var, var_info, GT, GT_info), used to determine
+            var_info and GT fields when subsets of samples are imported.
         '''
         self.logger = logger
         self.build = build
         self.raw_fields = fields
         self.fields = []
         self.delimiter = delimiter
-        self.merge_by_cols = merge_by_cols
+        # column range contains the range [start, end) of output for each
+        # raw field. If it is None, no output is available. This field tells
+        # the user how to split and handle output fields
         self.columnRange = [None] * len(self.raw_fields)
-        self.first_time = True
         self.ranges = ranges
+        #
+        self.first_time = True
+        self.nColumns = 0     # number of columns 
         self.import_var_info = True
         self.import_sample_range = None  # genotype fields might be disabled
         # used to report result
@@ -527,11 +536,14 @@ class LineImporter:
         self.num_records = 0
 
     def reset(self, import_var_info = True, import_sample_range = None):
-        ''' sample might not be imported
+        ''' 
+        import_var_info: if set to False, variant info will not be imported.
+        import_sample_range: if set to a range, only selected samples are handled
         '''
         self.first_time = True
         self.fields = []
         self.nColumns = 0
+        #
         self.import_var_info = import_var_info
         self.import_sample_range = import_sample_range
 
@@ -540,8 +552,8 @@ class LineImporter:
             tokens = [x.strip() for x in tokens.split(self.delimiter)]
         if self.first_time:
             self.nColumns = len(tokens)
-            cIdx = 0
-            num_sample = -1
+            cIdx = 0             # column index
+            num_sample = -1      # number of samples ...
             for fIdx, field in enumerate(self.raw_fields):
                 if not self.import_var_info:
                     # if sample range is not None, we do not import variant information either
@@ -567,7 +579,7 @@ class LineImporter:
                         e = e.__call__
                     indexes = []
                     # indexes gives the real indexes, for example
-                    # 8,8::2
+                    # 8,8::2 might yield
                     #
                     # indexes = [8, [8,10,12,14]]
                     #
@@ -615,9 +627,7 @@ class LineImporter:
                             # limiting the columns to import
                             if self.import_sample_range[0] >= len(cols) or self.import_sample_range[1] > len(cols):
                                 raise ValueError('ERROR PROCESSING subset of samples.')
-                            print cols
                             cols = cols[self.import_sample_range[0]:self.import_sample_range[1]]
-                            print 'SEL to ', cols
                         for c in cols:
                             self.fields.append((c, True, e))
                         if num_sample == -1:
@@ -628,9 +638,9 @@ class LineImporter:
                         cIdx += len(cols)
                     else:
                         # we need to worry about mixing integer and slice
-                        indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
+                        expanded_indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
                         count = 0
-                        for idx, c in enumerate(izip(*indexes)):
+                        for idx, c in enumerate(izip(*expanded_indexes)):
                             if self.import_sample_range is not None:
                                 if idx < self.import_sample_range[0] or idx >= self.import_sample_range[1]:
                                     continue
@@ -705,64 +715,9 @@ class LineImporter:
 
 
 #
-#
-# Write genotype to disk
-# 
-#
-
-class GenotypeWriter:
-    def __init__(self, geno_db, geno_fields, geno_info, sample_ids, logger=None):
-        #
-        self.db = DatabaseEngine()
-        self.db.connect(geno_db)
-        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
-            .format(','.join([self.db.PH] * (1 + len(geno_fields) + len(geno_info))))
-        self.cur = self.db.cursor()
-        if logger:
-            s = delayedAction(logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
-        for idx, sid in enumerate(sample_ids):
-            # create table
-            self.createNewSampleVariantTable(self.cur,
-                'genotype_{0}'.format(sid), len(geno_fields) > 0, geno_info)
-        self.db.commit()
-        if logger:
-            del s
-        self.count = 0
-        self.cache = {}
-
-    def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
-        '''Create a table ``genotype_??`` to store genotype data'''
-        cur.execute('''\
-            CREATE TABLE IF NOT EXISTS {0} (
-                variant_id INT NOT NULL
-            '''.format(table) + 
-            (', GT INT' if genotype else '') + 
-            ''.join([', {} {}'.format(f.name, f.type) for f in fields]) + ');'
-         )
-     
-    def write(self, id, rec):
-        try:
-            if len(self.cache[id]) == 1000:
-                self.cur.executemany(self.query.format(id), self.cache[id])
-                self.cache[id] = [rec]
-                self.count += 1
-            else:
-                self.cache[id].append(rec)
-        except KeyError:
-            self.cache[id] = [rec]
-        if self.count % 10000 == 0:
-            self.db.commit()
-    
-    def close(self):
-        for id, val in self.cache.iteritems():
-            if len(val) > 0:
-                self.cur.executemany(self.query.format(id), val)
-        self.db.commit()
-        self.db.close()
-
 # Read record from disk file
 #
-class TextWorker(Process):
+class ReaderWorker(Process):
     #
     # This class starts a process and use passed LineProcessor
     # to process input line. If multiple works are started,
@@ -871,7 +826,7 @@ class StandaloneTextReader:
         self.skipped_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = TextWorker(processor, input, varIdx, w, 1, 0, encoding, logger)
+        self.worker = ReaderWorker(processor, input, varIdx, w, 1, 0, encoding, logger)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -941,6 +896,62 @@ class MultiTextReader:
                     break
         for p in self.workers:
             p.join()
+
+#
+#
+# Write genotype to disk
+# 
+#
+
+class GenotypeWriter:
+    def __init__(self, geno_db, geno_fields, geno_info, sample_ids, logger=None):
+        #
+        self.db = DatabaseEngine()
+        self.db.connect(geno_db)
+        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+            .format(','.join([self.db.PH] * (1 + len(geno_fields) + len(geno_info))))
+        self.cur = self.db.cursor()
+        if logger:
+            s = delayedAction(logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
+        for idx, sid in enumerate(sample_ids):
+            # create table
+            self.createNewSampleVariantTable(self.cur,
+                'genotype_{0}'.format(sid), len(geno_fields) > 0, geno_info)
+        self.db.commit()
+        if logger:
+            del s
+        self.count = 0
+        self.cache = {}
+
+    def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
+        '''Create a table ``genotype_??`` to store genotype data'''
+        cur.execute('''\
+            CREATE TABLE IF NOT EXISTS {0} (
+                variant_id INT NOT NULL
+            '''.format(table) + 
+            (', GT INT' if genotype else '') + 
+            ''.join([', {} {}'.format(f.name, f.type) for f in fields]) + ');'
+         )
+     
+    def write(self, id, rec):
+        try:
+            if len(self.cache[id]) == 1000:
+                self.cur.executemany(self.query.format(id), self.cache[id])
+                self.cache[id] = [rec]
+                self.count += 1
+            else:
+                self.cache[id].append(rec)
+        except KeyError:
+            self.cache[id] = [rec]
+        if self.count % 10000 == 0:
+            self.db.commit()
+    
+    def close(self):
+        for id, val in self.cache.iteritems():
+            if len(val) > 0:
+                self.cur.executemany(self.query.format(id), val)
+        self.db.commit()
+        self.db.close()
 
 #
 #
@@ -1155,12 +1166,12 @@ class Importer:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineImporter(fmt.fields, [(1, 2, 3)], fmt.delimiter, fmt.merge_by_cols, self.ranges[2], self.logger)
+            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges[2], self.logger)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of samples
         if self.genotype_field:
-            self.prober = LineImporter([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None, self.ranges[2], self.logger)
+            self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, self.ranges[2], self.logger)
         # there are variant_info
         if self.variant_info:
             cur = self.db.cursor()

@@ -37,7 +37,7 @@ from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField
-from .importer import LineImporter, TextReader
+from .importer import LineProcessor, TextReader
   
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -259,7 +259,7 @@ class AnnoDBConfiger:
             except Exception as e:
                 self.logger.error('No field {} for build {}: {}'.format(items[1], key, e))
         #
-        processor = LineImporter(self.fields, build_info, self.delimiter, None, None, self.logger)
+        processor = LineProcessor(self.fields, build_info, self.delimiter, None, self.logger)
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
