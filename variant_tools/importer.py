@@ -552,10 +552,10 @@ class LineProcessor:
     def process(self, tokens):
         if not self.first_time:
             # if not first time, we know the maximum fields we need, if
-            # self.maxInputCol is n, we need to have n+2 fields to guarantee that
-            # the piece n+1 (index of n) is a properly split one
+            # self.maxInputCol is n, we need to have n+1 fields to guarantee that
+            # the piece n is a properly split one
             if type(tokens) is not list:
-                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol + 1)][:-1]
+                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol)][:self.maxInputCol ]
         else:
             if type(tokens) is not list:
                 tokens = [x.strip() for x in tokens.split(self.delimiter)]
@@ -668,6 +668,7 @@ class LineProcessor:
                     sys.exit('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
                     raise ValueError('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
             self.first_time = False
+            self.maxInputCol += 1    # use 1-indexes maxInputCol
         #
         try:
             # we first trust that nothing can go wrong and use a quicker method
@@ -1061,6 +1062,9 @@ class GenotypeImportWorker(Process):
         self.count = [0, 0]
 
     def run(self): 
+        self.logger.debug('Start importing genotypes for {} samples ({} - {})'.format(len(self.sample_ids),
+            min(self.sample_ids), max(self.sample_ids)))
+        start_import_time = time.time()
         writer = GenotypeWriter(self.genotype_file, self.genotype_field,
             self.genotype_info, self.sample_ids)
         fld_cols = None
@@ -1093,13 +1097,15 @@ class GenotypeImportWorker(Process):
                 for id in self.sample_ids:
                     writer.write(id, [variant_id])
             if self.count[0] - last_count > 100:
-                self.status.value = self.count[0]
+                self.status.value = self.count[0] * len(self.sample_ids)
                 last_count = self.count[0]
         writer.close()
+        end_import_time = time.time()
         #
         # acquire lock to the main genotype database
         self.lock.acquire()
         #
+        start_copy_time = time.time()
         # start copying genotype
         # copy genotype table
         db = DatabaseEngine()
@@ -1116,8 +1122,9 @@ class GenotypeImportWorker(Process):
             writer.createNewSampleVariantTable(cur, table, len(self.genotype_field) > 0,
                 self.genotype_info)
             cur.execute('INSERT INTO {0} SELECT * FROM __from.{0};'.format(table))
-            # try to give a reasonable estimate of progress...
-            self.status.value += self.count[0] // len(self.sample_ids)
+            # try to give a reasonable estimate of progress... we divide number of copied
+            # variants by 10 because it is generally 10 times faster to copy than import
+            self.status.value += self.count[0] // 10
         db.detach('__from')
         # remove the temporary file
         try:
@@ -1126,6 +1133,8 @@ class GenotypeImportWorker(Process):
             pass
         db.close()
         self.lock.release()
+        end_copy_time = time.time()
+        self.logger.debug('It took me {:.1f} seconds to import, and {:.1f} seconds to copy {} samples ({} - {}), waited {:.1f} seconds in between.'.format(end_import_time - start_import_time, end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), start_copy_time - end_import_time))
         
 #
 #
@@ -1146,6 +1155,9 @@ class Importer:
             sys.exit(1)
         #
         self.files = []
+        # in some cases, the files will be parsed first and we have exact line count
+        # in this case we cache this value to avoid repeated counting
+        self.file_line_count = {}
         cur = self.db.cursor()
         cur.execute('SELECT filename from filename;')
         existing_files = [x[0] for x in cur.fetchall()]
@@ -1469,6 +1481,7 @@ class Importer:
                 prog.update(self.count[0])
         prog.done()
         self.count[7] = reader.skipped_lines
+        self.file_line_count[input_filename] = self.count[0]
         self.db.commit()
 
     def finalize(self):
@@ -1616,22 +1629,43 @@ class Importer:
             # 
             # array will be passed so that subprocesses can know the
             # status 
-            lc = lineCount(input_filename, self.encoding)
-            # * 2 means getting, and then copying genotypes
-            prog = ProgressBar('Importing genotype', lc * len(sample_ids) * 2)
+            # we should have file line count from getVariants.
+            lc = self.file_line_count[input_filename]
+            # * 11/10  means getting, and then copying genotypes which takes 1/10 of time
+            prog = ProgressBar('Importing genotype', lc * len(sample_ids) * 11 // 10)
             status_array = [Value('i', 0) for x in range(self.jobs)]
             # a lock to write to the main genotype
             lock = Lock()
-            nSample = [0] * self.jobs
-            workers = []
             #
-            for piece in range(len(sample_ids) // trunk_size + 1):
-                start_sample = piece * trunk_size
-                end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
+            # determine workload:
+            # from our benchmark, if we split jobs evenly, the last trunk will
+            # take about double time to finish because the extra time to reach the end
+            # if the lines are long. Therefore, we are using an algorithm that the last
+            # piece will handle half of the samples of the first one.
+            #
+            # n -- len(sample_ids)
+            # m -- number of processes
+            # k -- workload of the first one
+            # k/2 -- workload of the last one
+            # 
+            # k =  4n/3m
+            #
+            workers = []
+            if self.jobs >= len(sample_ids):
+                workload = [1]*self.jobs + [0]*(len(sample_ids) - self.jobs)
+            else:
+                workload = [max(1, int(4*len(sample_ids)/(3.*self.jobs)*(1-x/(2.*(self.jobs - 1))))) for x in range(self.jobs)]
+                workload[0] = min(0, len(sample_ids) - sum(workload[1:]))
+            start_sample = 0
+            for piece in range(self.jobs):
+                if workload[piece] == 0:
+                    continue
+                end_sample = min(start_sample + workload[piece], len(sample_ids))
+                if end_sample <= start_sample:
+                    continue
                 # small sample size, use a single process
                 self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
                 tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, piece))
-                nSample[piece] = end_sample - start_sample
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
@@ -1643,9 +1677,10 @@ class Importer:
                     status_array[piece], lock, self.logger)
                 worker.start()
                 workers.append(worker)
+                start_sample = end_sample
             #
             while True:
-                prog.update(sum([x*y for x,y in zip([x.value for x in status_array], nSample)]))
+                prog.update(sum([x.value for x in status_array]))
                 time.sleep(2)
                 if True not in [x.is_alive() for x in workers]:
                     prog.done()
