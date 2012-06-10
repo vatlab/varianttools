@@ -35,7 +35,7 @@ from heapq import heappush, heappop, heappushpop
 from cPickle import dumps, loads, HIGHEST_PROTOCOL
 from binascii import a2b_base64, b2a_base64
 from subprocess import Popen, PIPE
-from multiprocessing import Process, Pipe, Value
+from multiprocessing import Process, Pipe, Value, Lock
 from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
@@ -1026,10 +1026,16 @@ class GenotypeImportWorker(Process):
     # to process input line. If multiple works are started,
     # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     #
-    def __init__(self, processor, input_filename, encoding,
+    def __init__(self, proj, processor, input_filename, encoding,
         genotype_file, genotype_field, genotype_info, 
-        variantIndex, genotype_status, ranges, sample_ids, status, logger):
+        variantIndex, genotype_status, ranges, sample_ids, status, lock,
+        logger):
+        #
+        # lock: a lock to write to the main project database
+        #
+        #
         Process.__init__(self)
+        self.main_genotype_file = '{}_genotype'.format(proj.name)
         self.reader = TextReader(processor, input_filename, None, 0, encoding, logger)
         self.genotype_file = genotype_file
         self.genotype_field = genotype_field
@@ -1040,6 +1046,7 @@ class GenotypeImportWorker(Process):
         self.sample_ids = sample_ids
         self.status = status
         self.logger = logger
+        self.lock = lock
         self.count = [0, 0]
 
     def run(self): 
@@ -1078,6 +1085,36 @@ class GenotypeImportWorker(Process):
                 self.status.value = self.count[0]
                 last_count = self.count[0]
         writer.close()
+        #
+        # acquire lock to the main genotype database
+        self.lock.acquire()
+        #
+        # start copying genotype
+        # copy genotype table
+        db = DatabaseEngine()
+        db.connect(self.main_genotype_file)
+        db.attach(self.genotype_file, '__from')
+        cur = db.cursor()
+        for count, ID in enumerate(self.sample_ids):
+            table = 'genotype_{}'.format(ID)
+            # if genotype already exist????? This should not happen
+            if db.hasTable(table):
+                self.logger.warning('Genotype table {} already exist in project.'.format(ID))
+                db.removeTable(table)
+            # create a new table
+            writer.createNewSampleVariantTable(cur, table, len(self.genotype_field) > 0,
+                self.genotype_info)
+            cur.execute('INSERT INTO {0} SELECT * FROM __from.{0};'.format(table))
+            # try to give a reasonable estimate of progress...
+            self.status.value += self.count[0] // len(self.sample_ids)
+        db.detach('__from')
+        # remove the temporary file
+        try:
+            os.remove(self.genotype_file)
+        except:
+            pass
+        db.close()
+        self.lock.release()
         
 #
 #
@@ -1569,68 +1606,39 @@ class Importer:
             # array will be passed so that subprocesses can know the
             # status 
             lc = lineCount(input_filename, self.encoding)
-            prog = ProgressBar('Importing genotype', lc * len(sample_ids))
+            # * 2 means getting, and then copying genotypes
+            prog = ProgressBar('Importing genotype', lc * len(sample_ids) * 2)
             status_array = [Value('i', 0) for x in range(self.jobs)]
+            # a lock to write to the main genotype
+            lock = Lock()
             nSample = [0] * self.jobs
             workers = []
-            file_sample = []
             #
             for piece in range(len(sample_ids) // trunk_size + 1):
                 start_sample = piece * trunk_size
                 end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
                 # small sample size, use a single process
                 self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
-                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype'.format(count, piece))
+                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, piece))
                 nSample[piece] = end_sample - start_sample
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
-                file_sample.append([tmp_file, sample_ids[start_sample : end_sample]])
-                worker = GenotypeImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
+                if os.path.isfile(tmp_file):
+                    raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
+                worker = GenotypeImportWorker(self.proj, self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, genotype_status, self.ranges,
                     sample_ids[start_sample : end_sample],
-                    status_array[piece], self.logger)
+                    status_array[piece], lock, self.logger)
                 worker.start()
                 workers.append(worker)
             #
             while True:
                 prog.update(sum([x*y for x,y in zip([x.value for x in status_array], nSample)]))
-                time.sleep(5)
+                time.sleep(2)
                 if True not in [x.is_alive() for x in workers]:
                     prog.done()
                     break
-            #
-            # start copying genotype
-            # copy genotype table
-            db = DatabaseEngine()
-            db.connect('{}_genotype'.format(self.proj.name))
-            prog = ProgressBar('Copying samples', len(sample_ids))
-            count = 0
-            for file, file_sample_ids in file_sample:
-                db.attach(file, '__from')
-                cur = db.cursor()
-                for idx, ID in enumerate(sorted(file_sample_ids)):
-                    table = 'genotype_{}'.format(ID)
-                    # get schema
-                    cur.execute('SELECT sql FROM __from.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
-                        (table,))
-                    sql = cur.fetchone()[0]
-                    if db.hasTable(table):
-                        self.logger.warning('Genotype table {} already exist in project.'.format(ID))
-                        db.removeTable(table)
-                    try:
-                        # self.logger.debug(sql)
-                        cur.execute(sql)
-                    except Exception as e:
-                        self.logger.debug(e)
-                    cur.execute('INSERT INTO {0} SELECT * FROM __from.{0};'.format(table))
-                    count += 1
-                    prog.update(count)
-                db.detach('__from')
-                os.remove(file)
-            # remove all annotations
-            prog.done()
-            db.close()
 
 
 
@@ -1672,8 +1680,6 @@ def importVariantsArguments(parser):
             dedicated reader processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
-    parser.add_argument('--old', action='store_true',
-        help='''If set, use the old import method that import variants and genotype together.''')
 
 def importVariants(args):
     #try:
@@ -1684,7 +1690,7 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            if args.jobs == 1 or args.old:
+            if args.jobs == 1:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
