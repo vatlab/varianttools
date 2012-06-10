@@ -1561,7 +1561,7 @@ class Importer:
             # if there are 800 samples,
             #   self.jobs = 4, trunk_size = 200 + 1
             #   piece = 800 / 201 + 1 = 3 + 1 = 4
-            trunk_size = max(100, len(sample_ids) / self.jobs + 1)
+            trunk_size = max(100, len(sample_ids) // self.jobs + 1)
             # 
             # array will be passed so that subprocesses can know the
             # status 
@@ -1570,8 +1570,9 @@ class Importer:
             status_array = [Value('i', 0) for x in range(self.jobs)]
             nSample = [0] * self.jobs
             workers = []
+            file_sample = []
             #
-            for piece in range(len(sample_ids) / trunk_size + 1):
+            for piece in range(len(sample_ids) // trunk_size + 1):
                 start_sample = piece * trunk_size
                 end_sample = min(len(sample_ids), (piece + 1) * trunk_size)
                 # small sample size, use a single process
@@ -1580,6 +1581,7 @@ class Importer:
                 nSample[piece] = end_sample - start_sample
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
+                file_sample.append([tmp_file, sample_ids])
                 worker = GenotypeImportWorker(self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, genotype_status, self.ranges,
@@ -1594,7 +1596,39 @@ class Importer:
                     prog.done()
                     break
             #
-            #self.count[7] = reader.skipped_lines
+            # start copying genotype
+            # copy genotype table
+            db = DatabaseEngine()
+            db.connect('{}_genotype'.format(self.proj.name))
+            prog = ProgressBar('Copying samples', len(sample_ids))
+            count = 0
+            for file, sample_ids in file_sample:
+                db.attach(file, '__from')
+                cur = db.cursor()
+                for idx, ID in enumerate(sorted(sample_ids)):
+                    table = 'genotype_{}'.format(ID)
+                    # get schema
+                    cur.execute('SELECT sql FROM __from.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
+                        (table,))
+                    sql = cur.fetchone()[0]
+                    if db.hasTable(table):
+                        self.logger.warning('Genotype table {} already exist in project.'.format(ID))
+                        db.removeTable(table)
+                    try:
+                        # self.logger.debug(sql)
+                        cur.execute(sql)
+                    except Exception as e:
+                        self.logger.debug(e)
+                    cur.execute('INSERT INTO {0} SELECT * FROM __from.{0};'.format(table))
+                    count += 1
+                    prog.update(count)
+                db.detach('__from')
+                os.remove(file)
+            # remove all annotations
+            prog.done()
+            db.close()
+
+
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
@@ -1636,7 +1670,7 @@ def importVariantsArguments(parser):
             automatically lead to better performance.''')
 
 def importVariants(args):
-    try:
+    #try:
         # the project is opened with verify=False so index on the master
         # variant table will not be created if it does not exist (because the
         # last command was a vtools import command)
@@ -1654,6 +1688,6 @@ def importVariants(args):
                 importer.importGenotypesInParallel()
             importer.finalize()
         proj.close()
-    except Exception as e:
-        sys.exit(e)
+    #except Exception as e:
+    #    sys.exit(e)
 
