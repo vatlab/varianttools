@@ -111,6 +111,8 @@ class ExtractFlag:
             return '0'
 
 class CommonLeading:
+    '''Find the common leading piece of two input strings (ref and alt).
+    '''
     def __init__(self):
         pass
 
@@ -128,6 +130,8 @@ class CommonLeading:
             return self._commonLeading(item[0], item[1])
 
 class CommonEnding:
+    '''Find the common ending piece of two input strings (ref and alt).
+    '''
     def __init__(self):
         pass
     
@@ -294,6 +298,7 @@ class ExtractValue:
         return ss[2].partition(self.sep)[0] if ss[2] is not None else self.default
 
 class IncreaseBy:
+    '''Increase passed value by a given number, will convert input to integer'''
     def __init__(self, inc=1):
         '''Adjust position'''
         self.inc = inc
@@ -314,6 +319,8 @@ class MapValue:
             return self.default
         
 class RemoveLeading:
+    '''Remove specified leading string if the input string starts with it. Used
+    for example to remove chr from inputs such as chr15'''
     def __init__(self, val):
         self.val = val
         self.vlen = len(val)
@@ -336,6 +343,7 @@ class EncodeGenotype:
         return self.map[item]
         
 class Nullify:
+    '''Change specified input value to NULL '''
     def __init__(self, val):
         self.val = val
         if type(self.val) == str:
@@ -532,13 +540,12 @@ class LineProcessor:
         self.import_var_info = True
         self.import_sample_range = None  # genotype fields might be disabled
         self.maxInputCol = 0      # sometimes processor do not have to split input all the way through
-        # used to report result
-        self.processed_lines = 0
-        self.skipped_lines = 0
-        self.num_records = 0
 
     def reset(self, import_var_info = True, import_sample_range = None):
-        ''' 
+        '''Reset the processor for its internal state, which is used when the processor
+        is used to process a new batch of data (with different format), or with
+        modified behavior.
+        
         import_var_info: if set to False, variant info will not be imported.
         import_sample_range: if set to a range, only selected samples are handled
         '''
@@ -555,7 +562,7 @@ class LineProcessor:
             # self.maxInputCol is n, we need to have n+1 fields to guarantee that
             # the piece n is a properly split one
             if type(tokens) is not list:
-                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol)][:self.maxInputCol ]
+                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol)][:self.maxInputCol]
         else:
             if type(tokens) is not list:
                 tokens = [x.strip() for x in tokens.split(self.delimiter)]
@@ -748,8 +755,7 @@ def TextReader(processor, input, varIdx, jobs, encoding, logger):
 
 class EmbeddedTextReader:
     #
-    # This processor uses the passed line processor to process input
-    # in the main process. No separate process is spawned.
+    # This reader read the file from the main process. No separate process is spawned.
     #
     def __init__(self, processor, input, varIdx, encoding, logger):
         self.num_records = 0
@@ -786,12 +792,22 @@ class EmbeddedTextReader:
 
 
 class ReaderWorker(Process):
-    #
-    # This class starts a process and use passed LineProcessor
-    # to process input line. If multiple works are started,
-    # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
-    #
+    '''
+    This class starts a process and use passed LineProcessor
+    to process input line. If multiple works are started,
+    they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
+    '''
     def __init__(self, processor, input, varIdx, output, step, index, encoding, logger):
+        '''
+        processor:  line processor
+        input:      input filename
+        output:     a pipe to write output
+        varIdx:     a dictionary of variants, used to only return matching lines if specified
+        step:       step between processing lines because multiple workers might read the same file
+        index:      index of this worker in the worker group
+        encoding:   file encoding
+        logger:     logger object to write error messages when things go wrong
+        '''
         self.processor = processor
         self.input = input
         self.output = output
@@ -840,10 +856,9 @@ class ReaderWorker(Process):
 
 
 class StandaloneTextReader:
-    #
-    # This processor fire up 1 worker to read an input file
-    # and gather their outputs
-    #
+    ''' This processor fire up 1 worker to read an input file
+    and gather their outputs
+    '''
     def __init__(self, processor, input, varIdx, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
@@ -865,10 +880,9 @@ class StandaloneTextReader:
         self.worker.join()
 
 class MultiTextReader:
-    #
-    # This processor fire up num workers to read an input file
-    # and gather their outputs
-    #
+    '''This processor fire up num workers to read an input file
+    and gather their outputs
+    '''
     def __init__(self, processor, input, varIdx, jobs, encoding, logger):
         self.readers = []
         self.workers = []
@@ -927,23 +941,35 @@ class MultiTextReader:
 #
 
 class GenotypeWriter:
-    def __init__(self, geno_db, geno_fields, geno_info, sample_ids, logger=None):
+    '''This class write genotypes to a genotype database, which does
+    not have to be the project genotype database.'''
+    def __init__(self, geno_db, geno_field, geno_info, sample_ids, logger=None):
+        '''geno_db:   genotype database
+        geno_field:   genotype field, there can be no or one genotype field (for GT)
+        geno_info:    genotype information fields
+        sample_ids:   ID of samples that will be written to this database
+        '''
         #
         self.db = DatabaseEngine()
         self.db.connect(geno_db)
         self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
-            .format(','.join([self.db.PH] * (1 + len(geno_fields) + len(geno_info))))
+            .format(','.join([self.db.PH] * (1 + len(geno_field) + len(geno_info))))
         self.cur = self.db.cursor()
         if logger:
             s = delayedAction(logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
         for idx, sid in enumerate(sample_ids):
             # create table
             self.createNewSampleVariantTable(self.cur,
-                'genotype_{0}'.format(sid), len(geno_fields) > 0, geno_info)
+                'genotype_{0}'.format(sid), len(geno_field) > 0, geno_info)
         self.db.commit()
         if logger:
             del s
+        #
+        # number of genotype batches that has been written
         self.count = 0
+        # cache of genotypes. This class will accumulate 1000 genotypes befire
+        # it writes to the disk using 'executemany', which will be faster than
+        # calling 1000 'execute'.
         self.cache = {}
 
     def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
@@ -959,12 +985,15 @@ class GenotypeWriter:
     def write(self, id, rec):
         try:
             if len(self.cache[id]) == 1000:
+                # this will fail if id does not exist, so we do not need 
+                # extra test if id is valie
                 self.cur.executemany(self.query.format(id), self.cache[id])
                 self.cache[id] = [rec]
                 self.count += 1
             else:
                 self.cache[id].append(rec)
         except KeyError:
+            # if this is a new id
             self.cache[id] = [rec]
         if self.count % 10000 == 0:
             self.db.commit()
@@ -980,8 +1009,10 @@ class GenotypeWriter:
 #
 # utility function to get sample name
 #
-def getSampleName(filename, prober, encoding, logger):
-    '''Prove text file for sample name'''
+def probeSampleName(filename, prober, encoding, logger):
+    '''Probe text file for sample name. Essentially speaking
+    this function will go to the last comment line, break it in pieces
+    and see if we can grab some headers'''
     header_line = None
     count = 0
     with openFile(filename) as input:
@@ -1033,16 +1064,18 @@ def getSampleName(filename, prober, encoding, logger):
 #
 # 
 class GenotypeImportWorker(Process):
-    #
-    # This class starts a process and use passed LineProcessor
-    # to process input line. If multiple works are started,
-    # they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
-    #
+    '''This class starts a process, import genotype to a temporary genotype database.
+    When a lock is acquired after it, it will copy the genotypes to the main
+    genotype database. '''
     def __init__(self, proj, processor, input_filename, encoding,
         genotype_file, genotype_field, genotype_info, 
-        variantIndex, genotype_status, ranges, sample_ids, status, lock,
+        variantIndex, ranges, sample_ids, status, lock,
         logger):
         #
+        # variantIndex:  variantIndex from the master thread, which has
+        #        all the variants obtained from getVariants(). This parameter
+        #        allows the GenotypeImportWorker get variant_id for all
+        #        variants without having to consult the master proces.
         # lock: a lock to write to the main project database
         #
         #
@@ -1053,7 +1086,6 @@ class GenotypeImportWorker(Process):
         self.genotype_field = genotype_field
         self.genotype_info = genotype_info
         self.variantIndex = variantIndex
-        self.genotype_status = genotype_status
         self.ranges = ranges
         self.sample_ids = sample_ids
         self.status = status
@@ -1075,7 +1107,8 @@ class GenotypeImportWorker(Process):
             except KeyError:
                 self.logger.debug('Variant {} {} {} {} not found'.format(rec[0], rec[1], rec[2], rec[3]))
                 continue
-            if self.genotype_status == 1:
+            # if there is genotype (and genotype_info)
+            if len(self.genotype_field) > 0:
                 if fld_cols is None:
                     col_rngs = [self.reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
@@ -1092,7 +1125,7 @@ class GenotypeImportWorker(Process):
                     except IndexError:
                         self.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
                             len(rec), fld_cols[-1][-1] + 1, rec))
-            elif self.genotype_status == 2:
+            else:
                 # should have only one sample
                 for id in self.sample_ids:
                     writer.write(id, [variant_id])
@@ -1345,7 +1378,7 @@ class Importer:
                 return []
             else:
                 try:
-                    numSample, names = getSampleName(input_filename, self.prober, self.encoding, self.logger)
+                    numSample, names = probeSampleName(input_filename, self.prober, self.encoding, self.logger)
                     if not names:
                         if numSample == 1:
                             self.logger.debug('Missing sample name (name None is used)'.format(numSample))
@@ -1373,7 +1406,7 @@ class Importer:
                 return self.recordFileAndSample(input_filename, self.sample_name)
             else:
                 try:
-                    numSample, names = getSampleName(input_filename, self.prober, self.encoding, self.logger)
+                    numSample, names = probeSampleName(input_filename, self.prober, self.encoding, self.logger)
                 except ValueError as e:
                     self.logger.debug(e)
                     numSample = 0
@@ -1606,17 +1639,9 @@ class Importer:
                 self.prober.reset()
             #
             sample_ids = self.getSampleIDs(input_filename)
+            if len(sample_ids) == 0:
+                continue
             #
-            # cache genotype status
-            if len(sample_ids) > 0 and len(self.genotype_field) > 0:
-                # has genotype
-                genotype_status = 1
-            elif len(sample_ids) > 0:
-                # no genotype but with sample
-                genotype_status = 2
-            else:
-                # no genotype no sample
-                return
             # number of process to be used
             # for example, there are 811 samples,
             #   self.jobs = 4, trunk_size = 202 + 1
@@ -1672,8 +1697,7 @@ class Importer:
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
                 worker = GenotypeImportWorker(self.proj, self.processor, input_filename, self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
-                    self.variantIndex, genotype_status, self.ranges,
-                    sample_ids[start_sample : end_sample],
+                    self.variantIndex, self.ranges, sample_ids[start_sample : end_sample],
                     status_array[piece], lock, self.logger)
                 worker.start()
                 workers.append(worker)

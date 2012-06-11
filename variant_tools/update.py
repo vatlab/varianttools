@@ -202,7 +202,7 @@ class Updater:
             sample_ids.append(rec[0])
             sample_names.append(rec[1])
         # what is the sample names get from this file?
-        nSample, names = getSampleName(filename, self.prober, self.encoding, self.logger)
+        nSample, names = probeSampleName(filename, self.prober, self.encoding, self.logger)
         if nSample != len(sample_ids):
             self.logger.warning('Number of samples mismatch. Cannot update genotype')
             return []
