@@ -1069,7 +1069,7 @@ class GenotypeImportWorker(Process):
     genotype database. '''
     def __init__(self, proj, processor, input_filename, encoding,
         genotype_file, genotype_field, genotype_info, 
-        variantIndex, ranges, sample_ids, status, lock,
+        variantIndex, ranges, sample_ids, status, locks,
         logger):
         #
         # variantIndex:  variantIndex from the master thread, which has
@@ -1090,12 +1090,23 @@ class GenotypeImportWorker(Process):
         self.sample_ids = sample_ids
         self.status = status
         self.logger = logger
-        self.lock = lock
+        self.locks = locks
         self.count = [0, 0]
 
     def run(self): 
-        self.logger.debug('Start importing genotypes for {} samples ({} - {})'.format(len(self.sample_ids),
-            min(self.sample_ids), max(self.sample_ids)))
+        while True:
+            # try to get a place to start working
+            slot = -1
+            for idx, lock in enumerate(self.locks[:-1]):
+                if lock.acquire(False):   # do not wait for this particular one
+                    slot = idx
+                    break
+            # start working ...
+            if slot != -1:
+                break
+            time.sleep(1)
+        self.logger.debug('Start importing genotypes for {} samples ({} - {}) at slot {}'.format(len(self.sample_ids),
+            min(self.sample_ids), max(self.sample_ids), slot + 1))
         start_import_time = time.time()
         writer = GenotypeWriter(self.genotype_file, self.genotype_field,
             self.genotype_info, self.sample_ids)
@@ -1136,7 +1147,7 @@ class GenotypeImportWorker(Process):
         end_import_time = time.time()
         #
         # acquire lock to the main genotype database
-        self.lock.acquire()
+        self.locks[-1].acquire()
         #
         start_copy_time = time.time()
         # start copying genotype
@@ -1165,9 +1176,11 @@ class GenotypeImportWorker(Process):
         except:
             pass
         db.close()
-        self.lock.release()
+        self.locks[-1].release()
         end_copy_time = time.time()
-        self.logger.debug('It took me {:.1f} seconds to import, and {:.1f} seconds to copy {} samples ({} - {}), waited {:.1f} seconds in between.'.format(end_import_time - start_import_time, end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), start_copy_time - end_import_time))
+        self.logger.debug('It took me {:.1f} seconds to import and {:.1f} seconds to copy {} samples ({} - {}), waited {:.1f} seconds in between.'.format(end_import_time - start_import_time, end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), start_copy_time - end_import_time))
+        # after everything is done, let other job start
+        self.locks[slot].release()
         
 #
 #
@@ -1610,7 +1623,7 @@ class Importer:
                     'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                         self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
 
-    def importVariants(self):
+    def importAllVariants(self):
         '''Import variants from all files'''
         for count,f in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
@@ -1634,6 +1647,11 @@ class Importer:
 
     def importGenotypesInParallel(self):
         '''import files one by one, adding variants along the way'''
+        workers = []
+        total_count = 0
+        # a lock to write to the main genotype, and each lock for permission to run jobs.
+        locks = [Lock() for x in range(self.jobs + 1)]
+        status_array = []
         for count, input_filename in enumerate(self.files):
             if self.genotype_field:
                 self.prober.reset()
@@ -1642,25 +1660,10 @@ class Importer:
             if len(sample_ids) == 0:
                 continue
             #
-            # number of process to be used
-            # for example, there are 811 samples,
-            #   self.jobs = 4, trunk_size = 202 + 1
-            #   piece = 811 / 203 + 1 = 3 + 1 = 4
-            #
-            # if there are 800 samples,
-            #   self.jobs = 4, trunk_size = 200 + 1
-            #   piece = 800 / 201 + 1 = 3 + 1 = 4
-            trunk_size = max(100, len(sample_ids) // self.jobs + 1)
-            # 
-            # array will be passed so that subprocesses can know the
-            # status 
             # we should have file line count from getVariants.
             lc = self.file_line_count[input_filename]
             # * 11/10  means getting, and then copying genotypes which takes 1/10 of time
-            prog = ProgressBar('Importing genotype', lc * len(sample_ids) * 11 // 10)
-            status_array = [Value('i', 0) for x in range(self.jobs)]
-            # a lock to write to the main genotype
-            lock = Lock()
+            total_count += lc * len(sample_ids) * 11 // 10
             #
             # determine workload:
             # from our benchmark, if we split jobs evenly, the last trunk will
@@ -1671,45 +1674,52 @@ class Importer:
             # n -- len(sample_ids)
             # m -- number of processes
             # k -- workload of the first one
+            # k - k/2(m-1) -- workload of the second one
+            # ...
             # k/2 -- workload of the last one
             # 
             # k =  4n/3m
             #
-            workers = []
-            if self.jobs >= len(sample_ids):
-                workload = [1]*self.jobs + [0]*(len(sample_ids) - self.jobs)
-            else:
-                workload = [max(1, int(4*len(sample_ids)/(3.*self.jobs)*(1-x/(2.*(self.jobs - 1))))) for x in range(self.jobs)]
-                workload[0] = min(0, len(sample_ids) - sum(workload[1:]))
+            # each process handle at least 10 sampples
+            workload = [max(10, int(4*len(sample_ids)/(3.*self.jobs)*(1-x/(2.*(self.jobs - 1))))) for x in range(self.jobs)]
+            # if there are missing ones, give it to workload
+            workload[0] += max(0, len(sample_ids) - sum(workload))
             start_sample = 0
-            for piece in range(self.jobs):
-                if workload[piece] == 0:
+            for job in range(self.jobs):
+                if workload[job] == 0:
                     continue
-                end_sample = min(start_sample + workload[piece], len(sample_ids))
+                end_sample = min(start_sample + workload[job], len(sample_ids))
                 if end_sample <= start_sample:
                     continue
-                # small sample size, use a single process
+                # tell the processor do not import variant info, import part of the sample
                 self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
-                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, piece))
+                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, job))
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
-                worker = GenotypeImportWorker(self.proj, self.processor, input_filename, self.encoding, tmp_file, 
+                status = Value('i', 0)
+                status_array.append(status)
+                worker = GenotypeImportWorker(self.proj, self.processor, input_filename, 
+                    self.encoding, tmp_file, 
                     self.genotype_field, self.genotype_info,
                     self.variantIndex, self.ranges, sample_ids[start_sample : end_sample],
-                    status_array[piece], lock, self.logger)
+                    status, locks, self.logger)
                 worker.start()
+                # 0 means the worker has not been started yet
                 workers.append(worker)
                 start_sample = end_sample
-            #
-            while True:
-                prog.update(sum([x.value for x in status_array]))
-                time.sleep(2)
-                if True not in [x.is_alive() for x in workers]:
-                    prog.done()
-                    break
-
+        # start jobs and monitor progress
+        prog = ProgressBar('Importing genotype', total_count)
+        while True:
+            # each process update their passed shared value
+            # the master process add them and get the total number of genotypes imported
+            prog.update(sum([x.value for x in status_array]))
+            # if the total number of running jobs is less than self.jobs
+            if True not in [x.is_alive() for x in workers]:
+                prog.done()
+                break
+            time.sleep(2)
 
 
 def importVariantsArguments(parser):
@@ -1765,10 +1775,30 @@ def importVariants(args):
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                # if jobs > 1, use processes to import samples simultaneously
-                importer.importVariants()
-                importer.importGenotypesInParallel()
-            importer.finalize()
+                # step 1: figure out number of samples for files
+                nSample = {}
+                for f in importer.files:
+                    if not importer.genotype_field:
+                        nSample[f] = 0
+                        continue
+                    try:
+                        importer.prober.reset()
+                        numSample, names = probeSampleName(f, importer.prober,
+                            importer.encoding, importer.logger)
+                        nSample[f] = numSample
+                    except ValueError:
+                        nSample[f] = 0
+                # how many files are there?
+                # if only one file, the users can choose 
+                if max(nSample.values()) < 10:
+                    # if all samples have a small number of samples
+                    # multiple processes could be used for each file
+                    importer.importFilesSequentially()
+                else:
+                    # some files have a number of samples
+                    importer.importAllVariants()
+                    importer.importGenotypesInParallel()
+                importer.finalize()
         proj.close()
     #except Exception as e:
     #    sys.exit(e)
