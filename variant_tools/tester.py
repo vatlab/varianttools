@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: rvtests.py $
+# $File: tester.py $
 # $LastChangedDate: 2012-06-05 12:31:19 -0500 (Tue, 05 Jun 2012) $
 # $Rev: 1179 $
 #
@@ -50,7 +50,7 @@ def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
     return sorted([(name, obj) for name, obj in globals().iteritems() \
         if type(obj) == type(NullTest) and issubclass(obj, NullTest) \
-            and name not in ('NullTest', 'GLMBurdenTest')], key=lambda x: x[0])
+            and name not in ('NullTest', 'GLMBurdenTest', 'CaseCtrlBurdenTest')], key=lambda x: x[0])
 
 
 class NullTest:
@@ -190,7 +190,7 @@ class GLMBurdenTest(NullTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -328,7 +328,7 @@ class LinRegBurden(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -499,7 +499,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -554,7 +554,7 @@ class LogitRegBurden(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -725,7 +725,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To not using adaptive procedure, set C=1. Default is C=0.1''')
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -740,3 +740,129 @@ class VariableThresholdsBt(GLMBurdenTest):
         self.weight = []
         self.use_indicator=False
         self.trait_type = 'disease'
+
+###
+# below are interface for some single covariate tests
+# implemented as they were originally published
+###
+
+class CaseCtrlBurdenTest(NullTest):
+    '''Single covariate case/ctrl burden test on collapsed genotypes within an association testing group'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        NullTest.__init__(self, logger, *method_args)
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='Test statistic.'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        if self.permutations > 0:
+            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+        #
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        self.algorithm = self._determine_algorithm()
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Single covariate case/ctrl burden test including CMC, WSS, KBAC, RBT and aSum. p-value
+            is calculated using exact/asymptotic distributions or permutation, depending on the input method. If --group_by
+            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='SBurdenTest',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum'], default='CMC',
+            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum".
+            Default set to "CMC"''')
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+    def _determine_algorithm(self):
+        a_scoregene = t.BinToX()
+        if self.aggregation_theme == 'WSS':
+            a_scoregene = None
+        elif self.aggregation_theme == 'KBAC':
+            a_scoregene = None
+        elif self.aggregation_theme == 'RBT':
+            a_scoregene = None
+        elif self.aggregation_theme == 'aSum':
+            a_scoregene = None
+        # data pre-processing
+        algorithm = t.AssoAlgorithm([
+            # calculate sample MAF
+            t.SetMaf(),
+            # filter out variants having MAF > mafupper or MAF <= maflower
+            t.SetSites(self.mafupper, self.maflower)
+            ])
+
+####
+        # weight genotype codings by w(MAF)
+        if 'MadsenBrowning' in self.weight and not self.use_indicator:
+            algorithm.append(t.WeightByAllMaf())
+
+        # association testing using analytic p-value
+        if self.permutations == 0:
+            algorithm.extend([
+                # calculate genotype score for a set of variants
+                a_scoregene,
+                # fit regression model
+                a_regression,
+                # evaluate p-value for the Wald's statistic
+                t.StudentPval(self.alternative)
+                ])
+        # association testing using permutation-based p-value
+        else:
+            if not self.variable_thresholds:
+                a_permutationtest = t.FixedPermutator(
+                        self.permute_by.upper(),
+                        self.alternative,
+                        self.permutations,
+                        self.adaptive,
+                        [a_regression]
+                        )
+                algorithm.extend([
+                        a_scoregene,
+                        a_permutationtest
+                        ])
+            else:
+                a_permutationtest = t.VariablePermutator(
+                        self.permute_by.upper(),
+                        self.alternative,
+                        self.permutations,
+                        self.adaptive,
+                        [a_scoregene, a_regression]
+                        )
+                algorithm.append(a_permutationtest)
+        return algorithm
+
+
+    def calculate(self):
+        self.data.countCaseCtrl()
+        self.algorithm.apply(self.data)
+        pvalues = self.data.pvalue()
+        statistics = self.data.statistic()
+        se = self.data.se()
+        res = [self.data.samplecounts()]
+        for (x, y, z) in zip(statistics, pvalues, se):
+            res.append(x)
+            res.append(y)
+            if self.permutations > 0:
+                # actual number of permutations
+                if math.isnan(z): res.append(z)
+                else: res.append(int(z))
+        return res
