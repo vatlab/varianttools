@@ -199,15 +199,6 @@ class TestImport(ProcessTestCase):
     def testMPImport(self):
         runCmd('vtools init test -f')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
-        #
-        # this line has ref=C, and alt=T,G
-        #
-        # the first reader reads C,T and C,G as two variants
-        # the second reader reads C,G and C,T as two variants because the
-        # multi-processing reader sorts its input
-        #
-        self.assertSucc('vtools select variant "pos=804653" -t removed')
-        self.assertSucc('vtools remove variants removed')
         samples = outputOfCmd('vtools show samples -l -1')
         genotype = outputOfCmd('vtools show genotypes -l -1')
         variants = outputOfCmd('vtools show table variant -l -1')
@@ -219,8 +210,6 @@ class TestImport(ProcessTestCase):
         #
         runCmd('vtools init test -f')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
-        self.assertSucc('vtools select variant "pos=804653" -t removed')
-        self.assertSucc('vtools remove variants removed')
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
         self.assertEqual(variants, outputOfCmd('vtools show table variant -l -1'))
@@ -231,8 +220,6 @@ class TestImport(ProcessTestCase):
         #
         runCmd('vtools init test -f')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
-        self.assertSucc('vtools select variant "pos=804653" -t removed')
-        self.assertSucc('vtools remove variants removed')
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
         self.assertEqual(variants, outputOfCmd('vtools show table variant -l -1'))

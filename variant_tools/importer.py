@@ -1514,7 +1514,7 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.encoding, self.logger)
+        reader = TextReader(self.processor, input_filename, None, 0, self.encoding, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
