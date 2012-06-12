@@ -1762,7 +1762,7 @@ def importVariantsArguments(parser):
             automatically lead to better performance.''')
 
 def importVariants(args):
-    #try:
+    try:
         # the project is opened with verify=False so index on the master
         # variant table will not be created if it does not exist (because the
         # last command was a vtools import command)
@@ -1798,8 +1798,8 @@ def importVariants(args):
                     # some files have a number of samples
                     importer.importAllVariants()
                     importer.importGenotypesInParallel()
-                importer.finalize()
+            importer.finalize()
         proj.close()
-    #except Exception as e:
-    #    sys.exit(e)
+    except Exception as e:
+        sys.exit(e)
 
