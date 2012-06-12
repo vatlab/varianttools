@@ -1283,7 +1283,7 @@ class Project:
         self.db.commit()
 
     def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
-        '''Create a table ``sample_variant`` to store vcf data'''
+        '''Create a table ``genotype_??`` to store genotype data'''
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
@@ -1586,6 +1586,35 @@ class Project:
             self.db.renameTable('{}_genotype.__tmp_{}'.format(self.name, ids[0]), 'genotype_{}'.format(ids[0]))
             prog.done()
 
+    def createVariantMap(self, table='variant', alt_build=False):
+        '''Create a map of all variants from specified table.
+        The dictionary looks like dict[(chr, ref, alt)][pos] = (id, 0)
+        to avoid repeating ref, alt all the time.
+        '''
+        variantIndex = {}
+        cur = self.db.cursor()
+        numVariants = self.db.numOfRows(table)
+        if numVariants == 0:
+            return variantIndex
+        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
+        if alt_build:
+            cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
+        else:
+            cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant {};'.format(where_clause))
+        prog = ProgressBar('Getting existing variants', numVariants)
+        for count, rec in enumerate(cur):
+            # zero for existing loci
+            key = (rec[1], rec[3], rec[4])
+            if key in variantIndex:
+                variantIndex[key][rec[2]] = (rec[0], 0)
+            else:
+                variantIndex[key] = {rec[2]: (rec[0], 0)}
+            #variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
+            if count % self.db.batch == 0:
+                prog.update(count)
+        prog.done()
+        return variantIndex
 
     def summarize(self):
         '''Summarize key features of the project
@@ -3232,8 +3261,23 @@ def admin(args):
                 proj.db.attach(proj.name + '_genotype')
                 proj.mergeSamples()
             elif args.rename_table:
+                if args.rename_table[0] == 'variant':
+                    raise ValueError('Cannot rename the master variant table')
+                if args.rename_table[1] == 'variant':
+                    raise ValueError('Cannot rename a table to the master variant table')
+                if args.rename_table[0] not in proj.getVariantTables():
+                    raise ValueError('Table {} does no exist or is not a variant table.'.format(args.rename_table[0]))
+                if args.rename_table[1] in proj.db.tables():
+                    raise ValueError('Table {} already exists in the project'.format(args.rename_table[1]))
+                if args.rename_table[0] == args.rename_table[1]:
+                    raise ValueError('Cannot rename a table to itself.')
                 proj.db.renameTable(args.rename_table[0], args.rename_table[1])
                 proj.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
+                # change the meta information of the table
+                cur = proj.db.cursor()
+                for key in ('desc', 'date', 'cmd'):
+                    cur.execute('UPDATE project SET name="__{}_of_{}" WHERE name="__{}_of_{}"'.format(
+                        key, args.rename_table[1], key, args.rename_table[0]))
             elif args.describe_table:
                 if not proj.db.hasTable(args.describe_table[0]):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))

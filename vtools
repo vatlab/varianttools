@@ -36,6 +36,7 @@ utils.setOptions(command_line='vtools ' + ' '.join([x if (x.isalnum() or x.start
 
 from variant_tools import project
 from variant_tools import importer
+from variant_tools import update
 from variant_tools import phenotype
 from variant_tools import liftOver
 from variant_tools import annotation
@@ -122,9 +123,9 @@ if __name__ == '__main__':
             statistics of genotypes and genotype info, or files that annotate variants or their
             locations (e.g. Read annotation from ANNOVAR output files, import additional variant
             or genotype fields from .vcf files).''')
-    importer.updateArguments(parser)
+    update.updateArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=importer.update)
+    parser.set_defaults(func=update.update)
     #
     # command select
     parser = subparsers.add_parser('select',
@@ -203,7 +204,7 @@ if __name__ == '__main__':
     # separate them into argv
     args, argv = master_parser.parse_known_args()
     # only command associate and sample_stat accept arbitrary parameter
-    if (args.func in [association.associate, project.init, importer.importVariants, importer.update, exporter.export]):
+    if (args.func in [association.associate, project.init, importer.importVariants, update.update, exporter.export]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)
