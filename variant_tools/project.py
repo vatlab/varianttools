@@ -3261,8 +3261,23 @@ def admin(args):
                 proj.db.attach(proj.name + '_genotype')
                 proj.mergeSamples()
             elif args.rename_table:
+                if args.rename_table[0] == 'variant':
+                    raise ValueError('Cannot rename the master variant table')
+                if args.rename_table[1] == 'variant':
+                    raise ValueError('Cannot rename a table to the master variant table')
+                if args.rename_table[0] not in proj.getVariantTables():
+                    raise ValueError('Table {} does no exist or is not a variant table.'.format(args.rename_table[0]))
+                if args.rename_table[1] in proj.db.tables():
+                    raise ValueError('Table {} already exists in the project'.format(args.rename_table[1]))
+                if args.rename_table[0] == args.rename_table[1]:
+                    raise ValueError('Cannot rename a table to itself.')
                 proj.db.renameTable(args.rename_table[0], args.rename_table[1])
                 proj.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
+                # change the meta information of the table
+                cur = proj.db.cursor()
+                for key in ('desc', 'date', 'cmd'):
+                    cur.execute('UPDATE project SET name="__{}_of_{}" WHERE name="__{}_of_{}"'.format(
+                        key, args.rename_table[1], key, args.rename_table[0]))
             elif args.describe_table:
                 if not proj.db.hasTable(args.describe_table[0]):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
