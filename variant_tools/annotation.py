@@ -285,7 +285,7 @@ class AnnoDBConfiger:
             db.commit()
             prog.done()
             self.logger.info('{0} records are handled, {1} ignored.'\
-                .format(all_records, processor.skipped_lines + skipped_records))
+                .format(all_records, p.skipped_lines + skipped_records))
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''
