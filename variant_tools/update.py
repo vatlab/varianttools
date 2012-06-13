@@ -228,7 +228,8 @@ class Updater:
         reader = TextReader(self.processor, input_filename,
             # in the case of variant, we filter from the reading stage to save some time
             None if (self.table == 'variant' or self.input_type != 'variant') else self.variantIndex,
-            self.jobs - 1, self.encoding, self.logger)
+            # getNew is False so we only get variants that are available in variantIndex
+            False, self.jobs - 1, self.encoding, self.logger)
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:

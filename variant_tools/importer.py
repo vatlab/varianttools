@@ -738,31 +738,34 @@ class LineProcessor:
 # Read record from disk file
 #
 
-def TextReader(processor, input, varIdx, jobs, encoding, logger):
+def TextReader(processor, input, varIdx, getNew, jobs, encoding, logger):
     '''
     input: input file
     varIdx: variant index, if specified, only matching variants will be returned
-        used by updater
+        used by updater, or only new variants will be returned by an variant reader
+    getNew: if getNew is true, only return variants that are NOT in varIdx. Otherwise,
+        return variants that re in varIdx.
     jobs: number of jobs
     encoding: file encoding
     '''
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, encoding, logger)
+        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, logger)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, encoding, logger)
+        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, logger)
     else:
-        return MultiTextReader(processor, input, varIdx, jobs, encoding, logger)
+        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, logger)
 
 class EmbeddedTextReader:
     #
     # This reader read the file from the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
         self.processor = processor
         self.input = input
         self.varIdx = varIdx
+        self.getNew = getNew
         self.encoding = encoding
         self.logger = logger
 
@@ -783,8 +786,14 @@ class EmbeddedTextReader:
                         self.num_records += 1
                         if self.varIdx is not None:
                             var_key = (rec[0], rec[2], rec[3])
-                            if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
-                                continue
+                            if self.getNew:
+                                # only need new variant, so continue if variant in varIdx.
+                                if var_key in self.varIdx and rec[1] in self.varIdx[var_key]:
+                                    continue
+                            else:
+                                # only need existing variant, continue if variant not in varIdx
+                                if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                    continue
                         yield (line_no, bins, rec)
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
@@ -797,7 +806,7 @@ class ReaderWorker(Process):
     to process input line. If multiple works are started,
     they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     '''
-    def __init__(self, processor, input, varIdx, output, step, index, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, output, step, index, encoding, logger):
         '''
         processor:  line processor
         input:      input filename
@@ -813,6 +822,7 @@ class ReaderWorker(Process):
         self.output = output
         self.step = step
         self.varIdx = varIdx
+        self.getNew = getNew
         self.index = index
         self.encoding = encoding
         self.logger = logger
@@ -839,8 +849,14 @@ class ReaderWorker(Process):
                         num_records += 1
                         if self.varIdx is not None:
                             var_key = (rec[0], rec[2], rec[3])
-                            if (var_key not in self.varIdx) or (rec[1] not in self.varIdx[var_key]):
-                                continue
+                            if self.getNew:
+                                # only need new variant, so continue if variant in varIdx.
+                                if var_key in self.varIdx and rec[1] in self.varIdx[var_key]:
+                                    continue
+                            else:
+                                # only need existing variant, continue if variant not in varIdx
+                                if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                    continue
                         self.output.send((line_no, bins, rec))
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
@@ -859,12 +875,12 @@ class StandaloneTextReader:
     ''' This processor fire up 1 worker to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, encoding, logger):
         self.num_records = 0
         self.skipped_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = ReaderWorker(processor, input, varIdx, w, 1, 0, encoding, logger)
+        self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0, encoding, logger)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -883,14 +899,14 @@ class MultiTextReader:
     '''This processor fire up num workers to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, jobs, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, jobs, encoding, logger):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.skipped_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = ReaderWorker(processor, input, varIdx, w, jobs, i, encoding, logger)
+            p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i, encoding, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1081,7 +1097,7 @@ class GenotypeImportWorker(Process):
         #
         Process.__init__(self)
         self.main_genotype_file = '{}_genotype'.format(proj.name)
-        self.reader = TextReader(processor, input_filename, None, 0, encoding, logger)
+        self.reader = TextReader(processor, input_filename, None, False, 0, encoding, logger)
         self.genotype_file = genotype_file
         self.genotype_field = genotype_field
         self.genotype_info = genotype_info
@@ -1460,7 +1476,7 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, self.jobs - 1, self.encoding, self.logger)
+        reader = TextReader(self.processor, input_filename, None, False, self.jobs - 1, self.encoding, self.logger)
         if genotype_status != 0:
             writer = GenotypeWriter(
                 # write directly to the genotype table
@@ -1514,7 +1530,8 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, 0, self.encoding, self.logger)
+        # getNew=True so the reader only read variants not in variantIndex
+        reader = TextReader(self.processor, input_filename, self.variantIndex, True, 2, self.encoding, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
@@ -1628,20 +1645,18 @@ class Importer:
         for count,f in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
             self.importVariant(f)
-            total_var = sum(self.count[3:7])
-            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported.'\
-                .format(total_var, self.count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+            self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
+                .format(self.count[2],
+                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                     self.count[0]))
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
         if len(self.files) > 1:
-            total_var = sum(self.total_count[3:7])
-            self.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported.'\
-                .format(total_var, self.total_count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
+            self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
+                .format(self.total_count[2],
+                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                     self.total_count[0]))
 
@@ -1775,29 +1790,8 @@ def importVariants(args):
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                # step 1: figure out number of samples for files
-                nSample = {}
-                for f in importer.files:
-                    if not importer.genotype_field:
-                        nSample[f] = 0
-                        continue
-                    try:
-                        importer.prober.reset()
-                        numSample, names = probeSampleName(f, importer.prober,
-                            importer.encoding, importer.logger)
-                        nSample[f] = numSample
-                    except ValueError:
-                        nSample[f] = 0
-                # how many files are there?
-                # if only one file, the users can choose 
-                if max(nSample.values()) < 10:
-                    # if all samples have a small number of samples
-                    # multiple processes could be used for each file
-                    importer.importFilesSequentially()
-                else:
-                    # some files have a number of samples
-                    importer.importAllVariants()
-                    importer.importGenotypesInParallel()
+                importer.importAllVariants()
+                importer.importGenotypesInParallel()
             importer.finalize()
         proj.close()
     except Exception as e:
