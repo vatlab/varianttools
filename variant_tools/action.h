@@ -243,6 +243,37 @@ public:
 
 };
 
+// set maf for samples having phenotype < mean(phenotypes)
+// input 1 is var name
+// input 2, if true, will set maf for samples having phenotype > mean(phenotypes)
+class SetMafByCtrl : public BaseAction
+{
+public:
+	SetMafByCtrl(std::string afvarname, bool reverse = false) :
+			BaseAction(), m_afvarname(afvarname), m_reverse(reverse)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new SetMafByCtrl(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "SetMafByCtrl";
+	}
+
+private:
+	std::string m_afvarname;
+	bool m_reverse;
+
+};
+
 
 class SetGMissingToMaf : public BaseAction
 {
@@ -269,22 +300,22 @@ public:
 };
 
 // compute weight w = 1 / sqrt(p*(1-p))
-// using the entire sample
 // compute weight by maf from selected samples (ctrls, low QT samples, etc)
-// FIXME not yet implemented
-class WeightByAllMaf : public BaseAction
+// based on d.getArrayVar(subsamplemaf)
+class WeightByMaf : public BaseAction
 {
 	// this will change the raw genotypes directly!
 
 public:
-	WeightByAllMaf() : BaseAction()
+	WeightByMaf(std::string subsamplemaf) :
+		BaseAction(), m_mafvarname(subsamplemaf)
 	{
 	}
 
 
 	BaseAction * clone() const
 	{
-		return new WeightByAllMaf(*this);
+		return new WeightByMaf(*this);
 	}
 
 
@@ -292,11 +323,14 @@ public:
 
 	std::string name()
 	{
-		return "WeightByAllMaf";
+		return "WeightByMaf";
 	}
 
 
+private:
+	std::string m_mafvarname;
 };
+
 
 class WeightByInfo : public BaseAction
 {
@@ -356,6 +390,31 @@ private:
 };
 
 
+//recode genotypes to 0,1 for dominant or recessive coding
+//actually from simulation using kyrukov's model I only see 16 homozygote alleles out of 1000 sample * 1000 replicates
+class CodeXByMOI : public BaseAction
+{
+public:
+	CodeXByMOI() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new CodeXByMOI(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "CodeXByMOI";
+	}
+
+
+};
 // Wald's statistic for simple linear model Y = b0 + b1x
 class SimpleLinearRegression : public BaseAction
 {

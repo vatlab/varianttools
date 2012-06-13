@@ -36,6 +36,8 @@ include variant_tools/project.py
 include variant_tools/phenotype.py
 include variant_tools/utils.py
 include variant_tools/variant.py
+include variant_tools/association.py
+include variant_tools/tester.py
 include variant_tools/compare.py
 include variant_tools/assoTests.i
 include variant_tools/config.h

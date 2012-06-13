@@ -37,6 +37,7 @@ bool SetMaf::apply(AssoData & d)
 	//but should be Ok if only use the relative mafs (e.g., weightings)
 	vectorf maf(genotype.front().size(), 0.0);
 	vectorf valid_all = maf;
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 
 	for (size_t j = 0; j < maf.size(); ++j) {
 		// calc maf and loci counts for site j
@@ -51,7 +52,7 @@ bool SetMaf::apply(AssoData & d)
 		}
 
 		if (valid_all[j] > 0.0) {
-			maf[j] = maf[j] / (valid_all[j] * 2.0);
+			maf[j] = maf[j] / (valid_all[j] * multiplier);
 		}
 		//  FIXME : re-code genotype.  will be incorrect for male chrX
 		if (maf[j] > 0.5) {
@@ -60,14 +61,55 @@ bool SetMaf::apply(AssoData & d)
 			for (size_t i = 0; i < genotype.size(); ++i) {
 				// genotype not missing
 				if (genotype[i][j] == genotype[i][j]) {
-					genotype[i][j] = 2.0 - genotype[i][j];
+					genotype[i][j] = multiplier - genotype[i][j];
 				}
 			}
 		}
 	}
 	d.setVar("maf", maf);
+	// actual sample size
+	d.setVar("maf_denominator", valid_all);
 	return true;
 }
+
+
+bool SetMafByCtrl::apply(AssoData & d)
+{
+	matrixf & genotype = d.raw_genotype();
+	vectorf & phenotype = d.phenotype();
+	double ybar = d.getDoubleVar("ybar");
+	vectorf af(genotype.front().size(), 0.0);
+	vectorf valid_all = af;
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
+
+	for (size_t j = 0; j < af.size(); ++j) {
+		// calc af and loci counts for site j
+		for (size_t i = 0; i < genotype.size(); ++i) {
+			// skip this sample or not, depending on phenotype
+			if (m_reverse) {
+				if (phenotype[i] > ybar) continue;
+			} else {
+				if (phenotype[i] < ybar) continue;
+			}
+			// genotype not missing
+			if (genotype[i][j] == genotype[i][j]) {
+				valid_all[j] += 1.0;
+				if (genotype[i][j] >= 1.0) {
+					af[j] += genotype[i][j];
+				}
+			}
+		}
+
+		if (valid_all[j] > 0.0) {
+			af[j] = (af[j] + 1.0) / ((valid_all[j] + 1.0) * multiplier);
+		}
+	}
+	d.setVar(m_afvarname, af);
+	// actual sample size
+	d.setVar(m_afvarname + "_denominator", valid_all);
+	return true;
+}
+
 
 
 bool SetGMissingToMaf::apply(AssoData & d)
@@ -107,19 +149,21 @@ bool WeightByInfo::apply(AssoData & d)
 }
 
 
-bool WeightByAllMaf::apply(AssoData & d)
+bool WeightByMaf::apply(AssoData & d)
 {
-	if (!d.hasVar("maf")) {
-		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to calculating weights.");
+	if (!d.hasVar(m_mafvarname)) {
+		throw RuntimeError(m_mafvarname + " has not been calculated. Please calculate it prior to calculating weights.");
 	}
-	vectorf & maf = d.getArrayVar("maf");
+	vectorf & maf = d.getArrayVar(m_mafvarname);
+	vectorf & denominator = d.getArrayVar(m_mafvarname + "_denominator");
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	//
 	vectorf weight;
 	for (size_t i = 0; i < maf.size(); ++i) {
 		if (fEqual(maf[i], 0.0) || fEqual(maf[i], 1.0)) {
 			weight.push_back(0.0);
-		} else{
-			weight.push_back(1.0 / sqrt(maf[i] * (1.0 - maf[i])));
+		} else {
+			weight.push_back(1.0 / sqrt(maf[i] * (1.0 - maf[i]) * denominator[i] * multiplier));
 		}
 	}
 
@@ -152,6 +196,37 @@ bool SetSites::apply(AssoData & d)
 				genotype[i].erase(genotype[i].begin() + j);
 			}
 			--j;
+		}
+	}
+	return true;
+}
+
+
+bool CodeXByMOI::apply(AssoData & d)
+{
+
+	matrixf & genotype = d.raw_genotype();
+
+	for (size_t i = 0; i < genotype.size(); ++i) {
+		for (size_t j = 0; j < genotype.front().size(); ++j) {
+			// missing genotype
+			if (genotype[i][j] != genotype[i][j]) continue;
+			switch (d.getIntVar("moi")) {
+			case 0:
+				// recessive
+			{
+				genotype[i][j] = (fEqual(genotype[i][j], 2.0)) ? 1.0 : 0.0;
+			}
+			break;
+			case 1:
+				// dominant
+			{
+				genotype[i][j] = (!fEqual(genotype[i][j], 0.0)) ? 1.0 : 0.0;
+			}
+			break;
+			default:
+				break;
+			}
 		}
 	}
 	return true;

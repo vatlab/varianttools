@@ -224,7 +224,7 @@ class GLMBurdenTest(NullTest):
             algorithm.append(t.SetGMissingToMaf())
         # weight genotype codings by w(MAF)
         if 'MadsenBrowning' in self.weight and not self.use_indicator:
-            algorithm.append(t.WeightByAllMaf())
+            algorithm.append(t.WeightByMaf("maf"))
         # weight with var_info/geno_info
         otherweights = [x for x in self.weight if not x.startswith('MadsenBrowning')]
         if len(otherweights) > 0:
@@ -813,7 +813,7 @@ class CaseCtrlBurdenTest(NullTest):
 ####
         # weight genotype codings by w(MAF)
         if 'MadsenBrowning' in self.weight and not self.use_indicator:
-            algorithm.append(t.WeightByAllMaf())
+            algorithm.append(t.WeightByMaf("maf"))
 
         # association testing using analytic p-value
         if self.permutations == 0:

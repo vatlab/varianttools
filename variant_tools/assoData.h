@@ -102,6 +102,9 @@ public:
 	{
 		//codings are 0, 1, 2, -9 and U(0,1) number for "expected" genotype
 		m_genotype = g;
+		// set default MOI to use additive coding
+		int moi = 2;
+		setVar("moi", moi);
 		return true;
 	}
 
