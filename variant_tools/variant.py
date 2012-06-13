@@ -472,7 +472,7 @@ def compareMultipleTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
     # display a progress bar during query. We therefore only use that faster method (3m38s
     # instead of 2m33s) in the case of -v0.
-    if args.count and sum([args.difference != '', args.union != '', args.intersection != '']) > 1:
+    if args.count and sum([args.difference != [], args.union != [], args.intersection != []]) > 1:
         raise ValueError('Argument --count can be used only with one operation.')
     # args.difference is
     #    None  for --difference
@@ -551,15 +551,15 @@ def compare(args):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             # this is the old behavior
             if len(args.tables) == 2 and ((args.B_diff_A is None and args.A_diff_B is None and \
-                args.A_and_B is None and args.A_or_B is None and args.intersection == '' and \
-                args.union == '' and args.difference == '' and args.count) or args.B_diff_A is not None
+                args.A_and_B is None and args.A_or_B is None and args.intersection == [] and \
+                args.union == [] and args.difference == [] and args.count) or args.B_diff_A is not None
                 or args.A_diff_B is not None or args.A_and_B is not None or args.A_or_B is not None):
-                if args.intersection != '' or args.union != '' or args.difference != '':
+                if args.intersection != [] or args.union != [] or args.difference != []:
                     raise ValueError('Parameters for the old and new interface cannot be mixed.')
                 compareTwoTables(proj, args)
             else:
                 # new interface, ignores all the A_XX_B parameters
-                if args.intersection == '' and args.union == '' and args.difference == '':
+                if args.intersection == [] and args.union == [] and args.difference == []:
                     proj.logger.warning('No action parameter is specified. Nothing to do.')
                     return
                 compareMultipleTables(proj, args)

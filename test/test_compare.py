@@ -75,15 +75,15 @@ class TestCompare(ProcessTestCase):
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
-        self.assertEqual(output2list('vtools show table common')[1:], ['880', '881', '882', '893'])
+        self.assertEqual(output2list('vtools show table common')[4:], ['880', '881', '882', '893'])
         self.assertSucc('vtools compare d_plekhn1 ns --union AorB')
-        self.assertEqual(output2list('vtools show table AorB')[1:], ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertEqual(output2list('vtools show table AorB')[4:], ['714', '869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare d_plekhn1 ns --intersection AandB')
-        self.assertEqual(output2list('vtools show table AandB')[1:], ['869', '880', '881', '882', '889', '893'])
+        self.assertEqual(output2list('vtools show table AandB')[4:], ['869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare d_plekhn1 ns --difference AdiffB')
-        self.assertEqual(output2list('vtools show table AdiffB')[1:], [])
+        self.assertEqual(output2list('vtools show table AdiffB')[4:], [])
         self.assertSucc('vtools compare ns d_plekhn1 --difference BdiffA')
-        self.assertEqual(output2list('vtools show table BdiffA')[1:], ['714'])
+        self.assertEqual(output2list('vtools show table BdiffA')[4:], ['714'])
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1 -c --union A_OR_B')
 
