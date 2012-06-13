@@ -41,6 +41,7 @@ from variant_tools import phenotype
 from variant_tools import liftOver
 from variant_tools import annotation
 from variant_tools import variant
+from variant_tools import compare
 from variant_tools import exporter
 from variant_tools import association
 
@@ -147,9 +148,9 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('compare',
         help='''Compare two variant tables, count or output 
             intersect and difference to other tables''')
-    variant.compareArguments(parser)
+    compare.compareArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=variant.compare)
+    parser.set_defaults(func=compare.compare)
     #
     # command output
     parser = subparsers.add_parser('output',
