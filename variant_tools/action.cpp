@@ -499,27 +499,55 @@ bool MannWhitneyu::apply(AssoData & d)
 	vectorf & phenotype = d.phenotype();
 	int ncases = d.getIntVar("ncases");
 	int nctrls = d.getIntVar("nctrls");
+	//
 	double caseScores[ncases], ctrlScores[nctrls];
 	int tmpa = 0, tmpu = 0;
 
-	for (unsigned i = 0; i != ydat.size(); ++i) {
-		if (ydat[i] == AFFECTED) {
-			caseScores[tmpa] = scores[i];
+	for (size_t i = 0; i < phenotype.size(); ++i) {
+		if (fEqual(phenotype[i], 1.0)) {
+			caseScores[tmpa] = genotype[i];
 			++tmpa;
 		}else {
-			ctrlScores[tmpu] = scores[i];
+			ctrlScores[tmpu] = genotype[i];
 			++tmpu;
 		}
 	}
-	double statistics = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
-	d.setStatistics(statistics);
+	double statistic = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
+	//
+	d.setStatistic(statistic);
 	if (m_store) {
-		if (!d.hasVar("WSSstats")) {
+		if (!d.hasVar("MWstats")) {
 			vectorf mwstats(0);
 			d.setVar("WSSstats", mwstats);
 		}
-		vectorf & wssstats = d.getDoubleArray("WSSstats");
-		wssstats.push_back(statistics);
+		vectorf & wssstats = d.getArrayVar("MWstats");
+		wssstats.push_back(statistic);
+	}
+	return true;
+}
+
+
+bool MannWhitneyuPval::apply(AssoData & d)
+{
+	if (!d.hasVar("MWstats")) {
+		throw ValueError("Cannot find Mann-Whitney test statistic");
+	}
+
+	vectorf & mwstats = d.getArrayVar("MWstats");
+	//compute mean and se. skip the first element
+	//which is the original statistic
+	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0) / (mwstats.size() - 1.0);
+	double se_stats = 0.0;
+	for (size_t i = 1; i < mwstats.size(); ++i) {
+		se_stats += pow(mwstats[i] - mean_stats, 2.0);
+	}
+	se_stats = se_stats / (mwstats.size() - 2.0);
+	if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
+	double statisticstd = (mwstats[0] - mean_stats) / se_stats;
+	if (m_sided == 1) {
+		d.setPvalue(gsl_cdf_ugaussian_Q(statisticstd));
+	}else {
+		d.setPvalue(gsl_cdf_chisq_Q(statisticstd * statisticstd, 1.0));
 	}
 	return true;
 }

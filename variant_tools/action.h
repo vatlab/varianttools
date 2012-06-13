@@ -636,6 +636,35 @@ private:
 	unsigned m_store;
 };
 
+
+class MannWhitneyuPval : public BaseAction
+{
+public:
+	MannWhitneyuPval(unsigned alternative)
+		: BaseAction(), m_sided(alternative)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new MannWhitneyuPval(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "MannWhitneyuPval";
+	}
+
+private:
+	unsigned m_sided;
+};
+
+
+
 ////////////////////////////////
 ////////////////////////////////
 
