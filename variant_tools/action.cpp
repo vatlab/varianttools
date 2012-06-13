@@ -111,7 +111,6 @@ bool SetMafByCtrl::apply(AssoData & d)
 }
 
 
-
 bool SetGMissingToMaf::apply(AssoData & d)
 {
 	if (!d.hasVar("maf")) {

@@ -250,7 +250,7 @@ class SetMafByCtrl : public BaseAction
 {
 public:
 	SetMafByCtrl(std::string afvarname, bool reverse = false) :
-			BaseAction(), m_afvarname(afvarname), m_reverse(reverse)
+		BaseAction(), m_afvarname(afvarname), m_reverse(reverse)
 	{
 	}
 
@@ -267,6 +267,7 @@ public:
 	{
 		return "SetMafByCtrl";
 	}
+
 
 private:
 	std::string m_afvarname;
