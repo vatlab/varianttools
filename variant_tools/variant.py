@@ -373,7 +373,7 @@ def excludeArguments(parser):
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
-    parser.add_argument('-t', '--to_table', 
+    parser.add_argument('-t', '--to_table', nargs='*', metavar=('TABLE', 'DESC'),
         help='''Destination variant table.''')
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('-c', '--count', action='store_true',

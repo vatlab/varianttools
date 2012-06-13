@@ -60,6 +60,7 @@ class TestExclude(ProcessTestCase):
 
     def testExcludeAnno(self):
         runCmd('vtools liftover hg19')
+        # FIXME: this test is bad because it requies downloading a large database
         runCmd('vtools use dbSNP')
         self.assertSucc('vtools exclude variant "dbSNP.locType=\'exact\'" -t no_exact')
         self.assertSucc('vtools output no_exact variant_id chr pos ref alt')
