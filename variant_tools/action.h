@@ -605,7 +605,36 @@ private:
 	bool m_midp;
 };
 
+/* MannWhitney rank test on m_X and m_phenotype.
+   store = false for not storing the statistics from each permutation test; true is otherwise
+   will be stored as d.setVar("WSSstatistics", mwstats)
+*/
+class MannWhitneyu : public BaseAction
+{
+public:
+	MannWhitneyu(bool store = false)
+		: BaseAction(), m_store(store)
+	{
+	}
 
+
+	BaseAction * clone() const
+	{
+		return new MannWhitneyu(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "MannWhitneyu";
+	}
+
+
+private:
+	unsigned m_store;
+};
 
 ////////////////////////////////
 ////////////////////////////////

@@ -440,8 +440,6 @@ bool Fisher2X2::apply(AssoData & d)
 {
 	vectorf & genotype = d.genotype();
 	vectorf & phenotype = d.phenotype();
-	vectorf & statistic = d.statistic();
-	vectorf & pval = d.pvalue();
 
 	if (genotype.size() != phenotype.size()) {
 		throw ValueError("genotype/phenotype do not match");
@@ -491,6 +489,38 @@ bool Fisher2X2::apply(AssoData & d)
 	}
 	d.setStatistic( (double)twotwoTable[3]);
 	d.setPvalue(pvalue);
+	return true;
+}
+
+
+bool MannWhitneyu::apply(AssoData & d)
+{
+	vectorf & genotype = d.genotype();
+	vectorf & phenotype = d.phenotype();
+	int ncases = d.getIntVar("ncases");
+	int nctrls = d.getIntVar("nctrls");
+	double caseScores[ncases], ctrlScores[nctrls];
+	int tmpa = 0, tmpu = 0;
+
+	for (unsigned i = 0; i != ydat.size(); ++i) {
+		if (ydat[i] == AFFECTED) {
+			caseScores[tmpa] = scores[i];
+			++tmpa;
+		}else {
+			ctrlScores[tmpu] = scores[i];
+			++tmpu;
+		}
+	}
+	double statistics = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
+	d.setStatistics(statistics);
+	if (m_store) {
+		if (!d.hasVar("WSSstats")) {
+			vectorf mwstats(0);
+			d.setVar("WSSstats", mwstats);
+		}
+		vectorf & wssstats = d.getDoubleArray("WSSstats");
+		wssstats.push_back(statistics);
+	}
 	return true;
 }
 

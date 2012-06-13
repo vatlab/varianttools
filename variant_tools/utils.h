@@ -44,6 +44,8 @@ bool fEqual(double a, double b);
 
 // round() float numbers
 void fRound(double & myValue, double PRECISION);
+// mannwhitney test
+double Mann_Whitneyu(double *, int, double *, int);
 
 // pairwise sum of vector elements. can be used in std::accumulate for vector2f objects
 struct VPlus

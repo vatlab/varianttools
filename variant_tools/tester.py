@@ -827,7 +827,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.extend([
                     a_permutationtest,
-                    t.MannWhitneyuPval()
+                    t.MannWhitneyuPval(1)
                     ])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))

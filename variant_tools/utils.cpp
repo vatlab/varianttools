@@ -44,6 +44,122 @@ void fRound(double & myValue, double PRECISION)
 	return;
 }
 
+//!- Mann-Whitney rank test statistic "U"
+// www.alglib.net
+// http://en.wikipedia.org/wiki/Mann-Whitney_U
+double Mann_Whitneyu(double x[], int n, double y[], int m)
+{
+	int i;
+	int k;
+	int t;
+	double tmp;
+	int tmpi;
+	int ns;
+	double u;
+	int w;
+
+	// Prepare
+
+	if (n <= 5 || m <= 5) {
+		std::cout << "Sample size too small" << std::endl;
+		exit(1);
+	}
+	ns = n + m;
+	double r[ns - 1];
+	int c[ns - 1];
+	for (i = 0; i <= n - 1; i++) {
+		r[i] = x[i];
+		c[i] = 0;
+	}
+	for (i = 0; i <= m - 1; i++) {
+		r[n + i] = y[i];
+		c[n + i] = 1;
+	}
+
+	// sort {R, C}, QS: smaller scores ranks higher
+
+	if (ns != 1) {
+		i = 2;
+		do {
+			t = i;
+			while (t != 1) {
+				k = t / 2;
+				if (r[k - 1] >= r[t - 1]) {
+					t = 1;
+				}else {
+					tmp = r[k - 1];
+					r[k - 1] = r[t - 1];
+					r[t - 1] = tmp;
+					tmpi = c[k - 1];
+					c[k - 1] = c[t - 1];
+					c[t - 1] = tmpi;
+					t = k;
+				}
+			}
+			i = i + 1;
+		} while (i <= ns);
+		i = ns - 1;
+		do {
+			tmp = r[i];
+			r[i] = r[0];
+			r[0] = tmp;
+			tmpi = c[i];
+			c[i] = c[0];
+			c[0] = tmpi;
+			t = 1;
+			while (t != 0) {
+				k = 2 * t;
+				if (k > i) {
+					t = 0;
+				}else {
+					if (k < i) {
+						if (r[k] > r[k - 1]) {
+							k = k + 1;
+						}
+					}
+					if (r[t - 1] >= r[k - 1]) {
+						t = 0;
+					}else {
+						tmp = r[k - 1];
+						r[k - 1] = r[t - 1];
+						r[t - 1] = tmp;
+						tmpi = c[k - 1];
+						c[k - 1] = c[t - 1];
+						c[t - 1] = tmpi;
+						t = k;
+					}
+				}
+			}
+			i = i - 1;
+		} while (i >= 1);
+	}
+
+	// Compute U
+
+	u = 0;
+	w = 1;
+	for (i = 0; i <= ns - 1; i++) {
+		if (i == 0)
+			w = 1;
+		else {
+			if (r[i] > r[i - 1])
+				w = i + 1;
+		}
+
+		if (c[i] == 0) {
+			//ranks (sum of) for cases
+			//std::cout << w << " ";
+			//std::cout << r[i] << " ";
+			u = u + w;
+		}
+	}
+
+	//u = n*m+m*(m+1)/2-u;
+	//std::cout << u << " ";
+	return u;
+}
+
+
 
 namespace vtools {
 
