@@ -58,6 +58,11 @@ def associateArguments(parser):
             cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
+    parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
+            default='additive',
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 
+            0/1/NA for dominant or recessive model.
+            Default set to quantitative''')
     parser.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
@@ -104,7 +109,7 @@ class AssociationTestManager:
     groups:      a list of groups
     group_names: names of the group
     '''
-    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, methods,
+    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, moi, methods,
         unknown_args, samples, group_by, missing_filter):
         self.proj = proj
         self.db = proj.db
@@ -112,6 +117,7 @@ class AssociationTestManager:
         self.var_info = var_info
         self.geno_info = geno_info
         self.missing_filter = missing_filter
+        self.moi = moi
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -380,6 +386,7 @@ class AssoTestsWorker(Process):
         self.covariates = param.covariates
         self.var_info = param.var_info
         self.geno_info = param.geno_info
+        self.moi = param.moi
         self.tests = param.tests
         self.group_names = param.group_names
         self.missing_filter = param.missing_filter
@@ -462,6 +469,7 @@ class AssoTestsWorker(Process):
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
+        self.data.setMOI(self.moi)
         for field in info.keys():
             self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
@@ -525,7 +533,7 @@ def associate(args):
         with Project(verbosity=args.verbosity) as proj:
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
-                    args.var_info, args.geno_info, args.methods, args.unknown_args,
+                    args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
                     args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)

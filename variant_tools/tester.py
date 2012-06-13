@@ -25,6 +25,7 @@
 
 import sys
 import os
+import math
 import argparse
 if sys.version_info.major == 2:
     import assoTests_py2 as t
@@ -215,6 +216,8 @@ class GLMBurdenTest(NullTest):
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         # data pre-processing
         algorithm = t.AssoAlgorithm([
+            # code genotype matrix by MOI being 0 1 or 2
+            t.CodeXByMOI(),
             # calculate sample MAF
             t.SetMaf(),
             # filter out variants having MAF > mafupper or MAF <= maflower
@@ -794,61 +797,88 @@ class CaseCtrlBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
-        a_scoregene = t.BinToX()
-        if self.aggregation_theme == 'WSS':
-            a_scoregene = None
-        elif self.aggregation_theme == 'KBAC':
-            a_scoregene = None
-        elif self.aggregation_theme == 'RBT':
-            a_scoregene = None
-        elif self.aggregation_theme == 'aSum':
-            a_scoregene = None
+#        a_scoregene = t.BinToX()
+#        if self.aggregation_theme == 'WSS':
+#            # have to do it from within permutation since weight depends on control/case status
+#            a_scoregene = None
+#        elif self.aggregation_theme == 'KBAC':
+#            a_scoregene = None
+#        elif self.aggregation_theme == 'RBT':
+#            a_scoregene = None
+#        elif self.aggregation_theme == 'aSum':
+#            a_scoregene = None
         # data pre-processing
         algorithm = t.AssoAlgorithm([
+            # code genotype matrix by MOI being 0 1 or 2
+            t.CodeXByMOI(),
             # calculate sample MAF
             t.SetMaf(),
             # filter out variants having MAF > mafupper or MAF <= maflower
             t.SetSites(self.mafupper, self.maflower)
             ])
 
-####
-        # weight genotype codings by w(MAF)
-        if 'MadsenBrowning' in self.weight and not self.use_indicator:
-            algorithm.append(t.WeightByMaf("maf"))
+        # Now write implementation of each association methods separately.
 
         # association testing using analytic p-value
         if self.permutations == 0:
-            algorithm.extend([
-                # calculate genotype score for a set of variants
-                a_scoregene,
-                # fit regression model
-                a_regression,
-                # evaluate p-value for the Wald's statistic
-                t.StudentPval(self.alternative)
-                ])
-        # association testing using permutation-based p-value
-        else:
-            if not self.variable_thresholds:
+            if self.aggregation_theme == 'CMC':
+                algorithm.extend([t.BinToX(),
+                    t.Fisher2X2(self.alternative, self.midp)])
+            elif self.aggregation_theme == 'WSS':
                 a_permutationtest = t.FixedPermutator(
-                        self.permute_by.upper(),
-                        self.alternative,
-                        self.permutations,
-                        self.adaptive,
-                        [a_regression]
+                        'Y',
+                        1,
+                        1000,
+                        1,
+                        [t.SetMafByCtrl("ctrlmaf", 0),
+                            t.WeightByMaf("ctrlmaf"),
+                            t.SumToX(),
+                            t.MannWhitneyu(store=True)]
                         )
                 algorithm.extend([
-                        a_scoregene,
-                        a_permutationtest
-                        ])
+                    a_permutationtest,
+                    t.MannWhitneyuPval()
+                    ])
             else:
-                a_permutationtest = t.VariablePermutator(
-                        self.permute_by.upper(),
-                        self.alternative,
+                raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
+
+         # association testing using permutation-based p-value
+        else:
+            if self.aggregation_theme == 'KBAC':
+                algorithm.append(t.FindGenotypePattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
                         self.permutations,
                         self.adaptive,
-                        [a_scoregene, a_regression]
+                        [t.KBACscore(),
+                            t.KBACtest()]
                         )
                 algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'RBT':
+                algorithm.append(t.FindGenotypePattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.RBTweight(),
+                            t.RBTtest()]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'aSum':
+                algorithm.append(t.FindGenotypePattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.AsumScore(),
+                            t.SimpleLogisticRegression()]
+                        )
+                algorithm.append(a_permutationtest)
+            else:
+                raise ValueError('Invalid permutation test {0}'.format(self.aggregation_theme))
         return algorithm
 
 

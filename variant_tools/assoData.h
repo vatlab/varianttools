@@ -108,7 +108,14 @@ public:
 		return true;
 	}
 
-
+    bool setMOI(const std::string s)
+    {
+        int moi = 2;
+        if (s == "dominant") moi = 1;
+        if (s == "recessive") moi = 0;
+        setVar("moi", moi);
+        return true;
+    }
 	// set genotype scores
 	bool setX(const vectorf & g)
 	{
