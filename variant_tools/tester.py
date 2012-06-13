@@ -792,22 +792,13 @@ class CaseCtrlBurdenTest(NullTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--midp', action='store_true',
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
-#        a_scoregene = t.BinToX()
-#        if self.aggregation_theme == 'WSS':
-#            # have to do it from within permutation since weight depends on control/case status
-#            a_scoregene = None
-#        elif self.aggregation_theme == 'KBAC':
-#            a_scoregene = None
-#        elif self.aggregation_theme == 'RBT':
-#            a_scoregene = None
-#        elif self.aggregation_theme == 'aSum':
-#            a_scoregene = None
-        # data pre-processing
         algorithm = t.AssoAlgorithm([
             # code genotype matrix by MOI being 0 1 or 2
             t.CodeXByMOI(),
@@ -818,7 +809,6 @@ class CaseCtrlBurdenTest(NullTest):
             ])
 
         # Now write implementation of each association methods separately.
-
         # association testing using analytic p-value
         if self.permutations == 0:
             if self.aggregation_theme == 'CMC':
@@ -842,9 +832,21 @@ class CaseCtrlBurdenTest(NullTest):
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
 
-         # association testing using permutation-based p-value
+        # association testing using permutation-based p-value
         else:
-            if self.aggregation_theme == 'KBAC':
+            if self.aggregation_theme == 'WSS':
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        1000,
+                        1,
+                        [t.SetMafByCtrl("ctrlmaf", 0),
+                            t.WeightByMaf("ctrlmaf"),
+                            t.SumToX(),
+                            t.MannWhitneyu(store=False)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'KBAC':
                 algorithm.append(t.FindGenotypePattern())
                 a_permutationtest = t.FixedPermutator(
                         'Y',

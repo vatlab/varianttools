@@ -26,6 +26,7 @@
 #include "action.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
+#include "fisher2.h"
 
 namespace vtools {
 
@@ -431,6 +432,65 @@ bool StudentPval::apply(AssoData & d)
 	} else {
 		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
 	}
+	return true;
+}
+
+
+bool Fisher2X2::apply(AssoData & d)
+{
+	vectorf & genotype = d.genotype();
+	vectorf & phenotype = d.phenotype();
+	vectorf & statistic = d.statistic();
+	vectorf & pval = d.pvalue();
+
+	if (genotype.size() != phenotype.size()) {
+		throw ValueError("genotype/phenotype do not match");
+	}
+	vectori twotwoTable(4, 0);
+	for (size_t i = 0; i != genotype.size(); ++i) {
+
+		if (genotype[i] != genotype[i]) {
+			throw ValueError("Input genotype data have missing entries");
+		}
+		if (!(fEqual(phenotype[i], 1.0) || fEqual(phenotype[i], 0.0))) {
+			throw ValueError("Input phenotype data not binary");
+		}
+
+		if (fEqual(phenotype[i], 1.0)) {
+			if (genotype[i] > 0.0)
+				twotwoTable[1] += 1;
+			else
+				twotwoTable[0] += 1;
+		}else {
+			if (genotype[i] > 0.0)
+				twotwoTable[3] += 1;
+			else
+				twotwoTable[2] += 1;
+		}
+	}
+
+	double pvalue = 0.0;
+	if (m_sided == 1) {
+		pvalue = (m_midp)
+		         ? (twotwoTable[3] > 0) * gsl_cdf_hypergeometric_P((twotwoTable[3] - 1), (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]))
+		         + 0.5 * gsl_ran_hypergeometric_pdf(twotwoTable[3], (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]))
+				 : gsl_cdf_hypergeometric_P((twotwoTable[3]), (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]));
+
+	}else {
+		double contingency_table[4] = { 0, 0, 0, 0 };
+		for (int i = 0; i != 4; ++i) contingency_table[i] = twotwoTable[i];
+		//stuff for Fisher's test
+		int nrow = 2;
+		int ncol = 2;
+		double expected = -1.0;
+		double percnt = 100.0;
+		double emin = 0.0;
+		double prt = 0.0;
+		int workspace = 300000;
+		fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pvalue, &workspace);
+	}
+	d.setStatistic( (double)twotwoTable[3]);
+	d.setPvalue(pvalue);
 	return true;
 }
 

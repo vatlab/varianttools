@@ -568,6 +568,47 @@ private:
 	unsigned m_sided;
 };
 
+/* Fisher's 2x2 table test on m_X and m_phenotype:
+
+   m_X\phenotype	phen=1	phen=0
+	m_X = 0			n1		n2
+	m_X > 0			n3		n4
+
+Result is the pvalue for m_pvalue; and n3 will be m_statistic
+If midp option is activated will then use midp correction for one-sided test.
+*/
+class Fisher2X2 : public BaseAction
+{
+public:
+	Fisher2X2(unsigned alternative, bool midp = false)
+		: BaseAction(), m_sided(alternative), m_midp(midp)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new Fisher2X2(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "Fisher2X2";
+	}
+
+
+private:
+	unsigned m_sided;
+	bool m_midp;
+};
+
+
+
+////////////////////////////////
+////////////////////////////////
 
 /**
  * Permutator class
