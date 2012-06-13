@@ -1079,7 +1079,7 @@ class GenotypeImportWorker(Process):
     When a lock is acquired after it, it will copy the genotypes to the main
     genotype database. '''
     def __init__(self, main_genotype_file, queue, encoding, genotype_field, genotype_info, ranges,
-        lock, status, logger):
+        status, copy_queue, logger):
         Process.__init__(self, name='GenotypeImporter')
         # lock: a lock to write to the main project database
         self.main_genotype_file = main_genotype_file
@@ -1089,7 +1089,7 @@ class GenotypeImportWorker(Process):
         self.genotype_info = genotype_info
         self.ranges = ranges
         self.lock = lock
-        self.status = status
+        self.copy_queue = copy_queue
         self.logger = logger
 
     def _importData(self):
@@ -1134,10 +1134,21 @@ class GenotypeImportWorker(Process):
                 last_count = self.count[0]
         writer.close()
         end_import_time = time.time()
-        #
-        # acquire lock to the main genotype database
-        self.lock.acquire()
-        #
+        self.logger.debug('It took me {:.1f} seconds to import {} samples ({} - {}).'.format(
+            end_import_time - start_import_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
+        self.copy_queue.put((
+
+
+class GenotypeCopier(Process):
+    def __init__(self, main_genotype_file, logger):
+        Process.__init__(self)
+        self.main_genotype_file = main_genotype_file
+        self.logger = logger
+
+    def run(self):
+        self.genotype_file, self.sample_ids, = item
+
+    def _copy(self):
         start_copy_time = time.time()
         # start copying genotype
         # copy genotype table
@@ -1627,19 +1638,19 @@ class Importer:
 
     def importFilesInParallel(self):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes'''
-        workers = []
+        importers = []
         total_count = 0
-        # a lock to write to the main genotype, and each lock for permission to run jobs.
-        master_genotype_table_lock = Lock()
+        # 
         status_array = [Value('i', 0) for x in range(self.jobs)]
-        work_queue = Queue()
-        # start worker
+        import_queue = Queue()
+        copy_queue = Queue()
+        # start importer
         for i in range(self.jobs):
-            worker = GenotypeImportWorker('{}_genotype.DB'.format(self.proj.name), work_queue, self.encoding,
+            importer = GenotypeImportWorker('{}_genotype.DB'.format(self.proj.name), import_queue, self.encoding,
                 self.genotype_field, self.genotype_info, self.ranges,
-                master_genotype_table_lock, status_array[x], self.logger)
-            workers.append(worker)
-            worker.start()
+                status_array[x], copy_queue, self.logger)
+            importers.append(importer)
+            importer.start()
         #
         for count, input_filename in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
@@ -1698,13 +1709,13 @@ class Importer:
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
-                work_queue.put((self.processor.raw_fields, self.processor.build,
+                import_queue.put((self.processor.raw_fields, self.processor.build,
                     self.processor.delimiter, start_sample, end_sample, input_filename, 
                     tmp_file, self.variantIndex, sample_ids[start_sample : end_sample]))
                 start_sample = end_sample
         # indicate the end of jobs
         for i in range(self.jobs):
-            work_queue.put(None)
+            import_queue.put(None)
         # start jobs and monitor progress
         prog = ProgressBar('Importing genotype', total_count, initCount=sum([x.value for x in status_array]))
         while True:
@@ -1712,7 +1723,7 @@ class Importer:
             # the master process add them and get the total number of genotypes imported
             prog.update(sum([x.value for x in status_array]))
             # if the total number of running jobs is less than self.jobs
-            if True not in [x.is_alive() for x in workers]:
+            if True not in [x.is_alive() for x in importers]:
                 prog.done()
                 break
             time.sleep(2)
