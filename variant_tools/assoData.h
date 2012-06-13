@@ -54,6 +54,7 @@ private:
 	typedef std::map<std::string, double> DoubleVars;
 	typedef std::map<std::string, int> IntVars;
 	typedef std::map<std::string, vectorf> ArrayVars;
+	typedef std::map<std::string, vectori> IntArrayVars;
 	typedef std::map<std::string, matrixf> MatrixVars;
 
 public:
@@ -324,13 +325,20 @@ public:
 		m_matrixVars[name] = value;
 	}
 
+	// store a int array with name 'name'
+	void setVar(const string & name, const vectori & value)
+	{
+		m_intArrayVars[name] = value;
+	}
+
 
 	bool hasVar(const string & name)
 	{
 		return (m_doubleVars.find(name) != m_doubleVars.end() ||
-		        m_arrayVars.find(name) != m_arrayVars.end()) ||
+		        m_arrayVars.find(name) != m_arrayVars.end() ||
+		        m_intArrayVars.find(name) != m_intArrayVars.end() ||
 		       m_intVars.find(name) != m_intVars.end() ||
-		       m_matrixVars.find(name) != m_matrixVars.end();
+		       m_matrixVars.find(name) != m_matrixVars.end());
 	}
 
 
@@ -363,6 +371,15 @@ public:
 		return it->second;
 	}
 
+
+	vectori & getIntArrayVar(const string & name)
+	{
+		IntArrayVars::iterator it = m_intArrayVars.find(name);
+
+		if (it == m_intArrayVars.end())
+			throw ValueError("No integer array with name " + name + " can be found");
+		return it->second;
+	}
 
 	matrixf & getMatrixVar(const string & name)
 	{
@@ -398,6 +415,8 @@ private:
 	IntVars m_intVars;
 	// arbitrary vectorf type of variables.
 	ArrayVars m_arrayVars;
+	// arbitrary vectori type of variables.
+	IntArrayVars m_intArrayVars;
 	//
 	MatrixVars m_matrixVars;
 };

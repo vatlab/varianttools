@@ -553,6 +553,80 @@ bool MannWhitneyuPval::apply(AssoData & d)
 }
 
 
+bool FindGenotypePattern::apply(AssoData & d)
+{
+	vectorf & ydat = d.phenotype();
+	matrixf & xdat = d.raw_genotype();
+	//FIXME
+	// missing data has to be replaced by MLG
+
+	// sample size
+	unsigned sampleSize = ydat.size();
+	// candidate region length
+	unsigned regionLen = xdat.front().size();
+
+	//!-Compute unique genotype patterns (string) as ID scores (double)
+	vectorf genotypeId(sampleSize);
+
+	for (size_t i = 0; i < sampleSize; ++i) {
+
+		double vntIdL = 0.0;
+		double vntIdR = 0.0;
+		const double ixiix = pow(9.0, 10.0);
+		unsigned lastCnt = 0;
+		unsigned tmpCnt = 0;
+
+		for (size_t j = 0; j < regionLen; ++j) {
+
+			if (xdat[i][j] >= 1.0) {
+				vntIdR += pow(3.0, 1.0 * (j - lastCnt)) * xdat[i][j];
+			}else  {
+				continue;
+			}
+			if (vntIdR >= ixiix) {
+				vntIdL = vntIdL + 1.0;
+				vntIdR = vntIdR - ixiix;
+				lastCnt = lastCnt + tmpCnt + 1;
+				tmpCnt = 0;
+				continue;
+			}else {
+				++tmpCnt;
+				continue;
+			}
+		}
+		// one-to-one "ID number" for a genotype pattern
+		genotypeId[i] = vntIdL + vntIdR * 1e-10;
+	}
+
+	// unique genotype patterns
+	vectorf uniquePattern = genotypeId;
+	std::sort(uniquePattern.begin(), uniquePattern.end());
+	std::vector<double>::iterator it = std::unique(uniquePattern.begin(), uniquePattern.end());
+	uniquePattern.resize(it - uniquePattern.begin());
+	if (fEqual(uniquePattern.front(), 0.0)) uniquePattern.erase(uniquePattern.begin());
+	if (uniquePattern.size() == 0) {
+		throw ValueError("Input genotype matrix do not have a variant");
+	}
+	// count number of sample individuals for each genotype pattern
+	vectori uniquePatternCounts(uniquePattern.size(), 0);
+	for (size_t i = 0; i < sampleSize; ++i) {
+		// for each sample, identify/count its genotype pattern
+		for (size_t u = 0; u < uniquePattern.size(); ++u) {
+			if (genotypeId[i] == uniquePattern[u]) {
+				// genotype pattern identified
+				++uniquePatternCounts[u];
+				// count this genotype pattern
+				break;
+			} else ;
+			// genotype pattern not found -- move on to next pattern
+		}
+	}
+	d.setVar("uniqGPattern", uniquePattern);
+	d.setVar("uniqGCounts", uniquePatternCounts);
+	return true;
+}
+
+
 bool PyAction::apply(AssoData & d)
 {
 	// Passing d to the function

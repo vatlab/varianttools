@@ -858,7 +858,6 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
-                algorithm.append(t.FindGenotypePattern())
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -869,7 +868,6 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'aSum':
-                algorithm.append(t.FindGenotypePattern())
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,

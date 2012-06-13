@@ -665,6 +665,33 @@ private:
 
 
 
+// find uniq genotype patterns with their counts
+// will modify data by:
+// 1. replace missing data with most likely genotype
+// 2. set d.setVar("uniqGPattern", uniquePattern); d.setVar("uniqGCounts", uniquePatternCounts);
+class FindGenotypePattern : public BaseAction
+{
+public:
+	FindGenotypePattern() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new FindGenotypePattern(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "FindGenotypePattern";
+	}
+
+};
+
 ////////////////////////////////
 ////////////////////////////////
 
