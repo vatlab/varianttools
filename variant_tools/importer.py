@@ -28,14 +28,9 @@ import os
 import sys
 import re
 import array
-import threading
-import Queue
 import time
 from heapq import heappush, heappop, heappushpop
-from cPickle import dumps, loads, HIGHEST_PROTOCOL
-from binascii import a2b_base64, b2a_base64
-from subprocess import Popen, PIPE
-from multiprocessing import Process, Pipe, Value, Lock
+from multiprocessing import Process, Pipe, Value, Lock, Queue
 from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
@@ -1083,52 +1078,30 @@ class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.
     When a lock is acquired after it, it will copy the genotypes to the main
     genotype database. '''
-    def __init__(self, proj, processor, input_filename, encoding,
-        genotype_file, genotype_field, genotype_info, 
-        variantIndex, ranges, sample_ids, status, locks,
-        logger):
-        #
-        # variantIndex:  variantIndex from the master thread, which has
-        #        all the variants obtained from getVariants(). This parameter
-        #        allows the GenotypeImportWorker get variant_id for all
-        #        variants without having to consult the master proces.
-        # lock: a lock to write to the main project database
-        #
-        #
+    def __init__(self, main_genotype_file, queue, encoding, genotype_field, genotype_info, ranges,
+        lock, status, logger):
         Process.__init__(self, name='GenotypeImporter')
-        self.main_genotype_file = '{}_genotype'.format(proj.name)
-        self.reader = TextReader(processor, input_filename, None, False, 0, encoding, logger)
-        self.genotype_file = genotype_file
+        # lock: a lock to write to the main project database
+        self.main_genotype_file = main_genotype_file
+        self.queue = queue
+        self.encoding = encoding
         self.genotype_field = genotype_field
         self.genotype_info = genotype_info
-        self.variantIndex = variantIndex
         self.ranges = ranges
-        self.sample_ids = sample_ids
+        self.lock = lock
         self.status = status
         self.logger = logger
-        self.locks = locks
-        self.count = [0, 0]
 
-    def run(self): 
-        while True:
-            # try to get a place to start working
-            slot = -1
-            for idx, lock in enumerate(self.locks[:-1]):
-                if lock.acquire(False):   # do not wait for this particular one
-                    slot = idx
-                    break
-            # start working ...
-            if slot != -1:
-                break
-            time.sleep(1)
-        self.logger.debug('Start importing genotypes for {} samples ({} - {}) at slot {}'.format(len(self.sample_ids),
-            min(self.sample_ids), max(self.sample_ids), slot + 1))
+    def _importData(self):
+        self.logger.debug('Start importing genotypes for {} samples ({} - {})'.format(len(self.sample_ids),
+            min(self.sample_ids), max(self.sample_ids)))
+        reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.logger)
         start_import_time = time.time()
         writer = GenotypeWriter(self.genotype_file, self.genotype_field,
             self.genotype_info, self.sample_ids)
         fld_cols = None
         last_count = 0
-        for self.count[0], bins, rec in self.reader.records():
+        for self.count[0], bins, rec in reader.records():
             try:
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
             except KeyError:
@@ -1137,7 +1110,7 @@ class GenotypeImportWorker(Process):
             # if there is genotype (and genotype_info)
             if len(self.genotype_field) > 0:
                 if fld_cols is None:
-                    col_rngs = [self.reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
+                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
                     for idx in range(len(self.sample_ids)):
                         fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
@@ -1157,13 +1130,13 @@ class GenotypeImportWorker(Process):
                 for id in self.sample_ids:
                     writer.write(id, [variant_id])
             if self.count[0] - last_count > 100:
-                self.status.value = self.count[0] * len(self.sample_ids)
+                self.status.value = self.start_status + self.count[0] * len(self.sample_ids)
                 last_count = self.count[0]
         writer.close()
         end_import_time = time.time()
         #
         # acquire lock to the main genotype database
-        self.locks[-1].acquire()
+        self.lock.acquire()
         #
         start_copy_time = time.time()
         # start copying genotype
@@ -1192,12 +1165,24 @@ class GenotypeImportWorker(Process):
         except:
             pass
         db.close()
-        self.locks[-1].release()
+        self.lock.release()
         end_copy_time = time.time()
         self.logger.debug('It took me {:.1f} seconds to import and {:.1f} seconds to copy {} samples ({} - {}), waited {:.1f} seconds in between.'.format(end_import_time - start_import_time, end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), start_copy_time - end_import_time))
-        # after everything is done, let other job start
-        self.locks[slot].release()
         
+    def run(self): 
+        while True:
+            item = self.queue.get()
+            if item is None:
+                break
+            # get parameters
+            fields, build, delimiter, start_sample, end_sample, self.input_filename, self.genotype_file, self.variantIndex, self.sample_ids = item
+            self.processor = LineProcessor(fields, build, delimiter, self.ranges, self.logger)
+            self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
+            self.count = [0, 0]
+            # use the last value as start
+            self.start_status = self.status.value
+            self._importData()
+
 #
 #
 #  Command import
@@ -1645,8 +1630,17 @@ class Importer:
         workers = []
         total_count = 0
         # a lock to write to the main genotype, and each lock for permission to run jobs.
-        locks = [Lock() for x in range(self.jobs + 1)]
-        status_array = []
+        master_genotype_table_lock = Lock()
+        status_array = [Value('i', 0) for x in range(self.jobs)]
+        work_queue = Queue()
+        # start worker
+        for i in range(self.jobs):
+            worker = GenotypeImportWorker('{}_genotype.DB'.format(self.proj.name), work_queue, self.encoding,
+                self.genotype_field, self.genotype_info, self.ranges,
+                master_genotype_table_lock, status_array[x], self.logger)
+            workers.append(worker)
+            worker.start()
+        #
         for count, input_filename in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
             self.importVariant(input_filename)
@@ -1704,17 +1698,13 @@ class Importer:
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
-                status = Value('i', 0)
-                status_array.append(status)
-                worker = GenotypeImportWorker(self.proj, self.processor, input_filename, 
-                    self.encoding, tmp_file, 
-                    self.genotype_field, self.genotype_info,
-                    self.variantIndex, self.ranges, sample_ids[start_sample : end_sample],
-                    status, locks, self.logger)
-                worker.start()
-                # 0 means the worker has not been started yet
-                workers.append(worker)
+                work_queue.put((self.processor.raw_fields, self.processor.build,
+                    self.processor.delimiter, start_sample, end_sample, input_filename, 
+                    tmp_file, self.variantIndex, sample_ids[start_sample : end_sample]))
                 start_sample = end_sample
+        # indicate the end of jobs
+        for i in range(self.jobs):
+            work_queue.put(None)
         # start jobs and monitor progress
         prog = ProgressBar('Importing genotype', total_count, initCount=sum([x.value for x in status_array]))
         while True:
@@ -1769,7 +1759,7 @@ def importVariantsArguments(parser):
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to import input file. Variant tools by default
             uses a single process for reading and writing, and can use one or more
-            dedicated reader processes (jobs=2 or more) to process input files. Due
+            dedicated importer processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
 
