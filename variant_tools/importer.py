@@ -817,6 +817,7 @@ class ReaderWorker(Process):
         encoding:   file encoding
         logger:     logger object to write error messages when things go wrong
         '''
+        Process.__init__(self, name='FileReader')
         self.processor = processor
         self.input = input
         self.output = output
@@ -826,7 +827,6 @@ class ReaderWorker(Process):
         self.index = index
         self.encoding = encoding
         self.logger = logger
-        Process.__init__(self)
 
     def run(self): 
         first = True
@@ -1095,7 +1095,7 @@ class GenotypeImportWorker(Process):
         # lock: a lock to write to the main project database
         #
         #
-        Process.__init__(self)
+        Process.__init__(self, name='GenotypeImporter')
         self.main_genotype_file = '{}_genotype'.format(proj.name)
         self.reader = TextReader(processor, input_filename, None, False, 0, encoding, logger)
         self.genotype_file = genotype_file
@@ -1640,11 +1640,16 @@ class Importer:
                     'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                         self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
 
-    def importAllVariants(self):
-        '''Import variants from all files'''
-        for count,f in enumerate(self.files):
-            self.logger.info('{} variants from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
-            self.importVariant(f)
+    def importFilesInParallel(self):
+        '''import files in parallel, by importing variants and genotypes separately, and in their own processes'''
+        workers = []
+        total_count = 0
+        # a lock to write to the main genotype, and each lock for permission to run jobs.
+        locks = [Lock() for x in range(self.jobs + 1)]
+        status_array = []
+        for count, input_filename in enumerate(self.files):
+            self.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
+            self.importVariant(input_filename)
             self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
                 .format(self.count[2],
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
@@ -1653,21 +1658,7 @@ class Importer:
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
-        if len(self.files) > 1:
-            self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
-                .format(self.total_count[2],
-                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.total_count[0]))
-
-    def importGenotypesInParallel(self):
-        '''import files one by one, adding variants along the way'''
-        workers = []
-        total_count = 0
-        # a lock to write to the main genotype, and each lock for permission to run jobs.
-        locks = [Lock() for x in range(self.jobs + 1)]
-        status_array = []
-        for count, input_filename in enumerate(self.files):
+            # genotypes?
             if self.genotype_field:
                 self.prober.reset()
             #
@@ -1725,7 +1716,7 @@ class Importer:
                 workers.append(worker)
                 start_sample = end_sample
         # start jobs and monitor progress
-        prog = ProgressBar('Importing genotype', total_count)
+        prog = ProgressBar('Importing genotype', total_count, initCount=sum([x.value for x in status_array]))
         while True:
             # each process update their passed shared value
             # the master process add them and get the total number of genotypes imported
@@ -1735,6 +1726,12 @@ class Importer:
                 prog.done()
                 break
             time.sleep(2)
+        if len(self.files) > 1:
+            self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
+                .format(self.total_count[2],
+                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                    self.total_count[0]))
 
 
 def importVariantsArguments(parser):
@@ -1790,8 +1787,7 @@ def importVariants(args):
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                importer.importAllVariants()
-                importer.importGenotypesInParallel()
+                importer.importFilesInParallel()
             importer.finalize()
         proj.close()
     except Exception as e:

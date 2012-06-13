@@ -254,7 +254,7 @@ except ImportError:
 
 class ProgressBar:
     '''A text-based progress bar'''
-    def __init__(self, message, totalCount = None):
+    def __init__(self, message, totalCount = None, initCount=0):
         if runOptions['verbosity'] == '0':
             self.update = self.empty
             self.curlUpdate = self.empty
@@ -272,6 +272,7 @@ class ProgressBar:
         except:
             self.term_width = 79
         self.count = 0
+        self.init_count = initCount
         self.finished = 0
         self.reset('', totalCount)
 
@@ -327,7 +328,7 @@ class ProgressBar:
         if second_elapsed < 0.0001 or self.count == 0:
             msg[4] = ''
         else:
-            cps = self.count / second_elapsed
+            cps = (self.count - self.init_count) / second_elapsed
             # speed
             if cps > 1000000:
                 msg[4] = ' {:.1f}M/s'.format(cps/1000000)
@@ -342,7 +343,8 @@ class ProgressBar:
         # estimated time left
         if self.totalCount:
             perc = min(1, float(self.count) / self.totalCount)
-            time_left = (second_elapsed / perc * (1 - perc)) if perc > 0 else 0
+            init_perc = min(1, float(self.init_count) / self.totalCount)
+            time_left = (second_elapsed / (perc - init_perc) * (1 - perc)) if perc > 0 else 0
             msg[5] += ' in {}{}'.format('' if time_left < 86400 else '{} days '.format(int(time_left/86400)),
                 time.strftime('%H:%M:%S', time.gmtime(time_left)))
         # percentage / progress
