@@ -679,7 +679,7 @@ bool KBACtest::apply(AssoData & d)
 		d.setVar("uniqGWeights", upWeights);
 	} else {
 		if (kbac.size() == 1) d.setStatistic(kbac);
-		else d.setStatistic(fmax(kbac[0], kbac[1]) );
+		else d.setStatistic( fmax(kbac[0], kbac[1]) );
 	}
 
 	return true;
@@ -1099,6 +1099,5 @@ bool VariablePermutator::apply(AssoData & d)
 	d.setSE(statistics[1]);
 	return true;
 }
-
 
 }

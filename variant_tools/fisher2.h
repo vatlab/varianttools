@@ -46,7 +46,7 @@
 #define DOUBLE_XMAX    DBL_MAX
 #define DOUBLE_XMIN    DBL_MIN
 
-/*Memory.h*/
+/*Memory.h
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -66,7 +66,7 @@ char * S_realloc(char *, long, long, int);
 #ifdef  __cplusplus
 }
 #endif
-
+*/
 /*boolean.h*/
 #undef FALSE
 #undef TRUE
@@ -82,8 +82,13 @@ typedef enum { FALSE = 0, TRUE /*, MAYBE */
 #endif
 
 /*fisher2.h*/
+#ifdef  __cplusplus
+extern "C" {
+#endif
 void fexact(int * nrow, int * ncol, double * table, int * ldtabl,
 	double * expect, double * percnt, double * emin, double * prt,
 	double * pre, /* new in C : */ int * workspace);
-
+#ifdef  __cplusplus
+}
+#endif
 #endif

@@ -54,6 +54,8 @@ include variant_tools/utils.h
 include variant_tools/utils.cpp
 include variant_tools/lm.h
 include variant_tools/lm.cpp
+include variant_tools/fisher2.h
+include variant_tools/fisher2.c
 include variant_tools/assoTests_py2.py
 include variant_tools/assoTests_py3.py
 include variant_tools/assoTests_wrap_py2.cpp
@@ -64,8 +66,6 @@ include sqlite/sqlite3.c
 include sqlite/sqlite3.h
 include sqlite/sqlite3ext.h
 include sqlite/vt_sqlite3_ext.c
-include sqlite/fisher2.h
-include sqlite/fisher2.c
 recursive-include sqlite/py2 *.h *.c
 recursive-include sqlite/py3 *.h *.c
 recursive-include variant_tools/gsl *.h *.c

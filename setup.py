@@ -69,6 +69,7 @@ ASSO_FILES = [
     'variant_tools/utils.cpp',
     'variant_tools/lm.h',
     'variant_tools/lm.cpp'
+
 ]
 
 SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
@@ -344,8 +345,10 @@ LIB_GSL = [
    'variant_tools/gsl/permutation/inline.c',
    'variant_tools/gsl/permutation/permutation.c',
    'variant_tools/gsl/permutation/permute.c'
-    ] 
-    
+    ]
+
+LIB_STAT = ['variant_tools/fisher2.c']
+
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
     libs = ['stdc++']
@@ -412,7 +415,7 @@ setup(name = "variant_tools",
                 'variant_tools/action.cpp',
                 'variant_tools/utils.cpp',
                 'variant_tools/lm.cpp'
-                ] + LIB_GSL,
+                ] + LIB_GSL + LIB_STAT,
             extra_compile_args = gccargs,
             library_dirs = [],
             libraries = libs,
@@ -420,4 +423,3 @@ setup(name = "variant_tools",
         )
       ]
 )
-
