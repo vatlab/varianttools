@@ -661,19 +661,80 @@ bool KBACtest::apply(AssoData & d)
 	for (size_t u = 0; u < up.size(); ++u) {
 		upWeights[u] = gsl_cdf_hypergeometric_P(upcSub[u], upc[u], ydat.size() - upc[u], (m_reverse) ? nCtrls : nCases);
 	}
-    if (m_weightOnly) {
-	    d.setVar("uniqGWeights", upWeights);
-    }
-    else {
-        // KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
-        // weighted by the hypergeometric distribution kernel
-        double kbac = 0.0;
-        for (size_t u = 0; u < up.size(); ++u) {
-            kbac += upWeights[u] * ( (1.0 * upcSub[u]) / (1.0 * ((m_reverse) ? nCtrls : nCases)) 
-                    - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((m_reverse) ? nCases : nCtrls)) );
-        }
-        d.setStatistic(kbac);
-    }
+	if (m_weightOnly) {
+		d.setVar("uniqGWeights", upWeights);
+	}else {
+		// KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
+		// weighted by the hypergeometric distribution kernel
+		double kbac = 0.0;
+		for (size_t u = 0; u < up.size(); ++u) {
+			kbac += upWeights[u] * ( (1.0 * upcSub[u]) / (1.0 * ((m_reverse) ? nCtrls : nCases))
+			                        - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((m_reverse) ? nCases : nCtrls)) );
+		}
+		d.setStatistic(kbac);
+	}
+	return true;
+}
+
+
+bool RBTtest::apply(AssoData & d)
+{
+	vectorf & ydat = d.phenotype();
+	matrixf & xdat = d.raw_genotype();
+	unsigned nCases = d.getIntVar("ncases");
+	unsigned nCtrls = d.getIntVar("nctrls");
+
+	matrixf RBTweights(2);
+
+	for (size_t j = 0; j < xdat.front().size(); ++j) {
+
+		//! - Count number of variants in cases/controls at a locus
+		unsigned countcs = 0;
+		unsigned countcn = 0;
+		for (size_t i = 0; i < ydat.size(); ++i) {
+			if (fEqual(ydat[i], 0.0)) {
+				countcn += (unsigned)xdat[i][j];
+			} else {
+				countcs += (unsigned)xdat[i][j];
+			}
+		}
+
+		//float w;
+		//k0=(int)(freq*2*nCtrls);
+		if (countcs > 0 && (1.0 * countcs) / (1.0 * nCases) > (1.0 * countcn) / (1.0 * nCtrls)) {
+			RBTweights[0].push_back(
+				-log(
+					gsl_cdf_poisson_P(countcn, nCtrls * (countcs + countcn) / (1.0 * ydat.size())) * (1.0 - gsl_cdf_poisson_P(countcs - 1, nCases * (countcs + countcn) / (1.0 * ydat.size())))
+				    )
+			    );
+		} else {
+			RBTweights[0].push_back(0.0);
+		}
+
+		//k0=(int)(freq*2*nCases);
+		if (countcn > 0 && (1.0 * countcn) / (1.0 * nCtrls) > (1.0 * countcs) / (1.0 * nCases)) {
+			RBTweights[1].push_back(
+				-log(
+					gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size())) * (1.0 - gsl_cdf_poisson_P(countcn - 1, nCtrls * (countcs + countcn) / (1.0 * ydat.size())))
+				    )
+			    );
+		} else {
+			RBTweights[1].push_back(0.0);
+		}
+	}
+	if (m_weightOnly) {
+		d.setVar("RBTweights", RBTweights);
+	} else {
+		// RVP statistic: The max statistic in the manuscript
+		// R - potentially risk and P - potentially protective
+		double sumR = std::accumulate(RBTweights[0].begin(), RBTweights[0].end(), 0.0);
+		if (m_sided == 1) {
+			d.setStatistic(sumR);
+		} else {
+			double sumP = std::accumulate(RBTweights[1].begin(), RBTweights[1].end(), 0.0);
+			d.setStatistic(fmax(sumR, sumP) );
+		}
+	}
 	return true;
 }
 

@@ -862,8 +862,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.RBTweight(reverse=False),
-                            t.RBTtest()]
+                        [t.RBTtest(self.alternative, weightOnly=False)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'aSum':

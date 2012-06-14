@@ -571,12 +571,12 @@ private:
 /* Fisher's 2x2 table test on m_X and m_phenotype:
 
    m_X\phenotype	phen=1	phen=0
-	m_X = 0			n1		n2
-	m_X > 0			n3		n4
+    m_X = 0			n1		n2
+    m_X > 0			n3		n4
 
-Result is the pvalue for m_pvalue; and n3 will be m_statistic
-If midp option is activated will then use midp correction for one-sided test.
-*/
+   Result is the pvalue for m_pvalue; and n3 will be m_statistic
+   If midp option is activated will then use midp correction for one-sided test.
+ */
 class Fisher2X2 : public BaseAction
 {
 public:
@@ -608,7 +608,7 @@ private:
 /* MannWhitney rank test on m_X and m_phenotype.
    store = false for not storing the statistics from each permutation test; true is otherwise
    will be stored as d.setVar("WSSstatistics", mwstats)
-*/
+ */
 class MannWhitneyu : public BaseAction
 {
 public:
@@ -659,10 +659,10 @@ public:
 		return "MannWhitneyuPval";
 	}
 
+
 private:
 	unsigned m_sided;
 };
-
 
 
 // find uniq genotype patterns with their counts
@@ -690,6 +690,7 @@ public:
 		return "FindGenotypePattern";
 	}
 
+
 };
 
 
@@ -697,7 +698,7 @@ class KBACtest : public BaseAction
 {
 public:
 	KBACtest(bool reverse = false, bool weightOnly = false) :
-        BaseAction(), m_reverse(reverse), m_weightOnly(weightOnly)
+		BaseAction(), m_reverse(reverse), m_weightOnly(weightOnly)
 	{
 	}
 
@@ -714,13 +715,41 @@ public:
 	{
 		return "KBACtest";
 	}
+
+
 private:
 	bool m_reverse;
-    bool m_weightOnly;
+	bool m_weightOnly;
 };
 
 
+class RBTtest : public BaseAction
+{
+public:
+	RBTtest(unsigned alternative, bool weightOnly = false) :
+		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
+	{
+	}
 
+
+	BaseAction * clone() const
+	{
+		return new RBTtest(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "RBTtest";
+	}
+
+
+private:
+	bool m_sided;
+	bool m_weightOnly;
+};
 
 ////////////////////////////////
 ////////////////////////////////
