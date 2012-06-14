@@ -1789,8 +1789,13 @@ class Importer:
                     # kill jobs
                     if importers[i] is not None:
                         import_queue.put(None)
-                prog.done()
                 break
+            time.sleep(2)
+        # wait for the remaining job to complete
+        while True:
+            prog.update(sum([x.value for x in genotype_import_count]))
+            if True not in [x is None or not x.is_alive() for x in importers]:
+                prog.done()
             time.sleep(2)
         #
         # tell the genotype copier that no more job is coming to end that process
