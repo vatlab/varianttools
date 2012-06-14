@@ -344,7 +344,7 @@ class ProgressBar:
         if self.totalCount:
             perc = min(1, float(self.count) / self.totalCount)
             init_perc = min(1, float(self.init_count) / self.totalCount)
-            time_left = (second_elapsed / (perc - init_perc) * (1 - perc)) if perc > 0 else 0
+            time_left = (second_elapsed / (perc - init_perc) * (1 - perc)) if perc > init_perc else 0
             msg[5] += ' in {}{}'.format('' if time_left < 86400 else '{} days '.format(int(time_left/86400)),
                 time.strftime('%H:%M:%S', time.gmtime(time_left)))
         # percentage / progress
