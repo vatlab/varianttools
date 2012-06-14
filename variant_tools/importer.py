@@ -1075,22 +1075,33 @@ def probeSampleName(filename, prober, encoding, logger):
 #
 # 
 class GenotypeImportWorker(Process):
-    '''This class starts a process, import genotype to a temporary genotype database.
-    When a lock is acquired after it, it will copy the genotypes to the main
-    genotype database. '''
-    def __init__(self, main_genotype_file, queue, encoding, genotype_field, genotype_info, ranges,
+    '''This class starts a process, import genotype to a temporary genotype database.'''
+    def __init__(self, queue, encoding, genotype_field, genotype_info, ranges,
         status, copy_queue, logger):
         Process.__init__(self, name='GenotypeImporter')
-        # lock: a lock to write to the main project database
-        self.main_genotype_file = main_genotype_file
         self.queue = queue
         self.encoding = encoding
         self.genotype_field = genotype_field
         self.genotype_info = genotype_info
         self.ranges = ranges
-        self.lock = lock
+        self.status = status
         self.copy_queue = copy_queue
         self.logger = logger
+
+    def run(self): 
+        while True:
+            item = self.queue.get()
+            if item is None:
+                break
+            # get parameters
+            fields, build, delimiter, start_sample, end_sample, self.input_filename, self.genotype_file, self.variantIndex, self.sample_ids = item
+            self.processor = LineProcessor(fields, build, delimiter, self.ranges, self.logger)
+            self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
+            self.count = [0, 0]
+            # use the last value as start
+            self.start_status = self.status.value
+            self._importData()
+
 
     def _importData(self):
         self.logger.debug('Start importing genotypes for {} samples ({} - {})'.format(len(self.sample_ids),
@@ -1136,64 +1147,56 @@ class GenotypeImportWorker(Process):
         end_import_time = time.time()
         self.logger.debug('It took me {:.1f} seconds to import {} samples ({} - {}).'.format(
             end_import_time - start_import_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
-        self.copy_queue.put((
+        # tell the genotype copier that it can start copying genotypes to the main
+        # genotype database
+        self.copy_queue.put((self.genotype_file, self.sample_ids))
 
 
 class GenotypeCopier(Process):
-    def __init__(self, main_genotype_file, logger):
+    def __init__(self, main_genotype_file, queue, status, logger):
         Process.__init__(self)
         self.main_genotype_file = main_genotype_file
+        self.queue = queue
+        self.status = status
         self.logger = logger
 
     def run(self):
-        self.genotype_file, self.sample_ids, = item
+        self.db = DatabaseEngine()
+        self.db.connect(self.main_genotype_file)
+        while True:
+            item = self.queue.get()
+            if item is None:
+                break
+            self.genotype_file, self.sample_ids = item
+            # get parameters
+            self._copySamples()
+        self.db.close()
 
-    def _copy(self):
+    def _copySamples(self):
         start_copy_time = time.time()
+        self.db.attach(self.genotype_file, '__from')
         # start copying genotype
         # copy genotype table
-        db = DatabaseEngine()
-        db.connect(self.main_genotype_file)
-        db.attach(self.genotype_file, '__from')
-        cur = db.cursor()
+        cur = self.db.cursor()
         for count, ID in enumerate(self.sample_ids):
-            table = 'genotype_{}'.format(ID)
-            # if genotype already exist????? This should not happen
-            if db.hasTable(table):
-                self.logger.warning('Genotype table {} already exist in project.'.format(ID))
-                db.removeTable(table)
-            # create a new table
-            writer.createNewSampleVariantTable(cur, table, len(self.genotype_field) > 0,
-                self.genotype_info)
-            cur.execute('INSERT INTO {0} SELECT * FROM __from.{0};'.format(table))
-            # try to give a reasonable estimate of progress... we divide number of copied
-            # variants by 10 because it is generally 10 times faster to copy than import
-            self.status.value += self.count[0] // 10
-        db.detach('__from')
+            # query the query from the temporary table
+            cur.execute('SELECT sql FROM __from.sqlite_master WHERE type="table" AND name="genotype_{}";'.format(ID))
+            # execute the query in the main genotype table
+            cur.execute(cur.fetchone()[0])
+            query = 'INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0};'.format(ID)
+            cur.execute(query)
+            # update progress
+            self.status.value += 1
+        self.db.detach('__from')
         # remove the temporary file
         try:
             os.remove(self.genotype_file)
         except:
             pass
-        db.close()
-        self.lock.release()
         end_copy_time = time.time()
-        self.logger.debug('It took me {:.1f} seconds to import and {:.1f} seconds to copy {} samples ({} - {}), waited {:.1f} seconds in between.'.format(end_import_time - start_import_time, end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), start_copy_time - end_import_time))
+        self.logger.debug('It took me {:.1f} seconds to copy {} samples ({} - {}).'.format(
+            end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
         
-    def run(self): 
-        while True:
-            item = self.queue.get()
-            if item is None:
-                break
-            # get parameters
-            fields, build, delimiter, start_sample, end_sample, self.input_filename, self.genotype_file, self.variantIndex, self.sample_ids = item
-            self.processor = LineProcessor(fields, build, delimiter, self.ranges, self.logger)
-            self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
-            self.count = [0, 0]
-            # use the last value as start
-            self.start_status = self.status.value
-            self._importData()
-
 #
 #
 #  Command import
@@ -1213,9 +1216,6 @@ class Importer:
             sys.exit(1)
         #
         self.files = []
-        # in some cases, the files will be parsed first and we have exact line count
-        # in this case we cache this value to avoid repeated counting
-        self.file_line_count = {}
         cur = self.db.cursor()
         cur.execute('SELECT filename from filename;')
         existing_files = [x[0] for x in cur.fetchall()]
@@ -1540,7 +1540,6 @@ class Importer:
                 prog.update(self.count[0])
         prog.done()
         self.count[7] = reader.skipped_lines
-        self.file_line_count[input_filename] = self.count[0]
         self.db.commit()
 
     def finalize(self):
@@ -1637,21 +1636,55 @@ class Importer:
                         self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
 
     def importFilesInParallel(self):
-        '''import files in parallel, by importing variants and genotypes separately, and in their own processes'''
+        '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
+        More specifically, suppose that there are three files
+
+        file1: variant1, sample1.1, sample1.2, sample1.3
+        file2: variant2, sample2.1, sample2.2
+        file3: variant3, sample3.1, sample3.2
+
+        where variant1, 2, and 3 are three potentially overlapping sets of variants.
+        sample1, sample2, sample3 are three groups of samples that are divided by the number of samples
+        and number of processes (self.jobs) (say, 3000 samples divided into three groups of 1000 samples).
+
+        Then, there are 
+
+        A: 2 TextReader processes <--> main process read variant1, 2, 3 --> master variant table
+        B: self.jobs GenotypeImportWorker reads sample 1.1, 1.2, 1.3, 2.1 etc ... --> temporary genotype tables
+        C: 1 GenotypeCopier -> copy temporary genotype tables to the master genotype table
+
+        The processes are organized so that 
+        1. sample A.x if read after variant A is read
+        2. genotypes are copied after temporary tables are completed
+
+        Because of the processes work together, although there are multiple progress bars, they
+        might start from the middle because some work might have already been done in the previous step.
+        '''
         importers = []
-        total_count = 0
-        # 
-        status_array = [Value('i', 0) for x in range(self.jobs)]
+        # total number of genotypes to import
+        total_genotype_count = 0
+        # total number of samples to copy
+        total_sample_count = 0
+        # number of genotypes each process have imported
+        genotype_import_count = [Value('i', 0) for x in range(self.jobs)]
+        sample_copy_count = Value('i', 0)
+        # import queue that accept jobs sample 1.1, 1.2, etc
         import_queue = Queue()
+        # copy queue that copy samples
         copy_queue = Queue()
         # start importer
         for i in range(self.jobs):
-            importer = GenotypeImportWorker('{}_genotype.DB'.format(self.proj.name), import_queue, self.encoding,
+            importer = GenotypeImportWorker(import_queue, self.encoding,
                 self.genotype_field, self.genotype_info, self.ranges,
-                status_array[x], copy_queue, self.logger)
+                genotype_import_count[i], copy_queue, self.logger)
             importers.append(importer)
             importer.start()
+        # start copier
+        copier = GenotypeCopier('{}_genotype.DB'.format(self.proj.name), copy_queue,
+            sample_copy_count, self.logger)
+        copier.start()
         #
+        # process each file
         for count, input_filename in enumerate(self.files):
             self.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
             self.importVariant(input_filename)
@@ -1660,21 +1693,21 @@ class Importer:
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
                     self.count[0]))
-            for i in range(len(self.count)):
-                self.total_count[i] += self.count[i]
-                self.count[i] = 0
             # genotypes?
             if self.genotype_field:
                 self.prober.reset()
-            #
+            # if there are samples?
             sample_ids = self.getSampleIDs(input_filename)
+            #
+            # we should have file line count from importVariant
+            total_genotype_count += self.count[0] * len(sample_ids)
+            total_sample_count += len(sample_ids)
+            #
+            for i in range(len(self.count)):
+                self.total_count[i] += self.count[i]
+                self.count[i] = 0
             if len(sample_ids) == 0:
                 continue
-            #
-            # we should have file line count from getVariants.
-            lc = self.file_line_count[input_filename]
-            # * 11/10  means getting, and then copying genotypes which takes 1/10 of time
-            total_count += lc * len(sample_ids) * 11 // 10
             #
             # determine workload:
             # from our benchmark, if we split jobs evenly, the last trunk will
@@ -1703,12 +1736,12 @@ class Importer:
                 if end_sample <= start_sample:
                     continue
                 # tell the processor do not import variant info, import part of the sample
-                self.processor.reset(import_var_info=False, import_sample_range = [start_sample, end_sample])
                 tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, job))
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
+                # send a import job to the importer workers
                 import_queue.put((self.processor.raw_fields, self.processor.build,
                     self.processor.delimiter, start_sample, end_sample, input_filename, 
                     tmp_file, self.variantIndex, sample_ids[start_sample : end_sample]))
@@ -1716,17 +1749,30 @@ class Importer:
         # indicate the end of jobs
         for i in range(self.jobs):
             import_queue.put(None)
-        # start jobs and monitor progress
-        prog = ProgressBar('Importing genotype', total_count, initCount=sum([x.value for x in status_array]))
+        # 
+        # minitor the import of genotypes
+        prog = ProgressBar('Importing genotypes', total_genotype_count, initCount=sum([x.value for x in genotype_import_count]))
         while True:
             # each process update their passed shared value
             # the master process add them and get the total number of genotypes imported
-            prog.update(sum([x.value for x in status_array]))
+            prog.update(sum([x.value for x in genotype_import_count]))
             # if the total number of running jobs is less than self.jobs
             if True not in [x.is_alive() for x in importers]:
                 prog.done()
                 break
             time.sleep(2)
+        #
+        # tell the genotype copier that no more job is coming to end that process
+        copy_queue.put(None)
+        # monitor the copy of genotypes
+        prog = ProgressBar('Copying genotype', total_sample_count, initCount=sample_copy_count.value)
+        while True:
+            time.sleep(2)
+            prog.update(sample_copy_count.value)
+            if not copier.is_alive():
+                prog.done()
+                break
+        # final status line
         if len(self.files) > 1:
             self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
                 .format(self.total_count[2],
