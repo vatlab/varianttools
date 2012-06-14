@@ -853,7 +853,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.KBACtest(reverse=False, weightOnly=False)]
+                        [t.KBACtest(self.alternative, weightOnly=False)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
@@ -871,8 +871,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.AsumScore(),
-                            t.SimpleLogisticRegression()]
+                        [t.AsumScore(), t.SimpleLogisticRegression()]
                         )
                 algorithm.append(a_permutationtest)
             else:

@@ -640,39 +640,48 @@ bool KBACtest::apply(AssoData & d)
 	unsigned nCtrls = d.getIntVar("nctrls");
 
 	//
-	for (size_t i = 0; i < ydat.size(); ++i) {
-		if ((m_reverse) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
-			// identify/count genotype pattern in cases (or ctrls when m_reverse = true)
-			for (size_t u = 0; u < up.size(); ++u) {
-				if (gId[i] == up[u]) {
-					// genotype pattern identified/counted in cases (or ctrls when m_reverse = true)
-					++upcSub[u];
-					break;
-				}else ;
-				// genotype pattern not found -- move on to next pattern
-			}
-		}else ;
-	}
-
+	vectorf kbac(0);
 	// KBAC weights
-	vectorf upWeights(up.size(), 0.0);
-	// genotype pattern weights, the hypergeometric distribution cmf
+	matrixf upWeights(m_sided);
+	for (size_t s = 0; s < m_sided; ++s) {
+		for (size_t i = 0; i < ydat.size(); ++i) {
+			if ((s) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
+				// identify/count genotype pattern in cases (or ctrls for two sided test)
+				for (size_t u = 0; u < up.size(); ++u) {
+					if (gId[i] == up[u]) {
+						// genotype pattern identified/counted in cases (or ctrls for two sided test)
+						++upcSub[u];
+						break;
+					}else ;
+					// genotype pattern not found -- move on to next pattern
+				}
+			}else ;
+		}
 
-	for (size_t u = 0; u < up.size(); ++u) {
-		upWeights[u] = gsl_cdf_hypergeometric_P(upcSub[u], upc[u], ydat.size() - upc[u], (m_reverse) ? nCtrls : nCases);
+
+		// genotype pattern weights, the hypergeometric distribution cmf
+		upWeights[s].resize(up.size());
+		for (size_t u = 0; u < up.size(); ++u) {
+			upWeights[s][u] = gsl_cdf_hypergeometric_P(upcSub[u], upc[u], ydat.size() - upc[u], (s) ? nCtrls : nCases);
+		}
+		if (!m_weightOnly) {
+			// KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
+			// weighted by the hypergeometric distribution kernel
+			kbac.push_back(0.0);
+			for (size_t u = 0; u < up.size(); ++u) {
+				kbac.back() += upWeights[s][u] * ( (1.0 * upcSub[u]) / (1.0 * ((s) ? nCtrls : nCases))
+				                                  - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((s) ? nCases : nCtrls)) );
+			}
+		}
 	}
+
 	if (m_weightOnly) {
 		d.setVar("uniqGWeights", upWeights);
-	}else {
-		// KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
-		// weighted by the hypergeometric distribution kernel
-		double kbac = 0.0;
-		for (size_t u = 0; u < up.size(); ++u) {
-			kbac += upWeights[u] * ( (1.0 * upcSub[u]) / (1.0 * ((m_reverse) ? nCtrls : nCases))
-			                        - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((m_reverse) ? nCases : nCtrls)) );
-		}
-		d.setStatistic(kbac);
+	} else {
+		if (kbac.size() == 1) d.setStatistic(kbac);
+		else d.setStatistic(fmax(kbac[0], kbac[1]) );
 	}
+
 	return true;
 }
 
@@ -702,22 +711,18 @@ bool RBTtest::apply(AssoData & d)
 		//float w;
 		//k0=(int)(freq*2*nCtrls);
 		if (countcs > 0 && (1.0 * countcs) / (1.0 * nCases) > (1.0 * countcn) / (1.0 * nCtrls)) {
-			RBTweights[0].push_back(
-				-log(
-					gsl_cdf_poisson_P(countcn, nCtrls * (countcs + countcn) / (1.0 * ydat.size())) * (1.0 - gsl_cdf_poisson_P(countcs - 1, nCases * (countcs + countcn) / (1.0 * ydat.size())))
-				    )
-			    );
+			double f = gsl_cdf_poisson_P(countcn, nCtrls * (countcs + countcn) / (1.0 * ydat.size()))
+			           * (1.0 - gsl_cdf_poisson_P(countcs - 1, nCases * (countcs + countcn) / (1.0 * ydat.size())));
+			RBTweights[0].push_back(-log(f));
 		} else {
 			RBTweights[0].push_back(0.0);
 		}
 
 		//k0=(int)(freq*2*nCases);
 		if (countcn > 0 && (1.0 * countcn) / (1.0 * nCtrls) > (1.0 * countcs) / (1.0 * nCases)) {
-			RBTweights[1].push_back(
-				-log(
-					gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size())) * (1.0 - gsl_cdf_poisson_P(countcn - 1, nCtrls * (countcs + countcn) / (1.0 * ydat.size())))
-				    )
-			    );
+			double f = gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size()))
+			           * (1.0 - gsl_cdf_poisson_P(countcn - 1, nCtrls * (countcs + countcn) / (1.0 * ydat.size())));
+			RBTweights[1].push_back(-log(f));
 		} else {
 			RBTweights[1].push_back(0.0);
 		}

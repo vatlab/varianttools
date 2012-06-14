@@ -697,8 +697,8 @@ public:
 class KBACtest : public BaseAction
 {
 public:
-	KBACtest(bool reverse = false, bool weightOnly = false) :
-		BaseAction(), m_reverse(reverse), m_weightOnly(weightOnly)
+	KBACtest(unsigned alternative, bool weightOnly = false) :
+		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
 	{
 	}
 
@@ -718,7 +718,7 @@ public:
 
 
 private:
-	bool m_reverse;
+	bool m_sided;
 	bool m_weightOnly;
 };
 
