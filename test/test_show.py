@@ -78,8 +78,8 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show annotation testNSFP')
         self.assertFail('vtools show test')
         self.assertSucc('vtools show tests')
-        self.assertSucc('vtools show test LNBT')
-        self.assertFail('vtools show tests LNBT')
+        self.assertSucc('vtools show test CollapseBT')
+        self.assertFail('vtools show tests CollapseBT')
 
 
 if __name__ == '__main__':
