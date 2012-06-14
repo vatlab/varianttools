@@ -840,7 +840,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         1000,
                         1,
-                        [t.SetMafByCtrl("ctrlmaf", 0),
+                        [t.SetMafByCtrl("ctrlmaf", reverse=False),
                             t.WeightByMaf("ctrlmaf"),
                             t.SumToX(),
                             t.MannWhitneyu(store=False)]
@@ -853,8 +853,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.KBACscore(),
-                            t.KBACtest()]
+                        [t.KBACtest(reverse=False, weightOnly=False)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
@@ -863,7 +862,7 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.RBTweight(),
+                        [t.RBTweight(reverse=False),
                             t.RBTtest()]
                         )
                 algorithm.append(a_permutationtest)

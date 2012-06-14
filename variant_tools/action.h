@@ -668,7 +668,7 @@ private:
 // find uniq genotype patterns with their counts
 // will modify data by:
 // 1. replace missing data with most likely genotype
-// 2. set d.setVar("uniqGPattern", uniquePattern); d.setVar("uniqGCounts", uniquePatternCounts);
+// 2. set d.setVar("gPattern", genotypeId); d.setVar("uniqGPattern", uniquePattern); d.setVar("uniqGCounts", uniquePatternCounts);
 class FindGenotypePattern : public BaseAction
 {
 public:
@@ -691,6 +691,36 @@ public:
 	}
 
 };
+
+
+class KBACtest : public BaseAction
+{
+public:
+	KBACtest(bool reverse = false, bool weightOnly = false) :
+        BaseAction(), m_reverse(reverse), m_weightOnly(weightOnly)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new KBACtest(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "KBACtest";
+	}
+private:
+	bool m_reverse;
+    bool m_weightOnly;
+};
+
+
+
 
 ////////////////////////////////
 ////////////////////////////////

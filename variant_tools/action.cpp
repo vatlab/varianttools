@@ -520,8 +520,8 @@ bool MannWhitneyu::apply(AssoData & d)
 			vectorf mwstats(0);
 			d.setVar("WSSstats", mwstats);
 		}
-		vectorf & wssstats = d.getArrayVar("MWstats");
-		wssstats.push_back(statistic);
+		vectorf & wstats = d.getArrayVar("MWstats");
+		wstats.push_back(statistic);
 	}
 	return true;
 }
@@ -580,7 +580,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 
 			if (xdat[i][j] >= 1.0) {
 				vntIdR += pow(3.0, 1.0 * (j - lastCnt)) * xdat[i][j];
-			}else  {
+			}else {
 				continue;
 			}
 			if (vntIdR >= ixiix) {
@@ -621,8 +621,59 @@ bool FindGenotypePattern::apply(AssoData & d)
 			// genotype pattern not found -- move on to next pattern
 		}
 	}
+	d.setVar("gPattern", genotypeId);
 	d.setVar("uniqGPattern", uniquePattern);
 	d.setVar("uniqGCounts", uniquePatternCounts);
+	return true;
+}
+
+
+bool KBACtest::apply(AssoData & d)
+{
+	vectori & up = d.getIntArrayVar("uniqGPattern");
+	vectori & upc = d.getIntArrayVar("uniqGCounts");
+	vectorf & gId = d.getArrayVar("gPattern");
+	// genotype pattern counts in cases (or in ctrls when m_reverse = true)
+	vectori upcSub(up.size(), 0);
+	vectorf & ydat = d.phenotype();
+	unsigned nCases = d.getIntVar("ncases");
+	unsigned nCtrls = d.getIntVar("nctrls");
+
+	//
+	for (size_t i = 0; i < ydat.size(); ++i) {
+		if ((m_reverse) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
+			// identify/count genotype pattern in cases (or ctrls when m_reverse = true)
+			for (size_t u = 0; u < up.size(); ++u) {
+				if (gId[i] == up[u]) {
+					// genotype pattern identified/counted in cases (or ctrls when m_reverse = true)
+					++upcSub[u];
+					break;
+				}else ;
+				// genotype pattern not found -- move on to next pattern
+			}
+		}else ;
+	}
+
+	// KBAC weights
+	vectorf upWeights(up.size(), 0.0);
+	// genotype pattern weights, the hypergeometric distribution cmf
+
+	for (size_t u = 0; u < up.size(); ++u) {
+		upWeights[u] = gsl_cdf_hypergeometric_P(upcSub[u], upc[u], ydat.size() - upc[u], (m_reverse) ? nCtrls : nCases);
+	}
+    if (m_weightOnly) {
+	    d.setVar("uniqGWeights", upWeights);
+    }
+    else {
+        // KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
+        // weighted by the hypergeometric distribution kernel
+        double kbac = 0.0;
+        for (size_t u = 0; u < up.size(); ++u) {
+            kbac += upWeights[u] * ( (1.0 * upcSub[u]) / (1.0 * ((m_reverse) ? nCtrls : nCases)) 
+                    - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((m_reverse) ? nCases : nCtrls)) );
+        }
+        d.setStatistic(kbac);
+    }
 	return true;
 }
 
