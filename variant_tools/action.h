@@ -751,6 +751,35 @@ private:
 	bool m_weightOnly;
 };
 
+// recode protective rare variants;
+// determine sites of rare variants having excess copies in ctrls
+// and determine whether or not to recode that site via a Fisher's test
+// evaluated at alpha = 0.1
+class RecodeProtectiveRV : public BaseAction
+{
+public:
+	RecodeProtectiveRV() : BaseAction()
+    {
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new RecodeProtectiveRV(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "RecodeProtectiveRV";
+	}
+
+};
+
+
+
 ////////////////////////////////
 ////////////////////////////////
 

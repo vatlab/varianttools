@@ -35,7 +35,7 @@ from .project import Field
 
 def freq(frequency):
     try:
-        value = float(input)
+        value = float(frequency)
         if not (value >= 0 and value <= 1):
             msg = "{0} is not valid input. Valid input should fall in range [0, 1]".format(frequency)
             raise ValueError(msg)
@@ -871,7 +871,9 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.AsumScore(), t.SimpleLogisticRegression()]
+                        [t.RecodeProtectiveRV(),
+                            t.SumToX,
+                            t.SimpleLogisticRegression()]
                         )
                 algorithm.append(a_permutationtest)
             else:

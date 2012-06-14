@@ -470,9 +470,24 @@ bool Fisher2X2::apply(AssoData & d)
 	double pvalue = 0.0;
 	if (m_sided == 1) {
 		pvalue = (m_midp)
-		         ? (twotwoTable[3] > 0) * gsl_cdf_hypergeometric_P((twotwoTable[3] - 1), (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]))
-		         + 0.5 * gsl_ran_hypergeometric_pdf(twotwoTable[3], (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]))
-				 : gsl_cdf_hypergeometric_P((twotwoTable[3]), (twotwoTable[1] + twotwoTable[3]), (twotwoTable[0] + twotwoTable[2]), (twotwoTable[3] + twotwoTable[2]));
+		         ? (twotwoTable[3] > 0) * gsl_cdf_hypergeometric_P(
+			(twotwoTable[3] - 1),
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[2]),
+			(twotwoTable[3] + twotwoTable[2])
+		    )
+		         + 0.5 * gsl_ran_hypergeometric_pdf(
+			twotwoTable[3],
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[2]),
+			(twotwoTable[3] + twotwoTable[2])
+		    )
+				 : gsl_cdf_hypergeometric_P(
+			(twotwoTable[3]),
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[2]),
+			(twotwoTable[3] + twotwoTable[2])
+		    );
 
 	}else {
 		double contingency_table[4] = { 0, 0, 0, 0 };
@@ -640,9 +655,10 @@ bool KBACtest::apply(AssoData & d)
 	unsigned nCtrls = d.getIntVar("nctrls");
 
 	//
-	vectorf kbac(0);
+	vectorf kbac(m_sided);
 	// KBAC weights
 	matrixf upWeights(m_sided);
+
 	for (size_t s = 0; s < m_sided; ++s) {
 		for (size_t i = 0; i < ydat.size(); ++i) {
 			if ((s) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
@@ -662,15 +678,20 @@ bool KBACtest::apply(AssoData & d)
 		// genotype pattern weights, the hypergeometric distribution cmf
 		upWeights[s].resize(up.size());
 		for (size_t u = 0; u < up.size(); ++u) {
-			upWeights[s][u] = gsl_cdf_hypergeometric_P(upcSub[u], upc[u], ydat.size() - upc[u], (s) ? nCtrls : nCases);
+			upWeights[s][u] = gsl_cdf_hypergeometric_P(
+				upcSub[u],
+				upc[u],
+				ydat.size() - upc[u],
+				(s) ? nCtrls : nCases
+			    );
 		}
 		if (!m_weightOnly) {
 			// KBAC statistic: sum of genotype pattern frequencies differences in cases vs. controls
 			// weighted by the hypergeometric distribution kernel
-			kbac.push_back(0.0);
+			kbac[s] = 0.0;
 			for (size_t u = 0; u < up.size(); ++u) {
-				kbac.back() += upWeights[s][u] * ( (1.0 * upcSub[u]) / (1.0 * ((s) ? nCtrls : nCases))
-				                                  - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((s) ? nCases : nCtrls)) );
+				kbac[s] += upWeights[s][u] * ( (1.0 * upcSub[u]) / (1.0 * ((s) ? nCtrls : nCases))
+				                              - (1.0 * (upc[u] - upcSub[u])) / (1.0 * ((s) ? nCases : nCtrls)) );
 			}
 		}
 	}
@@ -678,8 +699,8 @@ bool KBACtest::apply(AssoData & d)
 	if (m_weightOnly) {
 		d.setVar("uniqGWeights", upWeights);
 	} else {
-		if (kbac.size() == 1) d.setStatistic(kbac);
-		else d.setStatistic( fmax(kbac[0], kbac[1]) );
+		if (m_sided == 1) d.setStatistic(kbac);
+		else d.setStatistic(fmax(kbac[0], kbac[1]) );
 	}
 
 	return true;
@@ -693,7 +714,7 @@ bool RBTtest::apply(AssoData & d)
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
 
-	matrixf RBTweights(2);
+	matrixf RBTweights(m_sided);
 
 	for (size_t j = 0; j < xdat.front().size(); ++j) {
 
@@ -717,14 +738,15 @@ bool RBTtest::apply(AssoData & d)
 		} else {
 			RBTweights[0].push_back(0.0);
 		}
-
-		//k0=(int)(freq*2*nCases);
-		if (countcn > 0 && (1.0 * countcn) / (1.0 * nCtrls) > (1.0 * countcs) / (1.0 * nCases)) {
-			double f = gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size()))
-			           * (1.0 - gsl_cdf_poisson_P(countcn - 1, nCtrls * (countcs + countcn) / (1.0 * ydat.size())));
-			RBTweights[1].push_back(-log(f));
-		} else {
-			RBTweights[1].push_back(0.0);
+		if (m_sided > 1) {
+			//k0=(int)(freq*2*nCases);
+			if (countcn > 0 && (1.0 * countcn) / (1.0 * nCtrls) > (1.0 * countcs) / (1.0 * nCases)) {
+				double f = gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size()))
+				           * (1.0 - gsl_cdf_poisson_P(countcn - 1, nCtrls * (countcs + countcn) / (1.0 * ydat.size())));
+				RBTweights[1].push_back(-log(f));
+			} else {
+				RBTweights[1].push_back(0.0);
+			}
 		}
 	}
 	if (m_weightOnly) {
@@ -738,6 +760,88 @@ bool RBTtest::apply(AssoData & d)
 		} else {
 			double sumP = std::accumulate(RBTweights[1].begin(), RBTweights[1].end(), 0.0);
 			d.setStatistic(fmax(sumR, sumP) );
+		}
+	}
+	return true;
+}
+
+
+bool RecodeProtectiveRV::apply(AssoData & d)
+{
+	vectorf & ydat = d.phenotype();
+	matrixf & xdat = d.raw_genotype();
+	unsigned nCases = d.getIntVar("ncases");
+	unsigned nCtrls = d.getIntVar("nctrls");
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
+
+	//a binary sequence for whether or not there is an excess of rare variants in controls
+	vectori cexcess(xdat.front().size(), 0);
+
+	for (size_t j = 0; j < xdat.front().size(); ++j) {
+		double tmp1 = 0.0;
+		double tmp0 = 0.0;
+		for (size_t i = 0; i < xdat.size(); ++i) {
+			if (fEqual(ydat[i], 0.0)) {
+				//FIXME might want to use > 0.0 to handle imputed genotypes
+				if (xdat[i][j] >= 1.0) {
+					tmp0 += xdat[i][j];
+				}
+			}else {
+				if (xdat[i][j] >= 1.0) {
+					tmp1 += xdat[i][j];
+				}
+			}
+		}
+		if (tmp0 / (nCtrls * multiplier) > tmp1 / (nCases * multiplier)) {
+			cexcess[j] = 1;
+		}else {
+			continue;
+		}
+	}
+
+	//a binary sequence for whether or not a site should be recoded
+	vectori rsites(xdat.front().size(), 0);
+
+	for (size_t j = 0; j < xdat.front().size(); ++j) {
+		if (cexcess[j] == 0) continue;
+
+		// 2X2 Fisher's test onesided, no midp
+		vectori twotwoTable(4, 0);
+		for (size_t i = 0; i < xdat.size(); ++i) {
+			double gtmp = (xdat[i][j] == xdat[i][j]) ? xdat[i][j] : 0.0;
+			// note the difference here from Fisher2X2 class
+			// since in this case we check if rare variants are siginificantly enriched in ctrls
+			if (fEqual(ydat[i], 0.0)) {
+				if (gtmp > 0.0) twotwoTable[1] += 1;
+				else twotwoTable[0] += 1;
+			}else {
+				if (gtmp > 0.0) twotwoTable[3] += 1;
+				else twotwoTable[2] += 1;
+			}
+		}
+
+		double pvalue = gsl_cdf_hypergeometric_P(
+			(twotwoTable[3]),
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[2]),
+			(twotwoTable[3] + twotwoTable[2])
+		    );
+
+		if (pvalue < 0.1) {
+			rsites[j] = 1;
+		}else {
+			continue;
+		}
+	}
+
+	//recode sites
+	for (size_t i = 0; i < xdat.size(); ++i) {
+		//  scan all sample individuals
+		for (size_t j = 0; j < xdat.front().size(); ++j) {
+			//!- Recode protective variants as in Pan 2010
+			if (rsites[j] && xdat[i][j] == xdat[i][j]) {
+				xdat[i][j] = multiplier - xdat[i][j];
+			}
 		}
 	}
 	return true;
@@ -1099,5 +1203,6 @@ bool VariablePermutator::apply(AssoData & d)
 	d.setSE(statistics[1]);
 	return true;
 }
+
 
 }
