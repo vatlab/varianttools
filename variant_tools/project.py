@@ -956,7 +956,15 @@ class Project:
                 passwd=self.loadProperty('passwd'))
             self.db.connect(self.name)
         else: 
+            # pragma, set to None if the key does not exist. In this case
+            # the system default will be used.
+            pragma = self.loadProperty('sqlite_pragma', 'None')
+            try:
+                setOptions(sqlite_pragma=eval(pragma))
+            except:
+                self.logger.warning('Failed to set sqlite pragma "{}"'.format(pragma))
             # pass things like batch ... and re-connect
+            # runOptions['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
             self.db.connect(self.proj_file)
         #
@@ -1623,7 +1631,7 @@ class Project:
         info =  'Project name:                {}\n'.format(self.name)
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
-        info += 'Database engine:             {}\n'.format(self.db.engine)
+        info += 'Database engine:             {}\n'.format(self.db.describeEngine())
         info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
         info += 'Annotation databases:        {}\n'.format('\n'.join([' '*29 + os.path.join(x.dir, x.name) \
             + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
@@ -3247,6 +3255,13 @@ def adminArguments(parser):
         help='''Change table NAME to a NEW_NAME.''')
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
+    db_config = parser.add_argument_group('Fine-tune database operations')
+    db_config.add_argument('--pragma', nargs='*', metavar='PRAGMA', default=[],
+        help='''SQLITE pragma that will be set for all sqlite connections. For example,
+        'synchronous=OFF' could greatly improve the performance of certain operations
+        at the cost of larger risk of data loss in the event of failure. Setting this
+        option without parameter will clear existing settings. Wrong pragmas will be
+        ignored without warning.''')
 
 def admin(args):
     try:
@@ -3283,9 +3298,11 @@ def admin(args):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(args.describe_table[0], args.describe_table[1])
                 proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
+            elif args.pragma is not None:
+                proj.saveProperty('sqlite_pragma', str(args.pragma))
+                proj.logger.info('Sqlite pragma is set to "{}"'.format(', '.join(args.pragma)))
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
-
     except Exception as e:
         sys.exit(e)
 

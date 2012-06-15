@@ -963,8 +963,6 @@ class GenotypeWriter:
         #
         self.db = DatabaseEngine()
         self.db.connect(geno_db)
-        self.db.execute('PRAGMA synchronous = OFF')
-        self.db.execute('PRAGMA journal_mode = MEMORY')
         self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
             .format(','.join([self.db.PH] * (1 + len(geno_field) + len(geno_info))))
         self.cur = self.db.cursor()
@@ -1208,8 +1206,6 @@ class GenotypeCopier(Process):
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.main_genotype_file)
-        self.db.execute('PRAGMA synchronous = OFF')
-        self.db.execute('PRAGMA journal_mode = MEMORY')
         while True:
             item = self.queue.get()
             if item is None:

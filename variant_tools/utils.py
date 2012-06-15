@@ -58,7 +58,9 @@ runOptions = {
     'verbosity': '1',
     'temp_dir': None,
     # this will be the raw command that will be saved to log file
-    'command_line': ''
+    'command_line': '',
+    # default sqlite pragma
+    'sqlite_pragma': ['synchronous=OFF', 'default_cache_size=2000']
 }
 
 SQL_KEYWORDS = set([
@@ -106,13 +108,16 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
-def setOptions(verbosity=None, temp_dir=None, command_line=''):
+def setOptions(verbosity=None, temp_dir=None, command_line='', sqlite_pragma=None):
     if verbosity is not None:
         runOptions['verbosity'] = verbosity[0]
     if temp_dir:
         runOptions['temp_dir'] = temp_dir
     if command_line:
         runOptions['command_line'] = command_line
+    if sqlite_pragma is not None:
+        runOptions['sqlite_pragma'] = sqlite_pragma
+
 
 def getCommandLine():
     return runOptions['command_line']
@@ -541,6 +546,14 @@ class DatabaseEngine:
             self.AI = 'AUTOINCREMENT'
             self.database = None
 
+    
+    def describeEngine(self):
+        if self.engine == 'mysql':
+            return 'mysql'
+        elif runOptions['sqlite_pragma'] == []:
+            return 'sqlite (no pragma)'
+        else:
+            return 'sqlite (with pragma {})'.format(', '.join(runOptions['sqlite_pragma']))
     #
     # Connection
     #
@@ -566,7 +579,13 @@ class DatabaseEngine:
             # set default cache size to a larger number to improve query performance
             if not readonly:
                 cur = self.database.cursor()
-                cur.execute('PRAGMA default_cache_size=2000;')
+                for pragma in runOptions['sqlite_pragma']:
+                    # No error message will be produced for wrong pragma
+                    # but we may have syntax error.
+                    try:
+                        cur.execute('PRAGMA {}'.format(pragma))
+                    except:
+                        raise RuntimeError('Failed to set pragma "{}". Use "vtools admin --pragma" to reset pragmas.'.format(pragma))
                 self.database.commit()
             # trying to load extension
             for path in sys.path:
