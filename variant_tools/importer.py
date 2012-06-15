@@ -1118,6 +1118,22 @@ class GenotypeImportWorker(Process):
             if self.input_filename not in self.filelist:
                 # return the item to the list
                 self.import_queue.put(item)
+                #
+                # NOTE: according to the documentation:
+                #
+                # Warning As mentioned above, if a child process has put items on a queue (and it has not used
+                # JoinableQueue.cancel_join_thread()), then that process will not terminate until all buffered
+                # items have been flushed to the pipe.
+                #  
+                # This means that if you try joining that process you may get a deadlock unless you are sure 
+                # that all items which have been put on the queue have been consumed. Similarly, if the child 
+                # process is non-daemonic then the parent process may hang on exit when it tries to join all
+                # its non-daemonic children.
+                #
+                # Note that a queue created using a manager does not have this issue. See Programming
+                # guidelines.
+                self.import_queue.cancel_join_thread()
+                #
                 # committee succide
                 self.logger.debug('Importer {} is killed because it cannot handle variants from file {} (the last one it can handle is {})'.format(self.proc_index, self.input_filename, self.filelist[-1]))
                 break
@@ -1175,6 +1191,7 @@ class GenotypeImportWorker(Process):
         # tell the genotype copier that it can start copying genotypes to the main
         # genotype database
         self.copy_queue.put((self.genotype_file, self.sample_ids))
+        self.copy_queue.cancel_join_thread()
 
 
 class GenotypeCopier(Process):
