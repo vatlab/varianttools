@@ -1111,6 +1111,7 @@ class GenotypeImportWorker(Process):
         while True:
             item = self.import_queue.get()
             if item is None:
+                self.logger.debug('Importer {} exits normally'.format(self.proc_index))
                 break
             # get parameters
             self.input_filename, self.genotype_file, start_sample, end_sample, self.sample_ids = item
@@ -1118,7 +1119,7 @@ class GenotypeImportWorker(Process):
                 # return the item to the list
                 self.import_queue.put(item)
                 # committee succide
-                self.logger.debug('Kill myself because I cannot handle variants from file {} (the last one I can handle is {})'.format(self.input_filename, self.filelist[-1]))
+                self.logger.debug('Importer {} is killed because it cannot handle variants from file {} (the last one it can handle is {})'.format(self.proc_index, self.input_filename, self.filelist[-1]))
                 break
             self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
             self.count = [0, 0]
@@ -1128,7 +1129,7 @@ class GenotypeImportWorker(Process):
             self.task_count.value += 1
 
     def _importData(self):
-        self.logger.debug('Start importing genotypes for {} samples ({} - {})'.format(len(self.sample_ids),
+        self.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
             min(self.sample_ids), max(self.sample_ids)))
         reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.logger)
         start_import_time = time.time()
@@ -1169,7 +1170,7 @@ class GenotypeImportWorker(Process):
                 last_count = self.count[0]
         writer.close()
         end_import_time = time.time()
-        self.logger.debug('It took me {:.1f} seconds to import {} samples ({} - {}).'.format(
+        self.logger.debug('It took importer {} {:.1f} seconds to import {} samples ({} - {}).'.format(self.proc_index,
             end_import_time - start_import_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
         # tell the genotype copier that it can start copying genotypes to the main
         # genotype database
