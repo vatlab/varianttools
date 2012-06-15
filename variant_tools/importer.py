@@ -1219,7 +1219,7 @@ class GenotypeCopier(Process):
         except:
             pass
         end_copy_time = time.time()
-        self.logger.debug('It took me {:.1f} seconds to copy {} samples ({} - {}) from.'.format(
+        self.logger.debug('It took me {:.1f} seconds to copy {} samples ({} - {}) from {}.'.format(
             end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), self.genotype_file))
         
 #
