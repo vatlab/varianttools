@@ -331,34 +331,6 @@ private:
 };
 
 
-class WeightedSumToX : public BaseAction
-{
-
-public:
-	WeightedSumToX(const vectors & info) : BaseAction(), m_info(info)
-	{
-	}
-
-
-	BaseAction * clone() const
-	{
-		return new WeightedSumToX(*this);
-	}
-
-
-	bool apply(AssoData & d);
-
-	std::string name()
-	{
-		return "WeightedSumToX";
-	}
-
-
-private:
-	vectors m_info;
-};
-
-
 
 // remove variant sites having MAF <= lower_bound or MAF > upper_bound
 class SetSites : public BaseAction
@@ -712,7 +684,8 @@ public:
 
 	std::string name()
 	{
-		return "KBACtest";
+        // use the more approperate name here
+		return "KBACweight";
 	}
 
 
@@ -741,7 +714,7 @@ public:
 
 	std::string name()
 	{
-		return "RBTtest";
+		return "RBTweight";
 	}
 
 
@@ -1043,6 +1016,43 @@ private:
 	unsigned m_alternative;
 	double m_sig;
 	BaseAction * m_permute;
+};
+
+
+// this class works within a permutator, to perform weighted sum test based on different weighting themes
+// this class exists to handle the chanllege of using a weighting theme to test for both one-sided and two-sided hypothesis within a permutation test
+// while preserving the genotype codings
+// Python level input should be WeightedGenotypeTester(self.alternative, self.weight, [t.weighter(), t.test()])
+// lenght of vector of input actions should be exactly two for now
+class WeightedGenotypeTester : public BasePermutator
+{
+
+public:
+	WeightedGenotypeTester(unsigned alternative, const vectors & info, const vectora & actions) :
+        BasePermutator(actions), m_model(alternative), m_info(info)
+	{
+        m_stat.resize(2, 0.0);
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new WeightedGenotypeTester(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "WeightedGenotypeTester";
+	}
+
+
+private:
+    unsigned m_model;
+	vectors m_info;
+    vectorf m_stat;
 };
 
 }
