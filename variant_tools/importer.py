@@ -963,6 +963,8 @@ class GenotypeWriter:
         #
         self.db = DatabaseEngine()
         self.db.connect(geno_db)
+        self.db.execute('PRAGMA synchronous = OFF')
+        self.db.execute('PRAGMA journal_mode = MEMORY')
         self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
             .format(','.join([self.db.PH] * (1 + len(geno_field) + len(geno_info))))
         self.cur = self.db.cursor()
@@ -995,7 +997,7 @@ class GenotypeWriter:
      
     def write(self, id, rec):
         try:
-            if len(self.cache[id]) == 1000:
+            if len(self.cache[id]) == 10000:
                 # this will fail if id does not exist, so we do not need 
                 # extra test if id is valie
                 self.cur.executemany(self.query.format(id), self.cache[id])
@@ -1206,6 +1208,8 @@ class GenotypeCopier(Process):
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.main_genotype_file)
+        self.db.execute('PRAGMA synchronous = OFF')
+        self.db.execute('PRAGMA journal_mode = MEMORY')
         while True:
             item = self.queue.get()
             if item is None:
@@ -1213,6 +1217,7 @@ class GenotypeCopier(Process):
             self.genotype_file, self.sample_ids = item
             # get parameters
             self._copySamples()
+            self.db.commit()
             self.task_count += 1
         self.db.close()
         self.logger.debug('Genotype of {} samples are copied from {} files'.format(self.status.value, self.task_count))
