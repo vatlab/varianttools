@@ -1180,6 +1180,7 @@ class GenotypeCopier(Process):
         self.main_genotype_file = main_genotype_file
         self.queue = queue
         self.status = status
+        self.task_count = 0
         self.logger = logger
 
     def run(self):
@@ -1192,7 +1193,9 @@ class GenotypeCopier(Process):
             self.genotype_file, self.sample_ids = item
             # get parameters
             self._copySamples()
+            self.task_count += 1
         self.db.close()
+        self.logger.debug('Genotype of {} samples are copied from {} files'.format(self.status.value, self.task_count))
 
     def _copySamples(self):
         start_copy_time = time.time()
@@ -1216,8 +1219,8 @@ class GenotypeCopier(Process):
         except:
             pass
         end_copy_time = time.time()
-        self.logger.debug('It took me {:.1f} seconds to copy {} samples ({} - {}).'.format(
-            end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
+        self.logger.debug('It took me {:.1f} seconds to copy {} samples ({} - {}) from.'.format(
+            end_copy_time - start_copy_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), self.genotype_file))
         
 #
 #
@@ -1814,23 +1817,23 @@ class Importer:
                     importers[i] = importer
                     importer.start()
             time.sleep(1)
-        # tell the genotype copier that no more job is coming to end that process
-        copy_queue.put(None)
         # monitor the copy of genotypes
         prog = ProgressBar('Copying genotype', total_sample_count, initCount=sample_copy_count.value)
         while True:
             prog.update(sample_copy_count.value)
-            if not copier.is_alive():
+            if sample_copy_count.value == total_sample_count:
+                # tell the genotype copier that no more job is coming to end that process
+                copy_queue.put(None)
                 prog.done()
                 break
             time.sleep(1)
         # final status line
         if len(self.files) > 1:
-            self.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
+            self.logger.info('{:,} new variants ({}) from {:,} lines ({:,} samples) are imported.'\
                 .format(self.total_count[2],
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.total_count[0]))
+                    self.total_count[0], total_sample_count))
 
 
 def importVariantsArguments(parser):
