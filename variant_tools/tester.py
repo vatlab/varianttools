@@ -768,7 +768,7 @@ class CaseCtrlBurdenTest(NullTest):
             is calculated using exact/asymptotic distributions or permutation, depending on the input method. If --group_by
             option is specified, it will collapse the variants within a group into a single pseudo coding''',
             prog='vtools associate --method ' + self.__class__.__name__)
-        parser.add_argument('--name', default='SBurdenTest',
+        parser.add_argument('--name', default='SingleGeneCaseCtrlBT',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
@@ -799,6 +799,7 @@ class CaseCtrlBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
+        self.extern_weight = []
         algorithm = t.AssoAlgorithm([
             # code genotype matrix by MOI being 0 1 or 2
             t.CodeXByMOI(),
@@ -820,9 +821,12 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         1000,
                         1,
-                        [t.BrowningWeight(self.alternative),
-                            t.WeightedSumToX(["BrowningWeight"]),
+                        [t.WeightedGenotypeTester(
+                            self.alternative,
+                            self.extern_weight,
+                            [t.BrowningWeight(self.alternative),
                             t.MannWhitneyu(store=True)]
+                            )]
                         )
                 algorithm.extend([
                     a_permutationtest,
@@ -839,9 +843,12 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         1000,
                         1,
-                        [t.BrowningWeight(self.alternative),
-                            t.WeightedSumToX(["BrowningWeight"]),
+                        [t.WeighedGenotypeTester(
+                            self.alternative,
+                            self.extern_weight,
+                            [t.BrowningWeight(self.alternative),
                             t.MannWhitneyu(store=False)]
+                            )]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'KBAC':

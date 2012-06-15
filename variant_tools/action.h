@@ -267,7 +267,7 @@ public:
 
 	std::string name()
 	{
-		return "BrowningWeight";
+		return "Browningweight";
 	}
 
 

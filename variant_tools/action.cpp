@@ -175,7 +175,7 @@ bool BrowningWeight::apply(AssoData & d)
 			}
 		}
 	}
-	d.setVar("BrowningWeight", maf);
+	d.setVar("Browningweight", maf);
 	return true;
 }
 
@@ -465,40 +465,38 @@ bool Fisher2X2::apply(AssoData & d)
 
 		if (fEqual(phenotype[i], 1.0)) {
 			if (genotype[i] > 0.0)
-				twotwoTable[1] += 1;
-			else
 				twotwoTable[0] += 1;
+			else
+				twotwoTable[1] += 1;
 		}else {
 			if (genotype[i] > 0.0)
-				twotwoTable[3] += 1;
-			else
 				twotwoTable[2] += 1;
+			else
+				twotwoTable[3] += 1;
 		}
 	}
 
 	double pvalue = 0.0;
 	if (m_sided == 1) {
 		pvalue = (m_midp)
-		         ? (twotwoTable[3] > 0) * gsl_cdf_hypergeometric_P(
-			(twotwoTable[3] - 1),
-			(twotwoTable[1] + twotwoTable[3]),
+		         ? (twotwoTable[0] > 0) * gsl_cdf_hypergeometric_P(
+			(twotwoTable[0] - 1),
 			(twotwoTable[0] + twotwoTable[2]),
-			(twotwoTable[3] + twotwoTable[2])
-		    )
-		         + 0.5 * gsl_ran_hypergeometric_pdf(
-			twotwoTable[3],
 			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[1])
+		    ) + 0.5 * gsl_ran_hypergeometric_pdf(
+			twotwoTable[0],
 			(twotwoTable[0] + twotwoTable[2]),
-			(twotwoTable[3] + twotwoTable[2])
-		    )
-				 : gsl_cdf_hypergeometric_P(
-			(twotwoTable[3]),
 			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[1])
+		    ) : gsl_cdf_hypergeometric_P(
+			(twotwoTable[0] - 1),
 			(twotwoTable[0] + twotwoTable[2]),
-			(twotwoTable[3] + twotwoTable[2])
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[1])
 		    );
-
-	}else {
+		pvalue = 1.0 - pvalue;
+	} else {
 		double contingency_table[4] = { 0, 0, 0, 0 };
 		for (int i = 0; i != 4; ++i) contingency_table[i] = twotwoTable[i];
 		//stuff for Fisher's test
@@ -540,11 +538,11 @@ bool MannWhitneyu::apply(AssoData & d)
 	//
 	d.setStatistic(statistic);
 	if (m_store) {
-		if (!d.hasVar("MWstats")) {
+		if (!d.hasVar("RankStats")) {
 			vectorf mwstats(0);
-			d.setVar("WSSstats", mwstats);
+			d.setVar("RankStats", mwstats);
 		}
-		vectorf & wstats = d.getArrayVar("MWstats");
+		vectorf & wstats = d.getArrayVar("RankStats");
 		wstats.push_back(statistic);
 	}
 	return true;
@@ -553,14 +551,15 @@ bool MannWhitneyu::apply(AssoData & d)
 
 bool MannWhitneyuPval::apply(AssoData & d)
 {
-	if (!d.hasVar("MWstats")) {
+	if (!d.hasVar("RankStats")) {
 		throw ValueError("Cannot find Mann-Whitney test statistic");
 	}
 
-	vectorf & mwstats = d.getArrayVar("MWstats");
+	vectorf & mwstats = d.getArrayVar("RankStats");
 	//compute mean and se. skip the first element
 	//which is the original statistic
-	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0) / (mwstats.size() - 1.0);
+	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0) 
+		/ (mwstats.size() - 1.0);
 	double se_stats = 0.0;
 	for (size_t i = 1; i < mwstats.size(); ++i) {
 		se_stats += pow(mwstats[i] - mean_stats, 2.0);
@@ -821,19 +820,19 @@ bool RecodeProtectiveRV::apply(AssoData & d)
 			// note the difference here from Fisher2X2 class
 			// since in this case we check if rare variants are siginificantly enriched in ctrls
 			if (fEqual(ydat[i], 0.0)) {
-				if (gtmp > 0.0) twotwoTable[1] += 1;
-				else twotwoTable[0] += 1;
+				if (gtmp > 0.0) twotwoTable[0] += 1;
+				else twotwoTable[1] += 1;
 			}else {
-				if (gtmp > 0.0) twotwoTable[3] += 1;
-				else twotwoTable[2] += 1;
+				if (gtmp > 0.0) twotwoTable[2] += 1;
+				else twotwoTable[3] += 1;
 			}
 		}
 
-		double pvalue = gsl_cdf_hypergeometric_P(
-			(twotwoTable[3]),
-			(twotwoTable[1] + twotwoTable[3]),
+		double pvalue = 1.0 - gsl_cdf_hypergeometric_P(
+			(twotwoTable[0] - 1),
 			(twotwoTable[0] + twotwoTable[2]),
-			(twotwoTable[3] + twotwoTable[2])
+			(twotwoTable[1] + twotwoTable[3]),
+			(twotwoTable[0] + twotwoTable[1])
 		    );
 
 		if (pvalue < 0.1) {
