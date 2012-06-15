@@ -1077,7 +1077,7 @@ def probeSampleName(filename, prober, encoding, logger):
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, variantIndex, filelist, processor, encoding, genotype_field, genotype_info, ranges, 
-        import_queue, geno_count, task_count, copy_queue, logger):
+        import_queue, geno_count, task_count, copy_queue, proc_index, logger):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
@@ -1103,9 +1103,11 @@ class GenotypeImportWorker(Process):
         self.geno_count = geno_count
         self.task_count = task_count
         self.copy_queue = copy_queue
+        self.proc_index = proc_index
         self.logger = logger
 
     def run(self): 
+        self.logger.debug('Importer {} starts with variants from {} files'.format(self.proc_index, len(self.filelist)))
         while True:
             item = self.import_queue.get()
             if item is None:
@@ -1116,7 +1118,7 @@ class GenotypeImportWorker(Process):
                 # return the item to the list
                 self.import_queue.put(item)
                 # committee succide
-                self.logger.debug('Kill myself because I cannot handle variants from file {} (I can handle {})'.format(self.input_filename, self.filelist))
+                self.logger.debug('Kill myself because I cannot handle variants from file {} (the last one I can handle is {})'.format(self.input_filename, self.filelist[-1]))
                 break
             self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
             self.count = [0, 0]
@@ -1781,7 +1783,7 @@ class Importer:
                     if importers[i] is None or not importers[i].is_alive():
                         importer = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
                             self.processor, self.encoding, self.genotype_field, self.genotype_info, self.ranges,
-                            import_queue, genotype_import_count[i], task_count[i], copy_queue,
+                            import_queue, genotype_import_count[i], task_count[i], copy_queue, i,
                             self.logger)
                         importers[i] = importer
                         importer.start()
@@ -1813,7 +1815,7 @@ class Importer:
                 if importers[i] is None or not importers[i].is_alive():
                     importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding,
                         self.genotype_field, self.genotype_info, self.ranges,
-                        import_queue, genotype_import_count[i], task_count[i], copy_queue, self.logger)
+                        import_queue, genotype_import_count[i], task_count[i], copy_queue, i, self.logger)
                     importers[i] = importer
                     importer.start()
             time.sleep(1)
