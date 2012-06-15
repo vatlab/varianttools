@@ -243,21 +243,23 @@ public:
 
 };
 
-// set maf for samples having phenotype < mean(phenotypes)
-// input 1 is var name
-// input 2, if true, will set maf for samples having phenotype > mean(phenotypes)
-class SetMafByCtrl : public BaseAction
+// m_model: weight by maf from all, or selected samples (ctrls, low QT samples, etc)
+// m_model == 0 : set weight by maf
+// m_model == 1 : set weight by maf of samples having phenotype < mean(phenotypes), a 1Xn matrix
+// m_model == 2 : set weight by maf of samples having phenotype >/< mean(phenotypes), a 2Xn matrix
+// compute weight w = 1 / sqrt(p*(1-p))
+class BrowningWeight : public BaseAction
 {
 public:
-	SetMafByCtrl(std::string afvarname, bool reverse = false) :
-		BaseAction(), m_afvarname(afvarname), m_reverse(reverse)
+	BrowningWeight(unsigned model) :
+		BaseAction(), m_model(model)
 	{
 	}
 
 
 	BaseAction * clone() const
 	{
-		return new SetMafByCtrl(*this);
+		return new BrowningWeight(*this);
 	}
 
 
@@ -265,13 +267,12 @@ public:
 
 	std::string name()
 	{
-		return "SetMafByCtrl";
+		return "BrowningWeight";
 	}
 
 
 private:
-	std::string m_afvarname;
-	bool m_reverse;
+	unsigned m_model;
 
 };
 
@@ -298,38 +299,6 @@ public:
 	}
 
 
-};
-
-// compute weight w = 1 / sqrt(p*(1-p))
-// compute weight by maf from selected samples (ctrls, low QT samples, etc)
-// based on d.getArrayVar(subsamplemaf)
-class WeightByMaf : public BaseAction
-{
-	// this will change the raw genotypes directly!
-
-public:
-	WeightByMaf(std::string subsamplemaf) :
-		BaseAction(), m_mafvarname(subsamplemaf)
-	{
-	}
-
-
-	BaseAction * clone() const
-	{
-		return new WeightByMaf(*this);
-	}
-
-
-	bool apply(AssoData & d);
-
-	std::string name()
-	{
-		return "WeightByMaf";
-	}
-
-
-private:
-	std::string m_mafvarname;
 };
 
 
@@ -360,6 +329,36 @@ public:
 private:
 	vectors m_info;
 };
+
+
+class WeightedSumToX : public BaseAction
+{
+
+public:
+	WeightedSumToX(const vectors & info) : BaseAction(), m_info(info)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new WeightedSumToX(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "WeightedSumToX";
+	}
+
+
+private:
+	vectors m_info;
+};
+
+
 
 // remove variant sites having MAF <= lower_bound or MAF > upper_bound
 class SetSites : public BaseAction

@@ -226,13 +226,13 @@ class GLMBurdenTest(NullTest):
         # recode missing data
         if self.nan_adjust:
             algorithm.append(t.SetGMissingToMaf())
-        # weight genotype codings by w(MAF)
-        if 'MadsenBrowning' in self.weight and not self.use_indicator:
-            algorithm.append(t.WeightByMaf("maf"))
-        # weight with var_info/geno_info
-        otherweights = [x for x in self.weight if not x.startswith('MadsenBrowning')]
-        if len(otherweights) > 0:
-            algorithm.append(t.WeightByInfo(otherweights))
+
+        # weight with maf/var_info/geno_info
+        if len(self.weight) > 0:
+            if 'MadsenBrowning_all' in self.weight and not self.use_indicator:
+                algorithm.append(t.BrowningWeight(0))
+                self.weight[self.weight.index('MadsenBrowning_all')] = "BrowningWeight"
+            algorithm.append(t.WeightByInfo(self.weight))
         # association testing using analytic p-value
         if self.permutations == 0:
             algorithm.extend([
@@ -338,7 +338,7 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('--weight', nargs='*', default=[],
         help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
-            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
+            weights, i.e., 'MadsenBrowning_all' and 'MadsenBrowning' are available if specified, which will apply a weighting theme
             based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -466,7 +466,7 @@ class WeightedSumQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = ['MadsenBrowning']
+        self.weight = ['MadsenBrowning_all']
         self.trait_type = 'quantitative'
 
 class VariableThresholdsQt(GLMBurdenTest):
@@ -564,7 +564,7 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('--weight', nargs='*', default=[],
         help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
-            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
+            weights, i.e., 'MadsenBrowning_all' and 'MadsenBrowning' are available if specified, which will apply a weighting theme
             based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -692,7 +692,7 @@ class WeightedSumBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = 'MadsenBrowning_ctrl'
+        self.weight = 'MadsenBrowning'
         self.trait_type = 'disease'
 
 class VariableThresholdsBt(GLMBurdenTest):
@@ -820,9 +820,8 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         1000,
                         1,
-                        [t.SetMafByCtrl("ctrlmaf", 0),
-                            t.WeightByMaf("ctrlmaf"),
-                            t.SumToX(),
+                        [t.BrowningWeight(self.alternative),
+                            t.WeightedSumToX(["BrowningWeight"]),
                             t.MannWhitneyu(store=True)]
                         )
                 algorithm.extend([
@@ -840,9 +839,8 @@ class CaseCtrlBurdenTest(NullTest):
                         1,
                         1000,
                         1,
-                        [t.SetMafByCtrl("ctrlmaf", reverse=False),
-                            t.WeightByMaf("ctrlmaf"),
-                            t.SumToX(),
+                        [t.BrowningWeight(self.alternative),
+                            t.WeightedSumToX(["BrowningWeight"]),
                             t.MannWhitneyu(store=False)]
                         )
                 algorithm.append(a_permutationtest)
@@ -872,7 +870,7 @@ class CaseCtrlBurdenTest(NullTest):
                         self.permutations,
                         self.adaptive,
                         [t.RecodeProtectiveRV(),
-                            t.SumToX,
+                            t.SumToX(),
                             t.SimpleLogisticRegression()]
                         )
                 algorithm.append(a_permutationtest)

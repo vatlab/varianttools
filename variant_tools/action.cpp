@@ -74,42 +74,6 @@ bool SetMaf::apply(AssoData & d)
 }
 
 
-bool SetMafByCtrl::apply(AssoData & d)
-{
-	matrixf & genotype = d.raw_genotype();
-	vectorf & phenotype = d.phenotype();
-	double ybar = d.getDoubleVar("ybar");
-	vectorf af(genotype.front().size(), 0.0);
-	vectorf valid_all = af;
-	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
-
-	for (size_t j = 0; j < af.size(); ++j) {
-		// calc af and loci counts for site j
-		for (size_t i = 0; i < genotype.size(); ++i) {
-			// skip this sample or not, depending on phenotype
-			if (m_reverse) {
-				if (phenotype[i] > ybar) continue;
-			} else {
-				if (phenotype[i] < ybar) continue;
-			}
-			// genotype not missing
-			if (genotype[i][j] == genotype[i][j]) {
-				valid_all[j] += 1.0;
-				if (genotype[i][j] >= 1.0) {
-					af[j] += genotype[i][j];
-				}
-			}
-		}
-
-		if (valid_all[j] > 0.0) {
-			af[j] = (af[j] + 1.0) / ((valid_all[j] + 1.0) * multiplier);
-		}
-	}
-	d.setVar(m_afvarname, af);
-	// actual sample size
-	d.setVar(m_afvarname + "_denominator", valid_all);
-	return true;
-}
 
 
 bool SetGMissingToMaf::apply(AssoData & d)
@@ -141,41 +105,87 @@ bool WeightByInfo::apply(AssoData & d)
 		} else if (d.hasVar("__geno_" + m_info[i])) {
 			// get geno_info
 			d.weightX(d.getMatrixVar("__geno_" + m_info[i]));
+		} else if (d.hasVar(m_info[i])) {
+			// get internal weight matrix, should be a vectorf, only one vector
+			d.weightX(d.getMatrixVar(m_info[i])[0]);
 		} else {
-			throw ValueError("Cannot find genotype/phenotype information: " + m_info[i]);
+			throw ValueError("Cannot find genotype/variant information: " + m_info[i]);
 		}
 	}
 	return true;
 }
 
 
-bool WeightByMaf::apply(AssoData & d)
+bool BrowningWeight::apply(AssoData & d)
 {
-	if (!d.hasVar(m_mafvarname)) {
-		throw RuntimeError(m_mafvarname + " has not been calculated. Please calculate it prior to calculating weights.");
-	}
-	vectorf & maf = d.getArrayVar(m_mafvarname);
-	vectorf & denominator = d.getArrayVar(m_mafvarname + "_denominator");
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
-	//
-	vectorf weight;
-	for (size_t i = 0; i < maf.size(); ++i) {
-		if (fEqual(maf[i], 0.0) || fEqual(maf[i], 1.0)) {
-			weight.push_back(0.0);
+	matrixf maf(m_model);
+	matrixf valid_all(m_model);
+	if (m_model == 0) {
+		// Browing transformation by entire sample maf
+		if (!d.hasVar("maf")) {
+			throw RuntimeError("MAF has not been calculated. Please calculate it prior to calculating weights.");
 		} else {
-			weight.push_back(1.0 / sqrt(maf[i] * (1.0 - maf[i]) * denominator[i] * multiplier));
+			maf.push_back(d.getArrayVar("maf"));
+			valid_all.push_back(d.getArrayVar("maf_denominator"));
+		}
+	} else {
+		// m_model == 1 : weight by "ctrl" only. The weight matrices will have one column only
+		// m_model == 2 : weight by both models. The weight matrices will have 2 columns
+		matrixf & genotype = d.raw_genotype();
+		vectorf & phenotype = d.phenotype();
+		double ybar = d.getDoubleVar("ybar");
+		for (size_t s = 0; s < m_model; ++s) {
+			maf[s].resize(genotype.front().size(), 0.0);
+			valid_all[s].resize(maf[s].size(), 0.0);
+		}
+		for (size_t j = 0; j < maf.size(); ++j) {
+			// calc af and loci counts for site j
+			for (size_t s = 0; s < m_model; ++s) {
+				for (size_t i = 0; i < genotype.size(); ++i) {
+					if (!s) {
+						// model 1: weight by ctrl
+						if (phenotype[i] > ybar) continue;
+					} else {
+						// model 2
+						if (phenotype[i] < ybar) continue;
+					}
+					// genotype not missing
+					if (genotype[i][j] == genotype[i][j]) {
+						valid_all[s][j] += 1.0;
+						if (genotype[i][j] >= 1.0) {
+							maf[s][j] += genotype[i][j];
+						}
+					} 
+				}
+
+				if (valid_all[s][j] > 0.0) {
+					maf[s][j] = (maf[s][j] + 1.0) / ((valid_all[s][j] + 1.0) * multiplier);
+				}
+			}
 		}
 	}
-
-	d.weightX(weight);
+	// calculte weight. maf matrix will become the weight matrix
+	for (size_t s = 0; s < maf.size(); ++s) {
+		for (size_t i = 0; i < maf[s].size(); ++i) {
+			if (fEqual(maf[s][i], 0.0) || fEqual(maf[s][i], 1.0)) {
+				maf[s][i] = 0.0;
+			} else {
+				maf[s][i] = 1.0 / sqrt(maf[s][i] * (1.0 - maf[s][i]) * valid_all[s][i] * multiplier);
+			}
+		}
+	}
+	d.setVar("BrowningWeight", maf);
 	return true;
 }
 
 
 bool SetSites::apply(AssoData & d)
 {
-	if (!d.hasVar("maf"))
+	if (!d.hasVar("maf")) {
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to setting variant sites.");
+	}
+	//FIXME: all weights have to be trimed as well
 	vectorf & maf = d.getArrayVar("maf");
 	matrixf & genotype = d.raw_genotype();
 
@@ -280,7 +290,10 @@ bool BinToX::apply(AssoData & d)
 	return true;
 }
 
-
+bool WeightedSumToX::apply(AssoData &d) 
+{ 
+	return true;
+}
 bool SimpleLinearRegression::apply(AssoData & d)
 {
 	// simple linear regression score test
@@ -846,6 +859,8 @@ bool RecodeProtectiveRV::apply(AssoData & d)
 	}
 	return true;
 }
+
+//////////////
 
 
 bool PyAction::apply(AssoData & d)
