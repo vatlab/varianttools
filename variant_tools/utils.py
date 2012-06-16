@@ -585,7 +585,8 @@ class DatabaseEngine:
                     try:
                         cur.execute('PRAGMA {}'.format(pragma))
                     except:
-                        raise RuntimeError('Failed to set pragma "{}". Use "vtools admin --pragma" to reset pragmas.'.format(pragma))
+                        # I cannot raise an error because uers need to open the project to reset this value.
+                        print('Failed to set pragma "{}". Use "vtools admin --pragma" to reset pragmas.'.format(pragma))
                 self.database.commit()
             # trying to load extension
             for path in sys.path:
