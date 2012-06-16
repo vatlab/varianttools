@@ -816,21 +816,22 @@ class CaseCtrlBurdenTest(NullTest):
                 algorithm.extend([t.BinToX(),
                     t.Fisher2X2(self.alternative, self.midp)])
             elif self.aggregation_theme == 'WSS':
+                times = 1000
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
-                        1000,
+                        times,
                         1,
                         [t.WeightedGenotypeTester(
                             self.alternative,
                             self.extern_weight,
                             [t.BrowningWeight(self.alternative),
-                            t.MannWhitneyu(store=True)]
+                            t.MannWhitneyu(times = times, store=True)]
                             )]
                         )
                 algorithm.extend([
                     a_permutationtest,
-                    t.MannWhitneyuPval(1)
+                    t.WSSPvalue()
                     ])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
@@ -838,16 +839,17 @@ class CaseCtrlBurdenTest(NullTest):
         # association testing using permutation-based p-value
         else:
             if self.aggregation_theme == 'WSS':
+                # FIXME have to throw a warning message that only one-sided test is supported for the rank test version of WSS
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
                         [t.WeightedGenotypeTester(
-                            self.alternative,
+                            1,
                             self.extern_weight,
-                            [t.BrowningWeight(self.alternative),
-                            t.MannWhitneyu(store=False)]
+                            [t.BrowningWeight(1),
+                            t.MannWhitneyu()]
                             )]
                         )
                 algorithm.append(a_permutationtest)

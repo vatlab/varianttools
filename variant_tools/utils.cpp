@@ -153,7 +153,11 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 			u = u + w;
 		}
 	}
-
+	// comment these out since I am using the raw scores 
+	// rather than the actual U statistic
+	// in which case ties not properly handled
+	// this is based on communication with Dr. Browning (UW)
+	// and Dr. YeeHim Cheung (Columbia)
 	//u = n*m+m*(m+1)/2-u;
 	//std::cout << u << " ";
 	return u;

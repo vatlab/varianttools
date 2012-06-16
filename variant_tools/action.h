@@ -582,8 +582,8 @@ private:
 class MannWhitneyu : public BaseAction
 {
 public:
-	MannWhitneyu(bool store = false)
-		: BaseAction(), m_store(store)
+	MannWhitneyu(unsigned times = 0, bool store = false)
+		: BaseAction(), m_times(times), m_store(store)
 	{
 	}
 
@@ -603,22 +603,22 @@ public:
 
 
 private:
-	unsigned m_store;
+	unsigned m_times;
+	bool m_store;
 };
 
 
-class MannWhitneyuPval : public BaseAction
+class WSSPvalue : public BaseAction
 {
 public:
-	MannWhitneyuPval(unsigned alternative)
-		: BaseAction(), m_sided(alternative)
+	WSSPvalue() : BaseAction()
 	{
 	}
 
 
 	BaseAction * clone() const
 	{
-		return new MannWhitneyuPval(*this);
+		return new WSSPvalue(*this);
 	}
 
 
@@ -626,12 +626,10 @@ public:
 
 	std::string name()
 	{
-		return "MannWhitneyuPval";
+		return "WSSPvalue";
 	}
 
 
-private:
-	unsigned m_sided;
 };
 
 

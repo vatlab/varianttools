@@ -537,43 +537,56 @@ bool MannWhitneyu::apply(AssoData & d)
 	if (ncases < 5 || nctrls < 5) {
 		throw ValueError("Sample size too small to perform Mann-Whitney test.");
 	}
+	// rank sum of scores in cases
 	double statistic = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
 	//
 	if (statistic > 0.0) d.setStatistic(statistic);
 	if (m_store) {
 		if (!d.hasVar("RankStats")) {
-			vectorf mwstats(0);
+			matrixf mwstats(2);
 			d.setVar("RankStats", mwstats);
 		}
-		vectorf & wstats = d.getArrayVar("RankStats");
-		wstats.push_back(statistic);
+		matrixf & wstats = d.getMatrixVar("RankStats");
+		if (wstats[0].size() < m_times) {
+			wstats[0].push_back(statistic);
+		} else {
+			wstats[1].push_back(statistic);
+		}
 	}
 	return true;
 }
 
 
-bool MannWhitneyuPval::apply(AssoData & d)
+bool WSSPvalue::apply(AssoData & d)
 {
 	if (!d.hasVar("RankStats")) {
 		throw ValueError("Cannot find Mann-Whitney test statistic");
 	}
 
-	vectorf & mwstats = d.getArrayVar("RankStats");
+	matrixf & mwstats = d.getMatrixVar("RankStats");
+	// delete the 2nd column if it is empty
+	if (mwstats.back().size() == 0) mwstats.resize(mwstats.size() - 1);
+	vectorf normalstats(0);
 	//compute mean and se. skip the first element
 	//which is the original statistic
-	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0)
-	                    / (mwstats.size() - 1.0);
-	double se_stats = 0.0;
-	for (size_t i = 1; i < mwstats.size(); ++i) {
-		se_stats += pow(mwstats[i] - mean_stats, 2.0);
+	for (size_t s = 0; s < mwstats.size(); ++s) {
+		double ntotal = mwstats[s].size() - 1.0;
+		double mean_stats = (double)std::accumulate(mwstats[s].begin() + 1, mwstats[s].end(), 0.0)
+		                    / ntotal;
+		double se_stats = 0.0;
+		for (size_t i = 1; i < mwstats[s].size(); ++i) {
+			se_stats += pow(mwstats[s][i] - mean_stats, 2.0);
+		}
+		se_stats = sqrt(se_stats / (ntotal - 1.0));
+		// FIXME prevent extreme values: any better approach?
+		if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
+		normalstats.push_back((mwstats[s][0] - mean_stats) / se_stats);
 	}
-	se_stats = se_stats / (mwstats.size() - 2.0);
-	if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
-	double statisticstd = (mwstats[0] - mean_stats) / se_stats;
-	if (m_sided == 1) {
-		d.setPvalue(gsl_cdf_ugaussian_Q(statisticstd));
+	if (normalstats.size() < 2) {
+		d.setPvalue(gsl_cdf_ugaussian_Q(normalstats[0]));
 	}else {
-		d.setPvalue(gsl_cdf_chisq_Q(statisticstd * statisticstd, 1.0));
+		// two-sided test with multiple testing correction
+		d.setPvalue(2.0 * gsl_cdf_ugaussian_Q(fmax(abs(normalstats[0]), abs(normalstats[1]))));
 	}
 	return true;
 }
