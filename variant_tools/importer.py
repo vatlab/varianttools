@@ -30,7 +30,7 @@ import re
 import array
 import time
 from heapq import heappush, heappop, heappushpop
-from multiprocessing import Process, Pipe, Value, Lock, Queue
+from multiprocessing import Process, Pipe, Value, Lock, Manager
 from itertools import izip, repeat
 from collections import defaultdict
 from .project import Project, fileFMT
@@ -1070,6 +1070,77 @@ def probeSampleName(filename, prober, encoding, logger):
 
 
 #
+#  A status object to control the import process. I cannot use a simple
+#  queue solution because different types of importers are needed to handle
+#  different inputs.
+#
+class ImportStatus:
+    def __init__(self, manager):
+        self.tasks = manager.dict()
+        self.lock = Lock()
+        self.total_sample_count = Value('i', 0)
+        self.total_genotype_count = Value('i', 0)
+
+    def add(self, item, num_lines):
+        '''Add a job, each item has
+        input_filename:     source filename
+        tmp_file:           temporary genotype file
+        start_sample, end_sample: index of samples
+        sample_ids:         actual sample ids
+
+        Status of the items can be
+
+        0:  initial input, not imported
+        1:  being imported
+        2:  imported
+        3:  being copied
+        4:  copied (done)
+        '''
+        if item in self.tasks:
+            raise RuntimeError('Item already added to ImportStatus')
+        self.lock.acquire()
+        self.tasks[item] = 0
+        self.total_sample_count.value += len(item[-1])
+        self.total_genotype_count.value += num_lines * len(item[-1])
+        self.lock.release()
+
+    def itemToImport(self, filelist):
+        '''Try to find some item that can be imported. filelist is a list of files
+        that the importer can work on
+        '''
+        ret = None
+        self.lock.acquire()
+        for item in self.tasks.keys():
+            # only check for status 0 items
+            if self.tasks[item] == 0 and item[0] in filelist:
+                self.tasks[item] = 1  
+                ret = item
+                break
+        self.lock.release()
+        return ret
+
+    def pendingImport(self):
+        return sum([x < 2 for x in self.tasks.values()])
+
+    def itemToCopy(self):
+        '''Try to find some item that can be copied.'''
+        ret = None
+        self.lock.acquire()
+        for item in self.tasks.keys():
+            # only check for status 2 items
+            if self.tasks[item] == 2:
+                self.tasks[item] = 3
+                ret = item
+                break
+        self.lock.release()
+        return ret
+
+    def set(self, item, status):
+        self.lock.acquire()
+        self.tasks[item] = status
+        self.lock.release()
+
+#
 #   A working process to import genotype from a file, or part of a file
 #   and write to a temporary genotype database.
 #
@@ -1077,17 +1148,15 @@ def probeSampleName(filename, prober, encoding, logger):
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, variantIndex, filelist, processor, encoding, genotype_field, genotype_info, ranges, 
-        import_queue, geno_count, task_count, copy_queue, proc_index, logger):
+        geno_count, proc_index, status, logger):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
             is not in this list, this worker will succide so that it can be replaced 
             by a worker with more variants.
         encoding, genotypefield, genotype_info, ranges:  parameters to import data
-        import_queue: a queue to accept jobs (input file, sample range...)
         geno_count:  a shared variable to report number of genotype imported
-        task_count:  a shared variable to report number of tasks completed
-        copy_queu:   a queue to send copy jobs after genotypes are imported
+        status:      an ImportStatus object to monitor the progress
         '''
         Process.__init__(self, name='GenotypeImporter')
         self.variantIndex = variantIndex
@@ -1099,50 +1168,28 @@ class GenotypeImportWorker(Process):
         self.genotype_info = genotype_info
         self.ranges = ranges
         #
-        self.import_queue = import_queue
         self.geno_count = geno_count
-        self.task_count = task_count
-        self.copy_queue = copy_queue
         self.proc_index = proc_index
+        #
+        self.status = status
         self.logger = logger
 
     def run(self): 
         self.logger.debug('Importer {} starts with variants from {} files'.format(self.proc_index, len(self.filelist)))
         while True:
-            item = self.import_queue.get()
+            item = self.status.itemToImport(self.filelist)
             if item is None:
                 self.logger.debug('Importer {} exits normally'.format(self.proc_index))
                 break
             # get parameters
             self.input_filename, self.genotype_file, start_sample, end_sample, self.sample_ids = item
-            if self.input_filename not in self.filelist:
-                # return the item to the list
-                self.import_queue.put(item)
-                #
-                # NOTE: according to the documentation:
-                #
-                # Warning As mentioned above, if a child process has put items on a queue (and it has not used
-                # JoinableQueue.cancel_join_thread()), then that process will not terminate until all buffered
-                # items have been flushed to the pipe.
-                #  
-                # This means that if you try joining that process you may get a deadlock unless you are sure 
-                # that all items which have been put on the queue have been consumed. Similarly, if the child 
-                # process is non-daemonic then the parent process may hang on exit when it tries to join all
-                # its non-daemonic children.
-                #
-                # Note that a queue created using a manager does not have this issue. See Programming
-                # guidelines.
-                self.import_queue.cancel_join_thread()
-                #
-                # committee succide
-                self.logger.debug('Importer {} is killed because it cannot handle variants from file {} (the last one it can handle is {})'.format(self.proc_index, self.input_filename, self.filelist[-1]))
-                break
             self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
             self.count = [0, 0]
             # use the last value as start
             self.start_count = self.geno_count.value
             self._importData()
-            self.task_count.value += 1
+            # set the status to be imported (2)
+            self.status.set(item, 2)
 
     def _importData(self):
         self.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
@@ -1188,35 +1235,38 @@ class GenotypeImportWorker(Process):
         end_import_time = time.time()
         self.logger.debug('It took importer {} {:.1f} seconds to import {} samples ({} - {}).'.format(self.proc_index,
             end_import_time - start_import_time, len(self.sample_ids), min(self.sample_ids), max(self.sample_ids)))
-        # tell the genotype copier that it can start copying genotypes to the main
-        # genotype database
-        self.copy_queue.put((self.genotype_file, self.sample_ids))
-        self.copy_queue.cancel_join_thread()
 
 
 class GenotypeCopier(Process):
-    def __init__(self, main_genotype_file, queue, status, logger):
+    def __init__(self, main_genotype_file, copied_samples, status, logger):
+        '''copied_samples is a shared variable that should be increased with
+        each sample copy.
+        '''
         Process.__init__(self)
         self.main_genotype_file = main_genotype_file
-        self.queue = queue
+        self.copied_samples = copied_samples
         self.status = status
-        self.task_count = 0
         self.logger = logger
 
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.main_genotype_file)
+        file_count = 0
         while True:
-            item = self.queue.get()
+            item = self.status.itemToCopy()
             if item is None:
-                break
-            self.genotype_file, self.sample_ids = item
-            # get parameters
-            self._copySamples()
-            self.db.commit()
-            self.task_count += 1
+                time.sleep(1)
+            else:
+                infile, self.genotype_file, ss, es, self.sample_ids = item
+                # get parameters
+                self._copySamples()
+                self.db.commit()
+                # set the status of the item to be copied (4)
+                self.status.set(item, 4)
+                file_count += 1
         self.db.close()
-        self.logger.debug('Genotype of {} samples are copied from {} files'.format(self.status.value, self.task_count))
+        self.logger.debug('Genotype of {} samples are copied from {} files'.format(
+            self.copied_samples.value, file_count))
 
     def _copySamples(self):
         start_copy_time = time.time()
@@ -1232,7 +1282,7 @@ class GenotypeCopier(Process):
             query = 'INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0};'.format(ID)
             cur.execute(query)
             # update progress
-            self.status.value += 1
+            self.copied_samples.value += 1
         self.db.detach('__from')
         # remove the temporary file
         try:
@@ -1707,23 +1757,16 @@ class Importer:
         might start from the middle because some work might have already been done in the previous step.
         '''
         importers = [None] * self.jobs
-        # total number of genotypes to import
-        total_genotype_count = 0
-        # total number of samples to copy
-        total_sample_count = 0
-        # total number of tasks
-        total_task_count = 0
         # number of genotypes each process have imported
         genotype_import_count = [Value('i', 0) for x in range(self.jobs)]
-        task_count = [Value('i', 0) for x in range(self.jobs)]
+        # number of sample copied
         sample_copy_count = Value('i', 0)
         # import queue that accept jobs sample 1.1, 1.2, etc
-        import_queue = Queue()
-        # copy queue that copy samples
-        copy_queue = Queue()
+        m = Manager()
+        status = ImportStatus(m)
         # start copier
-        copier = GenotypeCopier('{}_genotype.DB'.format(self.proj.name), copy_queue,
-            sample_copy_count, self.logger)
+        copier = GenotypeCopier('{}_genotype.DB'.format(self.proj.name), 
+            sample_copy_count, status, self.logger)
         copier.start()
         #
         # The logic of importer is complex here. Because an importer needs to know variantIndex to 
@@ -1756,12 +1799,12 @@ class Importer:
             sample_ids = self.getSampleIDs(input_filename)
             #
             # we should have file line count from importVariant
-            total_genotype_count += self.count[0] * len(sample_ids)
-            total_sample_count += len(sample_ids)
+            num_of_lines = self.count[0]
             #
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
+            #
             if len(sample_ids) == 0:
                 continue
             #
@@ -1797,54 +1840,55 @@ class Importer:
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
+                # send a import job to the importer workers
+                status.add((input_filename, tmp_file, start_sample, end_sample, 
+                    tuple(sample_ids[start_sample : end_sample])), num_of_lines)
                 # start an importer if needed
                 for i in range(self.jobs):
                     if importers[i] is None or not importers[i].is_alive():
                         importer = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
                             self.processor, self.encoding, self.genotype_field, self.genotype_info, self.ranges,
-                            import_queue, genotype_import_count[i], task_count[i], copy_queue, i,
-                            self.logger)
+                            genotype_import_count[i], i, status, self.logger)
                         importers[i] = importer
                         importer.start()
                         break
-                # send a import job to the importer workers
-                import_queue.put((input_filename, tmp_file, start_sample, end_sample, 
-                    sample_ids[start_sample : end_sample]))
-                total_task_count += 1
                 start_sample = end_sample
         # 
         # minitor the import of genotypes
-        prog = ProgressBar('Importing genotypes', total_genotype_count, initCount=sum([x.value for x in genotype_import_count]))
+        prog = ProgressBar('Importing genotypes', status.total_genotype_count.value, initCount=sum([x.value for x in genotype_import_count]))
         while True:
             # each process update their passed shared value
             # the master process add them and get the total number of genotypes imported
             prog.update(sum([x.value for x in genotype_import_count]))
             # 
-            pending = total_task_count - sum([x.value for x in task_count])
+            pending = status.pendingImport()
             if pending == 0:
                 for i in range(self.jobs):
                     # kill worker jobs
                     if importers[i] is not None:
-                        import_queue.put(None)
+                        importers[i].terminate()
                 prog.done()
                 break
             # create importers if any of the importer is gone. This might be a waste of resource
             # but an importer that is pending does not cost much
+            new_count = 0
             for i in range(self.jobs):
                 if importers[i] is None or not importers[i].is_alive():
                     importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding,
                         self.genotype_field, self.genotype_info, self.ranges,
-                        import_queue, genotype_import_count[i], task_count[i], copy_queue, i, self.logger)
+                        genotype_import_count[i], i, status, self.logger)
                     importers[i] = importer
                     importer.start()
+                    new_count += 1
+                if new_count >= pending:
+                    break
             time.sleep(1)
         # monitor the copy of genotypes
-        prog = ProgressBar('Copying genotype', total_sample_count, initCount=sample_copy_count.value)
+        prog = ProgressBar('Copying genotype', status.total_sample_count.value, initCount=sample_copy_count.value)
         while True:
             prog.update(sample_copy_count.value)
-            if sample_copy_count.value == total_sample_count:
-                # tell the genotype copier that no more job is coming to end that process
-                copy_queue.put(None)
+            if sample_copy_count.value == status.total_sample_count.value:
+                copier.terminate()
                 prog.done()
                 break
             time.sleep(1)
@@ -1854,7 +1898,7 @@ class Importer:
                 .format(self.total_count[2],
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.total_count[0], total_sample_count))
+                    self.total_count[0], status.total_sample_count.value))
 
 
 def importVariantsArguments(parser):
