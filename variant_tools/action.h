@@ -331,7 +331,6 @@ private:
 };
 
 
-
 // remove variant sites having MAF <= lower_bound or MAF > upper_bound
 class SetSites : public BaseAction
 {
@@ -684,7 +683,7 @@ public:
 
 	std::string name()
 	{
-        // use the more approperate name here
+		// use the more approperate name here
 		return "KBACweight";
 	}
 
@@ -731,7 +730,7 @@ class RecodeProtectiveRV : public BaseAction
 {
 public:
 	RecodeProtectiveRV() : BaseAction()
-    {
+	{
 	}
 
 
@@ -748,8 +747,8 @@ public:
 		return "RecodeProtectiveRV";
 	}
 
-};
 
+};
 
 
 ////////////////////////////////
@@ -1029,9 +1028,9 @@ class WeightedGenotypeTester : public BasePermutator
 
 public:
 	WeightedGenotypeTester(unsigned alternative, const vectors & info, const vectora & actions) :
-        BasePermutator(actions), m_model(alternative), m_info(info)
+		BasePermutator(actions), m_model(alternative), m_info(info)
 	{
-        m_stat.resize(2, 0.0);
+		m_stat.resize(2, 0.0);
 	}
 
 
@@ -1050,9 +1049,9 @@ public:
 
 
 private:
-    unsigned m_model;
+	unsigned m_model;
 	vectors m_info;
-    vectorf m_stat;
+	vectorf m_stat;
 };
 
 }

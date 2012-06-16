@@ -74,8 +74,6 @@ bool SetMaf::apply(AssoData & d)
 }
 
 
-
-
 bool SetGMissingToMaf::apply(AssoData & d)
 {
 	if (!d.hasVar("maf")) {
@@ -121,6 +119,7 @@ bool BrowningWeight::apply(AssoData & d)
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	matrixf maf(m_model);
 	matrixf valid_all(m_model);
+
 	if (m_model == 0) {
 		// Browing transformation by entire sample maf
 		if (!d.hasVar("maf")) {
@@ -156,7 +155,7 @@ bool BrowningWeight::apply(AssoData & d)
 						if (genotype[i][j] >= 1.0) {
 							maf[s][j] += genotype[i][j];
 						}
-					} 
+					}
 				}
 
 				if (valid_all[s][j] > 0.0) {
@@ -289,6 +288,7 @@ bool BinToX::apply(AssoData & d)
 	d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
 	return true;
 }
+
 
 bool SimpleLinearRegression::apply(AssoData & d)
 {
@@ -534,9 +534,12 @@ bool MannWhitneyu::apply(AssoData & d)
 			++tmpu;
 		}
 	}
+	if (ncases < 5 || nctrls < 5) {
+		throw ValueError("Sample size too small to perform Mann-Whitney test.");
+	}
 	double statistic = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
 	//
-	d.setStatistic(statistic);
+	if (statistic > 0.0) d.setStatistic(statistic);
 	if (m_store) {
 		if (!d.hasVar("RankStats")) {
 			vectorf mwstats(0);
@@ -558,8 +561,8 @@ bool MannWhitneyuPval::apply(AssoData & d)
 	vectorf & mwstats = d.getArrayVar("RankStats");
 	//compute mean and se. skip the first element
 	//which is the original statistic
-	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0) 
-		/ (mwstats.size() - 1.0);
+	double mean_stats = (double)std::accumulate(mwstats.begin() + 1, mwstats.end(), 0.0)
+	                    / (mwstats.size() - 1.0);
 	double se_stats = 0.0;
 	for (size_t i = 1; i < mwstats.size(); ++i) {
 		se_stats += pow(mwstats[i] - mean_stats, 2.0);
@@ -854,6 +857,7 @@ bool RecodeProtectiveRV::apply(AssoData & d)
 	}
 	return true;
 }
+
 
 //////////////
 
@@ -1214,6 +1218,7 @@ bool VariablePermutator::apply(AssoData & d)
 	return true;
 }
 
+
 // foreach model:
 // 1. get weight from input info (via d.getVar)
 // 2. generate weighted sum (for wss and RBT) or recode genotype patterns by corresponding weight
@@ -1221,7 +1226,7 @@ bool VariablePermutator::apply(AssoData & d)
 // 3. apply a test statistic
 // end
 // max(sm1, sm2)
-bool WeightedGenotypeTester::apply(AssoData & d) 
+bool WeightedGenotypeTester::apply(AssoData & d)
 {
 	// check input actions
 	if (m_actions.size() != 2) {
@@ -1262,7 +1267,7 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 				//X[i] = std::accumulate(genotype[i].begin(), genotype[i].end(), 0.0);
 				for (size_t j = 0; j < genotype[i].size(); ++j) {
 					if (genotype[i][j] > 0.0) {
-						// internal weight 
+						// internal weight
 						double gtmp = genotype[i][j] * weights[s][j];
 						// external weight
 						for (size_t w = 0; w < extern_weights.size(); ++w) {
@@ -1286,7 +1291,7 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 					}else ;
 				}
 			}
-		} 
+		}
 		d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
 		// association testing
 		m_actions[1]->apply(d);
@@ -1296,5 +1301,6 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 	d.setStatistic(fmax(m_stat[0], m_stat[1]));
 	return true;
 }
+
 
 }

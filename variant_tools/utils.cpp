@@ -61,8 +61,8 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 	// Prepare
 
 	if (n <= 5 || m <= 5) {
-		std::cout << "Sample size too small" << std::endl;
-		exit(1);
+		std::clog << "Sample size too small" << std::endl;
+		return -9;
 	}
 	ns = n + m;
 	double r[ns - 1];

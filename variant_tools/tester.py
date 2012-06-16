@@ -841,9 +841,9 @@ class CaseCtrlBurdenTest(NullTest):
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
-                        1000,
-                        1,
-                        [t.WeighedGenotypeTester(
+                        self.permutations,
+                        self.adaptive,
+                        [t.WeightedGenotypeTester(
                             self.alternative,
                             self.extern_weight,
                             [t.BrowningWeight(self.alternative),
