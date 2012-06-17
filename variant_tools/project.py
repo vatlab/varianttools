@@ -967,6 +967,13 @@ class Project:
             # runOptions['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
             self.db.connect(self.proj_file)
+        # loading other options if they have been set
+        inor = self.loadProperty('__option_import_num_of_readers', None)
+        if inor is not None:
+            try:  # int() might fail
+                setOptions(import_num_of_readers=int(inor))
+            except:
+                self.logger.warning('Failed to set option import_num_of_readers {}'.format(inor))
         #
         # existing project
         cur = self.db.cursor()
@@ -3256,12 +3263,20 @@ def adminArguments(parser):
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
     db_config = parser.add_argument_group('Fine-tune database operations')
-    db_config.add_argument('--pragma', nargs='*', metavar='PRAGMA', default=[],
+    db_config.add_argument('--pragma', nargs='*', metavar='PRAGMA',
         help='''SQLITE pragma that will be set for all sqlite connections. For example,
         'synchronous=OFF' could greatly improve the performance of certain operations
         at the cost of larger risk of data loss in the event of failure. Setting this
         option without parameter will clear existing settings. Wrong pragmas will be
         ignored without warning.''')
+    options = parser.add_argument_group('Set values for some various internal options.')
+    options.add_argument('--set_options', nargs='+', metavar='OPTION',
+        help='''Set value to internal options such as the batch size for database
+        options. The default values of these options were chosen to fit most usage
+        patterns but tweaking them might provide better performance under some certain
+        circumstances. Please check the variant tools website for a list of supported
+        options.''')
+
 
 def admin(args):
     try:
@@ -3301,12 +3316,19 @@ def admin(args):
             elif args.pragma is not None:
                 proj.saveProperty('sqlite_pragma', str(args.pragma))
                 proj.logger.info('Sqlite pragma is set to "{}"'.format(', '.join(args.pragma)))
+            elif args.set_options is not None:
+                for option in args.set_options:
+                    if '=' not in option:
+                        raise ValueError('Runtime option should be specified as opt=value')
+                    opt, value = option.split('=', 1)
+                    if opt not in ['import_num_of_readers']:
+                        raise ValueError('Option {} is not currently supported.'.format(opt))
+                    proj.saveProperty('__option_{}'.format(opt), value)
+                    proj.logger.info('Option {} is set to {}'.format(opt, value))
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
         sys.exit(e)
-
-
 
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools.py

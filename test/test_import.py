@@ -209,6 +209,9 @@ class TestImport(ProcessTestCase):
         # compare results with -j3
         #
         runCmd('vtools init test -f')
+        # if more than one reader is used, the order of mutants in some cases will be changed, leading
+        # to different variant ids.
+        runCmd('vtools admin --set_options "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
@@ -219,6 +222,7 @@ class TestImport(ProcessTestCase):
         # compare results with -j10
         #
         runCmd('vtools init test -f')
+        runCmd('vtools admin --set_options "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
@@ -239,6 +243,7 @@ class TestImport(ProcessTestCase):
         # compare results with -j3
         #
         runCmd('vtools init test -f')
+        runCmd('vtools admin --set_options "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))

@@ -37,7 +37,7 @@ from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
-    downloadFile
+    downloadFile, runOptions
 
 #
 #
@@ -1642,7 +1642,8 @@ class Importer:
         # one process is for the main program, the
         # other threads will handle input
         # getNew=True so the reader only read variants not in variantIndex
-        reader = TextReader(self.processor, input_filename, self.variantIndex, True, 2, self.encoding, self.logger)
+        reader = TextReader(self.processor, input_filename, self.variantIndex, True, 
+            runOptions['import_num_of_readers'], self.encoding, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0

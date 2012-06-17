@@ -60,7 +60,9 @@ runOptions = {
     # this will be the raw command that will be saved to log file
     'command_line': '',
     # default sqlite pragma
-    'sqlite_pragma': ['synchronous=OFF', 'default_cache_size=2000']
+    'sqlite_pragma': ['synchronous=OFF', 'default_cache_size=2000'],
+    # number of processes used for reader under multi-processing mode
+    'import_num_of_readers': 2
 }
 
 SQL_KEYWORDS = set([
@@ -108,7 +110,8 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
-def setOptions(verbosity=None, temp_dir=None, command_line='', sqlite_pragma=None):
+def setOptions(verbosity=None, temp_dir=None, command_line='', sqlite_pragma=None,
+    import_num_of_readers=None):
     if verbosity is not None:
         runOptions['verbosity'] = verbosity[0]
     if temp_dir:
@@ -117,6 +120,8 @@ def setOptions(verbosity=None, temp_dir=None, command_line='', sqlite_pragma=Non
         runOptions['command_line'] = command_line
     if sqlite_pragma is not None:
         runOptions['sqlite_pragma'] = sqlite_pragma
+    if import_num_of_readers is not None:
+        runOptions['import_num_of_readers'] = import_num_of_readers
 
 
 def getCommandLine():
