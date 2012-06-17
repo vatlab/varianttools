@@ -138,15 +138,15 @@ bool BrowningWeight::apply(AssoData & d)
 			maf[s].resize(genotype.front().size(), 0.0);
 			valid_all[s].resize(maf[s].size(), 0.0);
 		}
-		for (size_t j = 0; j < maf.size(); ++j) {
-			// calc af and loci counts for site j
-			for (size_t s = 0; s < m_model; ++s) {
+		for (size_t s = 0; s < m_model; ++s) {
+			for (size_t j = 0; j < maf[s].size(); ++j) {
+				// calc af and loci counts for site j
 				for (size_t i = 0; i < genotype.size(); ++i) {
 					if (!s) {
 						// model 1: weight by ctrl
 						if (phenotype[i] > ybar) continue;
 					} else {
-						// model 2
+						// model 2: an additional weight by case
 						if (phenotype[i] < ybar) continue;
 					}
 					// genotype not missing
@@ -644,7 +644,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 	uniquePattern.resize(it - uniquePattern.begin());
 	if (fEqual(uniquePattern.front(), 0.0)) uniquePattern.erase(uniquePattern.begin());
 	if (uniquePattern.size() == 0) {
-		throw ValueError("Input genotype matrix do not have a variant");
+		throw ValueError("Input genotype matrix does not have a variant");
 	}
 	// count number of sample individuals for each genotype pattern
 	vectori uniquePatternCounts(uniquePattern.size(), 0);
@@ -1284,7 +1284,7 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 						double gtmp = genotype[i][j] * weights[s][j];
 						// external weight
 						for (size_t w = 0; w < extern_weights.size(); ++w) {
-							gtmp = extern_weights[w][j];
+							gtmp *= extern_weights[w][j];
 						}
 						X[i] += gtmp;
 					}
