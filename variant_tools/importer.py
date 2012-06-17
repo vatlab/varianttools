@@ -995,7 +995,7 @@ class GenotypeWriter:
      
     def write(self, id, rec):
         try:
-            if len(self.cache[id]) == 10000:
+            if len(self.cache[id]) == 1000:
                 # this will fail if id does not exist, so we do not need 
                 # extra test if id is valie
                 self.cur.executemany(self.query.format(id), self.cache[id])
@@ -1006,7 +1006,7 @@ class GenotypeWriter:
         except KeyError:
             # if this is a new id
             self.cache[id] = [rec]
-        if self.count % 10000 == 0:
+        if self.count % 1000 == 0:
             self.db.commit()
     
     def close(self):
@@ -1864,11 +1864,10 @@ class Importer:
                 # start an importer if needed
                 for i in range(self.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        importer = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
+                        importers[i] = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
                             self.processor, self.encoding, self.genotype_field, self.genotype_info, self.ranges,
                             genotype_import_count[i], i, status, self.logger)
-                        importers[i] = importer
-                        importer.start()
+                        importers[i].start()
                         break
                 start_sample = end_sample
         # 
@@ -1882,7 +1881,6 @@ class Importer:
             queued, importing = status.pendingImport()
             if queued + importing == 0:
                 # the importer will kill themselves after there is no pending job
-                # wait for all things to complete
                 prog.done()
                 break
             # create importers if any of the importer is gone. This might be a waste of resource
