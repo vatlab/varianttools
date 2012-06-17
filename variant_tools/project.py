@@ -3270,7 +3270,7 @@ def adminArguments(parser):
         option without parameter will clear existing settings. Wrong pragmas will be
         ignored without warning.''')
     options = parser.add_argument_group('Set values for some various internal options.')
-    options.add_argument('--set_options', nargs='+', metavar='OPTION',
+    options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
         options. The default values of these options were chosen to fit most usage
         patterns but tweaking them might provide better performance under some certain
@@ -3316,8 +3316,8 @@ def admin(args):
             elif args.pragma is not None:
                 proj.saveProperty('sqlite_pragma', str(args.pragma))
                 proj.logger.info('Sqlite pragma is set to "{}"'.format(', '.join(args.pragma)))
-            elif args.set_options is not None:
-                for option in args.set_options:
+            elif args.set_runtime_option is not None:
+                for option in args.set_runtime_option:
                     if '=' not in option:
                         raise ValueError('Runtime option should be specified as opt=value')
                     opt, value = option.split('=', 1)
