@@ -142,7 +142,7 @@ bool BrowningWeight::apply(AssoData & d)
 			for (size_t j = 0; j < maf[s].size(); ++j) {
 				// calc af and loci counts for site j
 				for (size_t i = 0; i < genotype.size(); ++i) {
-					if (!s) {
+					if (s == 0) {
 						// model 1: weight by ctrl
 						if (phenotype[i] > ybar) continue;
 					} else {
@@ -537,21 +537,33 @@ bool MannWhitneyu::apply(AssoData & d)
 	if (ncases < 5 || nctrls < 5) {
 		throw ValueError("Sample size too small to perform Mann-Whitney test.");
 	}
-	// rank sum of scores in cases
-	double statistic = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
-	//
-	if (statistic > 0.0) d.setStatistic(statistic);
+
+	// very trick to determine one-sided or two sided test w/o a relavant input parameter ...
 	if (m_store) {
 		if (!d.hasVar("RankStats")) {
-			matrixf mwstats(2);
-			d.setVar("RankStats", mwstats);
+			matrixf initstats(2);
+			d.setVar("RankStats", initstats);
 		}
 		matrixf & wstats = d.getMatrixVar("RankStats");
 		if (wstats[0].size() < m_times) {
-			wstats[0].push_back(statistic);
+			double srcase = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
+			if (srcase > 0.0) {
+				wstats[0].push_back(srcase);
+				d.setStatistic(srcase);
+			}
 		} else {
-			wstats[1].push_back(statistic);
+			// two-sided test required. should calculate
+			// rank sum of scores in ctrls
+			double srctrl = Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases);
+			if (srctrl > 0.0) {
+				wstats[1].push_back(srctrl);
+				d.setStatistic(srctrl);
+			}
 		}
+	} else {
+		// rank sum of scores in cases
+		double srcase = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
+		if (srcase > 0.0) d.setStatistic(srcase);
 	}
 	return true;
 }
@@ -566,7 +578,7 @@ bool WSSPvalue::apply(AssoData & d)
 	matrixf & mwstats = d.getMatrixVar("RankStats");
 	// delete the 2nd column if it is empty
 	if (mwstats.back().size() == 0) mwstats.resize(mwstats.size() - 1);
-	vectorf normalstats(0);
+	vectorf wsstat(0);
 	//compute mean and se. skip the first element
 	//which is the original statistic
 	for (size_t s = 0; s < mwstats.size(); ++s) {
@@ -580,13 +592,21 @@ bool WSSPvalue::apply(AssoData & d)
 		se_stats = sqrt(se_stats / (ntotal - 1.0));
 		// FIXME prevent extreme values: any better approach?
 		if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
-		normalstats.push_back((mwstats[s][0] - mean_stats) / se_stats);
+		wsstat.push_back((mwstats[s][0] - mean_stats) / se_stats);
 	}
-	if (normalstats.size() < 2) {
-		d.setPvalue(gsl_cdf_ugaussian_Q(normalstats[0]));
+
+	if (wsstat.size() < 2) {
+		// one-sided
+		d.setPvalue(gsl_cdf_ugaussian_Q(wsstat.front()));
 	}else {
-		// two-sided test with multiple testing correction
-		d.setPvalue(2.0 * gsl_cdf_ugaussian_Q(fmax(abs(normalstats[0]), abs(normalstats[1]))));
+		// two-sided (?) FIXME
+		double pval = 0.0;
+		if (!fEqual(wsstat[0], wsstat[1])) {
+			pval = fmin( 1.0, fmin(gsl_cdf_ugaussian_Q(wsstat[0]), gsl_cdf_ugaussian_Q(wsstat[1])) * 2.0 );
+		} else {
+			pval = gsl_cdf_ugaussian_Q(wsstat[0]);
+		}
+		d.setPvalue(pval);
 	}
 	return true;
 }
