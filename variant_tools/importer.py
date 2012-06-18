@@ -954,31 +954,33 @@ class MultiTextReader:
 class GenotypeWriter:
     '''This class write genotypes to a genotype database, which does
     not have to be the project genotype database.'''
-    def __init__(self, geno_db, geno_field, geno_info, sample_ids, logger=None):
+    def __init__(self, geno_db, geno_info, genotype_status, sample_ids, logger=None):
         '''geno_db:   genotype database
-        geno_field:   genotype field, there can be no or one genotype field (for GT)
         geno_info:    genotype information fields
         sample_ids:   ID of samples that will be written to this database
         '''
         #
         self.db = DatabaseEngine()
         self.db.connect(geno_db)
-        self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
-            .format(','.join([self.db.PH] * (1 + len(geno_field) + len(geno_info))))
+        if genotype_status == 2:
+            self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+                .format(','.join([self.db.PH] * (2 + len(geno_info))))
+        else:
+            self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db.PH)
         self.cur = self.db.cursor()
         if logger:
             s = delayedAction(logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
         for idx, sid in enumerate(sample_ids):
             # create table
             self.createNewSampleVariantTable(self.cur,
-                'genotype_{0}'.format(sid), len(geno_field) > 0, geno_info)
+                'genotype_{0}'.format(sid), genotype_status  == 2, geno_info)
         self.db.commit()
         if logger:
             del s
         #
         # number of genotype batches that has been written
         self.count = 0
-        # cache of genotypes. This class will accumulate 1000 genotypes befire
+        # cache of genotypes. This class will accumulate 1000 genotypes before
         # it writes to the disk using 'executemany', which will be faster than
         # calling 1000 'execute'.
         self.cache = {}
@@ -989,8 +991,8 @@ class GenotypeWriter:
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
             '''.format(table) + 
-            (', GT INT' if genotype else '') + 
-            ''.join([', {} {}'.format(f.name, f.type) for f in fields]) + ');'
+            (', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in fields]) if genotype else '')
+            + ');'
          )
      
     def write(self, id, rec):
@@ -1196,8 +1198,9 @@ class GenotypeImportWorker(Process):
                     self.logger.debug('Importer {} exits normally'.format(self.proc_index))
                     break
             # get parameters
-            self.input_filename, self.genotype_file, start_sample, end_sample, self.sample_ids = item
-            self.processor.reset(import_var_info=False, import_sample_range=[start_sample, end_sample])
+            self.input_filename, self.genotype_file, self.genotype_status, start_sample, end_sample, self.sample_ids = item
+            self.processor.reset(import_var_info=False, 
+                import_sample_range=[0,0] if self.genotype_status == 1 else [start_sample, end_sample])
             self.count = [0, 0]
             # use the last value as start
             self.start_count = self.geno_count.value
@@ -1215,8 +1218,7 @@ class GenotypeImportWorker(Process):
         self.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
             min(self.sample_ids), max(self.sample_ids)))
         reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.logger)
-        writer = GenotypeWriter(self.genotype_file, self.genotype_field,
-            self.genotype_info, self.sample_ids)
+        writer = GenotypeWriter(self.genotype_file, self.genotype_info, self.genotype_status, self.sample_ids)
         fld_cols = None
         last_count = 0
         for self.count[0], bins, rec in reader.records():
@@ -1225,8 +1227,8 @@ class GenotypeImportWorker(Process):
             except KeyError:
                 self.logger.debug('Variant {} {} {} {} not found'.format(rec[0], rec[1], rec[2], rec[3]))
                 continue
-            # if there is genotype (and genotype_info)
-            if len(self.genotype_field) > 0:
+            # if there is genotype 
+            if self.genotype_status == 2:
                 if fld_cols is None:
                     col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
@@ -1278,7 +1280,7 @@ class GenotypeCopier(Process):
                     break
                 time.sleep(1)
             else:
-                infile, self.genotype_file, ss, es, self.sample_ids = item
+                infile, self.genotype_file, gs, ss, es, self.sample_ids = item
                 start_copy_time = time.time()
                 # get parameters
                 self._copySamples()
@@ -1408,9 +1410,16 @@ class Importer:
         self.sample_name = sample_name
         #
         # how to split processed records
+        #
         self.ranges = fmt.ranges
         self.variant_fields = [x.name for x in fmt.fields[fmt.ranges[0]:fmt.ranges[1]]]
         self.variant_info = [x.name for x in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]]
+        #
+        # NOTE: for a given format, number of genotype_fields and associated genotype info
+        # are determined by the format file, and are fixed, but the number of samples in
+        # a file can vary. In particular, there can be no sample, and in this case, if a
+        # sample name is given, a sample will be created with only variant ids.
+        #
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
         self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
         #
@@ -1510,12 +1519,17 @@ class Importer:
             return variant_id
 
     def getSampleIDs(self, input_filename):
+        '''Return a list of sample ids, and a status field indicating
+        0:  no sample. sample id has to be empty
+        1:  no genotype but with sample (a list of variant ids, no genotype), there can be only one sample id.
+        2:  genotype with samples.
+        '''
         if not self.sample_name:
             # if no sample name is specified
             if not self.genotype_field:
                 self.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
                 self.sample_in_file = []
-                return []
+                return ([], 0)
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding, self.logger)
@@ -1523,27 +1537,27 @@ class Importer:
                         if numSample == 1:
                             self.logger.debug('Missing sample name (name None is used)'.format(numSample))
                             self.sample_in_file = [None]
-                            return self.recordFileAndSample(input_filename, [None])
+                            return (self.recordFileAndSample(input_filename, [None]), 2)
                         elif numSample == 0:
                             self.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
                             self.sample_in_file = []
-                            return []
+                            return ([], 0)
                         else:
                             raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
                     else:
                         self.sample_in_file = [x for x in names]
-                        return self.recordFileAndSample(input_filename, names)
+                        return (self.recordFileAndSample(input_filename, names), 2)
                 except ValueError:
                     # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
                     self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
                     self.sample_in_file = []
-                    return []
+                    return ([], 0)
         else:
             self.sample_in_file = [x for x in self.sample_name]
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 self.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
-                return self.recordFileAndSample(input_filename, self.sample_name)
+                return (self.recordFileAndSample(input_filename, self.sample_name), 1)
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding, self.logger)
@@ -1553,15 +1567,13 @@ class Importer:
                 #
                 if numSample == 0:
                     self.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
-                    self.genotype_field = []
-                    self.genotype_info = []
                     # remove genotype field from processor
                     self.processor.reset(import_var_info=True, import_sample_range=[0,0])
                     if len(self.sample_name) > 1:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
                     raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
-                return self.recordFileAndSample(input_filename, self.sample_name)
+                return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2)
  
     def importVariantAndGenotype(self, input_filename):
         '''Input variant and genotype at the same time, appropriate for cases with
@@ -1570,19 +1582,9 @@ class Importer:
         if self.genotype_field:
             self.prober.reset()
         #
-        sample_ids = self.getSampleIDs(input_filename)
+        sample_ids, genotype_status = self.getSampleIDs(input_filename)
         #
         cur = self.db.cursor()
-        # cache genotype status
-        if len(sample_ids) > 0 and len(self.genotype_field) > 0:
-            # has genotype
-            genotype_status = 1
-        elif len(sample_ids) > 0:
-            # no genotype but with sample
-            genotype_status = 2
-        else:
-            # no genotype no sample
-            genotype_status = 0
         lc = lineCount(input_filename, self.encoding)
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
@@ -1592,7 +1594,7 @@ class Importer:
             writer = GenotypeWriter(
                 # write directly to the genotype table
                 '{}_genotype'.format(self.proj.name),
-                self.genotype_field, self.genotype_info,
+                self.genotype_info, genotype_status,
                 sample_ids, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
@@ -1600,7 +1602,7 @@ class Importer:
         fld_cols = None
         for self.count[0], bins, rec in reader.records():
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-            if genotype_status == 1:
+            if genotype_status == 2:
                 if fld_cols is None:
                     col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
                     fld_cols = []
@@ -1617,7 +1619,7 @@ class Importer:
                     except IndexError:
                         self.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
                             len(rec), fld_cols[-1][-1] + 1, rec))
-            elif genotype_status == 2:
+            elif genotype_status == 1:
                 # should have only one sample
                 for id in sample_ids:
                     writer.write(id, [variant_id])
@@ -1815,7 +1817,7 @@ class Importer:
             if self.genotype_field:
                 self.prober.reset()
             # if there are samples?
-            sample_ids = self.getSampleIDs(input_filename)
+            sample_ids, genotype_status = self.getSampleIDs(input_filename)
             #
             # we should have file line count from importVariant
             num_of_lines = self.count[0]
@@ -1860,7 +1862,7 @@ class Importer:
                 if os.path.isfile(tmp_file):
                     raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
                 # send a import job to the importer workers
-                status.add((input_filename, tmp_file, start_sample, end_sample, 
+                status.add((input_filename, tmp_file, genotype_status, start_sample, end_sample, 
                     tuple(sample_ids[start_sample : end_sample])), num_of_lines)
                 # start an importer if needed
                 for i in range(self.jobs):
