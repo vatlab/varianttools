@@ -1639,6 +1639,13 @@ class Project:
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
         info += 'Database engine:             {}\n'.format(self.db.describeEngine())
+        #
+        # list all runtime options as (name, val) pairs
+        opts = [(x[9:], self.loadProperty(x, None)) for x in [
+            '__option_import_num_of_readers',
+        ]]
+        info += 'Runtime options:             {}\n'.format(
+            ', '.join(['{}={}'.format(name, val) for name,val in opts if val is not None]))
         info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
         info += 'Annotation databases:        {}\n'.format('\n'.join([' '*29 + os.path.join(x.dir, x.name) \
             + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
