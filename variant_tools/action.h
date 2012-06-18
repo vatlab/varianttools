@@ -405,7 +405,7 @@ public:
 
 	std::string name()
 	{
-		return "SimpleLinear";
+		return "SimpleLinearRegression";
 	}
 
 
@@ -431,7 +431,7 @@ public:
 
 	std::string name()
 	{
-		return "SimpleLogistic";
+		return "SimpleLogisticRegression";
 	}
 
 
@@ -577,13 +577,13 @@ private:
 
 /* MannWhitney rank test on m_X and m_phenotype.
    store = false for not storing the statistics from each permutation test; true is otherwise
-   will be stored as d.setVar("WSSstatistics", mwstats)
+   will be stored as d.setVar("RankStats", mwstats)
  */
 class MannWhitneyu : public BaseAction
 {
 public:
-	MannWhitneyu(unsigned times = 0, bool store = false)
-		: BaseAction(), m_times(times), m_store(store)
+	MannWhitneyu(unsigned alternative = 1, bool store = false)
+		: BaseAction(), m_sided(alternative), m_store(store)
 	{
 	}
 
@@ -603,7 +603,7 @@ public:
 
 
 private:
-	unsigned m_times;
+    unsigned m_sided;
 	bool m_store;
 };
 
@@ -611,7 +611,8 @@ private:
 class WSSPvalue : public BaseAction
 {
 public:
-	WSSPvalue() : BaseAction()
+	WSSPvalue(unsigned alternative) :
+		BaseAction(), m_sided(alternative)
 	{
 	}
 
@@ -630,6 +631,8 @@ public:
 	}
 
 
+private:
+	unsigned m_sided;
 };
 
 

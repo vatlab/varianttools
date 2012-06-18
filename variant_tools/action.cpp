@@ -538,32 +538,48 @@ bool MannWhitneyu::apply(AssoData & d)
 		throw ValueError("Sample size too small to perform Mann-Whitney test.");
 	}
 
-	// very trick to determine one-sided or two sided test w/o a relavant input parameter ...
 	if (m_store) {
 		if (!d.hasVar("RankStats")) {
-			matrixf initstats(2);
+			matrixf initstats(m_sided);
 			d.setVar("RankStats", initstats);
 		}
 		matrixf & wstats = d.getMatrixVar("RankStats");
-		if (wstats[0].size() < m_times) {
-			double srcase = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
-			if (srcase > 0.0) {
-				wstats[0].push_back(srcase);
-				d.setStatistic(srcase);
-			}
+		if (wstats.size() == 1) {
+			// one-sided test
+			wstats[0].push_back(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+			d.setStatistic(wstats[0]);
+
 		} else {
-			// two-sided test required. should calculate
-			// rank sum of scores in ctrls
-			double srctrl = Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases);
-			if (srctrl > 0.0) {
-				wstats[1].push_back(srctrl);
-				d.setStatistic(srctrl);
+			if (wstats[0].size() <= wstats[1].size()) {
+				// should be testing model 1
+				wstats[0].push_back(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+				d.setStatistic(wstats[0]);
+			} else {
+				// should be testing model 2
+				// rank sum of scores in ctrls
+				wstats[1].push_back(Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
+				d.setStatistic(wstats[1]);
 			}
-		}
-	} else {
+		} 
+	}else {
+		/*
+		   if (!d.hasVar("RankStatsOrig")) {
+		    vectorf initstats(m_sided);
+		    d.setVar("RankStatsOrig", initstats);
+		   }
+		   vectorf & wstat = d.getArrayVar("RankStatsOrig");
+		   if (wstat.size() == 1) {
+		    // rank sum of scores in cases
+		    wstat[0] = (Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+		    d.setStatistic(wstat[0]);
+		   } else {
+		    wstat[0] = (Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
+		    wstat[1] = (Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
+		    d.setStatistic(wstats[1]);
+		   }
+		 */
 		// rank sum of scores in cases
-		double srcase = Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls);
-		if (srcase > 0.0) d.setStatistic(srcase);
+		d.setStatistic(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
 	}
 	return true;
 }
@@ -576,12 +592,13 @@ bool WSSPvalue::apply(AssoData & d)
 	}
 
 	matrixf & mwstats = d.getMatrixVar("RankStats");
-	// delete the 2nd column if it is empty
-	if (mwstats.back().size() == 0) mwstats.resize(mwstats.size() - 1);
+	if (mwstats.size() != m_sided) {
+		throw ValueError("Rank Statistic does not match the alternative");
+	}
 	vectorf wsstat(0);
 	//compute mean and se. skip the first element
 	//which is the original statistic
-	for (size_t s = 0; s < mwstats.size(); ++s) {
+	for (size_t s = 0; s < m_sided; ++s) {
 		double ntotal = mwstats[s].size() - 1.0;
 		double mean_stats = (double)std::accumulate(mwstats[s].begin() + 1, mwstats[s].end(), 0.0)
 		                    / ntotal;
@@ -594,15 +611,14 @@ bool WSSPvalue::apply(AssoData & d)
 		if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
 		wsstat.push_back((mwstats[s][0] - mean_stats) / se_stats);
 	}
-
-	if (wsstat.size() < 2) {
+	if (m_sided == 1) {
 		// one-sided
 		d.setPvalue(gsl_cdf_ugaussian_Q(wsstat.front()));
 	}else {
 		// two-sided (?) FIXME
 		double pval = 0.0;
 		if (!fEqual(wsstat[0], wsstat[1])) {
-			pval = fmin( 1.0, fmin(gsl_cdf_ugaussian_Q(wsstat[0]), gsl_cdf_ugaussian_Q(wsstat[1])) * 2.0 );
+			pval = fmin(1.0, fmin(gsl_cdf_ugaussian_Q(wsstat[0]), gsl_cdf_ugaussian_Q(wsstat[1])) * 2.0);
 		} else {
 			pval = gsl_cdf_ugaussian_Q(wsstat[0]);
 		}
@@ -697,7 +713,6 @@ bool KBACtest::apply(AssoData & d)
 	vectorf & ydat = d.phenotype();
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
-
 	//
 	vectorf kbac(m_sided);
 	// KBAC weights
@@ -1106,8 +1121,8 @@ bool VariablePermutator::apply(AssoData & d)
 	if (m_actions.size() == 2) {
 		if ((m_actions[0]->name() == "BinToX" ||
 		     m_actions[0]->name() == "SumToX") &&
-		    (m_actions[1]->name() == "LinearRegression" ||
-		     m_actions[1]->name() == "LogisticRegression")) {
+		    (m_actions[1]->name().find("Regression") != std::string::npos)
+		    ) {
 			choice = 1;
 		}
 	}
@@ -1262,12 +1277,17 @@ bool VariablePermutator::apply(AssoData & d)
 bool WeightedGenotypeTester::apply(AssoData & d)
 {
 	// check input actions
+	// the first should be a weighting theme
+	// the 2nd should be a regression method, or the rank test
 	if (m_actions.size() != 2) {
 		throw ValueError("Exactly 2 actions is allowed (for now) for WeightedGenotypeTester (would someone want a combination of more than one weighting theme?)");
 	}
 	std::string wtheme = m_actions[0]->name();
 	if (wtheme.find("weight") == std::string::npos) {
 		throw ValueError("Invalid input action " + wtheme);
+	}
+	if (m_actions[1]->name().find("Regression") == std::string::npos && m_actions[1]->name() != "MannWhitneyu") {
+		throw ValueError("Invalid input action " + m_actions[1]->name());
 	}
 	// apply a weighting theme first
 	m_actions[0]->apply(d);

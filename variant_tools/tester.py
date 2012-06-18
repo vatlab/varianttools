@@ -816,22 +816,21 @@ class CaseCtrlBurdenTest(NullTest):
                 algorithm.extend([t.BinToX(),
                     t.Fisher2X2(self.alternative, self.midp)])
             elif self.aggregation_theme == 'WSS':
-                times = 1000
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
-                        times,
+                        1000,
                         1,
                         [t.WeightedGenotypeTester(
                             self.alternative,
                             self.extern_weight,
                             [t.BrowningWeight(self.alternative),
-                            t.MannWhitneyu(times = times, store=True)]
+                            t.MannWhitneyu(alternative=self.alternative, store=True)]
                             )]
                         )
                 algorithm.extend([
                     a_permutationtest,
-                    t.WSSPvalue()
+                    t.WSSPvalue(self.alternative)
                     ])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
