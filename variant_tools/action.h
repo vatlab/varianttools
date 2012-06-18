@@ -603,7 +603,7 @@ public:
 
 
 private:
-    unsigned m_sided;
+	unsigned m_sided;
 	bool m_store;
 };
 
@@ -668,7 +668,7 @@ public:
 class KBACtest : public BaseAction
 {
 public:
-	KBACtest(unsigned alternative, bool weightOnly = false) :
+	KBACtest(unsigned alternative = 1, bool weightOnly = false) :
 		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
 	{
 	}
@@ -690,7 +690,7 @@ public:
 
 
 private:
-	bool m_sided;
+	unsigned m_sided;
 	bool m_weightOnly;
 };
 
@@ -698,7 +698,7 @@ private:
 class RBTtest : public BaseAction
 {
 public:
-	RBTtest(unsigned alternative, bool weightOnly = false) :
+	RBTtest(unsigned alternative = 1, bool weightOnly = false) :
 		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
 	{
 	}
@@ -719,25 +719,26 @@ public:
 
 
 private:
-	bool m_sided;
+	unsigned m_sided;
 	bool m_weightOnly;
 };
 
-// recode protective rare variants;
+// recode protective rare variants and sum up the recoded genotype
+// will not change d.raw_genotype; will change d.genotype()
 // determine sites of rare variants having excess copies in ctrls
 // and determine whether or not to recode that site via a Fisher's test
 // evaluated at alpha = 0.1
-class RecodeProtectiveRV : public BaseAction
+class AdaptiveRvSum : public BaseAction
 {
 public:
-	RecodeProtectiveRV() : BaseAction()
+	AdaptiveRvSum() : BaseAction()
 	{
 	}
 
 
 	BaseAction * clone() const
 	{
-		return new RecodeProtectiveRV(*this);
+		return new AdaptiveRvSum(*this);
 	}
 
 
@@ -745,7 +746,7 @@ public:
 
 	std::string name()
 	{
-		return "RecodeProtectiveRV";
+		return "AdaptiveRvSum";
 	}
 
 

@@ -560,7 +560,7 @@ bool MannWhitneyu::apply(AssoData & d)
 				wstats[1].push_back(Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
 				d.setStatistic(wstats[1]);
 			}
-		} 
+		}
 	}else {
 		/*
 		   if (!d.hasVar("RankStatsOrig")) {
@@ -635,15 +635,10 @@ bool FindGenotypePattern::apply(AssoData & d)
 	//FIXME
 	// missing data has to be replaced by MLG
 
-	// sample size
-	unsigned sampleSize = ydat.size();
-	// candidate region length
-	unsigned regionLen = xdat.front().size();
-
 	//!-Compute unique genotype patterns (string) as ID scores (double)
-	vectorf genotypeId(sampleSize);
+	vectorf genotypeId(ydat.size());
 
-	for (size_t i = 0; i < sampleSize; ++i) {
+	for (size_t i = 0; i < ydat.size(); ++i) {
 
 		double vntIdL = 0.0;
 		double vntIdR = 0.0;
@@ -651,7 +646,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 		unsigned lastCnt = 0;
 		unsigned tmpCnt = 0;
 
-		for (size_t j = 0; j < regionLen; ++j) {
+		for (size_t j = 0; j < xdat.front().size(); ++j) {
 
 			if (xdat[i][j] >= 1.0) {
 				vntIdR += pow(3.0, 1.0 * (j - lastCnt)) * xdat[i][j];
@@ -684,7 +679,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 	}
 	// count number of sample individuals for each genotype pattern
 	vectori uniquePatternCounts(uniquePattern.size(), 0);
-	for (size_t i = 0; i < sampleSize; ++i) {
+	for (size_t i = 0; i < ydat.size(); ++i) {
 		// for each sample, identify/count its genotype pattern
 		for (size_t u = 0; u < uniquePattern.size(); ++u) {
 			if (genotypeId[i] == uniquePattern[u]) {
@@ -708,17 +703,17 @@ bool KBACtest::apply(AssoData & d)
 	vectorf & up = d.getArrayVar("uniqGPattern");
 	vectori & upc = d.getIntArrayVar("uniqGCounts");
 	vectorf & gId = d.getArrayVar("gPattern");
-	// genotype pattern counts in cases (or in ctrls when m_reverse = true)
-	vectori upcSub(up.size(), 0);
 	vectorf & ydat = d.phenotype();
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
 	//
 	vectorf kbac(m_sided);
-	// KBAC weights
+	// KBAC weights (unique genotype pattern weights)
 	matrixf upWeights(m_sided);
 
 	for (size_t s = 0; s < m_sided; ++s) {
+		// genotype pattern counts in cases (or in ctrls)
+		vectori upcSub(up.size(), 0);
 		for (size_t i = 0; i < ydat.size(); ++i) {
 			if ((s) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
 				// identify/count genotype pattern in cases (or ctrls for two sided test)
@@ -754,12 +749,11 @@ bool KBACtest::apply(AssoData & d)
 			}
 		}
 	}
-
 	if (m_weightOnly) {
 		d.setVar("KBACweight", upWeights);
 	} else {
-		if (m_sided == 1) d.setStatistic(kbac);
-		else d.setStatistic(fmax(kbac[0], kbac[1]) );
+		if (m_sided == 1) d.setStatistic(kbac[0]);
+		else d.setStatistic(fmax(kbac[0], kbac[1]));
 	}
 
 	return true;
@@ -825,7 +819,7 @@ bool RBTtest::apply(AssoData & d)
 }
 
 
-bool RecodeProtectiveRV::apply(AssoData & d)
+bool AdaptiveRvSum::apply(AssoData & d)
 {
 	vectorf & ydat = d.phenotype();
 	matrixf & xdat = d.raw_genotype();
@@ -893,16 +887,22 @@ bool RecodeProtectiveRV::apply(AssoData & d)
 		}
 	}
 
+	vectorf & X = d.genotype();
+	std::cout << X << std::endl;
+	std::cout << "-----" << std::endl;
+	X.resize(xdat.size(), 0.0);
 	//recode sites
-	for (size_t i = 0; i < xdat.size(); ++i) {
+	for (size_t i = 0; i < X.size(); ++i) {
 		//  scan all sample individuals
 		for (size_t j = 0; j < xdat.front().size(); ++j) {
 			//!- Recode protective variants as in Pan 2010
-			if (rsites[j] && xdat[i][j] == xdat[i][j]) {
-				xdat[i][j] = multiplier - xdat[i][j];
+			if (xdat[i][j] == xdat[i][j]) {
+				X[i] += (rsites[j]) ? (multiplier - xdat[i][j]) : xdat[i][j];
 			}
 		}
 	}
+	std::cout << X << std::endl;
+	d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
 	return true;
 }
 
