@@ -192,7 +192,7 @@ class GLMBurdenTest(NullTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -332,7 +332,7 @@ class LinRegBurden(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -503,7 +503,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -558,7 +558,7 @@ class LogitRegBurden(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
         parser.add_argument('--weight', nargs='*', default=[],
@@ -729,7 +729,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -777,8 +777,8 @@ class CaseCtrlBurdenTest(NullTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum'], default='CMC',
-            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum".
+        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT_Fisher'], default='CMC',
+            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT_Fisher".
             Default set to "CMC"''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -791,9 +791,9 @@ class CaseCtrlBurdenTest(NullTest):
             The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
-            To NOT using adaptive procedure, set C=1. Default is C=0.1''')
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--midp', action='store_true',
-            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC.''')
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC and VT_Fisher.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -832,6 +832,8 @@ class CaseCtrlBurdenTest(NullTest):
                     a_permutationtest,
                     t.WSSPvalue(self.alternative)
                     ])
+            elif self.aggregation_theme == 'Calpha':
+                pass
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
 
@@ -881,6 +883,24 @@ class CaseCtrlBurdenTest(NullTest):
                             t.SimpleLogisticRegression()]
                         )
                 algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'VT_Fisher':
+                algorithm.extend([
+                    t.FindVariantPattern(),
+                    t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)
+                    ])
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'RareCover':
+                pass
+            elif self.aggregation_theme == 'Calpha':
+                pass
+
             else:
                 raise ValueError('Invalid permutation test {0}'.format(self.aggregation_theme))
         return algorithm

@@ -753,6 +753,117 @@ public:
 };
 
 
+class FindVariantPattern : public BaseAction
+{
+public:
+	FindVariantPattern() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new FindVariantPattern(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "FindVariantPattern";
+	}
+
+
+};
+
+
+class VTFisher : public BaseAction
+{
+public:
+	VTFisher(double alpha, unsigned alternative = 1, bool midp = false) :
+		BaseAction(), m_sided(alternative), m_midp(midp), m_alpha(alpha)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new VTFisher(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "VTFisher";
+	}
+
+
+private:
+	unsigned m_sided;
+    bool m_midp;
+	double m_alpha;
+};
+
+
+class CalphaTest : public BaseAction
+{
+public:
+	CalphaTest(unsigned alternative = 1) :
+		BaseAction(), m_sided(alternative)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new CalphaTest(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "CalphaTest";
+	}
+
+
+private:
+	unsigned m_sided;
+};
+
+
+class RareCoverTest : public BaseAction
+{
+public:
+	RareCoverTest(unsigned alternative = 1) :
+		BaseAction(), m_sided(alternative)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new RareCoverTest(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "RareCoverTest";
+	}
+
+
+private:
+	unsigned m_sided;
+};
+
+
 ////////////////////////////////
 ////////////////////////////////
 

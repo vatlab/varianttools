@@ -135,8 +135,10 @@ bool BrowningWeight::apply(AssoData & d)
 		vectorf & phenotype = d.phenotype();
 		double ybar = d.getDoubleVar("ybar");
 		for (size_t s = 0; s < m_model; ++s) {
-			maf[s].resize(genotype.front().size(), 0.0);
+			maf[s].resize(genotype.front().size());
+			std::fill(maf[s].begin(), maf[s].end(), 0.0);
 			valid_all[s].resize(maf[s].size(), 0.0);
+			std::fill(valid_all[s].begin(), valid_all[s].end(), 0.0);
 		}
 		for (size_t s = 0; s < m_model; ++s) {
 			for (size_t j = 0; j < maf[s].size(); ++j) {
@@ -498,7 +500,18 @@ bool Fisher2X2::apply(AssoData & d)
 		pvalue = 1.0 - pvalue;
 	} else {
 		double contingency_table[4] = { 0, 0, 0, 0 };
-		for (int i = 0; i != 4; ++i) contingency_table[i] = twotwoTable[i];
+		for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
+		bool ok = (
+				contingency_table[0] >= 0 &&
+				contingency_table[1] >= 0 &&
+				contingency_table[2] >= 0 &&
+				contingency_table[3] >= 0 &&
+				(contingency_table[0] + contingency_table[1] +
+				 contingency_table[2] + contingency_table[0] > 0)
+			  );
+		if (!ok) {
+			throw ValueError("Invalid input table for fexact.");
+		}
 		//stuff for Fisher's test
 		int nrow = 2;
 		int ncol = 2;
@@ -812,7 +825,7 @@ bool RBTtest::apply(AssoData & d)
 			d.setStatistic(sumR);
 		} else {
 			double sumP = std::accumulate(RBTweights[1].begin(), RBTweights[1].end(), 0.0);
-			d.setStatistic(fmax(sumR, sumP) );
+			d.setStatistic(fmax(sumR, sumP));
 		}
 	}
 	return true;
@@ -888,9 +901,8 @@ bool AdaptiveRvSum::apply(AssoData & d)
 	}
 
 	vectorf & X = d.genotype();
-	std::cout << X << std::endl;
-	std::cout << "-----" << std::endl;
-	X.resize(xdat.size(), 0.0);
+	X.resize(xdat.size());
+	std::fill(X.begin(), X.end(), 0.0);
 	//recode sites
 	for (size_t i = 0; i < X.size(); ++i) {
 		//  scan all sample individuals
@@ -901,8 +913,174 @@ bool AdaptiveRvSum::apply(AssoData & d)
 			}
 		}
 	}
-	std::cout << X << std::endl;
+
 	d.setVar("xbar", (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size()));
+	return true;
+}
+
+
+bool FindVariantPattern::apply(AssoData & d)
+{
+	matrixf & xdat = d.raw_genotype();
+	vectori vnum(xdat.front().size(), 0);
+
+	for (size_t j = 0; j < xdat.front().size(); ++j) {
+		for (size_t i = 0; i < xdat.size(); ++i) {
+			if (xdat[i][j] == xdat[i][j]) {
+				vnum[j] += (int) xdat[i][j];
+			}
+		}
+	}
+	d.setVar("allVPattern", vnum);
+	// unique genotype patterns
+	std::sort(vnum.begin(), vnum.end());
+	std::vector<int>::iterator it = std::unique(vnum.begin(), vnum.end());
+	vnum.resize(it - vnum.begin());
+	if ((vnum.front() == 0 && vnum.size() == 1) || vnum.size() == 0) {
+		throw ValueError("Input genotype matrix does not have a variant");
+	}
+	if (vnum.front() != 0) {
+		vnum.insert(vnum.begin(), 0);
+	}
+	d.setVar("uniqVPattern", vnum);
+	return true;
+}
+
+
+bool VTFisher::apply(AssoData & d)
+{
+	// VT method using Fisher's test
+	// will send out a stopping signal if the initial statistics are significant
+	//! - Define <b> 'allPs' </b>, a vector of the p-values computed under different thresholds
+	matrixf & xdat = d.raw_genotype();
+	vectorf & ydat = d.phenotype();
+	vectori & vnum = d.getIntArrayVar("allVPattern");
+	vectori & uniqv = d.getIntArrayVar("uniqVPattern");
+
+	vectorf allPs(uniqv.size() - 1);
+	vectorf XCurr(xdat.size(), 0.0);
+	bool shouldstop = true;
+
+	//! - Iterate the following for all thresholds:
+	for (size_t t = 1; t < uniqv.size(); ++t) {
+		//! - - Record the index of loci that can be added at the new threshold criteria
+		vectori idxesAdding(0);
+		for (size_t s = 0; s < vnum.size(); ++s) {
+			if (vnum[s] > uniqv[t - 1] && vnum[s] <= uniqv[t])
+				idxesAdding.push_back(s);
+		}
+
+		//!- - For loci passing the threshold, implement CMC Fisher
+		vectorf X(xdat.size(), 0.0);
+		for (size_t i = 0; i < X.size(); ++i) {
+			for (size_t j = 0; j < idxesAdding.size(); ++j) {
+				size_t locIdx = (size_t)idxesAdding[j];
+				X[i] = (xdat[i][locIdx] > 0.0) ? 1.0 : 0.0;
+			}
+			XCurr[i] = (fEqual(X[i], 1.0)) ? 1.0 : XCurr[i];
+		}
+		// fisher's test
+		vectori twotwoTable(4, 0);
+		for (size_t i = 0; i < XCurr.size(); ++i) {
+
+			if (!(fEqual(ydat[i], 1.0) || fEqual(ydat[i], 0.0))) {
+				throw ValueError("Input ydat data not binary");
+			}
+
+			if (fEqual(ydat[i], 1.0)) {
+				if (XCurr[i] > 0.0)
+					twotwoTable[0] += 1;
+				else
+					twotwoTable[1] += 1;
+			}else {
+				if (XCurr[i] > 0.0)
+					twotwoTable[2] += 1;
+				else
+					twotwoTable[3] += 1;
+			}
+		}
+
+
+		double pvalue = 0.0;
+		if (m_sided == 1) {
+			pvalue = (m_midp)
+			         ? (twotwoTable[0] > 0) * gsl_cdf_hypergeometric_P(
+				(twotwoTable[0] - 1),
+				(twotwoTable[0] + twotwoTable[2]),
+				(twotwoTable[1] + twotwoTable[3]),
+				(twotwoTable[0] + twotwoTable[1])
+			    ) + 0.5 * gsl_ran_hypergeometric_pdf(
+				twotwoTable[0],
+				(twotwoTable[0] + twotwoTable[2]),
+				(twotwoTable[1] + twotwoTable[3]),
+				(twotwoTable[0] + twotwoTable[1])
+			    ) : gsl_cdf_hypergeometric_P(
+				(twotwoTable[0] - 1),
+				(twotwoTable[0] + twotwoTable[2]),
+				(twotwoTable[1] + twotwoTable[3]),
+				(twotwoTable[0] + twotwoTable[1])
+			    );
+			pvalue = 1.0 - pvalue;
+		} else {
+			double contingency_table[4] = { 0, 0, 0, 0 };
+			for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
+			bool ok = (
+					contingency_table[0] >= 0 &&
+					contingency_table[1] >= 0 &&
+					contingency_table[2] >= 0 &&
+					contingency_table[3] >= 0 &&
+					(contingency_table[0] + contingency_table[1] +
+					 contingency_table[2] + contingency_table[0] > 0)
+				 );
+			if (!ok) {
+				throw ValueError("Invalid input table for fexact.");
+			}
+			//stuff for Fisher's test
+			int nrow = 2;
+			int ncol = 2;
+			double expected = -1.0;
+			double percnt = 100.0;
+			double emin = 0.0;
+			double prt = 0.0;
+			int workspace = 300000;
+			fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pvalue, &workspace);
+		}
+		// end of fisher's test
+
+		if (pvalue <= m_alpha) {
+			// some tests can be siginficant.
+			shouldstop = false;
+		}
+		allPs[t-1] = pvalue;
+	}
+	// with this adaptive Fisher's approach the resulting p-values will not be uniformly distributed
+	vectorf validPs(0);
+	for (size_t i = 0; i < allPs.size(); ++i) {
+		if (allPs[i] > 0.0 && allPs[i] < 1.0) validPs.push_back(allPs[i]);
+	}
+	if (validPs.size() == 0) {
+		d.setStatistic(0.0);
+	} else {
+		d.setStatistic(-log(*min_element(validPs.begin(), validPs.end())));
+	}
+	if (shouldstop) {
+		// set the final p-value. This will prevent carrying out permutation tests
+		if (validPs.size() == 0) d.setPvalue(0.5);
+		else d.setPvalue(*min_element(validPs.begin(), validPs.end()));
+	}
+
+	return true;
+}
+
+
+bool CalphaTest::apply(AssoData & d)
+{
+	return true;
+}
+
+
+bool RareCoverTest::apply(AssoData & d)
+{
 	return true;
 }
 
@@ -1007,6 +1185,15 @@ bool AssoAlgorithm::apply(AssoData & d)
 
 bool FixedPermutator::apply(AssoData & d)
 {
+	if (d.pvalue().size()) {
+		// p-value has already been calculated
+		// this is for tests such as VT-Fisher
+		// where the tester is able to determine if there is need to pursue the permutation procedure
+		// after an initial calculation (will set p-value and statistic then to stop doing any permutation)
+		if (d.pvalue().front() > 0.0 && d.pvalue().front() < 1.0) {
+			return true;
+		}
+	}
 
 	RNG rng;
 	gsl_rng * gslr = rng.get();
@@ -1077,6 +1264,15 @@ bool FixedPermutator::apply(AssoData & d)
 
 bool VariablePermutator::apply(AssoData & d)
 {
+	if (d.pvalue().size()) {
+		// p-value has already been calculated
+		// this is for tests such as VT-Fisher
+		// where the tester is able to determine if there is need to pursue the permutation procedure
+		// after an initial calculation (will set p-value and statistic then to stop doing any permutation)		
+		if (d.pvalue().front() > 0.0 && d.pvalue().front() < 1.0) {
+			return true;
+		}
+	}
 	if (!d.hasVar("maf"))
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
 	vectorf & maf = d.getArrayVar("maf");
