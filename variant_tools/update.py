@@ -36,10 +36,8 @@ from multiprocessing import Process, Pipe
 
 from .project import AnnoDB, Project, Field, AnnoDBWriter, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, downloadFile, lineCount, \
-    DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
-    normalizeVariant, compressFile, SQL_KEYWORDS, extractField, openFile, \
-    consolidateFieldName
+from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
+    consolidateFieldName, runOptions
 from .importer import *
 
 #

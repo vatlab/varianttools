@@ -36,7 +36,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
-    normalizeVariant, compressFile, SQL_KEYWORDS, extractField
+    normalizeVariant, compressFile, SQL_KEYWORDS, extractField, runOptions
 from .importer import LineProcessor, TextReader
   
 class AnnoDBConfiger:
@@ -269,7 +269,7 @@ class AnnoDBConfiger:
             skipped_lines = 0
             lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, None, self.jobs - 1, self.encoding, self.logger)
+            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             all_records = 0
             skipped_records = 0
