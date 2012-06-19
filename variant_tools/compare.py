@@ -26,7 +26,7 @@
 
 import sys
 from .project import Project
-from .utils import ProgressBar 
+from .utils import ProgressBar, runOptions 
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
@@ -57,7 +57,7 @@ def compareTwoTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
     # display a progress bar during query. We therefore only use that faster method (3m38s
     # instead of 2m33s) in the case of -v0.
-    direct_query = proj.verbosity is not None and proj.verbosity.startswith('0')
+    direct_query = runOptions.verbosity is not None and runOptions.verbosity.startswith('0')
     cur = proj.db.cursor()
     variant_A = set()
     variant_B = set()

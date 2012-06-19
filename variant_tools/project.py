@@ -842,8 +842,6 @@ class Project:
             runOptions.cache_dir = self.loadProperty('__option_cache_dir')
         except:
             pass
-        # set global verbosity level and temporary directory
-        runOptions.verbosity=verbosity
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -859,13 +857,13 @@ class Project:
         if verbosity is None and not new:
             # try to get saved verbosity level
             try:
-                self.verbosity = self.loadProperty('__option_verbosity')
+                verbosity = self.loadProperty('__option_verbosity')
             except:
-                self.verbosity = verbosity
-        else:
-            self.verbosity = verbosity
+                pass
+        # set global verbosity level and temporary directory
+        runOptions.verbosity=verbosity
         #
-        cout.setLevel(logging.INFO if self.verbosity is None else levels[self.verbosity[0]])
+        cout.setLevel(levels[runOptions.verbosity])
         cout.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
         self.logger.addHandler(cout)
         # output to a log file
@@ -903,7 +901,7 @@ class Project:
             # FIXME: I am saving passwd as clear text here...
             self.saveProperty('passwd', kwargs.get('passwd'))
             self.saveProperty('batch', kwargs.get('batch', 10000))
-            self.saveProperty('__option_verbosity', self.verbosity)
+            self.saveProperty('__option_verbosity', runOptions.verbosity)
             # turn to the real online engine
             self.logger.debug('Connecting to mysql server')
             self.db.commit()
@@ -926,7 +924,7 @@ class Project:
         self.saveProperty('engine', engine)
         self.saveProperty('version', self.version)
         self.saveProperty('batch', kwargs.get('batch', 10000))
-        self.saveProperty('__option_verbosity', self.verbosity)
+        self.saveProperty('__option_verbosity', runOptions.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)
