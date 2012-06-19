@@ -137,7 +137,8 @@ class RuntimeOptions(object):
             self._cache_dir = path
         try:
             if not os.path.isdir(self._cache_dir):
-                os.mkdir(self._cache_dir)
+                print('Creating cache directory {}'.format(self._cache_dir))
+                os.makedirs(self._cache_dir)
         except:
             self._cache_dir = tempfile.mkdtemp() 
             print('Failed to create cache directory. Using {} instead'.format(self._cache_dir))

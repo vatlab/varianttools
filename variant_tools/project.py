@@ -834,15 +834,16 @@ class Project:
         self.version = VTOOLS_VERSION
         #
         # create a temporary directory
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         try:
-            if not os.path.isdir('cache'):
-                os.mkdir('cache')
-            self.temp_dir = 'cache'
+            # this might not exist becaues the project can be new and do not have the
+            # project table
+            runOptions.cache_dir = self.loadProperty('__option_cache_dir')
         except:
-            self.temp_dir = tempfile.mkdtemp()
+            pass
         # set global verbosity level and temporary directory
         runOptions.verbosity=verbosity
-        runOptions.cache_dir=self.temp_dir
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -858,8 +859,6 @@ class Project:
         if verbosity is None and not new:
             # try to get saved verbosity level
             try:
-                self.db = DatabaseEngine()
-                self.db.connect(self.proj_file)
                 self.verbosity = self.loadProperty('__option_verbosity')
             except:
                 self.verbosity = verbosity
@@ -1060,8 +1059,6 @@ class Project:
     def close(self):
         '''Write everything to disk...'''
         self.db.commit()
-        if self.temp_dir != 'cache' and os.path.isdir(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
         
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''
@@ -2850,7 +2847,7 @@ def init(args):
                 proj = Project(verbosity='0', verify=False)
                 proj.remove()
             except:
-                pass
+                print('Failed to remove project. Please manually remove *.proj files.')
         # create a new project
         #
         # args.batch is temporarily removed to keep interface clean

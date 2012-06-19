@@ -1701,7 +1701,7 @@ class Importer:
             return
         # we need to run lift over to convert coordinates before importing data.
         tool = LiftOverTool(self.proj)
-        to_be_mapped = os.path.join(self.proj.temp_dir, 'var_in.bed')
+        to_be_mapped = os.path.join(runOptions.cache_dir, 'var_in.bed')
         loci_count = 0
         with open(to_be_mapped, 'w') as output:
             for key in self.variantIndex:

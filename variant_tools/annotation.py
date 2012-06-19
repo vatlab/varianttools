@@ -217,7 +217,7 @@ class AnnoDBConfiger:
                 db = DababaseEngine(engine='mysql', user=user, passwd=password)
                 cur = db.cursor()
                 res = db.execute(query)
-                filename = os.path.join(self.proj.temp_dir, '{}_sql.txt'.format(self.name))
+                filename = os.path.join(runOptions.cache_dir, '{}_sql.txt'.format(self.name))
                 with open(filename, 'w') as output:
                     for rec in res:
                         output.write('{}\n'.format(','.join([str(x) for x in rec])))
@@ -237,8 +237,8 @@ class AnnoDBConfiger:
             return [tempFile]
         # if zip file?
         bundle = zipfile.ZipFile(tempFile)
-        bundle.extractall(self.proj.temp_dir)
-        return [os.path.join(self.proj.temp_dir, name) for name in bundle.namelist()]
+        bundle.extractall(runOptions.cache_dir)
+        return [os.path.join(runOptions.cache_dir, name) for name in bundle.namelist()]
     
     def importTxtRecords(self, db, source_files):
         #
