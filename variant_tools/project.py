@@ -42,8 +42,8 @@ import re
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
-from .utils import DatabaseEngine, ProgressBar, setOptions, SQL_KEYWORDS, delayedAction, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, getCommandLine
+from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, getCommandLine, runOptions
 
 
 # define a field type
@@ -841,7 +841,8 @@ class Project:
         except:
             self.temp_dir = tempfile.mkdtemp()
         # set global verbosity level and temporary directory
-        setOptions(verbosity=verbosity, temp_dir=self.temp_dir)
+        runOptins.verbosity=verbosity
+        runOptions.cache_dir=self.temp_dir
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -960,7 +961,7 @@ class Project:
             # the system default will be used.
             pragma = self.loadProperty('sqlite_pragma', 'None')
             try:
-                setOptions(sqlite_pragma=eval(pragma))
+                runOptions.sqlite_pragma=pragma
             except:
                 self.logger.warning('Failed to set sqlite pragma "{}"'.format(pragma))
             # pass things like batch ... and re-connect
@@ -971,7 +972,7 @@ class Project:
         inor = self.loadProperty('__option_import_num_of_readers', None)
         if inor is not None:
             try:  # int() might fail
-                setOptions(import_num_of_readers=int(inor))
+                runOptions.import_num_of_readers=inor
             except:
                 self.logger.warning('Failed to set option import_num_of_readers {}'.format(inor))
         #

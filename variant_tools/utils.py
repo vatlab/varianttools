@@ -134,15 +134,8 @@ class RuntimeOptions(object):
     #
     cache_dir = property(lambda self: self._cache_dir, _set_cache_dir)
 
+# the singleton object of RuntimeOptions
 runOptions = RuntimeOptions()
-
-def setOptions(verbosity=None, command_line='', sqlite_pragma=None,
-    import_num_of_readers=None, temp_dir=None):
-    runOptions.verbosity = verbosity
-    runOptions.command_line = command_line
-    runOptions.sqlite_pragma = sqlite_pragma
-    runOptions.cache_path = temp_dir
-    runOptions.import_num_of_readers = import_num_of_readers
 
 SQL_KEYWORDS = set([
     'ADD', 'ALL', 'ALTER', 'ANALYZE', 'AND', 'AS', 'ASC', 'ASENSITIVE', 'BEFORE',

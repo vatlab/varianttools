@@ -1674,7 +1674,7 @@ class Importer:
         # other threads will handle input
         # getNew=True so the reader only read variants not in variantIndex
         reader = TextReader(self.processor, input_filename, self.variantIndex, True, 
-            runOptions['import_num_of_readers'], self.encoding, self.logger)
+            runOptions.import_num_of_readers, self.encoding, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
