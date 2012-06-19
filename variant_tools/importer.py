@@ -1301,7 +1301,6 @@ class GenotypeCopier(Process):
                 start_copy_time = time.time()
                 # get parameters
                 self._copySamples()
-                self.db.commit()
                 # set the status of the item to be copied (4)
                 self.status.set(item[0], 4)
                 end_copy_time = time.time()
@@ -1334,6 +1333,7 @@ class GenotypeCopier(Process):
         for count, ID in enumerate(self.sample_ids):
             query = 'INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0};'.format(ID)
             cur.execute(query)
+            self.db.commit()
             # update progress
             self.copied_samples.value += 1
         self.db.detach('__from')
