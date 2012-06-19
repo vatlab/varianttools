@@ -46,11 +46,9 @@ from variant_tools import exporter
 from variant_tools import association
 
 def addCommonArgs(parser):
-    parser.add_argument('-v', '--verbosity', metavar='VERBOSITY',
+    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
         help='''Output error and warning (0), info (1) and debug (2) information
             to standard output (default to 1).'''),
-    #parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
-    #    help='''Allow at most N concurrent jobs.''')
 
 if __name__ == '__main__':
     #
