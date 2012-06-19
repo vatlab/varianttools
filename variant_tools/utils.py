@@ -67,7 +67,7 @@ class RuntimeOptions(object):
         self.persistent_options = [
             'logfile_verbosity',
             'verbosity',
-            'pragma',
+            'sqlite_pragma',
             'import_num_of_readers',
             'cache_dir'
         ]
@@ -103,9 +103,18 @@ class RuntimeOptions(object):
     #
     # attribute pragma
     #
-    def _set_sqlite_pragma(self, p):
-        if p is not None:
-            self._sqlite_pragma = eval(p)
+    def _set_sqlite_pragma(self, pragma):
+        if pragma is None:
+            return
+        try:
+            p = pragma.split(',')
+            #
+            for item in p:
+                if '=' not in str(item):
+                    print('Invalid pragma {}'.format(item))
+            self._sqlite_pragma = p
+        except:
+            print('Invalid pragma {}'.format(pragma))
     #
     sqlite_pragma = property(lambda self: self._sqlite_pragma, _set_sqlite_pragma)
     #

@@ -841,7 +841,7 @@ class Project:
         except:
             self.temp_dir = tempfile.mkdtemp()
         # set global verbosity level and temporary directory
-        runOptins.verbosity=verbosity
+        runOptions.verbosity=verbosity
         runOptions.cache_dir=self.temp_dir
         #
         # create a logger
@@ -959,11 +959,7 @@ class Project:
         else: 
             # pragma, set to None if the key does not exist. In this case
             # the system default will be used.
-            pragma = self.loadProperty('sqlite_pragma', 'None')
-            try:
-                runOptions.sqlite_pragma=pragma
-            except:
-                self.logger.warning('Failed to set sqlite pragma "{}"'.format(pragma))
+            runOptions.sqlite_pragma = self.loadProperty('sqlite_pragma', None)
             # pass things like batch ... and re-connect
             # runOptions['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
@@ -1639,12 +1635,10 @@ class Project:
         info =  'Project name:                {}\n'.format(self.name)
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
-        info += 'Database engine:             {}\n'.format(self.db.describeEngine())
+        info += 'Database engine:             {}\n'.format(self.db.engine)
         #
         # list all runtime options as (name, val) pairs
-        opts = [(x[9:], self.loadProperty(x, None)) for x in [
-            '__option_import_num_of_readers',
-        ]]
+        opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in runOptions.persistent_options]
         info += 'Runtime options:             {}\n'.format(
             ', '.join(['{}={}'.format(name, val) for name,val in opts if val is not None]))
         info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
@@ -3270,13 +3264,6 @@ def adminArguments(parser):
         help='''Change table NAME to a NEW_NAME.''')
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
-    db_config = parser.add_argument_group('Fine-tune database operations')
-    db_config.add_argument('--pragma', nargs='*', metavar='PRAGMA',
-        help='''SQLITE pragma that will be set for all sqlite connections. For example,
-        'synchronous=OFF' could greatly improve the performance of certain operations
-        at the cost of larger risk of data loss in the event of failure. Setting this
-        option without parameter will clear existing settings. Wrong pragmas will be
-        ignored without warning.''')
     options = parser.add_argument_group('Set values for some various internal options.')
     options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
@@ -3321,16 +3308,13 @@ def admin(args):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(args.describe_table[0], args.describe_table[1])
                 proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
-            elif args.pragma is not None:
-                proj.saveProperty('sqlite_pragma', str(args.pragma))
-                proj.logger.info('Sqlite pragma is set to "{}"'.format(', '.join(args.pragma)))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
                         raise ValueError('Runtime option should be specified as opt=value')
                     opt, value = option.split('=', 1)
-                    if opt not in ['import_num_of_readers']:
-                        raise ValueError('Option {} is not currently supported.'.format(opt))
+                    if opt not in runOptions.persistent_options:
+                        raise ValueError('Only options {} are currently supported.'.format(', '.join(runOptions.persistent_options)))
                     proj.saveProperty('__option_{}'.format(opt), value)
                     proj.logger.info('Option {} is set to {}'.format(opt, value))
             else:
