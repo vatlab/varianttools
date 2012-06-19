@@ -54,16 +54,95 @@ if sys.version_info.major == 2:
 else:
     import vt_sqlite3_py3 as sqlite3
 
-runOptions = {
-    'verbosity': '1',
-    'temp_dir': None,
-    # this will be the raw command that will be saved to log file
-    'command_line': '',
-    # default sqlite pragma
-    'sqlite_pragma': ['synchronous=OFF', 'default_cache_size=2000'],
-    # number of processes used for reader under multi-processing mode
-    'import_num_of_readers': 2
-}
+class RuntimeOptions(object):
+    # the following make RuntimeOptions a singleton class
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(RuntimeOptions, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        # these options could be set persistently
+        self.persistent_options = [
+            'logfile_verbosity',
+            'verbosity',
+            'pragma',
+            'import_num_of_readers',
+            'cache_dir'
+        ]
+        # this will be the raw command that will be saved to log file
+        self._command_line = ''
+        #
+        self._logfile_verbosity = '2'
+        self._verbosity = '1'
+        # default sqlite pragma
+        self._sqlite_pragma = ['synchronous=OFF', 'default_cache_size=2000']
+        # number of processes used for reader under multi-processing mode
+        self._import_num_of_readers = 2
+        # path to the project cache
+        self._cache_dir = 'cache'
+    #
+    # attribute command line
+    #
+    #
+    # attribute logfile_verbosity
+    #
+    def _set_logfile_verbosity(self, v):
+        self._logfile_verbosity = v
+    #
+    logfile_verbosity = property(lambda self: self._logfile_verbosity, _set_logfile_verbosity)
+    #
+    #
+    # attribute verbosity
+    #
+    def _set_verbosity(self, v):
+        self._verbosity = v
+    #
+    verbosity = property(lambda self: self._verbosity, _set_verbosity)
+    #
+    # attribute pragma
+    #
+    def _set_sqlite_pragma(self, p):
+        if p is not None:
+            self._sqlite_pragma = eval(p)
+    #
+    sqlite_pragma = property(lambda self: self._sqlite_pragma, _set_sqlite_pragma)
+    #
+    # attribute import_num_of_readers
+    #
+    def _set_import_num_of_readers(self, n):
+        try:
+            if n is not None:
+                self._import_num_of_readers = int(n)
+        except:
+            print('Failed to set number of readers to {}'.format())
+    #
+    import_num_of_readers = property(lambda self: self._import_num_of_readers, _set_import_num_of_readers)
+    #
+    # attribute cache_dir
+    #
+    def _set_cache_dir(self, path=None):
+        if path is not None:
+            self._cache_dir = path
+        try:
+            if not os.path.isdir(self._cache_dir):
+                os.mkdir(self._cache_dir)
+        except:
+            self._cache_dir = tempfile.mkdtemp() 
+            print('Failed to create cache directory. Using {} instead'.format(self._cache_dir))
+    #
+    cache_dir = property(lambda self: self._cache_dir, _set_cache_dir)
+
+runOptions = RuntimeOptions()
+
+def setOptions(verbosity=None, command_line='', sqlite_pragma=None,
+    import_num_of_readers=None, temp_dir=None):
+    runOptions.verbosity = verbosity
+    runOptions.command_line = command_line
+    runOptions.sqlite_pragma = sqlite_pragma
+    runOptions.cache_path = temp_dir
+    runOptions.import_num_of_readers = import_num_of_readers
 
 SQL_KEYWORDS = set([
     'ADD', 'ALL', 'ALTER', 'ANALYZE', 'AND', 'AS', 'ASC', 'ASENSITIVE', 'BEFORE',
@@ -110,22 +189,8 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
-def setOptions(verbosity=None, temp_dir=None, command_line='', sqlite_pragma=None,
-    import_num_of_readers=None):
-    if verbosity is not None:
-        runOptions['verbosity'] = verbosity[0]
-    if temp_dir:
-        runOptions['temp_dir'] = temp_dir
-    if command_line:
-        runOptions['command_line'] = command_line
-    if sqlite_pragma is not None:
-        runOptions['sqlite_pragma'] = sqlite_pragma
-    if import_num_of_readers is not None:
-        runOptions['import_num_of_readers'] = import_num_of_readers
-
-
 def getCommandLine():
-    return runOptions['command_line']
+    return runOptions.command_line
 
 #
 # Utility functions
@@ -265,7 +330,7 @@ except ImportError:
 class ProgressBar:
     '''A text-based progress bar'''
     def __init__(self, message, totalCount = None, initCount=0):
-        if runOptions['verbosity'] == '0':
+        if runOptions.verbosity == '0':
             self.update = self.empty
             self.curlUpdate = self.empty
             self.urllibUpdate = self.empty
@@ -445,8 +510,8 @@ def decompressIfNeeded(filename, inplace=True):
 def downloadFile(URL, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
-    dest = os.path.join(dest_dir if dest_dir else runOptions['temp_dir'], filename)
-    if runOptions['temp_dir'] == 'cache' and os.path.isfile(dest):
+    dest = os.path.join(dest_dir if dest_dir else runOptions.cache_path, filename)
+    if os.path.isfile(dest):
         return dest
     # use libcurl? Recommended but not always available
     try:
@@ -555,10 +620,10 @@ class DatabaseEngine:
     def describeEngine(self):
         if self.engine == 'mysql':
             return 'mysql'
-        elif runOptions['sqlite_pragma'] == []:
+        elif runOptions.sqlite_pragma == []:
             return 'sqlite (no pragma)'
         else:
-            return 'sqlite (with pragma {})'.format(', '.join(runOptions['sqlite_pragma']))
+            return 'sqlite (with pragma {})'.format(', '.join(runOptions.sqlite_pragma))
     #
     # Connection
     #
@@ -584,7 +649,7 @@ class DatabaseEngine:
             # set default cache size to a larger number to improve query performance
             if not readonly:
                 cur = self.database.cursor()
-                for pragma in runOptions['sqlite_pragma']:
+                for pragma in runOptions.sqlite_pragma:
                     # No error message will be produced for wrong pragma
                     # but we may have syntax error.
                     try:
