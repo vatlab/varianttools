@@ -163,6 +163,41 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 	return u;
 }
 
+double chisq2X2stat(const std::vector<double> & regressors, const std::vector<double> & responses)
+{
+	//! - 2 by 2 Chisq test
+	double A0 = 0.0, A1 = 0.0, U0 = 0.0, U1 = 0.0;
+	for (size_t i = 0; i < regressors.size(); ++i) {
+		if (fEqual(regressors[i], 0.0) && fEqual(responses[i], 0.0))
+			U0 += 1.0;
+		else if (fEqual(regressors[i], 0.0) && fEqual(responses[i], 1.0))
+			A0 += 1.0;
+		else if (fEqual(regressors[i], 1.0) && fEqual(responses[i], 0.0))
+			U1 += 1.0;
+		else if (fEqual(regressors[i], 1.0) && fEqual(responses[i], 1.0))
+			A1 += 1.0;
+		else {
+			return -9;
+		}
+	}     // collect the contigency table
+
+	double Aobs = A0 + A1;
+	double Uobs = U0 + U1;
+	double Tobs = Aobs + Uobs;
+	double Obs0 = A0 + U0;
+	double Obs1 = A1 + U1;
+
+	double EA0 = (Aobs * Obs0) / Tobs; if (EA0 == 0) EA0 = 0.05;
+	double EA1 = (Aobs * Obs1) / Tobs; if (EA1 == 0) EA1 = 0.05;
+	double EU0 = (Uobs * Obs0) / Tobs; if (EU0 == 0) EU0 = 0.05;
+	double EU1 = (Uobs * Obs1) / Tobs; if (EU1 == 0) EU1 = 0.05;
+
+	double statistic = ( (A0 - EA0) * (A0 - EA0) ) / EA0
+	                   + ( (A1 - EA1) * (A1 - EA1) ) / EA1
+	                   + ( (U0 - EU0) * (U0 - EU0) ) / EU0
+	                   + ( (U1 - EU1) * (U1 - EU1) ) / EU1;
+	return statistic;
+}
 
 
 namespace vtools {

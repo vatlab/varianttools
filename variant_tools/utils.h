@@ -46,6 +46,8 @@ bool fEqual(double a, double b);
 void fRound(double & myValue, double PRECISION);
 // mannwhitney test
 double Mann_Whitneyu(double *, int, double *, int);
+// 2X2 table chisq statistic
+double chisq2X2stat(const std::vector<double> & regressors, const std::vector<double> & responses);
 
 // pairwise sum of vector elements. can be used in std::accumulate for vector2f objects
 struct VPlus

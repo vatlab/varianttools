@@ -777,6 +777,34 @@ public:
 
 };
 
+// The original statistic in Price 2010 AJHG
+class VTTest : public BaseAction
+{
+public:
+	VTTest(unsigned alternative = 1) :
+		BaseAction(), m_sided(alternative)
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new VTTest(*this);
+	}
+
+
+	bool apply(AssoData & d);
+
+	std::string name()
+	{
+		return "VTTest";
+	}
+
+
+private:
+	unsigned m_sided;
+};
+
 
 class VTFisher : public BaseAction
 {
@@ -803,7 +831,7 @@ public:
 
 private:
 	unsigned m_sided;
-    bool m_midp;
+	bool m_midp;
 	double m_alpha;
 };
 
@@ -811,8 +839,8 @@ private:
 class CalphaTest : public BaseAction
 {
 public:
-	CalphaTest(unsigned alternative = 1) :
-		BaseAction(), m_sided(alternative)
+	CalphaTest(bool permutation = false) :
+		BaseAction(), m_permutation(permutation)
 	{
 	}
 
@@ -832,15 +860,16 @@ public:
 
 
 private:
-	unsigned m_sided;
+	bool m_permutation;
+
 };
 
 
 class RareCoverTest : public BaseAction
 {
 public:
-	RareCoverTest(unsigned alternative = 1) :
-		BaseAction(), m_sided(alternative)
+	RareCoverTest(unsigned alternative = 1, double difQ = 0.5) :
+		BaseAction(), m_sided(alternative), m_difQ(difQ)
 	{
 	}
 
@@ -861,6 +890,9 @@ public:
 
 private:
 	unsigned m_sided;
+	//!- the cut-off to use for the "heuristic greedy algorithm". = 0.5 as suggested by the paper
+	// FIXME it might not be proper for one-sided test with -logP from Fisher's test as statistic
+	double m_difQ;
 };
 
 

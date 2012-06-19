@@ -502,13 +502,13 @@ bool Fisher2X2::apply(AssoData & d)
 		double contingency_table[4] = { 0, 0, 0, 0 };
 		for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
 		bool ok = (
-				contingency_table[0] >= 0 &&
-				contingency_table[1] >= 0 &&
-				contingency_table[2] >= 0 &&
-				contingency_table[3] >= 0 &&
-				(contingency_table[0] + contingency_table[1] +
-				 contingency_table[2] + contingency_table[0] > 0)
-			  );
+		           contingency_table[0] >= 0 &&
+		           contingency_table[1] >= 0 &&
+		           contingency_table[2] >= 0 &&
+		           contingency_table[3] >= 0 &&
+		           (contingency_table[0] + contingency_table[1] +
+		            contingency_table[2] + contingency_table[0] > 0)
+		           );
 		if (!ok) {
 			throw ValueError("Invalid input table for fexact.");
 		}
@@ -927,7 +927,7 @@ bool FindVariantPattern::apply(AssoData & d)
 	for (size_t j = 0; j < xdat.front().size(); ++j) {
 		for (size_t i = 0; i < xdat.size(); ++i) {
 			if (xdat[i][j] == xdat[i][j]) {
-				vnum[j] += (int) xdat[i][j];
+				vnum[j] += (int)xdat[i][j];
 			}
 		}
 	}
@@ -943,6 +943,54 @@ bool FindVariantPattern::apply(AssoData & d)
 		vnum.insert(vnum.begin(), 0);
 	}
 	d.setVar("uniqVPattern", vnum);
+	return true;
+}
+
+
+bool VTTest::apply(AssoData & d)
+{
+	// VT method as in Price et al 2010
+	//! - Define <b> 'allZs' </b>, a vector of the Z scores computed under different thresholds
+	matrixf & xdat = d.raw_genotype();
+	vectorf & ydat = d.phenotype();
+	double ybar = d.getDoubleVar("ybar");
+	vectori & vnum = d.getIntArrayVar("allVPattern");
+	vectori & uniqv = d.getIntArrayVar("uniqVPattern");
+
+	vectorf allZs(uniqv.size() - 1);
+	vectorf zIa(xdat.size(), 0.0), zIb(xdat.size(), 0.0);
+
+	//! - Iterate the following for all thresholds:
+	for (size_t t = 1; t < uniqv.size(); ++t) {
+		//! - - Record the index of loci that can be added at the new threshold criteria
+		vectori idxesAdding(0);
+		for (size_t s = 0; s < vnum.size(); ++s) {
+			if (vnum[s] > uniqv[t - 1] && vnum[s] <= uniqv[t])
+				idxesAdding.push_back(s);
+		}
+
+		//!- - For loci passing the threshold criteria, implement Price paper page 3 z(T) formula
+		for (size_t i = 0; i < xdat.size(); ++i) {
+			double zIai = 0.0, zIbi = 0.0;
+			for (size_t j = 0; j < idxesAdding.size(); ++j) {
+				size_t locIdx = (size_t)idxesAdding[j];
+				zIai += (xdat[i][locIdx] > 0.0) ? (ydat[i] - ybar) * xdat[i][locIdx] : 0.0;
+				zIbi += (xdat[i][locIdx] > 0.0) ? xdat[i][locIdx] * xdat[i][locIdx] : 0.0;
+			}
+			zIa[i] += zIai;
+			zIb[i] += zIbi;
+		}
+		//! - Now each element in <b> 'allZs' </b> is z(T) for different thresholds
+		allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt(std::accumulate(zIb.begin(), zIb.end(), 0.0) );
+	}
+	//! - Compute zmax, the statistic; square it for two-sided test
+	if (m_sided == 2) {
+		for (size_t i = 0; i < allZs.size(); ++i) {
+			allZs[i] = allZs[i] * allZs[i];
+		}
+	}
+	d.setStatistic(*max_element(allZs.begin(), allZs.end()));
+
 	return true;
 }
 
@@ -1025,13 +1073,13 @@ bool VTFisher::apply(AssoData & d)
 			double contingency_table[4] = { 0, 0, 0, 0 };
 			for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
 			bool ok = (
-					contingency_table[0] >= 0 &&
-					contingency_table[1] >= 0 &&
-					contingency_table[2] >= 0 &&
-					contingency_table[3] >= 0 &&
-					(contingency_table[0] + contingency_table[1] +
-					 contingency_table[2] + contingency_table[0] > 0)
-				 );
+			           contingency_table[0] >= 0 &&
+			           contingency_table[1] >= 0 &&
+			           contingency_table[2] >= 0 &&
+			           contingency_table[3] >= 0 &&
+			           (contingency_table[0] + contingency_table[1] +
+			            contingency_table[2] + contingency_table[0] > 0)
+			           );
 			if (!ok) {
 				throw ValueError("Invalid input table for fexact.");
 			}
@@ -1051,7 +1099,7 @@ bool VTFisher::apply(AssoData & d)
 			// some tests can be siginficant.
 			shouldstop = false;
 		}
-		allPs[t-1] = pvalue;
+		allPs[t - 1] = pvalue;
 	}
 	// with this adaptive Fisher's approach the resulting p-values will not be uniformly distributed
 	vectorf validPs(0);
@@ -1075,13 +1123,164 @@ bool VTFisher::apply(AssoData & d)
 
 bool CalphaTest::apply(AssoData & d)
 {
+
+	/*! * the c-alpha Statistic: sum of the std. error of variant counts in cases <br>
+	 * *  Two-sided test, claims to be robust against protective mutations. <br>
+	 * * See <em> Ben. Neale et al. 2011 PLoS Genet. </em> <br><br>
+	 * * Implementation:
+	 */
+	vectorf & ydat = d.phenotype();
+	matrixf & xdat = d.raw_genotype();
+	double phat = d.getDoubleVar("ybar");
+	//
+	double calpT = 0.0;
+	double calpV = 0.0;
+	int singletonAll = 0;
+	int singletonCases = 0;
+	bool isEmptyData = true;
+
+	for (size_t j = 0; j < xdat.front().size(); ++j) {
+
+		//! - Count number of variants in cases/controls at a locus
+		int countcs = 0;
+		int countcn = 0;
+		for (size_t i = 0; i < ydat.size(); ++i) {
+			if (fEqual(ydat[i], 0)) countcn += (xdat[i][j] > 0.0) ? (int)xdat[i][j] : 0;
+			else countcs += (xdat[i][j] > 0.0) ? (int)xdat[i][j] : 0;
+		}
+		//! - the c-alpha method implementation
+		int ni = countcs + countcn;
+		if (ni < 2) {
+			singletonAll += ni;
+			singletonCases += countcs;
+			continue;
+		}else {
+			isEmptyData = false;
+		}
+		//!- * skip singletons
+		double niv = ni * phat * (1 - phat);
+		calpT += (countcs - ni * phat) * (countcs - ni * phat) - niv;
+		for (int u = 0; u <= ni; ++u) {
+			double tmess = (u - ni * phat) * (u - ni * phat) - niv;
+			calpV += tmess * tmess * gsl_ran_binomial_pdf(u, phat, ni);
+		}
+	}
+
+	if (singletonAll >= 2) {
+		isEmptyData = false;
+		double niv = singletonAll * phat * (1 - phat);
+		calpT += (singletonCases - singletonAll * phat) * (singletonCases - singletonAll * phat) - niv;
+		for (int u = 0; u <= singletonAll; ++u) {
+			double tmess = (u - singletonAll * phat) * (u - singletonAll * phat) - niv;
+			calpV += tmess * tmess * gsl_ran_binomial_pdf(u, phat, singletonAll);
+		}
+	} else ;
+	//!- * bin singletons
+	if (isEmptyData) {
+		throw ValueError("Cannot perform c-alpha test on data with all singletons");
+	}
+	//!- c-alpha statistic
+	if (m_permutation) {
+		d.setStatistic(calpT / sqrt(calpV));
+	} else {
+		d.setStatistic(calpT);
+		d.setSE(sqrt(calpV));
+	}
 	return true;
 }
 
 
 bool RareCoverTest::apply(AssoData & d)
 {
+	// RareCover method, 2010 PLoS CompBio
+	vectorf & ydat = d.phenotype();
+	matrixf & xdat = d.raw_genotype();
+
+	if (!d.hasVar("polymophic_index")) {
+		vectorf & mafs = d.getArrayVar("maf");
+		//!- Index of loci that are observed to be polymophic
+		vectori vntVct(0);
+		for (size_t j = 0; j < mafs.size(); ++j) {
+			if (mafs[j] > 0.0) vntVct.push_back(j + 1);
+		}
+		if (vntVct.size() == 0) {
+			throw ValueError("Input genotype matrix does not have a variant site");
+		} else {
+			d.setVar("polymophic_index", vntVct);
+		}
+	}
+	vectori vntNow = d.getIntArrayVar("polymophic_index");
+	//!- the current and the next statistics
+	double sCurr = 0.0, sNext = 0.0;
+	vectorf X(ydat.size(), 0.0);
+	//!- the current and the next genotype coding
+	vectorf XCurr(ydat.size(), 0.0);
+	do {
+		sCurr = sNext;
+		unsigned rmIdx = 0;
+		//!- the "test contributing" variant index, for the vntVct object
+		bool rmIdxFlag = false;
+		for (size_t t = 0; t < vntNow.size(); ++t) {
+
+			if (vntNow[t] == 0) continue;
+			size_t iIdx = vntNow[t] - 1;
+			//!- the index of a variant site
+			for (size_t i = 0; i < ydat.size(); ++i) {
+				X[i] = (XCurr[i] + xdat[i][iIdx] > 0.0) ? 1.0 : 0.0;
+			}
+			double statistic;
+			//! - 2 by 2 one-sided Fisher's test
+			if (m_sided == 1) {
+				// 2X2 Fisher's test onesided, no midp
+				vectori twotwoTable(4, 0);
+				for (size_t i = 0; i < ydat.size(); ++i) {
+					if (fEqual(ydat[i], 1.0)) {
+						if (X[i] > 0.0) twotwoTable[0] += 1;
+						else twotwoTable[1] += 1;
+					}else {
+						if (X[i] > 0.0) twotwoTable[2] += 1;
+						else twotwoTable[3] += 1;
+					}
+				}
+				double pvalue = 1.0 - gsl_cdf_hypergeometric_P(
+					(twotwoTable[0] - 1),
+					(twotwoTable[0] + twotwoTable[2]),
+					(twotwoTable[1] + twotwoTable[3]),
+					(twotwoTable[0] + twotwoTable[1])
+				    );
+
+				statistic = -1.0 * log(pvalue);
+			}
+			//! - 2 by 2 Chisq test
+			else {
+				statistic = chisq2X2stat(X, ydat);
+			}
+
+			if (statistic > sNext) {
+				sNext = statistic;
+				rmIdx = t;
+				rmIdxFlag = true;
+			} else continue;
+		}
+		//!- Now end up with a properly updated sNext statistic.
+		if (rmIdxFlag == false) {
+			// in this case, sNext is not updated, OK to break the loop.
+			break;
+		} else {
+			size_t rmVnt = vntNow[rmIdx] - 1;
+			//!- Update the genotype coding by adding in the contributing locus
+			for (size_t i = 0; i < ydat.size(); ++i) {
+				XCurr[i] = XCurr[i] + xdat[i][rmVnt];
+			}
+			//!- remove the contributing locus to avoid duplicated visit to it the next time.
+			vntNow[rmIdx] = 0;
+		}
+	} while (sNext - sCurr > m_difQ);
+
+	//!- Test statistic 'sNext'
+	d.setStatistic(sNext);
 	return true;
+
 }
 
 
@@ -1268,7 +1467,7 @@ bool VariablePermutator::apply(AssoData & d)
 		// p-value has already been calculated
 		// this is for tests such as VT-Fisher
 		// where the tester is able to determine if there is need to pursue the permutation procedure
-		// after an initial calculation (will set p-value and statistic then to stop doing any permutation)		
+		// after an initial calculation (will set p-value and statistic then to stop doing any permutation)
 		if (d.pvalue().front() > 0.0 && d.pvalue().front() < 1.0) {
 			return true;
 		}

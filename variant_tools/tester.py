@@ -777,8 +777,8 @@ class CaseCtrlBurdenTest(NullTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT_Fisher'], default='CMC',
-            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT_Fisher".
+        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT', 'VT_Fisher', 'RareCover', 'Calpha'], default='CMC',
+            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher".
             Default set to "CMC"''')
         parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -833,7 +833,8 @@ class CaseCtrlBurdenTest(NullTest):
                     t.WSSPvalue(self.alternative)
                     ])
             elif self.aggregation_theme == 'Calpha':
-                pass
+                algorithm.extend([t.CalphaTest(),
+                    t.GaussianPval(self.alternative)])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
 
@@ -896,11 +897,34 @@ class CaseCtrlBurdenTest(NullTest):
                         [t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
                         )
                 algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'VT':
+                algorithm.append(t.FindVariantPattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.VTTest(alternative=self.alternative)]
+                        )
+                algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RareCover':
-                pass
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.RareCoverTest(alternative=self.alternative, difQ = 0.5)]
+                        )
+                algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
-                pass
-
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        self.alternative,
+                        self.permutations,
+                        self.adaptive,
+                        [t.CalphaTest(permutation=True)]
+                        )
+                algorithm.append(a_permutationtest)
             else:
                 raise ValueError('Invalid permutation test {0}'.format(self.aggregation_theme))
         return algorithm
