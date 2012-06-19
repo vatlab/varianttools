@@ -860,7 +860,7 @@ class Project:
             try:
                 self.db = DatabaseEngine()
                 self.db.connect(self.proj_file)
-                self.verbosity = self.loadProperty('verbosity')
+                self.verbosity = self.loadProperty('__option_verbosity')
             except:
                 self.verbosity = verbosity
         else:
@@ -872,7 +872,7 @@ class Project:
         # output to a log file
         ch = logging.FileHandler(self.name + '.log', mode='w' if new else 'a')
         # NOTE: debug informaiton is always written to the log file
-        ch.setLevel(logging.DEBUG if self.verbosity is None or len(self.verbosity) == 1 else levels[self.verbosity[1]])
+        ch.setLevel(levels[runOptions.logfile_verbosity])
         ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
         self.logger.addHandler(ch)
         # start a new session
@@ -904,7 +904,7 @@ class Project:
             # FIXME: I am saving passwd as clear text here...
             self.saveProperty('passwd', kwargs.get('passwd'))
             self.saveProperty('batch', kwargs.get('batch', 10000))
-            self.saveProperty('verbosity', self.verbosity)
+            self.saveProperty('__option_verbosity', self.verbosity)
             # turn to the real online engine
             self.logger.debug('Connecting to mysql server')
             self.db.commit()
@@ -927,7 +927,7 @@ class Project:
         self.saveProperty('engine', engine)
         self.saveProperty('version', self.version)
         self.saveProperty('batch', kwargs.get('batch', 10000))
-        self.saveProperty('verbosity', self.verbosity)
+        self.saveProperty('__option_verbosity', self.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)

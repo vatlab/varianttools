@@ -89,7 +89,8 @@ class RuntimeOptions(object):
     # attribute logfile_verbosity
     #
     def _set_logfile_verbosity(self, v):
-        self._logfile_verbosity = v
+        if v in ['0', '1', '2']:
+            self._logfile_verbosity = v
     #
     logfile_verbosity = property(lambda self: self._logfile_verbosity, _set_logfile_verbosity)
     #
