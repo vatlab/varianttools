@@ -1116,7 +1116,7 @@ class ImportStatus:
         '''
         ret = None
         self.lock.acquire()
-        for item in self.tasks.keys():
+        for item in sorted(self.tasks.keys()):
             # only check for status 0 items
             if self.tasks[item][0] == 0 and item[0] in filelist:
                 self.tasks[item] = (1, self.tasks[item][1])
@@ -1141,7 +1141,7 @@ class ImportStatus:
         indicating whether or not the tables have been created.'''
         ret = None
         self.lock.acquire()
-        for item in self.tasks.keys():
+        for item in sorted(self.tasks.keys()):
             # only check for status 2 items
             if self.tasks[item][1] == 0:
                 self.tasks[item] = (self.tasks[item][0], 1)
