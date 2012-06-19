@@ -514,7 +514,7 @@ def decompressIfNeeded(filename, inplace=True):
 def downloadFile(URL, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
-    dest = os.path.join(dest_dir if dest_dir else runOptions.cache_path, filename)
+    dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
     if os.path.isfile(dest):
         return dest
     # use libcurl? Recommended but not always available

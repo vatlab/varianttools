@@ -1885,7 +1885,7 @@ class Importer:
                 if end_sample <= start_sample:
                     continue
                 # tell the processor do not import variant info, import part of the sample
-                tmp_file = os.path.join('cache', 'tmp_{}_{}_genotype.DB'.format(count, job))
+                tmp_file = os.path.join(runOptions.cache_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):

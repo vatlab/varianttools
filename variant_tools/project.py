@@ -304,7 +304,7 @@ class fileFMT:
             try:
                 fmt = downloadFile(url, quiet=True)
             except Exception as e:
-                raise ValueError('Failed to download format specification file {}.fmt'.format(name))
+                raise ValueError('Failed to download format specification file {}.fmt: {}'.format(name, e))
             self.name = name
             args = self.parseArgs(fmt, fmt_args)
             self.parseFMT(fmt, defaults=args)
