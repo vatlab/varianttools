@@ -972,7 +972,7 @@ class Project:
         else: 
             # pragma, set to None if the key does not exist. In this case
             # the system default will be used.
-            runOptions.sqlite_pragma = self.loadProperty('sqlite_pragma', None)
+            runOptions.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
             # pass things like batch ... and re-connect
             # runOptions['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
