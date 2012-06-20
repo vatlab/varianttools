@@ -74,9 +74,7 @@ class NullTest:
         self.data = data.clone()
 
     def calculate(self):
-        '''Calculate and return p-values. It can be either a single value
-        for all variants, or a list of p-values for each variant. Will print
-        data if NullTest is called'''
+        '''run an association test'''
         self.logger.info('No action is defined for NullTest')
         #self.logger.debug('Printing out group name, phenotypes, covariates and genotypes')
         #self.logger.debug(self.group)
@@ -102,9 +100,8 @@ class GroupStat(NullTest):
             )
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Group statistics calculator. This 'test'
-            is a statistics calculator based on the association-test framework. It is usually used
-            with other method to produce statistics for each testing group.''',
+        parser = argparse.ArgumentParser(description='''Group statistics calculator, usually is
+               used with other method to produce statistics for each association testing group.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='',
@@ -113,8 +110,8 @@ class GroupStat(NullTest):
         #
         # arguments that are used by this test
         parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+',
-            help='''Statistics to calculate, which can be number of variants in this group,
-                total sample size.''')
+            help='''Statistics to calculate for the group (currently avaiable statistics are number of variants
+                and total sample size).''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -127,21 +124,230 @@ class GroupStat(NullTest):
         res = []
         for field in self.fields:
             if field.name == 'num_variants':
-                # FIXME: this is inefficient because we do not have to create this object
-                # to count the number of variants
-                res.append(len(self.data.raw_genotype()[0]))
+                res.append(self.data.locicounts())
             elif field.name == 'sample_size':
-                # FIXME: this is inefficient because we do not have to create this object
-                # to count the number of variants
                 res.append(self.data.samplecounts())
         return res
 
-class GLMBurdenTest(NullTest):
-    '''Generalized Linear regression test on collapsed genotypes within an association testing group'''
+#
+# single covariate case/ctrl burden tests
+# implemented as they were originally published
+#
+
+class CaseCtrlBurdenTest(NullTest):
+    '''Single covariate case/ctrl burden test on aggregated genotypes within an association testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression, this is estimate of effect size for x'), 
+                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='Test statistic.'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        if self.permutations > 0:
+            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+        #
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        self.algorithm = self._determine_algorithm()
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Single covariate case/ctrl burden test including CMC, WSS, VT, VT_Fisher, KBAC, RBT and aSum.
+            p-value is calculated using exact/asymptotic distributions or permutation, depending on the input method. If --group_by
+            option is specified, it will collapse the variants within a group into a generic genotype score''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='SingleGeneCaseCtrlBT',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT', 'VT_Fisher', 'RareCover', 'Calpha'], default='CMC',
+            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher".
+            Default set to "CMC"''')
+        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--midp', action='store_true',
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC and VT_Fisher.''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+    def _determine_algorithm(self):
+        self.extern_weight = []
+        algorithm = t.AssoAlgorithm([
+            # code genotype matrix by MOI being 0 1 or 2
+            t.CodeXByMOI(),
+            # calculate sample MAF
+            t.SetMaf(),
+            # filter out variants having MAF > mafupper or MAF <= maflower
+            t.SetSites(self.mafupper, self.maflower)
+            ])
+
+        # Now write implementation of each association methods separately.
+        # association testing using analytic p-value
+        if self.permutations == 0:
+            if self.aggregation_theme == 'CMC':
+                algorithm.extend([t.BinToX(),
+                    t.Fisher2X2(self.alternative, self.midp)])
+            elif self.aggregation_theme == 'WSS':
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        1000,
+                        1,
+                        [t.WeightedGenotypeTester(
+                            self.alternative,
+                            self.extern_weight,
+                            [t.BrowningWeight(self.alternative),
+                            t.MannWhitneyu(alternative=self.alternative, store=True)]
+                            )]
+                        )
+                algorithm.extend([
+                    a_permutationtest,
+                    t.WSSPvalue(self.alternative)
+                    ])
+            elif self.aggregation_theme == 'Calpha':
+                # FIXME: have to throw a warning if self.alternative is set to 1
+                algorithm.extend([t.CalphaTest(),
+                    t.GaussianPval(1)])
+            else:
+                raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
+
+        # association testing using permutation-based p-value
+        else:
+            if self.aggregation_theme == 'WSS':
+                # FIXME: have to throw a warning if self.alternative is set to 2
+                # the rank test version of WSS only supports one-sided test
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.WeightedGenotypeTester(
+                            1,
+                            self.extern_weight,
+                            [t.BrowningWeight(1),
+                            t.MannWhitneyu()]
+                            )]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'KBAC':
+                algorithm.append(t.FindGenotypePattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.KBACtest(alternative=self.alternative, weightOnly=False)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'RBT':
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.RBTtest(self.alternative, weightOnly=False)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'aSum':
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.AdaptiveRvSum(),
+                            t.SimpleLogisticRegression()]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'VT_Fisher':
+                algorithm.extend([
+                    t.FindVariantPattern(),
+                    t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)
+                    ])
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'VT':
+                algorithm.append(t.FindVariantPattern())
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.VTTest(alternative=self.alternative)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'RareCover':
+                # FIXME: have to throw a warning if self.alternative is set to 1
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.RareCoverTest(difQ = 0.5)]
+                        )
+                algorithm.append(a_permutationtest)
+            elif self.aggregation_theme == 'Calpha':
+                # FIXME: have to throw a warning if self.alternative is set to 1
+                a_permutationtest = t.FixedPermutator(
+                        'Y',
+                        1,
+                        self.permutations,
+                        self.adaptive,
+                        [t.CalphaTest(permutation=True)]
+                        )
+                algorithm.append(a_permutationtest)
+            else:
+                raise ValueError('Invalid permutation test {0}'.format(self.aggregation_theme))
+        return algorithm
+
+
+    def calculate(self):
+        self.data.countCaseCtrl()
+        self.algorithm.apply(self.data)
+        pvalues = self.data.pvalue()
+        statistics = self.data.statistic()
+        se = self.data.se()
+        res = [self.data.samplecounts()]
+        for (x, y, z) in zip(statistics, pvalues, se):
+            res.append(x)
+            res.append(y)
+            if self.permutations > 0:
+                # actual number of permutations
+                if math.isnan(z): res.append(z)
+                else: res.append(int(z))
+        return res
+
+
+#
+# regression framework for some burden tests
+# modified extended tests on the basis of their original publications
+# to be able to take advantage of regression analysis
+# while maintaining the spirit of each association method
+#
+
+class GLMBurdenTest(NullTest):
+    '''Generalized Linear regression test on aggregated genotypes within an association testing group'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        NullTest.__init__(self, logger, *method_args)
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression this is estimate of effect size for x'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         if self.permutations == 0:
             self.fields.append(Field(name='wald_x', index=None, type='FLOAT', adj=None, comment='Wald statistic for x (beta_x/SE(beta_x))'))
@@ -159,7 +365,7 @@ class GLMBurdenTest(NullTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+            option is specified, it will collapse the variants within a group into a generic genotype score''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='GLMTest',
@@ -194,7 +400,7 @@ class GLMBurdenTest(NullTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
+            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
         parser.add_argument('--weight', nargs='*', default=[],
         help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
@@ -291,7 +497,8 @@ class GLMBurdenTest(NullTest):
 
 
 #
-# Derived statistical Association tests.
+# Derived association tests
+# Separating disease traits and quantitative traits
 #
 
 # quantitative traits
@@ -302,7 +509,7 @@ class LinRegBurden(GLMBurdenTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+            option is specified, it will collapse the variants within a group into a generic genotype score''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='LinRegBurden',
@@ -334,7 +541,7 @@ class LinRegBurden(GLMBurdenTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
+            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
         parser.add_argument('--weight', nargs='*', default=[],
         help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
@@ -528,7 +735,7 @@ class LogitRegBurden(GLMBurdenTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Logistic regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo coding''',
+            option is specified, it will collapse the variants within a group into a generic genotype score''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='LogitRegBurden',
@@ -560,7 +767,7 @@ class LogitRegBurden(GLMBurdenTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
-            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in GENE based analysis''')
+            help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
         parser.add_argument('--weight', nargs='*', default=[],
         help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
@@ -745,207 +952,4 @@ class VariableThresholdsBt(GLMBurdenTest):
         self.use_indicator=False
         self.trait_type = 'disease'
 
-###
-# below are interface for some single covariate tests
-# implemented as they were originally published
-###
 
-class CaseCtrlBurdenTest(NullTest):
-    '''Single covariate case/ctrl burden test on collapsed genotypes within an association testing group'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        NullTest.__init__(self, logger, *method_args)
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='Test statistic.'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
-        if self.permutations > 0:
-            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
-        #
-        # NullTest.__init__ will call parseArgs to get the parameters we need
-        self.algorithm = self._determine_algorithm()
-
-    def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Single covariate case/ctrl burden test including CMC, WSS, KBAC, RBT and aSum. p-value
-            is calculated using exact/asymptotic distributions or permutation, depending on the input method. If --group_by
-            option is specified, it will collapse the variants within a group into a single pseudo coding''',
-            prog='vtools associate --method ' + self.__class__.__name__)
-        parser.add_argument('--name', default='SingleGeneCaseCtrlBT',
-            help='''Name of the test that will be appended to names of output fields, usually used to
-                differentiate output of different tests, or the same test with different parameters.''')
-        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
-            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
-            will be included in analysis. Default set to 1.0''')
-        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
-            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
-            will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT', 'VT_Fisher', 'RareCover', 'Calpha'], default='CMC',
-            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher".
-            Default set to "CMC"''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
-            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
-            Default set to 1''')
-        # permutations arguments
-        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
-            help='''Number of permutations''')
-        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
-            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
-            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
-            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
-            specify a "C" that is slightly larger than the significance level for the study.
-            To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--midp', action='store_true',
-            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC and VT_Fisher.''')
-        args = parser.parse_args(method_args)
-        # incorporate args to this class
-        self.__dict__.update(vars(args))
-
-    def _determine_algorithm(self):
-        self.extern_weight = []
-        algorithm = t.AssoAlgorithm([
-            # code genotype matrix by MOI being 0 1 or 2
-            t.CodeXByMOI(),
-            # calculate sample MAF
-            t.SetMaf(),
-            # filter out variants having MAF > mafupper or MAF <= maflower
-            t.SetSites(self.mafupper, self.maflower)
-            ])
-
-        # Now write implementation of each association methods separately.
-        # association testing using analytic p-value
-        if self.permutations == 0:
-            if self.aggregation_theme == 'CMC':
-                algorithm.extend([t.BinToX(),
-                    t.Fisher2X2(self.alternative, self.midp)])
-            elif self.aggregation_theme == 'WSS':
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        1000,
-                        1,
-                        [t.WeightedGenotypeTester(
-                            self.alternative,
-                            self.extern_weight,
-                            [t.BrowningWeight(self.alternative),
-                            t.MannWhitneyu(alternative=self.alternative, store=True)]
-                            )]
-                        )
-                algorithm.extend([
-                    a_permutationtest,
-                    t.WSSPvalue(self.alternative)
-                    ])
-            elif self.aggregation_theme == 'Calpha':
-                # FIXME: have to throw a warning if self.alternative is set to 1
-                algorithm.extend([t.CalphaTest(),
-                    t.GaussianPval(1)])
-            else:
-                raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
-
-        # association testing using permutation-based p-value
-        else:
-            if self.aggregation_theme == 'WSS':
-                # FIXME: have to throw a warning if self.alternative is set to 2
-                # the rank test version of WSS only supports one-sided test
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.WeightedGenotypeTester(
-                            1,
-                            self.extern_weight,
-                            [t.BrowningWeight(1),
-                            t.MannWhitneyu()]
-                            )]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'KBAC':
-                algorithm.append(t.FindGenotypePattern())
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.KBACtest(alternative=self.alternative, weightOnly=False)]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'RBT':
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.RBTtest(self.alternative, weightOnly=False)]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'aSum':
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.AdaptiveRvSum(),
-                            t.SimpleLogisticRegression()]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'VT_Fisher':
-                algorithm.extend([
-                    t.FindVariantPattern(),
-                    t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)
-                    ])
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'VT':
-                algorithm.append(t.FindVariantPattern())
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.VTTest(alternative=self.alternative)]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'RareCover':
-                # FIXME: have to throw a warning if self.alternative is set to 1
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.RareCoverTest(difQ = 0.5)]
-                        )
-                algorithm.append(a_permutationtest)
-            elif self.aggregation_theme == 'Calpha':
-                # FIXME: have to throw a warning if self.alternative is set to 1
-                a_permutationtest = t.FixedPermutator(
-                        'Y',
-                        1,
-                        self.permutations,
-                        self.adaptive,
-                        [t.CalphaTest(permutation=True)]
-                        )
-                algorithm.append(a_permutationtest)
-            else:
-                raise ValueError('Invalid permutation test {0}'.format(self.aggregation_theme))
-        return algorithm
-
-
-    def calculate(self):
-        self.data.countCaseCtrl()
-        self.algorithm.apply(self.data)
-        pvalues = self.data.pvalue()
-        statistics = self.data.statistic()
-        se = self.data.se()
-        res = [self.data.samplecounts()]
-        for (x, y, z) in zip(statistics, pvalues, se):
-            res.append(x)
-            res.append(y)
-            if self.permutations > 0:
-                # actual number of permutations
-                if math.isnan(z): res.append(z)
-                else: res.append(int(z))
-        return res

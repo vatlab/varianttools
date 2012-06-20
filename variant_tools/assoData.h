@@ -109,14 +109,18 @@ public:
 		return true;
 	}
 
-    bool setMOI(const std::string s)
-    {
-        int moi = 2;
-        if (s == "dominant") moi = 1;
-        if (s == "recessive") moi = 0;
-        setVar("moi", moi);
-        return true;
-    }
+
+	bool setMOI(const std::string s)
+	{
+		int moi = 2;
+
+		if (s == "dominant") moi = 1;
+		if (s == "recessive") moi = 0;
+		setVar("moi", moi);
+		return true;
+	}
+
+
 	// set genotype scores
 	bool setX(const vectorf & g)
 	{
@@ -200,6 +204,12 @@ public:
 	unsigned samplecounts()
 	{
 		return m_phenotype.size();
+	}
+
+
+	unsigned locicounts()
+	{
+		return m_genotype.front().size();
 	}
 
 
@@ -325,6 +335,7 @@ public:
 		m_matrixVars[name] = value;
 	}
 
+
 	// store a int array with name 'name'
 	void setVar(const string & name, const vectori & value)
 	{
@@ -337,8 +348,8 @@ public:
 		return (m_doubleVars.find(name) != m_doubleVars.end() ||
 		        m_arrayVars.find(name) != m_arrayVars.end() ||
 		        m_intArrayVars.find(name) != m_intArrayVars.end() ||
-		       m_intVars.find(name) != m_intVars.end() ||
-		       m_matrixVars.find(name) != m_matrixVars.end());
+		        m_intVars.find(name) != m_intVars.end() ||
+		        m_matrixVars.find(name) != m_matrixVars.end());
 	}
 
 
@@ -380,6 +391,7 @@ public:
 			throw ValueError("No integer array with name " + name + " can be found");
 		return it->second;
 	}
+
 
 	matrixf & getMatrixVar(const string & name)
 	{
