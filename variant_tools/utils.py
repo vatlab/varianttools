@@ -148,7 +148,7 @@ class RuntimeOptions(object):
         except:
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
     #
-    cache_dir = property(lambda self: self._cache_dir, _set_cache_dir)
+    cache_dir = property(lambda self: 'cache', _set_cache_dir)
     #
     # attribute temp_dir
     #
