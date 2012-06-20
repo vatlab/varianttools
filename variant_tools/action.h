@@ -485,7 +485,7 @@ class GaussianPval : public BaseAction
 {
 public:
 	GaussianPval(unsigned sided = 1)
-		: BaseAction(), m_sided(sided)
+		: BaseAction(), m_tailed(sided)
 	{
 	}
 
@@ -505,7 +505,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 };
 
 
@@ -515,7 +515,7 @@ class StudentPval : public BaseAction
 {
 public:
 	StudentPval(unsigned sided = 1)
-		: BaseAction(), m_sided(sided)
+		: BaseAction(), m_tailed(sided)
 	{
 	}
 
@@ -535,7 +535,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 };
 
 /* Fisher's 2x2 table test on m_X and m_phenotype:
@@ -551,7 +551,7 @@ class Fisher2X2 : public BaseAction
 {
 public:
 	Fisher2X2(unsigned alternative, bool midp = false)
-		: BaseAction(), m_sided(alternative), m_midp(midp)
+		: BaseAction(), m_tailed(alternative), m_midp(midp)
 	{
 	}
 
@@ -571,7 +571,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 	bool m_midp;
 };
 
@@ -583,7 +583,7 @@ class MannWhitneyu : public BaseAction
 {
 public:
 	MannWhitneyu(unsigned alternative = 1, bool store = false)
-		: BaseAction(), m_sided(alternative), m_store(store)
+		: BaseAction(), m_tailed(alternative), m_store(store)
 	{
 	}
 
@@ -603,7 +603,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 	bool m_store;
 };
 
@@ -612,7 +612,7 @@ class WSSPvalue : public BaseAction
 {
 public:
 	WSSPvalue(unsigned alternative) :
-		BaseAction(), m_sided(alternative)
+		BaseAction(), m_tailed(alternative)
 	{
 	}
 
@@ -632,7 +632,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 };
 
 
@@ -669,7 +669,7 @@ class KBACtest : public BaseAction
 {
 public:
 	KBACtest(unsigned alternative = 1, bool weightOnly = false) :
-		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
+		BaseAction(), m_tailed(alternative), m_weightOnly(weightOnly)
 	{
 	}
 
@@ -690,7 +690,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 	bool m_weightOnly;
 };
 
@@ -699,7 +699,7 @@ class RBTtest : public BaseAction
 {
 public:
 	RBTtest(unsigned alternative = 1, bool weightOnly = false) :
-		BaseAction(), m_sided(alternative), m_weightOnly(weightOnly)
+		BaseAction(), m_tailed(alternative), m_weightOnly(weightOnly)
 	{
 	}
 
@@ -719,7 +719,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 	bool m_weightOnly;
 };
 
@@ -782,7 +782,7 @@ class VTTest : public BaseAction
 {
 public:
 	VTTest(unsigned alternative = 1) :
-		BaseAction(), m_sided(alternative)
+		BaseAction(), m_tailed(alternative)
 	{
 	}
 
@@ -802,7 +802,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 };
 
 
@@ -810,7 +810,7 @@ class VTFisher : public BaseAction
 {
 public:
 	VTFisher(double alpha, unsigned alternative = 1, bool midp = false) :
-		BaseAction(), m_sided(alternative), m_midp(midp), m_alpha(alpha)
+		BaseAction(), m_tailed(alternative), m_midp(midp), m_alpha(alpha)
 	{
 	}
 
@@ -830,7 +830,7 @@ public:
 
 
 private:
-	unsigned m_sided;
+	unsigned m_tailed;
 	bool m_midp;
 	double m_alpha;
 };
@@ -868,8 +868,8 @@ private:
 class RareCoverTest : public BaseAction
 {
 public:
-	RareCoverTest(unsigned alternative = 1, double difQ = 0.5) :
-		BaseAction(), m_sided(alternative), m_difQ(difQ)
+	RareCoverTest(double difQ = 0.5) :
+		BaseAction(), m_difQ(difQ)
 	{
 	}
 
@@ -889,9 +889,7 @@ public:
 
 
 private:
-	unsigned m_sided;
 	//!- the cut-off to use for the "heuristic greedy algorithm". = 0.5 as suggested by the paper
-	// FIXME it might not be proper for one-sided test with -logP from Fisher's test as statistic
 	double m_difQ;
 };
 

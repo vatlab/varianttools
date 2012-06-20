@@ -408,11 +408,11 @@ bool GaussianPval::apply(AssoData & d)
 	vectorf & se = d.se();
 	vectorf & pval = d.pvalue();
 
-	if (m_sided == 1) {
+	if (m_tailed == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
 			pval[i] = gsl_cdf_ugaussian_Q(statistic[i] / se[i]);
 		}
-	} else if (m_sided == 2) {
+	} else if (m_tailed == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
 			pval[i] = gsl_cdf_chisq_Q(statistic[i] / se[i] * statistic[i] / se[i], 1.0);
 		}
@@ -431,11 +431,11 @@ bool StudentPval::apply(AssoData & d)
 	vectorf & pval = d.pvalue();
 
 	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
-	if (m_sided == 1) {
+	if (m_tailed == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
 			pval[i] = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 		}
-	} else if (m_sided == 2) {
+	} else if (m_tailed == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
 			double p = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 			pval[i] = fmin(p, 1.0 - p) * 2.0;
@@ -479,7 +479,7 @@ bool Fisher2X2::apply(AssoData & d)
 	}
 
 	double pvalue = 0.0;
-	if (m_sided == 1) {
+	if (m_tailed == 1) {
 		pvalue = (m_midp)
 		         ? (twotwoTable[0] > 0) * gsl_cdf_hypergeometric_P(
 			(twotwoTable[0] - 1),
@@ -553,7 +553,7 @@ bool MannWhitneyu::apply(AssoData & d)
 
 	if (m_store) {
 		if (!d.hasVar("RankStats")) {
-			matrixf initstats(m_sided);
+			matrixf initstats(m_tailed);
 			d.setVar("RankStats", initstats);
 		}
 		matrixf & wstats = d.getMatrixVar("RankStats");
@@ -577,7 +577,7 @@ bool MannWhitneyu::apply(AssoData & d)
 	}else {
 		/*
 		   if (!d.hasVar("RankStatsOrig")) {
-		    vectorf initstats(m_sided);
+		    vectorf initstats(m_tailed);
 		    d.setVar("RankStatsOrig", initstats);
 		   }
 		   vectorf & wstat = d.getArrayVar("RankStatsOrig");
@@ -605,13 +605,13 @@ bool WSSPvalue::apply(AssoData & d)
 	}
 
 	matrixf & mwstats = d.getMatrixVar("RankStats");
-	if (mwstats.size() != m_sided) {
+	if (mwstats.size() != m_tailed) {
 		throw ValueError("Rank Statistic does not match the alternative");
 	}
 	vectorf wsstat(0);
 	//compute mean and se. skip the first element
 	//which is the original statistic
-	for (size_t s = 0; s < m_sided; ++s) {
+	for (size_t s = 0; s < m_tailed; ++s) {
 		double ntotal = mwstats[s].size() - 1.0;
 		double mean_stats = (double)std::accumulate(mwstats[s].begin() + 1, mwstats[s].end(), 0.0)
 		                    / ntotal;
@@ -624,7 +624,7 @@ bool WSSPvalue::apply(AssoData & d)
 		if (fEqual(se_stats, 0.0)) se_stats = 1.0e-6;
 		wsstat.push_back((mwstats[s][0] - mean_stats) / se_stats);
 	}
-	if (m_sided == 1) {
+	if (m_tailed == 1) {
 		// one-sided
 		d.setPvalue(gsl_cdf_ugaussian_Q(wsstat.front()));
 	}else {
@@ -720,11 +720,11 @@ bool KBACtest::apply(AssoData & d)
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
 	//
-	vectorf kbac(m_sided);
+	vectorf kbac(m_tailed);
 	// KBAC weights (unique genotype pattern weights)
-	matrixf upWeights(m_sided);
+	matrixf upWeights(m_tailed);
 
-	for (size_t s = 0; s < m_sided; ++s) {
+	for (size_t s = 0; s < m_tailed; ++s) {
 		// genotype pattern counts in cases (or in ctrls)
 		vectori upcSub(up.size(), 0);
 		for (size_t i = 0; i < ydat.size(); ++i) {
@@ -765,7 +765,7 @@ bool KBACtest::apply(AssoData & d)
 	if (m_weightOnly) {
 		d.setVar("KBACweight", upWeights);
 	} else {
-		if (m_sided == 1) d.setStatistic(kbac[0]);
+		if (m_tailed == 1) d.setStatistic(kbac[0]);
 		else d.setStatistic(fmax(kbac[0], kbac[1]));
 	}
 
@@ -780,7 +780,7 @@ bool RBTtest::apply(AssoData & d)
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
 
-	matrixf RBTweights(m_sided);
+	matrixf RBTweights(m_tailed);
 
 	for (size_t j = 0; j < xdat.front().size(); ++j) {
 
@@ -804,7 +804,7 @@ bool RBTtest::apply(AssoData & d)
 		} else {
 			RBTweights[0].push_back(0.0);
 		}
-		if (m_sided > 1) {
+		if (m_tailed > 1) {
 			//k0=(int)(freq*2*nCases);
 			if (countcn > 0 && (1.0 * countcn) / (1.0 * nCtrls) > (1.0 * countcs) / (1.0 * nCases)) {
 				double f = gsl_cdf_poisson_P(countcs, nCases * (countcs + countcn) / (1.0 * ydat.size()))
@@ -821,7 +821,7 @@ bool RBTtest::apply(AssoData & d)
 		// RVP statistic: The max statistic in the manuscript
 		// R - potentially risk and P - potentially protective
 		double sumR = std::accumulate(RBTweights[0].begin(), RBTweights[0].end(), 0.0);
-		if (m_sided == 1) {
+		if (m_tailed == 1) {
 			d.setStatistic(sumR);
 		} else {
 			double sumP = std::accumulate(RBTweights[1].begin(), RBTweights[1].end(), 0.0);
@@ -984,7 +984,7 @@ bool VTTest::apply(AssoData & d)
 		allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt(std::accumulate(zIb.begin(), zIb.end(), 0.0) );
 	}
 	//! - Compute zmax, the statistic; square it for two-sided test
-	if (m_sided == 2) {
+	if (m_tailed == 2) {
 		for (size_t i = 0; i < allZs.size(); ++i) {
 			allZs[i] = allZs[i] * allZs[i];
 		}
@@ -1050,7 +1050,7 @@ bool VTFisher::apply(AssoData & d)
 
 
 		double pvalue = 0.0;
-		if (m_sided == 1) {
+		if (m_tailed == 1) {
 			pvalue = (m_midp)
 			         ? (twotwoTable[0] > 0) * gsl_cdf_hypergeometric_P(
 				(twotwoTable[0] - 1),
@@ -1180,6 +1180,8 @@ bool CalphaTest::apply(AssoData & d)
 		throw ValueError("Cannot perform c-alpha test on data with all singletons");
 	}
 	//!- c-alpha statistic
+	//reject the null hypothesis when Z is larger than expected 
+	//using a one-tailed standard normal distribution for reference
 	if (m_permutation) {
 		d.setStatistic(calpT / sqrt(calpV));
 	} else {
@@ -1228,33 +1230,7 @@ bool RareCoverTest::apply(AssoData & d)
 			for (size_t i = 0; i < ydat.size(); ++i) {
 				X[i] = (XCurr[i] + xdat[i][iIdx] > 0.0) ? 1.0 : 0.0;
 			}
-			double statistic;
-			//! - 2 by 2 one-sided Fisher's test
-			if (m_sided == 1) {
-				// 2X2 Fisher's test onesided, no midp
-				vectori twotwoTable(4, 0);
-				for (size_t i = 0; i < ydat.size(); ++i) {
-					if (fEqual(ydat[i], 1.0)) {
-						if (X[i] > 0.0) twotwoTable[0] += 1;
-						else twotwoTable[1] += 1;
-					}else {
-						if (X[i] > 0.0) twotwoTable[2] += 1;
-						else twotwoTable[3] += 1;
-					}
-				}
-				double pvalue = 1.0 - gsl_cdf_hypergeometric_P(
-					(twotwoTable[0] - 1),
-					(twotwoTable[0] + twotwoTable[2]),
-					(twotwoTable[1] + twotwoTable[3]),
-					(twotwoTable[0] + twotwoTable[1])
-				    );
-
-				statistic = -1.0 * log(pvalue);
-			}
-			//! - 2 by 2 Chisq test
-			else {
-				statistic = chisq2X2stat(X, ydat);
-			}
+			double statistic = chisq2X2stat(X, ydat);
 
 			if (statistic > sNext) {
 				sNext = statistic;

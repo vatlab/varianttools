@@ -833,15 +833,17 @@ class CaseCtrlBurdenTest(NullTest):
                     t.WSSPvalue(self.alternative)
                     ])
             elif self.aggregation_theme == 'Calpha':
+                # FIXME: have to throw a warning if self.alternative is set to 1
                 algorithm.extend([t.CalphaTest(),
-                    t.GaussianPval(self.alternative)])
+                    t.GaussianPval(1)])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
 
         # association testing using permutation-based p-value
         else:
             if self.aggregation_theme == 'WSS':
-                # FIXME have to throw a warning message that only one-sided test is supported for the rank test version of WSS
+                # FIXME: have to throw a warning if self.alternative is set to 2
+                # the rank test version of WSS only supports one-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -908,18 +910,20 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RareCover':
+                # FIXME: have to throw a warning if self.alternative is set to 1
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.RareCoverTest(alternative=self.alternative, difQ = 0.5)]
+                        [t.RareCoverTest(difQ = 0.5)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
+                # FIXME: have to throw a warning if self.alternative is set to 1
                 a_permutationtest = t.FixedPermutator(
                         'Y',
-                        self.alternative,
+                        1,
                         self.permutations,
                         self.adaptive,
                         [t.CalphaTest(permutation=True)]
