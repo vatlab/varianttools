@@ -110,7 +110,8 @@ class RuntimeOptions(object):
     # attribute pragma
     #
     def _set_sqlite_pragma(self, pragma):
-        if pragma is None:
+        # 'None' is for backward compatibility
+        if pragma is None or pragma == 'None':
             return
         try:
             p = pragma.split(',')
@@ -152,8 +153,8 @@ class RuntimeOptions(object):
     # attribute temp_dir
     #
     def _set_temp_dir(self, path=None):
-        # user can explicity set a path
-        if path is not None:
+        # user can explicity set a path ('None' could be saved by a previous version of vtools)
+        if path is not None and path != 'None':
             self._temp_dir = path
         # the usual case
         if self._temp_dir is None:
