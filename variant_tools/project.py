@@ -855,7 +855,8 @@ class Project:
             # if not, None will be passed, and a temporary directory will be used.
             runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
         except:
-            pass
+            # this will force the use of a system temporary directory
+            runOptions.temp_dir = None
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -2870,7 +2871,8 @@ def init(args):
                 proj = Project(verbosity='0', verify=False)
                 proj.remove()
             except:
-                print('Failed to remove project. Please manually remove *.proj files.')
+                # we might not be able to open a non-exist project
+                pass
         # create a new project
         #
         # args.batch is temporarily removed to keep interface clean
