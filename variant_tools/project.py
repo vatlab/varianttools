@@ -865,7 +865,8 @@ class Project:
         levels = {
             '0': logging.ERROR,
             '1': logging.INFO,
-            '2': logging.DEBUG
+            '2': logging.DEBUG,
+            None: logging.INFO
             }
         #
         if verbosity is None and not new:

@@ -117,7 +117,7 @@ class RuntimeOptions(object):
             #
             for item in p:
                 if '=' not in str(item):
-                    print('Invalid pragma {}'.format(item))
+                    raise ValueError('Invalid pragma {}'.format(item))
             self._sqlite_pragma = p
         except:
             print('Invalid pragma {}'.format(pragma))
