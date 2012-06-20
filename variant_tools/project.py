@@ -43,7 +43,7 @@ from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, getCommandLine, runOptions
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions
 
 
 # define a field type
@@ -798,6 +798,13 @@ class Project:
             INFO2:       ..
 
     '''
+    # the following make Project a singleton class
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Project, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self, name=None, build=None, new=False, verbosity=None, verify=True, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
@@ -839,7 +846,14 @@ class Project:
         try:
             # this might not exist becaues the project can be new and do not have the
             # project table
-            runOptions.cache_dir = self.loadProperty('__option_cache_dir')
+            runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
+        except:
+            pass
+        # temporary directory...
+        try:
+            # if option temp_dir is set, the path will be used
+            # if not, None will be passed, and a temporary directory will be used.
+            runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
         except:
             pass
         #
@@ -874,7 +888,8 @@ class Project:
         self.logger.addHandler(ch)
         # start a new session
         self.logger.debug('')
-        self.logger.debug(getCommandLine())
+        self.logger.debug(runOptions.command_line)
+        self.logger.debug('Using temporary directory {}'.format(runOptions.temp_dir))
         if new:
             self.create(build=build, **kwargs)
         else:
@@ -1057,6 +1072,15 @@ class Project:
     def close(self):
         '''Write everything to disk...'''
         self.db.commit()
+        # temporary directories are cleared each time
+        try:
+            # __exit__() will also call close(), I do not know if I should remove
+            # it from __exit__. Anyway, the second call to close() will try to 
+            # remove temp_dir again...
+            if os.path.isdir(runOptions.temp_dir):
+                shutil.rmtree(runOptions.temp_dir)
+        except Exception as e:
+            print('Failed to remove temporary directory: {}'.format(e))
         
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''
@@ -1265,7 +1289,7 @@ class Project:
         if save_date:
             self.saveProperty('__date_of_{}'.format(table), time.strftime('%b%d', time.gmtime()))
         if save_cmd:
-            self.saveProperty('__cmd_of_{}'.format(table), getCommandLine())
+            self.saveProperty('__cmd_of_{}'.format(table), runOptions.command_line)
 
     def descriptionOfTable(self, table):
         '''Get description of table'''

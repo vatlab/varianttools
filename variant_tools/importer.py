@@ -1218,7 +1218,7 @@ class GenotypeImportWorker(Process):
             end_import_time = time.time()
             todo, going = self.status.pendingImport()
             self.logger.debug('Importing {} samples ({} - {}) to {} took importer {} {:.1f} seconds, {} onging, {} to go.'.format(
-                len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), self.genotype_file,
+                len(self.sample_ids), min(self.sample_ids), max(self.sample_ids), os.path.basename(self.genotype_file),
                 self.proc_index, end_import_time - start_import_time, going, todo))
 
     def _importData(self):
@@ -1306,7 +1306,7 @@ class GenotypeCopier(Process):
                 end_copy_time = time.time()
                 self.logger.debug('Copying {} samples ({} - {}) from {} took {:.1f} seconds, {} to go.'.format(
                     len(self.sample_ids), min(self.sample_ids), max(self.sample_ids),
-                    self.genotype_file, end_copy_time - start_copy_time, self.status.pendingCopy()))
+                    os.path.basename(self.genotype_file), end_copy_time - start_copy_time, self.status.pendingCopy()))
                 file_count += 1
 
 
@@ -1701,7 +1701,7 @@ class Importer:
             return
         # we need to run lift over to convert coordinates before importing data.
         tool = LiftOverTool(self.proj)
-        to_be_mapped = os.path.join(runOptions.cache_dir, 'var_in.bed')
+        to_be_mapped = os.path.join(runOptions.temp_dir, 'var_in.bed')
         loci_count = 0
         with open(to_be_mapped, 'w') as output:
             for key in self.variantIndex:
@@ -1885,7 +1885,7 @@ class Importer:
                 if end_sample <= start_sample:
                     continue
                 # tell the processor do not import variant info, import part of the sample
-                tmp_file = os.path.join(runOptions.cache_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
+                tmp_file = os.path.join(runOptions.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):

@@ -37,6 +37,7 @@ import urllib
 import urlparse
 import getpass
 import time
+import tempfile
 import tokenize
 import cStringIO
 import gzip
@@ -69,7 +70,11 @@ class RuntimeOptions(object):
             'verbosity',
             'sqlite_pragma',
             'import_num_of_readers',
-            'cache_dir'
+            # a persistent cache directory.
+            'cache_dir',
+            # a temporary directory that is used to store temporary files. Will be
+            # cleared after project is closed.
+            'temp_dir',
         ]
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -82,6 +87,8 @@ class RuntimeOptions(object):
         self._import_num_of_readers = 2
         # path to the project cache
         self._cache_dir = 'cache'
+        # path to a temporary directory, will be allocated automatically.
+        self._temp_dir = None
     #
     # attribute command line
     #
@@ -140,10 +147,27 @@ class RuntimeOptions(object):
                 print('Creating cache directory {}'.format(self._cache_dir))
                 os.makedirs(self._cache_dir)
         except:
-            self._cache_dir = tempfile.mkdtemp() 
-            print('Failed to create cache directory. Using {} instead'.format(self._cache_dir))
+            raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
     #
     cache_dir = property(lambda self: self._cache_dir, _set_cache_dir)
+    #
+    # attribute temp_dir
+    #
+    def _set_temp_dir(self, path=None):
+        # user can explicity set a path
+        if path is not None:
+            self._temp_dir = path
+        # the usual case
+        if self._temp_dir is None:
+            self._temp_dir = tempfile.mkdtemp() 
+        try:
+            if not os.path.isdir(self._temp_dir):
+                os.makedirs(self._temp_dir)
+        except:
+            raise RuntimeError('Failed to create a temporary directory {}.'.format(self._temp_dir))
+    #
+    temp_dir = property(lambda self: self._temp_dir, _set_temp_dir)
+
 
 # the singleton object of RuntimeOptions
 runOptions = RuntimeOptions()
@@ -192,9 +216,6 @@ SQL_KEYWORDS = set([
     'COUNT', 'DATE', 'DAY', 'DIV', 'EXP', 'IS', 'LIKE', 'MAX', 'MIN', 'MOD', 'MONTH',
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
-
-def getCommandLine():
-    return runOptions.command_line
 
 #
 # Utility functions
