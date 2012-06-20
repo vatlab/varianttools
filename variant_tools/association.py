@@ -185,7 +185,7 @@ class AssociationTestManager:
                 tests.append(method)
             except NameError as e:
                 self.logger.debug(e)
-                raise ValueError('Failed to identify association test {0}:{1}. Please use command "vtools show tests" for a list of tests'.format(name, e))
+                raise ValueError('Failed to load association test {0}: {1}. Please use command "vtools show tests" to list usable tests'.format(name, e))
         return tests
 
     def getPhenotype(self, condition, pheno, covar):

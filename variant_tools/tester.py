@@ -141,16 +141,21 @@ class CaseCtrlBurdenTest(NullTest):
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='statistic', index=None, type='FLOAT', adj=None, comment='Test statistic.'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        if ncovariates > 1:
+            self.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
         if self.permutations > 0:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
-        #
+        # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
+        self.trait_type = 'disease'
+        # no external weight in these tests (for now)
+        self.extern_weight = []
         # NullTest.__init__ will call parseArgs to get the parameters we need
         self.algorithm = self._determine_algorithm()
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Single covariate case/ctrl burden test including CMC, WSS, VT, VT_Fisher, KBAC, RBT and aSum.
-            p-value is calculated using exact/asymptotic distributions or permutation, depending on the input method. If --group_by
-            option is specified, it will collapse the variants within a group into a generic genotype score''',
+            p-value is calculated using exact/asymptotic distributions or permutation, depending on the input method. "--group_by"
+            option has to be specified to define genetic loci the burden tests will be applied to''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='SingleGeneCaseCtrlBT',
             help='''Name of the test that will be appended to names of output fields, usually used to
@@ -164,7 +169,7 @@ class CaseCtrlBurdenTest(NullTest):
         parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT', 'VT_Fisher', 'RareCover', 'Calpha'], default='CMC',
             help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher".
             Default set to "CMC"''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         # permutations arguments
@@ -183,7 +188,6 @@ class CaseCtrlBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
-        self.extern_weight = []
         algorithm = t.AssoAlgorithm([
             # code genotype matrix by MOI being 0 1 or 2
             t.CodeXByMOI(),
@@ -217,7 +221,9 @@ class CaseCtrlBurdenTest(NullTest):
                     t.WSSPvalue(self.alternative)
                     ])
             elif self.aggregation_theme == 'Calpha':
-                # FIXME: have to throw a warning if self.alternative is set to 1
+                # this has to be a two-sided test
+                # the analytical version of Calpha is not reliable
+                # implemented here to reflect its original publication
                 algorithm.extend([t.CalphaTest(),
                     t.GaussianPval(1)])
             else:
@@ -226,8 +232,8 @@ class CaseCtrlBurdenTest(NullTest):
         # association testing using permutation-based p-value
         else:
             if self.aggregation_theme == 'WSS':
-                # FIXME: have to throw a warning if self.alternative is set to 2
                 # the rank test version of WSS only supports one-sided test
+                # this has to be a one-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -294,7 +300,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RareCover':
-                # FIXME: have to throw a warning if self.alternative is set to 1
+                # this has to be a two-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -304,7 +310,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
-                # FIXME: have to throw a warning if self.alternative is set to 1
+                # this has to be a two-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -319,6 +325,8 @@ class CaseCtrlBurdenTest(NullTest):
 
 
     def calculate(self):
+        if self.data.locicounts() <= 2:
+            raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 3).")
         self.data.countCaseCtrl()
         self.algorithm.apply(self.data)
         pvalues = self.data.pvalue()
@@ -349,9 +357,10 @@ class GLMBurdenTest(NullTest):
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression this is estimate of effect size for x'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        self.ncovariates = ncovariates
         if self.permutations == 0:
             self.fields.append(Field(name='wald_x', index=None, type='FLOAT', adj=None, comment='Wald statistic for x (beta_x/SE(beta_x))'))
-            for i in range(ncovariates):
+            for i in range(self.ncovariates):
                 self.fields.extend([Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta for covariate {}'.format(str(i+2))),
                                     Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for covariate {}'.format(str(i+2))),
                                     Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
@@ -360,7 +369,7 @@ class GLMBurdenTest(NullTest):
         #
         # NullTest.__init__ will call parseArgs to get the parameters we need
         self.regression_model = {'quantitative':0, 'disease':1}
-        self.algorithm = self._determine_algorithm(ncovariates)
+        self.algorithm = self._determine_algorithm()
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Generalized linear regression test. p-value
@@ -382,7 +391,7 @@ class GLMBurdenTest(NullTest):
         parser.add_argument('--trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
             help='''Phenotype is quantitative trait or disease trait (0/1 coding).
             Default set to quantitative''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--use_indicator', action='store_true',
@@ -414,8 +423,8 @@ class GLMBurdenTest(NullTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def _determine_algorithm(self, ncovariates):
-        if ncovariates > 0:
+    def _determine_algorithm(self):
+        if self.ncovariates > 0:
             a_regression = t.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
         else:
             a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
@@ -501,11 +510,100 @@ class GLMBurdenTest(NullTest):
 # Separating disease traits and quantitative traits
 #
 
-# quantitative traits
+# case/ctrl single covariate tests
+class CFisher(CaseCtrlBurdenTest):
+    '''Fisher's exact test on collapsed variant loci, Li & Leal 2008'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.midp and self.alternative == 2:
+            self.logger.warning("midp option will be ignored for two-tailed test")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Collapsing test for case-control data (CMC test, Li & Leal 2008).
+            Different from the original publication which jointly test for common/rare variants using Hotelling's t^2 method,
+            this version of CMC will binarize rare variants (default frequency set to 0.01) within a group defined by "--group_by" and calculate p-value via Fisher's exact test.
+            A "mid-p" option is available for one-sided test to obtain a less conservative p-value estimate.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='CFisher',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.
+                Default set to "CFisher"''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        parser.add_argument('--midp', action='store_true',
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test.''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'CMC'
+        self.permutations = 0
+
+
+class WSSRankTest(CaseCtrlBurdenTest):
+    '''Weighted sum method using rank test statistic, Madsen & Browning 2009'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Weighted sum method using rank test statistic, Madsen & Browning 2009. p-value
+            is based on the significance level of the Wilcoxon rank-sum test. Two methods are avaliable for evaluating p-value: a semi-asymptotic
+            p-value based on normal distribution, or permutation based p-value. Variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings
+            will be summed up for rank test. Two-sided test is available for the asymptotic version, which will calculate two p-values based on weights
+            from controls and cases respectively, and use the smaller of them with multiple testing adjustment. For two-sided permutation based p-value
+            please refer to "vtools show test WeightedSumBt"''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='WSSRankTest',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by this test
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2"). Note that two-sided test is only
+            available for asymptotic version of the test. Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations. Set it to zero to use the asymptotic version. Default is zero''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'WSS'
+        if self.permutations and self.alternative == 2:
+            self.logger.warning("Two-sided test is only available for asymptotic version of the test. Setting permutations to zero ...")
+            self.permutations = 0
+
+# quantitative traits in regression framework
 class LinRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -523,7 +621,7 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--use_indicator', action='store_true',
@@ -562,8 +660,8 @@ class LinRegBurden(GLMBurdenTest):
 
 class CollapseQt(GLMBurdenTest):
     '''Collapsing method for quantitative traits, Li & Leal 2008'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for quantitative traits (Li & Leal 2008).
@@ -579,7 +677,7 @@ class CollapseQt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -601,8 +699,8 @@ class CollapseQt(GLMBurdenTest):
 
 class BurdenQt(GLMBurdenTest):
     '''Burden test for quantitative traits, Morris & Zeggini 2009'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for quantitative traits (Morris & Zeggini 2009).
@@ -617,7 +715,7 @@ class BurdenQt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -639,13 +737,13 @@ class BurdenQt(GLMBurdenTest):
 
 class WeightedSumQt(GLMBurdenTest):
     '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted sum statistic for quantitative traits (in the spirit of Madsen & Browning 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, variants will be weighted by 1/sqrt(P*(1-P)) and the weighted codings will be summed
+            option is specified, variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings will be summed
             up as one regressor''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
@@ -656,7 +754,7 @@ class WeightedSumQt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -678,8 +776,8 @@ class WeightedSumQt(GLMBurdenTest):
 
 class VariableThresholdsQt(GLMBurdenTest):
     '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for quantitative traits (in the spirit of Price et al 2010).
@@ -697,7 +795,7 @@ class VariableThresholdsQt(GLMBurdenTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         # permutations arguments
@@ -729,8 +827,8 @@ class VariableThresholdsQt(GLMBurdenTest):
 # binary traits
 class LogitRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for binary traits'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Logistic regression test. p-value
@@ -749,7 +847,7 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--use_indicator', action='store_true',
@@ -788,8 +886,8 @@ class LogitRegBurden(GLMBurdenTest):
 
 class CollapseBt(GLMBurdenTest):
     '''Collapsing method for binary traits, Li & Leal 2008'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for binary traits (Li & Leal 2008).
@@ -805,7 +903,7 @@ class CollapseBt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -827,8 +925,8 @@ class CollapseBt(GLMBurdenTest):
 
 class BurdenBt(GLMBurdenTest):
     '''Burden test for binary traits, Morris & Zeggini 2009'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for binary traits (Morris & Zeggini 2009).
@@ -843,7 +941,7 @@ class BurdenBt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -865,13 +963,13 @@ class BurdenBt(GLMBurdenTest):
 
 class WeightedSumBt(GLMBurdenTest):
     '''Weighted sum statistic for binary traits, in the spirit of Madsen & Browning 2009'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted sum statistic for binary traits (in the spirit of Madsen & Browning 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, variants will be weighted by 1/sqrt(P*(1-P)) and the weighted codings will be summed
+            option is specified, variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings will be summed
             up as one regressor''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
@@ -882,7 +980,7 @@ class WeightedSumBt(GLMBurdenTest):
         parser.add_argument('--mafupper', type=freq, default=0.01,
             help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
             will be included in analysis. Default set to 0.01''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -904,8 +1002,8 @@ class WeightedSumBt(GLMBurdenTest):
 
 class VariableThresholdsBt(GLMBurdenTest):
     '''Variable thresholds method for binary traits, in the spirit of Price et al 2010'''
-    def __init__(self, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, logger=None, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for binary traits (in the spirit of Price et al 2010).
@@ -923,7 +1021,7 @@ class VariableThresholdsBt(GLMBurdenTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--alternative', metavar='SIDED', type=int, choices = [1,2], default=1,
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
         # permutations arguments
