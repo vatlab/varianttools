@@ -70,8 +70,6 @@ class RuntimeOptions(object):
             'verbosity',
             'sqlite_pragma',
             'import_num_of_readers',
-            # a persistent cache directory.
-            'cache_dir',
             # a temporary directory that is used to store temporary files. Will be
             # cleared after project is closed.
             'temp_dir',
