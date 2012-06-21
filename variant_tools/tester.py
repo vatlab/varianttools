@@ -248,6 +248,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'KBAC':
+                algorithm.append(t.FillGMissing(method="mlg"))
                 algorithm.append(t.FindGenotypePattern())
                 a_permutationtest = t.FixedPermutator(
                         'Y',
@@ -258,6 +259,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
+                algorithm.append(t.FillGMissing(method="mlg"))
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -310,6 +312,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
+                algorithm.append(t.FillGMissing(method="mlg"))
                 # this has to be a two-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
@@ -353,7 +356,9 @@ class CaseCtrlBurdenTest(NullTest):
 class GLMBurdenTest(NullTest):
     '''Generalized Linear regression test on aggregated genotypes within an association testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
+        # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, logger, *method_args)
+        # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression this is estimate of effect size for x'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
@@ -366,8 +371,9 @@ class GLMBurdenTest(NullTest):
                                     Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
         else:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
-        #
-        # NullTest.__init__ will call parseArgs to get the parameters we need
+        # check for weighting theme
+        if self.permutations == 0 and self.weight in ['Browning', 'KBAC', 'RBT']:
+            raise ValueError("Weighting theme {0} requires the use of permutation tests. Please specify number of permutations".format(self.weight))
         self.regression_model = {'quantitative':0, 'disease':1}
         self.algorithm = self._determine_algorithm()
 
@@ -410,25 +416,50 @@ class GLMBurdenTest(NullTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--weight', nargs='*', default=[],
-        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
-            weights, i.e., 'MadsenBrowning' and 'MadsenBrownging_ctrl' are available if specified, which will apply a weighting theme
-            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            Note that all weights will be masked if --use_indicator is evoked.
             ''')
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. For quantitative traits weights will be based on
+               pseudo case/ctrl status defined by comparison with the mean of the quantitative traits. Except for
+               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               For details of the weighting themes, please refer to the online documentation.
+            ''')
+
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
+            ''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
+        # define aggregation method and regression method
+        a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
         if self.ncovariates > 0:
             a_regression = t.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
         else:
             a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
-        a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
+        if self.use_indicator:
+            self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
+            self.extern_weight = []
+            self.weight = 'None'
+        a_wtheme = None
+        # weighting theme
+        if self.weight == 'Browning_all':
+            a_wtheme = t.BrowningWeight(0)
+        elif self.weight == 'Browning':
+            a_wtheme = t.BrowningWeight(self.alternative)
+        elif self.weight == 'KBAC':
+            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True)
+        elif self.weight == 'RBT':
+            a_wtheme = t.RBTtest(alternative=self.alternative, weightOnly=True)
+        else:
+            raise ValueError('Invalid weighting theme {0}'.format(self.weight))
         # data pre-processing
         algorithm = t.AssoAlgorithm([
             # code genotype matrix by MOI being 0 1 or 2
@@ -438,47 +469,71 @@ class GLMBurdenTest(NullTest):
             # filter out variants having MAF > mafupper or MAF <= maflower
             t.SetSites(self.mafupper, self.maflower)
             ])
+        # special actions for KBAC and RBT weighting themes
+        if self.weight in ['KBAC', 'RBT']:
+            if not self.nan_adjust:
+                self.logger.warning("In order to use weighting theme {0}, missing genotypes will be \
+                        replaced by the most likely genotype based on MAF".format(self.weight))
+            algorithm.append(t.FillGMissing(method="mlg"))
+            if self.weight == 'KBAC':
+                algorithm.append(t.FindGenotypePattern())
         # recode missing data
         if self.nan_adjust:
-            algorithm.append(t.SetGMissingToMaf())
-
-        # weight with maf/var_info/geno_info
-        if len(self.weight) > 0:
-            if 'MadsenBrowning_all' in self.weight and not self.use_indicator:
-                algorithm.append(t.BrowningWeight(0))
-                self.weight[self.weight.index('MadsenBrowning_all')] = "BrowningWeight"
-            algorithm.append(t.WeightByInfo(self.weight))
+            algorithm.append(t.FillGMissing(method="maf"))
+        # prepare the weighted sum tester
+        a_wtester = None
+        if not self.weight == 'None':
+            a_wtester = t.WeightedGenotypeTester(
+                        self.alternative,
+                        self.extern_weight,
+                        [a_wtheme, a_regression]
+                    )
+        #
         # association testing using analytic p-value
+        #
         if self.permutations == 0:
-            algorithm.extend([
-                # calculate genotype score for a set of variants
-                a_scoregene,
-                # fit regression model
-                a_regression,
-                # evaluate p-value for the Wald's statistic
-                t.StudentPval(self.alternative)
-                ])
+            if not a_wtester:
+                # not using any weighting themes
+                algorithm.extend([
+                    # weight by var_info/geno_info
+                    t.WeightByInfo(self.extern_weight),
+                    # calculate genotype score for a set of variants
+                    a_scoregene,
+                    # fit regression model
+                    a_regression,
+                    # evaluate p-value for the Wald's statistic
+                    t.StudentPval(self.alternative)
+                    ])
+            else:
+                # using Browning_all as weight
+                algorithm.extend([
+                    a_wtester,
+                    t.StudentPval(self.alternative)
+                    ])
+        #
         # association testing using permutation-based p-value
+        #
         else:
+            if not a_wtester:
+                algorithm.append(t.WeightByInfo(self.extern_weight))
             if not self.variable_thresholds:
+                if not a_wtester:
+                    algorithm.append(a_scoregene)
                 a_permutationtest = t.FixedPermutator(
                         self.permute_by.upper(),
                         self.alternative,
                         self.permutations,
                         self.adaptive,
-                        [a_regression]
+                        [a_wtester if a_wtester else a_regression]
                         )
-                algorithm.extend([
-                        a_scoregene,
-                        a_permutationtest
-                        ])
+                algorithm.append(a_permutationtest)
             else:
                 a_permutationtest = t.VariablePermutator(
                         self.permute_by.upper(),
                         self.alternative,
                         self.permutations,
                         self.adaptive,
-                        [a_scoregene, a_regression]
+                        [a_wtester] if a_wtester else [a_scoregene, a_regression]
                         )
                 algorithm.append(a_permutationtest)
         return algorithm

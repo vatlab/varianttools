@@ -74,11 +74,15 @@ bool SetMaf::apply(AssoData & d)
 }
 
 
-bool SetGMissingToMaf::apply(AssoData & d)
+bool FillGMissing::apply(AssoData & d)
 {
 	if (!d.hasVar("maf")) {
 		throw RuntimeError("Sample MAF, which has not been calculated, is required for this operation.");
 	}
+
+	RNG rng;
+	gsl_rng * gslr = rng.get();
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	vectorf & maf = d.getArrayVar("maf");
 	matrixf & genotype = d.raw_genotype();
 	for (size_t j = 0; j < maf.size(); ++j) {
@@ -86,7 +90,30 @@ bool SetGMissingToMaf::apply(AssoData & d)
 		for (size_t i = 0; i < genotype.size(); ++i) {
 			// genotype missing; replace with maf
 			if (genotype[i][j] != genotype[i][j]) {
-				genotype[i][j] = maf[j] * 2.0; // times 2 here with the additive assumption of dosage
+				if (m_method == "maf") genotype[i][j] = maf[j] * multiplier;
+				else if (m_method == "mlg") {
+					// most likely genotype
+					double p = gsl_rng_uniform(gslr);
+					if (p > maf[j] * maf[j]) genotype[i][j] = 2.0;
+					else if (p < maf[j]) genotype[i][j] = 0.0;
+					else genotype[i][j] = 1.0;
+					switch (d.getIntVar("moi")) {
+					case 0:
+						// recessive
+					{
+						genotype[i][j] = (fEqual(genotype[i][j], 2.0)) ? 1.0 : 0.0;
+					}
+					break;
+					case 1:
+						// dominant
+					{
+						genotype[i][j] = (!fEqual(genotype[i][j], 0.0)) ? 1.0 : 0.0;
+					}
+					break;
+					default:
+						break;
+					}
+				}
 			}
 		}
 	}

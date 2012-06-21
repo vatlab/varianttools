@@ -277,17 +277,18 @@ private:
 };
 
 
-class SetGMissingToMaf : public BaseAction
+class FillGMissing : public BaseAction
 {
 public:
-	SetGMissingToMaf() : BaseAction()
+	FillGMissing(std::string method = "maf") :
+        BaseAction(), m_method(method)
 	{
 	}
 
 
 	BaseAction * clone() const
 	{
-		return new SetGMissingToMaf(*this);
+		return new FillGMissing(*this);
 	}
 
 
@@ -295,9 +296,11 @@ public:
 
 	std::string name()
 	{
-		return "SetGMissingToMaf";
+		return "FillGMissing";
 	}
 
+private:
+    std::string m_method;
 
 };
 
