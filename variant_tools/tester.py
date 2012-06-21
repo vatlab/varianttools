@@ -599,6 +599,109 @@ class WSSRankTest(CaseCtrlBurdenTest):
             self.logger.warning("Two-sided test is only available for asymptotic version of the test. Setting permutations to zero ...")
             self.permutations = 0
 
+
+class VTtest(CaseCtrlBurdenTest):
+    '''VT statistic for disease traits, Price et al 2010'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.permutations == 0:
+            raise ValueError("Please specify number of permutations for VTtest")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Variable thresholds test for disease traits, Price et al 2010. 
+        The burden test statistic of a group of variants will be
+        maximized over subsets of variants defined by applying different minor allele
+        frequency thresholds. This implementation provides two different statistics: 
+        the original VT statistics in Price et al 2010 (default) and an adaptive VT 
+        statistic combining the CFisher method (via "--cfisher" option). p-value is estimated by permutation test. 
+        The adaptive VT statistic will not generate uniformly distributed p-value. 
+        For a more generalized version of VT test, type "vtools show test VariableThresholdsBt / 
+        VariableThresholdsQt". ''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='VTtest',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=1.0,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 1.0''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--cfisher', action='store_true',
+            help='''This option, if evoked, will use an adaptive VT test via Fisher's exact statistic.
+            For more details, please refer to the online documentation.''')
+        parser.add_argument('--midp', action='store_true',
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. 
+            It is only applicatable to one sided test with "--cfisher" option.''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'VT'
+        if self.cfisher:
+            self.aggregation_theme = 'VT_Fisher'
+
+
+class KBAC(CaseCtrlBurdenTest):
+    '''Kernel Based Adaptive Clustering method, Liu & Leal 2010'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.permutations == 0:
+            raise ValueError("Please specify number of permutations for KBAC")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Kernel Based Adaptive Clustering method, Liu & Leal 2010. 
+            Genotype pattern frequencies, weighted by a hypergeometric density kernel function, is compared 
+            for differences between cases and controls. p-value is calculated using permutation for consistent 
+            estimate with different sample sizes (the approximation method of the original publication is not implemented).
+            Two-sided KBAC test is implemented by calculating a second statistic with case/ctrl label swapped, and
+            the larger of the two statistic is used as two-sided test statistic''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='KBAC',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'KBAC'
+
 # quantitative traits in regression framework
 class LinRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''
@@ -824,9 +927,9 @@ class VariableThresholdsQt(GLMBurdenTest):
         self.weight = []
         self.trait_type = 'quantitative'
 
-# binary traits
+# disease traits
 class LogitRegBurden(GLMBurdenTest):
-    '''A versatile framework of association tests for binary traits'''
+    '''A versatile framework of association tests for disease traits'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
@@ -885,12 +988,12 @@ class LogitRegBurden(GLMBurdenTest):
         self.trait_type = 'disease'
 
 class CollapseBt(GLMBurdenTest):
-    '''Collapsing method for binary traits, Li & Leal 2008'''
+    '''Collapsing method for disease traits, Li & Leal 2008'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for binary traits (Li & Leal 2008).
+        parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for disease traits (Li & Leal 2008).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, variants within a group will be collapsed into a single binary coding using an indicator function
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''',
@@ -924,12 +1027,12 @@ class CollapseBt(GLMBurdenTest):
         self.trait_type = 'disease'
 
 class BurdenBt(GLMBurdenTest):
-    '''Burden test for binary traits, Morris & Zeggini 2009'''
+    '''Burden test for disease traits, Morris & Zeggini 2009'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Fixed threshold burden test for binary traits (Morris & Zeggini 2009).
+        parser = argparse.ArgumentParser(description='''Fixed threshold burden test for disease traits (Morris & Zeggini 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, the group of variants will be coded using the counts of variants within the group.''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -962,12 +1065,12 @@ class BurdenBt(GLMBurdenTest):
         self.trait_type = 'disease'
 
 class WeightedSumBt(GLMBurdenTest):
-    '''Weighted sum statistic for binary traits, in the spirit of Madsen & Browning 2009'''
+    '''Weighted sum statistic for disease traits, in the spirit of Madsen & Browning 2009'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Weighted sum statistic for binary traits (in the spirit of Madsen & Browning 2009).
+        parser = argparse.ArgumentParser(description='''Weighted sum statistic for disease traits (in the spirit of Madsen & Browning 2009).
             p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
             option is specified, variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings will be summed
             up as one regressor''',
@@ -1001,12 +1104,12 @@ class WeightedSumBt(GLMBurdenTest):
         self.trait_type = 'disease'
 
 class VariableThresholdsBt(GLMBurdenTest):
-    '''Variable thresholds method for binary traits, in the spirit of Price et al 2010'''
+    '''Variable thresholds method for disease traits, in the spirit of Price et al 2010'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for binary traits (in the spirit of Price et al 2010).
+        parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for disease traits (in the spirit of Price et al 2010).
             The burden test statistic of a group of variants will be maximized over subsets of variants defined by applying different minor allele frequency
             thresholds. Significance of the statistic obtained is evaluated via permutation''',
             prog='vtools associate --method ' + self.__class__.__name__)
