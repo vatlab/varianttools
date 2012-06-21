@@ -605,7 +605,7 @@ class VTtest(CaseCtrlBurdenTest):
     def __init__(self, ncovariates, logger=None, *method_args):
         CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
         if self.permutations == 0:
-            raise ValueError("Please specify number of permutations for VTtest")
+            raise ValueError("Please specify number of permutations for VTtest method")
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds test for disease traits, Price et al 2010. 
@@ -628,8 +628,9 @@ class VTtest(CaseCtrlBurdenTest):
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
-            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
-            Default set to 1''')
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2"). Two sided test is only
+                valid with "--cfisher" option evoked (please use "VariableThresholdsBt" otherwise). 
+                Default set to 1''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
@@ -662,7 +663,7 @@ class KBAC(CaseCtrlBurdenTest):
     def __init__(self, ncovariates, logger=None, *method_args):
         CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
         if self.permutations == 0:
-            raise ValueError("Please specify number of permutations for KBAC")
+            raise ValueError("Please specify number of permutations for KBAC method")
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Kernel Based Adaptive Clustering method, Liu & Leal 2010. 
@@ -701,6 +702,180 @@ class KBAC(CaseCtrlBurdenTest):
         # We add the fixed parameter here ...
         #
         self.aggregation_theme = 'KBAC'
+
+
+class RBT(CaseCtrlBurdenTest):
+    '''Repication Based Test for protective and deleterious variants, Ionita-Laza et al 2011'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.permutations == 0:
+            raise ValueError("Please specify number of permutations for RBT method")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Repication Based Test for protective and deleterious variants, 
+            Ionita-Laza et al 2011. Variant sites are scored based on -log transformation of probability of having 
+            more than observed variants in cases/ctrls; the RBT statistic is defined as sum of the variant sites scores.
+            One-sided RBT is implemented in addition to the two-sided statistic described in the RBT paper. 
+            p-value is estimated via permutation test.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='RBT',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'RBT'
+
+
+class aSum(CaseCtrlBurdenTest):
+    '''Adaptive Sum score test for protective and deleterious variants, Han & Pan 2010'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.permutations == 0:
+            raise ValueError("Please specify number of permutations for aSum method")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Adaptive Sum score test for protective and deleterious variants, 
+            Han & Pan 2010. In the first stage of the test, each variant site are evaluated for excess of minor alleles 
+            in controls and genotype codings are flipped, and the second stage performs a burden test similar to BRV 
+            (Morris & Zeggini 2009). This two-stage test is robust to a mixture of protective/risk variants 
+            within one gene, yet is computationally intensive. aSum test is a two-tailed test.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='aSum',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'aSum'
+        self.alternative = 2
+
+
+class Calpha(CaseCtrlBurdenTest):
+    '''c-alpha test for unusual distribution of variants between cases and controls, Neale et al 2011'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''c-alpha test for unusual distribution of variants between 
+            cases and controls, Neale et al 2011. It tests for deviation of variance of minor allele counts in 
+            cases/ctrls from its expection based on binomial distribution. The statistic is asymptotically normally 
+            distributed. p-value can be evaluted using either permutation or asymptotic distribution as described 
+            in Neale et al 2011, although it is recommanded to use permutation to estimate a reliable p-value. 
+            Calpha test is a two-tailed test''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='Calpha',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'Calpha'
+        self.alternative = 2
+
+
+class RareCover(CaseCtrlBurdenTest):
+    '''A "covering" method for detecting rare variants association, Bhatia et al 2010.'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+        if self.permutations == 0:
+            raise ValueError("Please specify number of permutations for RareCover method")
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''A "covering" method for detecting rare variants association,
+            Bhatia et al 2010. The algorithm combines a disparate collection of rare variants and maximize the association
+            signal over the collection using a heuristic adaptive approach, which can be computationally intensive. 
+            Different from VT method, it does not require rare variants evaluated being adjacent in minor allele 
+            frequency ranking. RareCover test is a two-tailed test.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('--name', default='RareCover',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('-q1', '--mafupper', type=freq, default=0.01,
+            help='''Minor allele frequency upper limit. All variants having sample MAF<=m1
+            will be included in analysis. Default set to 0.01''')
+        parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
+            help='''Minor allele frequency lower limit. All variants having sample MAF>m2
+            will be included in analysis. Default set to 0.0''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+        #
+        # We add the fixed parameter here ...
+        #
+        self.aggregation_theme = 'RareCover'
+        self.alternative = 2
+
 
 # quantitative traits in regression framework
 class LinRegBurden(GLMBurdenTest):
