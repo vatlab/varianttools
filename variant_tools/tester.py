@@ -425,7 +425,7 @@ class GLMBurdenTest(NullTest):
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. For quantitative traits weights will be based on
                pseudo case/ctrl status defined by comparison with the mean of the quantitative traits. Except for
-               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
 
@@ -981,7 +981,7 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
-               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -1118,7 +1118,7 @@ class WeightedBurdenQt(GLMBurdenTest):
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
-               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -1237,7 +1237,7 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
-               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
@@ -1375,7 +1375,7 @@ class WeightedBurdenBt(GLMBurdenTest):
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
-               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
