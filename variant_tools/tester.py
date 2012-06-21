@@ -616,7 +616,7 @@ class WSSRankTest(CaseCtrlBurdenTest):
             p-value based on normal distribution, or permutation based p-value. Variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings
             will be summed up for rank test. Two-sided test is available for the asymptotic version, which will calculate two p-values based on weights
             from controls and cases respectively, and use the smaller of them with multiple testing adjustment. For two-sided permutation based p-value
-            please refer to "vtools show test WeightedSumBt"''',
+            please refer to "vtools show test WeightedBurdenBt"''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='WSSRankTest',
@@ -973,11 +973,16 @@ class LinRegBurden(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--weight', nargs='*', default=[],
-        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
-            weights, i.e., 'MadsenBrowning_all' and 'MadsenBrowning' are available if specified, which will apply a weighting theme
-            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            Note that all weights will be masked if --use_indicator is evoked.
+            ''')
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
@@ -1027,7 +1032,8 @@ class CollapseQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.trait_type = 'quantitative'
 
 class BurdenQt(GLMBurdenTest):
@@ -1065,22 +1071,25 @@ class BurdenQt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.trait_type = 'quantitative'
 
-class WeightedSumQt(GLMBurdenTest):
-    '''Weighted sum statistic for quantitative traits, in the spirit of Madsen & Browning 2009'''
+
+class WeightedBurdenQt(GLMBurdenTest):
+    '''Weighted genotype burden tests for quantitative traits, using one or many arbitrary external weights as well as one of 4 internal weighting themes'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Weighted sum statistic for quantitative traits (in the spirit of Madsen & Browning 2009).
-            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings will be summed
-            up as one regressor''',
+        parser = argparse.ArgumentParser(description='''Weighted genotype burden tests for quantitative traits,
+        using one or many arbitrary external weights as well as one of 4 internal weighting themes.
+        External weights (variant/genotype annotation field) are passed into the test by --var_info and --geno_info options.
+        Internal weighting themes are one of "Browning_all", "Browning", "KBAC" or "RBT". p-value is based on linear regression analysis
+        and permutation procedure has to be used for "Browning", "KBAC" or "RBT" weights.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='WBQt',
+        parser.add_argument('--name', default='WQt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
@@ -1090,6 +1099,28 @@ class WeightedSumQt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+      # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            Note that all weights will be masked if --use_indicator is evoked.
+            ''')
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               For details of the weighting themes, please refer to the online documentation.
+            ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -1102,9 +1133,7 @@ class WeightedSumQt(GLMBurdenTest):
         #
         self.use_indicator = False
         self.maflower = 0.0
-        self.permutations = 0
         self.variable_thresholds = False
-        self.weight = ['MadsenBrowning_all']
         self.trait_type = 'quantitative'
 
 class VariableThresholdsQt(GLMBurdenTest):
@@ -1154,7 +1183,8 @@ class VariableThresholdsQt(GLMBurdenTest):
         #
         self.variable_thresholds = True
         self.use_indicator=False
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.trait_type = 'quantitative'
 
 # disease traits
@@ -1199,11 +1229,16 @@ class LogitRegBurden(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--variable_thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--weight', nargs='*', default=[],
-        help='''Weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially. Additionally two special
-            weights, i.e., 'MadsenBrowning_all' and 'MadsenBrowning' are available if specified, which will apply a weighting theme
-            based on observed allele frequencies from data. Note that all weights will be masked if --use_indicator is evoked
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            Note that all weights will be masked if --use_indicator is evoked.
+            ''')
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               For details of the weighting themes, please refer to the online documentation.
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
@@ -1216,6 +1251,7 @@ class LogitRegBurden(GLMBurdenTest):
         # We add the fixed parameter here ...
         #
         self.trait_type = 'disease'
+
 
 class CollapseBt(GLMBurdenTest):
     '''Collapsing method for disease traits, Li & Leal 2008'''
@@ -1253,8 +1289,10 @@ class CollapseBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.trait_type = 'disease'
+
 
 class BurdenBt(GLMBurdenTest):
     '''Burden test for disease traits, Morris & Zeggini 2009'''
@@ -1291,22 +1329,24 @@ class BurdenBt(GLMBurdenTest):
         self.maflower = 0.0
         self.permutations = 0
         self.variable_thresholds = False
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.trait_type = 'disease'
 
-class WeightedSumBt(GLMBurdenTest):
-    '''Weighted sum statistic for disease traits, in the spirit of Madsen & Browning 2009'''
+class WeightedBurdenBt(GLMBurdenTest):
+    '''Weighted genotype burden tests for disease traits, using one or many arbitrary external weights as well as one of 4 internal weighting themes'''
     def __init__(self, ncovariates, logger=None, *method_args):
         GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Weighted sum statistic for disease traits (in the spirit of Madsen & Browning 2009).
-            p-value is based on the significance level of the regression coefficient for genotypes. If --group_by
-            option is specified, variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings will be summed
-            up as one regressor''',
+        parser = argparse.ArgumentParser(description='''Weighted genotype burden tests for disease traits,
+        using one or many arbitrary external weights as well as one of 4 internal weighting themes. 
+        External weights (variant/genotype annotation field) are passed into the test by --var_info and --geno_info options. 
+        Internal weighting themes are one of "Browning_all", "Browning", "KBAC" or "RBT". p-value is based on logistic regression analysis
+        and permutation procedure has to be used for "Browning", "KBAC" or "RBT" weights.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='WBBt',
+        parser.add_argument('--name', default='WBt',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
         # no argumant is added
@@ -1316,6 +1356,28 @@ class WeightedSumBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
+      # permutations arguments
+        parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
+            help='''Number of permutations''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            Note that all weights will be masked if --use_indicator is evoked.
+            ''')
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning' weighting, tests using all other weighting themes has to calculate p-value via permutation.
+               For details of the weighting themes, please refer to the online documentation.
+            ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
@@ -1328,10 +1390,9 @@ class WeightedSumBt(GLMBurdenTest):
         #
         self.use_indicator = False
         self.maflower = 0.0
-        self.permutations = 0
         self.variable_thresholds = False
-        self.weight = 'MadsenBrowning'
         self.trait_type = 'disease'
+
 
 class VariableThresholdsBt(GLMBurdenTest):
     '''Variable thresholds method for disease traits, in the spirit of Price et al 2010'''
@@ -1379,8 +1440,7 @@ class VariableThresholdsBt(GLMBurdenTest):
         # We add the fixed parameter here ...
         #
         self.variable_thresholds = True
-        self.weight = []
+        self.extern_weight = []
+        self.weight = 'None'
         self.use_indicator=False
         self.trait_type = 'disease'
-
-

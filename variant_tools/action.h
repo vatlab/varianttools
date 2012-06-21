@@ -281,7 +281,7 @@ class FillGMissing : public BaseAction
 {
 public:
 	FillGMissing(std::string method = "maf") :
-        BaseAction(), m_method(method)
+		BaseAction(), m_method(method)
 	{
 	}
 
@@ -299,8 +299,9 @@ public:
 		return "FillGMissing";
 	}
 
+
 private:
-    std::string m_method;
+	std::string m_method;
 
 };
 
