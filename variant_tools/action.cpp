@@ -534,12 +534,13 @@ bool MannWhitneyu::apply(AssoData & d)
 	vectorf & phenotype = d.phenotype();
 	int ncases = d.getIntVar("ncases");
 	int nctrls = d.getIntVar("nctrls");
+	double ybar = d.getDoubleVar("ybar");
 	//
 	double caseScores[ncases], ctrlScores[nctrls];
 	int tmpa = 0, tmpu = 0;
 
 	for (size_t i = 0; i < phenotype.size(); ++i) {
-		if (fEqual(phenotype[i], 1.0)) {
+		if (phenotype[i] > ybar) {
 			caseScores[tmpa] = genotype[i];
 			++tmpa;
 		}else {
@@ -719,6 +720,7 @@ bool KBACtest::apply(AssoData & d)
 	vectorf & ydat = d.phenotype();
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
+	double ybar = d.getDoubleVar("ybar");
 	//
 	vectorf kbac(m_tailed);
 	// KBAC weights (unique genotype pattern weights)
@@ -728,7 +730,7 @@ bool KBACtest::apply(AssoData & d)
 		// genotype pattern counts in cases (or in ctrls)
 		vectori upcSub(up.size(), 0);
 		for (size_t i = 0; i < ydat.size(); ++i) {
-			if ((s) ? fEqual(ydat[i], 0.0) : fEqual(ydat[i], 1.0)) {
+			if ((s) ? (ydat[i] <= ybar) : (ydat[i] > ybar)) {
 				// identify/count genotype pattern in cases (or ctrls for two sided test)
 				for (size_t u = 0; u < up.size(); ++u) {
 					if (gId[i] == up[u]) {
@@ -779,7 +781,7 @@ bool RBTtest::apply(AssoData & d)
 	matrixf & xdat = d.raw_genotype();
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
-
+	double ybar = d.getDoubleVar("ybar");
 	matrixf RBTweights(m_tailed);
 
 	for (size_t j = 0; j < xdat.front().size(); ++j) {
@@ -788,7 +790,7 @@ bool RBTtest::apply(AssoData & d)
 		unsigned countcs = 0;
 		unsigned countcn = 0;
 		for (size_t i = 0; i < ydat.size(); ++i) {
-			if (fEqual(ydat[i], 0.0)) {
+			if (ydat[i] <= ybar) {
 				countcn += (unsigned)xdat[i][j];
 			} else {
 				countcs += (unsigned)xdat[i][j];
@@ -839,7 +841,7 @@ bool AdaptiveRvSum::apply(AssoData & d)
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
-
+	double ybar = d.getDoubleVar("ybar");
 	//a binary sequence for whether or not there is an excess of rare variants in controls
 	vectori cexcess(xdat.front().size(), 0);
 
@@ -847,7 +849,7 @@ bool AdaptiveRvSum::apply(AssoData & d)
 		double tmp1 = 0.0;
 		double tmp0 = 0.0;
 		for (size_t i = 0; i < xdat.size(); ++i) {
-			if (fEqual(ydat[i], 0.0)) {
+			if (ydat[i] <= ybar) {
 				//FIXME might want to use > 0.0 to handle imputed genotypes
 				if (xdat[i][j] >= 1.0) {
 					tmp0 += xdat[i][j];
@@ -877,7 +879,7 @@ bool AdaptiveRvSum::apply(AssoData & d)
 			double gtmp = (xdat[i][j] == xdat[i][j]) ? xdat[i][j] : 0.0;
 			// note the difference here from Fisher2X2 class
 			// since in this case we check if rare variants are siginificantly enriched in ctrls
-			if (fEqual(ydat[i], 0.0)) {
+			if (ydat[i] <= ybar) {
 				if (gtmp > 0.0) twotwoTable[0] += 1;
 				else twotwoTable[1] += 1;
 			}else {
@@ -1145,7 +1147,7 @@ bool CalphaTest::apply(AssoData & d)
 		int countcs = 0;
 		int countcn = 0;
 		for (size_t i = 0; i < ydat.size(); ++i) {
-			if (fEqual(ydat[i], 0)) countcn += (xdat[i][j] > 0.0) ? (int)xdat[i][j] : 0;
+			if (ydat[i] <= phat) countcn += (xdat[i][j] > 0.0) ? (int)xdat[i][j] : 0;
 			else countcs += (xdat[i][j] > 0.0) ? (int)xdat[i][j] : 0;
 		}
 		//! - the c-alpha method implementation
@@ -1180,7 +1182,7 @@ bool CalphaTest::apply(AssoData & d)
 		throw ValueError("Cannot perform c-alpha test on data with all singletons");
 	}
 	//!- c-alpha statistic
-	//reject the null hypothesis when Z is larger than expected 
+	//reject the null hypothesis when Z is larger than expected
 	//using a one-tailed standard normal distribution for reference
 	if (m_permutation) {
 		d.setStatistic(calpT / sqrt(calpV));
