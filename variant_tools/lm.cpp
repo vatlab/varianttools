@@ -457,7 +457,7 @@ bool LogisticM::fit(LMData & d)
 
 		double tolt = 0.0;
 		for (size_t i = 0; i < ncol; ++i) {
-			tolt = tolt + abs(gsl_vector_get(beta_delta, i));
+			tolt = tolt + std::abs(gsl_vector_get(beta_delta, i));
 		}
 		if (tolt <= 1.0e-9) {
 			break;

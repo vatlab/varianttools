@@ -810,7 +810,7 @@ bool KBACtest::apply(AssoData & d)
 		d.setVar("KBACweight", upWeights);
 	} else {
 		if (m_tailed == 1) d.setStatistic(kbac[0]);
-		else d.setStatistic(fmax(kbac[0], kbac[1]));
+		else d.setStatistic(std::max(kbac[0], kbac[1]));
 	}
 
 	return true;
@@ -869,7 +869,7 @@ bool RBTtest::apply(AssoData & d)
 			d.setStatistic(sumR);
 		} else {
 			double sumP = std::accumulate(RBTweights[1].begin(), RBTweights[1].end(), 0.0);
-			d.setStatistic(fmax(sumR, sumP));
+			d.setStatistic(std::max(sumR, sumP));
 		}
 	}
 	return true;
@@ -1027,7 +1027,7 @@ bool VTTest::apply(AssoData & d)
 		//! - Now each element in <b> 'allZs' </b> is z(T) for different thresholds
 		double sb = std::accumulate(zIb.begin(), zIb.end(), 0.0);
 		if (fEqual(sb, 0.0)) allZs[t - 1] = 0.0;
-		else allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt( sb );
+		else allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt(sb);
 	}
 	//! - Compute zmax, the statistic; square it for two-sided test
 	if (m_tailed == 2) {
@@ -1766,9 +1766,16 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 		// association testing
 		m_actions[1]->apply(d);
 		// set statistic to m_stat
-		m_stat[s] = abs(d.statistic()[0]);
+		m_stats[s] = d.statistic();
 	}
-	d.setStatistic(fmax(m_stat[0], m_stat[1]));
+	if (m_stats[1].size() == 0) {
+		// only exists one vector, just use it
+		d.setStatistic(m_stats[0]);
+	} else {
+		for (size_t i = 0; i < 2; ++i) m_stats[i][0] = std::abs(m_stats[i][0]);
+		// compare to models, choose the larger of the two
+		(m_stats[0][0] > m_stats[1][0]) ? d.setStatistic(m_stats[0]) : d.setStatistic(m_stats[1]);
+	}
 	return true;
 }
 

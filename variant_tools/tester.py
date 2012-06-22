@@ -525,7 +525,10 @@ class GLMBurdenTest(NullTest):
                     algorithm.append(a_scoregene)
                 a_permutationtest = t.FixedPermutator(
                         self.permute_by.upper(),
-                        1 if a_wtester else self.alternative,
+                        # FIXME: logic is correct yet confusing here
+                        # use self.alternative = 2 for Browning_all only
+                        # because it resets a_wtimes to 1
+                        1 if a_wtimes == 2 else self.alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester if a_wtester else a_regression]
@@ -534,7 +537,7 @@ class GLMBurdenTest(NullTest):
             else:
                 a_permutationtest = t.VariablePermutator(
                         self.permute_by.upper(),
-                        1 if a_wtester else self.alternative,
+                        1 if a_wtimes == 2 else self.alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester] if a_wtester else [a_scoregene, a_regression]

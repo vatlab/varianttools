@@ -1177,7 +1177,9 @@ public:
 	WeightedGenotypeTester(unsigned alternative, const vectors & info, const vectora & actions) :
 		BasePermutator(actions), m_model(alternative), m_info(info)
 	{
-		m_stat.resize(2, 0.0);
+		vectorf tmp(0);
+
+		m_stats.resize(2, tmp);
 	}
 
 
@@ -1198,7 +1200,7 @@ public:
 private:
 	unsigned m_model;
 	vectors m_info;
-	vectorf m_stat;
+	matrixf m_stats;
 };
 
 }
