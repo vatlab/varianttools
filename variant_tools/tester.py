@@ -448,16 +448,20 @@ class GLMBurdenTest(NullTest):
             self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
             self.extern_weight = []
             self.weight = 'None'
-        a_wtheme = None
         # weighting theme
+        a_wtheme = None
+        a_wtimes = self.alternative
         if self.weight == 'Browning_all':
             a_wtheme = t.BrowningWeight(0)
+            a_wtimes = 1
         elif self.weight == 'Browning':
             a_wtheme = t.BrowningWeight(self.alternative)
         elif self.weight == 'KBAC':
             a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'RBT':
             a_wtheme = t.RBTtest(alternative=self.alternative, weightOnly=True)
+        elif self.weight == 'None':
+            pass
         else:
             raise ValueError('Invalid weighting theme {0}'.format(self.weight))
         # data pre-processing
@@ -482,9 +486,9 @@ class GLMBurdenTest(NullTest):
             algorithm.append(t.FillGMissing(method="maf"))
         # prepare the weighted sum tester
         a_wtester = None
-        if not self.weight == 'None':
+        if a_wtheme:
             a_wtester = t.WeightedGenotypeTester(
-                        self.alternative,
+                        a_wtimes,
                         self.extern_weight,
                         [a_wtheme, a_regression]
                     )
@@ -521,7 +525,7 @@ class GLMBurdenTest(NullTest):
                     algorithm.append(a_scoregene)
                 a_permutationtest = t.FixedPermutator(
                         self.permute_by.upper(),
-                        self.alternative,
+                        1 if a_wtester else self.alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester if a_wtester else a_regression]
@@ -530,7 +534,7 @@ class GLMBurdenTest(NullTest):
             else:
                 a_permutationtest = t.VariablePermutator(
                         self.permute_by.upper(),
-                        self.alternative,
+                        1 if a_wtester else self.alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester] if a_wtester else [a_scoregene, a_regression]
@@ -539,8 +543,7 @@ class GLMBurdenTest(NullTest):
         return algorithm
 
     def calculate(self):
-        if self.trait_type == 'disease':
-            self.data.countCaseCtrl()
+        self.data.countCaseCtrl()
         self.algorithm.apply(self.data)
         # get results
         pvalues = self.data.pvalue()

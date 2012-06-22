@@ -196,7 +196,7 @@ bool BrowningWeight::apply(AssoData & d)
 	// calculte weight. maf matrix will become the weight matrix
 	for (size_t s = 0; s < maf.size(); ++s) {
 		for (size_t i = 0; i < maf[s].size(); ++i) {
-			if (fEqual(maf[s][i], 0.0) || fEqual(maf[s][i], 1.0)) {
+			if (fEqual(maf[s][i], 0.0) || fEqual(maf[s][i], 1.0) || fEqual(valid_all[s][i], 0.0)) {
 				maf[s][i] = 0.0;
 			} else {
 				maf[s][i] = 1.0 / sqrt(maf[s][i] * (1.0 - maf[s][i]) * valid_all[s][i] * multiplier);
@@ -437,10 +437,16 @@ bool GaussianPval::apply(AssoData & d)
 
 	if (m_tailed == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
+			if (fEqual(se[i], 0.0)) {
+				throw ValueError("Standard Error has not been calculated");
+			}
 			pval[i] = gsl_cdf_ugaussian_Q(statistic[i] / se[i]);
 		}
 	} else if (m_tailed == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
+			if (fEqual(se[i], 0.0)) {
+				throw ValueError("Standard Error has not been calculated");
+			}
 			pval[i] = gsl_cdf_chisq_Q(statistic[i] / se[i] * statistic[i] / se[i], 1.0);
 		}
 	} else {
@@ -460,10 +466,16 @@ bool StudentPval::apply(AssoData & d)
 	// df = n - p where p = #covariates + 1 (for beta1) + 1 (for beta0) = ncovar+2
 	if (m_tailed == 1) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
+			if (fEqual(se[i], 0.0)) {
+				throw ValueError("Standard Error has not been calculated");
+			}
 			pval[i] = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 		}
 	} else if (m_tailed == 2) {
 		for (unsigned i = 0; i < statistic.size(); ++i) {
+			if (fEqual(se[i], 0.0)) {
+				throw ValueError("Standard Error has not been calculated");
+			}
 			double p = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
 			pval[i] = fmin(p, 1.0 - p) * 2.0;
 		}
@@ -641,6 +653,9 @@ bool WSSPvalue::apply(AssoData & d)
 	//which is the original statistic
 	for (size_t s = 0; s < m_tailed; ++s) {
 		double ntotal = mwstats[s].size() - 1.0;
+		if (!(ntotal > 1.0)) {
+			throw ValueError("Rank Statistic not saved");
+		}
 		double mean_stats = (double)std::accumulate(mwstats[s].begin() + 1, mwstats[s].end(), 0.0)
 		                    / ntotal;
 		double se_stats = 0.0;
@@ -1010,7 +1025,9 @@ bool VTTest::apply(AssoData & d)
 			zIb[i] += zIbi;
 		}
 		//! - Now each element in <b> 'allZs' </b> is z(T) for different thresholds
-		allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt(std::accumulate(zIb.begin(), zIb.end(), 0.0) );
+		double sb = std::accumulate(zIb.begin(), zIb.end(), 0.0);
+		if (fEqual(sb, 0.0)) allZs[t - 1] = 0.0;
+		else allZs[t - 1] = std::accumulate(zIa.begin(), zIa.end(), 0.0) / sqrt( sb );
 	}
 	//! - Compute zmax, the statistic; square it for two-sided test
 	if (m_tailed == 2) {

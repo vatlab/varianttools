@@ -158,9 +158,9 @@ public:
 	{
 		// set case/ctrl counts
 		setVar("ncases", (int)std::count_if(m_phenotype.begin(), m_phenotype.end(),
-				std::bind2nd(std::equal_to<double>(), 1.0)));
+				std::bind2nd(std::greater<double>(), getDoubleVar("ybar"))));
 		setVar("nctrls", (int)std::count_if(m_phenotype.begin(), m_phenotype.end(),
-				std::bind2nd(std::equal_to<double>(), 0.0)));
+				std::bind2nd(std::less_equal<double>(), getDoubleVar("ybar"))));
 		return true;
 
 	}
