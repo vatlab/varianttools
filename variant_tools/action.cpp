@@ -538,7 +538,7 @@ bool Fisher2X2::apply(AssoData & d)
 		    );
 		pvalue = 1.0 - pvalue;
 	} else {
-		pvalue = fexact2x2(twotwoTable,"two");
+		pvalue = fexact2x2(twotwoTable, "two");
 	}
 	d.setStatistic( (double)twotwoTable[3]);
 	d.setPvalue(pvalue);
@@ -1095,7 +1095,7 @@ bool VTFisher::apply(AssoData & d)
 			    );
 			pvalue = 1.0 - pvalue;
 		} else {
-			pvalue = fexact2x2(twotwoTable,"two");
+			pvalue = fexact2x2(twotwoTable, "two");
 		}
 		// end of fisher's test
 

@@ -44,6 +44,7 @@ void fRound(double & myValue, double PRECISION)
 	return;
 }
 
+
 //!- Mann-Whitney rank test statistic "U"
 // www.alglib.net
 // http://en.wikipedia.org/wiki/Mann-Whitney_U
@@ -153,7 +154,7 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 			u = u + w;
 		}
 	}
-	// comment these out since I am using the raw scores 
+	// comment these out since I am using the raw scores
 	// rather than the actual U statistic
 	// in which case ties not properly handled
 	// this is based on communication with Dr. Browning (UW)
@@ -163,10 +164,12 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 	return u;
 }
 
+
 double chisq2X2stat(const std::vector<double> & regressors, const std::vector<double> & responses)
 {
 	//! - 2 by 2 Chisq test
 	double A0 = 0.0, A1 = 0.0, U0 = 0.0, U1 = 0.0;
+
 	for (size_t i = 0; i < regressors.size(); ++i) {
 		if (fEqual(regressors[i], 0.0) && fEqual(responses[i], 0.0))
 			U0 += 1.0;
@@ -199,9 +202,12 @@ double chisq2X2stat(const std::vector<double> & regressors, const std::vector<do
 	return statistic;
 }
 
+
 std::vector<double> dnhyper(double m, double n, double k, double ncp)
-{	double lo = std::max(0.0, k - n);
+{
+	double lo = std::max(0.0, k - n);
 	double hi = std::min(k, m);
+
 	std::vector<double> d(0);
 	for (int i = lo; i <= hi; ++i) {
 		d.push_back(log(gsl_ran_hypergeometric_pdf(i, m, n, k)) + log(ncp) * i);
@@ -219,13 +225,14 @@ double mnhyper(double m, double n, double k, double ncp)
 {
 	double lo = std::max(0.0, k - n);
 	double hi = std::min(k, m);
+
 	if (ncp == 0.0) {
 		return lo;
 	}
 	if (std::abs(ncp) >= DBL_MAX) {
 		return hi;
 	}
-	std::vector<double> d = dnhyper(m,n,k,ncp);
+	std::vector<double> d = dnhyper(m, n, k, ncp);
 	double s = 0.0;
 	for (size_t i = 0; i < d.size(); ++i) {
 		s += (lo + (double)i) * d[i];
@@ -238,6 +245,7 @@ double pnhyper(double q, double m, double n, double k, double ncp, bool upper_ta
 {
 	double lo = std::max(0.0, k - n);
 	double hi = std::min(k, m);
+
 	if (ncp == 1.0) {
 		if (upper_tail) {
 			return gsl_cdf_hypergeometric_Q(q - 1, m, n, k);
@@ -260,7 +268,7 @@ double pnhyper(double q, double m, double n, double k, double ncp, bool upper_ta
 		}
 	}
 	double p = 0.0;
-	std::vector<double> d = dnhyper(m,n,k,ncp);
+	std::vector<double> d = dnhyper(m, n, k, ncp);
 	if (upper_tail) {
 		for (size_t i = 0; i < d.size(); ++i) {
 			if (lo + (double)i >= q) p += d[i];
@@ -299,7 +307,7 @@ double fexact2x2(std::vector<int> dat, std::string alternative, double ncp)
 			return (double)(x == hi);
 		} else {
 			double relErr = 1.0 + 1E-7;
-			std::vector<double> d = dnhyper(m,n,k,ncp);
+			std::vector<double> d = dnhyper(m, n, k, ncp);
 			for (size_t i = 0; i < d.size(); ++i) {
 				if (d[i] <= d[(size_t)(x - lo)] * relErr)
 					s += d[i];

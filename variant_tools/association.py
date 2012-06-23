@@ -36,6 +36,7 @@ from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
 from .phenotype import Sample
 from .tester import *
+from .pyper import *
 import argparse
 
 def associateArguments(parser):

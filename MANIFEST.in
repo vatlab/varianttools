@@ -39,6 +39,7 @@ include variant_tools/variant.py
 include variant_tools/association.py
 include variant_tools/tester.py
 include variant_tools/compare.py
+include variant_tools/pyper.py
 include variant_tools/assoTests.i
 include variant_tools/config.h
 include variant_tools/config_mac.h

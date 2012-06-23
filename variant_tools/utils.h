@@ -44,16 +44,23 @@
 
 // check if float numbers are equal
 bool fEqual(double a, double b);
+
 // round() float numbers
 void fRound(double & myValue, double PRECISION);
+
 // mannwhitney test
 double Mann_Whitneyu(double *, int, double *, int);
+
 // 2X2 table chisq statistic
 double chisq2X2stat(const std::vector<double> & regressors, const std::vector<double> & responses);
+
 // 2X2 table Fisher's test, translated from R's fisher.test
 std::vector<double> dnhyper(double m, double n, double k, double ncp);
+
 double mnhyper(double m, double n, double k, double ncp);
+
 double pnhyper(double q, double m, double n, double k, double ncp = 1.0, bool upper_tail = false);
+
 double fexact2x2(std::vector<int> dat, std::string alternative = "greater", double ncp = 1.0);
 
 // pairwise sum of vector elements. can be used in std::accumulate for vector2f objects
