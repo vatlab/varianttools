@@ -199,6 +199,116 @@ double chisq2X2stat(const std::vector<double> & regressors, const std::vector<do
 	return statistic;
 }
 
+std::vector<double> dnhyper(double m, double n, double k, double ncp)
+{	double lo = std::max(0.0, k - n);
+	double hi = std::min(k, m);
+	std::vector<double> d(0);
+	for (int i = lo; i <= hi; ++i) {
+		d.push_back(log(gsl_ran_hypergeometric_pdf(i, m, n, k)) + log(ncp) * i);
+	}
+	double dm = *max_element(d.begin(), d.end());
+	for (size_t i = 0; i < d.size(); ++i) {
+		d[i] = exp(d[i] - dm);
+	}
+	std::transform(d.begin(), d.end(), d.begin(), std::bind2nd(std::divides<double>(), std::accumulate(d.begin(), d.end(), 0.0)));
+	return d;
+}
+
+
+double mnhyper(double m, double n, double k, double ncp)
+{
+	double lo = std::max(0.0, k - n);
+	double hi = std::min(k, m);
+	if (ncp == 0.0) {
+		return lo;
+	}
+	if (std::abs(ncp) >= DBL_MAX) {
+		return hi;
+	}
+	std::vector<double> d = dnhyper(m,n,k,ncp);
+	double s = 0.0;
+	for (size_t i = 0; i < d.size(); ++i) {
+		s += (lo + (double)i) * d[i];
+	}
+	return s;
+}
+
+
+double pnhyper(double q, double m, double n, double k, double ncp, bool upper_tail)
+{
+	double lo = std::max(0.0, k - n);
+	double hi = std::min(k, m);
+	if (ncp == 1.0) {
+		if (upper_tail) {
+			return gsl_cdf_hypergeometric_Q(q - 1, m, n, k);
+		} else {
+			return gsl_cdf_hypergeometric_P(q, m, n, k);
+		}
+	}
+	if (ncp == 0.0) {
+		if (upper_tail) {
+			return (double)(q <= lo);
+		} else {
+			return (double)(q >= lo);
+		}
+	}
+	if (std::abs(ncp) >= DBL_MAX) {
+		if (upper_tail) {
+			return (double)(q <= hi);
+		} else {
+			return (double)(q >= hi);
+		}
+	}
+	double p = 0.0;
+	std::vector<double> d = dnhyper(m,n,k,ncp);
+	if (upper_tail) {
+		for (size_t i = 0; i < d.size(); ++i) {
+			if (lo + (double)i >= q) p += d[i];
+		}
+	} else {
+		for (size_t i = 0; i < d.size(); ++i) {
+			if (lo + (double)i <= q) p += d[i];
+		}
+	}
+	return p;
+}
+
+
+double fexact2x2(std::vector<int> dat, std::string alternative, double ncp)
+{
+	/*
+	   x[0] x[1]
+	   x[2] x[3]
+	 */
+	double m = dat[0] + dat[2];
+	double n = dat[1] + dat[3];
+	double k = dat[0] + dat[1];
+	double x = dat[0];
+	double lo = std::max(0.0, k - n);
+	double hi = std::min(k, m);
+	double s = 0.0;
+
+	if (alternative == "greater") {
+		s = pnhyper(x, m, n, k, ncp, true);
+	} else if (alternative == "less") {
+		s = pnhyper(x, m, n, k, ncp, false);
+	} else {
+		if (ncp == 0) {
+			return (double)(x == lo);
+		} else if (std::abs(ncp) >= DBL_MAX) {
+			return (double)(x == hi);
+		} else {
+			double relErr = 1.0 + 1E-7;
+			std::vector<double> d = dnhyper(m,n,k,ncp);
+			for (size_t i = 0; i < d.size(); ++i) {
+				if (d[i] <= d[(size_t)(x - lo)] * relErr)
+					s += d[i];
+			}
+		}
+	}
+	return s;
+}
+
 
 namespace vtools {
 

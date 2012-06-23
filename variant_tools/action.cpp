@@ -538,28 +538,7 @@ bool Fisher2X2::apply(AssoData & d)
 		    );
 		pvalue = 1.0 - pvalue;
 	} else {
-		double contingency_table[4] = { 0, 0, 0, 0 };
-		for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
-		bool ok = (
-		           contingency_table[0] >= 0 &&
-		           contingency_table[1] >= 0 &&
-		           contingency_table[2] >= 0 &&
-		           contingency_table[3] >= 0 &&
-		           (contingency_table[0] + contingency_table[1] +
-		            contingency_table[2] + contingency_table[0] > 0)
-		           );
-		if (!ok) {
-			throw ValueError("Invalid input table for fexact.");
-		}
-		//stuff for Fisher's test
-		int nrow = 2;
-		int ncol = 2;
-		double expected = -1.0;
-		double percnt = 100.0;
-		double emin = 0.0;
-		double prt = 0.0;
-		int workspace = 300000;
-		fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pvalue, &workspace);
+		pvalue = fexact2x2(twotwoTable,"two");
 	}
 	d.setStatistic( (double)twotwoTable[3]);
 	d.setPvalue(pvalue);
@@ -1116,28 +1095,7 @@ bool VTFisher::apply(AssoData & d)
 			    );
 			pvalue = 1.0 - pvalue;
 		} else {
-			double contingency_table[4] = { 0, 0, 0, 0 };
-			for (int i = 0; i < 4; ++i) contingency_table[i] = twotwoTable[i];
-			bool ok = (
-			           contingency_table[0] >= 0 &&
-			           contingency_table[1] >= 0 &&
-			           contingency_table[2] >= 0 &&
-			           contingency_table[3] >= 0 &&
-			           (contingency_table[0] + contingency_table[1] +
-			            contingency_table[2] + contingency_table[0] > 0)
-			           );
-			if (!ok) {
-				throw ValueError("Invalid input table for fexact.");
-			}
-			//stuff for Fisher's test
-			int nrow = 2;
-			int ncol = 2;
-			double expected = -1.0;
-			double percnt = 100.0;
-			double emin = 0.0;
-			double prt = 0.0;
-			int workspace = 300000;
-			fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pvalue, &workspace);
+			pvalue = fexact2x2(twotwoTable,"two");
 		}
 		// end of fisher's test
 
