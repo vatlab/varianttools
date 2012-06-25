@@ -26,12 +26,14 @@
 import sys
 import os
 import math
+from subprocess import PIPE, Popen
 import argparse
 if sys.version_info.major == 2:
     import assoTests_py2 as t
 else:
     import assoTests_py3 as t
 from .project import Field
+from .pyper import *
 
 def freq(frequency):
     try:
@@ -330,8 +332,8 @@ class CaseCtrlBurdenTest(NullTest):
 
 
     def calculate(self):
-        if self.data.locicounts() <= 2:
-            raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 3).")
+        if self.data.locicounts() <= 1:
+            raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 2).")
         self.data.countCaseCtrl()
         self.algorithm.apply(self.data)
         pvalues = self.data.pvalue()
@@ -1469,7 +1471,11 @@ class SKAT(NullTest):
         self.ncovariates = ncovariates
         if self.small_sample:
             self.fields.append(Field(name='pvalue_noadj', index=None, type='FLOAT', adj=None, comment='The p-value of SKAT without the small sample adjustment. It only appears when small sample adjustment is applied'))
-            self.fields.append(Field(name='pvalue_noadj_resampling', index=None, type='FLOAT', adj=None, comment='The p-value rom resampled outcome without the small sample adjustment. It only appears when small sample adjustment is applied'))
+        # Check for R/SKAT installation
+        tc = Popen(["R", "-e", "library('SKAT')"], stdin = PIPE, stdout = PIPE, stderr = PIPE)
+        out, error = tc.communicate()
+        if (tc.returncode):
+            raise ValueError("R/SKAT library not prpoerly installed: \n {0}".format(error.decode(sys.getdefaultencoding())))
         #
         self.algorithm = self._determine_algorithm()
 
@@ -1530,45 +1536,47 @@ class SKAT(NullTest):
     def _determine_algorithm(self):
         self.Rargs = []
         # get parameters and residuals from the H0 model
-        adjust_arg = 'Adjustment=TRUE' if not self.small_sample else 'is_kurtosis_adj={0}, n.Resampleing.kurtosis={1}'.format('TRUE' if self.resampling_kurtosis else 'FALSE', self.resampling_kurtosis)
-        h_null = '''obj <- SKAT_Null_Model{0}(y~{1}, out_type="{2}",
-        n.Resamping={3}, type.Resampling="bootstrap", {4})'''.format('_MomentAdjust' if self.small_sample else '',
-                1 if not self.ncovariates else 'X', 'C' if self.trait_type == 'quantitative' else 'D',
+        y_type = 'out_type="{0}", '.format('C' if self.trait_type == 'quantitative' else 'D')
+        adjust_arg = 'Adjustment=TRUE' if not self.small_sample else 'is_kurtosis_adj={0}, n.Resampling.kurtosis={1}'.format('TRUE' if self.resampling_kurtosis else 'FALSE', self.resampling_kurtosis)
+        h_null = '''obj <- SKAT_Null_Model{0}(y~{1}, {2}n.Resampling={3}, 
+        type.Resampling="bootstrap", {4})'''.format('_MomentAdjust' if self.small_sample else '',
+                1 if not self.ncovariates else 'X', y_type if not self.small_sample else '',
                 self.resampling, adjust_arg)
         self.Rargs.append(h_null)
         # get logistic weights
         if self.logistic_weights:
             self.Rargs.append('weights <- Get_Logistic_Weights(Z, par1={0}, par2={1})'.format(self.logistic_weights[0], self.logistic_weights[1]))
         # SKAT test
-        skat_test = '''re <- SKAT(Z, obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), weights = {4},
+        skat_test = '''re <- SKAT(Z, obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), {4}
         impute.method="{5}", r.corr={6}, is_check_genotype={7}, is_dosage={8}, missing_cutoff={9})'''.format(self.kernel, 
-                self.method, self.beta_param[0], self.beta_param[1], 'weights' if self.logistic_weights else 'NULL',
+                self.method, self.beta_param[0], self.beta_param[1], 'weights=weights, ' if self.logistic_weights else '',
                 self.impute, self.corr[0] if len(self.corr) == 1 else 'c('+','.join(map(str, self.corr))+')', 
                 'FALSE' if self.logistic_weights else 'TRUE', 'TRUE' if self.logistic_weights else 'FALSE', 
                 self.missing_cutoff)
         self.Rargs.append(skat_test)
         # get results
-        self.Rargs.extend(['p <- re$p.value', 'stat <- re$Q'])
+        self.Rargs.extend(['p <- re$p.value', 'stat <- re$Q[1,1]'])
         if self.resampling:
-            self.Rargs.append('pr <- Get_Resampling_Pvalue(re)')
-        self.logger.info("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
-
+            self.Rargs.append('pr <- Get_Resampling_Pvalue(re)$p.value')
+        else:
+            self.Rargs.append('pr <- -9')
+        self.Rargs.append('write(c(max(p,pr), stat {0}), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
+        self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
     def calculate(self):
-        pass
-#        if self.data.locicounts() <= 2:
-#            raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 3).")
-#        self.data.countCaseCtrl()
-#        self.algorithm.apply(self.data)
-#        pvalues = self.data.pvalue()
-#        statistics = self.data.statistic()
-#        se = self.data.se()
-#        res = [self.data.samplecounts()]
-#        for (x, y, z) in zip(statistics, pvalues, se):
-#            res.append(x)
-#            res.append(y)
-#            if self.permutations > 0:
-#                # actual number of permutations
-#                if math.isnan(z): res.append(z)
-#                else: res.append(int(z))
-#        return res
+        # translate data to string
+        zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(list(map(str, x))) + ')' for idx, x in enumerate(self.pydata['Z'])]))
+        xstr = 'cbind({0})'.format(','.join(['C'+str(idx+1)+'=c(' + ','.join(list(map(str, x))) + ')' for idx, x in enumerate(self.pydata['X'])])) if len(self.pydata['X']) > 0 else 'NA'
+        ystr = 'c(' + ','.join(list(map(str, self.pydata['y']))) + ')'
+        Rstr = 'library("SKAT")\ny<-{0}\nX<-{1}\nZ<-{2}\n{3}'.format(ystr, xstr, zstr, '\n'.join(self.Rargs))
+        tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
+        out, error = tc.communicate(Rstr.encode(sys.getdefaultencoding()))
+        if (tc.returncode):
+            raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
+        else:
+            if error:
+                self.logger.debug("WARNING message from SKAT package: \n{0}".format(error.decode(sys.getdefaultencoding())))
+        # res: (sample_size, pvalue, stat, pvalue.adj)
+        res = [len(self.pydata['y'])]
+        res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
+        return res

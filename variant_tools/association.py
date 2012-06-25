@@ -36,7 +36,7 @@ from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
 from .phenotype import Sample
 from .tester import *
-from .pyper import *
+
 import argparse
 
 def associateArguments(parser):
@@ -490,6 +490,21 @@ class AssoTestsWorker(Process):
         for field in data.keys():
             self.data.setVar('__var_' + field, data[field])
 
+    def setPyData(self, which, geno, pheno, covar, var_info, geno_Info, missing_code=None):
+        '''set all data to a python dictionary'''
+        if len(pheno) > 1:
+            raise ValueError('Only a single phenotype is allowed at this point')
+        if missing_code:
+            self.pydata['Z'] = [array('d', [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
+        else:
+            self.pydata['Z'] = [x for idx, x in enumerate(geno) if which[idx]]
+        self.pydata['y'] = [x for idx, x in enumerate(pheno[0]) if which[idx]]
+        if len(covar) > 0:
+            # skip the first covariate, a vector of '1''s
+            self.pydata['X'] = [array('d', [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
+        #FIXME: will not use var_info and geno_info for now
+
+
     def run(self):
         self.db = DatabaseEngine()
         self.db.connect(self.proj.name + '.proj', readonly=True)
@@ -513,13 +528,14 @@ class AssoTestsWorker(Process):
                 # select variants from each group:
                 genotype, which, var_info, geno_info = self.getGenotype(grp)
                 # set C++ data object
-                if len(self.tests) > 0 or (len(self.tests) > 1 and 'SKAT' in self.tests):
+                hasSKAT = 'SKAT' in [x.__class__.__name__ for x in self.tests]
+                if len(self.tests) > 0 or (len(self.tests) > 1 and hasSKAT):
                     self.setGenotype(which, genotype, geno_info)
                     self.setPhenotype(which, self.phenotypes, self.covariates)
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
-                if 'SKAT' in self.tests:
-                    self.setPydata(which, genotype, self.phenotypes, self.covariates, var_info, geno_info)
+                if hasSKAT:
+                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 9)
                 # association tests
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
