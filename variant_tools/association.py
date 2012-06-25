@@ -593,7 +593,8 @@ def associate(args):
                 #
                 if results.completed() > count:
                     count = results.completed()
-                    prog.update(count)
+                    failed_count = results.failed()
+                    prog.update(count, failed_count)
                     proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
                 #
                 if not any(proc_status):

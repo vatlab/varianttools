@@ -479,7 +479,7 @@ class ProgressBar:
                 if failed_front == 0:
                     msg[2] = ' [{}>{}]'.format('=' * front, ' ' * back)
                 else:
-                    msg[2] = ' [{}\033[1;31m{}\033[1;m>{}]'.format('=' * front, '?' * failed_front, ' ' * back)
+                    msg[2] = ' [{}\033[1;31m{}\033[1;m>{}]'.format('=' * front, '=' * failed_front, ' ' * back)
         else:
             width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4])
             msg[6] = ' '*width
