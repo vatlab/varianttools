@@ -50,8 +50,8 @@ def generalOutputArguments(parser):
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
     grp.add_argument('--na', default='NA',
         help='Output string for missing value')
-    grp.add_argument('-l', '--limit', default=-1, type=int,
-        help='''Number of record to display. Default to all record.''')
+    grp.add_argument('-l', '--limit', metavar='N', type=int,
+        help='''Limit output to the first N records.''')
     grp.add_argument('--build',
         help='''Output reference genome. If set to alternative build, chr and pos
             in the fields will be replaced by alt_chr and alt_pos''')
@@ -103,7 +103,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
         order_fields, tmp = consolidateFieldName(proj, table, ','.join(args.order_by))
         order_clause = ' ORDER BY {}'.format(order_fields)
     # LIMIT clause
-    limit_clause = '' if args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
+    limit_clause = '' if args.limit is None or args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
     query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
     proj.logger.debug('Running query {}'.format(query))
     # if output to a file

@@ -3074,17 +3074,16 @@ def showArguments(parser):
         help='''Items to display, which can be names of tables for type 'table',
             name of an annotation database for type 'annotation', name of a format
             for type 'format', and name of an association test for type 'test'.''')
-    parser.add_argument('-l', '--limit', default=10, type=int,
-        help='''Number of record to display for option 'show table'. All
-            records will be displayed if it is set to -1''')
+    parser.add_argument('-l', '--limit', metavar='N', type=int,
+        help='''Limit output to the first N records.''')
 
 
 def show(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             #
-            limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit > 0 else ''
-            omitted = '({} records omitted, use parameter --limit to see more)'
+            limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
+            omitted = '({} records omitted, use parameter --limit to display more or all records)'
             if args.type == 'project':
                 print(proj.summarize())
             elif args.type == 'tables':
