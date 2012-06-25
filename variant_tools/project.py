@@ -3121,7 +3121,7 @@ def show(args):
                 for rec in cur:
                     print(', '.join([str(x) for x in rec]))
                 nAll = proj.db.numOfRows(table)
-                if args.limit > 0 and args.limit < nAll:
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print omitted.format(nAll - args.limit)
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
@@ -3136,7 +3136,7 @@ def show(args):
                 for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
                 nAll = proj.db.numOfRows('sample')
-                if args.limit > 0 and args.limit < nAll:
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print omitted.format(nAll - args.limit)
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
@@ -3212,7 +3212,7 @@ def show(args):
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
                 nAll = proj.db.numOfRows('sample')
-                if args.limit > 0 and args.limit < nAll:
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print omitted.format(nAll - args.limit)
             elif args.type == 'tests':
                 # it is very bad idea to use circular import, but I have no choice
