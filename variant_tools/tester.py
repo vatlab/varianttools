@@ -70,8 +70,9 @@ class NullTest:
         # this function should never be called.
         raise SystemError('All association tests should define their own parseArgs function')
 
-    def setData(self, data):
+    def setData(self, data, pydata):
         self.data = data.clone()
+        self.pydata = pydata
 
     def calculate(self):
         '''run an association test'''
@@ -116,9 +117,10 @@ class GroupStat(NullTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def setData(self, data):
+    def setData(self, data, pydata):
         # do not clone data because this test does not change data
         self.data = data
+        self.pydata = pydata
 
     def calculate(self):
         res = []
@@ -1450,3 +1452,123 @@ class VariableThresholdsBt(GLMBurdenTest):
         self.weight = 'None'
         self.use_indicator=False
         self.trait_type = 'disease'
+
+#
+# External tests
+# The SKAT class wraps the R-SKAT package via simple piping (pypeR module)
+#
+class SKAT(NullTest):
+    '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        NullTest.__init__(self, logger, *method_args)
+        # set fields name for output database
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='Q_stats', index=None, type='FLOAT', adj=None, comment='Test statistic for SKAT, "Q"'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value{0}'.format(' (from resampled outcome)' if self.resampling else ''))]
+        self.ncovariates = ncovariates
+        if self.small_sample:
+            self.fields.append(Field(name='pvalue_noadj', index=None, type='FLOAT', adj=None, comment='The p-value of SKAT without the small sample adjustment. It only appears when small sample adjustment is applied'))
+            self.fields.append(Field(name='pvalue_noadj_resampling', index=None, type='FLOAT', adj=None, comment='The p-value rom resampled outcome without the small sample adjustment. It only appears when small sample adjustment is applied'))
+        #
+        self.algorithm = self._determine_algorithm()
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011).
+            This is a wrapper for the R package "SKAT" implemented & maintained by Seunggeun Lee, with a similar
+            interface and minimal descriptions based on the SKAT package documentation (May 11, 2012).
+            Please refer to http://http://cran.r-project.org/web/packages/SKAT/
+            for details of usage. To use this test you should have R installed with SKAT v0.75 or higher. 
+            The SKAT commands applied to the data will be recorded and saved in the project log file.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
+            help='''Phenotype is quantitative trait or disease trait (0/1 coding).
+            Default set to "quantitative"''')
+        parser.add_argument('--name', default='SKAT',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by SKAT
+        #
+        parser.add_argument('-k','--kernel', type=str, choices = ["linear", "linear.weighted", "IBS", "IBS.weighted", "quadratic", "2wayIX"],
+            default="linear.weighted",
+            help='''A type of kernel. Default set to "linear.weighted". Please refer to SKAT documentation for details.''')
+        parser.add_argument('--beta_param', nargs=2, type=float, default = [1,25],
+            help='''Parameters for beta weights. It is only used with weighted kernels. Default set to (1,25).
+                Please refer to SKAT documentation for details.''')
+        parser.add_argument('-m','--method', type=str, choices = ['davies','liu','liu.mod','optimal'], default='davies',
+            help='''A method to compute the p-value. Default set to "davies". Please refer to SKAT documentation for details.''')
+        parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
+            help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
+        parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',
+            help='''This option, if specified, will get the logistic weights from gentoype matrix Z and apply this weight to SKAT. It requires
+                two input parameters par1 and par2. To use the SKAT default setting, type `--logistic_weights 0.07 150'.
+                Please refer to SKAT documentation for details.''')
+        parser.add_argument('-r','--corr', nargs='*', type=float, default=[0],
+            help='''The pho parameter of SKAT test. Default is 0. Please refer to SKAT documentation for details.''')
+        parser.add_argument('--missing_cutoff', type=freq, default=0.15,
+            help='''a cutoff of the missing rates of SNPs. Any SNPs with missing
+                rates higher than cutoff will be excluded from the analysis. Default set to 0.15''')
+        parser.add_argument('--resampling', metavar='N', type=int, default=0,
+            help='''Number of resampling using bootstrap method. Set it to '0' if you do not want to apply resampling.''')
+        parser.add_argument('--small_sample', action='store_true',
+            help='''This option, if evoked, will apply small sample adjustment "SKAT_Null_Model_MomentAdjust" for small sample size and binary trait. Please refer to SKAT documentation for details.''')
+        parser.add_argument('--resampling_kurtosis', metavar='N', type=int, default=0,
+            help='''Number of resampling to estimate kurtosis, for small sample size adjustment.
+            Set it to '0' if you do not wnat to apply the adjustment. The SKAT default setting is 10000. Please 
+            refer to SKAT documentation for details.''')
+        # incorporate args to this class
+        args = parser.parse_args(method_args)
+        self.__dict__.update(vars(args))
+        if self.trait_type == 'quantitative' and self.small_sample:
+            self.logger.warning('Small sample-size adjustment does not apply to quantitative traits.')
+            self.small_sample = False
+        if self.resampling_kurtosis and not self.small_sample:
+            self.logger.warning('Kurtosis adjustment is only effective with "--small_sample" option.')
+            self.resampling_kurtosis = 0
+
+    def _determine_algorithm(self):
+        self.Rargs = []
+        # get parameters and residuals from the H0 model
+        adjust_arg = 'Adjustment=TRUE' if not self.small_sample else 'is_kurtosis_adj={0}, n.Resampleing.kurtosis={1}'.format('TRUE' if self.resampling_kurtosis else 'FALSE', self.resampling_kurtosis)
+        h_null = '''obj <- SKAT_Null_Model{0}(y~{1}, out_type="{2}",
+        n.Resamping={3}, type.Resampling="bootstrap", {4})'''.format('_MomentAdjust' if self.small_sample else '',
+                1 if not self.ncovariates else 'X', 'C' if self.trait_type == 'quantitative' else 'D',
+                self.resampling, adjust_arg)
+        self.Rargs.append(h_null)
+        # get logistic weights
+        if self.logistic_weights:
+            self.Rargs.append('weights <- Get_Logistic_Weights(Z, par1={0}, par2={1})'.format(self.logistic_weights[0], self.logistic_weights[1]))
+        # SKAT test
+        skat_test = '''re <- SKAT(Z, obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), weights = {4},
+        impute.method="{5}", r.corr={6}, is_check_genotype={7}, is_dosage={8}, missing_cutoff={9})'''.format(self.kernel, 
+                self.method, self.beta_param[0], self.beta_param[1], 'weights' if self.logistic_weights else 'NULL',
+                self.impute, self.corr[0] if len(self.corr) == 1 else 'c('+','.join(map(str, self.corr))+')', 
+                'FALSE' if self.logistic_weights else 'TRUE', 'TRUE' if self.logistic_weights else 'FALSE', 
+                self.missing_cutoff)
+        self.Rargs.append(skat_test)
+        # get results
+        self.Rargs.extend(['p <- re$p.value', 'stat <- re$Q'])
+        if self.resampling:
+            self.Rargs.append('pr <- Get_Resampling_Pvalue(re)')
+        self.logger.info("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
+
+
+    def calculate(self):
+        pass
+#        if self.data.locicounts() <= 2:
+#            raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 3).")
+#        self.data.countCaseCtrl()
+#        self.algorithm.apply(self.data)
+#        pvalues = self.data.pvalue()
+#        statistics = self.data.statistic()
+#        se = self.data.se()
+#        res = [self.data.samplecounts()]
+#        for (x, y, z) in zip(statistics, pvalues, se):
+#            res.append(x)
+#            res.append(y)
+#            if self.permutations > 0:
+#                # actual number of permutations
+#                if math.isnan(z): res.append(z)
+#                else: res.append(int(z))
+#        return res

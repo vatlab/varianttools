@@ -507,15 +507,22 @@ class AssoTestsWorker(Process):
             self.logger.debug('Retrieved association unit {}'.format(grpname))
             #
             self.data = t.AssoData()
+            self.pydata = {}
             values = list(grp)
             try:
                 # select variants from each group:
                 genotype, which, var_info, geno_info = self.getGenotype(grp)
-                self.setGenotype(which, genotype, geno_info)
-                self.setPhenotype(which, self.phenotypes, self.covariates)
-                self.setVarInfo(var_info)
+                # set C++ data object
+                if len(self.tests) > 0 or (len(self.tests) > 1 and 'SKAT' in self.tests):
+                    self.setGenotype(which, genotype, geno_info)
+                    self.setPhenotype(which, self.phenotypes, self.covariates)
+                    self.setVarInfo(var_info)
+                # set Python data object, for external tests
+                if 'SKAT' in self.tests:
+                    self.setPydata(which, genotype, self.phenotypes, self.covariates, var_info, geno_info)
+                # association tests
                 for test in self.tests:
-                    test.setData(self.data)
+                    test.setData(self.data, self.pydata)
                     result = test.calculate()
                     self.logger.debug('Finished association test on {}'.format(grpname))
                     values.extend(result)
