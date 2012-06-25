@@ -373,9 +373,10 @@ class ProgressBar:
             self.term_width = w
         except:
             self.term_width = 79
-        #
+        # total count, including failed ones
         self.count = 0
         self.failed_count = 0
+        # total initial count
         self.init_count = initCount
         self.init_failed_count = initFailedCount
         #
@@ -397,7 +398,9 @@ class ProgressBar:
         return
 
     def update(self, count, failed_count=0):
-        '''finished count jobs'''
+        '''completed count jobs, with failed_count failed jobs'''
+        if failed_count > count:
+            raise RuntimeError('Failed count should always less than or equal to completed count.')
         self.count = count
         self.failed_count = failed_count
         self.outputProgress()
@@ -426,9 +429,7 @@ class ProgressBar:
             self.last_time = self.start_time
         cur_time = time.time()
         # stop update progress bar more than once per second.
-        if (self.count + self.failed_count) > 0 and \
-            (self.count + self.failed_count) != self.totalCount \
-            and cur_time - self.last_time < 1:
+        if self.count > 0 and self.count != self.totalCount and cur_time - self.last_time < 1:
             return
         msg = ['', '', '', '', '', '', '']
         # message
@@ -438,7 +439,7 @@ class ProgressBar:
         if second_elapsed < 0.0001 or self.count == 0:
             msg[4] = ''
         else:
-            cps = (self.count + self.failed_count - self.init_count - self.init_failed_count) / second_elapsed
+            cps = (self.count - self.init_count) / second_elapsed
             # speed
             if cps > 1000000:
                 msg[4] = ' {:.1f}M/s'.format(cps/1000000)
@@ -452,28 +453,32 @@ class ProgressBar:
                 msg[4] = ' 0.0/s'
         # estimated time left
         if self.totalCount:
-            perc = min(1, float(self.count + self.failed_count) / self.totalCount)
-            init_perc = min(1, float(self.init_count + self.init_failed_count) / self.totalCount)
+            perc = min(1, float(self.count) / self.totalCount)
+            init_perc = min(1, float(self.init_count) / self.totalCount)
             time_left = (second_elapsed / (perc - init_perc) * (1 - perc)) if perc > init_perc else 0
             msg[5] += ' in {}{}'.format('' if time_left < 86400 else '{} days '.format(int(time_left/86400)),
                 time.strftime('%H:%M:%S', time.gmtime(time_left)))
         # percentage / progress
-        if (self.count + self.failed_count) > 0:
+        if self.count > 0:
             if self.failed_count == 0:
                 # no failed count
                 msg[3] = ' {:,}'.format(int(self.count))
+                m3Len = len(msg[3])
             else:
-                msg[3] = ' {:,}/{:,} failed'.format(int(self.count), int(self.failed_count))
+                # display failed count in red
+                msg[3] = ' {:,}/\033[1;31m{:,}\033[1;m'.format(int(self.count), int(self.failed_count))
+                m3Len = len(msg[3]) - 12  # the color strings should not be counted as length of message
         else:
             msg[3] = ' '
+            m3Len = 1
         if self.totalCount:
             # percentage
             perc = min(1, float(self.count) / self.totalCount)
             failed_perc = min(1, float(self.failed_count) / self.totalCount)
-            msg[1] = ' {:5.1f}%'.format((perc + failed_perc) * 100)
-            width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4]) - len(msg[5])
+            msg[1] = ' {:5.1f}%'.format(perc * 100)
+            width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4]) - len(msg[5])
             if width > 5:
-                front = int(perc * (width - 5))
+                front = int((perc - failed_perc) * (width - 5))
                 failed_front = int(failed_perc * (width - 5))
                 back = width - 5 - front - failed_front
                 if failed_front == 0:
@@ -481,17 +486,21 @@ class ProgressBar:
                 else:
                     msg[2] = ' [{}\033[1;31m{}\033[1;m>{}]'.format('=' * front, '=' * failed_front, ' ' * back)
         else:
-            width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4])
+            width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4])
             msg[6] = ' '*width
         # use stderr to avoid messing up process output
         sys.stderr.write('\r' + ''.join(msg))
 
-    def done(self, completed=None):
+    def done(self, completed=None, failed=None):
         '''Finish, output a new line'''
         if completed is not None:
             self.count = completed
         elif self.totalCount:
             self.count = self.totalCount
+        #
+        if failed is not None:
+            self.falied_count = failed
+        #
         msg = ['', '', '', '', '', '']
         # message
         msg[0] = self.main + ':'
@@ -508,17 +517,24 @@ class ProgressBar:
             msg[4] = ' {:.1f}s each'.format(1. / cps)
         else:
             msg[4] = ' 0.0/s'
-        msg[3] = ' {:,}'.format(self.finished + self.count)
+        #
+        if self.failed_count == 0:
+            msg[3] = ' {:,}'.format(self.finished + self.count)
+            m3Len = len(msg[3])
+        else:
+            msg[3] = ' {:,}/\033[1;31m{:,}\033[1;m'.format(self.finished + self.count, self.failed_count)
+            m3Len = len(msg[3]) - 12
         msg[5] += ' in {}{}'.format('' if second_elapsed < 86400 else '{} days '.format(int(second_elapsed/86400)),
                 time.strftime('%H:%M:%S', time.gmtime(second_elapsed)))
         # percentage / progress
         if self.totalCount:
             # percentage
             msg[1] = ' 100%'
-            width = self.term_width - len(msg[0]) - len(msg[1]) - len(msg[3]) - len(msg[4]) - len(msg[5])
+            width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4]) - len(msg[5])
             if width > 5:
                 front = int(width - 5)
-                msg[2] = ' [{}>]'.format('=' * front)
+                failed_front = int(float(self.failed_count)/self.count*front)
+                msg[2] = ' [{}\033[1;31m{}\033[1;m]'.format('=' * (front - failed_front), '=' * failed_front)
         sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
