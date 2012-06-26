@@ -451,9 +451,10 @@ class GLMBurdenTest(NullTest):
         else:
             a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
         if self.use_indicator:
-            self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
-            self.extern_weight = []
-            self.weight = 'None'
+            if not (self.weight == 'None' and len(self.extern_weight) == 0):
+                self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
+                self.extern_weight = []
+                self.weight = 'None'
         try:
             self.permute_by = self.permute_by.upper()
         except:
