@@ -759,11 +759,29 @@ class DatabaseEngine:
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db, dbName))
+            for pragma in runOptions.sqlite_pragma:
+                if '.' in pragma and pragma.split('.', 1)[0] != dbName:
+                    # if pragma is for a specific table with another name, ignore
+                    pass
+                #
+                try:
+                    cur.execute('PRAGMA {}.{}'.format(dbName, pragma))
+                except:
+                    pass
             return dbName
         else:
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db + '.DB' if db != ':memory:' else db, dbName))
+            for pragma in runOptions.sqlite_pragma:
+                if '.' in pragma and pragma.split('.', 1)[0] != dbName:
+                    # if pragma is for a specific table with another name, ignore
+                    pass
+                #
+                try:
+                    cur.execute('PRAGMA {}.{}'.format(dbName, pragma))
+                except:
+                    pass
             return dbName
 
     def detach(self, db):
