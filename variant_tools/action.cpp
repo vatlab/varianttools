@@ -22,7 +22,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <cfloat>
 #include "action.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
@@ -540,7 +540,7 @@ bool Fisher2X2::apply(AssoData & d)
 	} else {
 		pvalue = fexact2x2(twotwoTable, "two");
 	}
-	d.setStatistic( (double)twotwoTable[3]);
+	d.setStatistic( (twotwoTable[1] * twotwoTable[2]) ? (double)twotwoTable[3] * (double)twotwoTable[0] / ((double)twotwoTable[1] * (double)twotwoTable[2]) : DBL_MAX);
 	d.setPvalue(pvalue);
 	return true;
 }
@@ -999,6 +999,7 @@ bool VTFisher::apply(AssoData & d)
 	vectori & uniqv = d.getIntArrayVar("uniqVPattern");
 
 	vectorf allPs(uniqv.size() - 1);
+	vectorf allStats(uniqv.size() - 1);
 	vectorf XCurr(xdat.size(), 0.0);
 	bool shouldstop = true;
 
@@ -1072,16 +1073,18 @@ bool VTFisher::apply(AssoData & d)
 			shouldstop = false;
 		}
 		allPs[t - 1] = pvalue;
+		allStats[t - 1] = (twotwoTable[1] * twotwoTable[2]) ? (double)twotwoTable[3] * (double)twotwoTable[0] / ((double)twotwoTable[1] * (double)twotwoTable[2]) : DBL_MAX;
 	}
 	// with this adaptive Fisher's approach the resulting p-values will not be uniformly distributed
-	vectorf validPs(0);
+	vectorf validPs(0), validStats(0);
 	for (size_t i = 0; i < allPs.size(); ++i) {
 		if (allPs[i] > 0.0 && allPs[i] < 1.0) validPs.push_back(allPs[i]);
+		if (std::abs(allStats[i]) < DBL_MAX) validStats.push_back(allStats[i]);
 	}
-	if (validPs.size() == 0) {
+	if (validStats.size() == 0) {
 		d.setStatistic(0.0);
 	} else {
-		d.setStatistic(-log(*min_element(validPs.begin(), validPs.end())));
+		d.setStatistic(*max_element(validStats.begin(), validStats.end()));
 	}
 	if (shouldstop) {
 		// set the final p-value. This will prevent carrying out permutation tests
