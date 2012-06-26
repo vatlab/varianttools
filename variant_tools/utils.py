@@ -70,6 +70,8 @@ class RuntimeOptions(object):
             'verbosity',
             'sqlite_pragma',
             'import_num_of_readers',
+            # loading genotypes to RAM for association test
+            'associate_genotype_cache_size',
             # a temporary directory that is used to store temporary files. Will be
             # cleared after project is closed.
             'temp_dir',
@@ -87,6 +89,8 @@ class RuntimeOptions(object):
         self._cache_dir = 'cache'
         # path to a temporary directory, will be allocated automatically.
         self._temp_dir = None
+        #
+        self._associate_genotype_cache_size = 0
     #
     # attribute command line
     #
@@ -166,6 +170,26 @@ class RuntimeOptions(object):
             raise RuntimeError('Failed to create a temporary directory {}.'.format(self._temp_dir))
     #
     temp_dir = property(lambda self: self._temp_dir, _set_temp_dir)
+    #
+    # attribute associate_genotype_cache_size
+    # 
+    def _set_associate_genotype_cache_size(self, size='0'):
+        # assuming kb
+        if size is None:
+            return
+        if size.isdigit():
+            self._associate_genotype_cache_size = int(size)
+        else:
+            if (not size[:-1].isdigit()) or size[-1].upper() not in ['K', 'M', 'G']:
+                raise ValueError('Associate genotype cache size should ends in K, M, or G (assuming K if unspecified).')
+            if size.upper().endswith('K'):
+                self._associate_genotype_cache_size = int(size[:-1])
+            elif size.upper().endswith('M'):
+                self._associate_genotype_cache_size = int(size[:-1]) * 1024
+            elif size.upper().endswith('G'):
+                self._associate_genotype_cache_size = int(size[:-1]) * 1024 * 1024
+    #
+    associate_genotype_cache_size = property(lambda self: self._associate_genotype_cache_size, _set_associate_genotype_cache_size)
 
 
 # the singleton object of RuntimeOptions

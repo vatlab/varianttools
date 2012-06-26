@@ -33,7 +33,7 @@ import math
 from collections import OrderedDict
 from copy import copy, deepcopy
 from .project import Project, Field, AnnoDB, AnnoDBWriter
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction
+from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
 from .phenotype import Sample
 from .tester import *
 
@@ -258,10 +258,11 @@ class AssociationTestManager:
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
         cur.execute('''\
-            CREATE TABLE __asso_tmp (
+            CREATE {} TABLE __asso_tmp (
               variant_id INT NOT NULL,
               {});
-              '''.format(','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)])))
+              '''.format('TEMPORARY' if runOptions.associate_genotype_cache_size > 0 else '',
+              ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)])))
         #
         # select variant_id and groups for association testing
         group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by))
@@ -281,7 +282,7 @@ class AssociationTestManager:
         # This will be the tmp table to extract variant_id by groups
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
             self.from_clause, self.where_clause)
-        s = delayedAction(self.logger.info, "Creating association test table (please be patient ...)")
+        s = delayedAction(self.logger.info, "Grouping genotypes by {}, please be patient ...".format(', '.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
@@ -299,6 +300,109 @@ class AssociationTestManager:
         #
         #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
         return field_names, field_types, groups
+
+class GenotypeGrabber:
+    def __init__(self, param):
+        #
+        self.proj = param.proj
+        self.table = param.table
+        self.sample_IDs = param.sample_IDs
+        self.phenotypes = param.phenotypes
+        self.covariates = param.covariates
+        self.var_info = param.var_info
+        self.geno_info = param.geno_info
+        self.moi = param.moi
+        self.tests = param.tests
+        self.group_names = param.group_names
+        self.missing_filter = param.missing_filter
+        #
+        self.logger = param.proj.logger
+        if runOptions.associate_genotype_cache_size == 0:
+            self.db = DatabaseEngine()
+            self.db.connect(param.proj.name + '.proj', readonly=True)
+            self.db.attach(param.proj.name + '_genotype.DB', '__fromGeno')
+        else:
+            self.db = self.proj.db
+            self.proj.logger.debug('Setting PRAGMA __fromGeno.cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+            self.db.execute('PRAGMA __fromGeno.cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+        
+    def __del__(self):
+        self.db.detach('__fromGeno')
+        self.db.close()
+        
+    def getGenotype(self, group):
+        '''Get genotype for variants in specified group'''
+        try:
+            grpname = '"' + ", ".join(map(str, group)) + '"'
+        except TypeError:
+            grpname = None
+        # get variant_id
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause)
+        #
+        #self.logger.debug('Running on group {0} query {1}'.format(group, query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        variant_id = [x[0] for x in cur.fetchall()]
+        numSites = len(variant_id)
+        #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
+        #
+        # get annotation
+        var_info = {x:[] for x in self.var_info}
+        if self.var_info:
+            select_clause, fields = consolidateFieldName(self.proj, self.table, ','.join(['variant_id'] + self.var_info))
+            #
+            # FROM clause
+            from_clause = 'FROM {} '.format(self.table)
+            fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+            #
+            processed = set()
+            # the normal annotation databases that are 'LEFT OUTER JOIN'
+            for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+                if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
+                    from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+                    processed.add((tbl.lower(), conn.lower()))
+            #
+            # query
+            query = 'SELECT {0} {1} WHERE variant.variant_id IN ({2})'.format(
+                select_clause, from_clause, ','.join([self.db.PH]*len(variant_id)))
+            #self.logger.debug('Running query: {}'.format(query))
+            cur.execute(query, variant_id)
+            #
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+            for idx, key in enumerate(self.var_info):
+                var_info[key] = [data[x][idx] for x in variant_id]
+        #
+        # get genotypes
+        genotype = []
+        geno_info = {x:[] for x in self.geno_info}
+        for ID in self.sample_IDs:
+            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
+                .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
+            try:
+                cur.execute(query, group) # , variant_id)
+            except Exception as e:
+                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+            #
+            # genotype belonging to the same sample name are put together
+            #
+            # handle missing values
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+            # handle -1 coding (double heterozygotes)
+            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
+            #
+            # handle genotype_info
+            for idx, key in enumerate(self.geno_info):
+                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+        #
+        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
+        # remove individuals having many missing genotypes, or have all missing variants
+        toKeep = [(x < (self.missing_filter * numSites)) for x in missing_counts]
+        numtoRemove = len(self.sample_IDs) - sum(toKeep)
+        if numtoRemove > 0:
+            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
+        return genotype, toKeep, var_info, geno_info
 
 
 class ResultRecorder:
@@ -380,92 +484,23 @@ class ResultRecorder:
 class AssoTestsWorker(Process):
     '''Association test calculator'''
     def __init__(self, param, grpQueue, output):
-        self.proj = param.proj
-        self.table = param.table
-        self.sample_IDs = param.sample_IDs
+        self.param = param
+#        self.proj = param.proj
+#        self.table = param.table
+#        self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
-        self.var_info = param.var_info
-        self.geno_info = param.geno_info
+#        self.var_info = param.var_info
+#        self.geno_info = param.geno_info
         self.moi = param.moi
         self.tests = param.tests
-        self.group_names = param.group_names
-        self.missing_filter = param.missing_filter
+#        self.group_names = param.group_names
+#        self.missing_filter = param.missing_filter
         self.queue = grpQueue
         self.output = output
-        self.logger = self.proj.logger
+        self.logger = param.proj.logger
         self.db = None
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
-
-    def getGenotype(self, group):
-        '''Get genotype for variants in specified group'''
-        # get variant_id
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause)
-        #
-        #self.logger.debug('Running on group {0} query {1}'.format(group, query))
-        cur = self.db.cursor()
-        cur.execute(query, group)
-        variant_id = [x[0] for x in cur.fetchall()]
-        numSites = len(variant_id)
-        #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
-        #
-        # get annotation
-        var_info = {x:[] for x in self.var_info}
-        if self.var_info:
-            select_clause, fields = consolidateFieldName(self.proj, self.table, ','.join(['variant_id'] + self.var_info))
-            #
-            # FROM clause
-            from_clause = 'FROM {} '.format(self.table)
-            fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
-            #
-            processed = set()
-            # the normal annotation databases that are 'LEFT OUTER JOIN'
-            for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-                if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
-                    from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
-                    processed.add((tbl.lower(), conn.lower()))
-            #
-            # query
-            query = 'SELECT {0} {1} WHERE variant.variant_id IN ({2})'.format(
-                select_clause, from_clause, ','.join([self.db.PH]*len(variant_id)))
-            #self.logger.debug('Running query: {}'.format(query))
-            cur.execute(query, variant_id)
-            #
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-            for idx, key in enumerate(self.var_info):
-                var_info[key] = [data[x][idx] for x in variant_id]
-        #
-        # get genotypes
-        genotype = []
-        geno_info = {x:[] for x in self.geno_info}
-        for ID in self.sample_IDs:
-            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN ({1});'\
-                .format(ID, ','.join([self.db.PH]*len(variant_id)), ' '.join([', ' + x for x in self.geno_info]))
-            try:
-                cur.execute(query, variant_id)
-            except Exception as e:
-                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-            #
-            # genotype belonging to the same sample name are put together
-            #
-            # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
-            # handle -1 coding (double heterozygotes)
-            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
-            #
-            # handle genotype_info
-            for idx, key in enumerate(self.geno_info):
-                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-        #
-        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
-        # remove individuals having many missing genotypes, or have all missing variants
-        toKeep = [(x < (self.missing_filter * numSites)) for x in missing_counts]
-        numtoRemove = len(self.sample_IDs) - sum(toKeep)
-        if numtoRemove > 0:
-            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
-        return genotype, toKeep, var_info, geno_info
 
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -506,12 +541,17 @@ class AssoTestsWorker(Process):
 
 
     def run(self):
-        self.db = DatabaseEngine()
-        self.db.connect(self.proj.name + '.proj', readonly=True)
-        self.db.attach(self.proj.name + '_genotype.DB', '__fromGeno')
-        #
+        # if genotypes are not cached, each worker will grab genotype from the database by itself
+        if runOptions.associate_genotype_cache_size == 0:
+            gg = GenotypeGrabber(self.param)
         while True:
-            grp = self.queue.get()
+            # if cached, get genotype from the main process
+            if runOptions.associate_genotype_cache_size > 0:
+                grp, (genotype, which, var_info, geno_info) = self.queue.get()
+            else:
+                # otherwise, only the group
+                grp = self.queue.get()
+            #
             try:
                 grpname = '"' + ", ".join(map(str, grp)) + '"'
             except TypeError:
@@ -525,8 +565,9 @@ class AssoTestsWorker(Process):
             self.pydata = {}
             values = list(grp)
             try:
-                # select variants from each group:
-                genotype, which, var_info, geno_info = self.getGenotype(grp)
+                if runOptions.associate_genotype_cache_size == 0:
+                    # select variants from each group:
+                    genotype, which, var_info, geno_info = gg.getGenotype(grp)
                 # set C++ data object
                 hasSKAT = 'SKAT' in [x.__class__.__name__ for x in self.tests]
                 if len(self.tests) > 0 or (len(self.tests) > 1 and hasSKAT):
@@ -549,7 +590,6 @@ class AssoTestsWorker(Process):
                 # return no result for any of the tests if a test fails.
                 values = []
             self.output.send(values)
-        self.db.detach('__fromGeno')
 
 
 def associate(args):
@@ -571,16 +611,29 @@ def associate(args):
                 r, w = Pipe(False)
                 AssoTestsWorker(asso, grpQueue, w).start()
                 readers.append(r)
+            #
             # put all jobs to queue, the workers will work on them
-            for grp in asso.groups:
-                grpQueue.put(grp)
-            # the worker will stop once all jobs are finished
-            for j in range(nJobs):
-                grpQueue.put(None)
-            count = 0
-            prog = ProgressBar('Testing for association', len(asso.groups))
+            if runOptions.associate_genotype_cache_size > 0:
+                geno = GenotypeGrabber(asso)
+                prog = ProgressBar('Getting genotypes', len(asso.groups))
+                for count,grp in enumerate(asso.groups):
+                    geno.getGenotype(grp)
+                    #grpQueue.put((grp, geno.getGenotype(grp)))
+                    prog.update(count)
+                for j in range(nJobs):
+                    grpQueue.put(None)
+                prog.done()
+            else:
+                for grp in asso.groups:
+                    grpQueue.put(grp)
+                # the worker will stop once all jobs are finished
+                for j in range(nJobs):
+                    grpQueue.put(None)
             #
             proc_status = [True] * len(readers)
+            count = 0
+            # get initial completed and failed
+            prog = ProgressBar('Testing for association', len(asso.groups), results.completed(), results.failed())
             while True:
                 for idx, (s,r) in enumerate(zip(proc_status, readers)):
                     if not s:
@@ -593,8 +646,7 @@ def associate(args):
                 #
                 if results.completed() > count:
                     count = results.completed()
-                    failed_count = results.failed()
-                    prog.update(count, failed_count)
+                    prog.update(count, results.failed())
                     proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
                 #
                 if not any(proc_status):

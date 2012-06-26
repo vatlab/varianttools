@@ -848,6 +848,7 @@ class Project:
         # if option temp_dir is set, the path will be used
         # if not, None will be passed, and a temporary directory will be used.
         runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
+        runOptions.associate_genotype_cache_size = self.loadProperty('__option_associate_genotype_cache_size', None)
         #
         # create a logger
         self.logger = logging.getLogger()
