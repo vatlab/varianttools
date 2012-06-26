@@ -709,10 +709,14 @@ class DatabaseEngine:
             self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
             self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
             self.database.enable_load_extension(True)
-            # set default cache size to a larger number to improve query performance
+            # FIXME: we may need to reconsider this because some pragma applies to 
+            # readonly databases (e.g. cache_size)
             if not readonly:
                 cur = self.database.cursor()
                 for pragma in runOptions.sqlite_pragma:
+                    # if a pragma is only applicable to certain database, check its name
+                    if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
+                        continue
                     # No error message will be produced for wrong pragma
                     # but we may have syntax error.
                     try:
@@ -774,14 +778,24 @@ class DatabaseEngine:
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db + '.DB' if db != ':memory:' else db, dbName))
             for pragma in runOptions.sqlite_pragma:
-                if '.' in pragma and pragma.split('.', 1)[0] != dbName:
-                    # if pragma is for a specific table with another name, ignore
-                    pass
-                #
-                try:
-                    self.execute('PRAGMA {}.{}'.format(dbName, pragma))
-                except:
-                    pass
+                # database specific pragma
+                if '.' in pragma.split('=')[0]:
+                    # pragma for another database
+                    if pragma.split('.', 1)[0] != dbName:
+                        # if pragma is for a specific table with another name, ignore
+                        continue
+                    else:
+                        # execute it
+                        try:
+                            self.execute('PRAGMA {}'.format(pragma))
+                        except:
+                            pass
+                else:
+                    # apply general pragma to the attached database
+                    try:
+                        self.execute('PRAGMA {}.{}'.format(dbName, pragma))
+                    except:
+                        pass
             return dbName
 
     def detach(self, db):
