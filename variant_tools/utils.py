@@ -531,8 +531,8 @@ class ProgressBar:
             # percentage
             msg[1] = ' 100%'
             width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4]) - len(msg[5])
-            if width > 5:
-                front = int(width - 5)
+            if width > 4:
+                front = int(width - 4)
                 failed_front = int(float(self.failed_count)/self.count*front)
                 msg[2] = ' [{}\033[1;31m{}\033[1;m]'.format('=' * (front - failed_front), '=' * failed_front)
         sys.stderr.write('\r' + ''.join(msg) + '\n')
