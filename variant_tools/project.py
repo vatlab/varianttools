@@ -843,20 +843,11 @@ class Project:
         # create a temporary directory
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
-        try:
-            # this might not exist becaues the project can be new and do not have the
-            # project table
-            runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
-        except:
-            pass
+        runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
         # temporary directory...
-        try:
-            # if option temp_dir is set, the path will be used
-            # if not, None will be passed, and a temporary directory will be used.
-            runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
-        except:
-            # this will force the use of a system temporary directory
-            runOptions.temp_dir = None
+        # if option temp_dir is set, the path will be used
+        # if not, None will be passed, and a temporary directory will be used.
+        runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -872,10 +863,7 @@ class Project:
         #
         if verbosity is None and not new:
             # try to get saved verbosity level
-            try:
-                verbosity = self.loadProperty('__option_verbosity')
-            except:
-                pass
+            verbosity = self.loadProperty('__option_verbosity', None)
         # set global verbosity level and temporary directory
         runOptions.verbosity=verbosity
         #
@@ -979,12 +967,7 @@ class Project:
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
             self.db.connect(self.proj_file)
         # loading other options if they have been set
-        inor = self.loadProperty('__option_import_num_of_readers', None)
-        if inor is not None:
-            try:  # int() might fail
-                runOptions.import_num_of_readers=inor
-            except:
-                self.logger.warning('Failed to set option import_num_of_readers {}'.format(inor))
+        runOptions.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         #
         # existing project
         cur = self.db.cursor()
@@ -1087,8 +1070,8 @@ class Project:
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''
         cur = self.db.cursor()
-        cur.execute('SELECT value FROM project WHERE name={0};'.format(self.db.PH), (key,))
         try:
+            cur.execute('SELECT value FROM project WHERE name={0};'.format(self.db.PH), (key,))
             return cur.fetchone()[0]
         except Exception as e:
             #self.logger.debug(e)
@@ -1106,8 +1089,7 @@ class Project:
             else:
                 cur.execute('INSERT INTO project VALUES ({0}, {0});'.format(self.db.PH), (key, value))
         except Exception as e:
-            self.logger.debug(e)
-            raise
+            pass
         self.db.commit()
 
     def remove(self):
