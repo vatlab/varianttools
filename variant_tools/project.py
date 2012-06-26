@@ -2871,8 +2871,18 @@ def init(args):
                 proj = Project(verbosity='0', verify=False)
                 proj.remove()
             except:
-                # we might not be able to open a non-exist project
-                pass
+                # we might not be able to open a non-exist project if it is malformed.
+                # however, this will not completely remove the project if the project
+                # uses a MySQL engine.
+                files = glob.glob('*.proj')
+                if len(files) > 0:
+                    for f in files:
+                        try:
+                            os.remove(f)
+                            os.remove(f.replace('.proj', '_genotype.DB'))
+                        except:
+                            # we might not be able to remove files...
+                            raise OSError('Failed to remove existing project {}'.format(f))
         # create a new project
         #
         # args.batch is temporarily removed to keep interface clean
