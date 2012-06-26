@@ -454,7 +454,10 @@ class GLMBurdenTest(NullTest):
             self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
             self.extern_weight = []
             self.weight = 'None'
-        self.permute_by = self.permute_by.upper()
+        try:
+            self.permute_by = self.permute_by.upper()
+        except:
+            pass
         # weighting theme
         a_wtheme = None
         a_wtimes = self.alternative
