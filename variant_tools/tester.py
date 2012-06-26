@@ -468,9 +468,7 @@ class GLMBurdenTest(NullTest):
         elif self.weight == 'Browning':
             a_wtheme = t.BrowningWeight(self.alternative)
         elif self.weight == 'KBAC':
-            # FIXME: not very efficient to recalculate GID at each permutation
-            # not sure if there is a way to permute the GID with the raw data ...
-            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True, recalculateGID=True)
+            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'RBT':
             a_wtheme = t.RBTtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'None':

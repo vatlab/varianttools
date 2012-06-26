@@ -26,6 +26,7 @@
 
 #include "assoData.h"
 #include <cmath>
+#include <algorithm>
 namespace vtools {
 
 
@@ -99,7 +100,7 @@ void AssoData::weightX(const matrixf & weight)
 
 bool AssoData::setGenotypeId()
 {
-    // note: this will simply ignore missing data (treat as wildtype)
+	// note: this will simply ignore missing data (treat as wildtype)
 
 	m_genotype_id.resize(m_phenotype.size());
 
@@ -133,6 +134,14 @@ bool AssoData::setGenotypeId()
 		m_genotype_id[i] = vntIdL + vntIdR * 1e-10;
 	}
 
+	vectorf v = m_genotype_id;
+	std::sort(v.begin(), v.end());
+	std::vector<double>::iterator it = std::unique(v.begin(), v.end());
+	v.resize(it - v.begin());
+	for (size_t i = 0; i < m_genotype_id.size(); ++i) {
+		std::vector<double>::iterator low = std::lower_bound(v.begin(), v.end(), m_genotype_id[i]);
+		m_genotype_id[i] = double(low - v.begin());
+	}
 }
 
 

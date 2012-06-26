@@ -701,10 +701,6 @@ bool KBACtest::apply(AssoData & d)
 {
 	vectorf & up = d.getArrayVar("uniqGPattern");
 	vectori & upc = d.getIntArrayVar("uniqGCounts");
-
-	if (m_recalculateGID) {
-		d.setGenotypeId();
-	}
 	vectorf & gId = d.genotype_id();
 	vectorf & ydat = d.phenotype();
 	unsigned nCases = d.getIntVar("ncases");
@@ -1491,7 +1487,7 @@ bool VariablePermutator::apply(AssoData & d)
 		// This will be used for genotype permutations
 		// when only this gindex will be permuted
 		// and all vectors in "genotypes" will be re-ordered by gindex
-		for (size_t i = 0; i < genotypes[0].size(); ++i) {
+		for (size_t i = 0; i < genotypes.front().size(); ++i) {
 			gindex.push_back(i);
 		}
 	}

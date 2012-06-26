@@ -189,6 +189,35 @@ public:
 
 };
 
+class PermuteAllX : public BaseAction
+{
+public:
+	PermuteAllX() : BaseAction()
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new PermuteAllX(*this);
+	}
+
+
+	bool apply(AssoData & d)
+	{
+		d.permuteAllX();
+		return true;
+	}
+
+
+	std::string name()
+	{
+		return "PermuteAllX";
+	}
+
+
+};
+
 class PermuteY : public BaseAction
 {
 public:
@@ -672,8 +701,8 @@ public:
 class KBACtest : public BaseAction
 {
 public:
-	KBACtest(unsigned alternative = 1, bool weightOnly = false, bool recalculateGID = false) :
-		BaseAction(), m_tailed(alternative), m_weightOnly(weightOnly), m_recalculateGID(recalculateGID)
+	KBACtest(unsigned alternative = 1, bool weightOnly = false) :
+		BaseAction(), m_tailed(alternative), m_weightOnly(weightOnly)
 	{
 	}
 
@@ -696,7 +725,6 @@ public:
 private:
 	unsigned m_tailed;
 	bool m_weightOnly;
-	bool m_recalculateGID;
 };
 
 
@@ -1065,7 +1093,7 @@ public:
 		: BasePermutator(actions), m_times(times), m_alternative(alternative), m_sig(sig)
 	{
 		// permute phenotypes or permute genotype scores
-		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteRawX());
+		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteAllX());
 	}
 
 
@@ -1126,7 +1154,7 @@ public:
 		: BasePermutator(actions), m_times(times), m_alternative(alternative), m_sig(sig)
 	{
 		// permute phenotypes or permute genotype scores
-		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteRawX());
+		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteAllX());
 	}
 
 

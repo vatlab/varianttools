@@ -82,8 +82,8 @@ public:
 	 */
 
 	AssoData() :
-		m_phenotype(0), m_genotype(0),
-		m_C(0), m_X(0), m_genotype_id(0),
+		m_phenotype(0), m_C(0), m_genotype(0),
+		m_X(0), m_genotype_id(0), m_genotype_index(0),
 		m_pval(0), m_statistic(0), m_se(0), m_model(),
 		m_doubleVars(), m_intVars(), m_arrayVars(),
 		m_intArrayVars(), m_matrixVars()
@@ -105,6 +105,11 @@ public:
 	{
 		//codings are 0, 1, 2, -9 and U(0,1) number for "expected" genotype
 		m_genotype = g;
+		// set genotype ID
+		m_genotype_index.resize(m_genotype.size());
+		for (size_t i = 0; i < m_genotype_index.size(); ++i) {
+			m_genotype_index[i] = i;
+		}
 		// set default MOI to use additive coding
 		int moi = 2;
 		setVar("moi", moi);
@@ -309,6 +314,17 @@ public:
 	}
 
 
+	// permute all X, by genotype index
+	// including genotype score, genotype pattern ID, and raw genotype
+	void permuteAllX()
+	{
+		random_shuffle(m_genotype_index.begin(), m_genotype_index.end());
+		reorder(m_genotype_index.begin(), m_genotype_index.end(), m_genotype.begin());
+		if (m_X.size() > 0) reorder(m_genotype_index.begin(), m_genotype_index.end(), m_X.begin());
+		if (m_genotype_id.size() > 0) reorder(m_genotype_index.begin(), m_genotype_index.end(), m_genotype_id.begin());
+	}
+
+
 	// permute genotype scores
 	void permuteX()
 	{
@@ -420,14 +436,16 @@ public:
 private:
 	/// raw phenotype and gneotype data
 	vectorf m_phenotype;
-	matrixf m_genotype;
-
 	// covariates
 	matrixf m_C;
-
-	/// translated genotype
+	// genotype
+	matrixf m_genotype;
+	// translated genotype
 	vectorf m_X;
+	// genotype pattern ID
 	vectorf m_genotype_id;
+	// genotype index ID
+	std::vector<size_t> m_genotype_index;
 	// statistics from association tests
 	vectorf m_pval;
 	vectorf m_statistic;
