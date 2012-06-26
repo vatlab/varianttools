@@ -230,4 +230,4 @@ comment=DP fields in INFO. Total depth of samples in a vcf file.
 index=9, 10:
 adj=FieldFromFormat('DP', ':')
 type=INTEGER
-comment=DP fields in INFO. Depth for each sample in a vcf file.
+comment=DP fields in FORMAT. Depth for each sample genotype in a vcf file.
