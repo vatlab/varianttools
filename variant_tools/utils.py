@@ -765,7 +765,7 @@ class DatabaseEngine:
                     pass
                 #
                 try:
-                    cur.execute('PRAGMA {}.{}'.format(dbName, pragma))
+                    self.execute('PRAGMA {}.{}'.format(dbName, pragma))
                 except:
                     pass
             return dbName
@@ -779,7 +779,7 @@ class DatabaseEngine:
                     pass
                 #
                 try:
-                    cur.execute('PRAGMA {}.{}'.format(dbName, pragma))
+                    self.execute('PRAGMA {}.{}'.format(dbName, pragma))
                 except:
                     pass
             return dbName
