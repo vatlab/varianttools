@@ -282,7 +282,7 @@ class AssociationTestManager:
         # This will be the tmp table to extract variant_id by groups
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(self.table, group_fields,
             self.from_clause, self.where_clause)
-        s = delayedAction(self.logger.info, "Grouping genotypes by {}, please be patient ...".format(', '.join(group_by)))
+        s = delayedAction(self.logger.info, "Grouping variants by {}, please be patient ...".format(', '.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
@@ -364,10 +364,10 @@ class GenotypeGrabber:
                     processed.add((tbl.lower(), conn.lower()))
             #
             # query
-            query = 'SELECT {0} {1} WHERE variant.variant_id IN ({2})'.format(
-                select_clause, from_clause, ','.join([self.db.PH]*len(variant_id)))
+            query = 'SELECT {0} {1} WHERE variant.variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {2})'.format(
+                select_clause, from_clause, where_clause)
             #self.logger.debug('Running query: {}'.format(query))
-            cur.execute(query, variant_id)
+            cur.execute(query, group)
             #
             data = {x[0]:x[1:] for x in cur.fetchall()}
             for idx, key in enumerate(self.var_info):
