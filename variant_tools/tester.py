@@ -252,7 +252,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'KBAC':
-                algorithm.append(t.FillGMissing(method="mlg"))
+#                algorithm.append(t.FillGMissing(method="mlg"))
                 algorithm.append(t.FindGenotypePattern())
                 a_permutationtest = t.FixedPermutator(
                         'Y',
@@ -263,7 +263,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
-                algorithm.append(t.FillGMissing(method="mlg"))
+#                algorithm.append(t.FillGMissing(method="mlg"))
                 a_permutationtest = t.FixedPermutator(
                         'Y',
                         1,
@@ -316,7 +316,7 @@ class CaseCtrlBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
-                algorithm.append(t.FillGMissing(method="mlg"))
+#                algorithm.append(t.FillGMissing(method="mlg"))
                 # this has to be a two-sided test
                 a_permutationtest = t.FixedPermutator(
                         'Y',
@@ -452,6 +452,7 @@ class GLMBurdenTest(NullTest):
             self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
             self.extern_weight = []
             self.weight = 'None'
+        self.permute_by = self.permute_by.upper()
         # weighting theme
         a_wtheme = None
         a_wtimes = self.alternative
@@ -461,7 +462,7 @@ class GLMBurdenTest(NullTest):
         elif self.weight == 'Browning':
             a_wtheme = t.BrowningWeight(self.alternative)
         elif self.weight == 'KBAC':
-            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True)
+            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True, recalculateGID=True)
         elif self.weight == 'RBT':
             a_wtheme = t.RBTtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'None':
@@ -478,13 +479,12 @@ class GLMBurdenTest(NullTest):
             t.SetSites(self.mafupper, self.maflower)
             ])
         # special actions for KBAC and RBT weighting themes
-        if self.weight in ['KBAC', 'RBT']:
-            if not self.nan_adjust:
-                self.logger.warning("In order to use weighting theme {0}, missing genotypes will be \
-                        replaced by the most likely genotype based on MAF".format(self.weight))
-            algorithm.append(t.FillGMissing(method="mlg"))
-            if self.weight == 'KBAC':
-                algorithm.append(t.FindGenotypePattern())
+#        if self.weight in ['KBAC', 'RBT']:
+#            if not self.nan_adjust:
+#                self.logger.warning("In order to use weighting theme {0}, missing genotypes will be replaced by the most likely genotype based on MAF".format(self.weight))
+#            algorithm.append(t.FillGMissing(method="mlg"))
+        if self.weight == 'KBAC':
+            algorithm.append(t.FindGenotypePattern())
         # recode missing data
         if self.nan_adjust:
             algorithm.append(t.FillGMissing(method="maf"))
@@ -528,7 +528,7 @@ class GLMBurdenTest(NullTest):
                 if not a_wtester:
                     algorithm.append(a_scoregene)
                 a_permutationtest = t.FixedPermutator(
-                        self.permute_by.upper(),
+                        self.permute_by,
                         # FIXME: logic is correct yet confusing here
                         # use self.alternative = 2 for Browning_all only
                         # because it resets a_wtimes to 1
@@ -540,7 +540,7 @@ class GLMBurdenTest(NullTest):
                 algorithm.append(a_permutationtest)
             else:
                 a_permutationtest = t.VariablePermutator(
-                        self.permute_by.upper(),
+                        self.permute_by,
                         1 if a_wtimes == 2 else self.alternative,
                         self.permutations,
                         self.adaptive,
@@ -1125,9 +1125,9 @@ class WeightedBurdenQt(GLMBurdenTest):
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
-        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'Browning_all',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
-               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Default set to 'Browning_all'. Except for
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
@@ -1382,9 +1382,9 @@ class WeightedBurdenBt(GLMBurdenTest):
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
-        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
+        parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'Browning_all',
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
-               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Except for
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. Default set to 'Browning_all'. Except for
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')

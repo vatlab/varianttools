@@ -25,7 +25,7 @@
 
 
 #include "assoData.h"
-
+#include <cmath>
 namespace vtools {
 
 
@@ -94,6 +94,45 @@ void AssoData::weightX(const matrixf & weight)
 			}
 		}
 	}
+}
+
+
+bool AssoData::setGenotypeId()
+{
+    // note: this will simply ignore missing data (treat as wildtype)
+
+	m_genotype_id.resize(m_phenotype.size());
+
+	for (size_t i = 0; i < m_phenotype.size(); ++i) {
+
+		double vntIdL = 0.0;
+		double vntIdR = 0.0;
+		const double ixiix = pow(9.0, 10.0);
+		unsigned lastCnt = 0;
+		unsigned tmpCnt = 0;
+
+		for (size_t j = 0; j < m_genotype.front().size(); ++j) {
+
+			if (m_genotype[i][j] >= 1.0) {
+				vntIdR += pow(3.0, 1.0 * (j - lastCnt)) * m_genotype[i][j];
+			}else {
+				continue;
+			}
+			if (vntIdR >= ixiix) {
+				vntIdL = vntIdL + 1.0;
+				vntIdR = vntIdR - ixiix;
+				lastCnt = lastCnt + tmpCnt + 1;
+				tmpCnt = 0;
+				continue;
+			}else {
+				++tmpCnt;
+				continue;
+			}
+		}
+		// one-to-one "ID number" for a genotype pattern
+		m_genotype_id[i] = vntIdL + vntIdR * 1e-10;
+	}
+
 }
 
 

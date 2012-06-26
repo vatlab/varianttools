@@ -665,44 +665,9 @@ bool WSSPvalue::apply(AssoData & d)
 
 bool FindGenotypePattern::apply(AssoData & d)
 {
-	vectorf & ydat = d.phenotype();
-	matrixf & xdat = d.raw_genotype();
-	//FIXME
-	// missing data has to be replaced by MLG
-
 	//!-Compute unique genotype patterns (string) as ID scores (double)
-	vectorf genotypeId(ydat.size());
-
-	for (size_t i = 0; i < ydat.size(); ++i) {
-
-		double vntIdL = 0.0;
-		double vntIdR = 0.0;
-		const double ixiix = pow(9.0, 10.0);
-		unsigned lastCnt = 0;
-		unsigned tmpCnt = 0;
-
-		for (size_t j = 0; j < xdat.front().size(); ++j) {
-
-			if (xdat[i][j] >= 1.0) {
-				vntIdR += pow(3.0, 1.0 * (j - lastCnt)) * xdat[i][j];
-			}else {
-				continue;
-			}
-			if (vntIdR >= ixiix) {
-				vntIdL = vntIdL + 1.0;
-				vntIdR = vntIdR - ixiix;
-				lastCnt = lastCnt + tmpCnt + 1;
-				tmpCnt = 0;
-				continue;
-			}else {
-				++tmpCnt;
-				continue;
-			}
-		}
-		// one-to-one "ID number" for a genotype pattern
-		genotypeId[i] = vntIdL + vntIdR * 1e-10;
-	}
-
+	d.setGenotypeId();
+	vectorf & genotypeId = d.genotype_id();
 	// unique genotype patterns
 	vectorf uniquePattern = genotypeId;
 	std::sort(uniquePattern.begin(), uniquePattern.end());
@@ -714,7 +679,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 	}
 	// count number of sample individuals for each genotype pattern
 	vectori uniquePatternCounts(uniquePattern.size(), 0);
-	for (size_t i = 0; i < ydat.size(); ++i) {
+	for (size_t i = 0; i < genotypeId.size(); ++i) {
 		// for each sample, identify/count its genotype pattern
 		for (size_t u = 0; u < uniquePattern.size(); ++u) {
 			if (genotypeId[i] == uniquePattern[u]) {
@@ -726,7 +691,6 @@ bool FindGenotypePattern::apply(AssoData & d)
 			// genotype pattern not found -- move on to next pattern
 		}
 	}
-	d.setVar("gPattern", genotypeId);
 	d.setVar("uniqGPattern", uniquePattern);
 	d.setVar("uniqGCounts", uniquePatternCounts);
 	return true;
@@ -737,7 +701,11 @@ bool KBACtest::apply(AssoData & d)
 {
 	vectorf & up = d.getArrayVar("uniqGPattern");
 	vectori & upc = d.getIntArrayVar("uniqGCounts");
-	vectorf & gId = d.getArrayVar("gPattern");
+
+	if (m_recalculateGID) {
+		d.setGenotypeId();
+	}
+	vectorf & gId = d.genotype_id();
 	vectorf & ydat = d.phenotype();
 	unsigned nCases = d.getIntVar("ncases");
 	unsigned nCtrls = d.getIntVar("nctrls");
@@ -1671,6 +1639,7 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 	vectorf & X = d.genotype();
 	matrixf & genotype = d.raw_genotype();
 	matrixf & weights = d.getMatrixVar(wtheme);
+
 	// computer X for 1 or 2 sided hypothesis
 	for (size_t s = 0; s < m_model; ++s) {
 		X.resize(genotype.size());
@@ -1709,7 +1678,7 @@ bool WeightedGenotypeTester::apply(AssoData & d)
 			// now kbac scoring system
 			// using KBAC weights directly as X
 			vectorf & uniquePattern = d.getArrayVar("uniqGPattern");
-			vectorf & genotypeId = d.getArrayVar("gPattern");
+			vectorf & genotypeId = d.genotype_id();
 			matrixf & uniquePatternWeights = d.getMatrixVar("KBACweight");
 			for (size_t i = 0; i < genotype.size(); ++i) {
 				for (size_t u = 0; u < uniquePattern.size(); ++u) {

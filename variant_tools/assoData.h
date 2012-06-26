@@ -82,9 +82,11 @@ public:
 	 */
 
 	AssoData() :
-		m_phenotype(0), m_genotype(0), m_C(0), m_X(0),
+		m_phenotype(0), m_genotype(0),
+		m_C(0), m_X(0), m_genotype_id(0),
 		m_pval(0), m_statistic(0), m_se(0), m_model(),
-		m_doubleVars(), m_intVars(), m_arrayVars()
+		m_doubleVars(), m_intVars(), m_arrayVars(),
+		m_intArrayVars(), m_matrixVars()
 	{
 	}
 
@@ -128,6 +130,12 @@ public:
 		return true;
 	}
 
+
+	// Convert genotype patterns (a vector of 0/1/2) as ID scores (double)
+	// one-to-one "ID number" for a genotype pattern
+	// an efficient storage of diplotype patterns.
+	// will be useful for at least KBAC test
+	bool setGenotypeId();
 
 	// set phenotypes
 	// input is a vector, i.e., no there is no other phenotype covariates and genotype will be the only predictor in the statistical model
@@ -180,6 +188,12 @@ public:
 	vectorf & genotype()
 	{
 		return m_X;
+	}
+
+
+	vectorf & genotype_id()
+	{
+		return m_genotype_id;
 	}
 
 
@@ -413,7 +427,7 @@ private:
 
 	/// translated genotype
 	vectorf m_X;
-
+	vectorf m_genotype_id;
 	// statistics from association tests
 	vectorf m_pval;
 	vectorf m_statistic;
