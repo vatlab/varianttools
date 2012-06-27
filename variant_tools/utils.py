@@ -158,7 +158,11 @@ class RuntimeOptions(object):
     #
     def _set_temp_dir(self, path=None):
         # user can explicity set a path ('None' could be saved by a previous version of vtools)
-        if path is not None and path != 'None':
+        if path not in [None, 'None', '']:
+            if os.path.isdir(path) and os.listdir(path):
+                raise ValueError('Cannot set temporary directory to a non-empty directory {}. '.format(path) + \
+                    'Please clear this directory or use command "vtools admin --set_runtime_option temp_dir=DIR" '
+                    'to set it to another path, or a random path (empty DIR).')
             self._temp_dir = path
         # the usual case
         if self._temp_dir is None:

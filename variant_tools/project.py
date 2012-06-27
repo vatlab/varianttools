@@ -845,9 +845,6 @@ class Project:
         self.db.connect(self.proj_file)
         runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
         # temporary directory...
-        # if option temp_dir is set, the path will be used
-        # if not, None will be passed, and a temporary directory will be used.
-        runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
         runOptions.associate_genotype_cache_size = self.loadProperty('__option_associate_genotype_cache_size', None)
         #
         # create a logger
@@ -880,6 +877,14 @@ class Project:
         # start a new session
         self.logger.debug('')
         self.logger.debug(runOptions.command_line)
+        # if option temp_dir is set, the path will be used
+        # if not, None will be passed, and a temporary directory will be used.
+        try:
+            runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
+        except Exception as e:
+            self.logger.warning('Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
+            # use a random directory
+            runOptions.temp_dir = None
         self.logger.debug('Using temporary directory {}'.format(runOptions.temp_dir))
         if new:
             self.create(build=build, **kwargs)
