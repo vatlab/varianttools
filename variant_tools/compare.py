@@ -169,6 +169,8 @@ def compareMultipleTables(proj, args):
             raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
         if table == 'variant':
             raise ValueError('Cannot overwrite master variant table')
+        if table.startswith('_'):
+            raise ValueError('Name of variant table cannot start with underscore.')
         if proj.db.hasTable(table):
             new_table = proj.db.backupTable(table)
             proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
