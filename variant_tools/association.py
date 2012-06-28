@@ -39,6 +39,14 @@ from .tester import *
 
 import argparse
 
+def istr(d):
+    try:
+        x = int(d)
+        x = str(x)
+    except:
+        x = str(d)
+    return x
+
 def associateArguments(parser):
     parser.add_argument('table', help='''Variant table.''')
     parser.add_argument('phenotypes', nargs=1,
@@ -332,10 +340,6 @@ class GenotypeGrabber:
         
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
-        try:
-            grpname = '"' + ", ".join(map(str, group)) + '"'
-        except TypeError:
-            grpname = None
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
         query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause)
@@ -494,6 +498,8 @@ class AssoTestsWorker(Process):
 #        self.geno_info = param.geno_info
         self.moi = param.moi
         self.tests = param.tests
+        self.hasSKAT = 'SKAT' in [x.__class__.__name__ for x in self.tests]
+        self.hasScoreSeq = 'ScoreSeq' in [x.__class__.__name__ for x in self.tests]
 #        self.group_names = param.group_names
 #        self.missing_filter = param.missing_filter
         self.queue = grpQueue
@@ -525,18 +531,19 @@ class AssoTestsWorker(Process):
         for field in data.keys():
             self.data.setVar('__var_' + field, data[field])
 
-    def setPyData(self, which, geno, pheno, covar, var_info, geno_Info, missing_code=None):
-        '''set all data to a python dictionary'''
+    def setPyData(self, which, geno, pheno, covar, var_info, geno_Info, missing_code=None, grpname=None):
+        '''set all data to a python dictionary in str format'''
+        self.pydata['name'] = grpname
         if len(pheno) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
         if missing_code:
-            self.pydata['Z'] = [array('d', [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
+            self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
         else:
-            self.pydata['Z'] = [x for idx, x in enumerate(geno) if which[idx]]
-        self.pydata['y'] = [x for idx, x in enumerate(pheno[0]) if which[idx]]
+            self.pydata['genotype'] = [map(istr, x) for idx, x in enumerate(geno) if which[idx]]
+        self.pydata['phenotype'] = map(str, [x for idx, x in enumerate(pheno[0]) if which[idx]])
         if len(covar) > 0:
             # skip the first covariate, a vector of '1''s
-            self.pydata['X'] = [array('d', [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
+            self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
         #FIXME: will not use var_info and geno_info for now
 
 
@@ -553,13 +560,13 @@ class AssoTestsWorker(Process):
                 grp = self.queue.get()
             #
             try:
-                grpname = '"' + ", ".join(map(str, grp)) + '"'
+                grpname = ", ".join(map(str, grp))
             except TypeError:
                 grpname = None
             if grp is None:
                 self.output.send(None)
                 break
-            self.logger.debug('Retrieved association unit {}'.format(grpname))
+            self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
             #
             self.data = t.AssoData()
             self.pydata = {}
@@ -569,22 +576,24 @@ class AssoTestsWorker(Process):
                     # select variants from each group:
                     genotype, which, var_info, geno_info = gg.getGenotype(grp)
                 # set C++ data object
-                hasSKAT = 'SKAT' in [x.__class__.__name__ for x in self.tests]
-                if len(self.tests) > 0 or (len(self.tests) > 1 and hasSKAT):
+                if (len(self.tests) - self.hasSKAT - self.hasScoreSeq) > 0:
                     self.setGenotype(which, genotype, geno_info)
                     self.setPhenotype(which, self.phenotypes, self.covariates)
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
-                if hasSKAT:
-                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 9)
+                if self.hasSKAT:
+                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 9, grpname)
+                if self.hasScoreSeq:
+                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 'NA', grpname)
+
                 # association tests
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
                     result = test.calculate()
-                    self.logger.debug('Finished association test on {}'.format(grpname))
+                    self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except Exception as e:
-                self.logger.debug('An ERROR has occured while processing {}: {}'.format(grpname, e))
+                self.logger.debug('An ERROR has occured while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 # return no result for any of the tests if a test fails.

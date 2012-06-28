@@ -23,16 +23,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-import os
-import math
+import sys, os, shlex
 from subprocess import PIPE, Popen
+import math
+import time
 import argparse
 if sys.version_info.major == 2:
     import assoTests_py2 as t
 else:
     import assoTests_py3 as t
 from .project import Field
+from .utils import runOptions
 
 def freq(frequency):
     try:
@@ -1568,19 +1569,22 @@ class SKAT(NullTest):
         self.Rargs.append('write(c(stat {0}, max(p,pr)), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
         self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
+    def _format_data(self):
+        zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['genotype'])]))
+        xstr = 'cbind({0})'.format(','.join(['C'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['covariates'])])) if len(self.pydata['covariates']) > 0 else 1
+        ystr = 'c(' + ','.join(self.pydata['phenotype']) + ')'
+        self.Rstr = 'library("SKAT")\ny<-{0}\nX<-{1}\nZ<-{2}\n{3}'.format(ystr, xstr, zstr, '\n'.join(self.Rargs))
+
     def calculate(self):
         # translate data to string
-        zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(list(map(str, x))) + ')' for idx, x in enumerate(self.pydata['Z'])]))
-        xstr = 'cbind({0})'.format(','.join(['C'+str(idx+1)+'=c(' + ','.join(list(map(str, x))) + ')' for idx, x in enumerate(self.pydata['X'])])) if len(self.pydata['X']) > 0 else 'NA'
-        ystr = 'c(' + ','.join(list(map(str, self.pydata['y']))) + ')'
-        Rstr = 'library("SKAT")\ny<-{0}\nX<-{1}\nZ<-{2}\n{3}'.format(ystr, xstr, zstr, '\n'.join(self.Rargs))
+        self._format_data()
         tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
-        out, error = tc.communicate(Rstr.encode(sys.getdefaultencoding()))
+        out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
         if (tc.returncode):
             raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
         else:
             if error:
-                self.logger.debug("WARNING message from SKAT package: \n{0}".format(error.decode(sys.getdefaultencoding())))
+                self.logger.debug("WARNING message from SKAT package for group {0}: \n{1}".format(self.pydata['name'], error.decode(sys.getdefaultencoding())))
         # res: (sample_size, pvalue, stat, pvalue.adj)
         res = [len(self.pydata['y'])]
         res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
@@ -1597,8 +1601,13 @@ class ScoreSeq(NullTest):
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='Q_stats', index=None, type='FLOAT', adj=None, comment='Test statistic for SKAT, "Q"'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value{0}'.format(' (from resampled outcome)' if self.resampling else ''))]
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value{0}'.format(' (from resampled outcome)' if self.resample else ''))]
         self.ncovariates = ncovariates
+        self.SCORESeq = os.path.abspath(self.SCORESeq)
+        try:
+            Popen(self.SCORESeq, stdout = PIPE, stderr = PIPE)
+        except Exception as e:
+                raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
 
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
@@ -1614,7 +1623,7 @@ class ScoreSeq(NullTest):
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('SCORESeq', type=str,
-            help='''Absolute path to the SCORE-Seq program executable file (/path/to/SCORE-Seq). The program can be downloaded from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/''')
+            help='''Path to the SCORE-Seq program executable file (/path/to/SCORE-Seq). The program can be downloaded from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/''')
         parser.add_argument('--name', default='ScoreSeq',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
@@ -1630,7 +1639,7 @@ class ScoreSeq(NullTest):
         parser.add_argument('--MAC', type=int, default=1.0,
             help='''Specify the MAC (minor allele counts) lower bound, which is any integer. Default set to 1.0''')
         parser.add_argument('--CR', type=freq, default=0,
-            help='''Specify the call rate lower bound, which is any number between 0 and 1.''')
+            help='''Specify the call rate lower bound, which is any number between 0 and 1. Default set to 0''')
         parser.add_argument('--resample', metavar='R', type=int,
             help='''Turn on resampling and specify the maximum number of resamples. If R is set to -1, then the default of 1 million resamples is applied; otherwise, R should be an integer between 1 million and 100 millions. In the latter case, the software will perform resampling up to R times for any resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
@@ -1641,9 +1650,32 @@ class ScoreSeq(NullTest):
 
 
     def _determine_algorithm(self):
-        pass
+        self.Sargs = '{0} -vtlog {1} -MAF {2} -MAC {3} -CR {4} '.format(self.SCORESeq, os.path.join(runOptions.cache_dir, self.vtlog), self.MAF, self.MAC, self.CR)
+        if self.resample:
+            if not self.EREC:
+                raise ValueError("Please specify --EREC 1 or 2")
+            self.Sargs += '-resample {0} -EREC {1} '.format(self.resample, self.EREC)
+    def _format_data(self):
+        self.gname = self.pydata['name']
+        nvar = len(self.pydata['genotype'][0])
+        nsample = len(self.pydata['genotype'])
+        with open(os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
+            f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
+        with open(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
+            f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
+        with open(os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
+            f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
 
     def calculate(self):
+        self._format_data()
+        sargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
+                os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)),
+                os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)))
+        out, error = Popen(shlex.split(sargs), stdout = PIPE, stderr= PIPE).communicate()
+        if error:
+            raise ValueError(' (exception captured from SKAT package) \n'.format(error.decode(sys.getdefaultencoding())))
+
+
 #        out, error = tc.communicate(Rstr.encode(sys.getdefaultencoding()))
 #        if (tc.returncode):
 #            raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
