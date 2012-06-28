@@ -33,7 +33,6 @@ if sys.version_info.major == 2:
 else:
     import assoTests_py3 as t
 from .project import Field
-from .pyper import *
 
 def freq(frequency):
     try:
@@ -1463,7 +1462,7 @@ class VariableThresholdsBt(GLMBurdenTest):
 
 #
 # External tests
-# The SKAT class wraps the R-SKAT package via simple piping (pypeR module)
+# The SKAT class wraps the R-SKAT package via simple piping 
 #
 class SKAT(NullTest):
     '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
@@ -1487,7 +1486,7 @@ class SKAT(NullTest):
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011).
-            This is a wrapper for the R package "SKAT" implemented & maintained by Seunggeun Lee, with a similar
+            This is a wrapper for the R package "SKAT" implemented & maintained by Dr. Seunggeun Lee, with a similar
             interface and minimal descriptions based on the SKAT package documentation (May 11, 2012).
             Please refer to http://http://cran.r-project.org/web/packages/SKAT/
             for details of usage. To use this test you should have R installed with SKAT v0.75 or higher. 
@@ -1566,7 +1565,7 @@ class SKAT(NullTest):
             self.Rargs.append('pr <- Get_Resampling_Pvalue(re)$p.value')
         else:
             self.Rargs.append('pr <- -9')
-        self.Rargs.append('write(c(max(p,pr), stat {0}), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
+        self.Rargs.append('write(c(stat {0}, max(p,pr)), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
         self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
     def calculate(self):
@@ -1586,3 +1585,72 @@ class SKAT(NullTest):
         res = [len(self.pydata['y'])]
         res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
         return res
+
+#
+# SCORE-Seq program wrapper
+#
+class ScoreSeq(NullTest):
+    '''Score statistic / SCORE-Seq software (Tang & Lin 2011)'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        NullTest.__init__(self, logger, *method_args)
+        # set fields name for output database
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='Q_stats', index=None, type='FLOAT', adj=None, comment='Test statistic for SKAT, "Q"'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value{0}'.format(' (from resampled outcome)' if self.resampling else ''))]
+        self.ncovariates = ncovariates
+
+        # Check for SCORE-Seq installation
+        self.algorithm = self._determine_algorithm()
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
+            conducting a number of association tests for each SNP-set (gene).
+            This is a wrapper for the Linux based SCORE-Seq program implemented & maintained by Dr. Danyu Lin, with a similar
+            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. Although single variant
+            test is available in SCORE-Seq, we will not provide the interface here (its equivalent 'vtools associate' command is 
+            the 'LinRegBurden' option without using --group_by). 
+            To use this test you should have the SCORE-Seq program on your computer. 
+            The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        parser.add_argument('SCORESeq', type=str,
+            help='''Absolute path to the SCORE-Seq program executable file (/path/to/SCORE-Seq). The program can be downloaded from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/''')
+        parser.add_argument('--name', default='ScoreSeq',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by ScoreSeq
+        #
+        parser.add_argument('--dominant', action='store_true',
+            help='''Use the dominant instead of the additive model.''')
+        parser.add_argument('--vtlog', type=str, default='vt_{0}.log'.format(time.strftime('%b%d_%H%M%S', time.gmtime())),
+            help='''Specify the log file for VT tests.''')
+        parser.add_argument('--MAF', type=freq, default=0.05,
+            help='''Specify the MAF upper bound, which is any number between 0 and 1. Default set to 0.05''')
+        parser.add_argument('--MAC', type=int, default=1.0,
+            help='''Specify the MAC (minor allele counts) lower bound, which is any integer. Default set to 1.0''')
+        parser.add_argument('--CR', type=freq, default=0,
+            help='''Specify the call rate lower bound, which is any number between 0 and 1.''')
+        parser.add_argument('--resample', metavar='R', type=int,
+            help='''Turn on resampling and specify the maximum number of resamples. If R is set to -1, then the default of 1 million resamples is applied; otherwise, R should be an integer between 1 million and 100 millions. In the latter case, the software will perform resampling up to R times for any resampling test that has a p-value < 1e-4 after 1 million resamples.''')
+        parser.add_argument('--EREC', type=int, choices = [1,2],
+            help='''Specify the constant delta for the EREC test. 1 for binary trait; 2 for standardized continuous trait. This option is effective only when resampling is turned on.''')
+        # incorporate args to this class
+        args = parser.parse_args(method_args)
+        self.__dict__.update(vars(args))
+
+
+    def _determine_algorithm(self):
+        pass
+
+    def calculate(self):
+#        out, error = tc.communicate(Rstr.encode(sys.getdefaultencoding()))
+#        if (tc.returncode):
+#            raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
+#        else:
+#            if error:
+#                self.logger.debug("WARNING message from SKAT package: \n{0}".format(error.decode(sys.getdefaultencoding())))
+#        # res: (sample_size, pvalue, stat, pvalue.adj)
+#        res = [len(self.pydata['y'])]
+#        res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
+#        return res
