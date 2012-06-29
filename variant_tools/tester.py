@@ -27,6 +27,7 @@ import sys, os, shlex
 from subprocess import PIPE, Popen
 import math
 import zipfile
+import platform
 import argparse
 if sys.version_info.major == 2:
     import assoTests_py2 as t
@@ -1598,6 +1599,10 @@ class ScoreSeq(NullTest):
     def __init__(self, ncovariates, logger=None, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, logger, *method_args)
+        if not platform.system() == 'Linux':
+            raise OSError("You platform does not support SCORE-Seq program. It is available for Linux only.")
+        elif not platform.architecture()[0] == '64bit':
+            raise OSError("You Linux platform does not support SCORE-Seq program. It requires a 64bit Linux machine.")
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='T1_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
