@@ -26,7 +26,7 @@
 import sys, os, shlex
 from subprocess import PIPE, Popen
 import math
-import time
+import zipfile
 import argparse
 if sys.version_info.major == 2:
     import assoTests_py2 as t
@@ -1586,7 +1586,7 @@ class SKAT(NullTest):
             if error:
                 self.logger.debug("WARNING message from SKAT package for group {0}: \n{1}".format(self.pydata['name'], error.decode(sys.getdefaultencoding())))
         # res: (sample_size, pvalue, stat, pvalue.adj)
-        res = [len(self.pydata['y'])]
+        res = [len(self.pydata['phenotype'])]
         res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
         return res
 
@@ -1600,15 +1600,35 @@ class ScoreSeq(NullTest):
         NullTest.__init__(self, logger, *method_args)
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='Q_stats', index=None, type='FLOAT', adj=None, comment='Test statistic for SKAT, "Q"'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value{0}'.format(' (from resampled outcome)' if self.resample else ''))]
+                        Field(name='T1_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='T5_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='Fp_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='VT_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='T1_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
+                        Field(name='T5_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
+                        Field(name='Fp_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
+                        Field(name='VT_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
+                        Field(name='EREC_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
+                        Field(name='T1_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
+                        Field(name='T1_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
+                        Field(name='T1_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)'),
+                        Field(name='T5_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
+                        Field(name='T5_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
+                        Field(name='T5_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)'),
+                        Field(name='Fp_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
+                        Field(name='Fp_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
+                        Field(name='Fp_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
         self.ncovariates = ncovariates
         self.SCORESeq = os.path.abspath(self.SCORESeq)
         try:
             Popen(self.SCORESeq, stdout = PIPE, stderr = PIPE)
         except Exception as e:
                 raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
-
+        if self.archive:
+            self.archive = os.path.join(runOptions.cache_dir, self.archive)
+            if os.path.exists(self.archive + '.zip'):
+                self.logger.warning("Existing file '{0}' will be replaced!".format(self.archive + '.zip'))
+                os.remove(self.archive + '.zip')
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
 
@@ -1618,8 +1638,8 @@ class ScoreSeq(NullTest):
             This is a wrapper for the Linux based SCORE-Seq program implemented & maintained by Dr. Danyu Lin, with a similar
             interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. Although single variant
             test is available in SCORE-Seq, we will not provide the interface here (its equivalent 'vtools associate' command is 
-            the 'LinRegBurden' option without using --group_by). 
-            To use this test you should have the SCORE-Seq program on your computer. 
+            the 'LinRegBurden' option without using --group_by).
+            To use this test you should have the SCORE-Seq program on your computer.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('SCORESeq', type=str,
@@ -1632,8 +1652,6 @@ class ScoreSeq(NullTest):
         #
         parser.add_argument('--dominant', action='store_true',
             help='''Use the dominant instead of the additive model.''')
-        parser.add_argument('--vtlog', type=str, default='vt_{0}.log'.format(time.strftime('%b%d_%H%M%S', time.gmtime())),
-            help='''Specify the log file for VT tests.''')
         parser.add_argument('--MAF', type=freq, default=0.05,
             help='''Specify the MAF upper bound, which is any number between 0 and 1. Default set to 0.05''')
         parser.add_argument('--MAC', type=int, default=1.0,
@@ -1644,17 +1662,24 @@ class ScoreSeq(NullTest):
             help='''Turn on resampling and specify the maximum number of resamples. If R is set to -1, then the default of 1 million resamples is applied; otherwise, R should be an integer between 1 million and 100 millions. In the latter case, the software will perform resampling up to R times for any resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
             help='''Specify the constant delta for the EREC test. 1 for binary trait; 2 for standardized continuous trait. This option is effective only when resampling is turned on.''')
+        parser.add_argument('--archive', metavar='name', type=str,
+            help='''If this option is specified, a zip file will be created, which will archive all the input/output in a SCORE-Seq analysis at the expense of
+                    additional disk I/O burden and storage (for a potentially huge zip file).''')
+
         # incorporate args to this class
         args = parser.parse_args(method_args)
         self.__dict__.update(vars(args))
 
 
     def _determine_algorithm(self):
-        self.Sargs = '{0} -vtlog {1} -MAF {2} -MAC {3} -CR {4} '.format(self.SCORESeq, os.path.join(runOptions.cache_dir, self.vtlog), self.MAF, self.MAC, self.CR)
+        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.SCORESeq, self.MAF, self.MAC, self.CR)
         if self.resample:
             if not self.EREC:
                 raise ValueError("Please specify --EREC 1 or 2")
             self.Sargs += '-resample {0} -EREC {1} '.format(self.resample, self.EREC)
+        if self.dominant:
+            self.Sargs += '-dominant '
+
     def _format_data(self):
         self.gname = self.pydata['name']
         nvar = len(self.pydata['genotype'][0])
@@ -1666,23 +1691,39 @@ class ScoreSeq(NullTest):
         with open(os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
             f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
 
+    def _process_output(self):
+        # parse output
+        self.colnames = ["T1_P","T5_P","Fp_P","VT_P","T1_R","T5_R","Fp_R","VT_R","EREC_R","T1_U","T1_V","T1_Z","T5_U","T5_V","T5_Z","Fp_U","Fp_V","Fp_Z"]
+        self.stats = {}
+        for item in self.colnames:
+            self.stats[item] = None
+        with open(os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
+            colnames = [x for x in f.readline().split()[1:]]
+            stats = [float(x) if not x == "NA" else None for x in f.readline().split()[1:]]
+        for (x,y) in zip(colnames, stats):
+            self.stats[x] = y
+        # archive or clean up output
+        if self.archive:
+            with zipfile.ZipFile(self.archive + ".zip", 'a') as z:
+                os.chdir(runOptions.cache_dir)
+                for item in os.listdir("."):
+                    if item.startswith(self.gname):
+                        z.write(item)
+                        os.remove(item)
+        else:
+            for item in os.listdir(runOptions.cache_dir):
+                if item.startswith(self.gname):
+                    os.remove(os.path.join(runOptions.cache_dir, item))
+
     def calculate(self):
         self._format_data()
-        sargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
+        sargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)),
-                os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)))
+                os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_vt.log'.format(self.gname)))
         out, error = Popen(shlex.split(sargs), stdout = PIPE, stderr= PIPE).communicate()
         if error:
             raise ValueError(' (exception captured from SKAT package) \n'.format(error.decode(sys.getdefaultencoding())))
-
-
-#        out, error = tc.communicate(Rstr.encode(sys.getdefaultencoding()))
-#        if (tc.returncode):
-#            raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
-#        else:
-#            if error:
-#                self.logger.debug("WARNING message from SKAT package: \n{0}".format(error.decode(sys.getdefaultencoding())))
-#        # res: (sample_size, pvalue, stat, pvalue.adj)
-#        res = [len(self.pydata['y'])]
-#        res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
-#        return res
+        self._process_output()
+        res = [len(self.pydata['phenotype'])]
+        res.extend([x for x in [self.stats[y] for y in self.colnames]])
+        return res
