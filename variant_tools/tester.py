@@ -1713,7 +1713,7 @@ class ScoreSeq(NullTest):
                 self.stats[x] = y
         except IOError:
             fail = 1
-        if not sum([0 if math.isnan(x) else 1 for x in self.stats.values()]) and not fail == 1:
+        if not sum([0 if math.isnan(x) else 1 for x in self.stats.values()]) and not fail:
             fail = 2
         # archive or clean up output
         if self.archive:
