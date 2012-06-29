@@ -1624,9 +1624,9 @@ class ScoreSeq(NullTest):
                         Field(name='Fp_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
                         Field(name='Fp_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
         self.ncovariates = ncovariates
-        self.SCORESeq = os.path.abspath(self.SCORESeq)
+        self.path_to_program = os.path.abspath(self.path_to_program)
         try:
-            Popen(self.SCORESeq, stdout = PIPE, stderr = PIPE)
+            Popen(self.path_to_program, stdout = PIPE, stderr = PIPE)
         except Exception as e:
                 raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
         if self.archive:
@@ -1649,7 +1649,7 @@ class ScoreSeq(NullTest):
             To use this test you should have the SCORE-Seq program on your computer.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
-        parser.add_argument('SCORESeq', type=str,
+        parser.add_argument('path_to_program', type=str,
             help='''Path to the SCORE-Seq program executable file (/path/to/SCORE-Seq). The program can be downloaded from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/''')
         parser.add_argument('--name', default='ScoreSeq',
             help='''Name of the test that will be appended to names of output fields, usually used to
@@ -1679,7 +1679,7 @@ class ScoreSeq(NullTest):
 
 
     def _determine_algorithm(self):
-        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.SCORESeq, self.MAF, self.MAC, self.CR)
+        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.path_to_program, self.MAF, self.MAC, self.CR)
         if self.resample:
             if not self.EREC:
                 raise ValueError("Please specify --EREC 1 or 2")
@@ -1732,9 +1732,10 @@ class ScoreSeq(NullTest):
 
     def calculate(self):
         self._format_data()
-        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4} -msglog {5}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
-                os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
+                os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)),
+                os.path.join(runOptions.temp_dir, '{0}_msg.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
         except:
