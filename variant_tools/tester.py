@@ -1630,7 +1630,7 @@ class ScoreSeq(NullTest):
         except Exception as e:
                 raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
         if self.archive:
-            self.archive = os.path.join(runOptions.cache_dir, self.archive)
+            self.curr_dir = os.getcwd()
             if os.path.exists(self.archive + '.zip'):
                 self.logger.warning("Existing file '{0}' will be replaced!".format(self.archive + '.zip'))
                 os.remove(self.archive + '.zip')
@@ -1690,11 +1690,11 @@ class ScoreSeq(NullTest):
         self.gname = self.pydata['name']
         nvar = len(self.pydata['genotype'][0])
         nsample = len(self.pydata['genotype'])
-        with open(os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
+        with open(os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
             f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
-        with open(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
+        with open(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
             f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
-        with open(os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
+        with open(os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
             f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
 
     def _process_output(self):
@@ -1705,33 +1705,27 @@ class ScoreSeq(NullTest):
             self.stats[item] = None
         failed = None
         try:
-            with open(os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
+            with open(os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
                 colnames = [x for x in f.readline().split()[1:]]
                 stats = [float(x) if not x == "NA" else None for x in f.readline().split()[1:]]
             for (x,y) in zip(colnames, stats):
                 self.stats[x] = y
         except IOError:
-            failed = 1
+            raise ValueError("No output from SCORE-Seq.\nTo trouble-shoot, please run: {0}".format(self.gSargs))
         # archive or clean up output
         if self.archive:
-            with zipfile.ZipFile(self.archive + ".zip", 'a') as z:
-                for item in os.listdir(runOptions.cache_dir):
-                    if item.split('_') == self.gname:
-                        z.write(os.path.join(runOptions.cache_dir, item))
-                        os.remove(os.path.join(runOptions.cache_dir, item))
-        else:
-            for item in os.listdir(runOptions.cache_dir):
-                if item.split('_') == self.gname:
-                    os.remove(os.path.join(runOptions.cache_dir, item))
-        if failed:
-            raise ValueError("No output from SCORE-Seq.\nTo trouble-shoot, please run: {0}".format(self.gSargs))
-
+            with zipfile.ZipFile(self.archive + ".zip", 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+                os.chdir(runOptions.temp_dir)
+                for item in os.listdir("."):
+                    if item.split('_')[0] == self.gname:
+                        z.write(item)
+                os.chdir(self.curr_dir)
 
     def calculate(self):
         self._format_data()
-        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
-                os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)),
-                os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_vt.log'.format(self.gname)))
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
+                os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
+                os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
         except:
