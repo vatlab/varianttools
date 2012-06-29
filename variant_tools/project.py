@@ -1071,7 +1071,7 @@ class Project:
             if os.path.isdir(runOptions.temp_dir):
                 shutil.rmtree(runOptions.temp_dir)
         except Exception as e:
-            sys.stderr.write('Failed to remove temporary directory: {}'.format(e))
+            sys.stderr.write('Failed to remove temporary directory: {}\n'.format(e.strerror))
         
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''
