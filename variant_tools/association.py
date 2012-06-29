@@ -545,7 +545,8 @@ class AssoTestsWorker(Process):
             # skip the first covariate, a vector of '1''s
             self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
         #FIXME: will not use var_info and geno_info for now
-
+        if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
+            raise ValueError("No input data")
 
     def run(self):
         # if genotypes are not cached, each worker will grab genotype from the database by itself

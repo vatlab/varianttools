@@ -1631,6 +1631,7 @@ class ScoreSeq(NullTest):
                 os.remove(self.archive + '.zip')
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
+        self.logger.debug("Running command {0}".format(self.Sargs))
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
@@ -1697,32 +1698,39 @@ class ScoreSeq(NullTest):
         self.stats = {}
         for item in self.colnames:
             self.stats[item] = None
-        with open(os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
-            colnames = [x for x in f.readline().split()[1:]]
-            stats = [float(x) if not x == "NA" else None for x in f.readline().split()[1:]]
-        for (x,y) in zip(colnames, stats):
-            self.stats[x] = y
+        failed = None
+        try:
+            with open(os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
+                colnames = [x for x in f.readline().split()[1:]]
+                stats = [float(x) if not x == "NA" else None for x in f.readline().split()[1:]]
+            for (x,y) in zip(colnames, stats):
+                self.stats[x] = y
+        except IOError:
+            failed = 1
         # archive or clean up output
         if self.archive:
             with zipfile.ZipFile(self.archive + ".zip", 'a') as z:
-                os.chdir(runOptions.cache_dir)
-                for item in os.listdir("."):
-                    if item.startswith(self.gname):
-                        z.write(item)
-                        os.remove(item)
+                for item in os.listdir(runOptions.cache_dir):
+                    if item.split('_') == self.gname:
+                        z.write(os.path.join(runOptions.cache_dir, item))
+                        os.remove(os.path.join(runOptions.cache_dir, item))
         else:
             for item in os.listdir(runOptions.cache_dir):
-                if item.startswith(self.gname):
+                if item.split('_') == self.gname:
                     os.remove(os.path.join(runOptions.cache_dir, item))
+        if failed:
+            raise ValueError("No output from SCORE-Seq.\nTo trouble-shoot, please run: {0}".format(self.gSargs))
+
 
     def calculate(self):
         self._format_data()
-        sargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4}".format(os.path.join(runOptions.cache_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.cache_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_mapping.txt'.format(self.gname)),
                 os.path.join(runOptions.cache_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.cache_dir, '{0}_vt.log'.format(self.gname)))
-        out, error = Popen(shlex.split(sargs), stdout = PIPE, stderr= PIPE).communicate()
-        if error:
-            raise ValueError(' (exception captured from SKAT package) \n'.format(error.decode(sys.getdefaultencoding())))
+        try:
+            out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
+        except:
+            pass
         self._process_output()
         res = [len(self.pydata['phenotype'])]
         res.extend([x for x in [self.stats[y] for y in self.colnames]])
