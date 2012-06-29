@@ -487,7 +487,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, output):
+    def __init__(self, param, grpQueue, resQueue):
         self.param = param
 #        self.proj = param.proj
 #        self.table = param.table
@@ -503,7 +503,7 @@ class AssoTestsWorker(Process):
 #        self.group_names = param.group_names
 #        self.missing_filter = param.missing_filter
         self.queue = grpQueue
-        self.output = output
+        self.resQuque = resQueue
         self.logger = param.proj.logger
         self.db = None
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
@@ -565,7 +565,6 @@ class AssoTestsWorker(Process):
             except TypeError:
                 grpname = None
             if grp is None:
-                self.output.send(None)
                 break
             self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
             #
@@ -599,7 +598,7 @@ class AssoTestsWorker(Process):
                 self.data = t.AssoData()
                 # return no result for any of the tests if a test fails.
                 values = []
-            self.output.send(values)
+            self.resQueue.put(values)
 
 
 def associate(args):
@@ -615,11 +614,11 @@ def associate(args):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 4: start all workers
             grpQueue = Queue()
+            # the result queue is used by workers to return results
+            resQueue = Queue()
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            readers = []
             for j in range(nJobs):
-                r, w = Pipe(False)
-                AssoTestsWorker(asso, grpQueue, w).start()
+                AssoTestsWorker(asso, grpQueue, resQueue).start()
                 readers.append(r)
             #
             # put all jobs to queue, the workers will work on them
@@ -640,29 +639,21 @@ def associate(args):
                 for j in range(nJobs):
                     grpQueue.put(None)
             #
-            proc_status = [True] * len(readers)
             count = 0
             # get initial completed and failed
             prog = ProgressBar('Testing for association', len(asso.groups), results.completed(), results.failed())
             while True:
-                for idx, (s,r) in enumerate(zip(proc_status, readers)):
-                    if not s:
-                        continue
-                    res = r.recv()
-                    if res is None:
-                        proc_status[idx] = False
-                    else:
-                        results.record(res)
-                #
-                if results.completed() > count:
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                    proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
-                #
-                if not any(proc_status):
-                    # if everything is done
-                    assert results.completed() == len(asso.groups)
+                # if everything is done
+                if count >= len(asso.groups):
                     break
+                # not done? wait from the queue and write to the result recorder
+                res = resQueue.get()
+                results.record(res)
+                # update progress bar
+                count = results.completed()
+                prog.update(count, results.failed())
+                proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+            # finished
             prog.done()
             results.done()
             # summary
