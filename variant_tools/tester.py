@@ -1631,9 +1631,10 @@ class ScoreSeq(NullTest):
                 raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
         if self.archive:
             self.curr_dir = os.getcwd()
-            if os.path.exists(self.archive + '.zip'):
-                self.logger.warning("Existing file '{0}' will be replaced!".format(self.archive + '.zip'))
-                os.remove(self.archive + '.zip')
+            if os.path.isdir(self.archive) and os.listdir(self.archive):
+                raise ValueError("Cannot set archive directory to a non-empty directory. Please specify another directory.")
+            if not os.path.isdir(self.archive):
+                os.mkdir(self.archive)
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
         self.logger.debug("Running command {0}".format(self.Sargs))
@@ -1668,9 +1669,9 @@ class ScoreSeq(NullTest):
             help='''Turn on resampling and specify the maximum number of resamples. If R is set to -1, then the default of 1 million resamples is applied; otherwise, R should be an integer between 1 million and 100 millions. In the latter case, the software will perform resampling up to R times for any resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
             help='''Specify the constant delta for the EREC test. 1 for binary trait; 2 for standardized continuous trait. This option is effective only when resampling is turned on.''')
-        parser.add_argument('--archive', metavar='name', type=str,
-            help='''If this option is specified, a zip file will be created, which will archive all the input/output in a SCORE-Seq analysis at the expense of
-                    additional disk I/O burden and storage (for a potentially huge zip file).''')
+        parser.add_argument('--archive', metavar='DIR', type=str,
+            help='''If this option is specified, a zip file will be created for each gene, which will archive the input/output file of the SCORE-Seq analysis and write to DIR, at the expense of
+                    additional disk I/O burden and storage.''')
 
         # incorporate args to this class
         args = parser.parse_args(method_args)
@@ -1702,24 +1703,32 @@ class ScoreSeq(NullTest):
         self.colnames = ["T1_P","T5_P","Fp_P","VT_P","T1_R","T5_R","Fp_R","VT_R","EREC_R","T1_U","T1_V","T1_Z","T5_U","T5_V","T5_Z","Fp_U","Fp_V","Fp_Z"]
         self.stats = {}
         for item in self.colnames:
-            self.stats[item] = None
-        failed = None
+            self.stats[item] = float('nan')
+        fail = None
         try:
             with open(os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
                 colnames = [x for x in f.readline().split()[1:]]
-                stats = [float(x) if not x == "NA" else None for x in f.readline().split()[1:]]
+                stats = [float(x) if not x == "NA" else float('nan') for x in f.readline().split()[1:]]
             for (x,y) in zip(colnames, stats):
                 self.stats[x] = y
         except IOError:
-            raise ValueError("No output from SCORE-Seq.\nTo trouble-shoot, please run: {0}".format(self.gSargs))
+            fail = 1
+        if not sum([0 if math.isnan(x) else 1 for x in self.stats.values()]) and not fail == 1:
+            fail = 2
         # archive or clean up output
         if self.archive:
-            with zipfile.ZipFile(self.archive + ".zip", 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+            with zipfile.ZipFile(os.path.join(self.archive, self.gname + '.zip'), 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
                 os.chdir(runOptions.temp_dir)
                 for item in os.listdir("."):
                     if item.split('_')[0] == self.gname:
                         z.write(item)
                 os.chdir(self.curr_dir)
+        #
+        if fail == 1:
+            raise ValueError("No output from SCORE-Seq.\nTo trouble-shoot, please run: {0}".format(self.gSargs.replace(runOptions.temp_dir+'/', '')))
+        if fail == 2:
+            raise ValueError("No statistic is calculated by SCORE-Seq. \nTo trouble-shoot, please run: {0}".format(self.gSargs.replace(runOptions.temp_dir+'/', '')))
+
 
     def calculate(self):
         self._format_data()
