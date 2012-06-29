@@ -503,7 +503,7 @@ class AssoTestsWorker(Process):
 #        self.group_names = param.group_names
 #        self.missing_filter = param.missing_filter
         self.queue = grpQueue
-        self.resQuque = resQueue
+        self.resQueue = resQueue
         self.logger = param.proj.logger
         self.db = None
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
@@ -619,7 +619,6 @@ def associate(args):
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             for j in range(nJobs):
                 AssoTestsWorker(asso, grpQueue, resQueue).start()
-                readers.append(r)
             #
             # put all jobs to queue, the workers will work on them
             if runOptions.associate_genotype_cache_size > 0:
