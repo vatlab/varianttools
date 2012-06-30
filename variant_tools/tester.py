@@ -82,14 +82,8 @@ class NullTest:
         self.pydata = pydata
 
     def calculate(self):
-        '''run an association test'''
-        self.logger.info('No action is defined for NullTest')
-        #self.logger.debug('Printing out group name, phenotypes, covariates and genotypes')
-        #self.logger.debug(self.group)
-        #self.logger.debug(self.data.phenotype())
-        #self.logger.debug(self.data.covariates())
-        #self.logger.debug(self.data.raw_genotype())
-        return 0
+        self.dump_data(dformat='w', tdir=self.directory)
+        return []
 
 
 class GroupStat(NullTest):
@@ -107,17 +101,17 @@ class GroupStat(NullTest):
                 Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
             )
 
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Group statistics calculator, usually is
                used with other method to produce statistics for each association testing group.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('--name', default='',
-            help='''Name of the test that will be appended to names of output fields, usually used to
-                differentiate output of different tests, or the same test with different parameters.''')
+            help='''Name of the test that will be appended to names of output fields.''')
         #
         # arguments that are used by this test
-        parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+',
+        parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+', default=['num_variants', 'sample_size'],
             help='''Statistics to calculate for the group (currently available statistics are number of variants
                 and total sample size).''')
         args = parser.parse_args(method_args)
@@ -1476,20 +1470,20 @@ class ExternTest(NullTest):
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
 
-    def dump_data(self, dformat=None):
+    def dump_data(self, dformat=None, tdir=runOptions.temp_dir):
         if not self.pydata:
             raise ValueError("Python data dictionary is empty")
         self.gname = self.pydata['name']
-        if dformat == 'write_to_tmp':
+        if dformat == 'w':
             nvar = len(self.pydata['genotype'][0])
             nsample = len(self.pydata['genotype'])
-            with open(os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
+            with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
                 f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
-            with open(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
+            with open(os.path.join(tdir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
                 f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
-            with open(os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
+            with open(os.path.join(tdir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
                 f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
-            return ''
+            return 0
         elif dformat == 'R':
             # output data to R script as a string
             zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['genotype'])]))
@@ -1499,6 +1493,37 @@ class ExternTest(NullTest):
         else:
             # output nothing
             return ''
+
+class GroupWrite(ExternTest):
+    '''Write data to disk for each testing group'''
+    def __init__(self, ncovariates, logger=None, *method_args):
+        ExternTest.__init__(self, logger, *method_args)
+        if os.path.isdir(self.directory) and os.listdir(self.directory):
+            raise ValueError("Cannot set output directory to a non-empty directory. Please specify another directory.")
+        if not os.path.isdir(self.directory):
+            os.mkdir(self.directory)
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''Group data writer. It will create 3 files for each group: a phenotype file
+                with rows representing samples , the 1st column is sample name, the 2nd column is the quantitative or binary phenotype
+                and remaining columns are covariates if there are any; a genotype file with rows representing variants and the columns represent sample genotypes
+                (order of the rows matches the genotype file). Coding of genotypes are minor allele counts (0/1/2). Missing values are denoted as “NA”; a mapping file
+                that matches the group ID and variant ID in pairs.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='',
+            help='''Name of the test that will be appended to names of output fields.''')
+        parser.add_argument('directory', type=str,
+            help='''Output data will be written to the directory specified.''')
+        # incorporate args to this class
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+    def setData(self, data, pydata):
+        self.data = data
+        self.pydata = pydata
+
 
 class SKAT(ExternTest):
     '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
@@ -1607,7 +1632,7 @@ class SKAT(ExternTest):
 
     def calculate(self):
         # translate data to string
-        self.Rstr = self.dump_data('R')
+        self.Rstr = self.dump_data(dformat='R')
         self.Rstr += '\nlibrary("SKAT")\nZ[which(is.na(Z))] <- 9\n{0}'.format('\n'.join(self.Rargs))
         tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
         out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
@@ -1770,7 +1795,7 @@ class ScoreSeq(ExternTest):
 
 
     def calculate(self):
-        self.dump_data('write_to_tmp')
+        self.dump_data(dformat='w')
         self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4} -msglog {5}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)),
