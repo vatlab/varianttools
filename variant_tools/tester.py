@@ -1634,8 +1634,8 @@ class ScoreSeq(NullTest):
     def getSCORE_Seq(self):
         '''Obtain the SCORE_Seq tool, download from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/ if needed.'''
         try:
-            subprocess.Popen(['SCORE-Seq'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH':os.pathsep.join(['.', runOptions.cache_die, os.environ['PATH']])})
+            Popen(['SCORE-Seq'], stdout=PIPE, stderr=PIPE,
+                env={'PATH':os.pathsep.join(['.', runOptions.cache_dir, os.environ['PATH']])})
             return 'SCORE-Seq'
         except:
             # otherwise download the tool
