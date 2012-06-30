@@ -115,7 +115,7 @@ class GroupStat(NullTest):
         #
         # arguments that are used by this test
         parser.add_argument('--stat', choices=['num_variants', 'sample_size'], nargs='+',
-            help='''Statistics to calculate for the group (currently avaiable statistics are number of variants
+            help='''Statistics to calculate for the group (currently available statistics are number of variants
                 and total sample size).''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -188,7 +188,7 @@ class CaseCtrlBurdenTest(NullTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--midp', action='store_true',
-            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicatable to one sided test of CMC and VT_Fisher.''')
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. It is only applicable to one sided test of CMC and VT_Fisher.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
@@ -439,7 +439,7 @@ class GLMBurdenTest(NullTest):
 
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
             ''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -594,7 +594,7 @@ class CFisher(CaseCtrlBurdenTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Collapsing test for case-control data (CMC test, Li & Leal 2008).
             Different from the original publication which jointly test for common/rare variants using Hotelling's t^2 method,
-            this version of CMC will binarize rare variants (default frequency set to 0.01) within a group defined by "--group_by" and calculate p-value via Fisher's exact test.
+            this version of CMC will binaries rare variants (default frequency set to 0.01) within a group defined by "--group_by" and calculate p-value via Fisher's exact test.
             A "mid-p" option is available for one-sided test to obtain a less conservative p-value estimate.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='CFisher',
@@ -630,7 +630,7 @@ class WSSRankTest(CaseCtrlBurdenTest):
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted sum method using rank test statistic, Madsen & Browning 2009. p-value
-            is based on the significance level of the Wilcoxon rank-sum test. Two methods are avaliable for evaluating p-value: a semi-asymptotic
+            is based on the significance level of the Wilcoxon rank-sum test. Two methods are available for evaluating p-value: a semi-asymptotic
             p-value based on normal distribution, or permutation based p-value. Variants will be weighted by 1/sqrt(nP*(1-P)) and the weighted codings
             will be summed up for rank test. Two-sided test is available for the asymptotic version, which will calculate two p-values based on weights
             from controls and cases respectively, and use the smaller of them with multiple testing adjustment. For two-sided permutation based p-value
@@ -778,14 +778,14 @@ class KBAC(CaseCtrlBurdenTest):
 
 
 class RBT(CaseCtrlBurdenTest):
-    '''Repication Based Test for protective and deleterious variants, Ionita-Laza et al 2011'''
+    '''Replication Based Test for protective and deleterious variants, Ionita-Laza et al 2011'''
     def __init__(self, ncovariates, logger=None, *method_args):
         CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for RBT method")
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Repication Based Test for protective and deleterious variants, 
+        parser = argparse.ArgumentParser(description='''Replication Based Test for protective and deleterious variants, 
             Ionita-Laza et al 2011. Variant sites are scored based on -log transformation of probability of having 
             more than observed variants in cases/ctrls; the RBT statistic is defined as sum of the variant sites scores.
             One-sided RBT is implemented in addition to the two-sided statistic described in the RBT paper. 
@@ -873,9 +873,9 @@ class Calpha(CaseCtrlBurdenTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''c-alpha test for unusual distribution of variants between 
             cases and controls, Neale et al 2011. It tests for deviation of variance of minor allele counts in 
-            cases/ctrls from its expection based on binomial distribution. The statistic is asymptotically normally 
-            distributed. p-value can be evaluted using either permutation or asymptotic distribution as described 
-            in Neale et al 2011, although it is recommanded to use permutation to estimate a reliable p-value. 
+            cases/ctrls from its exception based on binomial distribution. The statistic is asymptotically normally 
+            distributed. p-value can be evaluated using either permutation or asymptotic distribution as described 
+            in Neale et al 2011, although it is recommended to use permutation to estimate a reliable p-value. 
             Calpha test is a two-tailed test''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='Calpha',
@@ -993,7 +993,7 @@ class LinRegBurden(GLMBurdenTest):
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
         parser.add_argument('--extern_weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
@@ -1004,7 +1004,7 @@ class LinRegBurden(GLMBurdenTest):
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1038,7 +1038,7 @@ class CollapseQt(GLMBurdenTest):
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1077,7 +1077,7 @@ class BurdenQt(GLMBurdenTest):
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1130,7 +1130,7 @@ class WeightedBurdenQt(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--extern_weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'Browning_all',
@@ -1141,7 +1141,7 @@ class WeightedBurdenQt(GLMBurdenTest):
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1191,7 +1191,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1249,7 +1249,7 @@ class LogitRegBurden(GLMBurdenTest):
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
         parser.add_argument('--extern_weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'None',
@@ -1260,7 +1260,7 @@ class LogitRegBurden(GLMBurdenTest):
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1295,7 +1295,7 @@ class CollapseBt(GLMBurdenTest):
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1335,7 +1335,7 @@ class BurdenBt(GLMBurdenTest):
             Default set to 1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1387,7 +1387,7 @@ class WeightedBurdenBt(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--extern_weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
-            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
+            or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
             ''')
         parser.add_argument('--weight', type=str, choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = 'Browning_all',
@@ -1398,7 +1398,7 @@ class WeightedBurdenBt(GLMBurdenTest):
             ''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1449,7 +1449,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--nan_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
-            be adjusted to incorperate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1515,7 +1515,7 @@ class SKAT(NullTest):
         parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
             help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
         parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',
-            help='''This option, if specified, will get the logistic weights from gentoype matrix Z and apply this weight to SKAT. It requires
+            help='''This option, if specified, will get the logistic weights from genotype matrix Z and apply this weight to SKAT. It requires
                 two input parameters par1 and par2. To use the SKAT default setting, type `--logistic_weights 0.07 150'.
                 Please refer to SKAT documentation for details.''')
         parser.add_argument('-r','--corr', nargs='*', type=float, default=[0],
@@ -1639,16 +1639,21 @@ class ScoreSeq(NullTest):
             return 'SCORE-Seq'
         except:
             # otherwise download the tool
-            self.logger.debug('Failed to execute SCORE_Seq -h')
+            self.logger.debug('Failed to execute SCORE-Seq -h')
             if not platform.system() == 'Linux':
                 raise OSError("You platform does not support SCORE-Seq program. It is available for Linux only.")
             elif not platform.architecture()[0] == '64bit':
                 raise OSError("You Linux platform does not support SCORE-Seq program. It requires a 64bit Linux machine.")
             #
             SCORE_Seq_URL = 'http://www.bios.unc.edu/~dlin/software/SCORE-Seq/v3.0/dist/SCORE-Seq-3.0-linux-64.zip'
+            SCORE_Seq_URL_backup = 'http://www.houstonbioinformatics.org/vtools/programs/SCORE-Seq-3.0-linux-64.zip'
             try:
-                self.logger.info('Downloading SCORE_Seq tool from UNC')
-                SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, runOptions.temp_dir)
+                self.logger.info('Downloading SCORE-Seq program (V3.0) from UNC')
+                try:
+                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, runOptions.temp_dir)
+                except:
+                    self.logger.info('Using backup URL from houstonbioinformatics.org')
+                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL_backup, runOptions.temp_dir)
                 bundle = zipfile.ZipFile(SCORE_Seq_zip)
                 bundle.extractall(runOptions.cache_dir)
                 SCORE_Seq_Exe = os.path.join(runOptions.cache_dir, 'SCORE-Seq')
@@ -1664,7 +1669,7 @@ class ScoreSeq(NullTest):
             interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. Although single variant
             test is available in SCORE-Seq, we will not provide the interface here (its equivalent 'vtools associate' command is 
             the 'LinRegBurden' option without using --group_by).
-            To use this test you should have the SCORE-Seq program on your computer.
+            To use this test you should have the SCORE-Seq program on your computer; otherwise the program will be downloaded.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='ScoreSeq',
