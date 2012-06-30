@@ -1621,7 +1621,6 @@ class ScoreSeq(NullTest):
                         Field(name='Fp_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
                         Field(name='Fp_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
         self.ncovariates = ncovariates
-        self.path_to_program = None
         if self.archive:
             self.curr_dir = os.getcwd()
             if os.path.isdir(self.archive) and os.listdir(self.archive):
