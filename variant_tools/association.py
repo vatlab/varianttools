@@ -498,8 +498,7 @@ class AssoTestsWorker(Process):
 #        self.geno_info = param.geno_info
         self.moi = param.moi
         self.tests = param.tests
-        self.hasSKAT = 'SKAT' in [x.__class__.__name__ for x in self.tests]
-        self.hasScoreSeq = 'ScoreSeq' in [x.__class__.__name__ for x in self.tests]
+        self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
 #        self.group_names = param.group_names
 #        self.missing_filter = param.missing_filter
         self.queue = grpQueue
@@ -576,14 +575,12 @@ class AssoTestsWorker(Process):
                     # select variants from each group:
                     genotype, which, var_info, geno_info = gg.getGenotype(grp)
                 # set C++ data object
-                if (len(self.tests) - self.hasSKAT - self.hasScoreSeq) > 0:
+                if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
                     self.setPhenotype(which, self.phenotypes, self.covariates)
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
-                if self.hasSKAT:
-                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 9, grpname)
-                if self.hasScoreSeq:
+                if self.num_extern_tests:
                     self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 'NA', grpname)
 
                 # association tests

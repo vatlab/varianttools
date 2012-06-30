@@ -56,7 +56,7 @@ def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
     return sorted([(name, obj) for name, obj in globals().iteritems() \
         if type(obj) == type(NullTest) and issubclass(obj, NullTest) \
-            and name not in ('NullTest', 'GLMBurdenTest', 'CaseCtrlBurdenTest')], key=lambda x: x[0])
+            and name not in ('NullTest', 'ExternTest', 'GLMBurdenTest', 'CaseCtrlBurdenTest')], key=lambda x: x[0])
 
 
 class NullTest:
@@ -65,7 +65,10 @@ class NullTest:
         '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
         self.logger = logger
+        # trait type
         self.trait_type = None
+        # group name
+        self.gname = None
         self.fields = []
         self.parseArgs(*method_args)
         #
@@ -1465,13 +1468,43 @@ class VariableThresholdsBt(GLMBurdenTest):
 
 #
 # External tests
-# The SKAT class wraps the R-SKAT package via simple piping 
+# The SKAT class wraps the R-SKAT package via simple piping
 #
-class SKAT(NullTest):
+
+class ExternTest(NullTest):
+    '''Base class for tests using external programs'''
+    def __init__(self, logger=None, *method_args):
+        NullTest.__init__(self, logger, *method_args)
+
+    def dump_data(self, dformat=None):
+        if not self.pydata:
+            raise ValueError("Python data dictionary is empty")
+        self.gname = self.pydata['name']
+        if dformat == 'write_to_tmp':
+            nvar = len(self.pydata['genotype'][0])
+            nsample = len(self.pydata['genotype'])
+            with open(os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
+                f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
+            with open(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
+                f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
+            with open(os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
+                f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
+            return ''
+        elif dformat == 'R':
+            # output data to R script as a string
+            zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['genotype'])]))
+            xstr = 'cbind({0})'.format(','.join(['C'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['covariates'])])) if len(self.pydata['covariates']) > 0 else 1
+            ystr = 'c(' + ','.join(self.pydata['phenotype']) + ')'
+            return 'y<-{0}\nX<-{1}\nZ<-{2}'.format(ystr, xstr, zstr)
+        else:
+            # output nothing
+            return ''
+
+class SKAT(ExternTest):
     '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
     def __init__(self, ncovariates, logger=None, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
-        NullTest.__init__(self, logger, *method_args)
+        ExternTest.__init__(self, logger, *method_args)
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='Q_stats', index=None, type='FLOAT', adj=None, comment='Test statistic for SKAT, "Q"'),
@@ -1571,15 +1604,11 @@ class SKAT(NullTest):
         self.Rargs.append('write(c(stat {0}, max(p,pr)), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
         self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
-    def _format_data(self):
-        zstr = 'rbind({0})'.format(','.join(['I'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['genotype'])]))
-        xstr = 'cbind({0})'.format(','.join(['C'+str(idx+1)+'=c(' + ','.join(x) + ')' for idx, x in enumerate(self.pydata['covariates'])])) if len(self.pydata['covariates']) > 0 else 1
-        ystr = 'c(' + ','.join(self.pydata['phenotype']) + ')'
-        self.Rstr = 'library("SKAT")\ny<-{0}\nX<-{1}\nZ<-{2}\n{3}'.format(ystr, xstr, zstr, '\n'.join(self.Rargs))
 
     def calculate(self):
         # translate data to string
-        self._format_data()
+        self.Rstr = self.dump_data('R')
+        self.Rstr += '\nlibrary("SKAT")\nZ[which(is.na(Z))] <- 9\n{0}'.format('\n'.join(self.Rargs))
         tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
         out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
         if (tc.returncode):
@@ -1595,7 +1624,7 @@ class SKAT(NullTest):
 #
 # SCORE-Seq program wrapper
 #
-class ScoreSeq(NullTest):
+class ScoreSeq(ExternTest):
     '''Score statistic / SCORE-Seq software (Tang & Lin 2011)'''
     def __init__(self, ncovariates, logger=None, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
@@ -1708,17 +1737,6 @@ class ScoreSeq(NullTest):
         if self.dominant:
             self.Sargs += '-dominant '
 
-    def _format_data(self):
-        self.gname = self.pydata['name']
-        nvar = len(self.pydata['genotype'][0])
-        nsample = len(self.pydata['genotype'])
-        with open(os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
-            f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
-        with open(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
-            f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
-        with open(os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
-            f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
-
     def _process_output(self):
         # parse output
         self.colnames = ["T1_P","T5_P","Fp_P","VT_P","T1_R","T5_R","Fp_R","VT_R","EREC_R","T1_U","T1_V","T1_Z","T5_U","T5_V","T5_Z","Fp_U","Fp_V","Fp_Z"]
@@ -1752,7 +1770,7 @@ class ScoreSeq(NullTest):
 
 
     def calculate(self):
-        self._format_data()
+        self.dump_data('write_to_tmp')
         self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4} -msglog {5}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)),
