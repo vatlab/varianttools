@@ -34,7 +34,7 @@ from .phenotype import Sample
 def outputArguments(parser):
     parser.add_argument('table', help='''variants to output.''')
     parser.add_argument('fields', nargs='+',
-        help='''A list of fields that will be outputed. SQL-compatible expressions
+        help='''A list of fields that will be outputted. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
 def generalOutputArguments(parser):
@@ -162,7 +162,7 @@ def selectArguments(parser):
     grp.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant, which is a shortcut to '--output count(1)'.''')
     grp.add_argument('-o', '--output', nargs='*', metavar='FIELDS', default=[],
-        help='''A list of fields that will be outputed. SQL-compatible expressions
+        help='''A list of fields that will be outputted. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
 
@@ -367,7 +367,7 @@ def select(args, reverse=False):
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
     parser.add_argument('condition', nargs='*', default=[],
-        help='''Conditions by which variants are execluded. Multiple arguments are
+        help='''Conditions by which variants are excluded. Multiple arguments are
             automatically joined by 'AND' so 'OR' conditions should be provided by
             a single argument with conditions joined by 'OR'. If unspecified, all
             variants (except those excluded by parameter --samples) will be excluded.''')
@@ -381,7 +381,7 @@ def excludeArguments(parser):
     grp.add_argument('-c', '--count', action='store_true',
         help='''Output number of variant, which is a shortcut to '--output count(1)'.''')
     grp.add_argument('-o', '--output', nargs='*', metavar='FIELDS', default=[],
-        help='''A list of fields that will be outputed. SQL-compatible expressions
+        help='''A list of fields that will be outputted. SQL-compatible expressions
             or functions such as "pos-1", "count(1)" or "sum(num)" are also allowed. ''')
 
 def exclude(args):

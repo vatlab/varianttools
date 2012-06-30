@@ -957,5 +957,3 @@ def export(args):
         proj.close()
     except Exception as e:
         sys.exit(e)
-
-

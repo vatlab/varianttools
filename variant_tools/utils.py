@@ -157,7 +157,7 @@ class RuntimeOptions(object):
     # attribute temp_dir
     #
     def _set_temp_dir(self, path=None):
-        # user can explicity set a path ('None' could be saved by a previous version of vtools)
+        # user can explicitly set a path ('None' could be saved by a previous version of vtools)
         if path not in [None, 'None', '']:
             if os.path.isdir(path) and (os.listdir(path) or 
                     (not os.access(path, os.R_OK)) or (not os.access(path, os.W_OK)) or

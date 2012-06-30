@@ -87,7 +87,7 @@ class Updater:
             self.import_alt_build = True
         elif self.proj.alt_build is None:
             # even more troublesome
-            self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
+            self.logger.warning('The new files uses a different reference genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
             self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
             tool = LiftOverTool(self.proj)
             # in case of insert, the indexes will be dropped soon so do not build
@@ -753,7 +753,7 @@ def updateArguments(parser):
             max, and min are currently supported. In addition, special functions #(GT), #(alt), #(hom),
             #(het) and  #(other) are provided to count the number of valid genotypes (not NULL),
             alternative alleles, homozygotes, heterozygotes, and individuals with two different
-            alterantive alleles.''')
+            alternative alleles.''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',

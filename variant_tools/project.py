@@ -1199,7 +1199,7 @@ class Project:
             # Index on the primary reference genome is UNIQUE when there is no alternative reference
             # genome. If there is, multiple variants from the alternative reference genome might
             # be mapped to the same coordinates on the primary reference genome. I have tried to 
-            # set some of the coordinates to NULL, but the unqiueness problem becomes a problem
+            # set some of the coordinates to NULL, but the uniqueness problem becomes a problem
             # across projects. For example, 
             #
             # If c_19 and c_19a both map to c_18 in one project
@@ -3066,7 +3066,7 @@ def showArguments(parser):
             databases, 'annotation ANN' for details about annotation database ANN,
             'formats' for all supported import and export formats, 'format FMT' for
             details of format FMT, 'tests' for a list of all association tests, and
-            'test TST' for details of an associationt est TST. The default parameter
+            'test TST' for details of an association test TST. The default parameter
             of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be names of tables for type 'table',
@@ -3344,4 +3344,3 @@ def admin(args):
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools.py
     pass
-

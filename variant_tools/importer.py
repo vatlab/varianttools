@@ -507,7 +507,7 @@ class SequentialExtractor:
 #
 #
 class LineProcessor:
-    '''An intepreter that read a record (a line), process it and return processed records.'''
+    '''An interpreter that read a record (a line), process it and return processed records.'''
     def __init__(self, fields, build, delimiter, ranges, logger):
         '''
         fields: a list of fields with index, adj (other items are not used)
@@ -999,7 +999,7 @@ class GenotypeWriter:
         try:
             if len(self.cache[id]) == 1000:
                 # this will fail if id does not exist, so we do not need 
-                # extra test if id is valie
+                # extra test if id is valid
                 self.cur.executemany(self.query.format(id), self.cache[id])
                 self.cache[id] = [rec]
                 self.count += 1
@@ -1171,7 +1171,7 @@ class GenotypeImportWorker(Process):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
-            is not in this list, this worker will succide so that it can be replaced 
+            is not in this list, this worker will suicide so that it can be replaced 
             by a worker with more variants.
         encoding, genotypefield, genotype_info, ranges:  parameters to import data
         geno_count:  a shared variable to report number of genotype imported
@@ -1410,7 +1410,7 @@ class Importer:
             self.import_alt_build = True
         elif self.proj.alt_build is None:
             # even more troublesome
-            self.logger.warning('The new files uses a different refrence genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
+            self.logger.warning('The new files uses a different reference genome ({}) from the primary reference genome ({}) of the project.'.format(self.build, self.proj.build))
             self.logger.info('Adding an alternative reference genome ({}) to the project.'.format(self.build))
             tool = LiftOverTool(self.proj)
             # in case of insert, the indexes will be dropped soon so do not build
@@ -1535,7 +1535,7 @@ class Importer:
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
             return variant_id
         else:
-            # new varaint!
+            # new variant!
             # alt_chr and alt_pos are updated if adding by alternative reference genome
             self.count[2] += 1
             cur.execute(self.variant_insert_query, rec)
@@ -1873,7 +1873,7 @@ class Importer:
             # 
             # k =  4n/3m
             #
-            # each process handle at least 10 sampples
+            # each process handle at least 10 samples
             workload = [max(10, int(4*len(sample_ids)/(3.*self.jobs)*(1-x/(2.*(self.jobs - 1))))) for x in range(self.jobs)]
             # if there are missing ones, give it to workload
             workload[0] += max(0, len(sample_ids) - sum(workload))
@@ -1903,7 +1903,7 @@ class Importer:
                         break
                 start_sample = end_sample
         # 
-        # minitor the import of genotypes
+        # monitor the import of genotypes
         prog = ProgressBar('Importing genotypes', status.total_genotype_count, initCount=sum([x.value for x in genotype_import_count]))
         while True:
             # each process update their passed shared value

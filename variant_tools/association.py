@@ -593,7 +593,7 @@ class AssoTestsWorker(Process):
                     self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except Exception as e:
-                self.logger.debug('An ERROR has occured while processing {}: {}'.format(repr(grpname), e))
+                self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 # return no result for any of the tests if a test fails.

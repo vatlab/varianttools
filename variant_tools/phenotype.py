@@ -146,7 +146,7 @@ class Sample:
         self.db = proj.db
 
     def load(self, filename, allowed_fields, samples):
-        '''Load phenotype informaiton from a file'''
+        '''Load phenotype information from a file'''
         if not self.db.hasTable('sample'):
             self.logger.warning('Project does not have a sample table.')
             return
@@ -239,7 +239,7 @@ class Sample:
                         self.logger.warning('Filename {} and sample name {} does not match any sample'.format(key[0], key[1]))
                         continue
                     if len(ids) != 1:
-                        raise ValueError('Filename and sample should unqiuely determine a sample')
+                        raise ValueError('Filename and sample should uniquely determine a sample')
                     for id in [x for x in ids if x in allowed_samples]:
                         count[0] += 1
                         cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
@@ -377,10 +377,10 @@ class Sample:
             else:
                 if len(header) != len(fields):
                     self.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(header), len(fields)))
-                print(delimiter.join(header))                  
+                print(delimiter.join(header))
         for rec in cur:
             print(delimiter.join([na if x is None else str(x) for x in rec]))
-                
+
 
 def generalOutputArguments(parser):
     grp = parser.add_argument_group('Output options')

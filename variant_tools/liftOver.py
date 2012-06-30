@@ -175,7 +175,7 @@ class LiftOverTool:
         #
         mapped_file = os.path.join(runOptions.cache_dir, 'var_out.bed')
         if flip:
-            self.logger.info('Flipping primary and alterantive reference genome')
+            self.logger.info('Flipping primary and alternative reference genome')
             cur.execute('UPDATE variant SET alt_bin=bin, alt_chr=chr, alt_pos=pos;')
             cur.execute('UPDATE variant SET bin=NULL, chr=NULL, pos=NULL')
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
@@ -197,7 +197,7 @@ class LiftOverTool:
             raise ValueError('Cannot set alternative build the same as primary build')
         if self.proj.alt_build is not None and self.proj.alt_build != alt_build:
             self.logger.warning('Setting a different alternative reference genome.')
-            self.logger.warning('The original alternative genome {} will be overritten.'.format(self.proj.alt_build))
+            self.logger.warning('The original alternative genome {} will be overwritten.'.format(self.proj.alt_build))
         self.proj.alt_build = alt_build
         self.proj.saveProperty('alt_build', alt_build)
         self.updateAltCoordinates(flip)
