@@ -29,12 +29,13 @@ import math
 import zipfile
 import platform
 import argparse
+import stat
 if sys.version_info.major == 2:
     import assoTests_py2 as t
 else:
     import assoTests_py3 as t
 from .project import Field
-from .utils import runOptions
+from .utils import runOptions, downloadFile
 
 def freq(frequency):
     try:
@@ -1599,10 +1600,6 @@ class ScoreSeq(NullTest):
     def __init__(self, ncovariates, logger=None, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, logger, *method_args)
-        if not platform.system() == 'Linux':
-            raise OSError("You platform does not support SCORE-Seq program. It is available for Linux only.")
-        elif not platform.architecture()[0] == '64bit':
-            raise OSError("You Linux platform does not support SCORE-Seq program. It requires a 64bit Linux machine.")
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='T1_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
@@ -1624,11 +1621,7 @@ class ScoreSeq(NullTest):
                         Field(name='Fp_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
                         Field(name='Fp_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
         self.ncovariates = ncovariates
-        self.path_to_program = os.path.abspath(self.path_to_program)
-        try:
-            Popen(self.path_to_program, stdout = PIPE, stderr = PIPE)
-        except Exception as e:
-                raise ValueError("ERROR: Wrong path to SCORE-Seq, {0}".format(e.strerror))
+        self.path_to_program = None
         if self.archive:
             self.curr_dir = os.getcwd()
             if os.path.isdir(self.archive) and os.listdir(self.archive):
@@ -1639,6 +1632,32 @@ class ScoreSeq(NullTest):
         self.algorithm = self._determine_algorithm()
         self.logger.debug("Running command {0}".format(self.Sargs))
 
+    def getSCORE_Seq(self):
+        '''Obtain the SCORE_Seq tool, download from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/ if needed.'''
+        try:
+            subprocess.Popen(['SCORE-Seq'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env={'PATH':os.pathsep.join(['.', runOptions.cache_die, os.environ['PATH']])})
+            return 'SCORE-Seq'
+        except:
+            # otherwise download the tool
+            self.logger.debug('Failed to execute SCORE_Seq -h')
+            if not platform.system() == 'Linux':
+                raise OSError("You platform does not support SCORE-Seq program. It is available for Linux only.")
+            elif not platform.architecture()[0] == '64bit':
+                raise OSError("You Linux platform does not support SCORE-Seq program. It requires a 64bit Linux machine.")
+            #
+            SCORE_Seq_URL = 'http://www.bios.unc.edu/~dlin/software/SCORE-Seq/v3.0/dist/SCORE-Seq-3.0-linux-64.zip'
+            try:
+                self.logger.info('Downloading SCORE_Seq tool from UNC')
+                SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, runOptions.temp_dir)
+                bundle = zipfile.ZipFile(SCORE_Seq_zip)
+                bundle.extractall(runOptions.cache_dir)
+                SCORE_Seq_Exe = os.path.join(runOptions.cache_dir, 'SCORE-Seq')
+                os.chmod(SCORE_Seq_Exe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
+            except Exception as e:
+                raise RuntimeError('Failed to download SCORE-Seq from {}. Please check the URL or manually download the program: {}'.format(SCORE_Seq_URL, e))
+        return SCORE_Seq_Exe
+       
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
             conducting a number of association tests for each SNP-set (gene).
@@ -1649,8 +1668,6 @@ class ScoreSeq(NullTest):
             To use this test you should have the SCORE-Seq program on your computer.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
-        parser.add_argument('path_to_program', type=str,
-            help='''Path to the SCORE-Seq program executable file (/path/to/SCORE-Seq). The program can be downloaded from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/''')
         parser.add_argument('--name', default='ScoreSeq',
             help='''Name of the test that will be appended to names of output fields, usually used to
                 differentiate output of different tests, or the same test with different parameters.''')
@@ -1679,7 +1696,7 @@ class ScoreSeq(NullTest):
 
 
     def _determine_algorithm(self):
-        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.path_to_program, self.MAF, self.MAC, self.CR)
+        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.getSCORE_Seq(), self.MAF, self.MAC, self.CR)
         if self.resample:
             if not self.EREC:
                 raise ValueError("Please specify --EREC 1 or 2")
