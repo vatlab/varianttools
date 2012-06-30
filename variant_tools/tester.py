@@ -82,7 +82,6 @@ class NullTest:
         self.pydata = pydata
 
     def calculate(self):
-        self.dump_data(dformat='w', tdir=self.directory)
         return []
 
 
@@ -1523,6 +1522,10 @@ class GroupWrite(ExternTest):
     def setData(self, data, pydata):
         self.data = data
         self.pydata = pydata
+
+    def calculate(self):
+        self.dump_data(dformat='w', tdir=self.directory)
+        return []
 
 
 class SKAT(ExternTest):
