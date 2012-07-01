@@ -311,21 +311,7 @@ class AssociationTestManager:
         #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
         return field_names, field_types, groups
 
-    def getVarInfo(self, grp):
-        var_info = {x:[] for x in self.var_info}
-        if not self.var_info:
-            return var_info
-        #
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        query = 'SELECT {0} FROM __asso_tmp WHERE {2})'.format(
-            ', '.join(self.var_info), from_clause, where_clause)
-        #self.logger.debug('Running query: {}'.format(query))
-        cur.execute(query, group)
-        #
-        data = {x[0]:x[1:] for x in cur.fetchall()}
-        for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
-        return var_info
+
 
 
 class GenotypeGrabber:
@@ -356,7 +342,23 @@ class GenotypeGrabber:
     def __del__(self):
         self.db.detach('__fromGeno')
         self.db.close()
-        
+
+    def getVarInfo(self, grp):
+        var_info = {x:[] for x in self.var_info}
+        if not self.var_info:
+            return var_info
+        #
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        query = 'SELECT {0} FROM __asso_tmp WHERE {2})'.format(
+            ', '.join(self.var_info), from_clause, where_clause)
+        #self.logger.debug('Running query: {}'.format(query))
+        cur.execute(query, group)
+        #
+        data = {x[0]:x[1:] for x in cur.fetchall()}
+        for idx, key in enumerate(self.var_info):
+            var_info[key] = [data[x][idx] for x in variant_id]
+        return var_info
+
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
         # get variant_id
@@ -369,7 +371,6 @@ class GenotypeGrabber:
         variant_id = [x[0] for x in cur.fetchall()]
         numSites = len(variant_id)
         #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
-        #
         # get genotypes
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
@@ -399,7 +400,7 @@ class GenotypeGrabber:
         numtoRemove = len(self.sample_IDs) - sum(toKeep)
         if numtoRemove > 0:
             self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
-        return genotype, toKeep, geno_info
+        return genotype, toKeep, self.getVarInfo(group), geno_info
 
 
 class ResultRecorder:
@@ -547,10 +548,10 @@ class AssoTestsWorker(Process):
         while True:
             # if cached, get genotype from the main process
             if runOptions.associate_genotype_cache_size > 0:
-                grp, var_info, (genotype, which, geno_info) = self.queue.get()
+                grp, (genotype, which, var_info, geno_info) = self.queue.get()
             else:
                 # otherwise, only the group
-                grp, var_info = self.queue.get()
+                grp = self.queue.get()
             #
             try:
                 grpname = ", ".join(map(str, grp))
@@ -566,7 +567,7 @@ class AssoTestsWorker(Process):
             try:
                 if runOptions.associate_genotype_cache_size == 0:
                     # select variants from each group:
-                    genotype, which, geno_info = gg.getGenotype(grp)
+                    genotype, which, var_info, geno_info = gg.getGenotype(grp)
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
@@ -615,16 +616,14 @@ def associate(args):
                 geno = GenotypeGrabber(asso)
                 prog = ProgressBar('Getting genotypes', len(asso.groups))
                 for count,grp in enumerate(asso.groups):
-                    var_info = asso.getVarInfo(grp)
-                    grpQueue.put((grp, var_info, geno.getGenotype(grp)))
+                    grpQueue.put((grp, geno.getGenotype(grp)))
                     prog.update(count)
                 for j in range(nJobs):
                     grpQueue.put(None)
                 prog.done()
             else:
                 for grp in asso.groups:
-                    var_info = asso.getVarInfo(grp)
-                    grpQueue.put((grp, var_info))
+                    grpQueue.put(grp)
                 # the worker will stop once all jobs are finished
                 for j in range(nJobs):
                     grpQueue.put(None)
