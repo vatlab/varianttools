@@ -355,7 +355,7 @@ class GenotypeGrabber:
     def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info}
         query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
-            ','+','.join(self.var_info) if self.var_info else '', where_clause)
+            ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
         #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         cur.execute(query, group)

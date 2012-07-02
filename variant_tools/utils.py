@@ -750,11 +750,17 @@ class DatabaseEngine:
                         continue
                     # No error message will be produced for wrong pragma
                     # but we may have syntax error.
-                    try:
-                        cur.execute('PRAGMA {}'.format(pragma))
-                    except:
-                        # I cannot raise an error because uers need to open the project to reset this value.
-                        print('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.'.format(pragma))
+                    while True:
+                        try:
+                            cur.execute('PRAGMA {}'.format(pragma))
+                            break
+                        except sqlite3.OperationalError:
+                            # if operational error, sleep a while, and retry
+                            time.sleep(1)
+                        except:
+                            # I cannot raise an error because uers need to open the project to reset this value.
+                            print('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.'.format(pragma))
+                            break
                 self.database.commit()
             # trying to load extension
             for path in sys.path:
