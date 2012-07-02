@@ -276,7 +276,7 @@ class AssociationTestManager:
               {} {} {});
               '''.format('TEMPORARY' if runOptions.associate_genotype_cache_size > 0 else '',
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
-              ''.join([', {} FLOAT'.format(x) for x in self.var_info]),
+              ''.join([', {} FLOAT'.format(x.replace('.', '_')) for x in self.var_info]),
               ', chr VARCHAR(20) NULL, pos INTEGER NULL' if chr_pos else ''))
         #
         # select variant_id and groups for association testing
