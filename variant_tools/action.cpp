@@ -550,23 +550,18 @@ bool MannWhitneyu::apply(AssoData & d)
 {
 	vectorf & genotype = d.genotype();
 	vectorf & phenotype = d.phenotype();
-	int ncases = d.getIntVar("ncases");
-	int nctrls = d.getIntVar("nctrls");
 	double ybar = d.getDoubleVar("ybar");
 	//
-	double caseScores[ncases], ctrlScores[nctrls];
-	int tmpa = 0, tmpu = 0;
+	vectorf caseScores(0), ctrlScores(0);
 
 	for (size_t i = 0; i < phenotype.size(); ++i) {
 		if (phenotype[i] > ybar) {
-			caseScores[tmpa] = genotype[i];
-			++tmpa;
+			caseScores.push_back(genotype[i]);
 		}else {
-			ctrlScores[tmpu] = genotype[i];
-			++tmpu;
+			ctrlScores.push_back(genotype[i]);
 		}
 	}
-	if (ncases < 5 || nctrls < 5) {
+	if (caseScores.size() < 5 || ctrlScores.size() < 5) {
 		throw ValueError("Sample size too small to perform Mann-Whitney test.");
 	}
 
@@ -578,18 +573,18 @@ bool MannWhitneyu::apply(AssoData & d)
 		matrixf & wstats = d.getMatrixVar("RankStats");
 		if (wstats.size() == 1) {
 			// one-sided test
-			wstats[0].push_back(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+			wstats[0].push_back(Mann_Whitneyu(caseScores, ctrlScores));
 			d.setStatistic(wstats[0]);
 
 		} else {
 			if (wstats[0].size() <= wstats[1].size()) {
 				// should be testing model 1
-				wstats[0].push_back(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+				wstats[0].push_back(Mann_Whitneyu(caseScores, ctrlScores));
 				d.setStatistic(wstats[0]);
 			} else {
 				// should be testing model 2
 				// rank sum of scores in ctrls
-				wstats[1].push_back(Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
+				wstats[1].push_back(Mann_Whitneyu(ctrlScores, caseScores));
 				d.setStatistic(wstats[1]);
 			}
 		}
@@ -602,16 +597,16 @@ bool MannWhitneyu::apply(AssoData & d)
 		   vectorf & wstat = d.getArrayVar("RankStatsOrig");
 		   if (wstat.size() == 1) {
 		    // rank sum of scores in cases
-		    wstat[0] = (Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+		    wstat[0] = (Mann_Whitneyu(caseScores, ctrlScores));
 		    d.setStatistic(wstat[0]);
 		   } else {
-		    wstat[0] = (Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
-		    wstat[1] = (Mann_Whitneyu(ctrlScores, nctrls, caseScores, ncases));
+		    wstat[0] = (Mann_Whitneyu(caseScores, ctrlScores));
+		    wstat[1] = (Mann_Whitneyu(ctrlScores, caseScores));
 		    d.setStatistic(wstats[1]);
 		   }
 		 */
 		// rank sum of scores in cases
-		d.setStatistic(Mann_Whitneyu(caseScores, ncases, ctrlScores, nctrls));
+		d.setStatistic(Mann_Whitneyu(caseScores, ctrlScores));
 	}
 	return true;
 }

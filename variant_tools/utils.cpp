@@ -48,7 +48,7 @@ void fRound(double & myValue, double PRECISION)
 //!- Mann-Whitney rank test statistic "U"
 // www.alglib.net
 // http://en.wikipedia.org/wiki/Mann-Whitney_U
-double Mann_Whitneyu(double x[], int n, double y[], int m)
+double Mann_Whitneyu(const std::vector<double> & x, const std::vector<double> & y)
 {
 	int i;
 	int k;
@@ -58,16 +58,18 @@ double Mann_Whitneyu(double x[], int n, double y[], int m)
 	int ns;
 	double u;
 	int w;
+	int n = (int)x.size();
+	int m = (int)y.size();
 
 	// Prepare
 
-	if (n <= 5 || m <= 5) {
+	if (n < 5 || m < 5) {
 		std::clog << "Sample size too small" << std::endl;
 		return -9;
 	}
 	ns = n + m;
-	double r[ns - 1];
-	int c[ns - 1];
+	std::vector<double> r(ns);
+	std::vector<int> c(ns);
 	for (i = 0; i <= n - 1; i++) {
 		r[i] = x[i];
 		c[i] = 0;

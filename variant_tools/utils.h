@@ -49,7 +49,7 @@ bool fEqual(double a, double b);
 void fRound(double & myValue, double PRECISION);
 
 // mannwhitney test
-double Mann_Whitneyu(double *, int, double *, int);
+double Mann_Whitneyu(const std::vector<double> & x, const std::vector<double> & y);
 
 // 2X2 table chisq statistic
 double chisq2X2stat(const std::vector<double> & regressors, const std::vector<double> & responses);
