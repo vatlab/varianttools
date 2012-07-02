@@ -110,6 +110,7 @@ class AssociationTestManager:
 
     tests:       a list of test objects
     sample_IDs:  sample IDs
+    sample_names:   sample names
     table:       variant table (genotype)
     phenotypes:  phenotypes
     covariates:  covariates
@@ -135,7 +136,7 @@ class AssociationTestManager:
         # step 0: get testers
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         # step 1: get samples and related phenotypes
-        self.sample_IDs, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
+        self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
         # step 2: check if tests are compatible with phenotypes
         for idx, item in enumerate([list(set(x)) for x in self.phenotypes]):
             if (list(map(float, item)) == [2.0, 1.0] or list(map(float, item)) == [1.0, 2.0]):
@@ -200,7 +201,7 @@ class AssociationTestManager:
     def getPhenotype(self, condition, pheno, covar):
         '''Get a list of samples from specified condition. This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
-            query = 'SELECT sample_id, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
+            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
                 ', '.join(pheno + (covar if covar is not None else []))) + \
                 (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '')
             self.logger.debug('Select phenotype and covariates using query {}'.format(query))
@@ -208,13 +209,15 @@ class AssociationTestManager:
             cur.execute(query)
             data = []
             for rec in cur:
-                # get id, phenotype, and covariants
-                data.append([rec[0], rec[1 : (1 + len(pheno))], rec[ (1 + len(pheno)) : ]])
+                # get id, sample_name, phenotype, and covariants
+                data.append([rec[0], rec[1], rec[2 : (2 + len(pheno))], rec[ (2 + len(pheno)) : ]])
             sample_IDs = []
+            sample_names = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
-            for i, p, c in data:
+            for i, j, p, c in data:
                 sample_IDs.append(i)
+                sample_names.append(j)
                 [x.append(y) for x,y in zip(phenotypes, p)]
                 [x.append(y) for x,y in zip(covariates, c)]
             if len(sample_IDs) == 0:
@@ -233,7 +236,7 @@ class AssociationTestManager:
                 raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values: '
                                  'missing values should be removed from analysis or '
                                  'inferred with numeric values')
-            return sample_IDs, phenotypes, covariates
+            return sample_IDs, sample_names, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
             if str(e).startswith('Invalid coding'):
@@ -313,8 +316,6 @@ class AssociationTestManager:
         #
         #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
         return field_names, field_types, groups
-
-
 
 
 class GenotypeGrabber:
@@ -478,18 +479,12 @@ class AssoTestsWorker(Process):
     def __init__(self, param, grpQueue, resQueue):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
-#        self.proj = param.proj
-#        self.table = param.table
-#        self.sample_IDs = param.sample_IDs
+        self.sample_names = param.sample_names
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
-#        self.var_info = param.var_info
-#        self.geno_info = param.geno_info
         self.moi = param.moi
         self.tests = param.tests
         self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
-#        self.group_names = param.group_names
-#        self.missing_filter = param.missing_filter
         self.queue = grpQueue
         self.resQueue = resQueue
         self.logger = param.proj.logger
@@ -502,14 +497,14 @@ class AssoTestsWorker(Process):
         for field in info.keys():
             self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
-    def setPhenotype(self, which, data, covariates=None):
+    def setPhenotype(self, which):
         '''Set phenotype data'''
-        if len(data) > 1:
+        if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
-        phen = [x for idx, x in enumerate(data[0]) if which[idx]]
-        if covariates:
-          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in covariates]
-        if covariates:
+        phen = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
+        if self.covariates:
+          covt = [[x for idx, x in enumerate(y) if which[idx]] for y in self.covariates]
+        if self.covariates:
           self.data.setPhenotype(phen, covt)
         else:
           self.data.setPhenotype(phen)
@@ -519,22 +514,26 @@ class AssoTestsWorker(Process):
             if field not in ['chr', 'pos']:
                 self.data.setVar('__var_' + field, data[field])
 
-    def setPyData(self, which, geno, pheno, covar, var_info, geno_Info, missing_code=None, grpname=None):
+    def setPyData(self, which, geno, var_info, geno_Info, missing_code=None, grpname=None):
         '''set all data to a python dictionary in str format'''
-        self.pydata['name'] = grpname
-        if len(pheno) > 1:
+        if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
         #
+        self.pydata['name'] = grpname
         if missing_code:
             self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
         else:
             self.pydata['genotype'] = [map(istr, x) for idx, x in enumerate(geno) if which[idx]]
-        self.pydata['phenotype'] = map(str, [x for idx, x in enumerate(pheno[0]) if which[idx]])
-        if len(covar) > 0:
-            # skip the first covariate, a vector of '1''s
-            self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
+        #
         self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
         #FIXME: will not use other var_info and geno_info for now
+        #
+        self.pydata['sample_name'] = self.sample_names
+        self.pydata['phenotype'] = map(str, [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]])
+        if self.covariates:
+            # skip the first covariate, a vector of '1''s
+            self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in self.covariates[1:]]
+        #
         if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
             raise ValueError("No input data")
 
@@ -568,11 +567,11 @@ class AssoTestsWorker(Process):
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
-                    self.setPhenotype(which, self.phenotypes, self.covariates)
+                    self.setPhenotype(which)
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
                 if self.num_extern_tests:
-                    self.setPyData(which, genotype, self.phenotypes, self.covariates, var_info, geno_info, 'NA', grpname)
+                    self.setPyData(which, genotype, var_info, geno_info, 'NA', grpname)
 
                 # association tests
                 for test in self.tests:
