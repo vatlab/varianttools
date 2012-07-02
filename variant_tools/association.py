@@ -135,6 +135,7 @@ class AssociationTestManager:
         #
         # step 0: get testers
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
+        self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
         # step 1: get samples and related phenotypes
         self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
         # step 2: check if tests are compatible with phenotypes
@@ -248,9 +249,13 @@ class AssociationTestManager:
 
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
-        chr_pos = ['chr', 'pos']
+        # do not write chr, pos to __asso_tmp by default
+        chr_pos = []
+        # have to include chr, pos for ExternTest based methods
+        if self.num_extern_tests:
+            chr_pos = ['chr', 'pos']
         if not group_by:
-            group_by = chr_pos
+            group_by = ['chr', 'pos']
             chr_pos = []
         # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
@@ -334,6 +339,9 @@ class GenotypeGrabber:
         self.missing_filter = param.missing_filter
         #
         self.logger = param.proj.logger
+        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
+        if param.num_extern_tests:
+            self.var_info += ['chr', 'pos']
         if runOptions.associate_genotype_cache_size == 0:
             self.db = DatabaseEngine()
             self.db.connect(param.proj.name + '.proj', readonly=True)
@@ -348,16 +356,19 @@ class GenotypeGrabber:
         self.db.close()
 
     def getVarInfo(self, group, where_clause):
-        var_info = {x:[] for x in self.var_info + ['chr', 'pos']}
-        query = 'SELECT variant_id, {0} FROM __asso_tmp WHERE ({1})'.format(
-            ', '.join(self.var_info + ['chr', 'pos']), where_clause)
+        var_info = {x:[] for x in self.var_info}
+        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
+            ','+','.join(self.var_info) if self.var_info else '', where_clause)
         #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         cur.execute(query, group)
         #
-        data = {x[0]:x[1:] for x in cur.fetchall()}
+        if not self.var_info:
+            data = {x[0]:[] for x in cur.fetchall()}
+        else:
+            data = {x[0]:x[1:] for x in cur.fetchall()}
         variant_id = sorted(data.keys(), key=int)
-        for idx, key in enumerate(self.var_info + ['chr', 'pos']):
+        for idx, key in enumerate(self.var_info):
             var_info[key] = [data[x][idx] for x in variant_id]
         return var_info, variant_id
 
@@ -377,7 +388,7 @@ class GenotypeGrabber:
             try:
                 cur.execute(query, group)
             except Exception as e:
-                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
+                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.geno_info, ID, e))
             data = {x[0]:x[1:] for x in cur.fetchall()}
             # handle missing values
             gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
@@ -484,7 +495,7 @@ class AssoTestsWorker(Process):
         self.covariates = param.covariates
         self.moi = param.moi
         self.tests = param.tests
-        self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
+        self.num_extern_tests = param.num_extern_tests
         self.queue = grpQueue
         self.resQueue = resQueue
         self.logger = param.proj.logger
@@ -525,7 +536,10 @@ class AssoTestsWorker(Process):
         else:
             self.pydata['genotype'] = [map(istr, x) for idx, x in enumerate(geno) if which[idx]]
         #
-        self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
+        try:
+            self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
+        except:
+            self.pydata['coordinate'] = []
         #FIXME: will not use other var_info and geno_info for now
         #
         self.pydata['sample_name'] = self.sample_names

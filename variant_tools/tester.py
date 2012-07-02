@@ -1469,7 +1469,7 @@ class ExternTest(NullTest):
     def __init__(self, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
 
-    def dump_data(self, dformat=None, tdir=runOptions.temp_dir):
+    def dump_data(self, dformat, tdir):
         if not self.pydata:
             raise ValueError("Python data dictionary is empty")
         self.gname = self.pydata['name']
@@ -1635,7 +1635,7 @@ class SKAT(ExternTest):
 
     def calculate(self):
         # translate data to string
-        self.Rstr = self.dump_data(dformat='R')
+        self.Rstr = self.dump_data(dformat='R', tdir=runOptions.temp_dir)
         self.Rstr += '\nlibrary("SKAT")\nZ[which(is.na(Z))] <- 9\n{0}'.format('\n'.join(self.Rargs))
         tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
         out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
@@ -1798,7 +1798,7 @@ class ScoreSeq(ExternTest):
 
 
     def calculate(self):
-        self.dump_data(dformat='w')
+        self.dump_data(dformat='w', tdir=runOptions.temp_dir)
         self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4} -msglog {5}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)),
