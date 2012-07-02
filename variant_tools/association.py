@@ -273,10 +273,10 @@ class AssociationTestManager:
         #   chr VARCHAR(20),
         #   pos INT
         #
-        cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
-        cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
+        cur.execute('DROP TABLE IF EXISTS __fromGeno.__asso_tmp;')
+        cur.execute('DROP INDEX IF EXISTS __fromGeno.__asso_tmp_index;')
         cur.execute('''\
-            CREATE {} TABLE __asso_tmp (
+            CREATE {} TABLE __fromGeno.__asso_tmp (
               variant_id INT NOT NULL,
               {} {} {});
               '''.format('TEMPORARY' if runOptions.associate_genotype_cache_size > 0 else '',
@@ -300,19 +300,19 @@ class AssociationTestManager:
         self.from_clause = ', '.join(from_clause)
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups
-        query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(
+        query = 'INSERT INTO __fromGeno.__asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(
             self.table, group_fields,
             self.from_clause, self.where_clause)
         s = delayedAction(self.logger.info, "Grouping variants by {}, please be patient ...".format(', '.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
-            CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
+            CREATE INDEX __fromGeno.__asso_tmp_index ON __asso_tmp ({});
             '''.format(','.join(['{} ASC'.format(x) for x in field_names])))
         del s
         # get group by
         cur.execute('''\
-            SELECT DISTINCT {} FROM __asso_tmp;
+            SELECT DISTINCT {} FROM __fromGeno.__asso_tmp;
             '''.format(', '.join(field_names)))
         groups = cur.fetchall()
         self.logger.info('{} groups are found'.format(len(groups)))
@@ -342,17 +342,14 @@ class GenotypeGrabber:
         # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
         if param.num_extern_tests:
             self.var_info += ['chr', 'pos']
-        if runOptions.associate_genotype_cache_size == 0:
-            self.db = DatabaseEngine()
-            self.db.connect(param.proj.name + '.proj', readonly=True)
-            self.db.attach(param.proj.name + '_genotype.DB', '__fromGeno')
-        else:
+        self.db = DatabaseEngine()
+        self.db.connect(param.proj.name + '_genotype.DB')
+        if runOptions.associate_genotype_cache_size > 0:
             self.db = self.proj.db
-            self.proj.logger.debug('Setting PRAGMA __fromGeno.cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
-            self.db.execute('PRAGMA __fromGeno.cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+            self.proj.logger.debug('Setting PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+            self.db.execute('PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
         
     def __del__(self):
-        self.db.detach('__fromGeno')
         self.db.close()
 
     def getVarInfo(self, group, where_clause):
@@ -383,7 +380,7 @@ class GenotypeGrabber:
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         for ID in self.sample_IDs:
-            query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
+            query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
             try:
                 cur.execute(query, group)
