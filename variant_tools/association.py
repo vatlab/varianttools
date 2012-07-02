@@ -346,9 +346,8 @@ class GenotypeGrabber:
         self.db.detach('__fromGeno')
         self.db.close()
 
-    def getVarInfo(self, group):
+    def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info + ['chr', 'pos']}
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
         query = 'SELECT variant_id, {0} FROM __asso_tmp WHERE ({1})'.format(
             ', '.join(self.var_info + ['chr', 'pos']), where_clause)
         #self.logger.debug('Running query: {}'.format(query))
@@ -356,46 +355,46 @@ class GenotypeGrabber:
         cur.execute(query, group)
         #
         data = {x[0]:x[1:] for x in cur.fetchall()}
+        variant_id = sorted(data.keys(), key=int)
         for idx, key in enumerate(self.var_info + ['chr', 'pos']):
-            var_info[key] = [data[x][idx] for x in sorted(data.keys())]
-        return var_info
+            var_info[key] = [data[x][idx] for x in variant_id]
+        return var_info, variant_id
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
         cur = self.db.cursor()
-        # get genotypes
+        # variant info
+        var_info, variant_id = self.getVarInfo(group, where_clause)
+        # get genotypes / genotype info
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         for ID in self.sample_IDs:
             query = 'SELECT variant_id, GT {2} FROM __fromGeno.genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
             try:
-                cur.execute(query, group) # , variant_id)
+                cur.execute(query, group)
             except Exception as e:
                 raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.var_info, ID, e))
             data = {x[0]:x[1:] for x in cur.fetchall()}
-            #
-            # genotype belonging to the same sample name are put together
-            #
             # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in sorted(data.keys())]
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
             # handle -1 coding (double heterozygotes)
             genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
             #
             # handle genotype_info
+            #
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-        #
-        numSites = len(data.keys())
+        # filter individuals by genotype missingness at a locus
+        nloci = len(genotype[0])
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
-        # remove individuals having many missing genotypes, or have all missing variants
-        toKeep = [(x < (self.missing_filter * numSites)) for x in missing_counts]
-        numtoRemove = len(self.sample_IDs) - sum(toKeep)
-        if numtoRemove > 0:
-            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(numtoRemove, len(genotype)))
-        return genotype, toKeep, self.getVarInfo(group), geno_info
+        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
+        if len(which) - sum(which) > 0:
+            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
+        #
+        return genotype, which, var_info, geno_info
 
 
 class ResultRecorder:
@@ -525,8 +524,6 @@ class AssoTestsWorker(Process):
         self.pydata['name'] = grpname
         if len(pheno) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
-        if not len(var_info['pos']) == len(geno[0]):
-            raise ValueError('Unmatched genotype-variant information')
         #
         if missing_code:
             self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
