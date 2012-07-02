@@ -742,26 +742,30 @@ class DatabaseEngine:
             self.database.enable_load_extension(True)
             # FIXME: we may need to reconsider this because some pragma applies to 
             # readonly databases (e.g. cache_size)
-            if not readonly:
-                cur = self.database.cursor()
-                for pragma in runOptions.sqlite_pragma:
-                    # if a pragma is only applicable to certain database, check its name
-                    if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
-                        continue
-                    # No error message will be produced for wrong pragma
-                    # but we may have syntax error.
-                    while True:
-                        try:
-                            cur.execute('PRAGMA {}'.format(pragma))
-                            break
-                        except sqlite3.OperationalError:
-                            # if operational error, sleep a while, and retry
-                            time.sleep(1)
-                        except:
-                            # I cannot raise an error because uers need to open the project to reset this value.
-                            print('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.'.format(pragma))
-                            break
-                self.database.commit()
+            cur = self.database.cursor()
+            for pragma in runOptions.sqlite_pragma:
+                # if a pragma is only applicable to certain database, check its name
+                if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
+                    continue
+                # No error message will be produced for wrong pragma
+                # but we may have syntax error.
+                while True:
+                    try:
+                        cur.execute('PRAGMA {}'.format(pragma))
+                        break
+                    except sqlite3.OperationalError:
+                        # if operational error, sleep a while, and retry
+                        time.sleep(1)
+                    except:
+                        # I cannot raise an error because uers need to open the project to reset this value.
+                        print('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.'.format(pragma))
+                        break
+            while True:
+                try:
+                    self.database.commit()
+                    break
+                except sqlite3.OperationalError:
+                    time.sleep(1)
             # trying to load extension
             for path in sys.path:
                 ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))

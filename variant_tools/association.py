@@ -26,7 +26,7 @@
 import sys
 import os
 import threading
-from multiprocessing import Process, Queue, Pipe, Lock
+from multiprocessing import Process, Queue, Pipe, Lock, Value
 import time
 from array import array
 import math
@@ -343,7 +343,7 @@ class GenotypeGrabber:
         if param.num_extern_tests:
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
-        self.db.connect(param.proj.name + '_genotype.DB')
+        self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
         if runOptions.associate_genotype_cache_size > 0:
             self.db = self.proj.db
             self.proj.logger.debug('Setting PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
@@ -484,7 +484,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue):
+    def __init__(self, param, grpQueue, resQueue, ready):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.sample_names = param.sample_names
@@ -496,6 +496,7 @@ class AssoTestsWorker(Process):
         self.queue = grpQueue
         self.resQueue = resQueue
         self.logger = param.proj.logger
+        self.ready = ready
         self.db = None
 
     def setGenotype(self, which, data, info):
@@ -552,6 +553,9 @@ class AssoTestsWorker(Process):
         # if genotypes are not cached, each worker will grab genotype from the database by itself
         if runOptions.associate_genotype_cache_size == 0:
             gg = GenotypeGrabber(self.param)
+        # 
+        # tell the master process that this worker is ready
+        self.ready.value = 1
         while True:
             # if cached, get genotype from the main process
             if runOptions.associate_genotype_cache_size > 0:
@@ -616,9 +620,21 @@ def associate(args):
             # the result queue is used by workers to return results
             resQueue = Queue()
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
+            ready_flags = [Value('i', 0) for x in range(nJobs)]
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue).start()
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j]).start()
             #
+            # wait for all connection to be ready, because if there are many workers,
+            # some of them might start slowly to a point when another ready worker starts
+            # to work, it faces a locked database and cannot proceed. Note that the workers
+            # select from a readonly database and do not have any lock issue, but the 
+            # connection part might block the database.
+            while True:
+                if all([x.value for x in ready_flags]):
+                    break
+                else:
+                    print [x.value for x in ready_flags]
+                    time.sleep(1)
             # put all jobs to queue, the workers will work on them
             if runOptions.associate_genotype_cache_size > 0:
                 geno = GenotypeGrabber(asso)
