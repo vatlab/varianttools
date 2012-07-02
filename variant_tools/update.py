@@ -33,7 +33,7 @@ import gzip
 import zipfile
 from collections import defaultdict
 from multiprocessing import Process, Pipe
-
+import math
 from .project import AnnoDB, Project, Field, AnnoDBWriter, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
@@ -429,7 +429,7 @@ def setFieldValue(proj, table, items, build):
 def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     '''Count sample allele count etc for specified sample and variant table'''
     if not proj.isVariantTable(variant_table):
-        raise ValueError('"Variant_table {} does not exist.'.format(variant_table))
+        raise ValueError('"Variant table {} does not exist.'.format(variant_table))
     #
     #
     # NOTE: this function could be implemented using one or more query more
@@ -452,7 +452,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         return
 
     # separate special functions...
-    num = hom = het = other = cnt = None
+    num = hom = het = other = cnt = corr = None
 
     # keys to speed up some operations
     MEAN = 0
@@ -479,21 +479,23 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             other = f
         elif e == '#(GT)':
             cnt = f
+        elif e == '#(corr)':
+            corr = f
         elif e.startswith('#('):
-            raise ValueError('Unrecognized parameter {}: only parameters alt, hom, het, other and GT are accepted for special function #'.format(stat))
+            raise ValueError('Unrecognized parameter {}: only parameters alt, hom, het, other, GT and corr are accepted for special function #'.format(stat))
         else:
             m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
             if m is None:
                 raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max and min'.format(stat))
             dest, operation, field = m.groups()
             if operation not in possibleOperations:
-                raise ValueError('Unsupported operation {}.  Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
+                raise ValueError('Unsupported operation {}. Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
             operations.append(operationKeys[operation])
             genotypeFields.append(field)
             fieldCalcs.append(None)
             destinations.append(dest)
     #
-    coreDestinations = [num, hom, het, other, cnt]
+    coreDestinations = [num, hom, het, other, cnt, corr]
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -577,14 +579,16 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         #proj.logger.debug(query)
         cur.execute(query)
 
+        last_dosage = None
         for rec in cur:
             if rec[0] not in variants:
-                variants[rec[0]] = [0, 0, 0, 0]
+                # [heter, hom, other, total, dosage^2, dosage * dosage_of_previous_variant]
+                variants[rec[0]] = [0, 0, 0, 0, 0, 0]
                 variants[rec[0]].extend(list(fieldCalcs))
-
-            # type heterozygote
+            # total valid GT
             if rec[1] is not None:
                 variants[rec[0]][3] += 1
+            # type heterozygote
             if rec[1] == 1:
                 variants[rec[0]][0] += 1
             # type homozygote
@@ -595,12 +599,21 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
                 variants[rec[0]][2] += 1
             elif rec[1] not in [0, None]:
                 proj.logger.warning('Invalid genotype type {}'.format(rec[1]))
-        
+            # correlation in genotype with the previous variant
+            # FIXME: for correlation calculation, have to approxiate missing genotype with wildtype because we do not impute here
+            dosage = 0
+            if rec[1]:
+                dosage = rec[1] if rec[1] >= 0 else 2
+            variants[rec[0]][4] += dosage * dosage
+            if last_dosage is not None:
+                variants[rec[0]][5] += dosage * last_dosage
+            last_dosage = dosage
+            #
             # this collects genotype_field information
             if len(validGenotypeFields) > 0:
                 for index in validGenotypeIndices:
                     queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
-                    recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and wildtype
+                    recIndex = index + 6       # first 6 attributes of variants are het, hom, double_het and GT, etc
                     # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
                     # by sqlite even when the field type is INT.
                     if rec[queryIndex] in [None, '']:
@@ -633,8 +646,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     #
     headers = [x.lower() for x in proj.db.getHeaders(variant_table)]
     table_attributes = [(num, 'INT'), (hom, 'INT'),
-            (het, 'INT'), (other, 'INT'), (cnt, 'INT')]
-    fieldsDefaultZero = [num, hom, het, other, cnt]
+            (het, 'INT'), (other, 'INT'), (cnt, 'INT'), (corr, 'FLOAT')]
+    fieldsDefaultZero = [num, hom, het, other, cnt, corr]
     
     for index in validGenotypeIndices:
         field = genotypeFields[index]
@@ -650,7 +663,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     for field, fldtype in table_attributes:
         if field is None:
             continue
-        # We are setting default values on the count fields to 0.  The genotype stat fields are set to NULL by default.
+        # We are setting default values on the count fields to 0. The genotype stat fields are set to NULL by default.
         defaultValue = 0 if field in fieldsDefaultZero else None
         if field.lower() in headers:
             if proj.db.typeOfColumn(variant_table, field) != (fldtype + ' NULL'):
@@ -668,11 +681,13 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
     warning = False
+    # mean and variance of genotype, for previous variant
+    last_mv = None
     for count,id in enumerate(variants):
         value = variants[id]
         res = []
         if num is not None:
-            # het + hom * 2 + other 
+            # het + hom * 2 + other
             res.append(value[0] + value[1] * 2 + value[2])
         if hom is not None:
             res.append(value[1])
@@ -682,12 +697,30 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             res.append(value[2])
         if cnt is not None:
             res.append(value[3])
-            
+        if corr is not None:
+            # vX = sum(X^2) / n - mean(X) * mean(X)
+            # vY = sum(Y^2) / n - mean(Y) * mean(Y)
+            # cov = sum(X*Y) / n - mean(X) * mean(Y)
+            # corr = cov / sqrt(vY*vX)
+            mY = float(value[0] + value[1] * 2 + value[2]) / float(len(IDs))
+            vY = float(value[4]) / float(len(IDs)) - mY * mY
+            if last_mv is None:
+                # the first record does not have correlation with its preceding variant
+                res.append(0.0)
+            else:
+                cov = float(value[5]) / float(len(IDs)) - last_mv[0] * mY
+                denom = math.sqrt(vY * last_mv[1])
+                if denom == 0.0:
+                    # no variation in both variants; consider them independent
+                    res.append(0.0)
+                else:
+                    res.append(cov / denom)
+            last_mv = [mY, vY]
         # for genotype_field operations, the value[operation_index] holds the result of the operation
         # except for the "mean" operation which needs to be divided by num_samples that have that variant
         try:
             for index in validGenotypeIndices:
-                operationIndex = index + 4     # the first 4 indices hold the values for hom, het, double het and total genotype
+                operationIndex = index + 6     # the first 6 indices hold the values for hom, het, double het, total, dosage^2, dosage*previous_dosage of genotype
                 operationCalculation = value[operationIndex]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
@@ -702,6 +735,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     proj.db.commit()
     prog.done()
     proj.logger.info('{} records are updated'.format(count))
+
 
 def updateArguments(parser):
     parser.add_argument('table', help='''variants to be updated.''')
@@ -751,9 +785,9 @@ def updateArguments(parser):
         help='''One or more expressions such as meanQT=avg(QT) that aggregate genotype info (e.g. QT)
             of variants in all or selected samples to specified fields (e.g. meanQT). Functions sum, avg,
             max, and min are currently supported. In addition, special functions #(GT), #(alt), #(hom),
-            #(het) and  #(other) are provided to count the number of valid genotypes (not NULL),
-            alternative alleles, homozygotes, heterozygotes, and individuals with two different
-            alternative alleles.''')
+            #(het), #(other) and #(corr) are provided to count the number of valid genotypes (not NULL),
+            alternative alleles, homozygotes, heterozygotes, individuals with two different
+            alternative alleles, and correlation in genotype between current and its preceding variant.''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
