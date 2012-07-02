@@ -245,8 +245,10 @@ class AssociationTestManager:
 
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
+        chr_pos = ['chr', 'pos']
         if not group_by:
-            group_by = ['chr', 'pos']
+            group_by = chr_pos
+            chr_pos = []
         # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields]
@@ -268,13 +270,14 @@ class AssociationTestManager:
         cur.execute('''\
             CREATE {} TABLE __asso_tmp (
               variant_id INT NOT NULL,
-              {} {});
+              {} {} {});
               '''.format('TEMPORARY' if runOptions.associate_genotype_cache_size > 0 else '',
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
-              ''.join([', {} FLOAT'.format(x) for x in self.var_info])))
+              ''.join([', {} FLOAT'.format(x) for x in self.var_info]),
+              ', chr VARCHAR(20) NULL, pos INTEGER NULL' if chr_pos else ''))
         #
         # select variant_id and groups for association testing
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by + self.var_info))
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by + self.var_info + chr_pos))
         from_clause = [self.table]
         where_clause = []
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
@@ -343,34 +346,25 @@ class GenotypeGrabber:
         self.db.detach('__fromGeno')
         self.db.close()
 
-    def getVarInfo(self, grp):
-        var_info = {x:[] for x in self.var_info}
-        if not self.var_info:
-            return var_info
-        #
+    def getVarInfo(self, group):
+        var_info = {x:[] for x in self.var_info + ['chr', 'pos']}
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        query = 'SELECT {0} FROM __asso_tmp WHERE {2})'.format(
-            ', '.join(self.var_info), from_clause, where_clause)
+        query = 'SELECT variant_id, {0} FROM __asso_tmp WHERE ({1})'.format(
+            ', '.join(self.var_info + ['chr', 'pos']), where_clause)
         #self.logger.debug('Running query: {}'.format(query))
+        cur = self.db.cursor()
         cur.execute(query, group)
         #
         data = {x[0]:x[1:] for x in cur.fetchall()}
-        for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
+        for idx, key in enumerate(self.var_info + ['chr', 'pos']):
+            var_info[key] = [data[x][idx] for x in sorted(data.keys())]
         return var_info
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        query = 'SELECT variant_id FROM __asso_tmp WHERE {}'.format(where_clause)
-        #
-        #self.logger.debug('Running on group {0} query {1}'.format(group, query))
         cur = self.db.cursor()
-        cur.execute(query, group)
-        variant_id = [x[0] for x in cur.fetchall()]
-        numSites = len(variant_id)
-        #self.logger.debug('Getting {0} variants for {1}'.format(numSites, group))
         # get genotypes
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
@@ -386,7 +380,7 @@ class GenotypeGrabber:
             # genotype belonging to the same sample name are put together
             #
             # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in sorted(data.keys())]
             # handle -1 coding (double heterozygotes)
             genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
             #
@@ -394,6 +388,7 @@ class GenotypeGrabber:
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
         #
+        numSites = len(data.keys())
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
         # remove individuals having many missing genotypes, or have all missing variants
         toKeep = [(x < (self.missing_filter * numSites)) for x in missing_counts]
@@ -522,13 +517,17 @@ class AssoTestsWorker(Process):
 
     def setVarInfo(self, data):
         for field in data.keys():
-            self.data.setVar('__var_' + field, data[field])
+            if field not in ['chr', 'pos']:
+                self.data.setVar('__var_' + field, data[field])
 
     def setPyData(self, which, geno, pheno, covar, var_info, geno_Info, missing_code=None, grpname=None):
         '''set all data to a python dictionary in str format'''
         self.pydata['name'] = grpname
         if len(pheno) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
+        if not len(var_info['pos']) == len(geno[0]):
+            raise ValueError('Unmatched genotype-variant information')
+        #
         if missing_code:
             self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
         else:
@@ -537,7 +536,8 @@ class AssoTestsWorker(Process):
         if len(covar) > 0:
             # skip the first covariate, a vector of '1''s
             self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in covar[1:]]
-        #FIXME: will not use var_info and geno_info for now
+        self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
+        #FIXME: will not use other var_info and geno_info for now
         if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
             raise ValueError("No input data")
 
@@ -587,6 +587,7 @@ class AssoTestsWorker(Process):
                 self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
+                self.pydata = {}
                 # return no result for any of the tests if a test fails.
                 values = []
             self.resQueue.put(values)

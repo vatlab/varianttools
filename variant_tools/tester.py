@@ -1477,11 +1477,11 @@ class ExternTest(NullTest):
             nvar = len(self.pydata['genotype'][0])
             nsample = len(self.pydata['genotype'])
             with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join(['V{0}\t'.format(idx+1) + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
+                f.writelines('\n'.join([':'.join(self.pydata['coordinate'][idx]) + '\t' + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
             with open(os.path.join(tdir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
                 f.writelines('\n'.join(['I{0}\t'.format(idx+1) + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
             with open(os.path.join(tdir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([self.gname + '\t' + 'V' + str(idx+1) for idx in range(nvar)]))
+                f.writelines('\n'.join([self.gname + '\t' +  ':'.join(self.pydata['coordinate'][idx]) for idx in range(nvar)]))
             return 0
         elif dformat == 'R':
             # output data to R script as a string
