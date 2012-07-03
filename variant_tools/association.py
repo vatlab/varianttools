@@ -381,19 +381,23 @@ class GenotypeCacher(Process):
             # tell others that this sample is cached
             self.cached_samples[id] = 1
             if memory_usage > self.size:
-                self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
                 break
         prog.done()
+        self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
         # tell the main process that this process is ready
         self.ready.value = 1
 
     def serve(self, i, queue, pipe):
         # read sample_id, group from queue, send results to pipe
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        cur = self.db.cursor()
         while True:
-            item = queue.get()
-            self.logger.debug('THREAD {} get request {}'.format(i, item))
-            time.sleep(1)
-        #pass
+            group, ids = queue.get()
+            for id in ids:
+                cur.execute('''SELECT * from cache.genotype_{0} WHERE variant_id IN 
+                    (SELECT variant_id FROM __asso_tmp WHERE {1})'''.format(id, where_clause), group)
+                data = {x[0]:x[1:] for x in cur.fetchall()}
+                pipe.send(data)
 
     def run(self):
         self.logger.info('Start caching')
@@ -452,7 +456,6 @@ class GenotypeGrabber:
 
     def getGenotype(self, group):
         '''Get genotype for variants in specified group'''
-        self.logger.debug('FROM WORKER {}'.format(sum(self.cache.cached_samples)))
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
         cur = self.db.cursor()
@@ -465,9 +468,12 @@ class GenotypeGrabber:
         if self.cache is not None:
             # which IDs could be obtained from the cache?
             cached = [x for x in self.sample_IDs if self.cache.cached_samples[x]]
-            self.queue.put(cached)
-        #    pass
+            if cached:
+                self.queue.put((group, cached))
+        # getting samples locally from my own connection
         for ID in self.sample_IDs:
+            if self.cache is not None and ID in cached:
+                continue
             query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
             try:
@@ -484,6 +490,22 @@ class GenotypeGrabber:
             #
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+        # getting genotoypes from the cache
+        if self.cache is not None:
+            for ID in cached:
+                data = self.pipe.recv()
+                # FIXME: this is wrong because things are supposed to be ordered
+                # handle missing values
+                gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+                # handle -1 coding (double heterozygotes)
+                genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
+                #
+                # handle genotype_info
+                #
+                for idx, key in enumerate(self.geno_info):
+                    geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+            self.logger.debug('{} samples obtained from the cache'.format(len(cached)))
+
         # filter individuals by genotype missingness at a locus
         nloci = len(genotype[0])
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
