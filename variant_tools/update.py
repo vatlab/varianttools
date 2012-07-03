@@ -574,7 +574,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
             continue
 
-        query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY v.chr, v.pos;'.format(' '.join([',' + x for x in fieldSelect]),
+        query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY v.chr, v.pos;'.format(' '.join([', g.' + x for x in fieldSelect]),
             proj.name, id, whereClause)
         #proj.logger.debug(query)
         cur.execute(query)
