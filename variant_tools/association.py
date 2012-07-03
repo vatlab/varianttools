@@ -276,10 +276,10 @@ class AssociationTestManager:
         cur.execute('DROP TABLE IF EXISTS __fromGeno.__asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __fromGeno.__asso_tmp_index;')
         cur.execute('''\
-            CREATE {} TABLE __fromGeno.__asso_tmp (
+            CREATE TABLE __fromGeno.__asso_tmp (
               variant_id INT NOT NULL,
               {} {} {});
-              '''.format('TEMPORARY' if runOptions.associate_genotype_cache_size > 0 else '',
+              '''.format(
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
               ''.join([', {} FLOAT'.format(x.replace('.', '_')) for x in self.var_info]),
               ', chr VARCHAR(20) NULL, pos INTEGER NULL' if chr_pos else ''))
@@ -316,6 +316,7 @@ class AssociationTestManager:
             '''.format(', '.join(field_names)))
         groups = cur.fetchall()
         self.logger.info('{} groups are found'.format(len(groups)))
+        self.db.commit()
         #
         # the output can be too long
         #
@@ -345,7 +346,6 @@ class GenotypeGrabber:
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
         if runOptions.associate_genotype_cache_size > 0:
-            self.db = self.proj.db
             self.proj.logger.debug('Setting PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
             self.db.execute('PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
         
