@@ -328,7 +328,7 @@ class GenotypeCacher(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
     '''
-    def __init__(self, param, size):
+    def __init__(self, param, size, ready):
         Process.__init__(self)
         self.proj = param.proj
         self.table = param.table
@@ -350,27 +350,37 @@ class GenotypeCacher(Process):
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
         self.db.attach(':memory:', 'cache')
         self.size = size
+        self.ready = ready
         
     def loadGenotypes(self):
         # create a list of all vairants
-        query = 'INSERT INTO cache.__all_ids AS SELECT distinct variant_id FROM __asso_tmp;'
-        for ID in self.sample_IDs:
-        #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
-        cur.execute(query, group)
-        #
-        if not self.var_info:
-            data = {x[0]:[] for x in cur.fetchall()}
-        else:
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-        variant_id = sorted(data.keys(), key=int)
-        for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
-        return var_info, variant_id
+        # create a table with all IDs
+        cur.execute('CREATE TABLE cache.__all_ids (variant_id INT);')
+        cur.execute('INSERT INTO cache.__all_ids SELECT distinct variant_id FROM __asso_tmp;')
+        # 
+        cur.execute('''PRAGMA cache.page_size''')
+        # for some reason, the real memory consumption is page_size*page_count*1.5
+        page_size = cur.fetchall()[0][0]
+        prog = ProgressBar('Filling cache', self.size)
+        for count, id in enumerate(self.sample_IDs):
+            # 0.4/s per 1.1/s with/without controlling variant_id...
+            cur.execute('''CREATE TABLE cache.genotype_{0} AS SELECT variant_id, GT {1} 
+                FROM genotype_{0} ''' .format( id, ' '.join([', ' + x for x in self.geno_info])))
+                 #WHERE variant_id IN (SELECT variant_id FROM cache.__all_ids)'''
+            #cur.execute('''CREATE INDEX cache.genotype_{0}_idx ON genotype_{0} (variant_id)'''.format(id))
+            cur.execute('''PRAGMA cache.page_count''')
+            page_count = cur.fetchall()[0][0]
+            self.logger.debug('''SIZE {} * {} = {:1f}M'''.format(page_count, page_size, page_count*page_size/1024./1024.*1.5))
+            memory_usage = page_count * page_size * 3 / 2 /1024
+            prog.update(memory_usage)
+            if memory_usage > self.size:
+                self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
+                break
+        prog.done()
 
     def run(self):
-        while True:
-            break           
+        self.loadGenotypes()
         
         
 class GenotypeGrabber:
@@ -666,12 +676,12 @@ def associate(args):
             # the result queue is used by workers to return results
             resQueue = Queue()
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            ready_flags = [Value('i', 0) for x in range(nJobs)]
+            ready_flags = [Value('i', 0) for x in range(nJobs + (1 if runOptions.associate_genotype_cache_size > 0 else 0))]
             # if a genotype cache is specified, a cacher object will be used to
             # load genotype tables into RAM and provide genotypes to other workers
             # if it has the table in RAM
             if runOptions.associate_genotype_cache_size > 0:
-                cacher = GenotypeCacher(asso, runOptions.associate_genotype_cache_size)
+                cacher = GenotypeCacher(asso, runOptions.associate_genotype_cache_size, ready_flags[-1])
                 cacher.start()
             else:
                 cacher = None
