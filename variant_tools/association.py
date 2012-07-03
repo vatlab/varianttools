@@ -26,7 +26,7 @@
 import sys
 import os
 import threading
-from multiprocessing import Process, Queue, Pipe, Lock, Value
+from multiprocessing import Process, Queue, Pipe, Lock, Value, Array
 import time
 from array import array
 import math
@@ -351,6 +351,8 @@ class GenotypeCacher(Process):
         self.db.attach(':memory:', 'cache')
         self.size = size
         self.ready = ready
+        #
+        self.cached_samples = Array('i', max(self.sample_IDs) + 1)
         
     def loadGenotypes(self):
         # create a list of all vairants
@@ -371,16 +373,26 @@ class GenotypeCacher(Process):
             #cur.execute('''CREATE INDEX cache.genotype_{0}_idx ON genotype_{0} (variant_id)'''.format(id))
             cur.execute('''PRAGMA cache.page_count''')
             page_count = cur.fetchall()[0][0]
-            self.logger.debug('''SIZE {} * {} = {:1f}M'''.format(page_count, page_size, page_count*page_size/1024./1024.*1.5))
             memory_usage = page_count * page_size * 3 / 2 /1024
             prog.update(memory_usage)
+            # tell others that this sample is cached
+            self.cached_samples[id] = 1
             if memory_usage > self.size:
                 self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
                 break
         prog.done()
 
+    def getGenotype(self, queue, pipe):
+        # read sample_id, group from queue, send results to pipe
+        pass
+
     def run(self):
-        self.loadGenotypes()
+        loader = threading.Thread(target=self.loadGenotypes)
+        loader.start()
+        while True:
+            self.logger.debug('{} samples cached'.format(sum(self.cached_samples)))
+            time.sleep(1)
+
         
         
 class GenotypeGrabber:
