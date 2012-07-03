@@ -574,8 +574,12 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
             continue
 
-        query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY v.chr, v.pos;'.format(' '.join([', g.' + x for x in fieldSelect]),
-            proj.name, id, whereClause)
+        if corr is None:
+            query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
+                proj.name, id, whereClause)
+        else:
+            query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY v.chr, v.pos;'.format(' '.join([', g.' + x for x in fieldSelect]),
+                proj.name, id, whereClause)
         #proj.logger.debug(query)
         cur.execute(query)
 
@@ -599,15 +603,16 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
                 variants[rec[0]][2] += 1
             elif rec[1] not in [0, None]:
                 proj.logger.warning('Invalid genotype type {}'.format(rec[1]))
-            # correlation in genotype with the previous variant
-            # FIXME: for correlation calculation, have to approxiate missing genotype with wildtype because we do not impute here
-            dosage = 0
-            if rec[1]:
-                dosage = rec[1] if rec[1] >= 0 else 2
-            variants[rec[0]][4] += dosage * dosage
-            if last_dosage is not None:
-                variants[rec[0]][5] += dosage * last_dosage
-            last_dosage = dosage
+            if corr is not None:
+                # correlation in genotype with its preceding variant
+                # FIXME: for correlation calculation, have to approxiate missing genotype with wildtype because we do not impute here
+                dosage = 0
+                if rec[1]:
+                    dosage = rec[1] if rec[1] >= 0 else 2
+                variants[rec[0]][4] += dosage * dosage
+                if last_dosage is not None:
+                    variants[rec[0]][5] += dosage * last_dosage
+                last_dosage = dosage
             #
             # this collects genotype_field information
             if len(validGenotypeFields) > 0:
