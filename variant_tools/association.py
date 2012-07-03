@@ -348,7 +348,6 @@ class GenotypeCacher(Process):
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        self.db.attach(':memory:', 'cache')
         #
         self.size = size
         #
@@ -361,27 +360,26 @@ class GenotypeCacher(Process):
         # create a list of all vairants
         cur = self.db.cursor()
         # create a table with all IDs
-        cur.execute('CREATE TABLE cache.__all_ids (variant_id INT);')
-        cur.execute('INSERT INTO cache.__all_ids SELECT distinct variant_id FROM __asso_tmp;')
-        # 
-        cur.execute('''PRAGMA cache.page_size''')
-        # for some reason, the real memory consumption is page_size*page_count*1.5
-        page_size = cur.fetchall()[0][0]
-        prog = ProgressBar('Filling cache', self.size)
+        lenGrp = len(self.group_names)
+        lenGI = len(self.geno_info)
         for count, id in enumerate(self.sample_IDs):
             # 0.4/s per 1.1/s with/without controlling variant_id...
-            cur.execute('''CREATE TABLE cache.genotype_{0} AS SELECT variant_id, GT {1} 
-                FROM genotype_{0} ''' .format( id, ' '.join([', ' + x for x in self.geno_info])))
-                 #WHERE variant_id IN (SELECT variant_id FROM cache.__all_ids)'''
-            #cur.execute('''CREATE INDEX cache.genotype_{0}_idx ON genotype_{0} (variant_id)'''.format(id))
-            cur.execute('''PRAGMA cache.page_count''')
-            page_count = cur.fetchall()[0][0]
-            memory_usage = page_count * page_size * 3 / 2 /1024
-            prog.update(memory_usage)
-            # tell others that this sample is cached
-            self.cached_samples[id] = 1
-            if memory_usage > self.size:
-                break
+            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} FROM __asso_tmp, genotype_{0} WHERE __asso_tmp.variant_id = genotype_{0}.variant_id ORDER BY {2}'''.format(
+                id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names)))
+            self.logger.info('''SELECT genotype_{0}.variant_id, GT {1}, {2} FROM __asso_tmp, genotype_{0} WHERE __asso_tmp.variant_id = genotype_{0}.variant_id ORDER BY {2}'''.format(
+                id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names)))
+            # grab data for each group by
+            data = {}
+            cur_group = None
+            for rec in cur:
+                self.logger.debug('{}'.format(rec))
+                sys.exit(0)
+                grp = rec[-lenGrp:]
+                if cur_group != grp:
+                    # a new group
+                    data[grp] = rec[1:lenGrp]
+                else:
+                    data[gro].append(rec[1:lenGrp])
         prog.done()
         self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
         # tell the main process that this process is ready
