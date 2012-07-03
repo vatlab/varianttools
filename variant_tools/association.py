@@ -324,8 +324,57 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
+class GenotypeCacher(Process):
+    '''This process continuous load genotype to a cache, and send results to 
+    the requesters if it has it.
+    '''
+    def __init__(self, param, size):
+        Process.__init__(self)
+        self.proj = param.proj
+        self.table = param.table
+        self.sample_IDs = param.sample_IDs
+        self.phenotypes = param.phenotypes
+        self.covariates = param.covariates
+        self.var_info = param.var_info
+        self.geno_info = param.geno_info
+        self.moi = param.moi
+        self.tests = param.tests
+        self.group_names = param.group_names
+        self.missing_filter = param.missing_filter
+        #
+        self.logger = param.proj.logger
+        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
+        if param.num_extern_tests:
+            self.var_info += ['chr', 'pos']
+        self.db = DatabaseEngine()
+        self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
+        self.db.attach(':memory:', 'cache')
+        self.size = size
+        
+    def loadGenotypes(self):
+        # create a list of all vairants
+        query = 'INSERT INTO cache.__all_ids AS SELECT distinct variant_id FROM __asso_tmp;'
+        for ID in self.sample_IDs:
+        #self.logger.debug('Running query: {}'.format(query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        #
+        if not self.var_info:
+            data = {x[0]:[] for x in cur.fetchall()}
+        else:
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+        variant_id = sorted(data.keys(), key=int)
+        for idx, key in enumerate(self.var_info):
+            var_info[key] = [data[x][idx] for x in variant_id]
+        return var_info, variant_id
+
+    def run(self):
+        while True:
+            break           
+        
+        
 class GenotypeGrabber:
-    def __init__(self, param):
+    def __init__(self, param, cache):
         #
         self.proj = param.proj
         self.table = param.table
@@ -345,9 +394,7 @@ class GenotypeGrabber:
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        if runOptions.associate_genotype_cache_size > 0:
-            self.proj.logger.debug('Setting PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
-            self.db.execute('PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+        self.cache = cache
         
     def __del__(self):
         self.db.close()
@@ -379,6 +426,10 @@ class GenotypeGrabber:
         # get genotypes / genotype info
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
+        # if a cache is usable
+        if self.cache is not None:
+            # which IDs could be obtained from the cache?
+            pass
         for ID in self.sample_IDs:
             query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
@@ -484,7 +535,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready):
+    def __init__(self, param, grpQueue, resQueue, ready, cache):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.sample_names = param.sample_names
@@ -498,6 +549,7 @@ class AssoTestsWorker(Process):
         self.logger = param.proj.logger
         self.ready = ready
         self.db = None
+        self.cache = cache
 
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -551,18 +603,13 @@ class AssoTestsWorker(Process):
 
     def run(self):
         # if genotypes are not cached, each worker will grab genotype from the database by itself
-        if runOptions.associate_genotype_cache_size == 0:
-            gg = GenotypeGrabber(self.param)
+        gg = GenotypeGrabber(self.param, self.cache)
         # 
         # tell the master process that this worker is ready
         self.ready.value = 1
         while True:
             # if cached, get genotype from the main process
-            if runOptions.associate_genotype_cache_size > 0:
-                grp, (genotype, which, var_info, geno_info) = self.queue.get()
-            else:
-                # otherwise, only the group
-                grp = self.queue.get()
+            grp = self.queue.get()
             #
             try:
                 grpname = ", ".join(map(str, grp))
@@ -576,9 +623,8 @@ class AssoTestsWorker(Process):
             self.pydata = {}
             values = list(grp)
             try:
-                if runOptions.associate_genotype_cache_size == 0:
-                    # select variants from each group:
-                    genotype, which, var_info, geno_info = gg.getGenotype(grp)
+                # select variants from each group:
+                genotype, which, var_info, geno_info = gg.getGenotype(grp)
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
@@ -621,8 +667,17 @@ def associate(args):
             resQueue = Queue()
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             ready_flags = [Value('i', 0) for x in range(nJobs)]
+            # if a genotype cache is specified, a cacher object will be used to
+            # load genotype tables into RAM and provide genotypes to other workers
+            # if it has the table in RAM
+            if runOptions.associate_genotype_cache_size > 0:
+                cacher = GenotypeCacher(asso, runOptions.associate_genotype_cache_size)
+                cacher.start()
+            else:
+                cacher = None
+            #
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j]).start()
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], cacher).start()
             #
             # wait for all connection to be ready, because if there are many workers,
             # some of them might start slowly to a point when another ready worker starts
@@ -636,21 +691,11 @@ def associate(args):
                     print [x.value for x in ready_flags]
                     time.sleep(1)
             # put all jobs to queue, the workers will work on them
-            if runOptions.associate_genotype_cache_size > 0:
-                geno = GenotypeGrabber(asso)
-                prog = ProgressBar('Getting genotypes', len(asso.groups))
-                for count,grp in enumerate(asso.groups):
-                    grpQueue.put((grp, geno.getGenotype(grp)))
-                    prog.update(count)
-                for j in range(nJobs):
-                    grpQueue.put(None)
-                prog.done()
-            else:
-                for grp in asso.groups:
-                    grpQueue.put(grp)
-                # the worker will stop once all jobs are finished
-                for j in range(nJobs):
-                    grpQueue.put(None)
+            for grp in asso.groups:
+                grpQueue.put(grp)
+            # the worker will stop once all jobs are finished
+            for j in range(nJobs):
+                grpQueue.put(None)
             #
             count = 0
             # get initial completed and failed
