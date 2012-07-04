@@ -354,54 +354,58 @@ class GenotypeCacher(Process):
         self.cached_samples = Array('i', max(self.sample_IDs) + 1)
         self.queues = queues
         self.pipes = pipes
-        self.ready = ready
+        # tell the main process that this process is ready
+        ready.value = 1
+        self.lock = threading.Lock()
+        self.genotype_cache = {}
         
-    def loadGenotypes(self):
+    def loadGenotypes(self, lock):
         # create a list of all vairants
         cur = self.db.cursor()
         # create a table with all IDs
         lenGrp = len(self.group_names)
-        lenGI = len(self.geno_info)
         for count, id in enumerate(self.sample_IDs):
             # 0.4/s per 1.1/s with/without controlling variant_id...
-            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} FROM __asso_tmp, genotype_{0} WHERE __asso_tmp.variant_id = genotype_{0}.variant_id ORDER BY {2}'''.format(
-                id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names)))
-            self.logger.info('''SELECT genotype_{0}.variant_id, GT {1}, {2} FROM __asso_tmp, genotype_{0} WHERE __asso_tmp.variant_id = genotype_{0}.variant_id ORDER BY {2}'''.format(
-                id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names)))
+            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                FROM __asso_tmp, genotype_{0} WHERE __asso_tmp.variant_id = genotype_{0}.variant_id
+                ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]),
+                    ', '.join(self.group_names)))
             # grab data for each group by
             data = {}
             cur_group = None
             for rec in cur:
-                self.logger.debug('{}'.format(rec))
-                sys.exit(0)
                 grp = rec[-lenGrp:]
                 if cur_group != grp:
                     # a new group
-                    data[grp] = rec[1:lenGrp]
+                    data[grp] = {rec[0]: rec[1:-lenGrp]}
                 else:
-                    data[gro].append(rec[1:lenGrp])
-        prog.done()
-        self.logger.info('{} of {} samples are cached'.format(count+1, len(self.sample_IDs)))
-        # tell the main process that this process is ready
-        self.ready.value = 1
+                    data[gro][rec[0]] = rec[1:-lenGrp]
+            # put the dictionary to the master ...
+            lock.acquire()
+            self.genotype_cache[id] = data
+            lock.release()
+            # tells other processes that this sample has been cached.
+            self.cached_samples[id] = 1
+            # 
+            # if we know the ram used, wait...
+            #
 
-    def serve(self, i, queue, pipe):
+    def serve(self, lock, queue, pipe):
         # read sample_id, group from queue, send results to pipe
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        cur = self.db.cursor()
         while True:
             group, ids = queue.get()
+            res = {}
+            lock.acquire()
             for id in ids:
-                cur.execute('''SELECT * from cache.genotype_{0} WHERE variant_id IN 
-                    (SELECT variant_id FROM __asso_tmp WHERE {1})'''.format(id, where_clause), group)
-                data = {x[0]:x[1:] for x in cur.fetchall()}
-                pipe.send(data)
+                res[id] = self.cached_samples[id].pop(group)
+            lock.release
+            pipe.send(res)
 
     def run(self):
         self.logger.info('Start caching')
-        loader = threading.Thread(target=self.loadGenotypes)
+        loader = threading.Thread(target=self.loadGenotypes, args=self.lock)
         loader.start()
-        servers = [threading.Thread(target=self.serve, args=(i, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
+        servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
         [x.start() for x in servers]
         loader.join()
         [x.join() for x in servers]
@@ -490,10 +494,10 @@ class GenotypeGrabber:
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
         # getting genotoypes from the cache
         if self.cache is not None:
-            for ID in cached:
-                data = self.pipe.recv()
-                # FIXME: this is wrong because things are supposed to be ordered
+            all_data = self.pipe.recv()
+            for id in cached:
                 # handle missing values
+                data = all_data[id]
                 gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
                 # handle -1 coding (double heterozygotes)
                 genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
