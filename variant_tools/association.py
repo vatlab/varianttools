@@ -331,36 +331,36 @@ class GenotypeCacher(Process):
     def __init__(self, param, size, ready, queues, pipes):
         Process.__init__(self)
         self.proj = param.proj
-        self.table = param.table
         self.sample_IDs = param.sample_IDs
-        self.phenotypes = param.phenotypes
-        self.covariates = param.covariates
-        self.var_info = param.var_info
         self.geno_info = param.geno_info
-        self.moi = param.moi
-        self.tests = param.tests
         self.group_names = param.group_names
-        self.missing_filter = param.missing_filter
         #
         self.logger = param.proj.logger
-        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
-        if param.num_extern_tests:
-            self.var_info += ['chr', 'pos']
+        #
         self.db = DatabaseEngine()
+        # readonly allows simultaneous access from several threads
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
         #
         self.size = size
-        #
-        self.cached_samples = Array('i', max(self.sample_IDs) + 1)
         self.queues = queues
         self.pipes = pipes
+        # this lock is used to prevent modification of self.genotype_cache
+        # from multiple threads
+        self.genotype_cache = {}
+        self.lock = threading.Lock()
+        #
+        # used to allow other processes to know the status of each sample
+        self.cached_samples = Array('i', max(self.sample_IDs) + 1)
+        self.completed_groups = []
         # tell the main process that this process is ready
         ready.value = 1
-        self.lock = threading.Lock()
-        self.genotype_cache = {}
         
     def loadGenotypes(self, lock):
-        # create a list of all vairants
+        ''' one thread will be dedicated to read genotypes from the database
+        The major difference between this function and the load genotype function
+        in a genotype grabber is that it read and cache ALL genotypes from a sample
+        instead of querying genotypes for each group, which can be a lot slower.
+        '''
         cur = self.db.cursor()
         # create a table with all IDs
         lenGrp = len(self.group_names)
@@ -374,36 +374,43 @@ class GenotypeCacher(Process):
             data = {}
             cur_group = None
             for rec in cur:
-                grp = rec[-lenGrp:]
+                grp = tuple(rec[-lenGrp:])
                 if cur_group != grp:
                     # a new group
                     data[grp] = {rec[0]: rec[1:-lenGrp]}
                 else:
-                    data[gro][rec[0]] = rec[1:-lenGrp]
-            # put the dictionary to the master ...
+                    data[grp][rec[0]] = rec[1:-lenGrp]
+            # put the dictionary to the master thread...
             lock.acquire()
             self.genotype_cache[id] = data
             lock.release()
             # tells other processes that this sample has been cached.
             self.cached_samples[id] = 1
-            # 
-            # if we know the ram used, wait...
+            #
+            # if we know the ram used, wait... not sure how to do this at this point
             #
 
     def serve(self, lock, queue, pipe):
         # read sample_id, group from queue, send results to pipe
         while True:
-            group, ids = queue.get()
+            item = queue.get()
+            if item is None:
+                break
+            group, ids = item
             res = {}
             lock.acquire()
             for id in ids:
-                res[id] = self.cached_samples[id].pop(group)
-            lock.release
+                try:
+                    res[id] = self.genotype_cache[id].pop(group)
+                except:
+                    res[id] = {}
+            # this information will be used to remove unneeded results
+            self.completed_groups.append(group)
+            lock.release()
             pipe.send(res)
 
     def run(self):
-        self.logger.info('Start caching')
-        loader = threading.Thread(target=self.loadGenotypes, args=self.lock)
+        loader = threading.Thread(target=self.loadGenotypes, args=(self.lock,))
         loader.start()
         servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
         [x.start() for x in servers]
@@ -507,7 +514,6 @@ class GenotypeGrabber:
                 for idx, key in enumerate(self.geno_info):
                     geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
             self.logger.debug('{} samples obtained from the cache'.format(len(cached)))
-
         # filter individuals by genotype missingness at a locus
         nloci = len(genotype[0])
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
@@ -714,7 +720,7 @@ class AssoTestsWorker(Process):
 
 
 def associate(args):
-    try:
+    #try:
         with Project(verbosity=args.verbosity) as proj:
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
@@ -786,5 +792,5 @@ def associate(args):
             # use the result database in the project
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-    except Exception as e:
-        sys.exit(e)
+    #except Exception as e:
+    #    sys.exit(e)
