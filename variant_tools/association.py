@@ -715,7 +715,7 @@ def associate(args):
             while True:
                 time.sleep(1)
                 prog.update(sum(cached_samples))
-                if sum(cahed_samples) == len(asso.sample_IDs):
+                if sum(cached_samples) == len(asso.sample_IDs):
                     break
             prog.done()
             #
