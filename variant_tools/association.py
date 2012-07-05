@@ -329,7 +329,7 @@ class GenotypeCacher(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
     '''
-    def __init__(self, param, size, ready, queues, pipes, cached, start, end, start_working, filename):
+    def __init__(self, param, size, ready, queues, pipes, cached, start, end, start_working):
         Process.__init__(self)
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
@@ -362,7 +362,6 @@ class GenotypeCacher(Process):
         self.start_sample = start
         self.end_sample = end
         self.start_working = start_working
-        self.filename = filename
         
     def loadGenotypes(self, lock, sample_IDs):
         ''' one thread will be dedicated to read genotypes from the database
@@ -373,8 +372,6 @@ class GenotypeCacher(Process):
         cur = self.db.cursor()
         # create a table with all IDs
         lenGrp = len(self.group_names)
-        shelf = shelve.open(self.filename, 'n', protocol=2)
-        self.logger.info('Write disk to {}'.format(self.filename))
         for count, id in enumerate(sample_IDs[self.start_sample:self.end_sample]):
             # 0.4/s per 1.1/s with/without controlling variant_id...
             cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
@@ -396,13 +393,18 @@ class GenotypeCacher(Process):
             #self.genotype_cache[id] = data
             #self.logger.info('Write sample {} to {}'.format(id, self.filename))
             self.cached_samples[id] = 1
-            shelf[str(id)] = data
+            if id % 10 == 0:  # new one
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'n', protocol=2)
+            else:
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'c', protocol=2)
+            for grp,val in data.iteritems():
+                shelf['{},{}'.format(id, grp)] = val
             #lock.release()
             # tells other processes that this sample has been cached.
             #
             # if we know the ram used, wait... not sure how to do this at this point
             #
-        shelf.close()
+            shelf.close()
 
     def serve(self, lock, queue, pipe):
         # read sample_id, group from queue, send results to pipe
@@ -430,7 +432,6 @@ class GenotypeCacher(Process):
             else:
                 break
         #
-        self.logger.info('Cacher {} started for sample {} - {}'.format(self.filename, self.start_sample, self.end_sample))
         self.loadGenotypes(self.lock, self.sample_IDs)
         #servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
         #[x.start() for x in servers]
@@ -767,12 +768,14 @@ def associate(args):
                 pipes = [Pipe() for j in range(nJobs)] 
                 n = len(asso.sample_IDs)
                 for i in range(nJobs):
-                    start = i*n//nJobs
-                    end = (i + 1) * n // nJobs
+                    start = (i*n//nJobs//10)*10
+                    end = ((i + 1) * n // nJobs//10) * 10
+                    if i == nJobs - 1:
+                        end = n
                     proj.logger.info('{} - {}'.format(start, end))
                     GenotypeCacher(asso, runOptions.associate_genotype_cache_size, ready_flags[-i-1],
                         queues, [x[1] for x in pipes], cached, start, end, start_working,
-                        os.path.join(runOptions.cache_dir, 'geno_{}'.format(i))).start()
+                        ).start()
                 #for j in range(nJobs):
                 #    AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], cacher, queues[j], pipes[j][0]).start()
             else:
