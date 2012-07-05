@@ -28,6 +28,7 @@ import os
 import threading
 from multiprocessing import Process, Queue, Pipe, Value, Array
 import time
+import shelve
 from array import array
 import math
 from collections import OrderedDict
@@ -328,7 +329,7 @@ class GenotypeCacher(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
     '''
-    def __init__(self, param, size, ready, queues, pipes, cached, start, end, start_working):
+    def __init__(self, param, size, ready, queues, pipes, cached, start, end, start_working, filename):
         Process.__init__(self)
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
@@ -361,6 +362,7 @@ class GenotypeCacher(Process):
         self.start_sample = start
         self.end_sample = end
         self.start_working = start_working
+        self.filename = filename
         
     def loadGenotypes(self, lock, sample_IDs):
         ''' one thread will be dedicated to read genotypes from the database
@@ -371,6 +373,8 @@ class GenotypeCacher(Process):
         cur = self.db.cursor()
         # create a table with all IDs
         lenGrp = len(self.group_names)
+        shelf = shelve.open(self.filename, 'n', protocol=2)
+        self.logger.info('Write disk to {}'.format(self.filename))
         for count, id in enumerate(sample_IDs[self.start_sample:self.end_sample]):
             # 0.4/s per 1.1/s with/without controlling variant_id...
             cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
@@ -390,12 +394,15 @@ class GenotypeCacher(Process):
             # put the dictionary to the master thread...
             #lock.acquire()
             #self.genotype_cache[id] = data
+            #self.logger.info('Write sample {} to {}'.format(id, self.filename))
             self.cached_samples[id] = 1
+            shelf[str(id)] = data
             #lock.release()
             # tells other processes that this sample has been cached.
             #
             # if we know the ram used, wait... not sure how to do this at this point
             #
+        shelf.close()
 
     def serve(self, lock, queue, pipe):
         # read sample_id, group from queue, send results to pipe
@@ -422,18 +429,13 @@ class GenotypeCacher(Process):
                 time.sleep(1)
             else:
                 break
-        n = len(self.sample_IDs)
-        nThread = 1
-        for i in range(nThread):
-            start = i*n//nThread
-            end = (i + 1) * n // nThread
-            loader = threading.Thread(target=self.loadGenotypes,    
-                args=(self.lock, self.sample_IDs[start:end]))
-            loader.start()
-        servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
-        [x.start() for x in servers]
-        loader.join()
-        [x.join() for x in servers]
+        #
+        self.logger.info('Cacher {} started for sample {} - {}'.format(self.filename, self.start_sample, self.end_sample))
+        self.loadGenotypes(self.lock, self.sample_IDs)
+        #servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
+        #[x.start() for x in servers]
+        #loader.join()
+        #[x.join() for x in servers]
         
 class GenotypeGrabber:
     def __init__(self, param, cache, queue, pipe):
@@ -492,14 +494,14 @@ class GenotypeGrabber:
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         # if a cache is usable
-        if self.cache is not None:
+        if self.cache is None:
             # which IDs could be obtained from the cache?
             cached = [x for x in self.sample_IDs if self.cache.cached_samples[x]]
             if cached:
                 self.queue.put((group, cached))
         # getting samples locally from my own connection
         for ID in self.sample_IDs:
-            if self.cache is not None and ID in cached:
+            if self.cache is  None and ID in cached:
                 continue
             query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
                 .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
@@ -518,7 +520,7 @@ class GenotypeGrabber:
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
         # getting genotoypes from the cache
-        if self.cache is not None:
+        if self.cache is None:
             all_data = self.pipe.recv()
             for id in cached:
                 # handle missing values
@@ -753,8 +755,7 @@ def associate(args):
             # the result queue is used by workers to return results
             resQueue = Queue()
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            nThread = 8
-            ready_flags = [Value('i', 0) for x in range(nJobs + (nThread if runOptions.associate_genotype_cache_size > 0 else 0))]
+            ready_flags = [Value('i', 0) for x in range(nJobs + (nJobs if runOptions.associate_genotype_cache_size > 0 else 0))]
             # if a genotype cache is specified, a cacher object will be used to
             # load genotype tables into RAM and provide genotypes to other workers
             # if it has the table in RAM
@@ -762,24 +763,24 @@ def associate(args):
             start_working = Value('i', 0)
             if runOptions.associate_genotype_cache_size > 0:
                 # create a bunch of queues and pipes for communication between Cacher and Worker
-                queues = [Queue() for j in range(args.jobs)]
-                pipes = [Pipe() for j in range(args.jobs)] 
+                queues = [Queue() for j in range(nJobs)]
+                pipes = [Pipe() for j in range(nJobs)] 
                 n = len(asso.sample_IDs)
-                for i in range(nThread):
-                    start = i*n//nThread
-                    end = (i + 1) * n // nThread
+                for i in range(nJobs):
+                    start = i*n//nJobs
+                    end = (i + 1) * n // nJobs
                     proj.logger.info('{} - {}'.format(start, end))
-                    cacher = GenotypeCacher(asso, runOptions.associate_genotype_cache_size, ready_flags[-i-1],
-                        queues, [x[1] for x in pipes], cached, start, end, start_working)
-                    cacher.start()
-                for j in range(nJobs):
-                    AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], cacher, queues[j], pipes[j][0]).start()
+                    GenotypeCacher(asso, runOptions.associate_genotype_cache_size, ready_flags[-i-1],
+                        queues, [x[1] for x in pipes], cached, start, end, start_working,
+                        os.path.join(runOptions.cache_dir, 'geno_{}'.format(i))).start()
+                #for j in range(nJobs):
+                #    AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], cacher, queues[j], pipes[j][0]).start()
             else:
                 for j in range(nJobs):
                     AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], None, None, None).start()
             #
             while True:
-                if all([x.value for x in ready_flags[-nThread:]]):
+                if all([x.value for x in ready_flags[-nJobs:]]):
                     start_working.value=1
                     break
                 else:
