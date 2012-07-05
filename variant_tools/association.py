@@ -329,7 +329,7 @@ class GenotypeLoader(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
     '''
-    def __init__(self, param, start, end, ready_flags, index, cached_samples):
+    def __init__(self, param, ready_flags, index, queue, cached_samples):
         Process.__init__(self)
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
@@ -338,11 +338,10 @@ class GenotypeLoader(Process):
         self.db_name = param.proj.name + '_genotype.DB'
         self.logger = param.proj.logger
         #
-        self.start_sample = start
-        self.end_sample = end
         # used to allow other processes to know the status of each sample
         self.ready_flags = ready_flags
         self.index = index
+        self.queue = queue
         self.cached_samples = cached_samples
 
     def run(self):
@@ -366,7 +365,10 @@ class GenotypeLoader(Process):
                 time.sleep(1)
         #
         lenGrp = len(self.group_names)
-        for count, id in enumerate(self.sample_IDs[self.start_sample:self.end_sample]):
+        while True:
+            id = self.queue.get()
+            if id is None:
+                break
             # 0.4/s per 1.1/s with/without controlling variant_id...
             cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
                 FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
@@ -687,6 +689,7 @@ def associate(args):
             except ValueError as e:
                 sys.exit(e)
             #
+            sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # step 1: getting all genotypes
             # the loaders can start working only after all of them are ready. Otherwise one
@@ -696,15 +699,12 @@ def associate(args):
             # Tells the master process which samples are loaded, used by the progress bar.
             cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
-            # jobs will be divided by nJobs, with 10 samples in a group
-            trunk = len(asso.sample_IDs) // nJobs // 10 * 10
+            for id in asso.sample_IDs:
+                sampleQueue.put(id)
             for i in range(nJobs):
-                start = i * trunk
-                end = min(len(asso.sample_IDs), start + trunk)
-                if start >= end:
-                    ready_flags[i] = 1
-                    continue
-                GenotypeLoader(asso, start, end, ready_flags, i, cached_samples).start()
+                GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
+                # None will kill the workers
+                sampleQueue.put(None)
             # progress bar...
             prog = ProgressBar('Loading genotype', len(asso.sample_IDs))
             while True:
