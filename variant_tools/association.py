@@ -325,54 +325,48 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
-class GenotypeCacher(Process):
+class GenotypeLoader(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
     '''
-    def __init__(self, param, size, ready, queues, pipes, cached, start, end, start_working):
+    def __init__(self, param, start, end, ready_flags, index, cached_samples):
         Process.__init__(self)
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
         self.geno_info = param.geno_info
         self.group_names = param.group_names
-        #
+        self.db_name = param.proj.name + '_genotype.DB'
         self.logger = param.proj.logger
         #
-        self.db = DatabaseEngine()
-        # readonly allows simultaneous access from several threads
-        self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        self.db.attach(':memory:', 'cache')
-        self.db.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
-        self.db.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
-        #
-        self.size = size
-        self.queues = queues
-        self.pipes = pipes
-        # this lock is used to prevent modification of self.genotype_cache
-        # from multiple threads
-        self.genotype_cache = {}
-        self.lock = threading.Lock()
-        #
-        # used to allow other processes to know the status of each sample
-        self.cached_samples = cached
-        self.completed_groups = []
-        # tell the main process that this process is ready
-        self.ready = ready
-        ready.value = 1
         self.start_sample = start
         self.end_sample = end
-        self.start_working = start_working
-        
-    def loadGenotypes(self, lock, sample_IDs):
-        ''' one thread will be dedicated to read genotypes from the database
-        The major difference between this function and the load genotype function
-        in a genotype grabber is that it read and cache ALL genotypes from a sample
-        instead of querying genotypes for each group, which can be a lot slower.
-        '''
-        cur = self.db.cursor()
-        # create a table with all IDs
+        # used to allow other processes to know the status of each sample
+        self.ready_flags = ready_flags
+        self.index = index
+        self.cached_samples = cached_samples
+
+    def run(self):
+        # loading genotypes from genotype database
+        db = DatabaseEngine()
+        # readonly allows simultaneous access from several threads
+        db.connect(self.db_name, readonly=True)
+        # move __asso_tmp to :memory: can speed up the process a lot
+        db.attach(':memory:', 'cache')
+        # tells other processes that I am ready
+        self.ready_flags[self.index] = 1
+        # filling __asso_tmp, this is per-process so might use some RAM
+        cur = db.cursor()
+        cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
+        cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
+        # wait all processes to get ready
+        while True:
+            if all(self.ready_flags):
+                break
+            else:
+                time.sleep(1)
+        #
         lenGrp = len(self.group_names)
-        for count, id in enumerate(sample_IDs[self.start_sample:self.end_sample]):
+        for count, id in enumerate(self.sample_IDs[self.start_sample:self.end_sample]):
             # 0.4/s per 1.1/s with/without controlling variant_id...
             cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
                 FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
@@ -388,55 +382,15 @@ class GenotypeCacher(Process):
                     data[grp] = {rec[0]: rec[1:-lenGrp]}
                 else:
                     data[grp][rec[0]] = rec[1:-lenGrp]
-            # put the dictionary to the master thread...
-            #lock.acquire()
-            #self.genotype_cache[id] = data
-            #self.logger.info('Write sample {} to {}'.format(id, self.filename))
-            self.cached_samples[id] = 1
             if id % 10 == 0:  # new one
                 shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'n', protocol=2)
             else:
                 shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'c', protocol=2)
             for grp,val in data.iteritems():
                 shelf['{},{}'.format(id, grp)] = val
-            #lock.release()
-            # tells other processes that this sample has been cached.
-            #
-            # if we know the ram used, wait... not sure how to do this at this point
-            #
             shelf.close()
-
-    def serve(self, lock, queue, pipe):
-        # read sample_id, group from queue, send results to pipe
-        while True:
-            item = queue.get()
-            if item is None:
-                break
-            group, ids = item
-            res = {}
-            lock.acquire()
-            for id in ids:
-                try:
-                    res[id] = self.genotype_cache[id].pop(group)
-                except:
-                    res[id] = {}
-            # this information will be used to remove unneeded results
-            self.completed_groups.append(group)
-            lock.release()
-            pipe.send(res)
-
-    def run(self):
-        while True:
-            if not self.start_working.value:
-                time.sleep(1)
-            else:
-                break
-        #
-        self.loadGenotypes(self.lock, self.sample_IDs)
-        #servers = [threading.Thread(target=self.serve, args=(self.lock, self.queues[i], self.pipes[i])) for i in range(len(self.queues))]
-        #[x.start() for x in servers]
-        #loader.join()
-        #[x.join() for x in servers]
+            # report progress
+            self.cached_samples[id] = 1
         
 class GenotypeGrabber:
     def __init__(self, param, cache, queue, pipe):
@@ -743,56 +697,40 @@ class AssoTestsWorker(Process):
 def associate(args):
     #try:
         with Project(verbosity=args.verbosity) as proj:
+            # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
                     args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
-            #
+            # step 1: getting all genotypes
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # step 4: start all workers
-            grpQueue = Queue()
-            # the result queue is used by workers to return results
-            resQueue = Queue()
-            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            ready_flags = [Value('i', 0) for x in range(nJobs + (nJobs if runOptions.associate_genotype_cache_size > 0 else 0))]
-            # if a genotype cache is specified, a cacher object will be used to
-            # load genotype tables into RAM and provide genotypes to other workers
-            # if it has the table in RAM
-            cached = Array('i', max(asso.sample_IDs) + 1)
-            start_working = Value('i', 0)
-            if runOptions.associate_genotype_cache_size > 0:
-                # create a bunch of queues and pipes for communication between Cacher and Worker
-                queues = [Queue() for j in range(nJobs)]
-                pipes = [Pipe() for j in range(nJobs)] 
-                n = len(asso.sample_IDs)
-                for i in range(nJobs):
-                    start = (i*n//nJobs//10)*10
-                    end = ((i + 1) * n // nJobs//10) * 10
-                    if i == nJobs - 1:
-                        end = n
-                    proj.logger.info('{} - {}'.format(start, end))
-                    GenotypeCacher(asso, runOptions.associate_genotype_cache_size, ready_flags[-i-1],
-                        queues, [x[1] for x in pipes], cached, start, end, start_working,
-                        ).start()
-                #for j in range(nJobs):
-                #    AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], cacher, queues[j], pipes[j][0]).start()
-            else:
-                for j in range(nJobs):
-                    AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], None, None, None).start()
+            # the loaders can start working only after all of them are ready. Otherwise one
+            # worker might block the database when others are trying to retrieve data
+            # which is a non-blocking procedure.
+            ready_flags = [Value('i', 0) for x in range(nJobs)]
+            # Tells the master process which samples are loaded, used by the progress bar.
+            cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
-            while True:
-                if all([x.value for x in ready_flags[-nJobs:]]):
-                    start_working.value=1
-                    break
-                else:
-                    time.sleep(1)
-            prog = ProgressBar('caching', len(asso.sample_IDs))
+            # jobs will be divided by nJobs, with 10 samples in a group
+            trunk = len(asso.sample_IDs) // nJobs // 10 * 10
+            for i in range(nJobs):
+                start = i * trunk
+                end = min(len(asso.sample_IDs), start + trunk)
+                if start >= end:
+                    ready_flags[i] = 1
+                    continue
+                GenotypeLoader(asso, start, end, ready_flags, i, cached_samples).start()
+            # progress bar...
+            prog = ProgressBar('Loading genotype', len(asso.sample_IDs))
             while True:
                 time.sleep(1)
-                prog.update(sum(cached))
+                prog.update(sum(cached_samples))
             prog.done()
+            # 
+            for j in range(nJobs):
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], None, None, None).start()
             # wait for all connection to be ready, because if there are many workers,
             # some of them might start slowly to a point when another ready worker starts
             # to work, it faces a locked database and cannot proceed. Note that the workers
@@ -804,6 +742,11 @@ def associate(args):
                 else:
                     print [x.value for x in ready_flags]
                     time.sleep(1)
+            # step 4: start all workers
+            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
+            grpQueue = Queue()
+            # the result queue is used by workers to return results
+            resQueue = Queue()
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
