@@ -349,24 +349,26 @@ class GenotypeLoader(Process):
         self.cached_samples = cached_samples
 
     def run(self):
-        # loading genotypes from genotype database
-        db = DatabaseEngine()
-        # readonly allows simultaneous access from several threads
-        db.connect(self.db_name, readonly=True)
-        # move __asso_tmp to :memory: can speed up the process a lot
-        db.attach(':memory:', 'cache')
-        # filling __asso_tmp, this is per-process so might use some RAM
-        cur = db.cursor()
-        cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
-        cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
-        # tells other processes that I am ready
-        self.ready_flags[self.index] = 1
         # wait all processes to get ready
         while True:
+            # if the previous once hace done, it is my turn to use db. We do this sequentially
+            # to avoid database lock
+            if all(self.ready_flags[:self.index]) and not self.ready_flags[self.index]:
+                # loading genotypes from genotype database
+                db = DatabaseEngine()
+                # readonly allows simultaneous access from several threads
+                db.connect(self.db_name, readonly=True)
+                # move __asso_tmp to :memory: can speed up the process a lot
+                db.attach(':memory:', 'cache')
+                # filling __asso_tmp, this is per-process so might use some RAM
+                cur = db.cursor()
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
+                cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
+                # tells other processes that I am ready
+                self.ready_flags[self.index] = 1
             if all(self.ready_flags):
                 break
-            else:
-                time.sleep(1)
+            time.sleep(1)
         #
         lenGrp = len(self.group_names)
         while True:
@@ -692,7 +694,7 @@ def associate(args):
             # the loaders can start working only after all of them are ready. Otherwise one
             # worker might block the database when others are trying to retrieve data
             # which is a non-blocking procedure.
-            ready_flags = [Value('i', 0) for x in range(nJobs)]
+            ready_flags = Array('i', [0]*nJobs)
             # Tells the master process which samples are loaded, used by the progress bar.
             cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
