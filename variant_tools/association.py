@@ -355,12 +355,12 @@ class GenotypeLoader(Process):
         db.connect(self.db_name, readonly=True)
         # move __asso_tmp to :memory: can speed up the process a lot
         db.attach(':memory:', 'cache')
-        # tells other processes that I am ready
-        self.ready_flags[self.index] = 1
         # filling __asso_tmp, this is per-process so might use some RAM
         cur = db.cursor()
         cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
         cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
+        # tells other processes that I am ready
+        self.ready_flags[self.index] = 1
         # wait all processes to get ready
         while True:
             if all(self.ready_flags):
