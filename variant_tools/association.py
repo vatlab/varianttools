@@ -40,6 +40,10 @@ from .tester import *
 
 import argparse
 
+# the numer of samples that are grouped during genotype loading. Setting it larger
+# will reduce the number of temporary files, but might cause worse write performance
+SAMPLE_GROUP_SIZE = 10
+
 def istr(d):
     try:
         x = int(d)
@@ -386,10 +390,10 @@ class GenotypeLoader(Process):
                         cur_group = grp
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
-                if id % 10 == 0:  # new one
-                    shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'n', protocol=2)
+                if id % SAMPLE_GROUP_SIZE == 0:  # new one
+                    shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n', protocol=2)
                 else:
-                    shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'c', protocol=2)
+                    shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'c', protocol=2)
                 for grp,val in data.iteritems():
                     shelf['{},{}'.format(id, grp)] = val
                 shelf.close()
@@ -538,12 +542,12 @@ class AssoTestsWorker(Process):
         opened_shelve = None
         for ID in self.sample_IDs:
             if opened_shelve is None:
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
-                opened_shelve = ID // 10
-            elif opened_shelve != ID // 10:
+                shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                opened_shelve = ID // SAMPLE_GROUP_SIZE
+            elif opened_shelve != ID // SAMPLE_GROUP_SIZE:
                 shelf.close()
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
-                opened_shelve = ID // 10
+                shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                opened_shelve = ID // SAMPLE_GROUP_SIZE
             #
             try:
                 data = shelf['{},{}'.format(ID, group)]
@@ -643,6 +647,9 @@ class AssoTestsWorker(Process):
             try:
                 # select variants from each group:
                 genotype, which, var_info, geno_info = self.getGenotype(grp)
+                # if I throw an exception here, the program completes in 5 minutes, indicating
+                # the data collection part takes an insignificant part of the process.
+                # 
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
@@ -689,14 +696,14 @@ def associate(args):
             # Tells the master process which samples are loaded, used by the progress bar.
             cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
-            # group ids by tenth (0, ..., 9), (10, ..., 20) etc because they will be
+            # group ids by sample group size, e.g. (0, ..., 9), (10, ..., 20) etc because they will be
             # saved in the same file
             sample_groups = {}
             for id in sorted(asso.sample_IDs):
-                if id // 10 in sample_groups:
-                    sample_groups[id // 10].append(id)
+                if id // SAMPLE_GROUP_SIZE in sample_groups:
+                    sample_groups[id // SAMPLE_GROUP_SIZE].append(id)
                 else:
-                    sample_groups[id // 10] = [id]
+                    sample_groups[id // SAMPLE_GROUP_SIZE] = [id]
             for g,v in sample_groups.iteritems():
                 sampleQueue.put(v)
             for i in range(nJobs):
