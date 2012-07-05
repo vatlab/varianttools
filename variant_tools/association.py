@@ -715,10 +715,12 @@ def associate(args):
                 # None will kill the workers
                 sampleQueue.put(None)
             # progress bar...
-            prog = ProgressBar('Loading genotype', len(asso.sample_IDs))
+            prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
             while True:
                 time.sleep(1)
                 prog.update(sum(cached_samples))
+                if sum(cahed_samples) == len(asso.sample_IDs):
+                    break
             prog.done()
             #
             # step 2: workers work on genotypes
