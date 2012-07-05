@@ -375,7 +375,8 @@ class GenotypeLoader(Process):
             IDs = self.queue.get()
             if IDs is None:
                 break
-            for id in IDs:
+            # IDs are sorted to make sure 10 is processed before 11
+            for id in sorted(IDs):
                 # 0.4/s per 1.1/s with/without controlling variant_id...
                 cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
                     FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
@@ -395,6 +396,7 @@ class GenotypeLoader(Process):
                 if id % SAMPLE_GROUP_SIZE == 0:  # new one
                     shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n', protocol=2)
                 else:
+                    # this will create the database as well if it does not exist (no ID=10, only 11 etc)
                     shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'c', protocol=2)
                 for grp,val in data.iteritems():
                     shelf['{},{}'.format(id, grp)] = val
@@ -480,7 +482,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.proj = param.proj
@@ -501,7 +503,8 @@ class AssoTestsWorker(Process):
         self.queue = grpQueue
         self.resQueue = resQueue
         self.logger = param.proj.logger
-        self.ready = ready
+        self.ready_flags = ready_flags
+        self.index = index
         self.logger = self.proj.logger
         #
         # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
@@ -630,7 +633,13 @@ class AssoTestsWorker(Process):
     def run(self):
         # 
         # tell the master process that this worker is ready
-        self.ready.value = 1
+        self.ready_flags[self.index] = 1
+        # wait all processes to e ready
+        while True:
+            if all(self.ready_flags):
+                break
+            else:
+                time.sleep(1)
         while True:
             # if cached, get genotype from the main process
             grp = self.queue.get()
@@ -727,15 +736,9 @@ def associate(args):
             # the result queue is used by workers to return results
             resQueue = Queue()
             # see if all workers are ready
-            ready_flags = [Value('i', 0) for x in range(nJobs)]
+            ready_flags = Array('i', [0]*nJobs)
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j]).start()
-            # wait for all connection to be ready
-            while True:
-                if all([x.value for x in ready_flags]):
-                    break
-                else:
-                    time.sleep(1)
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j).start()
             # send jobs ...
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             # get initial completed and failed
