@@ -696,7 +696,8 @@ def associate(args):
                     args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
-            #
+            # define results here but it might fail if args.to_db is not writable
+            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
@@ -744,7 +745,6 @@ def associate(args):
             for j in range(nJobs):
                 AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j).start()
             # send jobs ...
-            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
             # get initial completed and failed
             prog = ProgressBar('Testing for association', len(asso.groups))
             # put all jobs to queue, the workers will work on them
