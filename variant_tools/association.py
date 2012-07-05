@@ -699,11 +699,15 @@ def associate(args):
             #
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
+            # loading from disk cannot really benefit from more than 8 simutaneous read, due to
+            # disk access limits, but I do not want to introduce another parameter to specify
+            # number of reading processes.
+            nLoaders = min(8, nJobs)
             # step 1: getting all genotypes
             # the loaders can start working only after all of them are ready. Otherwise one
             # worker might block the database when others are trying to retrieve data
             # which is a non-blocking procedure.
-            ready_flags = Array('i', [0]*nJobs)
+            ready_flags = Array('i', [0]*nLoaders)
             # Tells the master process which samples are loaded, used by the progress bar.
             cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
@@ -717,7 +721,7 @@ def associate(args):
                     sample_groups[id // SAMPLE_GROUP_SIZE] = [id]
             for g,v in sample_groups.iteritems():
                 sampleQueue.put(v)
-            for i in range(nJobs):
+            for i in range(nLoaders):
                 GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
                 # None will kill the workers
                 sampleQueue.put(None)
