@@ -380,6 +380,7 @@ class GenotypeLoader(Process):
                 if cur_group != grp:
                     ## a new group
                     data[grp] = {rec[0]: rec[1:-lenGrp]}
+                    cur_group = grp
                 else:
                     data[grp][rec[0]] = rec[1:-lenGrp]
             if id % 10 == 0:  # new one
@@ -393,7 +394,7 @@ class GenotypeLoader(Process):
             self.cached_samples[id] = 1
         
 class GenotypeGrabber:
-    def __init__(self, param, cache, queue, pipe):
+    def __init__(self, param):
         #
         self.proj = param.proj
         self.table = param.table
@@ -414,9 +415,6 @@ class GenotypeGrabber:
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        self.cache = cache
-        self.queue = queue
-        self.pipe = pipe
         
     def __del__(self):
         self.db.close()
@@ -448,23 +446,22 @@ class GenotypeGrabber:
         # get genotypes / genotype info
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
-        # if a cache is usable
-        if self.cache is None:
-            # which IDs could be obtained from the cache?
-            cached = [x for x in self.sample_IDs if self.cache.cached_samples[x]]
-            if cached:
-                self.queue.put((group, cached))
         # getting samples locally from my own connection
+        opened_shelve = None
         for ID in self.sample_IDs:
-            if self.cache is  None and ID in cached:
-                continue
-            query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
+            if opened_shelve is None:
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
+                opened_shelve = ID // 10
+            elif opened_shelve != ID // 10:
+                shelf.close()
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
+                opened_shelve = ID // 10
+            #
             try:
-                cur.execute(query, group)
-            except Exception as e:
-                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.geno_info, ID, e))
-            data = {x[0]:x[1:] for x in cur.fetchall()}
+                data = shelf['{},{}'.format(ID, group)]
+            except:
+                # this sample might not have this group at all
+                data = {}
             # handle missing values
             gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
             # handle -1 coding (double heterozygotes)
@@ -474,21 +471,9 @@ class GenotypeGrabber:
             #
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-        # getting genotoypes from the cache
-        if self.cache is None:
-            all_data = self.pipe.recv()
-            for id in cached:
-                # handle missing values
-                data = all_data[id]
-                gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
-                # handle -1 coding (double heterozygotes)
-                genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
-                #
-                # handle genotype_info
-                #
-                for idx, key in enumerate(self.geno_info):
-                    geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-            self.logger.debug('{} samples obtained from the cache'.format(len(cached)))
+        #
+        # close the last shelf
+        shelf.close()
         # filter individuals by genotype missingness at a locus
         nloci = len(genotype[0])
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
@@ -577,7 +562,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready, cache, cacheQueue, cachePipe):
+    def __init__(self, param, grpQueue, resQueue, ready):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.sample_names = param.sample_names
@@ -591,9 +576,6 @@ class AssoTestsWorker(Process):
         self.logger = param.proj.logger
         self.ready = ready
         self.db = None
-        self.cache = cache
-        self.cacheQueue = cacheQueue
-        self.cachePipe = cachePipe
 
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -647,7 +629,7 @@ class AssoTestsWorker(Process):
 
     def run(self):
         # if genotypes are not cached, each worker will grab genotype from the database by itself
-        gg = GenotypeGrabber(self.param, self.cache, self.cacheQueue, self.cachePipe)
+        gg = GenotypeGrabber(self.param)
         # 
         # tell the master process that this worker is ready
         self.ready.value = 1
@@ -695,7 +677,7 @@ class AssoTestsWorker(Process):
 
 
 def associate(args):
-    #try:
+    try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: create an association testing object with all group information
             try:
@@ -704,8 +686,9 @@ def associate(args):
                     args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
-            # step 1: getting all genotypes
+            #
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
+            # step 1: getting all genotypes
             # the loaders can start working only after all of them are ready. Otherwise one
             # worker might block the database when others are trying to retrieve data
             # which is a non-blocking procedure.
@@ -728,25 +711,26 @@ def associate(args):
                 time.sleep(1)
                 prog.update(sum(cached_samples))
             prog.done()
-            # 
+            #
+            # step 2: workers work on genotypes
+            # the group queue is used to send groups
+            grpQueue = Queue()
+            # the result queue is used by workers to return results
+            resQueue = Queue()
+            # see if all workers are ready
+            ready_flags = [Value('i', 0) for x in range(nJobs)]
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j], None, None, None).start()
-            # wait for all connection to be ready, because if there are many workers,
-            # some of them might start slowly to a point when another ready worker starts
-            # to work, it faces a locked database and cannot proceed. Note that the workers
-            # select from a readonly database and do not have any lock issue, but the 
-            # connection part might block the database.
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j]).start()
+            # wait for all connection to be ready
             while True:
                 if all([x.value for x in ready_flags]):
                     break
                 else:
-                    print [x.value for x in ready_flags]
                     time.sleep(1)
-            # step 4: start all workers
+            # send jobs ...
             results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            grpQueue = Queue()
-            # the result queue is used by workers to return results
-            resQueue = Queue()
+            # get initial completed and failed
+            prog = ProgressBar('Testing for association', len(asso.groups))
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
@@ -755,8 +739,6 @@ def associate(args):
                 grpQueue.put(None)
             #
             count = 0
-            # get initial completed and failed
-            prog = ProgressBar('Testing for association', len(asso.groups), results.completed(), results.failed())
             while True:
                 # if everything is done
                 if count >= len(asso.groups):
@@ -776,5 +758,5 @@ def associate(args):
             # use the result database in the project
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-    #except Exception as e:
-    #    sys.exit(e)
+    except Exception as e:
+        sys.exit(e)
