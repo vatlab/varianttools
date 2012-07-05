@@ -844,8 +844,6 @@ class Project:
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
-        # temporary directory...
-        runOptions.associate_genotype_cache_size = self.loadProperty('__option_associate_genotype_cache_size', None)
         #
         # create a logger
         self.logger = logging.getLogger()
