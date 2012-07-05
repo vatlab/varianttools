@@ -366,34 +366,35 @@ class GenotypeLoader(Process):
         #
         lenGrp = len(self.group_names)
         while True:
-            id = self.queue.get()
-            if id is None:
+            IDs = self.queue.get()
+            if IDs is None:
                 break
-            # 0.4/s per 1.1/s with/without controlling variant_id...
-            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
-                FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
-                ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]),
-                    ', '.join(self.group_names)))
-            # grab data for each group by
-            data = {}
-            cur_group = None
-            for rec in cur:
-                grp = tuple(rec[-lenGrp:])
-                if cur_group != grp:
-                    ## a new group
-                    data[grp] = {rec[0]: rec[1:-lenGrp]}
-                    cur_group = grp
+            for id in IDs:
+                # 0.4/s per 1.1/s with/without controlling variant_id...
+                cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                    FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
+                    ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]),
+                        ', '.join(self.group_names)))
+                # grab data for each group by
+                data = {}
+                cur_group = None
+                for rec in cur:
+                    grp = tuple(rec[-lenGrp:])
+                    if cur_group != grp:
+                        ## a new group
+                        data[grp] = {rec[0]: rec[1:-lenGrp]}
+                        cur_group = grp
+                    else:
+                        data[grp][rec[0]] = rec[1:-lenGrp]
+                if id % 10 == 0:  # new one
+                    shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'n', protocol=2)
                 else:
-                    data[grp][rec[0]] = rec[1:-lenGrp]
-            if id % 10 == 0:  # new one
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'n', protocol=2)
-            else:
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'c', protocol=2)
-            for grp,val in data.iteritems():
-                shelf['{},{}'.format(id, grp)] = val
-            shelf.close()
-            # report progress
-            self.cached_samples[id] = 1
+                    shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // 10)), 'c', protocol=2)
+                for grp,val in data.iteritems():
+                    shelf['{},{}'.format(id, grp)] = val
+                shelf.close()
+                # report progress
+                self.cached_samples[id] = 1
         
 class GenotypeGrabber:
     def __init__(self, param):
@@ -699,8 +700,16 @@ def associate(args):
             # Tells the master process which samples are loaded, used by the progress bar.
             cached_samples = Array('i', max(asso.sample_IDs) + 1)
             #
-            for id in asso.sample_IDs:
-                sampleQueue.put(id)
+            # group ids by tenth (0, ..., 9), (10, ..., 20) etc because they will be
+            # saved in the same file
+            sample_groups = {}
+            for id in sorted(asso.sample_IDs):
+                if id // 10 in sample_groups:
+                    sample_groups[id // 10].append(id)
+                else:
+                    sample_groups[id // 10] = [id]
+            for g,v in sample_groups.iteritems():
+                sampleQueue.put(v)
             for i in range(nJobs):
                 GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
                 # None will kill the workers
