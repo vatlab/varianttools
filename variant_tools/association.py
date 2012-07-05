@@ -396,97 +396,6 @@ class GenotypeLoader(Process):
                 # report progress
                 self.cached_samples[id] = 1
         
-class GenotypeGrabber:
-    def __init__(self, param):
-        #
-        self.proj = param.proj
-        self.table = param.table
-        self.sample_IDs = param.sample_IDs
-        self.phenotypes = param.phenotypes
-        self.covariates = param.covariates
-        self.var_info = param.var_info
-        self.geno_info = param.geno_info
-        self.moi = param.moi
-        self.tests = param.tests
-        self.group_names = param.group_names
-        self.missing_filter = param.missing_filter
-        self.logger = self.proj.logger
-        #
-        self.logger = param.proj.logger
-        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
-        if param.num_extern_tests:
-            self.var_info += ['chr', 'pos']
-        self.db = DatabaseEngine()
-        self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        
-    def __del__(self):
-        self.db.close()
-
-    def getVarInfo(self, group, where_clause):
-        var_info = {x:[] for x in self.var_info}
-        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
-            ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
-        #self.logger.debug('Running query: {}'.format(query))
-        cur = self.db.cursor()
-        cur.execute(query, group)
-        #
-        if not self.var_info:
-            data = {x[0]:[] for x in cur.fetchall()}
-        else:
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-        variant_id = sorted(data.keys(), key=int)
-        for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
-        return var_info, variant_id
-
-    def getGenotype(self, group):
-        '''Get genotype for variants in specified group'''
-        # get variant_id
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        cur = self.db.cursor()
-        # variant info
-        var_info, variant_id = self.getVarInfo(group, where_clause)
-        # get genotypes / genotype info
-        genotype = []
-        geno_info = {x:[] for x in self.geno_info}
-        # getting samples locally from my own connection
-        opened_shelve = None
-        for ID in self.sample_IDs:
-            if opened_shelve is None:
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
-                opened_shelve = ID // 10
-            elif opened_shelve != ID // 10:
-                shelf.close()
-                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
-                opened_shelve = ID // 10
-            #
-            try:
-                data = shelf['{},{}'.format(ID, group)]
-            except:
-                # this sample might not have this group at all
-                data = {}
-            # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
-            # handle -1 coding (double heterozygotes)
-            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
-            #
-            # handle genotype_info
-            #
-            for idx, key in enumerate(self.geno_info):
-                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-        #
-        # close the last shelf
-        shelf.close()
-        # filter individuals by genotype missingness at a locus
-        nloci = len(genotype[0])
-        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
-        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
-        if len(which) - sum(which) > 0:
-            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
-        #
-        return genotype, which, var_info, geno_info
-
-
 class ResultRecorder:
     def __init__(self, params, db_name=None, update=False, logger=None):
         self.succ_count = 0
@@ -568,9 +477,18 @@ class AssoTestsWorker(Process):
     def __init__(self, param, grpQueue, resQueue, ready):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
-        self.sample_names = param.sample_names
+        self.proj = param.proj
+        self.table = param.table
+        self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
+        self.var_info = param.var_info
+        self.geno_info = param.geno_info
+        self.moi = param.moi
+        self.tests = param.tests
+        self.group_names = param.group_names
+        self.missing_filter = param.missing_filter
+        self.sample_names = param.sample_names
         self.moi = param.moi
         self.tests = param.tests
         self.num_extern_tests = param.num_extern_tests
@@ -578,7 +496,80 @@ class AssoTestsWorker(Process):
         self.resQueue = resQueue
         self.logger = param.proj.logger
         self.ready = ready
-        self.db = None
+        self.logger = self.proj.logger
+        #
+        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
+        if param.num_extern_tests:
+            self.var_info += ['chr', 'pos']
+        self.db = DatabaseEngine()
+        self.db.connect(param.proj.name + '_genotype.DB', readonly=True) 
+
+    def __del__(self):
+        self.db.close()
+
+    def getVarInfo(self, group, where_clause):
+        var_info = {x:[] for x in self.var_info}
+        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
+            ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
+        #self.logger.debug('Running query: {}'.format(query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        #
+        if not self.var_info:
+            data = {x[0]:[] for x in cur.fetchall()}
+        else:
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+        variant_id = sorted(data.keys(), key=int)
+        for idx, key in enumerate(self.var_info):
+            var_info[key] = [data[x][idx] for x in variant_id]
+        return var_info, variant_id
+
+    def getGenotype(self, group):
+        '''Get genotype for variants in specified group'''
+        # get variant_id
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        cur = self.db.cursor()
+        # variant info
+        var_info, variant_id = self.getVarInfo(group, where_clause)
+        # get genotypes / genotype info
+        genotype = []
+        geno_info = {x:[] for x in self.geno_info}
+        # getting samples locally from my own connection
+        opened_shelve = None
+        for ID in self.sample_IDs:
+            if opened_shelve is None:
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
+                opened_shelve = ID // 10
+            elif opened_shelve != ID // 10:
+                shelf.close()
+                shelf = shelve.open(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // 10)), 'r')
+                opened_shelve = ID // 10
+            #
+            try:
+                data = shelf['{},{}'.format(ID, group)]
+            except:
+                # this sample might not have this group at all
+                data = {}
+            # handle missing values
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+            # handle -1 coding (double heterozygotes)
+            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
+            #
+            # handle genotype_info
+            #
+            for idx, key in enumerate(self.geno_info):
+                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+        #
+        # close the last shelf
+        shelf.close()
+        # filter individuals by genotype missingness at a locus
+        nloci = len(genotype[0])
+        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
+        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
+        if len(which) - sum(which) > 0:
+            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
+        #
+        return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -631,8 +622,6 @@ class AssoTestsWorker(Process):
             raise ValueError("No input data")
 
     def run(self):
-        # if genotypes are not cached, each worker will grab genotype from the database by itself
-        gg = GenotypeGrabber(self.param)
         # 
         # tell the master process that this worker is ready
         self.ready.value = 1
@@ -653,7 +642,7 @@ class AssoTestsWorker(Process):
             values = list(grp)
             try:
                 # select variants from each group:
-                genotype, which, var_info, geno_info = gg.getGenotype(grp)
+                genotype, which, var_info, geno_info = self.getGenotype(grp)
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
