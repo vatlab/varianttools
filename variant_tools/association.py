@@ -66,7 +66,7 @@ class ShelfDB:
             self.get = self._get_py3
         else:
             self.add = self._add_py2
-            self.get = self._get_py3
+            self.get = self._get_py2
 
     # python 2 and 3 have slightly different types and methods for pickling.
     def _add_py2(self, key, value):
