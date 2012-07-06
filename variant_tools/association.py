@@ -348,7 +348,9 @@ class MyShelf:
         self.db = DatabaseEngine()
         self.db.connect(filename)
         self.cur = self.db.cursor()
-        self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
+        self.mode = mode
+        if mode == 'n':
+            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
         self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
         self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
 
@@ -361,8 +363,9 @@ class MyShelf:
         return pickle.loads(self.cur.fetchone()[0])
 
     def close(self):
-        self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
-        self.db.commit()
+        if self.mode == 'n':
+            self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
+            self.db.commit()
         self.db.close()
 
 class GenotypeLoader(Process):
