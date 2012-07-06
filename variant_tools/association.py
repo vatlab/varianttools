@@ -33,7 +33,13 @@ from array import array
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
-import cPickle as pickle
+try:
+    # python 2 has pickle and cPickle
+    import cPickle as pickle
+except:
+    # python 3 has pickle
+    import pickle
+
 from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
 from .phenotype import Sample
@@ -93,6 +99,15 @@ class Py2SqliteShelf:
         self.db.close()
 
 class Py2KyotoCabinetShelf:
+    #
+    # Performance Note:
+    #
+    # MacOSX, 183 small databases, cache_dir, regular HD
+    #     read: -j8, 52min
+    #     write: -j32
+    #
+    #
+    #
     def __init__(self, filename, mode='n'):
         if not with_kyotocabinet:
             raise RuntimeError('Cannot use KyotoCabinet because it is not installed')
@@ -818,7 +833,6 @@ def associate(args):
                 AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j).start()
             # send jobs ...
             # get initial completed and failed
-            prog = ProgressBar('Testing for association', len(asso.groups))
             # put all jobs to queue, the workers will work on them
             for grp in asso.groups:
                 grpQueue.put(grp)
@@ -827,6 +841,14 @@ def associate(args):
                 grpQueue.put(None)
             #
             count = 0
+            s = delayedAction(proj.logger.info, "Starting {} association test workers".format(nJobs))
+            while True:
+                if all(ready_flags):
+                    break
+                else:
+                    time.sleep(1)
+            del s
+            prog = ProgressBar('Testing for association', len(asso.groups))
             while True:
                 # if everything is done
                 if count >= len(asso.groups):
