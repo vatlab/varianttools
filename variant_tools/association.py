@@ -329,6 +329,20 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
+class MyShelf:
+    def __init__(self, filename, mode='c'):
+        self.shelf = shelve.open(filename, mode, protocol=2)
+
+    def add(self, key, value):
+        self.shelf[key] = value
+
+    def get(self, key):
+        return self.shelf[key]
+
+    def close(self):
+        self.shelf.close()
+
+
 class GenotypeLoader(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
@@ -394,12 +408,12 @@ class GenotypeLoader(Process):
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
                 if id % SAMPLE_GROUP_SIZE == 0:  # new one
-                    shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n', protocol=2)
+                    shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n')
                 else:
                     # this will create the database as well if it does not exist (no ID=10, only 11 etc)
-                    shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'c', protocol=2)
+                    shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'c')
                 for grp,val in data.iteritems():
-                    shelf['{},{}'.format(id, grp)] = val
+                    shelf.add('{},{}'.format(id, grp), val)
                 shelf.close()
                 # report progress
                 self.cached_samples[id] = 1
@@ -547,15 +561,15 @@ class AssoTestsWorker(Process):
         opened_shelve = None
         for ID in self.sample_IDs:
             if opened_shelve is None:
-                shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
                 opened_shelve = ID // SAMPLE_GROUP_SIZE
             elif opened_shelve != ID // SAMPLE_GROUP_SIZE:
                 shelf.close()
-                shelf = shelve.open(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
                 opened_shelve = ID // SAMPLE_GROUP_SIZE
             #
             try:
-                data = shelf['{},{}'.format(ID, group)]
+                data = shelf.get('{},{}'.format(ID, group))
             except:
                 # this sample might not have this group at all
                 data = {}
