@@ -44,8 +44,6 @@ from .phenotype import Sample
 from .tester import *
 
 import argparse
-if sys.version > '3':
-    buffer=memoryview
 
 class ShelfDB:
     def __init__(self, filename, mode='n'):
@@ -63,13 +61,29 @@ class ShelfDB:
         self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
         self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
 
-    def add(self, key, value):
+        if sys.version_info.major >= 3:
+            self.add = self._add_py3
+            self.get = self._get_py3
+        else:
+            self.add = self._add_py2
+            self.get = self._get_py3
+
+    # python 2 and 3 have slightly different types and methods for pickling.
+    def _add_py2(self, key, value):
         self.cur.execute(self.insert_query, 
             (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
-    def get(self, key):
+    def _add_py3(self, key, value):
+        self.cur.execute(self.insert_query, 
+            (key, memoryview(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+
+    def _get_py2(self, key):
         self.cur.execute(self.select_query, (key,))
         return pickle.loads(str(self.cur.fetchone()[0]))
+
+    def _get_py3(self, key):
+        self.cur.execute(self.select_query, (key,))
+        return pickle.loads(self.cur.fetchone()[0])
 
     def close(self):
         if self.mode == 'n':
