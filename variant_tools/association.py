@@ -454,6 +454,7 @@ class GenotypeLoader(Process):
             # do not produce annoying traceback
             pass
         finally:
+            db.close()
             # close shelf
             shelf.close()
         
@@ -771,8 +772,11 @@ def associate(args):
             #
             for id in asso.sample_IDs:
                 sampleQueue.put(id)
+            loaders = []
             for i in range(nLoaders):
-                GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
+                loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
+                loader.start()
+                loaders.append(loader)
                 # None will kill the workers
                 sampleQueue.put(None)
             #
