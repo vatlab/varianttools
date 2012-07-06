@@ -360,7 +360,7 @@ class MyShelf:
 
     def get(self, key):
         self.cur.execute(self.select_query, (key,))
-        return pickle.loads(self.cur.fetchone()[0])
+        return pickle.loads(str(self.cur.fetchone()[0]))
 
     def close(self):
         if self.mode == 'n':
