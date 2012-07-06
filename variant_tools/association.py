@@ -33,6 +33,7 @@ from array import array
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
+import cPickle as pickle
 from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
 from .phenotype import Sample
@@ -329,7 +330,7 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
-class MyShelf:
+class MyShelveShelf:
     def __init__(self, filename, mode='n'):
         self.shelf = shelve.open(filename, mode, protocol=2)
 
@@ -342,6 +343,26 @@ class MyShelf:
     def close(self):
         self.shelf.close()
 
+class MyShelf:
+    def __init__(self, filename, mode='n'):
+        self.db = DatabaseEngine()
+        self.db.connect(filename)
+        self.cur = self.db.cursor()
+        self.cur.execute('CREATE TABLE data (key VARCHAR(255) primary key, val TEXT);')
+        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
+        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
+
+    def add(self, key, value):
+        self.cur.execute(self.insert_query, 
+            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+
+    def get(self, key):
+        self.cur.execute(self.select_query, (key,))
+        return pickle.loads(self.cur.fetchone()[0])
+
+    def close(self):
+        self.db.commit()
+        self.db.close()
 
 class GenotypeLoader(Process):
     '''This process continuous load genotype to a cache, and send results to 
