@@ -42,7 +42,7 @@ import argparse
 
 # the numer of samples that are grouped during genotype loading. Setting it larger
 # will reduce the number of temporary files, but might cause worse write performance
-SAMPLE_GROUP_SIZE = 10
+SAMPLE_GROUP_SIZE = 20
 
 def istr(d):
     try:
@@ -330,7 +330,7 @@ class AssociationTestManager:
 
 
 class MyShelf:
-    def __init__(self, filename, mode='c'):
+    def __init__(self, filename, mode='n'):
         self.shelf = shelve.open(filename, mode, protocol=2)
 
     def add(self, key, value):
@@ -389,6 +389,8 @@ class GenotypeLoader(Process):
             IDs = self.queue.get()
             if IDs is None:
                 break
+            # for each batch, add to a separate shelf
+            shelf = None
             # IDs are sorted to make sure 10 is processed before 11
             for id in sorted(IDs):
                 # 0.4/s per 1.1/s with/without controlling variant_id...
@@ -407,16 +409,14 @@ class GenotypeLoader(Process):
                         cur_group = grp
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
-                if id % SAMPLE_GROUP_SIZE == 0:  # new one
+                if shelf is None:
                     shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n')
-                else:
-                    # this will create the database as well if it does not exist (no ID=10, only 11 etc)
-                    shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'c')
                 for grp,val in data.iteritems():
                     shelf.add('{},{}'.format(id, grp), val)
-                shelf.close()
                 # report progress
                 self.cached_samples[id] = 1
+            # close shelf
+            shelf.close()
         
 class ResultRecorder:
     def __init__(self, params, db_name=None, update=False, logger=None):
@@ -526,9 +526,13 @@ class AssoTestsWorker(Process):
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True) 
+        #
+        self.shelves = {}
 
     def __del__(self):
         self.db.close()
+        for val in self.shelves.values():
+            shelf.close()
 
     def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info}
@@ -558,15 +562,13 @@ class AssoTestsWorker(Process):
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
         # getting samples locally from my own connection
-        opened_shelve = None
         for ID in self.sample_IDs:
-            if opened_shelve is None:
+            dbID = ID // SAMPLE_GROUP_SIZE
+            if dbID not in self.shelves:
                 shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
-                opened_shelve = ID // SAMPLE_GROUP_SIZE
-            elif opened_shelve != ID // SAMPLE_GROUP_SIZE:
-                shelf.close()
-                shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
-                opened_shelve = ID // SAMPLE_GROUP_SIZE
+                self.shelves[dbID] = shelf
+            else:
+                shelf = self.shelves[dbID]
             #
             try:
                 data = shelf.get('{},{}'.format(ID, group))
@@ -583,8 +585,6 @@ class AssoTestsWorker(Process):
             for idx, key in enumerate(self.geno_info):
                 geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
         #
-        # close the last shelf
-        shelf.close()
         # filter individuals by genotype missingness at a locus
         nloci = len(genotype[0])
         missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
