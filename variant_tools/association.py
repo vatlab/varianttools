@@ -712,6 +712,9 @@ class AssoTestsWorker(Process):
                     result = test.calculate()
                     self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
+            except KeyboardInterrupt as e:
+                # die silently if stopped by Ctrl-C
+                pass
             except Exception as e:
                 self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
@@ -764,12 +767,17 @@ def associate(args):
             del s
             # progress bar...
             prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
-            while True:
-                time.sleep(1)
-                done = sum([x != 0 for x in cached_samples])
-                prog.update(done)
-                if done == len(asso.sample_IDs):
-                    break
+            try:
+                while True:
+                    time.sleep(1)
+                    done = sum([x != 0 for x in cached_samples])
+                    prog.update(done)
+                    if done == len(asso.sample_IDs):
+                        break
+            except KeyboardInterrupt as e:
+                proj.logger.error('\nLoading genotype stopped by keyboard interruption.')
+                proj.close()
+                sys.exit(1)
             prog.done()
             #
             # step 2: workers work on genotypes
@@ -801,17 +809,23 @@ def associate(args):
                     time.sleep(1)
             del s
             prog = ProgressBar('Testing for association', len(asso.groups))
-            while True:
-                # if everything is done
-                if count >= len(asso.groups):
-                    break
-                # not done? wait from the queue and write to the result recorder
-                res = resQueue.get()
-                results.record(res)
-                # update progress bar
-                count = results.completed()
-                prog.update(count, results.failed())
-                proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+            try:
+                while True:
+                    # if everything is done
+                    if count >= len(asso.groups):
+                        break
+                    # not done? wait from the queue and write to the result recorder
+                    res = resQueue.get()
+                    results.record(res)
+                    # update progress bar
+                    count = results.completed()
+                    prog.update(count, results.failed())
+                    proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+            except KeyboardInterrupt as e:
+                proj.logger.error('\nAssociation tests stopped by keyboard interruption.')
+                results.done()
+                proj.close()
+                sys.exit(1)
             # finished
             prog.done()
             results.done()
