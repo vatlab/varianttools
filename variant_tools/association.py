@@ -25,10 +25,8 @@
 
 import sys
 import os
-import threading
 from multiprocessing import Process, Queue, Pipe, Value, Array
 import time
-import shelve
 from array import array
 import math
 from collections import OrderedDict
@@ -49,32 +47,13 @@ import argparse
 if sys.version > '3':
     buffer=memoryview
 
-try:
-    import kyotocabinet
-    with_kyotocabinet = True
-except ImportError:
-    with_kyotocabinet = False
-
-# the numer of samples that are grouped during genotype loading. Setting it larger
-# will reduce the number of temporary files, but might cause worse write performance
-SAMPLE_GROUP_SIZE = 20
-
-
-class ShelveShelf:
+class ShelfDB:
     def __init__(self, filename, mode='n'):
-        self.shelf = shelve.open(filename, mode, protocol=2)
-
-    def add(self, key, value):
-        self.shelf[key] = value
-
-    def get(self, key):
-        return self.shelf[key]
-
-    def close(self):
-        self.shelf.close()
-
-class Py2SqliteShelf:
-    def __init__(self, filename, mode='n'):
+        if os.path.isfile(filename + '.DB'):
+            if mode == 'n':
+                os.remove(filename + '.DB')
+        elif mode == 'r':
+            raise ValueError('Temporary database {} does not exist.'.format(filename))
         self.db = DatabaseEngine()
         self.db.connect(filename)
         self.cur = self.db.cursor()
@@ -97,38 +76,6 @@ class Py2SqliteShelf:
             self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
             self.db.commit()
         self.db.close()
-
-class Py2KyotoCabinetShelf:
-    #
-    # Performance Note:
-    #
-    # MacOSX, 183 small databases, cache_dir, regular HD
-    #     read: -j8, 52min
-    #     write: -j32
-    #
-    #
-    #
-    def __init__(self, filename, mode='n'):
-        if not with_kyotocabinet:
-            raise RuntimeError('Cannot use KyotoCabinet because it is not installed')
-        self.db = kyotocabinet.DB()
-        self.mode = mode
-        if mode == 'n':
-            self.db.open(filename + '.kch', kyotocabinet.DB.OWRITER | kyotocabinet.DB.OCREATE)
-        else:
-            self.db.open(filename + '.kch', kyotocabinet.DB.OREADER)
-
-    def add(self, key, value):
-        self.db.set(key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
-
-    def get(self, key):
-        return pickle.loads(str(self.db.get(key)))
-
-    def close(self):
-        self.db.close()
-
-MyShelf = Py2KyotoCabinetShelf
-
 
 def istr(d):
     try:
@@ -442,7 +389,7 @@ class GenotypeLoader(Process):
             if all(self.ready_flags[:self.index]) and not self.ready_flags[self.index]:
                 # loading genotypes from genotype database
                 db = DatabaseEngine()
-                # readonly allows simultaneous access from several threads
+                # readonly allows simultaneous access from several processes
                 db.connect(self.db_name, readonly=True)
                 # move __asso_tmp to :memory: can speed up the process a lot
                 db.attach(':memory:', 'cache')
@@ -456,15 +403,15 @@ class GenotypeLoader(Process):
                 break
             time.sleep(1)
         #
+        shelf = ShelfDB(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(self.index)), 'n')
         lenGrp = len(self.group_names)
-        while True:
-            IDs = self.queue.get()
-            if IDs is None:
-                break
-            # for each batch, add to a separate shelf
-            shelf = None
-            # IDs are sorted to make sure 10 is processed before 11
-            for id in sorted(IDs):
+        try:
+            while True:
+                id = self.queue.get()
+                if id is None:
+                    break
+                # for each batch, add to a separate shelf
+                # IDs are sorted to make sure 10 is processed before 11
                 # 0.4/s per 1.1/s with/without controlling variant_id...
                 cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
                     FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
@@ -481,12 +428,14 @@ class GenotypeLoader(Process):
                         cur_group = grp
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
-                if shelf is None:
-                    shelf = MyShelf(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n')
                 for grp,val in data.iteritems():
                     shelf.add('{},{}'.format(id, grp), val)
-                # report progress
-                self.cached_samples[id] = 1
+                # report progress, and tells the master process who owns the data
+                self.cached_samples[id] = 1 + self.index
+        except KeyboardInterrupt as e:
+            # do not produce annoying traceback
+            pass
+        finally:
             # close shelf
             shelf.close()
         
@@ -568,7 +517,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready_flags, index):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.proj = param.proj
@@ -591,6 +540,7 @@ class AssoTestsWorker(Process):
         self.logger = param.proj.logger
         self.ready_flags = ready_flags
         self.index = index
+        self.sampleMap = sampleMap
         self.logger = self.proj.logger
         #
         # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
@@ -635,9 +585,9 @@ class AssoTestsWorker(Process):
         geno_info = {x:[] for x in self.geno_info}
         # getting samples locally from my own connection
         for ID in self.sample_IDs:
-            dbID = ID // SAMPLE_GROUP_SIZE
+            dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
-                shelf = MyShelf(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                shelf = ShelfDB(os.path.join(runOptions.cache_dir, 'geno_{}'.format(dbID)), 'r')
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
@@ -789,46 +739,38 @@ def associate(args):
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
             # disk access limits, but I do not want to introduce another parameter to specify
             # number of reading processes.
-            if not os.listdir(runOptions.cache_dir):
-                nLoaders = min(8, nJobs)
-                # step 1: getting all genotypes
-                # the loaders can start working only after all of them are ready. Otherwise one
-                # worker might block the database when others are trying to retrieve data
-                # which is a non-blocking procedure.
-                ready_flags = Array('i', [0]*nLoaders)
-                # Tells the master process which samples are loaded, used by the progress bar.
-                cached_samples = Array('i', max(asso.sample_IDs) + 1)
-                #
-                # group ids by sample group size, e.g. (0, ..., 9), (10, ..., 20) etc because they will be
-                # saved in the same file
-                sample_groups = {}
-                for id in sorted(asso.sample_IDs):
-                    if id // SAMPLE_GROUP_SIZE in sample_groups:
-                        sample_groups[id // SAMPLE_GROUP_SIZE].append(id)
-                    else:
-                        sample_groups[id // SAMPLE_GROUP_SIZE] = [id]
-                for g,v in sample_groups.iteritems():
-                    sampleQueue.put(v)
-                for i in range(nLoaders):
-                    GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
-                    # None will kill the workers
-                    sampleQueue.put(None)
-                #
-                s = delayedAction(proj.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
-                while True:
-                    if all(ready_flags):
-                        break
-                    else:
-                        time.sleep(1)
-                del s
-                # progress bar...
-                prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
-                while True:
+            nLoaders = min(8, nJobs)
+            # step 1: getting all genotypes
+            # the loaders can start working only after all of them are ready. Otherwise one
+            # worker might block the database when others are trying to retrieve data
+            # which is a non-blocking procedure.
+            ready_flags = Array('i', [0]*nLoaders)
+            # Tells the master process which samples are loaded, used by the progress bar.
+            cached_samples = Array('i', max(asso.sample_IDs) + 1)
+            #
+            for id in asso.sample_IDs:
+                sampleQueue.put(id)
+            for i in range(nLoaders):
+                GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
+                # None will kill the workers
+                sampleQueue.put(None)
+            #
+            s = delayedAction(proj.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
+            while True:
+                if all(ready_flags):
+                    break
+                else:
                     time.sleep(1)
-                    prog.update(sum(cached_samples))
-                    if sum(cached_samples) == len(asso.sample_IDs):
-                        break
-                prog.done()
+            del s
+            # progress bar...
+            prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
+            while True:
+                time.sleep(1)
+                done = sum([x != 0 for x in cached_samples])
+                prog.update(done)
+                if done == len(asso.sample_IDs):
+                    break
+            prog.done()
             #
             # step 2: workers work on genotypes
             # the group queue is used to send groups
@@ -838,7 +780,9 @@ def associate(args):
             # see if all workers are ready
             ready_flags = Array('i', [0]*nJobs)
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j).start()
+                # the dictionary has the number of temporary database for each sample
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
+                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0}).start()
             # send jobs ...
             # get initial completed and failed
             # put all jobs to queue, the workers will work on them
