@@ -40,6 +40,8 @@ from .phenotype import Sample
 from .tester import *
 
 import argparse
+if sys.version > '3':
+    buffer=memoryview
 
 # the numer of samples that are grouped during genotype loading. Setting it larger
 # will reduce the number of temporary files, but might cause worse write performance
