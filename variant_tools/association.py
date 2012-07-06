@@ -813,6 +813,14 @@ def associate(args):
                     GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
                     # None will kill the workers
                     sampleQueue.put(None)
+                #
+                s = delayedAction(proj.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
+                while True:
+                    if all(ready_flags):
+                        break
+                    else:
+                        time.sleep(1)
+                del s
                 # progress bar...
                 prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
                 while True:
