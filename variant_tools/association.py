@@ -43,9 +43,77 @@ import argparse
 if sys.version > '3':
     buffer=memoryview
 
+try:
+    import kyotocabinet
+    with_kyotocabinet = True
+except ImportError:
+    with_kyotocabinet = False
+
 # the numer of samples that are grouped during genotype loading. Setting it larger
 # will reduce the number of temporary files, but might cause worse write performance
 SAMPLE_GROUP_SIZE = 20
+
+
+class ShelveShelf:
+    def __init__(self, filename, mode='n'):
+        self.shelf = shelve.open(filename, mode, protocol=2)
+
+    def add(self, key, value):
+        self.shelf[key] = value
+
+    def get(self, key):
+        return self.shelf[key]
+
+    def close(self):
+        self.shelf.close()
+
+class Py2SqliteShelf:
+    def __init__(self, filename, mode='n'):
+        self.db = DatabaseEngine()
+        self.db.connect(filename)
+        self.cur = self.db.cursor()
+        self.mode = mode
+        if mode == 'n':
+            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
+        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
+        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
+
+    def add(self, key, value):
+        self.cur.execute(self.insert_query, 
+            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+
+    def get(self, key):
+        self.cur.execute(self.select_query, (key,))
+        return pickle.loads(str(self.cur.fetchone()[0]))
+
+    def close(self):
+        if self.mode == 'n':
+            self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
+            self.db.commit()
+        self.db.close()
+
+class Py2KyotoCabinetShelf:
+    def __init__(self, filename, mode='n'):
+        if not with_kyotocabinet:
+            raise RuntimeError('Cannot use KyotoCabinet because it is not installed')
+        self.db = kyotocabinet.DB()
+        self.mode = mode
+        if mode == 'n':
+            self.db.open(filename + '.kch', kyotocabinet.DB.OWRITER | kyotocabinet.DB.OCREATE)
+        else:
+            self.db.open(filename + '.kch', kyotocabinet.DB.OREADER)
+
+    def add(self, key, value):
+        self.db.set(key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
+
+    def get(self, key):
+        return pickle.loads(str(self.db.get(key)))
+
+    def close(self):
+        self.db.close()
+
+MyShelf = Py2KyotoCabinetShelf
+
 
 def istr(d):
     try:
@@ -332,44 +400,6 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
-class MyShelveShelf:
-    def __init__(self, filename, mode='n'):
-        self.shelf = shelve.open(filename, mode, protocol=2)
-
-    def add(self, key, value):
-        self.shelf[key] = value
-
-    def get(self, key):
-        return self.shelf[key]
-
-    def close(self):
-        self.shelf.close()
-
-class MyShelf:
-    def __init__(self, filename, mode='n'):
-        self.db = DatabaseEngine()
-        self.db.connect(filename)
-        self.cur = self.db.cursor()
-        self.mode = mode
-        if mode == 'n':
-            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
-        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
-        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
-
-    def add(self, key, value):
-        self.cur.execute(self.insert_query, 
-            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
-
-    def get(self, key):
-        self.cur.execute(self.select_query, (key,))
-        return pickle.loads(str(self.cur.fetchone()[0]))
-
-    def close(self):
-        if self.mode == 'n':
-            self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
-            self.db.commit()
-        self.db.close()
-
 class GenotypeLoader(Process):
     '''This process continuous load genotype to a cache, and send results to 
     the requesters if it has it.
@@ -437,7 +467,7 @@ class GenotypeLoader(Process):
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
                 if shelf is None:
-                    shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n')
+                    shelf = MyShelf(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(id // SAMPLE_GROUP_SIZE)), 'n')
                 for grp,val in data.iteritems():
                     shelf.add('{},{}'.format(id, grp), val)
                 # report progress
@@ -592,7 +622,7 @@ class AssoTestsWorker(Process):
         for ID in self.sample_IDs:
             dbID = ID // SAMPLE_GROUP_SIZE
             if dbID not in self.shelves:
-                shelf = MyShelf(os.path.join(runOptions.temp_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
+                shelf = MyShelf(os.path.join(runOptions.cache_dir, 'geno_{}'.format(ID // SAMPLE_GROUP_SIZE)), 'r')
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
@@ -744,37 +774,38 @@ def associate(args):
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
             # disk access limits, but I do not want to introduce another parameter to specify
             # number of reading processes.
-            nLoaders = min(8, nJobs)
-            # step 1: getting all genotypes
-            # the loaders can start working only after all of them are ready. Otherwise one
-            # worker might block the database when others are trying to retrieve data
-            # which is a non-blocking procedure.
-            ready_flags = Array('i', [0]*nLoaders)
-            # Tells the master process which samples are loaded, used by the progress bar.
-            cached_samples = Array('i', max(asso.sample_IDs) + 1)
-            #
-            # group ids by sample group size, e.g. (0, ..., 9), (10, ..., 20) etc because they will be
-            # saved in the same file
-            sample_groups = {}
-            for id in sorted(asso.sample_IDs):
-                if id // SAMPLE_GROUP_SIZE in sample_groups:
-                    sample_groups[id // SAMPLE_GROUP_SIZE].append(id)
-                else:
-                    sample_groups[id // SAMPLE_GROUP_SIZE] = [id]
-            for g,v in sample_groups.iteritems():
-                sampleQueue.put(v)
-            for i in range(nLoaders):
-                GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
-                # None will kill the workers
-                sampleQueue.put(None)
-            # progress bar...
-            prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
-            while True:
-                time.sleep(1)
-                prog.update(sum(cached_samples))
-                if sum(cached_samples) == len(asso.sample_IDs):
-                    break
-            prog.done()
+            if not os.listdir(runOptions.cache_dir):
+                nLoaders = min(8, nJobs)
+                # step 1: getting all genotypes
+                # the loaders can start working only after all of them are ready. Otherwise one
+                # worker might block the database when others are trying to retrieve data
+                # which is a non-blocking procedure.
+                ready_flags = Array('i', [0]*nLoaders)
+                # Tells the master process which samples are loaded, used by the progress bar.
+                cached_samples = Array('i', max(asso.sample_IDs) + 1)
+                #
+                # group ids by sample group size, e.g. (0, ..., 9), (10, ..., 20) etc because they will be
+                # saved in the same file
+                sample_groups = {}
+                for id in sorted(asso.sample_IDs):
+                    if id // SAMPLE_GROUP_SIZE in sample_groups:
+                        sample_groups[id // SAMPLE_GROUP_SIZE].append(id)
+                    else:
+                        sample_groups[id // SAMPLE_GROUP_SIZE] = [id]
+                for g,v in sample_groups.iteritems():
+                    sampleQueue.put(v)
+                for i in range(nLoaders):
+                    GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples).start()
+                    # None will kill the workers
+                    sampleQueue.put(None)
+                # progress bar...
+                prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
+                while True:
+                    time.sleep(1)
+                    prog.update(sum(cached_samples))
+                    if sum(cached_samples) == len(asso.sample_IDs):
+                        break
+                prog.done()
             #
             # step 2: workers work on genotypes
             # the group queue is used to send groups
