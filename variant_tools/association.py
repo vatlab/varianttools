@@ -714,7 +714,7 @@ class AssoTestsWorker(Process):
                     values.extend(result)
             except KeyboardInterrupt as e:
                 # die silently if stopped by Ctrl-C
-                pass
+                break
             except Exception as e:
                 self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
