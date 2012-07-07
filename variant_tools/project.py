@@ -844,8 +844,6 @@ class Project:
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
-        # temporary directory...
-        runOptions.associate_genotype_cache_size = self.loadProperty('__option_associate_genotype_cache_size', None)
         #
         # create a logger
         self.logger = logging.getLogger()
@@ -1986,13 +1984,19 @@ class ProjCopier:
             if self.vtable == 'variant':
                 if self.genotypes:
                     # copy selected genotypes
-                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE {1};'.format(table, self.genotypes))
+                    try:
+                        cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE {1};'.format(table, self.genotypes))
+                    except:
+                        raise RuntimeError('Failed to copy {} with condition {}'.format(table, self.genotypes))
                 else:
                     # copy all variants and genotypes
                     cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0};'.format(table))
             else:
                 if self.genotypes:
-                    cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE ({2}) AND (__fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1}));'.format(table, self.vtable, self.genotypes))
+                    try:
+                        cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE ({2}) AND (__fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1}));'.format(table, self.vtable, self.genotypes))
+                    except:
+                        raise RuntimeError('Failed to copy {} with condition {}. The field might not exist.'.format(table, self.genotypes))
                 else:
                     cur.execute('INSERT INTO {0} SELECT * FROM __fromGeno.{0} WHERE __fromGeno.{0}.variant_id IN (SELECT variant_id FROM __fromDB.{1});'.format(table, self.vtable))
             prog.update(idx + 1)
@@ -2026,19 +2030,21 @@ class ProjCopier:
         thread = threading.Thread(target=self.createIndex, args=(sqls,))
         thread.start()
         # start copying samples
-        if self.geno_file is not None:
-            copied_samples = self.copySamples()
-        else:
-            copied_samples = 0
-        self.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
-        # wait for the thread to close
-        s = delayedAction(self.logger.info, 'Create indexes')
-        if thread.is_alive():
-            thread.join()
-        del s
-        # re-connect the main database for proer cleanup
-        self.proj.db = DatabaseEngine()
-        self.proj.db.connect(self.proj.proj_file)
+        try:
+            if self.geno_file is not None:
+                copied_samples = self.copySamples()
+            else:
+                copied_samples = 0
+            self.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
+            # wait for the thread to close
+            s = delayedAction(self.logger.info, 'Create indexes')
+            if thread.is_alive():
+                thread.join()
+            del s
+        finally:
+            # re-connect the main database for proer cleanup
+            self.proj.db = DatabaseEngine()
+            self.proj.db.connect(self.proj.proj_file)
 
 
 class SortedVariantMapper(threading.Thread):

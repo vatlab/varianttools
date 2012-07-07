@@ -25,19 +25,75 @@
 
 import sys
 import os
-import threading
-from multiprocessing import Process, Queue, Pipe, Lock, Value
+from multiprocessing import Process, Queue, Pipe, Value, Array
 import time
 from array import array
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
+try:
+    # python 2 has pickle and cPickle
+    import cPickle as pickle
+except:
+    # python 3 has pickle
+    import pickle
+
 from .project import Project, Field, AnnoDB, AnnoDBWriter
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
 from .phenotype import Sample
 from .tester import *
 
 import argparse
+
+class ShelfDB:
+    def __init__(self, filename, mode='n'):
+        if os.path.isfile(filename + '.DB'):
+            if mode == 'n':
+                os.remove(filename + '.DB')
+        elif mode == 'r':
+            raise ValueError('Temporary database {} does not exist.'.format(filename))
+        self.db = DatabaseEngine()
+        self.db.connect(filename)
+        self.cur = self.db.cursor()
+        self.mode = mode
+        if mode == 'n':
+            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
+        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
+        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
+
+        if sys.version_info.major >= 3:
+            self.add = self._add_py3
+            self.get = self._get_py3
+        else:
+            self.add = self._add_py2
+            self.get = self._get_py2
+
+    # python 2 and 3 have slightly different types and methods for pickling.
+    def _add_py2(self, key, value):
+        # return value from dumps needs to be converted to buffer (bytes)
+        self.cur.execute(self.insert_query, 
+            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+
+    def _get_py2(self, key):
+        self.cur.execute(self.select_query, (key,))
+        # pickle.loads only accepts string, ...
+        return pickle.loads(str(self.cur.fetchone()[0]))
+
+    def _add_py3(self, key, value):
+        # return values for dumps is already bytes...
+        self.cur.execute(self.insert_query, 
+            (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
+
+    def _get_py3(self, key):
+        self.cur.execute(self.select_query, (key,))
+        # pickle.loads accepts bytes directly
+        return pickle.loads(self.cur.fetchone()[0])
+
+    def close(self):
+        if self.mode == 'n':
+            self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
+            self.db.commit()
+        self.db.close()
 
 def istr(d):
     try:
@@ -324,88 +380,84 @@ class AssociationTestManager:
         return field_names, field_types, groups
 
 
-class GenotypeGrabber:
-    def __init__(self, param):
-        #
+class GenotypeLoader(Process):
+    '''This process continuous load genotype to a cache, and send results to 
+    the requesters if it has it.
+    '''
+    def __init__(self, param, ready_flags, index, queue, cached_samples):
+        Process.__init__(self)
         self.proj = param.proj
-        self.table = param.table
         self.sample_IDs = param.sample_IDs
-        self.phenotypes = param.phenotypes
-        self.covariates = param.covariates
-        self.var_info = param.var_info
         self.geno_info = param.geno_info
-        self.moi = param.moi
-        self.tests = param.tests
         self.group_names = param.group_names
-        self.missing_filter = param.missing_filter
-        #
+        self.db_name = param.proj.name + '_genotype.DB'
         self.logger = param.proj.logger
-        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
-        if param.num_extern_tests:
-            self.var_info += ['chr', 'pos']
-        self.db = DatabaseEngine()
-        self.db.connect(param.proj.name + '_genotype.DB', readonly=True)
-        if runOptions.associate_genotype_cache_size > 0:
-            self.proj.logger.debug('Setting PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
-            self.db.execute('PRAGMA cache_size=-{}'.format(runOptions.associate_genotype_cache_size))
+        #
+        # used to allow other processes to know the status of each sample
+        self.ready_flags = ready_flags
+        self.index = index
+        self.queue = queue
+        self.cached_samples = cached_samples
+
+    def run(self):
+        # wait all processes to get ready
+        while True:
+            # if the previous once hace done, it is my turn to use db. We do this sequentially
+            # to avoid database lock
+            if all(self.ready_flags[:self.index]) and not self.ready_flags[self.index]:
+                # loading genotypes from genotype database
+                db = DatabaseEngine()
+                # readonly allows simultaneous access from several processes
+                db.connect(self.db_name, readonly=True)
+                # move __asso_tmp to :memory: can speed up the process a lot
+                db.attach(':memory:', 'cache')
+                # filling __asso_tmp, this is per-process so might use some RAM
+                cur = db.cursor()
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
+                cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
+                # tells other processes that I am ready
+                self.ready_flags[self.index] = 1
+            if all(self.ready_flags):
+                break
+            time.sleep(1)
+        #
+        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n')
+        lenGrp = len(self.group_names)
+        try:
+            while True:
+                id = self.queue.get()
+                if id is None:
+                    break
+                # for each batch, add to a separate shelf
+                # IDs are sorted to make sure 10 is processed before 11
+                # 0.4/s per 1.1/s with/without controlling variant_id...
+                cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                    FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
+                    ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]),
+                        ', '.join(self.group_names)))
+                # grab data for each group by
+                data = {}
+                cur_group = None
+                for rec in cur:
+                    grp = tuple(rec[-lenGrp:])
+                    if cur_group != grp:
+                        ## a new group
+                        data[grp] = {rec[0]: rec[1:-lenGrp]}
+                        cur_group = grp
+                    else:
+                        data[grp][rec[0]] = rec[1:-lenGrp]
+                for grp,val in data.iteritems():
+                    shelf.add('{},{}'.format(id, grp), val)
+                # report progress, and tells the master process who owns the data
+                self.cached_samples[id] = 1 + self.index
+        except KeyboardInterrupt as e:
+            # do not produce annoying traceback
+            pass
+        finally:
+            db.close()
+            # close shelf
+            shelf.close()
         
-    def __del__(self):
-        self.db.close()
-
-    def getVarInfo(self, group, where_clause):
-        var_info = {x:[] for x in self.var_info}
-        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
-            ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
-        #self.logger.debug('Running query: {}'.format(query))
-        cur = self.db.cursor()
-        cur.execute(query, group)
-        #
-        if not self.var_info:
-            data = {x[0]:[] for x in cur.fetchall()}
-        else:
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-        variant_id = sorted(data.keys(), key=int)
-        for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
-        return var_info, variant_id
-
-    def getGenotype(self, group):
-        '''Get genotype for variants in specified group'''
-        # get variant_id
-        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        cur = self.db.cursor()
-        # variant info
-        var_info, variant_id = self.getVarInfo(group, where_clause)
-        # get genotypes / genotype info
-        genotype = []
-        geno_info = {x:[] for x in self.geno_info}
-        for ID in self.sample_IDs:
-            query = 'SELECT variant_id, GT {2} FROM genotype_{0} WHERE variant_id IN (SELECT variant_id FROM __asso_tmp WHERE {1});'\
-                .format(ID,  where_clause, ' '.join([', ' + x for x in self.geno_info]))
-            try:
-                cur.execute(query, group)
-            except Exception as e:
-                raise ValueError('Failed to retrieve genotype and genotype info ({0}) for sample with ID {1}: {2}'.format(self.geno_info, ID, e))
-            data = {x[0]:x[1:] for x in cur.fetchall()}
-            # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
-            # handle -1 coding (double heterozygotes)
-            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
-            #
-            # handle genotype_info
-            #
-            for idx, key in enumerate(self.geno_info):
-                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
-        # filter individuals by genotype missingness at a locus
-        nloci = len(genotype[0])
-        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
-        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
-        if len(which) - sum(which) > 0:
-            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
-        #
-        return genotype, which, var_info, geno_info
-
-
 class ResultRecorder:
     def __init__(self, params, db_name=None, update=False, logger=None):
         self.succ_count = 0
@@ -484,20 +536,104 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
-        self.sample_names = param.sample_names
+        self.proj = param.proj
+        self.table = param.table
+        self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
+        self.var_info = param.var_info
+        self.geno_info = param.geno_info
+        self.moi = param.moi
+        self.tests = param.tests
+        self.group_names = param.group_names
+        self.missing_filter = param.missing_filter
+        self.sample_names = param.sample_names
         self.moi = param.moi
         self.tests = param.tests
         self.num_extern_tests = param.num_extern_tests
         self.queue = grpQueue
         self.resQueue = resQueue
         self.logger = param.proj.logger
-        self.ready = ready
-        self.db = None
+        self.ready_flags = ready_flags
+        self.index = index
+        self.sampleMap = sampleMap
+        self.logger = self.proj.logger
+        #
+        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
+        if param.num_extern_tests:
+            self.var_info += ['chr', 'pos']
+        self.db = DatabaseEngine()
+        self.db.connect(param.proj.name + '_genotype.DB', readonly=True) 
+        #
+        self.shelves = {}
+
+    def __del__(self):
+        self.db.close()
+        for val in self.shelves.values():
+            shelf.close()
+
+    def getVarInfo(self, group, where_clause):
+        var_info = {x:[] for x in self.var_info}
+        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
+            ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
+        #self.logger.debug('Running query: {}'.format(query))
+        cur = self.db.cursor()
+        cur.execute(query, group)
+        #
+        if not self.var_info:
+            data = {x[0]:[] for x in cur.fetchall()}
+        else:
+            data = {x[0]:x[1:] for x in cur.fetchall()}
+        variant_id = sorted(data.keys(), key=int)
+        for idx, key in enumerate(self.var_info):
+            var_info[key] = [data[x][idx] for x in variant_id]
+        return var_info, variant_id
+
+    def getGenotype(self, group):
+        '''Get genotype for variants in specified group'''
+        # get variant_id
+        where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
+        cur = self.db.cursor()
+        # variant info
+        var_info, variant_id = self.getVarInfo(group, where_clause)
+        # get genotypes / genotype info
+        genotype = []
+        geno_info = {x:[] for x in self.geno_info}
+        # getting samples locally from my own connection
+        for ID in self.sample_IDs:
+            dbID = self.sampleMap[ID]
+            if dbID not in self.shelves:
+                shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r')
+                self.shelves[dbID] = shelf
+            else:
+                shelf = self.shelves[dbID]
+            #
+            try:
+                data = shelf.get('{},{}'.format(ID, group))
+            except:
+                # this sample might not have this group at all
+                data = {}
+            # handle missing values
+            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+            # handle -1 coding (double heterozygotes)
+            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
+            #
+            # handle genotype_info
+            #
+            for idx, key in enumerate(self.geno_info):
+                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+        #
+        # filter individuals by genotype missingness at a locus
+        nloci = len(genotype[0])
+        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
+        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
+        if len(which) - sum(which) > 0:
+            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
+        #
+        return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
@@ -550,19 +686,18 @@ class AssoTestsWorker(Process):
             raise ValueError("No input data")
 
     def run(self):
-        # if genotypes are not cached, each worker will grab genotype from the database by itself
-        if runOptions.associate_genotype_cache_size == 0:
-            gg = GenotypeGrabber(self.param)
         # 
         # tell the master process that this worker is ready
-        self.ready.value = 1
+        self.ready_flags[self.index] = 1
+        # wait all processes to e ready
+        while True:
+            if all(self.ready_flags):
+                break
+            else:
+                time.sleep(1)
         while True:
             # if cached, get genotype from the main process
-            if runOptions.associate_genotype_cache_size > 0:
-                grp, (genotype, which, var_info, geno_info) = self.queue.get()
-            else:
-                # otherwise, only the group
-                grp = self.queue.get()
+            grp = self.queue.get()
             #
             try:
                 grpname = ", ".join(map(str, grp))
@@ -576,9 +711,11 @@ class AssoTestsWorker(Process):
             self.pydata = {}
             values = list(grp)
             try:
-                if runOptions.associate_genotype_cache_size == 0:
-                    # select variants from each group:
-                    genotype, which, var_info, geno_info = gg.getGenotype(grp)
+                # select variants from each group:
+                genotype, which, var_info, geno_info = self.getGenotype(grp)
+                # if I throw an exception here, the program completes in 5 minutes, indicating
+                # the data collection part takes an insignificant part of the process.
+                # 
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info)
@@ -594,6 +731,9 @@ class AssoTestsWorker(Process):
                     result = test.calculate()
                     self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
+            except KeyboardInterrupt as e:
+                # die silently if stopped by Ctrl-C
+                break
             except Exception as e:
                 self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
@@ -607,65 +747,107 @@ class AssoTestsWorker(Process):
 def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
                     args.samples, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
-            #
+            # define results here but it might fail if args.to_db is not writable
+            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
+            sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # step 4: start all workers
+            # loading from disk cannot really benefit from more than 8 simutaneous read, due to
+            # disk access limits, but I do not want to introduce another parameter to specify
+            # number of reading processes.
+            nLoaders = min(8, nJobs)
+            # step 1: getting all genotypes
+            # the loaders can start working only after all of them are ready. Otherwise one
+            # worker might block the database when others are trying to retrieve data
+            # which is a non-blocking procedure.
+            ready_flags = Array('i', [0]*nLoaders)
+            # Tells the master process which samples are loaded, used by the progress bar.
+            cached_samples = Array('i', max(asso.sample_IDs) + 1)
+            #
+            for id in asso.sample_IDs:
+                sampleQueue.put(id)
+            loaders = []
+            for i in range(nLoaders):
+                loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
+                loader.start()
+                loaders.append(loader)
+                # None will kill the workers
+                sampleQueue.put(None)
+            #
+            s = delayedAction(proj.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
+            while True:
+                if all(ready_flags):
+                    break
+                else:
+                    time.sleep(1)
+            del s
+            # progress bar...
+            prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
+            try:
+                while True:
+                    time.sleep(1)
+                    done = sum([x != 0 for x in cached_samples])
+                    prog.update(done)
+                    if done == len(asso.sample_IDs):
+                        break
+            except KeyboardInterrupt as e:
+                proj.logger.error('\nLoading genotype stopped by keyboard interruption.')
+                proj.close()
+                sys.exit(1)
+            prog.done()
+            #
+            # step 2: workers work on genotypes
+            # the group queue is used to send groups
             grpQueue = Queue()
             # the result queue is used by workers to return results
             resQueue = Queue()
-            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
-            ready_flags = [Value('i', 0) for x in range(nJobs)]
+            # see if all workers are ready
+            ready_flags = Array('i', [0]*nJobs)
             for j in range(nJobs):
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags[j]).start()
-            #
-            # wait for all connection to be ready, because if there are many workers,
-            # some of them might start slowly to a point when another ready worker starts
-            # to work, it faces a locked database and cannot proceed. Note that the workers
-            # select from a readonly database and do not have any lock issue, but the 
-            # connection part might block the database.
-            while True:
-                if all([x.value for x in ready_flags]):
-                    break
-                else:
-                    print [x.value for x in ready_flags]
-                    time.sleep(1)
+                # the dictionary has the number of temporary database for each sample
+                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
+                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0}).start()
+            # send jobs ...
+            # get initial completed and failed
             # put all jobs to queue, the workers will work on them
-            if runOptions.associate_genotype_cache_size > 0:
-                geno = GenotypeGrabber(asso)
-                prog = ProgressBar('Getting genotypes', len(asso.groups))
-                for count,grp in enumerate(asso.groups):
-                    grpQueue.put((grp, geno.getGenotype(grp)))
-                    prog.update(count)
-                for j in range(nJobs):
-                    grpQueue.put(None)
-                prog.done()
-            else:
-                for grp in asso.groups:
-                    grpQueue.put(grp)
-                # the worker will stop once all jobs are finished
-                for j in range(nJobs):
-                    grpQueue.put(None)
+            for grp in asso.groups:
+                grpQueue.put(grp)
+            # the worker will stop once all jobs are finished
+            for j in range(nJobs):
+                grpQueue.put(None)
             #
             count = 0
-            # get initial completed and failed
-            prog = ProgressBar('Testing for association', len(asso.groups), results.completed(), results.failed())
+            s = delayedAction(proj.logger.info, "Starting {} association test workers".format(nJobs))
             while True:
-                # if everything is done
-                if count >= len(asso.groups):
+                if all(ready_flags):
                     break
-                # not done? wait from the queue and write to the result recorder
-                res = resQueue.get()
-                results.record(res)
-                # update progress bar
-                count = results.completed()
-                prog.update(count, results.failed())
-                proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+                else:
+                    time.sleep(1)
+            del s
+            prog = ProgressBar('Testing for association', len(asso.groups))
+            try:
+                while True:
+                    # if everything is done
+                    if count >= len(asso.groups):
+                        break
+                    # not done? wait from the queue and write to the result recorder
+                    res = resQueue.get()
+                    results.record(res)
+                    # update progress bar
+                    count = results.completed()
+                    prog.update(count, results.failed())
+                    proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+            except KeyboardInterrupt as e:
+                proj.logger.error('\nAssociation tests stopped by keyboard interruption.')
+                results.done()
+                proj.close()
+                sys.exit(1)
             # finished
             prog.done()
             results.done()
