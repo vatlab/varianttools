@@ -53,6 +53,8 @@ class TestInit(ProcessTestCase):
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         self.assertSucc('vtools init test --parent parent --variants ceu')
+        # non-existing genotype field
+        self.assertFail('vtools init test --parent parent --variants ceu --genotypes GD>10')
         self.assertEqual(numOfVariant(), 288)
         self.assertEqual(numOfSample(), 61)
         shutil.rmtree('parent')

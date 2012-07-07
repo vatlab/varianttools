@@ -296,10 +296,10 @@ class AssociationTestManager:
             return sample_IDs, sample_names, phenotypes, covariates
         except Exception as e:
             self.logger.debug(e)
-            if str(e).startswith('Invalid coding'):
+            if str(e).startswith('Invalid (non-numeric) coding'):
                 raise ValueError(e)
             else:
-                raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
+                raise ValueError('Failed to retrieve phenotype {} {}. Please use command '
                     '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno),
                     '' if covar is None else (' and/or covariate' + ', '.join(covar))))
 
