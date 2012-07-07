@@ -170,7 +170,8 @@ class RuntimeOptions(object):
             if not os.path.isdir(self._temp_dir):
                 os.makedirs(self._temp_dir)
         except:
-            raise RuntimeError('Failed to create a temporary directory {}.'.format(self._temp_dir))
+            sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._temp_dir))
+            self._temp_dir = tempfile.mkdtemp()
     #
     temp_dir = property(lambda self: self._temp_dir, _set_temp_dir)
 
