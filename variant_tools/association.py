@@ -421,7 +421,7 @@ class GenotypeLoader(Process):
                 break
             time.sleep(1)
         #
-        shelf = ShelfDB(os.path.join(runOptions.cache_dir, 'geno_{0}'.format(self.index)), 'n')
+        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n')
         lenGrp = len(self.group_names)
         try:
             while True:
@@ -606,7 +606,7 @@ class AssoTestsWorker(Process):
         for ID in self.sample_IDs:
             dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
-                shelf = ShelfDB(os.path.join(runOptions.cache_dir, 'geno_{}'.format(dbID)), 'r')
+                shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r')
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
