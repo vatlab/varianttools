@@ -23,11 +23,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-import os
+import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array
 import time
-from array import array
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
@@ -149,14 +147,22 @@ def associateArguments(parser):
             chromosome), they should be merged using command vtools admin.''')
     parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limiting genotypes to those matching conditions that
-            use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15'). 
+            use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15').
             Genotypes failing such conditions will be regarded as missing genotypes.''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
-    parser.add_argument('--missing_filter', metavar='proportion', type=freq, default=1.0,
-           help='''When -g is specified, will remove samples having missing genotypes
-           exceeding the given proportion within a group''' )
+    parser.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
+           help='''When -g is specified, will remove samples based on given expression 
+           within each group. Currently special expression '%%(NA)' is provided to remove
+           samples by genotype missingness. For example '%%(NA)>0.1' will remove samples
+           having more than 10%% missing genotypes within a group.''' )
+    parser.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
+           help='''When -g is specified, will remove variant sites based on given expression 
+           within each group. Currently special expression '%%(NA)' is provided to remove
+           variant sites by genotype missingness. For example '%%(NA)>0.1' will remove loci
+           having more than 10%% missing genotypes within a group. Note that this filter will
+           be applied after "--discard_samples" is applied, if the latter is specified.''' )
     parser.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')
     parser.add_argument('--update', action='store_true',
@@ -180,26 +186,30 @@ class AssociationTestManager:
     group_names: names of the group
     '''
     def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, moi, methods,
-        unknown_args, samples, genotypes, group_by, missing_filter):
+        unknown_args, samples, genotypes, group_by, discard_samples, discard_variants):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
         self.var_info = var_info
         self.geno_info = geno_info
         self.genotypes = genotypes
-        self.missing_filter = missing_filter
         self.moi = moi
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         self.table = table
         #
-        # step 0: get testers
+        # step 1: get missing filter conditions
+        self.missing_ind_ge, self.missing_var_ge = self.getMissingFilters(discard_samples, discard_variants)
+        #
+        # step 2: get testers
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
-        # step 1: get samples and related phenotypes
+        #
+        # step 3: get samples and related phenotypes
         self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
-        # step 2: check if tests are compatible with phenotypes
+        #
+        # step 4: check if tests are compatible with phenotypes
         for idx, item in enumerate([list(set(x)) for x in self.phenotypes]):
             if (list(map(float, item)) == [2.0, 1.0] or list(map(float, item)) == [1.0, 2.0]):
                 self.phenotypes[idx] = [i - 1.0 for i in self.phenotypes[idx]]
@@ -208,7 +218,8 @@ class AssociationTestManager:
                 for test in self.tests:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
-        # step 3: indexes genotype tables if needed
+        #
+        # step 5: indexes genotype tables if needed
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         unindexed_IDs = []
         for id in self.sample_IDs:
@@ -222,8 +233,37 @@ class AssociationTestManager:
                 prog.update(idx + 1)
             prog.done()
         #
-        # step 4: get groups
+        # step 6: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
+
+    def getMissingFilters(self, discard_samples, discard_variants):
+        missing_ind_ge = missing_var_ge = 1.0
+        # sample level missingness filter
+        for expr in discard_samples:
+            try:
+                sep = re.search(r'>|=|<|>=|<=', expr).group(0)
+                e, value = [x.strip() for x in stat.split(sep)]
+                if e == '%(NA)' and sep == '>':
+                    # missing individual level genotypes greater than
+                    missing_ind_ge = float(value)
+            except Exception as e:
+                raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
+        # variant level missingness filter
+        for expr in discard_variants:
+            try:
+                sep = re.search(r'>|=|<|>=|<=', expr).group(0)
+                e, value = [x.strip() for x in stat.split(sep)]
+                if e == '%(NA)' and sep == '>':
+                    # missing variant level genotypes greater than
+                    missing_var_ge = float(value)
+            except Exception as e:
+                raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
+        # check input values
+        if missing_ind_ge > 1.0 or missing_ind_ge < 0.0:
+            raise ValueError('Invalid parameter {} for expression "%(NA)": value should fall between 0 and 1'.format(missing_ind_ge))
+        if missing_var_ge > 1.0 or missing_var_ge < 0.0:
+            raise ValueError('Invalid parameter {} for expression "%(NA)": value should fall between 0 and 1'.format(missing_var_ge))
+        return missing_ind_ge, missing_var_ge
 
     def getAssoTests(self, methods, ncovariates, common_args):
         '''Get a list of methods from parameter methods, passing method specific and common
@@ -563,7 +603,8 @@ class AssoTestsWorker(Process):
         self.moi = param.moi
         self.tests = param.tests
         self.group_names = param.group_names
-        self.missing_filter = param.missing_filter
+        self.missing_ind_ge = param.missing_ind_ge
+        self.missing_var_ge = param.missing_var_ge
         self.sample_names = param.sample_names
         self.moi = param.moi
         self.tests = param.tests
@@ -633,20 +674,50 @@ class AssoTestsWorker(Process):
             # handle missing values
             gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
             # handle -1 coding (double heterozygotes)
-            genotype.append(array('d', [2.0 if x[0] == -1.0 else x[0] for x in gtmp]))
+            genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
             #
             # handle genotype_info
             #
             for idx, key in enumerate(self.geno_info):
-                geno_info[key].append(array('d', [x[idx+1] for x in gtmp]))
+                geno_info[key].append([x[idx+1] for x in gtmp])
         #
-        # filter individuals by genotype missingness at a locus
-        nloci = len(genotype[0])
-        missing_counts = [sum(list(map(math.isnan, x))) for x in genotype]
-        which = [(x < (self.missing_filter * nloci)) for x in missing_counts]
+        # filter samples/variants for missingness
+        return self.filterGenotype(genotype, geno_info, var_info, ', '.join(group))
+
+    def filterGenotype(self, genotype, geno_info, var_info, gname):
+        '''
+        Filter genotypes by missingness criteria. Not very efficient because it essentially 
+        copied genotype, var_info and geno_info skipping the loci to be removed.
+            - genotype is a Individual_list * Variants_list matrix of GT values 0,1,2 and nan
+            - var_info is a dictionary with each key being information corresponding Variant_list
+            - geno_info is a dictionary with each key having a matrix of the same structure as genotype matrix
+        '''
+        # Step 1: filter individuals by genotype missingness at a locus
+        missing_ratios = [sum(list(map(math.isnan, x))) / float(len(x)) for x in genotype]
+        which = [x < self.missing_ind_ge for x in missing_ratios]
         if len(which) - sum(which) > 0:
-            self.logger.debug('{} out of {} samples will be removed due to missing genotypes'.format(len(which) - sum(which), len(which)))
-        #
+            self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {} percent missing genotypes'\
+                    .format(repr(gname), len(which) - sum(which), len(which), self.missing_ind_ge * 100))
+        # Step 2: filter variants by genotype missingness at a locus
+        keep_loci = []
+        for i in range(len(genotype[0])):
+            missingness_vi = list(map(math.isnan, [x[i] for x, y in zip(genotype, which) if y]))
+            keep_loci.append((float(sum(missingness_vi)) / float(len(missingness_vi))) < self.missing_var_ge)
+        if len(keep_loci) - sum(keep_loci) > 0:
+            # filter genotype and geno_info
+            for idx in range(len(genotype)):
+                genotype[idx] = [i for i, j in zip(genotype[idx], keep_loci) if j]
+                for k in geno_info.keys():
+                    geno_info[k][idx] = [i for i, j in zip(geno_info[k][idx], keep_loci) if j]
+            # filter var_info
+            for k in var_info.keys():
+                var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
+            #
+            self.logger.debug('In {}, {} out of {} loci will be removed due to having more than {} percent missing genotypes after filtering on samples'\
+                    .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
+        # Step 3: check for non-triviality of genotype matrix
+        if sum(which) < 5 or len(genotype[0]) == 0:
+            raise ValueError("Insufficient data for {} to be analyzed.".format(repr(gname)))
         return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info):
@@ -765,7 +836,7 @@ def associate(args):
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
-                    args.samples, args.genotypes, args.group_by, args.missing_filter)
+                    args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
             except ValueError as e:
                 sys.exit(e)
             # define results here but it might fail if args.to_db is not writable
