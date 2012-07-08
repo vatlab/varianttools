@@ -242,7 +242,7 @@ class AssociationTestManager:
         for expr in discard_samples:
             try:
                 sep = re.search(r'>|=|<|>=|<=', expr).group(0)
-                e, value = [x.strip() for x in stat.split(sep)]
+                e, value = [x.strip() for x in expr.split(sep)]
                 if e == '%(NA)' and sep == '>':
                     # missing individual level genotypes greater than
                     missing_ind_ge = float(value)
@@ -695,6 +695,9 @@ class AssoTestsWorker(Process):
         # Step 1: filter individuals by genotype missingness at a locus
         missing_ratios = [sum(list(map(math.isnan, x))) / float(len(x)) for x in genotype]
         which = [x < self.missing_ind_ge for x in missing_ratios]
+        # check for non-triviality of phenotype data
+        if sum(which) < 5:
+            raise ValueError("Insufficient samples for {} to be analyzed.".format(repr(gname)))
         if len(which) - sum(which) > 0:
             self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {} percent missing genotypes'\
                     .format(repr(gname), len(which) - sum(which), len(which), self.missing_ind_ge * 100))
@@ -715,9 +718,9 @@ class AssoTestsWorker(Process):
             #
             self.logger.debug('In {}, {} out of {} loci will be removed due to having more than {} percent missing genotypes after filtering on samples'\
                     .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
-        # Step 3: check for non-triviality of genotype matrix
-        if sum(which) < 5 or len(genotype[0]) == 0:
-            raise ValueError("Insufficient data for {} to be analyzed.".format(repr(gname)))
+        # check for non-triviality of genotype matrix
+        if len(genotype[0]) == 0:
+            raise ValueError("Insufficient variants for {} to be analyzed.".format(repr(gname)))
         return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info):
