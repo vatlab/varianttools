@@ -246,23 +246,31 @@ class AssociationTestManager:
                 if e == '%(NA)' and sep == '>':
                     # missing individual level genotypes greater than
                     missing_ind_ge = float(value)
-            except Exception as e:
+                else:
+                    raise ValueError('Invalid expression {}'.format(expr))
+            except ValueError:
                 raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
         # variant level missingness filter
         for expr in discard_variants:
             try:
                 sep = re.search(r'>|=|<|>=|<=', expr).group(0)
-                e, value = [x.strip() for x in stat.split(sep)]
+                e, value = [x.strip() for x in expr.split(sep)]
                 if e == '%(NA)' and sep == '>':
                     # missing variant level genotypes greater than
                     missing_var_ge = float(value)
-            except Exception as e:
+                else:
+                    raise ValueError('Invalid expression {}'.format(expr))
+            except ValueError:
                 raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
         # check input values
         if missing_ind_ge > 1.0 or missing_ind_ge < 0.0:
-            raise ValueError('Invalid parameter {} for expression "%(NA)": value should fall between 0 and 1'.format(missing_ind_ge))
+            raise ValueError('Invalid parameter "{}" for expression %(NA): value should fall between 0 and 1'.format(missing_ind_ge))
         if missing_var_ge > 1.0 or missing_var_ge < 0.0:
-            raise ValueError('Invalid parameter {} for expression "%(NA)": value should fall between 0 and 1'.format(missing_var_ge))
+            raise ValueError('Invalid parameter "{}" for expression %(NA): value should fall between 0 and 1'.format(missing_var_ge))
+        if missing_ind_ge == 0.0:
+            missing_ind_ge = 1.0E-8
+        if missing_var_ge == 0.0:
+            missing_var_ge = 1.0E-8
         return missing_ind_ge, missing_var_ge
 
     def getAssoTests(self, methods, ncovariates, common_args):
