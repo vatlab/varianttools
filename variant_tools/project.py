@@ -845,6 +845,8 @@ class Project:
         self.db.connect(self.proj_file)
         runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
+        runOptions.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
+        #
         # create a logger
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)

@@ -87,6 +87,8 @@ class RuntimeOptions(object):
         self._cache_dir = 'cache'
         # path to a temporary directory, will be allocated automatically.
         self._temp_dir = None
+        # how to handle missing data
+        self._treat_missing_as_wildtype = False
     #
     # attribute command line
     #
@@ -174,6 +176,18 @@ class RuntimeOptions(object):
             self._temp_dir = tempfile.mkdtemp()
     #
     temp_dir = property(lambda self: self._temp_dir, _set_temp_dir)
+    #
+    # attribute treat_missing_as_wildtype
+    def _set_treat_missing_as_wildtype(self, val):
+        if val in [None, 'None', '0', 'False', 'false', 'FALSE']:
+            self._treat_missing_as_wildtype = False
+        elif val in ['1', 'True', 'TRUE', 'true']:
+            self._treat_missing_as_wildtype = True
+        else:
+            print('Invalid input for runtime option treat_missing_as_wildtype')
+            self._treat_missing_as_wildtype = False
+    #
+    treat_missing_as_wildtype = property(lambda self: self._treat_missing_as_wildtype, _set_treat_missing_as_wildtype)
 
 
 # the singleton object of RuntimeOptions
