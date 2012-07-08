@@ -386,10 +386,20 @@ class AssociationTestManager:
 
 
 class GenotypeLoader(Process):
-    '''This process continuous load genotype to a cache, and send results to 
-    the requesters if it has it.
-    '''
+    '''This process loads genotypes in batch and send the results to a
+    temporary sqlite database to be used later. This avoids numerous
+    random access queies and significantly improves the performance of
+    association tests. '''
     def __init__(self, param, ready_flags, index, queue, cached_samples):
+        '''
+        param: association test parameters, with sample ids.
+        ready_flags: indicators if each loader has opened the database and
+            ready for query.
+        index: index of the current loader.
+        queue: queue to get sample ids.
+        cached_samples: tells the master process which sample has been
+            processed, and by which loader.
+        '''
         Process.__init__(self)
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
@@ -398,8 +408,6 @@ class GenotypeLoader(Process):
         self.group_names = param.group_names
         self.db_name = param.proj.name + '_genotype.DB'
         self.logger = param.proj.logger
-        #
-        # used to allow other processes to know the status of each sample
         self.ready_flags = ready_flags
         self.index = index
         self.queue = queue
@@ -408,8 +416,8 @@ class GenotypeLoader(Process):
     def run(self):
         # wait all processes to get ready
         while True:
-            # if the previous once hace done, it is my turn to use db. We do this sequentially
-            # to avoid database lock
+            # if the previous ones have done, it is my turn to use db. We do this sequentially
+            # to avoid database lock.
             if all(self.ready_flags[:self.index]) and not self.ready_flags[self.index]:
                 # loading genotypes from genotype database
                 db = DatabaseEngine()
@@ -434,12 +442,12 @@ class GenotypeLoader(Process):
                 id = self.queue.get()
                 if id is None:
                     break
-                # for each batch, add to a separate shelf
-                # IDs are sorted to make sure 10 is processed before 11
-                # 0.4/s per 1.1/s with/without controlling variant_id...
+                #
                 cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
                     FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
-                    ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names),
+                    ORDER BY {2}'''.format(id,
+                        ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
+                        ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
                         ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
                 # grab data for each group by
                 data = {}
