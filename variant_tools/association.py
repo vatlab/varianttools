@@ -140,13 +140,17 @@ def associateArguments(parser):
             tests can be specified as mod_name.test_name where mod_name should
             be a Python module (system wide or in the current directory), and
             test_name should be a subclass of NullTest.''')
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"'). Each line of the sample table (vtools show
             samples) is considered as samples. If genotype of a physical sample
             is scattered into multiple samples (e.g. imported chromosome by
             chromosome), they should be merged using command vtools admin.''')
+    parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
+        help='''Limiting genotypes to those matching conditions that
+            use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15'). 
+            Genotypes failing such conditions will be regarded as missing genotypes.''')
     parser.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
@@ -176,12 +180,13 @@ class AssociationTestManager:
     group_names: names of the group
     '''
     def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, moi, methods,
-        unknown_args, samples, group_by, missing_filter):
+        unknown_args, samples, genotypes, group_by, missing_filter):
         self.proj = proj
         self.db = proj.db
         self.logger = proj.logger
         self.var_info = var_info
         self.geno_info = geno_info
+        self.genotypes = genotypes
         self.missing_filter = missing_filter
         self.moi = moi
         # table?
@@ -247,7 +252,7 @@ class AssociationTestManager:
                 # check if method is valid
                 if not hasattr(method, 'fields'):
                     raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
-                if not method.fields:
+                if not method.fields and name != 'GroupWrite':
                     self.logger.warning('Association test {} has invalid or empty fields. No result will be generated.'.format(name))
                 tests.append(method)
             except NameError as e:
@@ -389,6 +394,7 @@ class GenotypeLoader(Process):
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
         self.geno_info = param.geno_info
+        self.geno_cond = param.genotypes
         self.group_names = param.group_names
         self.db_name = param.proj.name + '_genotype.DB'
         self.logger = param.proj.logger
@@ -432,9 +438,9 @@ class GenotypeLoader(Process):
                 # IDs are sorted to make sure 10 is processed before 11
                 # 0.4/s per 1.1/s with/without controlling variant_id...
                 cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
-                    FROM cache.__asso_tmp, genotype_{0} WHERE cache.__asso_tmp.variant_id = genotype_{0}.variant_id
-                    ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]),
-                        ', '.join(self.group_names)))
+                    FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
+                    ORDER BY {2}'''.format(id, ' '.join([', ' + x for x in self.geno_info]), ', '.join(self.group_names),
+                        ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
                 # grab data for each group by
                 data = {}
                 cur_group = None
@@ -751,7 +757,7 @@ def associate(args):
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
-                    args.samples, args.group_by, args.missing_filter)
+                    args.samples, args.genotypes, args.group_by, args.missing_filter)
             except ValueError as e:
                 sys.exit(e)
             # define results here but it might fail if args.to_db is not writable

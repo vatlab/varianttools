@@ -433,7 +433,7 @@ class GLMBurdenTest(NullTest):
                For details of the weighting themes, please refer to the online documentation.
             ''')
 
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
             ''')
@@ -484,13 +484,13 @@ class GLMBurdenTest(NullTest):
             ])
         # special actions for KBAC and RBT weighting themes
 #        if self.weight in ['KBAC', 'RBT']:
-#            if not self.nan_adjust:
+#            if not self.NA_adjust:
 #                self.logger.warning("In order to use weighting theme {0}, missing genotypes will be replaced by the most likely genotype based on MAF".format(self.weight))
 #            algorithm.append(t.FillGMissing(method="mlg"))
         if self.weight == 'KBAC':
             algorithm.append(t.FindGenotypePattern())
         # recode missing data
-        if self.nan_adjust:
+        if self.NA_adjust:
             algorithm.append(t.FillGMissing(method="maf"))
         # prepare the weighted sum tester
         a_wtester = None
@@ -998,7 +998,7 @@ class LinRegBurden(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1032,7 +1032,7 @@ class CollapseQt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1071,7 +1071,7 @@ class BurdenQt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1135,7 +1135,7 @@ class WeightedBurdenQt(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1185,7 +1185,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1254,7 +1254,7 @@ class LogitRegBurden(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1289,7 +1289,7 @@ class CollapseBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1329,7 +1329,7 @@ class BurdenBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1392,7 +1392,7 @@ class WeightedBurdenBt(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
@@ -1443,7 +1443,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--nan_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
 
