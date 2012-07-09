@@ -46,6 +46,7 @@ include variant_tools/config_mac.h
 include variant_tools/config_linux.h
 include variant_tools/config_solaris.h
 include variant_tools/config_win32.h
+include variant_tools/swigpyrun.h
 include variant_tools/assoTests.h
 include variant_tools/assoData.h
 include variant_tools/action.h
