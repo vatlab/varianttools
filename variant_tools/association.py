@@ -850,7 +850,7 @@ def associate(args):
         with Project(verbosity=args.verbosity) as proj:
             # step 0: create an association testing object with all group information
             try:
-                asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
+                asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
                     args.var_info, args.geno_info, args.methods, args.unknown_args,
                     args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
             except ValueError as e:
