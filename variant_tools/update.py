@@ -564,9 +564,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if genotypes is not None and len(genotypes) != 0:
             where_cond.extend(genotypes)
         if variant_table != 'variant':
-            where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
+            where_cond.append('{}variant_id in (SELECT variant_id FROM {})'.format('' if corr is None else 'g.', variant_table))
         whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
-        
         fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
         if validGenotypeFields is not None and len(validGenotypeFields) != 0:
             fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
@@ -578,8 +577,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
                 proj.name, id, whereClause)
         else:
-            query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY v.chr, v.pos;'.format(' '.join([', g.' + x for x in fieldSelect]),
-                proj.name, id, whereClause)
+            query = 'SELECT g.variant_id {} FROM {}_genotype.genotype_{} AS g JOIN variant AS v ON g.variant_id=v.variant_id {} ORDER BY chr, pos;'\
+                    .format(' '.join([', g.' + x for x in fieldSelect]), proj.name, id, whereClause)
         #proj.logger.debug(query)
         cur.execute(query)
 
