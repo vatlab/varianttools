@@ -1423,18 +1423,21 @@ bool VariablePermutator::apply(AssoData & d)
 
 	// obtain proper MAF thresholds
 	// each element in this vector of MAF thresholds will define one subset of variant sites
-	std::sort(maf.begin(), maf.end());
-	std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
-	maf.resize(it - maf.begin());
-	if (fEqual(maf.front(), 0.0)) {
-		maf.erase(maf.begin());
-	}
-	if (fEqual(maf.back(), 1.0)) {
-		maf.erase(maf.end());
-	}
-	// now maf should be a sorted vector of unique MAF's from AssoData
-	// maf \in (0.0, 1.0)
-	if (maf.size() == 0) {
+	try {
+		std::sort(maf.begin(), maf.end());
+		std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
+		maf.resize(it - maf.begin());
+		if (maf.size() == 0) throw "maf is empty";
+		if (fEqual(maf.front(), 0.0)) {
+			maf.erase(maf.begin());
+		}
+		if (maf.size() == 0) throw "maf is empty";
+		if (fEqual(maf.back(), 1.0)) {
+			maf.erase(maf.end());
+		}
+		if (maf.size() == 0) throw "maf is empty";
+	} catch (...) {
+		// maf \in (0.0, 1.0)
 		// nothing to do
 		// FIXME should throw a Python message
 		d.setPvalue(std::numeric_limits<double>::quiet_NaN());
@@ -1442,9 +1445,9 @@ bool VariablePermutator::apply(AssoData & d)
 		d.setSE(std::numeric_limits<double>::quiet_NaN());
 		return true;
 	}
+	// now maf should be a sorted vector of unique MAF's from AssoData
 
 	double maflower = maf.front() - std::numeric_limits<double>::epsilon();
-
 
 	// ==== optimization for certain methods ====
 	// determine whether to use a quicker permutation routine if the actions are simply "codeX + doRegression"
