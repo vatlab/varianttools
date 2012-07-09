@@ -384,6 +384,10 @@ class AssociationTestManager:
         #
         cur.execute('DROP TABLE IF EXISTS __fromGeno.__asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __fromGeno.__asso_tmp_index;')
+        # this table has
+        #  variant_id
+        #  groups (e.g. chr, pos)
+        #  variant_info
         cur.execute('''\
             CREATE TABLE __fromGeno.__asso_tmp (
               variant_id INT NOT NULL,
@@ -475,7 +479,9 @@ class GenotypeLoader(Process):
                 db.attach(':memory:', 'cache')
                 # filling __asso_tmp, this is per-process so might use some RAM
                 cur = db.cursor()
-                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT * FROM __asso_tmp;')
+                # variant info of the original __asso_tmp table are not copied because they are not used.
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __asso_tmp;'.format(
+                        ', '.join(self.group_names)))
                 cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
                 # tells other processes that I am ready
                 self.ready_flags[self.index] = 1
