@@ -102,26 +102,28 @@ def istr(d):
     return x
 
 def associateArguments(parser):
-    parser.add_argument('table', help='''Variant table.''')
-    parser.add_argument('phenotypes', nargs=1,
+    data = parser.add_argument_group('Genotype, phenotype, and covariates')
+    data.add_argument('variants', help='''Table of variants to be tested.''')
+    data.add_argument('phenotypes', nargs=1,
         help='''A list of phenotypes that will be passed to the association
             statistics calculator. Currently only a single phenotype is allowed.''')
-    parser.add_argument('--covariates', nargs='*', default=[],
+    data.add_argument('--covariates', nargs='*', default=[],
         help='''Optional phenotypes that will be passed to statistical
             tests as covariates. Values of these phenotypes should be integer
             or float.''')
-    parser.add_argument('--var_info', nargs='*', default=[],
+    data.add_argument('--var_info', nargs='*', default=[],
         help='''Optional variant information fields (e.g. minor allele frequency
             from 1000 genomes project) that will be passed to statistical tests.
             The fields could be any annotation fields of with integer or float
             values, including those from used annotation databases (use "vtools
             show fields" to see a list of usable fields). ''')
-    parser.add_argument('--geno_info', nargs='*', default=[],
+    data.add_argument('--geno_info', nargs='*', default=[],
         help='''Optional genotype fields (e.g. quality score of genotype calls,
             cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
-    parser.add_argument('-m', '--methods', nargs='+',
+    tests = parser.add_argument_group('Association tests')
+    tests.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
             --method "m --alternative 2" "m1 --permute 1000"), although
@@ -133,34 +135,36 @@ def associateArguments(parser):
             tests can be specified as mod_name.test_name where mod_name should
             be a Python module (system wide or in the current directory), and
             test_name should be a subclass of NullTest.''')
-    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
+    tests.add_argument('-g', '--group_by', nargs='*',
+        help='''Group variants by fields. If specified, variants will be separated
+            into groups and are tested one by one.''')
+    filters = parser.add_argument_group('Select and filter samples and genotypes.')
+    filters.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"'). Each line of the sample table (vtools show
             samples) is considered as samples. If genotype of a physical sample
             is scattered into multiple samples (e.g. imported chromosome by
             chromosome), they should be merged using command vtools admin.''')
-    parser.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
+    filters.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limiting genotypes to those matching conditions that
             use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15').
             Genotypes failing such conditions will be regarded as missing genotypes.''')
-    parser.add_argument('-g', '--group_by', nargs='*',
-        help='''Group variants by fields. If specified, variants will be separated
-            into groups and are tested one by one.''')
-    parser.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
+    filters.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
            help='''Discard samples that match specified conditions within each test
            group (defined by parameter --group_by). Currently only expressions in
            the form of "%%(NA)>p" is providedted to remove samples that have more 100*p
            percent of missing values.''')
-    parser.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
+    filters.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
            help='''Discard variant sites based on specified conditions within each test
            group. Currently only expressions in the form of '%%(NA)>p' is provided to
            remove variant sites that have more than 100*p percent of missing genotypes.
            Note that this filter will be applied after "--discard_samples" is applied,
            if the latter also is specified.''' )
-    parser.add_argument('--to_db', metavar='annoDB',
+    output = parser.add_argument_group('Output of test statistics')
+    output.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')
-    parser.add_argument('--update', action='store_true',
+    output.add_argument('--update', action='store_true',
         help='''When --to_db is specified, allow updating existing fields in the result database''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
