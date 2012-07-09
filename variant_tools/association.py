@@ -138,7 +138,7 @@ def associateArguments(parser):
     tests.add_argument('-g', '--group_by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
-    filters = parser.add_argument_group('Select and filter samples and genotypes.')
+    filters = parser.add_argument_group('Select and filter samples and genotypes')
     filters.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
@@ -713,7 +713,7 @@ class AssoTestsWorker(Process):
         if sum(which) < 5:
             raise ValueError("Insufficient samples for {} to be analyzed.".format(repr(gname)))
         if len(which) - sum(which) > 0:
-            self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {} percent missing genotypes'\
+            self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {}% missing genotypes'\
                     .format(repr(gname), len(which) - sum(which), len(which), self.missing_ind_ge * 100))
         # Step 2: filter variants by genotype missingness at a locus
         keep_loci = []
@@ -730,7 +730,7 @@ class AssoTestsWorker(Process):
             for k in var_info.keys():
                 var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
             #
-            self.logger.debug('In {}, {} out of {} loci will be removed due to having more than {} percent missing genotypes after filtering on samples'\
+            self.logger.debug('In {}, {} out of {} loci will be removed due to having more than {}% missing genotypes after filtering on samples'\
                     .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
         # check for non-triviality of genotype matrix
         if len(genotype[0]) == 0:
