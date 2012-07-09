@@ -121,11 +121,6 @@ def associateArguments(parser):
             cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
-    parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
-            default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 
-            0/1/NA for dominant or recessive model.
-            Default set to quantitative''')
     parser.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
@@ -185,7 +180,7 @@ class AssociationTestManager:
     groups:      a list of groups
     group_names: names of the group
     '''
-    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, moi, methods,
+    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, methods,
         unknown_args, samples, genotypes, group_by, discard_samples, discard_variants):
         self.proj = proj
         self.db = proj.db
@@ -193,7 +188,6 @@ class AssociationTestManager:
         self.var_info = var_info
         self.geno_info = geno_info
         self.genotypes = genotypes
-        self.moi = moi
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -614,13 +608,11 @@ class AssoTestsWorker(Process):
         self.covariates = param.covariates
         self.var_info = param.var_info
         self.geno_info = param.geno_info
-        self.moi = param.moi
         self.tests = param.tests
         self.group_names = param.group_names
         self.missing_ind_ge = param.missing_ind_ge
         self.missing_var_ge = param.missing_var_ge
         self.sample_names = param.sample_names
-        self.moi = param.moi
         self.tests = param.tests
         self.num_extern_tests = param.num_extern_tests
         self.queue = grpQueue
@@ -638,6 +630,10 @@ class AssoTestsWorker(Process):
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True) 
         #
         self.shelves = {}
+        #
+        self.g_na = float('NaN')
+        if runOptions.treat_missing_as_wildtype:
+            self.g_na = 0.0
 
     def __del__(self):
         self.db.close()
@@ -686,7 +682,7 @@ class AssoTestsWorker(Process):
                 # this sample might not have this group at all
                 data = {}
             # handle missing values
-            gtmp = [data.get(x, [float('NaN')]*(len(self.geno_info)+1)) for x in variant_id]
+            gtmp = [data.get(x, [self.g_na] + [float('NaN')]*len(self.geno_info)) for x in variant_id]
             # handle -1 coding (double heterozygotes)
             genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
             #
@@ -740,7 +736,6 @@ class AssoTestsWorker(Process):
     def setGenotype(self, which, data, info):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
-        self.data.setMOI(self.moi)
         for field in info.keys():
             self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
@@ -852,7 +847,7 @@ def associate(args):
             # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.table, args.phenotypes, args.covariates,
-                    args.var_info, args.geno_info, args.moi, args.methods, args.unknown_args,
+                    args.var_info, args.geno_info, args.methods, args.unknown_args,
                     args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
             except ValueError as e:
                 sys.exit(e)
