@@ -806,7 +806,7 @@ class AssoTestsWorker(Process):
                 grpname = None
             if grp is None:
                 break
-            self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
+            # self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
             #
             self.data = t.AssoData()
             self.pydata = {}
@@ -830,7 +830,7 @@ class AssoTestsWorker(Process):
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
                     result = test.calculate()
-                    self.logger.debug('Finished association test on {}'.format(repr(grpname)))
+                    # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except KeyboardInterrupt as e:
                 # die silently if stopped by Ctrl-C
@@ -943,7 +943,7 @@ def associate(args):
                     # update progress bar
                     count = results.completed()
                     prog.update(count, results.failed())
-                    proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+                    # proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
             except KeyboardInterrupt as e:
                 proj.logger.error('\nAssociation tests stopped by keyboard interruption.')
                 results.done()
