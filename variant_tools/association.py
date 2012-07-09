@@ -148,16 +148,16 @@ def associateArguments(parser):
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
     parser.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
-           help='''When -g is specified, will remove samples based on given expression 
-           within each group. Currently special expression '%%(NA)' is provided to remove
-           samples by genotype missingness. For example '%%(NA)>0.1' will remove samples
-           having more than 10%% missing genotypes within a group.''' )
+           help='''Discard samples that match specified conditions within each test
+           group (defined by parameter --group_by). Currently only expressions in
+           the form of "%%(NA)>p" is providedted to remove samples that have more 100*p
+           percent of missing values.''')
     parser.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
-           help='''When -g is specified, will remove variant sites based on given expression 
-           within each group. Currently special expression '%%(NA)' is provided to remove
-           variant sites by genotype missingness. For example '%%(NA)>0.1' will remove loci
-           having more than 10%% missing genotypes within a group. Note that this filter will
-           be applied after "--discard_samples" is applied, if the latter is specified.''' )
+           help='''Discard variant sites based on specified conditions within each test
+           group. Currently only expressions in the form of '%%(NA)>p' is provided to
+           remove variant sites that have more than 100*p percent of missing genotypes.
+           Note that this filter will be applied after "--discard_samples" is applied,
+           if the latter also is specified.''' )
     parser.add_argument('--to_db', metavar='annoDB',
         help='''Name of a database to which results from association tests will be written''')
     parser.add_argument('--update', action='store_true',
