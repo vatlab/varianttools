@@ -165,8 +165,8 @@ class Sample:
                 if len(headers) == 2:
                     raise ValueError('No phenotype to be imported')
             else:
-                raise ValueError('The phenotype file must start with a header line with the first '
-                    'column sample_name, or first two fields being filename and sample_name.')
+                raise ValueError('The phenotype file must be tab delimited, and starts with a header line '
+                    'with the first column sample_name, or first two columns being filename and sample_name.')
             #
             records = {}
             nCol = len(headers)

@@ -3140,9 +3140,9 @@ def show(args):
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'\
                     .format(' '.join([','+x for x in fields[3:]]), limit_clause))
                 for rec in cur:
-                    if args.verbosity != '2' and len(rec[1]) > 20:
+                    if args.verbosity != '2' and len(rec[1]) > 25:
                         rec = list(rec)
-                        rec[1] = '...' + rec[1][-17:]
+                        rec[1] = rec[1][:8] + '...' + rec[1][-14:]
                     print('\t'.join(['{}'.format(x) for x in rec]))
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
