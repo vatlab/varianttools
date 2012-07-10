@@ -153,14 +153,14 @@ class LiftOverTool:
             self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
         del s
         # export existing variants to a temporary file
-        num_variants = self.exportVariantsInBedFormat(os.path.join(runOptions.cache_dir, 'var_in.bed'))
+        num_variants = self.exportVariantsInBedFormat(os.path.join(runOptions.temp_dir, 'var_in.bed'))
         if num_variants == 0:
             return {}
-        self.runLiftOver(os.path.join(runOptions.cache_dir, 'var_in.bed'), chainFile,
-            os.path.join(runOptions.cache_dir, 'var_out.bed'), os.path.join(runOptions.cache_dir, 'unmapped.bed'))           
+        self.runLiftOver(os.path.join(runOptions.temp_dir, 'var_in.bed'), chainFile,
+            os.path.join(runOptions.temp_dir, 'var_out.bed'), os.path.join(runOptions.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(runOptions.cache_dir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(runOptions.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
@@ -173,7 +173,7 @@ class LiftOverTool:
             self.logger.info('{0} records failed to map.'.format(err_count))
         #
         #
-        mapped_file = os.path.join(runOptions.cache_dir, 'var_out.bed')
+        mapped_file = os.path.join(runOptions.temp_dir, 'var_out.bed')
         if flip:
             self.logger.info('Flipping primary and alternative reference genome')
             cur.execute('UPDATE variant SET alt_bin=bin, alt_chr=chr, alt_pos=pos;')
@@ -220,11 +220,11 @@ class LiftOverTool:
         if not chainFile:
             raise RuntimeError('Failed to obtain UCSC chain file {}'.format(chainFile))
         # export existing variants to a temporary file
-        self.runLiftOver(os.path.join(runOptions.cache_dir, 'var_in.bed'), chainFile,
-            os.path.join(runOptions.cache_dir, 'var_out.bed'), os.path.join(runOptions.cache_dir, 'unmapped.bed'))           
+        self.runLiftOver(map_in, chainFile,
+            os.path.join(runOptions.temp_dir, 'var_out.bed'), os.path.join(runOptions.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(runOptions.cache_dir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(runOptions.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
@@ -234,7 +234,7 @@ class LiftOverTool:
                     self.logger.debug(line.rstrip())
                 err_count += 1
         #
-        return os.path.join(runOptions.cache_dir, 'var_out.bed'), err_count
+        return os.path.join(runOptions.temp_dir, 'var_out.bed'), err_count
     
 #
 #

@@ -257,7 +257,7 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 289)
         # 104 records in SAMP1.vcf failed to map to hg19
-        self.assertSucc('vtools import vcf/var_format.vcf --build hg19')
+        self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
         # all records in var_format.vcf are mapped to hg18
         self.assertEqual(numOfSample(), 1+1)
         self.assertEqual(numOfVariant(), 289 + 98)
@@ -271,7 +271,7 @@ class TestImport(ProcessTestCase):
         # it the output is the same
         out1 = outputOfCmd('vtools output variant bin chr pos alt_bin alt_chr alt_pos')
         self.assertSucc('vtools init test -f')
-        self.assertSucc('vtools import vcf/var_format.vcf --build hg19')
+        self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
         self.assertEqual(numOfVariant(), 98)
         self.assertEqual(numOfSample(), 1)
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
