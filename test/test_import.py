@@ -105,10 +105,10 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 11)
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'kaiw\n')
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function' )
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
         self.assertSucc('vtools output variant mut_type')
         # test for importing user specified var_info
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_output txt/annovar.txt.exonic_variant_function --var_info function --force' )
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
         self.assertEqual(len(output2list('vtools select variant "function is not NULL" -o function')), 78)
         # mut_type should not be imported because it is not specified
         self.assertFail('vtools output variant mut_type')
