@@ -3099,7 +3099,7 @@ def show(args):
                 for table in proj.getVariantTables():
                     desc, date, cmd = proj.descriptionOfTable(table) 
                     print('{:<20} {: >10,} {:>8}  {}'.format(table, proj.db.numOfRows(table), date, 
-                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=50))))
+                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
