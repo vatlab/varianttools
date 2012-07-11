@@ -3228,9 +3228,9 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
-                print('\n'.join(['{} {}'.format(test,
-                    '\n'.join(textwrap.wrap(obj.__doc__, initial_indent=' '*(27-len(test)),
-                        subsequent_indent=' '*28))) for test, obj in getAllTests()]))
+                print('\n'.join(['{}{}{}'.format(test, ' '*(22-len(test)),
+                    '\n'.join(textwrap.wrap(obj.__doc__, initial_indent=' '*22, width=78,
+                        subsequent_indent=' '*22))[22:]) for test, obj in getAllTests()]))
             elif args.type == 'test':
                 from .association import getAllTests
                 if len(args.items) == 0:
