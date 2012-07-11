@@ -3072,7 +3072,7 @@ def remove(args):
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test'], nargs='?', default='project',
+        'tests', 'test', 'runtime_options'], nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
@@ -3082,8 +3082,9 @@ def showArguments(parser):
             databases, 'annotation ANN' for details about annotation database ANN,
             'formats' for all supported import and export formats, 'format FMT' for
             details of format FMT, 'tests' for a list of all association tests, and
-            'test TST' for details of an association test TST. The default parameter
-            of this command is 'project'.''')
+            'test TST' for details of an association test TST, 'runtime_options'
+            for a list of runtime options and their descriptions. The default 
+            parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be names of tables for type 'table',
             name of an annotation database for type 'annotation', name of a format
@@ -3250,11 +3251,18 @@ def show(args):
                     raise ValueError('Unrecognized test name {}. A list of tests can be obtained from command "vtools show tests"'.format(args.items[0]))
                 # test
                 test = [y for x,y in tests if x.lower() == args.items[0].lower()][0]
-                print 'Name:          {}'.format(args.items[0])
-                print 'Description:   {}'.format('\n'.join(textwrap.wrap(test.__doc__, initial_indent='',
-                        subsequent_indent=' '*15)))
+                print('Name:          {}'.format(args.items[0]))
+                print('Description:   {}'.format('\n'.join(textwrap.wrap(test.__doc__, initial_indent='',
+                        subsequent_indent=' '*15))))
                 # create an instance of the test and pass -h to it
                 test(1, None, ['-h']) 
+            elif args.type == 'runtime_options':
+                for opt, (def_value, description) in runOptions.persistent_options.iteritems():
+                    val = str(getattr(runOptions, opt))
+                    print('{}{}{} {}'.format(opt, ' '*(27-len(opt)), val,
+                        '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
+                    print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
+                        subsequent_indent=' '*27)))
     except Exception as e:
         sys.exit(e)
 

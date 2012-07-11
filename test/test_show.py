@@ -80,6 +80,8 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show tests')
         self.assertSucc('vtools show test CollapseBT')
         self.assertFail('vtools show tests CollapseBT')
+        # show runtime options
+        self.assertSucc('vtools show runtime_options')
 
 
 if __name__ == '__main__':

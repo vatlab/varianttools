@@ -65,30 +65,45 @@ class RuntimeOptions(object):
 
     def __init__(self):
         # these options could be set persistently
-        self.persistent_options = [
-            'logfile_verbosity',
-            'verbosity',
-            'sqlite_pragma',
-            'import_num_of_readers',
+        self.persistent_options = {
+            'logfile_verbosity': ('2', 'Verbosity level of the log file, can be 0 for warning '
+                'and error only, 1 for general information, or 2 for general and debug information.'),
+            'verbosity': ('1', 'Default verbosity level (to the standard output) of the project. '
+                'This option can be set during vtools init where the verbosity level set by option'
+                ' --verbosity will be set as the project default.'),
+            'sqlite_pragma': ('synchronous=OFF,default_cache_size=2000', 'If your project uses a '
+                'sqlite database engine, you can optimize its performance by setting appropriate '
+                'pragma, which will be applied to all opened database connections.'),
+            'import_num_of_readers': (2, 'variant tools by default uses two processes to read from '
+                'input files during multi-process importing (--jobs > 0). You can want to set it '
+                'to zero if a single process provides better performance or reduces disk traffic.'),
             # a temporary directory that is used to store temporary files. Will be
             # cleared after project is closed.
-            'temp_dir',
-        ]
+            'temp_dir': (None, 'Use the specified temporary directory to store temporary files '
+                'to improve performance (use separate disks for project and temp files), or '
+                'avoid problems due to insufficient disk space.'),
+            'treat_missing_as_wildtype': (False, 'Treat missing values as wildtype alleles for '
+                'association tests. This option is used when samples are called individuals or '
+                'in batch so genotypes for some samples are ignored and treated as missing if '
+                'they consist of all wildtype alleles. This option should be used with caution '
+                'because it convert real missing genotypes and genotypes removed due to, for '
+                'example low quality score, to wildtype genotypes.'),
+        }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
-        #
-        self._logfile_verbosity = '2'
-        self._verbosity = '1'
-        # default sqlite pragma
-        self._sqlite_pragma = ['synchronous=OFF', 'default_cache_size=2000']
-        # number of processes used for reader under multi-processing mode
-        self._import_num_of_readers = 2
         # path to the project cache
         self._cache_dir = 'cache'
+        #
+        self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
+        self._verbosity = self.persistent_options['verbosity'][0]
+        # default sqlite pragma
+        self._sqlite_pragma = self.persistent_options['sqlite_pragma'][0].split(',')
+        # number of processes used for reader under multi-processing mode
+        self._import_num_of_readers = self.persistent_options['import_num_of_readers'][0]
         # path to a temporary directory, will be allocated automatically.
-        self._temp_dir = None
+        self._temp_dir = self.persistent_options['temp_dir'][0]
         # how to handle missing data
-        self._treat_missing_as_wildtype = False
+        self._treat_missing_as_wildtype = self.persistent_options['treat_missing_as_wildtype'][0]
     #
     # attribute command line
     #
