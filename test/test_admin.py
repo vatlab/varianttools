@@ -31,42 +31,65 @@ from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, getGen
 
 class TestAdmin(ProcessTestCase):
 
-     def setUp(self):
-         'Create a project'
-         runCmd('vtools init test -f')
+    def setUp(self):
+        'Create a project'
+        runCmd('vtools init test -f')
 
-     def removeProj(self):
-         runCmd('vtools remove project')
+    def removeProj(self):
+        runCmd('vtools remove project')
 
-     def TestMerge_SameTable(self):
-         'Test command admin'
-         self.assertFail('vtools admin')
-         self.assertSucc('vtools admin -h')
-         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
-         self.assertEqual(numOfSample(), 60)
-         self.assertEqual(numOfVariant(),288)
-         self.assertSucc('vtools admin --rename_samples \'sample_name like "%NA069%"\' NA06900')
-         #could not merge them together if they are from the same table.
-         self.assertFail('vtools admin --merge_samples')
+    def testMergeSamples(self):
+        'Test command vtools admin --merge_samples'
+        self.assertFail('vtools admin')
+        self.assertSucc('vtools admin -h')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertEqual(numOfSample(), 60)
+        self.assertEqual(numOfVariant(),288)
+        self.assertSucc('vtools admin --rename_samples \'sample_name like "%NA069%"\' NA06900')
+        #could not merge them together if they are from the same table.
+        self.assertFail('vtools admin --merge_samples')
+        # Test command vtools admin --merge_samples'
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
+        self.assertEqual(numOfVariant(),577)
+        self.assertEqual(numOfSample(), 61)
+        runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
+        self.assertEqual(numOfSample(), 61)
+        runCmd('vtools admin --merge_samples')         
+        self.assertEqual(numOfVariant(),577)
+        self.assertEqual(numOfSample(), 60)
+        # Test merge samples with overlapping variants
+        runCmd('vtools init test -f')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+        self.assertSucc('vtools import vcf/SAMP1.vcf  --build hg18')
+        self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
+        self.assertFail('vtools admin --merge_samples')
+        #the reason is that the two samepls have some identical variants. If you want to merge them, the samples should have different unique variant information.
 
-     def TestMerge_DiffTable(self):
-         'Test command admin'
-         runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
-         runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
-         self.assertEqual(numOfVariant(),577)
-         self.assertEqual(numOfSample(), 61)
-         runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
-         self.assertEqual(numOfSample(), 61)
-         runCmd('vtools admin --merge_samples')         
-         self.assertEqual(numOfVariant(),577)
-         self.assertEqual(numOfSample(), 60)
+    def testRenameTable(self):
+        'test rename tables'
+        # FIXME: fail: rename master variant table
+        # FIXME: fail: rename to existing table
+        # FIXME: fail: rename to table with leading underscore
+        # FIXME: test vtools show tables output
+        # FIXME: test date and description of renamed table should not change
+        pass
 
-     def TestMerge_DiffTableFail(self):
-         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
-         self.assertSucc('vtools import vcf/SAMP1.vcf  --build hg18')
-         self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
-         self.assertFail('vtools admin --merge_samples')
-         #the reason is that the two samepls have some identical variants. If you want to merge them, the samples should have different unique variant information.
+    def testDescribeTable(self):
+        'test describe tables'
+        # FIXME: fail, describe non-existing table
+        # FIXME: test changed description
+        # FIXME: data of table should not change
+        pass
+
+    def testRuntimeOption(self):
+        'test set runtime options'
+        # FIXME: test for valid options
+        # FIXME: test for value of options -- for whatever value, vtools should be able to load the project
+        # FIXME: test for non-exist temp_dir
+        # FIXME: test for sqlite_pragma
+        pass
 
 if __name__ == '__main__':
     unittest.main()
