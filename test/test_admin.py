@@ -91,5 +91,12 @@ class TestAdmin(ProcessTestCase):
         # FIXME: test for sqlite_pragma
         pass
 
+    def testResetRuntimeOption(self):
+        'test reset runtime options'
+        # FIXME: fail no OPT
+        # FIXME: fail invalid OPT
+        # FIXME: set and rest sqlite_pragma, use vtools show to check
+        pass
+        
 if __name__ == '__main__':
     unittest.main()

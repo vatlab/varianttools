@@ -1098,6 +1098,14 @@ class Project:
             pass
         self.db.commit()
 
+    def removeProperty(self, key):
+        cur = self.db.cursor()
+        try:
+            cur.execute('DELETE FROM project WHERE name={};'.format(self.db.PH), (key,))
+        except Exception as e:
+            pass
+        self.db.commit()
+
     def remove(self):
         '''Remove the current project'''
         # step 1: remove database
@@ -3298,9 +3306,11 @@ def adminArguments(parser):
     options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
         options. The default values of these options were chosen to fit most usage
-        patterns but tweaking them might provide better performance under some certain
-        circumstances. Please check the variant tools website for a list of supported
-        options.''')
+        patterns but tweaking them might provide better performance under certain
+        circumstances. Please use command "vtools show runtime_options" to list
+        all currently supported runtime options.''')
+    options.add_argument('--reset_runtime_option', metavar='OPT',
+        help='''Reset value to a runtime option to its default value.''')
 
 
 def admin(args):
@@ -3347,6 +3357,11 @@ def admin(args):
                         raise ValueError('Only options {} are currently supported.'.format(', '.join(runOptions.persistent_options)))
                     proj.saveProperty('__option_{}'.format(opt), value)
                     proj.logger.info('Option {} is set to {}'.format(opt, value))
+            elif args.reset_runtime_option is not None:
+                if args.reset_runtime_option not in runOptions.persistent_options:
+                    raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.''')
+                proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
+                proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
