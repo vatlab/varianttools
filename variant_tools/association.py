@@ -696,7 +696,8 @@ class AssoTestsWorker(Process):
                 geno_info[key].append([x[idx+1] for x in gtmp])
         #
         # filter samples/variants for missingness
-        return self.filterGenotype(genotype, geno_info, var_info, ', '.join(group))
+        gname = ', '.join(list(map(str, group)))
+        return self.filterGenotype(genotype, geno_info, var_info, gname)
 
     def filterGenotype(self, genotype, geno_info, var_info, gname):
         '''
