@@ -217,19 +217,26 @@ class AssociationTestManager:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
         #
+        # We automatically index genotypes before when we retrieve genotypes for each group.
+        # With the new load genotype method, genotypes are loaded in batch so genotypes do not
+        # help that much. Because creating indexes are slow and take a lot of disk space, we
+        # disable auto-indexing for this command. If the user are going to run this command
+        # a lot, they can create indexes explicitly using command 'vtools admin --index_genotypes'
+        #
+        #
         # step 5: indexes genotype tables if needed
-        proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
-        unindexed_IDs = []
-        for id in self.sample_IDs:
-            if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
-                unindexed_IDs.append(id)
-        if unindexed_IDs:
-            cur = proj.db.cursor()
-            prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
-            for idx, ID in enumerate(unindexed_IDs):
-                cur.execute('CREATE INDEX __fromGeno.genotype_{0}_index ON genotype_{0} (variant_id ASC)'.format(ID))
-                prog.update(idx + 1)
-            prog.done()
+        # proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
+        # unindexed_IDs = []
+        # for id in self.sample_IDs:
+        #     if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
+        #         unindexed_IDs.append(id)
+        # if unindexed_IDs:
+        #     cur = proj.db.cursor()
+        #     prog = ProgressBar('Indexing genotypes', len(unindexed_IDs))
+        #     for idx, ID in enumerate(unindexed_IDs):
+        #         cur.execute('CREATE INDEX __fromGeno.genotype_{0}_index ON genotype_{0} (variant_id ASC)'.format(ID))
+        #         prog.update(idx + 1)
+        #     prog.done()
         #
         # step 6: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
