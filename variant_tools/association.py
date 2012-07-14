@@ -217,8 +217,8 @@ class AssociationTestManager:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
         #
-        # We automatically index genotypes before when we retrieve genotypes for each group.
-        # With the new load genotype method, genotypes are loaded in batch so genotypes do not
+        # We automatically index genotypes before when we retrieved genotypes for each group.
+        # With the new load genotype method, genotypes are loaded in batch so indexing does not
         # help that much. Because creating indexes are slow and take a lot of disk space, we
         # disable auto-indexing for this command. If the user are going to run this command
         # a lot, they can create indexes explicitly using command 'vtools admin --index_genotypes'
