@@ -972,6 +972,8 @@ def associate(args):
             # tells the maintenance process to stop
             maintenance_flag.value = 0
             # wait for the maitenance process to stop
+            s = delayedAction(proj.logger.info, "Maintaining database. This might take a few minutes.", delay=10)
             maintenance.join()
+            del s
     except Exception as e:
         sys.exit(e)
