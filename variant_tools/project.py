@@ -39,6 +39,7 @@ import threading
 import Queue
 import time
 import re
+from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
@@ -1901,6 +1902,52 @@ class Project:
                     raise ValueError('Database does not define any reference genome.')
         raise ValueError('Failed to locate field {}'.format(field))
         
+
+class MaintenanceProcess(Process):
+    '''This class starts a separate process to tune the database, e.g.
+    create indexes for genotypes. When active_flag is false, it will
+    exit itself.'''
+    def __init__(self, proj, active_flag):
+        Process.__init__(self)
+        self.name = proj.name
+        self.logger = proj.logger
+        self.active_flag = active_flag
+
+    def createIndexes(self):
+        try:
+            db = DatabaseEngine()
+            db.connect('{}_genotype.DB'.format(self.name))
+            cur = db.cursor()
+            # get all tables, this is sqlite specific, and genotype table specific
+            cur.execute('SELECT name FROM sqlite_master WHERE type="table" AND name LIKE "genotype_%"')
+            all_indexes = set([x[0] + '_index' for x in cur.fetchall()])
+            cur.execute('SELECT name FROM sqlite_master WHERE type="index" AND name LIKE "genotype_%"')
+            cur_indexes = set([x[0] for x in cur.fetchall()])
+            missing_indexes = all_indexes - cur_indexes
+            if len(missing_indexes) == 0:
+                return
+        except KeyboardInterrupt as e:
+            # interrupted just return, nothing harmful is done.
+            db.close()
+            return
+        #
+        self.logger.debug('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
+        try:
+            for idx in missing_indexes:
+                if not self.active_flag.value:
+                    break
+                cur.execute('CREATE INDEX {0} ON {1} (variant_id)'.format(idx, idx[:-6]))
+                db.commit()
+        except KeyboardInterrupt as e:
+            # if keyboard interrupt, stop, but not immediately
+            self.active_flag.value = 0
+        finally:
+            # make sure the database is properly closed...
+            db.commit()
+            db.close()
+
+    def run(self):
+        self.createIndexes()
 
 class ProjCopier:
     def __init__(self, proj, dir, vtable, samples, genotypes):

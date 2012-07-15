@@ -36,7 +36,7 @@ except:
     # python 3 has pickle
     import pickle
 
-from .project import Project, Field, AnnoDB, AnnoDBWriter
+from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
 from .phenotype import Sample
 from .tester import *
@@ -217,6 +217,8 @@ class AssociationTestManager:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
         #
+        proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
+        #
         # We automatically index genotypes before when we retrieved genotypes for each group.
         # With the new load genotype method, genotypes are loaded in batch so indexing does not
         # help that much. Because creating indexes are slow and take a lot of disk space, we
@@ -225,7 +227,6 @@ class AssociationTestManager:
         #
         #
         # step 5: indexes genotype tables if needed
-        # proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         # unindexed_IDs = []
         # for id in self.sample_IDs:
         #     if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
@@ -910,7 +911,10 @@ def associate(args):
                 proj.close()
                 sys.exit(1)
             prog.done()
-            #
+            # step 1.5, start a maintenance process to create indexes, if needed.
+            maintenance_flag = Value('i', 1)
+            maintenance = MaintenanceProcess(proj, maintenance_flag)
+            maintenance.start()
             # step 2: workers work on genotypes
             # the group queue is used to send groups
             grpQueue = Queue()
@@ -965,5 +969,9 @@ def associate(args):
             # use the result database in the project
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+            # tells the maintenance process to stop
+            maintenance_flag.value = 0
+            # wait for the maitenance process to stop
+            maintenance.join()
     except Exception as e:
         sys.exit(e)
