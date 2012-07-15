@@ -1907,13 +1907,18 @@ class MaintenanceProcess(Process):
     '''This class starts a separate process to tune the database, e.g.
     create indexes for genotypes. When active_flag is false, it will
     exit itself.'''
-    def __init__(self, proj, active_flag):
+    def __init__(self, proj, jobs, active_flag):
         Process.__init__(self)
         self.name = proj.name
         self.logger = proj.logger
+        if not jobs:  # if no job is specified
+            self.jobs = {'genotype_index': []}
+        else:
+            self.jobs = jobs
         self.active_flag = active_flag
 
-    def createIndexes(self):
+    def createIndexes(self, sample_IDs):
+        # specified IDs will have high priority to be handled
         try:
             db = DatabaseEngine()
             db.connect('{}_genotype.DB'.format(self.name))
@@ -1933,7 +1938,9 @@ class MaintenanceProcess(Process):
         #
         self.logger.debug('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
         try:
-            for idx in missing_indexes:
+            # we process IDs in sample_IDs first ...
+            for idx in [x for x in missing_indexes if int(x[9:-6]) in sample_IDs] + \
+                [x for x in missing_indexes if int(x[9:-6]) not in sample_IDs]:
                 if not self.active_flag.value:
                     break
                 cur.execute('CREATE INDEX {0} ON {1} (variant_id)'.format(idx, idx[:-6]))
@@ -1947,7 +1954,8 @@ class MaintenanceProcess(Process):
             db.close()
 
     def run(self):
-        self.createIndexes()
+        if 'genotype_index' in self.jobs:
+            self.createIndexes(set(self.jobs['genotype_index']))
 
 class ProjCopier:
     def __init__(self, proj, dir, vtable, samples, genotypes):

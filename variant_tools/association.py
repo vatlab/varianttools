@@ -913,7 +913,7 @@ def associate(args):
             prog.done()
             # step 1.5, start a maintenance process to create indexes, if needed.
             maintenance_flag = Value('i', 1)
-            maintenance = MaintenanceProcess(proj, maintenance_flag)
+            maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
             maintenance.start()
             # step 2: workers work on genotypes
             # the group queue is used to send groups
