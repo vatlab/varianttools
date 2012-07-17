@@ -422,7 +422,7 @@ class AssociationTestManager:
         query = 'INSERT INTO __fromGeno.__asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(
             self.table, group_fields,
             self.from_clause, self.where_clause)
-        s = delayedAction(self.logger.info, "Grouping variants by {}, please be patient ...".format(', '.join(group_by)))
+        s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".format(':'.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
@@ -439,7 +439,7 @@ class AssociationTestManager:
         #
         # the output can be too long
         #
-        #self.logger.debug('Group by: {}'.format(', '.join(map(str, groups))))
+        #self.logger.debug('Group by: {}'.format(':'.join(map(str, groups))))
         return field_names, field_types, groups
 
 
@@ -704,7 +704,7 @@ class AssoTestsWorker(Process):
                 geno_info[key].append([x[idx+1] for x in gtmp])
         #
         # filter samples/variants for missingness
-        gname = ', '.join(list(map(str, group)))
+        gname = ':'.join(list(map(str, group)))
         return self.filterGenotype(genotype, geno_info, var_info, gname)
 
     def filterGenotype(self, genotype, geno_info, var_info, gname):
@@ -810,7 +810,7 @@ class AssoTestsWorker(Process):
             grp = self.queue.get()
             #
             try:
-                grpname = ", ".join(map(str, grp))
+                grpname = ":".join(map(str, grp))
             except TypeError:
                 grpname = None
             if grp is None:
@@ -911,6 +911,8 @@ def associate(args):
                 proj.close()
                 sys.exit(1)
             prog.done()
+            for loader in loaders:
+                loader.join()
             # step 1.5, start a maintenance process to create indexes, if needed.
             maintenance_flag = Value('i', 1)
             maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
