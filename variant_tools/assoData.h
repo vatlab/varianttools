@@ -56,6 +56,7 @@ private:
 	typedef std::map<std::string, vectorf> ArrayVars;
 	typedef std::map<std::string, vectori> IntArrayVars;
 	typedef std::map<std::string, matrixf> MatrixVars;
+	typedef std::map<std::string, std::string> StringVars;
 
 public:
 	/*
@@ -79,6 +80,7 @@ public:
 	 *  DoubleVar ybar: mean(m_phenotype)
 	 *  intVar ncases: number of cases for case/ctrl data
 	 *  intVar nctrls: number of ctrls for case/ctrl data
+	 *  stringVar gname: association group name
 	 */
 
 	AssoData() :
@@ -86,7 +88,7 @@ public:
 		m_X(0), m_genotype_id(0), m_genotype_index(0),
 		m_pval(0), m_statistic(0), m_se(0), m_model(),
 		m_doubleVars(), m_intVars(), m_arrayVars(),
-		m_intArrayVars(), m_matrixVars()
+		m_intArrayVars(), m_matrixVars(), m_stringVars()
 	{
 	}
 
@@ -373,13 +375,21 @@ public:
 	}
 
 
+	// store a string value with name 'name'
+	void setVar(const string & name, const string value)
+	{
+		m_stringVars[name] = value;
+	}
+
+
 	bool hasVar(const string & name)
 	{
 		return (m_doubleVars.find(name) != m_doubleVars.end() ||
 		        m_arrayVars.find(name) != m_arrayVars.end() ||
 		        m_intArrayVars.find(name) != m_intArrayVars.end() ||
 		        m_intVars.find(name) != m_intVars.end() ||
-		        m_matrixVars.find(name) != m_matrixVars.end());
+		        m_matrixVars.find(name) != m_matrixVars.end() ||
+		        m_stringVars.find(name) != m_stringVars.end());
 	}
 
 
@@ -433,6 +443,16 @@ public:
 	}
 
 
+	string getStringVar(const string & name)
+	{
+		StringVars::iterator it = m_stringVars.find(name);
+
+		if (it == m_stringVars.end())
+			throw ValueError("No string variable with name " + name + " can be found");
+		return it->second;
+	}
+
+
 private:
 	/// raw phenotype and gneotype data
 	vectorf m_phenotype;
@@ -463,6 +483,7 @@ private:
 	IntArrayVars m_intArrayVars;
 	//
 	MatrixVars m_matrixVars;
+	StringVars m_stringVars;
 };
 
 }

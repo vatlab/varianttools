@@ -80,6 +80,12 @@ class NullTest:
     def setData(self, data, pydata):
         self.data = data.clone()
         self.pydata = pydata
+        if self.data.hasVar("gname"):
+            self.gname = self.data.getStringVar("gname")
+        elif "name" in self.pydata.keys():
+            self.gname = self.pydata["name"]
+        else:
+            pass
 
     def calculate(self):
         return []
@@ -121,14 +127,24 @@ class GroupStat(NullTest):
         # do not clone data because this test does not change data
         self.data = data
         self.pydata = pydata
+        if self.data.hasVar("gname"):
+            self.gname = self.data.getStringVar("gname")
+        elif "name" in self.pydata.keys():
+            self.gname = self.pydata["name"]
+        else:
+            pass
 
     def calculate(self):
         res = []
         for field in self.fields:
-            if field.name == 'num_variants':
-                res.append(self.data.locicounts())
-            elif field.name == 'sample_size':
-                res.append(self.data.samplecounts())
+            try:
+                if field.name == 'num_variants':
+                    res.append(self.data.locicounts())
+                elif field.name == 'sample_size':
+                    res.append(self.data.samplecounts())
+            except Exception as e:
+                self.logger.debug("Exception captured from association test {} while processing {}: {}".format(self.__class__.__name__, self.gname, e))
+                res.append(float('nan'))
         return res
 
 #
@@ -1543,7 +1559,6 @@ class ExternTest(NullTest):
     def dump_data(self, dformat, tdir):
         if not self.pydata:
             raise ValueError("Python data dictionary is empty")
-        self.gname = self.pydata['name']
         if dformat == 'w':
             nvar = len(self.pydata['genotype'][0])
             nsample = len(self.pydata['genotype'])

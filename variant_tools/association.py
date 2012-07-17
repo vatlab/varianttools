@@ -749,9 +749,10 @@ class AssoTestsWorker(Process):
             raise ValueError("Insufficient variants for {} to be analyzed.".format(repr(gname)))
         return genotype, which, var_info, geno_info
 
-    def setGenotype(self, which, data, info):
+    def setGenotype(self, which, data, info, grpname):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
+        self.data.setVar("gname", str(grpname))
         for field in info.keys():
             self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
@@ -831,7 +832,7 @@ class AssoTestsWorker(Process):
                 # 
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
-                    self.setGenotype(which, genotype, geno_info)
+                    self.setGenotype(which, genotype, geno_info, grpname)
                     self.setPhenotype(which)
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
