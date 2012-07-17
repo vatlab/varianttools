@@ -1847,12 +1847,9 @@ class ScoreSeq(ExternTest):
 
     def _determine_algorithm(self):
         if hasattr(self, 'MAFL'):
-            self.Sargs = '{0} -noRare -com {1} -ofileC {2} '.format(self.getSCORE_Seq(), self.MAFL, 
-                    os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)))
+            self.Sargs = '{0} -noRare -com {1} '.format(self.getSCORE_Seq(), self.MAFL)
         else:
-            self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} -ofile {4} -vtlog {5} '.format(self.getSCORE_Seq(),
-                    self.MAF, self.MAC, self.CR, os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)),
-                    os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
+            self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.getSCORE_Seq(), self.MAF, self.MAC, self.CR)
             if self.resample:
                 if not self.EREC:
                     raise ValueError("Please specify --EREC 1 or 2")
@@ -1897,9 +1894,14 @@ class ScoreSeq(ExternTest):
 
     def calculate(self):
         self.dump_data(dformat='w', tdir=runOptions.temp_dir)
-        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3} ".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_msg.log'.format(self.gname)))
+        if hasattr(self, 'MAFL'):
+            self.gSargs += " -ofileC {}".format(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)))
+        else:
+            self.gSargs += " -ofile {} -vtlog {} ".format(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)),
+                    os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
         except:
