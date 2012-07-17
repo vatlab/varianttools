@@ -1729,7 +1729,14 @@ class ScoreSeq(ExternTest):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, logger, *method_args)
         # set fields name for output database
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+        if hasattr(self, 'MAFL'):
+            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='SNV_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
+                        Field(name='SNV_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
+                        Field(name='SNV_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
+        else:
+            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
                         Field(name='T1_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
                         Field(name='T5_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
                         Field(name='Fp_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
@@ -1758,6 +1765,7 @@ class ScoreSeq(ExternTest):
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
         self.logger.debug("Running command {0}".format(self.Sargs))
+
 
     def getSCORE_Seq(self):
         '''Obtain the SCORE_Seq tool, download from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/ if needed.'''
@@ -1789,25 +1797,28 @@ class ScoreSeq(ExternTest):
             except Exception as e:
                 raise RuntimeError('Failed to download SCORE-Seq from {}. Please check the URL or manually download the program: {}'.format(SCORE_Seq_URL, e))
         return SCORE_Seq_Exe
-       
+
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
             conducting a number of association tests for each SNP-set (gene).
             This is a wrapper for the Linux based SCORE-Seq program implemented & maintained by Dr. Danyu Lin, with a similar
-            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. Although single variant
-            test is available in SCORE-Seq, we will not provide the interface here (its equivalent 'vtools associate' command is 
-            the 'LinRegBurden' option without using --group_by).
+            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. 
             To use this test you should have the SCORE-Seq program on your computer; otherwise the program will be downloaded.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
-        parser.add_argument('--name', default='ScoreSeq',
-            help='''Name of the test that will be appended to names of output fields, usually used to
-                differentiate output of different tests, or the same test with different parameters.''')
-        #
-        # arguments that are used by ScoreSeq
-        #
-        parser.add_argument('--dominant', action='store_true',
-            help='''Use the dominant instead of the additive model.''')
+        subparsers = parser.add_subparsers(title='subcommands')
+        parser_a = subparsers.add_parser('aggregated', help='''Aggregated analysis of rare variants using SCORE-Seq''')
+        self.aggregatedArgs(parser_a)
+        self.addCommonArgs(parser_a)
+        parser_s = subparsers.add_parser('single', help='''Single SNV analysis of common variants using SCORE-Seq''')
+        self.singleArgs(parser_s)
+        self.addCommonArgs(parser_s)
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+    def aggregatedArgs(self, parser):
         parser.add_argument('--MAF', type=freq, default=0.05,
             help='''Specify the MAF upper bound, which is any number between 0 and 1. Default set to 0.05''')
         parser.add_argument('--MAC', type=int, default=1.0,
@@ -1818,33 +1829,49 @@ class ScoreSeq(ExternTest):
             help='''Turn on resampling and specify the maximum number of resamples. If R is set to -1, then the default of 1 million resamples is applied; otherwise, R should be an integer between 1 million and 100 millions. In the latter case, the software will perform resampling up to R times for any resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
             help='''Specify the constant delta for the EREC test. 1 for binary trait; 2 for standardized continuous trait. This option is effective only when resampling is turned on.''')
+
+    def addCommonArgs(self, parser):
+        parser.add_argument('--name', default='ScoreSeq',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        parser.add_argument('--dominant', action='store_true',
+            help='''Use the dominant instead of the additive model.''')
         parser.add_argument('--archive', metavar='DIR', type=str,
             help='''If this option is specified, a zip file will be created for each gene, which will archive the input/output file of the SCORE-Seq analysis and write to DIR, at the expense of
                     additional disk I/O burden and storage.''')
 
-        # incorporate args to this class
-        args = parser.parse_args(method_args)
-        self.__dict__.update(vars(args))
+    def singleArgs(self, parser):
+        parser.add_argument('--MAFL', type=freq, default = 0.0,
+            help='''Specify the MAF lower bound, which is any number between 0 and 1. Default set to 0.0''')
 
 
     def _determine_algorithm(self):
-        self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} '.format(self.getSCORE_Seq(), self.MAF, self.MAC, self.CR)
-        if self.resample:
-            if not self.EREC:
-                raise ValueError("Please specify --EREC 1 or 2")
-            self.Sargs += '-resample {0} -EREC {1} '.format(self.resample, self.EREC)
+        if hasattr(self, 'MAFL'):
+            self.Sargs = '{0} -noRare -com {1} -ofileC {2} '.format(self.getSCORE_Seq(), self.MAFL, 
+                    os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)))
+        else:
+            self.Sargs = '{0} -MAF {1} -MAC {2} -CR {3} -ofile {4} -vtlog {5} '.format(self.getSCORE_Seq(),
+                    self.MAF, self.MAC, self.CR, os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)),
+                    os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
+            if self.resample:
+                if not self.EREC:
+                    raise ValueError("Please specify --EREC 1 or 2")
+                self.Sargs += '-resample {0} -EREC {1} '.format(self.resample, self.EREC)
         if self.dominant:
             self.Sargs += '-dominant '
 
     def _process_output(self):
         # parse output
-        self.colnames = ["T1_P","T5_P","Fp_P","VT_P","T1_R","T5_R","Fp_R","VT_R","EREC_R","T1_U","T1_V","T1_Z","T5_U","T5_V","T5_Z","Fp_U","Fp_V","Fp_Z"]
+        if hasattr(self, 'MAFL'):
+            self.colnames = ["pvalue", "SNV_U", "SNV_V", "SNV_Z"]
+        else:
+            self.colnames = ["T1_P","T5_P","Fp_P","VT_P","T1_R","T5_R","Fp_R","VT_R","EREC_R","T1_U","T1_V","T1_Z","T5_U","T5_V","T5_Z","Fp_U","Fp_V","Fp_Z"]
         self.stats = {}
         for item in self.colnames:
             self.stats[item] = float('nan')
         fail = None
         try:
-            with open(os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), 'r') as f:
+            with open(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)), 'r') as f:
                 colnames = [x for x in f.readline().split()[1:]]
                 stats = [float(x) if not x == "NA" else float('nan') for x in f.readline().split()[1:]]
             for (x,y) in zip(colnames, stats):
@@ -1870,9 +1897,8 @@ class ScoreSeq(ExternTest):
 
     def calculate(self):
         self.dump_data(dformat='w', tdir=runOptions.temp_dir)
-        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -ofile {3} -vtlog {4} -msglog {5}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3}".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
-                os.path.join(runOptions.temp_dir, '{0}_rare.out'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_msg.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
