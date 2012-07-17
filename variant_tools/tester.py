@@ -1737,10 +1737,10 @@ class ScoreSeq(ExternTest):
                         Field(name='SNV_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
         else:
             self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='T1_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='T5_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='Fp_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='VT_P', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_T1', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_T5', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_Fp', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_VT', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
                         Field(name='T1_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
                         Field(name='T5_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
                         Field(name='Fp_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
