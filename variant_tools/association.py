@@ -216,6 +216,9 @@ class AssociationTestManager:
                 for test in self.tests:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
+        # step 4-1: check if 'SSeq_common' is valid to use
+        if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
+            raise ValueError("SSeq_common method cannot be used with --group_by/-g")
         #
         proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         #
