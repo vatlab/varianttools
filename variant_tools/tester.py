@@ -503,6 +503,12 @@ class GLMBurdenTest(NullTest):
             pass
         else:
             raise ValueError('Invalid weighting theme {0}'.format(self.weight))
+        # re-define direction of tests for weighted sum tests
+        # by default will be set to 1 so that it works for 'Browning, KBAC and RBT'
+        # for Browning_all and no weighting theme, would want to use the original alternative
+        w_alternative = 1
+        if self.weight in ['Browning_all', 'None']:
+            w_alternative = self.alternative
         # data pre-processing
         algorithm = t.AssoAlgorithm([
             # code genotype matrix by MOI being 0 1 or 2
@@ -563,10 +569,7 @@ class GLMBurdenTest(NullTest):
                     algorithm.append(a_scoregene)
                 a_permutationtest = t.FixedPermutator(
                         self.permute_by,
-                        # FIXME: logic is correct yet confusing here
-                        # use self.alternative = 2 for Browning_all only
-                        # because it resets a_wtimes to 1
-                        1 if a_wtimes == 2 else self.alternative,
+                        w_alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester if a_wtester else a_regression]
@@ -575,7 +578,7 @@ class GLMBurdenTest(NullTest):
             else:
                 a_permutationtest = t.VariablePermutator(
                         self.permute_by,
-                        1 if a_wtimes == 2 else self.alternative,
+                        w_alternative,
                         self.permutations,
                         self.adaptive,
                         [a_wtester] if a_wtester else [a_scoregene, a_regression]
