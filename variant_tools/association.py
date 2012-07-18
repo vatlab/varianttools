@@ -361,9 +361,9 @@ class AssociationTestManager:
             if str(e).startswith('Invalid (non-numeric) coding'):
                 raise ValueError(e)
             else:
-                raise ValueError('Failed to retrieve phenotype {} {}. Please use command '
+                raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
                     '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno),
-                    '' if covar is None else (' and/or covariate' + ', '.join(covar))))
+                    '' if not covar else (' and/or covariate' + ', '.join(covar))))
 
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''

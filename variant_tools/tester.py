@@ -143,7 +143,7 @@ class GroupStat(NullTest):
                 elif field.name == 'sample_size':
                     res.append(self.data.samplecounts())
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -371,7 +371,7 @@ class CaseCtrlBurdenTest(NullTest):
                     if math.isnan(z): res.append(z)
                     else: res.append(int(z))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -604,7 +604,7 @@ class GLMBurdenTest(NullTest):
                     if math.isnan(z): res.append(z)
                     else: res.append(int(z))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -1743,7 +1743,7 @@ class SKAT(ExternTest):
             # res: (sample_size, pvalue, stat, pvalue.adj)
             res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -1928,7 +1928,7 @@ class ScoreSeq(ExternTest):
             self._process_output()
             res.extend([x for x in [self.stats[y] for y in self.colnames]])
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
