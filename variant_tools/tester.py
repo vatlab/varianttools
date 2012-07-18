@@ -136,15 +136,15 @@ class GroupStat(NullTest):
 
     def calculate(self):
         res = []
-        for field in self.fields:
-            try:
+        try:
+            for field in self.fields:
                 if field.name == 'num_variants':
                     res.append(self.data.locicounts())
                 elif field.name == 'sample_size':
                     res.append(self.data.samplecounts())
-            except Exception as e:
-                self.logger.debug("Exception captured from association test {} while processing {}: {}".format(self.__class__.__name__, self.gname, e))
-                res.append(float('nan'))
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 #
@@ -355,20 +355,24 @@ class CaseCtrlBurdenTest(NullTest):
     def calculate(self):
         if self.data.locicounts() <= 1:
             raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 2).")
-        self.data.setMOI(self.moi)
-        self.data.countCaseCtrl()
-        self.algorithm.apply(self.data)
-        pvalues = self.data.pvalue()
-        statistics = self.data.statistic()
-        se = self.data.se()
         res = [self.data.samplecounts()]
-        for (x, y, z) in zip(statistics, pvalues, se):
-            res.append(x)
-            res.append(y)
-            if self.permutations > 0:
-                # actual number of permutations
-                if math.isnan(z): res.append(z)
-                else: res.append(int(z))
+        try:
+            self.data.setMOI(self.moi)
+            self.data.countCaseCtrl()
+            self.algorithm.apply(self.data)
+            pvalues = self.data.pvalue()
+            statistics = self.data.statistic()
+            se = self.data.se()
+            for (x, y, z) in zip(statistics, pvalues, se):
+                res.append(x)
+                res.append(y)
+                if self.permutations > 0:
+                    # actual number of permutations
+                    if math.isnan(z): res.append(z)
+                    else: res.append(int(z))
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 
@@ -580,24 +584,28 @@ class GLMBurdenTest(NullTest):
         return algorithm
 
     def calculate(self):
-        self.data.setMOI(self.moi)
-        self.data.countCaseCtrl()
-        self.algorithm.apply(self.data)
-        # get results
-        pvalues = self.data.pvalue()
-        regstats = self.data.statistic()
-        regse = self.data.se()
         res = [self.data.samplecounts()]
-        for (x, y, z) in zip(regstats, pvalues, regse):
-            res.append(x)
-            res.append(y)
-            if self.permutations == 0:
-                # Wald statistic
-                res.append(x/z)
-            else:
-                # actual number of permutations
-                if math.isnan(z): res.append(z)
-                else: res.append(int(z))
+        try:
+            self.data.setMOI(self.moi)
+            self.data.countCaseCtrl()
+            self.algorithm.apply(self.data)
+            # get results
+            pvalues = self.data.pvalue()
+            regstats = self.data.statistic()
+            regse = self.data.se()
+            for (x, y, z) in zip(regstats, pvalues, regse):
+                res.append(x)
+                res.append(y)
+                if self.permutations == 0:
+                    # Wald statistic
+                    res.append(x/z)
+                else:
+                    # actual number of permutations
+                    if math.isnan(z): res.append(z)
+                    else: res.append(int(z))
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 
@@ -1721,18 +1729,22 @@ class SKAT(ExternTest):
 
     def calculate(self):
         # translate data to string
+        res = [len(self.pydata['phenotype'])]
         self.Rstr = self.dump_data(dformat='R', tdir=runOptions.temp_dir)
         self.Rstr += '\nlibrary("SKAT")\nZ[which(is.na(Z))] <- 9\n{0}'.format('\n'.join(self.Rargs))
         tc = Popen(["R", '--slave', '--vanilla'], stdin = PIPE, stdout = PIPE, stderr = PIPE)
-        out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
-        if (tc.returncode):
-            raise ValueError(" (exception captured from SKAT package) \n{0}".format(error.decode(sys.getdefaultencoding())))
-        else:
-            if error:
-                self.logger.debug("WARNING message from SKAT package for group {0}: \n{1}".format(self.pydata['name'], error.decode(sys.getdefaultencoding())))
-        # res: (sample_size, pvalue, stat, pvalue.adj)
-        res = [len(self.pydata['phenotype'])]
-        res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
+        try:
+            out, error = tc.communicate(self.Rstr.encode(sys.getdefaultencoding()))
+            if (tc.returncode):
+                raise ValueError("\n{0}".format(error.decode(sys.getdefaultencoding())))
+            else:
+                if error:
+                    self.logger.debug("WARNING message from SKAT package for group {0}: \n{1}".format(self.pydata['name'], error.decode(sys.getdefaultencoding())))
+            # res: (sample_size, pvalue, stat, pvalue.adj)
+            res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 #
@@ -1901,6 +1913,7 @@ class ScoreSeq(ExternTest):
 
 
     def calculate(self):
+        res = [len(self.pydata['phenotype'])]
         self.dump_data(dformat='w', tdir=runOptions.temp_dir)
         self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3} ".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
                 os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
@@ -1912,11 +1925,11 @@ class ScoreSeq(ExternTest):
                     os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
-        except:
-            pass
-        self._process_output()
-        res = [len(self.pydata['phenotype'])]
-        res.extend([x for x in [self.stats[y] for y in self.colnames]])
+            self._process_output()
+            res.extend([x for x in [self.stats[y] for y in self.colnames]])
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing {}: {}".format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 
