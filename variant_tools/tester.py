@@ -474,6 +474,7 @@ class GLMBurdenTest(NullTest):
     def _determine_algorithm(self):
         # define aggregation method and regression method
         a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
+        a_analyticP = t.StudentPval(self.alternative) if self.trait_type == 'quantitative' else t.GaussianPval(self.alternative)
         if self.ncovariates > 0:
             a_regression = t.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
         else:
@@ -550,13 +551,13 @@ class GLMBurdenTest(NullTest):
                     # fit regression model
                     a_regression,
                     # evaluate p-value for the Wald's statistic
-                    t.StudentPval(self.alternative)
+                    a_analyticP
                     ])
             else:
                 # using Browning_all as weight
                 algorithm.extend([
                     a_wtester,
-                    t.StudentPval(self.alternative)
+                    a_analyticP
                     ])
         #
         # association testing using permutation-based p-value
