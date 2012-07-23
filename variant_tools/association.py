@@ -163,21 +163,24 @@ def associateArguments(parser):
             use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15').
             Genotypes failing such conditions will be regarded as missing genotypes.''')
     filters.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
-           help='''Discard samples that match specified conditions within each test
-           group (defined by parameter --group_by). Currently only expressions in
-           the form of "%%(NA)>p" is providedted to remove samples that have more 100*p
-           percent of missing values.''')
+        help='''Discard samples that match specified conditions within each test
+            group (defined by parameter --group_by). Currently only expressions in
+            the form of "%%(NA)>p" is providedted to remove samples that have more 100*p
+            percent of missing values.''')
     filters.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
-           help='''Discard variant sites based on specified conditions within each test
-           group. Currently only expressions in the form of '%%(NA)>p' is provided to
-           remove variant sites that have more than 100*p percent of missing genotypes.
-           Note that this filter will be applied after "--discard_samples" is applied,
-           if the latter also is specified.''' )
+        help='''Discard variant sites based on specified conditions within each test
+            group. Currently only expressions in the form of '%%(NA)>p' is provided to
+            remove variant sites that have more than 100*p percent of missing genotypes.
+            Note that this filter will be applied after "--discard_samples" is applied,
+            if the latter also is specified.''' )
     output = parser.add_argument_group('Output of test statistics')
     output.add_argument('--to_db', metavar='annoDB',
-        help='''Name of a database to which results from association tests will be written''')
-    output.add_argument('--update', action='store_true',
-        help='''When --to_db is specified, allow updating existing fields in the result database''')
+        help='''Name of a database to which results from association tests will
+            be written. Groups with existing results in the database will be
+            ignored unless parameter --force is used.''')
+    output.add_argument('-f', '--force', action='store_true',
+        help='''Analyze all groups including those that have recorded results in
+            the result database.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.''')
 
@@ -548,7 +551,7 @@ class GenotypeLoader(Process):
             shelf.close()
         
 class ResultRecorder:
-    def __init__(self, params, db_name=None, update=False, logger=None):
+    def __init__(self, params, db_name=None, update_existing=False, logger=None):
         self.succ_count = 0
         self.failed_count = 0
         #
@@ -580,7 +583,7 @@ class ResultRecorder:
                 {'*': self.group_names},       # link by group fields
                 logger,
                 True,                          # allow updating an existing database
-                update                    # allow updating an existing field
+                update_existing                # allow updating an existing field
             )
             #
             self.cur = self.writer.db.cursor()
@@ -884,7 +887,7 @@ def associate(args):
             except ValueError as e:
                 sys.exit(e)
             # define results here but it might fail if args.to_db is not writable
-            results = ResultRecorder(asso, args.to_db, args.update, proj.logger)
+            results = ResultRecorder(asso, args.to_db, args.force, proj.logger)
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
