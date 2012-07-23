@@ -860,9 +860,6 @@ class AssoTestsWorker(Process):
                     result = test.calculate()
                     # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
-                # raise error when all results fail
-                if len([x for x in values[1:] if x != x]) == (len(values) - 1) and len(values) > 1:
-                    raise ValueError("No valid output")
             except KeyboardInterrupt as e:
                 # die silently if stopped by Ctrl-C
                 break
@@ -871,7 +868,7 @@ class AssoTestsWorker(Process):
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 self.pydata = {}
-                # return no result for any of the tests if a test fails.
+                # return no result for any of the tests if an error message is captured.
                 values = []
             self.resQueue.put(values)
 
