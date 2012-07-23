@@ -41,6 +41,11 @@ from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAct
 from .phenotype import Sample
 from .tester import *
 
+if sys.version_info.major == 2:
+    from vt_sqlite3_py2 import OperationalError
+else:
+    from vt_sqlite3_py3 import OperationalError
+
 import argparse
 
 class ShelfDB:
@@ -89,9 +94,16 @@ class ShelfDB:
 
     def close(self):
         if self.mode == 'n':
-            self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
             self.db.commit()
-        self.db.close()
+            try:
+                self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
+                self.db.commit()
+            except OperationalError:
+                pass
+            finally:
+                # close the database even if create index failed. In this case
+                # shelf retrival will be slower but still doable
+                self.db.close()
 
 def istr(d):
     try:
