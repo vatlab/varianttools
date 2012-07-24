@@ -578,6 +578,9 @@ class ResultRecorder:
         #
         self.writer = None
         if db_name:
+            old_pragma = runOptions.sqlite_pragma
+            # make sure each commit will write data to disk, the performance can be bad though.
+            runOptions.sqlite_pragma = 'synchronous=FULL,journal_mode=DELETE'
             self.writer = AnnoDBWriter(db_name, self.fields,
                 'field',                       # field annotation databases
                 'Annotation database used to record results of association tests. Created on {}'.format(
@@ -588,6 +591,8 @@ class ResultRecorder:
                 True,                          # allow updating an existing database
                 update_existing                # allow updating an existing field
             )
+            # restore system sqlite_pragma
+            runOptions.sqlite_pragma = ','.join(old_pragma)
             #
             self.cur = self.writer.db.cursor()
             if self.writer.update_existing:
