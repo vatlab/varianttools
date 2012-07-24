@@ -414,7 +414,7 @@ class AssociationTestManager:
         #  variant_info
         cur.execute('''\
             CREATE TABLE __fromGeno.__asso_tmp (
-              variant_id INT NOT NULL,
+              variant_id INT NOT NULL, _ignored INT, 
               {} {} {});
               '''.format(
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
@@ -436,8 +436,8 @@ class AssociationTestManager:
         #
         self.from_clause = ', '.join(from_clause)
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
-        # This will be the tmp table to extract variant_id by groups
-        query = 'INSERT INTO __fromGeno.__asso_tmp SELECT DISTINCT {}.variant_id, {} FROM {} {};'.format(
+        # This will be the tmp table to extract variant_id by groups (ignored is 0)
+        query = 'INSERT INTO __fromGeno.__asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.format(
             self.table, group_fields,
             self.from_clause, self.where_clause)
         s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".format(':'.join(group_by)))
@@ -504,7 +504,8 @@ class GenotypeLoader(Process):
                 # filling __asso_tmp, this is per-process so might use some RAM
                 cur = db.cursor()
                 # variant info of the original __asso_tmp table are not copied because they are not used.
-                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __asso_tmp;'.format(
+                # we only copy records that are not ignored
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __asso_tmp WHERE _ignored = 0;'.format(
                         ', '.join(self.group_names)))
                 cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
                 # tells other processes that I am ready
@@ -900,12 +901,18 @@ def associate(args):
             if args.to_db and (not args.force) and results.writer.update_existing and \
                 set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])): 
                     existing_groups = results.get_groups()
-                    proj.logger.info('{}'.format(existing_groups[:10]))
                     num_groups = len(asso.groups)
                     asso.groups = list(set(asso.groups).difference(set(existing_groups)))
                     if len(asso.groups) != num_groups:
                         proj.logger.info('{} out of {} groups with existing results are ignored. You can use option --force to re-analyze all groups.'.format(
                             num_groups - len(asso.groups), num_groups))
+                        # mark existing groups as ignored
+                        cur = proj.db.cursor()
+                        query = 'UPDATE __fromGeno.__asso_tmp SET _ignored = 1 WHERE {}'.format(
+                            ', '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                        for grp in existing_groups:
+                            cur.execute(query, grp)
+                        proj.db.commit()
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
