@@ -898,6 +898,9 @@ def associate(args):
                     args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
             except ValueError as e:
                 sys.exit(e)
+            if len(asso.groups) == 0:
+                proj.logger.info('No data to analyze.')
+                sys.exit(0)
             # define results here but it might fail if args.to_db is not writable
             results = ResultRecorder(asso, args.to_db, args.force, proj.logger)
             # determine if some results are already exist
@@ -914,6 +917,8 @@ def associate(args):
                     if len(asso.groups) != num_groups:
                         proj.logger.info('{} out of {} groups with existing results are ignored. You can use option --force to re-analyze all groups.'.format(
                             num_groups - len(asso.groups), num_groups))
+                        if len(asso.groups) == 0:
+                            sys.exit(0)
                         # mark existing groups as ignored
                         cur = proj.db.cursor()
                         query = 'UPDATE __fromGeno.__asso_tmp SET _ignored = 1 WHERE {}'.format(
@@ -1014,7 +1019,7 @@ def associate(args):
                     prog.update(count, results.failed())
                     # proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
             except KeyboardInterrupt as e:
-                proj.logger.error('\nAssociation tests stopped by keyboard interruption.')
+                proj.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.format(count, len(asso.groups)))
                 results.done()
                 proj.close()
                 sys.exit(1)
