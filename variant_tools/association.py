@@ -607,6 +607,8 @@ class ResultRecorder:
             else:
                 self.insert_query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
                     ','.join([self.writer.db.PH] * len(self.fields)))
+        #
+        self.last_commit = time.time()
 
     def get_groups(self):
         '''Get groups that have been calculated'''
@@ -631,8 +633,10 @@ class ResultRecorder:
             else:
                 # insert a new record
                 self.cur.execute(self.insert_query, res)
-            # commit the record each time in order to keep data in case of disasters such as sudden power loss.
-            self.writer.db.commit()
+            # commit the records from time to time to write data to disk
+            if time.time() - self.last_commit > 5:
+                self.writer.db.commit()
+                self.last_commit = time.time()
 
     def completed(self):
         return self.succ_count
