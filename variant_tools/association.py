@@ -616,12 +616,12 @@ class ResultRecorder:
         return self.cur.fetchall()
 
     def record(self, res):
-        str_output = '\t'.join(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
         self.succ_count += 1
         if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
             # all fields are NaN: count this as a failure
             self.failed_count += 1
         else:
+            str_output = '\t'.join(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
             print(str_output)
         # also write to an annotation database?
         if self.writer:
