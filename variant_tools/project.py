@@ -603,25 +603,26 @@ class AnnoDBWriter:
                     raise ValueError('Existing database has different linking fields (existing: {}, required: {}).'.format(self.build, rec[1]))
         # get existing fields
         cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
-        cur_fields = []
+        # cur_fields is made a class member to make others know what are available
+        self.cur_fields = []
         for rec in cur:
-            cur_fields.append(Field(*rec))
+            self.cur_fields.append(Field(*rec))
         # add new fields
         s = delayedAction(self.logger.info, 'Adding fields to existing result database')
         for field in self.fields:
             # name already exist
-            if field.name in [x.name for x in cur_fields]:
-                cf = [x for x in cur_fields if x.name == field.name][0] 
+            if field.name in [x.name for x in self.cur_fields]:
+                cf = [x for x in self.cur_fields if x.name == field.name][0] 
                 if field.type != cf.type:
                     raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
                 if overwrite_existing_fields:
                     self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
-                else:
-                    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
-                        raise ValueError('Cannot modify database {} because field {} already exists. '
-                            'Please use test option --name to add a new suffix to this field, '
-                            'write the results to a different database (option --to_db), or use '
-                            'option --update to force updating the existing fields.'.format(self.name, field.name))
+                #else:
+                #    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
+                #        raise ValueError('Cannot modify database {} because field {} already exists. '
+                #            'Please use test option --name to add a new suffix to this field, '
+                #            'write the results to a different database (option --to_db), or use '
+                #            'option --update to force updating the existing fields.'.format(self.name, field.name))
             else:
                 # add new field
                 cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),

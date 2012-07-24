@@ -595,9 +595,15 @@ class ResultRecorder:
                 self.insert_query = 'INSERT INTO {0} ({1}) VALUES ({2});'.format(db_name,
                     ','.join([x.name for x in self.fields]),
                     ','.join([self.writer.db.PH] * len(self.fields)))
+                self.select_query = 'SELECT {1} FROM {0};'.format(db_name, ', '.join(self.group_names))
             else:
                 self.insert_query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
                     ','.join([self.writer.db.PH] * len(self.fields)))
+
+    def get_groups(self):
+        '''Get groups that have been calculated'''
+        self.cur.execute(self.select_query)
+        return self.cur.fetchall()
 
     def record(self, res):
         self.succ_count += 1
@@ -885,6 +891,21 @@ def associate(args):
                 sys.exit(e)
             # define results here but it might fail if args.to_db is not writable
             results = ResultRecorder(asso, args.to_db, args.force, proj.logger)
+            # determine if some results are already exist
+            #
+            # if write to a db and
+            # if not forcefully recalculate everything and
+            # the file exists
+            # if the new fields is a subset of fields in the database
+            if args.to_db and (not args.force) and results.writer.update_existing and \
+                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])): 
+                    existing_groups = results.get_groups()
+                    proj.logger.info('{}'.format(existing_groups[:10]))
+                    num_groups = len(asso.groups)
+                    asso.groups = list(set(asso.groups).difference(set(existing_groups)))
+                    if len(asso.groups) != num_groups:
+                        proj.logger.info('{} out of {} groups with existing results are ignored. You can use option --force to re-analyze all groups.'.format(
+                            num_groups - len(asso.groups), num_groups))
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simutaneous read, due to
