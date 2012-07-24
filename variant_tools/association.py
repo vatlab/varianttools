@@ -617,10 +617,14 @@ class ResultRecorder:
         if self.writer:
             if self.writer.update_existing:
                 self.cur.execute(self.update_query, res[len(self.group_names):] + res[:len(self.group_names)])
+                # if no record to update, insert a new one
                 if self.cur.rowcount == 0:
                     self.cur.execute(self.insert_query, res)
             else:
+                # insert a new record
                 self.cur.execute(self.insert_query, res)
+            # commit the record each time in order to keep data in case of disasters such as sudden power loss.
+            self.writer.db.commit()
 
     def completed(self):
         return self.succ_count
