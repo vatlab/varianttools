@@ -558,8 +558,10 @@ class ResultRecorder:
         #
         self.group_names = params.group_names
         self.fields = []
+        self.group_fields = []
         for n,t in zip(params.group_names, params.group_types):
-            self.fields.append(Field(name=n, index=None, type=t, adj=None, comment=n))
+            self.group_fields.append(Field(name=n, index=None, type=t, adj=None, comment=n))
+        self.fields.extend(self.group_fields)
         for test in params.tests:
             if test.name:
                 self.fields.extend([
@@ -607,12 +609,13 @@ class ResultRecorder:
         return self.cur.fetchall()
 
     def record(self, res):
-        self.succ_count += 1
-        if not res:
-            self.failed_count += 1
-            return
         str_output = '\t'.join(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
-        print(str_output)
+        self.succ_count += 1
+        if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
+            # all fields are NaN: count this as a failure
+            self.failed_count += 1
+        else:
+            print(str_output)
         # also write to an annotation database?
         if self.writer:
             if self.writer.update_existing:
@@ -639,7 +642,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap, result_fields):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.proj = param.proj
@@ -663,6 +666,7 @@ class AssoTestsWorker(Process):
         self.index = index
         self.sampleMap = sampleMap
         self.logger = self.proj.logger
+        self.result_fields = result_fields
         #
         # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
         if param.num_extern_tests:
@@ -880,7 +884,7 @@ class AssoTestsWorker(Process):
                 self.data = t.AssoData()
                 self.pydata = {}
                 # return no result for any of the tests if an error message is captured.
-                values = []
+                values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
             self.resQueue.put(values)
 
 
@@ -903,7 +907,7 @@ def associate(args):
             # the file exists
             # if the new fields is a subset of fields in the database
             if args.to_db and (not args.force) and results.writer.update_existing and \
-                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])): 
+                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
                     existing_groups = results.get_groups()
                     num_groups = len(asso.groups)
                     asso.groups = list(set(asso.groups).difference(set(existing_groups)))
@@ -978,7 +982,7 @@ def associate(args):
             for j in range(nJobs):
                 # the dictionary has the number of temporary database for each sample
                 AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
-                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0}).start()
+                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0}, results.fields).start()
             # send jobs ...
             # get initial completed and failed
             # put all jobs to queue, the workers will work on them
