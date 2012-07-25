@@ -89,6 +89,8 @@ template <typename T> std::string n2s(T Number)
 
 namespace std {
 // order a vector by index specified in another vector
+// Note that this is not exactly reordering, since the reorder vector contains the final location for each corresponding element in the data vector,
+// which is different from a reorder vector that selects which initial data vector element should appear at each final location.
 // this will not destruct the index vector
 template< typename order_iterator, typename value_iterator >
 void reorder(order_iterator order_begin, order_iterator order_end, value_iterator v)

@@ -37,7 +37,9 @@ bool LMData::setX(const std::vector<std::vector<double> > & x)
 			throw ValueError("Dimension not match with input X");
 		}
 	}
-
+	if (m_x) {
+		gsl_matrix_free(m_x);
+	}
 	m_x = gsl_matrix_alloc(x.front().size(), x.size());
 	for (size_t j = 0; j < m_x->size2; j++) {
 		for (size_t i = 0; i < m_x->size1; i++) {
@@ -58,7 +60,9 @@ bool LMData::setY(const std::vector<double> & y)
 			throw ValueError("Dimension not match with input Y");
 		}
 	}
-
+	if (m_y) {
+		gsl_vector_free(m_y);
+	}
 	m_y = gsl_vector_alloc(y.size());
 	for (size_t i = 0; i < m_y->size; i++) {
 		gsl_vector_set(m_y, i, y[i]);

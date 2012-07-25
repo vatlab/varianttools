@@ -152,6 +152,12 @@ public:
 
 	virtual ~BaseLM()
 	{
+		if (m_beta) {
+			gsl_vector_free(m_beta);
+		}
+		if (m_sebeta) {
+			gsl_vector_free(m_sebeta);
+		}
 	}
 
 
