@@ -3314,7 +3314,8 @@ def show(args):
                 test(1, None, ['-h']) 
             elif args.type == 'runtime_options':
                 for opt, (def_value, description) in runOptions.persistent_options.iteritems():
-                    val = str(getattr(runOptions, opt))
+                    # get the raw value of option (not the attribute, which might not be a string)
+                    val = str(getattr(runOptions, '_' + opt))
                     print('{}{}{} {}'.format(opt, ' '*(27-len(opt)), val,
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
                     print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,

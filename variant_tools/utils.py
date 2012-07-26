@@ -97,11 +97,12 @@ class RuntimeOptions(object):
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
         # default sqlite pragma
-        self._sqlite_pragma = self.persistent_options['sqlite_pragma'][0].split(',')
+        self._sqlite_pragma = self.persistent_options['sqlite_pragma'][0]
         # number of processes used for reader under multi-processing mode
         self._import_num_of_readers = self.persistent_options['import_num_of_readers'][0]
         # path to a temporary directory, will be allocated automatically.
         self._temp_dir = self.persistent_options['temp_dir'][0]
+        self._proj_temp_dir = self._temp_dir  # per project temp directory
         # how to handle missing data
         self._treat_missing_as_wildtype = self.persistent_options['treat_missing_as_wildtype'][0]
     #
@@ -136,22 +137,23 @@ class RuntimeOptions(object):
             for item in p:
                 if '=' not in str(item):
                     raise ValueError('Invalid pragma {}'.format(item))
-            self._sqlite_pragma = p
+            self._sqlite_pragma = pragma
         except:
             print('Invalid pragma {}'.format(pragma))
     #
-    sqlite_pragma = property(lambda self: self._sqlite_pragma, _set_sqlite_pragma)
+    sqlite_pragma = property(lambda self: self._sqlite_pragma.split(','), _set_sqlite_pragma)
     #
     # attribute import_num_of_readers
     #
     def _set_import_num_of_readers(self, n):
         try:
             if n is not None:
-                self._import_num_of_readers = int(n)
+                int(n)   # test if n is an integer
+                self._import_num_of_readers = str(n)
         except:
-            print('Failed to set number of readers to {}'.format())
+            print('Failed to set number of readers to {}'.format(n))
     #
-    import_num_of_readers = property(lambda self: self._import_num_of_readers, _set_import_num_of_readers)
+    import_num_of_readers = property(lambda self: int(self._import_num_of_readers), _set_import_num_of_readers)
     #
     # attribute cache_dir
     #
@@ -180,29 +182,29 @@ class RuntimeOptions(object):
                     'command "vtools admin --set_runtime_option temp_dir=DIR" to set it to another path, '
                     'or a random path (empty DIR).')
             self._temp_dir = path
+            self._proj_temp_dir = path
         # the usual case
         if self._temp_dir is None:
-            self._temp_dir = tempfile.mkdtemp() 
+            self._proj_temp_dir = tempfile.mkdtemp() 
         try:
-            if not os.path.isdir(self._temp_dir):
-                os.makedirs(self._temp_dir)
+            if not os.path.isdir(self._proj_temp_dir):
+                os.makedirs(self._proj_temp_dir)
         except:
-            sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._temp_dir))
-            self._temp_dir = tempfile.mkdtemp()
+            sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
+            self._proj_temp_dir = tempfile.mkdtemp()
     #
-    temp_dir = property(lambda self: self._temp_dir, _set_temp_dir)
+    temp_dir = property(lambda self: self._proj_temp_dir, _set_temp_dir)
     #
     # attribute treat_missing_as_wildtype
     def _set_treat_missing_as_wildtype(self, val):
-        if val in [None, 'None', '0', 'False', 'false', 'FALSE']:
-            self._treat_missing_as_wildtype = False
-        elif val in ['1', 'True', 'TRUE', 'true']:
-            self._treat_missing_as_wildtype = True
+        if val in ['None', '0', 'False', 'false', 'FALSE', '1', 'True', 'TRUE', 'true']:
+            self._treat_missing_as_wildtype = val
         else:
             print('Invalid input for runtime option treat_missing_as_wildtype')
-            self._treat_missing_as_wildtype = False
+            self._treat_missing_as_wildtype = 'False'
     #
-    treat_missing_as_wildtype = property(lambda self: self._treat_missing_as_wildtype, _set_treat_missing_as_wildtype)
+    treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype in ['1', 'True', 'TRUE', 'true'] else False,
+        _set_treat_missing_as_wildtype)
 
 
 # the singleton object of RuntimeOptions
