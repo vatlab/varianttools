@@ -82,7 +82,7 @@ class RuntimeOptions(object):
             'temp_dir': (None, 'Use the specified temporary directory to store temporary files '
                 'to improve performance (use separate disks for project and temp files), or '
                 'avoid problems due to insufficient disk space.'),
-            'treat_missing_as_wildtype': (False, 'Treat missing values as wildtype alleles for '
+            'treat_missing_as_wildtype': ('False', 'Treat missing values as wildtype alleles for '
                 'association tests. This option is used when samples are called individuals or '
                 'in batch so genotypes for some samples are ignored and treated as missing if '
                 'they consist of all wildtype alleles. This option should be used with caution '
@@ -197,13 +197,15 @@ class RuntimeOptions(object):
     #
     # attribute treat_missing_as_wildtype
     def _set_treat_missing_as_wildtype(self, val):
-        if val in [None, 'None', '0', 'False', 'false', 'FALSE', '1', 'True', 'TRUE', 'true']:
-            self._treat_missing_as_wildtype = val
+        if val in [None, 'None', '0', 'False', 'false', 'FALSE']:
+            self._treat_missing_as_wildtype = 'False'
+        elif val in ['1', 'True', 'TRUE', 'true']:
+            self._treat_missing_as_wildtype = 'True'
         else:
             print('Invalid input ({}) for runtime option treat_missing_as_wildtype'.format(val))
             self._treat_missing_as_wildtype = 'False'
     #
-    treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype in ['1', 'True', 'TRUE', 'true'] else False,
+    treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype == 'True' else False,
         _set_treat_missing_as_wildtype)
 
 
