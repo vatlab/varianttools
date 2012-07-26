@@ -92,6 +92,7 @@ namespace std
 }
 
 %ignore vtools::PyAction::PyAction(const PyAction & rhs);
+%ignore vtools::PyFunc;
 
 %include "utils.h"
 %include "lm.h"

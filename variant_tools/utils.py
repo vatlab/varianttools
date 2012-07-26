@@ -197,10 +197,10 @@ class RuntimeOptions(object):
     #
     # attribute treat_missing_as_wildtype
     def _set_treat_missing_as_wildtype(self, val):
-        if val in ['None', '0', 'False', 'false', 'FALSE', '1', 'True', 'TRUE', 'true']:
+        if val in [None, 'None', '0', 'False', 'false', 'FALSE', '1', 'True', 'TRUE', 'true']:
             self._treat_missing_as_wildtype = val
         else:
-            print('Invalid input for runtime option treat_missing_as_wildtype')
+            print('Invalid input ({}) for runtime option treat_missing_as_wildtype'.format(val))
             self._treat_missing_as_wildtype = 'False'
     #
     treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype in ['1', 'True', 'TRUE', 'true'] else False,
