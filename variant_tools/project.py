@@ -1690,7 +1690,7 @@ class Project:
         if not name.isalnum():
             raise ValueError('Snapshot name should not have any special character.')
         s = delayedAction(self.logger.info, 'Creating snapshot')
-        with tarfile.open(os.path.join(runOptions.cache_dir, 'snapshot_{}.gztar'.format(name)), 'w:gz') as snapshot:
+        with tarfile.open(os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name)), 'w') as snapshot:
             s = delayedAction(self.logger.info, 'Copying project')
             snapshot.add('{}.proj'.format(self.name))
             del s
@@ -1711,14 +1711,14 @@ class Project:
         # get all information about snapshots
         snapshots = list(self.listSnapshots())
         #
-        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.gztar'.format(name))
+        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
         if not os.path.isfile(snapshot_file):
             raise ValueError('Snapshot {} does not exist'.format(name))
         #
         # close project
         self.db.close()
         try:
-            with tarfile.open(snapshot_file, 'r:gz') as snapshot:
+            with tarfile.open(snapshot_file, 'r') as snapshot:
                 s = delayedAction(self.logger.info, 'Load project')
                 snapshot.extract('{}.proj'.format(self.name))
                 del s
@@ -1738,8 +1738,8 @@ class Project:
         
     def listSnapshots(self):
         '''return all snapshots'''
-        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.gztar')):
-            name = ss[len(runOptions.cache_dir) + 10: -6]
+        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
+            name = ss[len(runOptions.cache_dir) + 10: -4]
             date = self.loadProperty('__snapshot_{}_date'.format(name), None)
             message = self.loadProperty('__snapshot_{}_message'.format(name), None)
             if date is not None:
