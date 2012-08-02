@@ -931,7 +931,7 @@ def associate(args):
                         # mark existing groups as ignored
                         cur = proj.db.cursor()
                         query = 'UPDATE __fromGeno.__asso_tmp SET _ignored = 1 WHERE {}'.format(
-                            ', '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                            ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
                         for grp in existing_groups:
                             cur.execute(query, grp)
                         proj.db.commit()
