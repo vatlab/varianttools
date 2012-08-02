@@ -1684,6 +1684,66 @@ class Project:
             + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
         return info
 
+    def saveSnapshot(self, name, message):
+        '''Save snapshot'''
+        if not name.isalnum():
+            raise ValueError('Snapshot name should not have any special character.')
+        s = delayedAction(self.logger.info, 'Copying project')
+        shutil.copyfile('{}.proj'.format(self.name),
+            os.path.join(runOptions.cache_dir, 'snapshot_{}.proj'.format(name)))
+        del s
+        s = delayedAction(self.logger.info, 'Copying genotypes')
+        shutil.copyfile('{}_genotype.DB'.format(self.name),
+            os.path.join(runOptions.cache_dir, 'snapshot_{}_genotype.DB'.format(name)))
+        del s
+        self.saveProperty('__snapshot_{}_date'.format(name), time.strftime('%b%d %H:%M:%S', time.gmtime()))
+        self.saveProperty('__snapshot_{}_message'.format(name), message)
+        
+    def loadSnapshot(self, name):
+        '''Load snapshot'''
+        #
+        date = self.loadProperty('__snapshot_{}_date'.format(name), None)
+        message = self.loadProperty('__snapshot_{}_message'.format(name), None)
+        if date is None:
+            raise ValueError('{} is not a recorded snapshot'.format(name))
+        #
+        # get all information about snapshots
+        snapshots = list(self.listSnapshots())
+        #
+        # close project
+        self.db.close()
+        proj = os.path.join(runOptions.cache_dir, 'snapshot_{}.proj'.format(name))
+        geno = os.path.join(runOptions.cache_dir, 'snapshot_{}_genotype.DB'.format(name))
+        if not os.path.isfile(proj) or not os.path.isfile(geno):
+            raise ValueError('Snapshot {} does not exist'.format(name))
+        #
+        try:
+            s = delayedAction(self.logger.info, 'Load project')
+            shutil.copyfile(proj, '{}.proj'.format(self.name))
+            del s
+            s = delayedAction(self.logger.info, 'Load genotypes')
+            shutil.copyfile(geno, '{}_genotype.DB'.format(self.name))
+            del s
+        finally:
+            # re-connect the main database for proer cleanup
+            self.db = DatabaseEngine()
+            self.db.connect(self.proj_file)
+            #
+            # re-insert snapshot information because the old project might
+            # not have all the snapshots defined
+            for name, date, message in snapshots:
+                self.saveProperty('__snapshot_{}_date'.format(name), date)
+                self.saveProperty('__snapshot_{}_message'.format(name), message)
+        
+    def listSnapshots(self):
+        '''return all snapshots'''
+        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.proj')):
+            name = ss[len(runOptions.cache_dir) + 10: -5]
+            date = self.loadProperty('__snapshot_{}_date'.format(name), None)
+            message = self.loadProperty('__snapshot_{}_message'.format(name), None)
+            if date is not None:
+                yield (name, date, message)
+
     #
     # temporary table which are created in separate database
     # because it is very slow for delite to remove temporary table
@@ -3147,7 +3207,7 @@ def remove(args):
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test', 'runtime_options'], nargs='?', default='project',
+        'tests', 'test', 'runtime_options', 'snapshots'], nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
@@ -3158,8 +3218,9 @@ def showArguments(parser):
             'formats' for all supported import and export formats, 'format FMT' for
             details of format FMT, 'tests' for a list of all association tests, and
             'test TST' for details of an association test TST, 'runtime_options'
-            for a list of runtime options and their descriptions. The default 
-            parameter of this command is 'project'.''')
+            for a list of runtime options and their descriptions, 'snapshots' for
+            a list of snapshots saved by command 'vtools admin --save_snapshots'.
+            The default parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be names of tables for type 'table',
             name of an annotation database for type 'annotation', name of a format
@@ -3339,6 +3400,13 @@ def show(args):
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
                     print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
                         subsequent_indent=' '*27)))
+            elif args.type == 'snapshots':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
+                print('{:<20} {:>15}  {}'.format('snapshot', 'date', 'message'))
+                for snapshot, date, desc in proj.listSnapshots():
+                    print('{:<20} {:>15}  {}'.format(snapshot, date, 
+                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
     except Exception as e:
         sys.exit(e)
 
@@ -3386,6 +3454,13 @@ def adminArguments(parser):
         help='''Change table NAME to a NEW_NAME.''')
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
+    snapshots = parser.add_argument_group('Save and load snapshots')
+    snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
+        help='''Create a snapshot of the current project with NAME, which could be
+        re-loaded using command 'vtools admin --load_snapshot'.''')
+    snapshots.add_argument('--load_snapshot', metavar='NAME',
+        help='''Revert the current project to specified snapshot. All changes since
+        the last snapshot will be lost.''')
     options = parser.add_argument_group('Set values for some various internal options.')
     options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
@@ -3446,6 +3521,12 @@ def admin(args):
                     raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.''')
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
+            elif args.save_snapshot is not None:
+                proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1])
+                proj.logger.info('Snapshot {} has been saved'.format(args.save_snapshot[0]))
+            elif args.load_snapshot is not None:
+                proj.loadSnapshot(args.load_snapshot)
+                proj.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
