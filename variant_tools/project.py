@@ -1691,25 +1691,25 @@ class Project:
             raise ValueError('Snapshot name should not have any special character.')
         s = delayedAction(self.logger.info, 'Creating snapshot')
         with tarfile.open(os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name)), 'w') as snapshot:
+            readme_file = os.path.join(runOptions.cache_dir, 'README')
+            with open(readme_file, 'w') as readme:
+                readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
+                readme.write('Name: {}\n'.format(name))
+                readme.write('Date: {}\n'.format(time.strftime('%b%d %H:%M:%S', time.gmtime())))
+                readme.write('Info: {}\n'.format(message))
+            # add README file
+            snapshot.add(readme_file, 'README')
             s = delayedAction(self.logger.info, 'Copying project')
             snapshot.add('{}.proj'.format(self.name))
             del s
             s = delayedAction(self.logger.info, 'Copying genotypes')
             snapshot.add('{}_genotype.DB'.format(self.name))
             del s
-        self.saveProperty('__snapshot_{}_date'.format(name), time.strftime('%b%d %H:%M:%S', time.gmtime()))
-        self.saveProperty('__snapshot_{}_message'.format(name), message)
+            os.remove(readme_file)
+
         
-    def loadSnapshot(self, name):
+    def loadSnapshot(self, name, filename=None):
         '''Load snapshot'''
-        #
-        date = self.loadProperty('__snapshot_{}_date'.format(name), None)
-        message = self.loadProperty('__snapshot_{}_message'.format(name), None)
-        if date is None:
-            raise ValueError('{} is not a recorded snapshot'.format(name))
-        #
-        # get all information about snapshots
-        snapshots = list(self.listSnapshots())
         #
         snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
         if not os.path.isfile(snapshot_file):
@@ -1729,21 +1729,28 @@ class Project:
             # re-connect the main database for proer cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
-            #
-            # re-insert snapshot information because the old project might
-            # not have all the snapshots defined
-            for name, date, message in snapshots:
-                self.saveProperty('__snapshot_{}_date'.format(name), date)
-                self.saveProperty('__snapshot_{}_message'.format(name), message)
         
     def listSnapshots(self):
-        '''return all snapshots'''
-        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
-            name = ss[len(runOptions.cache_dir) + 10: -4]
-            date = self.loadProperty('__snapshot_{}_date'.format(name), None)
-            message = self.loadProperty('__snapshot_{}_message'.format(name), None)
-            if date is not None:
-                yield (name, date, message)
+        '''return meta information for all snapshots'''
+        for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
+            name = snapshot_file[len(runOptions.cache_dir) + 10: -4]
+            try:
+                with tarfile.open(snapshot_file, 'r') as snapshot:
+                    files = snapshot.getnames()
+                    if files != ['README', '{}.proj'.format(self.name),
+                        '{}_genotype.DB'.format(self.name)]:
+                        self.logger.debug('{}: content of snapshot mismatch: {}'.format(snapshot_file, files))
+                        continue
+                    snapshot.extract('README', runOptions.cache_dir)
+                    with open(os.path.join(runOptions.cache_dir, 'README'), 'r') as readme:
+                        readme.readline()   # header line
+                        name = readme.readline()[6:].rstrip()  # snapshot name
+                        date = readme.readline()[6:].rstrip()  # date
+                        message = ' '.join(readme.read()[6:].split('\n'))  # message
+                    os.remove(os.path.join(runOptions.cache_dir, 'README'))
+                    yield (name, date, message)
+            except Exception as e:
+                self.logger.debug('{}: snapshot read error: {}'.format(snapshot_file, e))
 
     #
     # temporary table which are created in separate database
