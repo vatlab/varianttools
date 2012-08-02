@@ -1687,10 +1687,17 @@ class Project:
 
     def saveSnapshot(self, name, message):
         '''Save snapshot'''
-        if not name.isalnum():
-            raise ValueError('Snapshot name should not have any special character.')
+        if name.endswith('.tar') or name.endswith('.tar.gz'):
+            filename = name
+            mode = 'w:gz' if name.endswith('.tar.gz') else 'w'
+        elif name.isalnum():
+            filename = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+            mode = 'w'
+        else:
+            raise ValueError('Snapshot name should be a filename with extension .tar or .tar.gz, or a name without any special character.')
+        #
         s = delayedAction(self.logger.info, 'Creating snapshot')
-        with tarfile.open(os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name)), 'w') as snapshot:
+        with tarfile.open(filename, mode) as snapshot:
             readme_file = os.path.join(runOptions.cache_dir, 'README')
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
@@ -1707,50 +1714,57 @@ class Project:
             del s
             os.remove(readme_file)
 
-        
-    def loadSnapshot(self, name, filename=None):
+    def loadSnapshot(self, name):
         '''Load snapshot'''
         #
-        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+        if name.endswith('.tar') or name.endswith('.tar.gz'):
+            snapshot_file = name
+            mode = 'r:gz' if name.endswith('.tar.gz') else 'r'
+        elif name.isalnum():
+            snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+            mode = 'r'
+        else:
+            raise ValueError('Snapshot name should be a filename with extension .tar or .tar.gz, or a name without any special character.')
+        #
         if not os.path.isfile(snapshot_file):
             raise ValueError('Snapshot {} does not exist'.format(name))
         #
         # close project
         self.db.close()
         try:
-            with tarfile.open(snapshot_file, 'r') as snapshot:
+            with tarfile.open(snapshot_file, mode) as snapshot:
                 s = delayedAction(self.logger.info, 'Load project')
                 snapshot.extract('{}.proj'.format(self.name))
                 del s
                 s = delayedAction(self.logger.info, 'Load genotypes')
                 snapshot.extract('{}_genotype.DB'.format(self.name))
                 del s
+        except Exception as e:
+            raise ValueError('Failed to load snapshot: {}'.format(e))
         finally:
             # re-connect the main database for proer cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
         
-    def listSnapshots(self):
+    def getSnapshotInfo(self, filename):
         '''return meta information for all snapshots'''
-        for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
-            name = snapshot_file[len(runOptions.cache_dir) + 10: -4]
-            try:
-                with tarfile.open(snapshot_file, 'r') as snapshot:
-                    files = snapshot.getnames()
-                    if files != ['README', '{}.proj'.format(self.name),
-                        '{}_genotype.DB'.format(self.name)]:
-                        self.logger.debug('{}: content of snapshot mismatch: {}'.format(snapshot_file, files))
-                        continue
-                    snapshot.extract('README', runOptions.cache_dir)
-                    with open(os.path.join(runOptions.cache_dir, 'README'), 'r') as readme:
-                        readme.readline()   # header line
-                        name = readme.readline()[6:].rstrip()  # snapshot name
-                        date = readme.readline()[6:].rstrip()  # date
-                        message = ' '.join(readme.read()[6:].split('\n'))  # message
-                    os.remove(os.path.join(runOptions.cache_dir, 'README'))
-                    yield (name, date, message)
-            except Exception as e:
-                self.logger.debug('{}: snapshot read error: {}'.format(snapshot_file, e))
+        try:
+            with tarfile.open(filename, 'r') as snapshot:
+                files = snapshot.getnames()
+                if files != ['README', '{}.proj'.format(self.name),
+                    '{}_genotype.DB'.format(self.name)]:
+                    raise ValueError('{}: content of snapshot mismatch: {}'.format(filename, files))
+                snapshot.extract('README', runOptions.cache_dir)
+                with open(os.path.join(runOptions.cache_dir, 'README'), 'r') as readme:
+                    readme.readline()   # header line
+                    name = readme.readline()[6:].rstrip()  # snapshot name
+                    date = readme.readline()[6:].rstrip()  # date
+                    message = ' '.join(readme.read()[6:].split('\n'))  # message
+                os.remove(os.path.join(runOptions.cache_dir, 'README'))
+                return (name, date, message)
+        except Exception as e:
+            self.logger.debug('{}: snapshot read error: {}'.format(filename, e))
+            return (None, None, None)
 
     #
     # temporary table which are created in separate database
@@ -3215,7 +3229,8 @@ def remove(args):
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test', 'runtime_options', 'snapshots'], nargs='?', default='project',
+        'tests', 'test', 'runtime_options', 'snapshot', 'snapshots'],
+        nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
@@ -3226,9 +3241,10 @@ def showArguments(parser):
             'formats' for all supported import and export formats, 'format FMT' for
             details of format FMT, 'tests' for a list of all association tests, and
             'test TST' for details of an association test TST, 'runtime_options'
-            for a list of runtime options and their descriptions, 'snapshots' for
-            a list of snapshots saved by command 'vtools admin --save_snapshots'.
-            The default parameter of this command is 'project'.''')
+            for a list of runtime options and their descriptions, 'snapshot' for a
+            particular snapshot by name or filename, 'snapshots' for a list of
+            snapshots saved by command 'vtools admin --save_snapshots'. The default
+            parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be names of tables for type 'table',
             name of an annotation database for type 'annotation', name of a format
@@ -3408,13 +3424,23 @@ def show(args):
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
                     print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
                         subsequent_indent=' '*27)))
+            elif args.type == 'snapshot':
+                if not args.items:
+                    raise ValueError('Please provide a list of snapshot name or filenames')
+                print('{:<20} {:>15}  {}'.format('snapshot', 'date', 'message'))
+                for snapshot in args.items:
+                    name, date, desc = proj.getSnapshotInfo(snapshot)
+                    print('{:<20} {:>15}  {}'.format(name, date, 
+                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
                 print('{:<20} {:>15}  {}'.format('snapshot', 'date', 'message'))
-                for snapshot, date, desc in proj.listSnapshots():
-                    print('{:<20} {:>15}  {}'.format(snapshot, date, 
-                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
+                for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
+                    name, date, desc = proj.getSnapshotInfo(snapshot_file)
+                    if name is not None:
+                        print('{:<20} {:>15}  {}'.format(name, date, 
+                            '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
     except Exception as e:
         sys.exit(e)
 
@@ -3465,10 +3491,13 @@ def adminArguments(parser):
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
-        re-loaded using command 'vtools admin --load_snapshot'.''')
+        re-loaded using command 'vtools admin --load_snapshot'. A filename with
+        extension .tar or .tar.gz can be used to save the snapshot to a specific
+        directory but such snapshots are not listed by command 'vtools show snapshots'. ''')
     snapshots.add_argument('--load_snapshot', metavar='NAME',
         help='''Revert the current project to specified snapshot. All changes since
-        the last snapshot will be lost.''')
+        the that snapshot will be lost. A filename is allowed to load snapshot from
+        a specific file.''')
     options = parser.add_argument_group('Set values for some various internal options.')
     options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
