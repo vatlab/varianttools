@@ -39,6 +39,7 @@ import threading
 import Queue
 import time
 import re
+import zipfile
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
@@ -1688,14 +1689,14 @@ class Project:
         '''Save snapshot'''
         if not name.isalnum():
             raise ValueError('Snapshot name should not have any special character.')
-        s = delayedAction(self.logger.info, 'Copying project')
-        shutil.copyfile('{}.proj'.format(self.name),
-            os.path.join(runOptions.cache_dir, 'snapshot_{}.proj'.format(name)))
-        del s
-        s = delayedAction(self.logger.info, 'Copying genotypes')
-        shutil.copyfile('{}_genotype.DB'.format(self.name),
-            os.path.join(runOptions.cache_dir, 'snapshot_{}_genotype.DB'.format(name)))
-        del s
+        s = delayedAction(self.logger.info, 'Creating snapshot')
+        with zipfile.ZipFile(os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name)), 'w') as snapshot:
+            s = delayedAction(self.logger.info, 'Copying project')
+            snapshot.write('{}.proj'.format(self.name))
+            del s
+            s = delayedAction(self.logger.info, 'Copying genotypes')
+            snapshot.write('{}_genotype.DB'.format(self.name))
+            del s
         self.saveProperty('__snapshot_{}_date'.format(name), time.strftime('%b%d %H:%M:%S', time.gmtime()))
         self.saveProperty('__snapshot_{}_message'.format(name), message)
         
@@ -1710,20 +1711,20 @@ class Project:
         # get all information about snapshots
         snapshots = list(self.listSnapshots())
         #
-        # close project
-        self.db.close()
-        proj = os.path.join(runOptions.cache_dir, 'snapshot_{}.proj'.format(name))
-        geno = os.path.join(runOptions.cache_dir, 'snapshot_{}_genotype.DB'.format(name))
-        if not os.path.isfile(proj) or not os.path.isfile(geno):
+        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name))
+        if not os.path.isfile(snapshot_file):
             raise ValueError('Snapshot {} does not exist'.format(name))
         #
+        # close project
+        self.db.close()
         try:
-            s = delayedAction(self.logger.info, 'Load project')
-            shutil.copyfile(proj, '{}.proj'.format(self.name))
-            del s
-            s = delayedAction(self.logger.info, 'Load genotypes')
-            shutil.copyfile(geno, '{}_genotype.DB'.format(self.name))
-            del s
+            with zipfile.ZipFile(snapshot_file, 'r') as snapshot:
+                s = delayedAction(self.logger.info, 'Load project')
+                snapshot.extract('{}.proj'.format(self.name))
+                del s
+                s = delayedAction(self.logger.info, 'Load genotypes')
+                snapshot.extract('{}_genotype.DB'.format(self.name))
+                del s
         finally:
             # re-connect the main database for proer cleanup
             self.db = DatabaseEngine()
@@ -1737,8 +1738,8 @@ class Project:
         
     def listSnapshots(self):
         '''return all snapshots'''
-        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.proj')):
-            name = ss[len(runOptions.cache_dir) + 10: -5]
+        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.zip')):
+            name = ss[len(runOptions.cache_dir) + 10: -4]
             date = self.loadProperty('__snapshot_{}_date'.format(name), None)
             message = self.loadProperty('__snapshot_{}_message'.format(name), None)
             if date is not None:
