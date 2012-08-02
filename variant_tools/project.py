@@ -1690,7 +1690,7 @@ class Project:
         if not name.isalnum():
             raise ValueError('Snapshot name should not have any special character.')
         s = delayedAction(self.logger.info, 'Creating snapshot')
-        with zipfile.ZipFile(os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name)), 'w') as snapshot:
+        with zipfile.ZipFile(os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name)), 'w', allowZip64=True) as snapshot:
             s = delayedAction(self.logger.info, 'Copying project')
             snapshot.write('{}.proj'.format(self.name))
             del s
@@ -1718,7 +1718,7 @@ class Project:
         # close project
         self.db.close()
         try:
-            with zipfile.ZipFile(snapshot_file, 'r') as snapshot:
+            with zipfile.ZipFile(snapshot_file, 'r', allowZip64=True) as snapshot:
                 s = delayedAction(self.logger.info, 'Load project')
                 snapshot.extract('{}.proj'.format(self.name))
                 del s
