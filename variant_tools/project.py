@@ -39,7 +39,7 @@ import threading
 import Queue
 import time
 import re
-import zipfile
+import tarfile
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
@@ -1690,12 +1690,12 @@ class Project:
         if not name.isalnum():
             raise ValueError('Snapshot name should not have any special character.')
         s = delayedAction(self.logger.info, 'Creating snapshot')
-        with zipfile.ZipFile(os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name)), 'w', allowZip64=True) as snapshot:
+        with tarfile.open(os.path.join(runOptions.cache_dir, 'snapshot_{}.gztar'.format(name)), 'w:gz') as snapshot:
             s = delayedAction(self.logger.info, 'Copying project')
-            snapshot.write('{}.proj'.format(self.name))
+            snapshot.add('{}.proj'.format(self.name))
             del s
             s = delayedAction(self.logger.info, 'Copying genotypes')
-            snapshot.write('{}_genotype.DB'.format(self.name))
+            snapshot.add('{}_genotype.DB'.format(self.name))
             del s
         self.saveProperty('__snapshot_{}_date'.format(name), time.strftime('%b%d %H:%M:%S', time.gmtime()))
         self.saveProperty('__snapshot_{}_message'.format(name), message)
@@ -1711,14 +1711,14 @@ class Project:
         # get all information about snapshots
         snapshots = list(self.listSnapshots())
         #
-        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.zip'.format(name))
+        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.gztar'.format(name))
         if not os.path.isfile(snapshot_file):
             raise ValueError('Snapshot {} does not exist'.format(name))
         #
         # close project
         self.db.close()
         try:
-            with zipfile.ZipFile(snapshot_file, 'r', allowZip64=True) as snapshot:
+            with tarfile.open(snapshot_file, 'r:gz') as snapshot:
                 s = delayedAction(self.logger.info, 'Load project')
                 snapshot.extract('{}.proj'.format(self.name))
                 del s
@@ -1738,8 +1738,8 @@ class Project:
         
     def listSnapshots(self):
         '''return all snapshots'''
-        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.zip')):
-            name = ss[len(runOptions.cache_dir) + 10: -4]
+        for ss in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.gztar')):
+            name = ss[len(runOptions.cache_dir) + 10: -6]
             date = self.loadProperty('__snapshot_{}_date'.format(name), None)
             message = self.loadProperty('__snapshot_{}_message'.format(name), None)
             if date is not None:
