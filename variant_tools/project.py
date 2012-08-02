@@ -1687,14 +1687,14 @@ class Project:
 
     def saveSnapshot(self, name, message):
         '''Save snapshot'''
-        if name.endswith('.tar') or name.endswith('.tar.gz'):
+        if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             filename = name
-            mode = 'w:gz' if name.endswith('.tar.gz') else 'w'
+            mode = 'w' if name.endswith('.tar') else 'w:gz'
         elif name.isalnum():
             filename = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'w'
         else:
-            raise ValueError('Snapshot name should be a filename with extension .tar or .tar.gz, or a name without any special character.')
+            raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
         #
         s = delayedAction(self.logger.info, 'Creating snapshot')
         with tarfile.open(filename, mode) as snapshot:
@@ -1717,14 +1717,14 @@ class Project:
     def loadSnapshot(self, name):
         '''Load snapshot'''
         #
-        if name.endswith('.tar') or name.endswith('.tar.gz'):
+        if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             snapshot_file = name
-            mode = 'r:gz' if name.endswith('.tar.gz') else 'r'
+            mode = 'r' if name.endswith('.tar') else 'r:gz'
         elif name.isalnum():
             snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'r'
         else:
-            raise ValueError('Snapshot name should be a filename with extension .tar or .tar.gz, or a name without any special character.')
+            raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
         #
         if not os.path.isfile(snapshot_file):
             raise ValueError('Snapshot {} does not exist'.format(name))
@@ -3492,8 +3492,9 @@ def adminArguments(parser):
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
         re-loaded using command 'vtools admin --load_snapshot'. A filename with
-        extension .tar or .tar.gz can be used to save the snapshot to a specific
-        directory but such snapshots are not listed by command 'vtools show snapshots'. ''')
+        extension .tar, .tgz or .tar.gz can be used to save the snapshot to a specific
+        directory with compression but such snapshots are not listed by command
+        'vtools show snapshots'. ''')
     snapshots.add_argument('--load_snapshot', metavar='NAME',
         help='''Revert the current project to specified snapshot. All changes since
         the that snapshot will be lost. A filename is allowed to load snapshot from
