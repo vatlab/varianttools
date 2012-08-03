@@ -1746,10 +1746,19 @@ class Project:
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
         
-    def getSnapshotInfo(self, filename):
+    def getSnapshotInfo(self, name):
         '''return meta information for all snapshots'''
+        if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
+            snapshot_file = name
+            mode = 'r' if name.endswith('.tar') else 'r:gz'
+        elif name.isalnum():
+            snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+            mode = 'r'
+        else:
+            raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
+        #
         try:
-            with tarfile.open(filename, 'r') as snapshot:
+            with tarfile.open(snapshot_file, mode) as snapshot:
                 files = snapshot.getnames()
                 if files != ['README', '{}.proj'.format(self.name),
                     '{}_genotype.DB'.format(self.name)]:
@@ -3427,20 +3436,21 @@ def show(args):
             elif args.type == 'snapshot':
                 if not args.items:
                     raise ValueError('Please provide a list of snapshot name or filenames')
-                print('{:<20} {:>15}  {}'.format('snapshot', 'date', 'message'))
+                print('{:<15} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot in args.items:
                     name, date, desc = proj.getSnapshotInfo(snapshot)
-                    print('{:<20} {:>15}  {}'.format(name, date, 
-                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
+                    if name is not None:
+                        print('{:<15} {:<15} {}'.format(name, date, 
+                            '\n'.join(textwrap.wrap(' '*32 + desc, initial_indent='', subsequent_indent=' '*32))[32:]))
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
-                print('{:<20} {:>15}  {}'.format('snapshot', 'date', 'message'))
+                print('{:<15} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
                     name, date, desc = proj.getSnapshotInfo(snapshot_file)
                     if name is not None:
-                        print('{:<20} {:>15}  {}'.format(name, date, 
-                            '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*30))))
+                        print('{:<15} {:<15} {}'.format(name, date, 
+                            '\n'.join(textwrap.wrap(' '*32 + desc, initial_indent='', subsequent_indent=' '*32))[32:]))
     except Exception as e:
         sys.exit(e)
 
