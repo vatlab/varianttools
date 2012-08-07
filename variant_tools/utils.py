@@ -177,7 +177,7 @@ class RuntimeOptions(object):
         if path not in [None, 'None', '']:
             if os.path.isdir(path) and (os.listdir(path) or 
                     (not os.access(path, os.R_OK)) or (not os.access(path, os.W_OK)) or
-                    (os.stat(path) & stat.S_ISVTX == 512)):
+                    (os.stat(path).st_mode & stat.S_ISVTX == 512)):
                 raise ValueError('Cannot set temporary directory to directory {} because '.format(path) + \
                     'it is not empty or is not writable or deletable. Please clear this directory or use '
                     'command "vtools admin --set_runtime_option temp_dir=DIR" to set it to another path, '
