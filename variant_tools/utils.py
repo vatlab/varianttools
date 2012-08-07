@@ -43,6 +43,7 @@ import cStringIO
 import gzip
 import threading
 import re
+import stat
 try:
     # not all platforms/installations of python support bz2
     import bz2

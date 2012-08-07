@@ -1572,14 +1572,14 @@ class ExternTest(NullTest):
         if not self.pydata:
             raise ValueError("Python data dictionary is empty")
         if dformat == 'w':
-            nvar = len(self.pydata['genotype'][0])
-            nsample = len(self.pydata['genotype'])
+            self.nvar = len(self.pydata['genotype'][0])
+            self.nsample = len(self.pydata['genotype'])
             with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([':'.join(self.pydata['coordinate'][idx]) + '\t' + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(nvar)]))
+                f.writelines('\n'.join([':'.join(self.pydata['coordinate'][idx]) + '\t' + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(self.nvar)]))
             with open(os.path.join(tdir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([self.pydata['sample_name'][idx] + '\t' + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(nsample)]))
+                f.writelines('\n'.join([self.pydata['sample_name'][idx] + '\t' + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(self.nsample)]))
             with open(os.path.join(tdir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([self.gname + '\t' +  ':'.join(self.pydata['coordinate'][idx]) for idx in range(nvar)]))
+                f.writelines('\n'.join([self.gname + '\t' +  ':'.join(self.pydata['coordinate'][idx]) for idx in range(self.nvar)]))
             return 0
         elif dformat == 'R':
             # output data to R script as a string
@@ -1595,6 +1595,10 @@ class GroupWrite(ExternTest):
     '''Write data to disk for each testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
         ExternTest.__init__(self, logger, *method_args)
+        self.fields.extend([
+                Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group'),
+                Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
+                ])
         if os.path.isdir(self.directory) and os.listdir(self.directory):
             raise ValueError("Cannot set output directory to a non-empty directory. Please specify another directory.")
         if not os.path.isdir(self.directory):
@@ -1608,7 +1612,7 @@ class GroupWrite(ExternTest):
                 that matches the group ID and variant ID in pairs.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='',
+        parser.add_argument('--name', default='gwrite',
             help='''Name of the test that will be appended to names of output fields.''')
         parser.add_argument('directory', type=str,
             help='''Output data will be written to the directory specified.''')
@@ -1617,13 +1621,15 @@ class GroupWrite(ExternTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def setData(self, data, pydata):
-        self.data = data
-        self.pydata = pydata
-
     def calculate(self):
         self.dump_data(dformat='w', tdir=self.directory)
-        return []
+        res = []
+        for field in self.fields:
+            if field.name == 'num_variants':
+                res.append(self.nvar)
+            elif field.name == 'sample_size':
+                res.append(self.nsample)
+        return res
 
 
 class SKAT(ExternTest):

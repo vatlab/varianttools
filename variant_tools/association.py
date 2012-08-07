@@ -324,7 +324,7 @@ class AssociationTestManager:
                 # check if method is valid
                 if not hasattr(method, 'fields'):
                     raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
-                if not method.fields and name != 'GroupWrite':
+                if not method.fields:
                     self.logger.warning('Association test {} has invalid or empty fields. No result will be generated.'.format(name))
                 tests.append(method)
             except NameError as e:
@@ -812,7 +812,7 @@ class AssoTestsWorker(Process):
             if field not in ['chr', 'pos']:
                 self.data.setVar('__var_' + field, data[field])
 
-    def setPyData(self, which, geno, var_info, geno_Info, missing_code=None, grpname=None):
+    def setPyData(self, which, geno, var_info, geno_Info, missing_code, grpname):
         '''set all data to a python dictionary in str format'''
         if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
@@ -853,9 +853,9 @@ class AssoTestsWorker(Process):
             grp = self.queue.get()
             #
             try:
-                grpname = ":".join(map(str, grp))
+                grpname = ":".join(list(map(str, grp)))
             except TypeError:
-                grpname = None
+                grpname = "None"
             if grp is None:
                 break
             # self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
