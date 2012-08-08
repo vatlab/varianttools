@@ -850,6 +850,8 @@ class Project:
         #
         runOptions.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
         #
+        runOptions.associate_test_timeout = self.loadProperty('__option_associate_test_timeout', None)
+        #
         # create a logger
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)

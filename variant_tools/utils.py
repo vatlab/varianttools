@@ -89,6 +89,9 @@ class RuntimeOptions(object):
                 'they consist of all wildtype alleles. This option should be used with caution '
                 'because it convert real missing genotypes and genotypes removed due to, for '
                 'example low quality score, to wildtype genotypes.'),
+            'associate_test_timeout': (3600, 'Cancel associate test and return special values '
+                'when a test lasts more than specified time (in seconds, default to 3600s, '
+                'namely 1 hour). Setting this option to 0 will disable this option.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -106,6 +109,8 @@ class RuntimeOptions(object):
         self._proj_temp_dir = self._temp_dir  # per project temp directory
         # how to handle missing data
         self._treat_missing_as_wildtype = self.persistent_options['treat_missing_as_wildtype'][0]
+        # association test time out
+        self._associate_test_timeout = self.persistent_options['associate_test_timeout'][0]
     #
     # attribute command line
     #
@@ -208,6 +213,17 @@ class RuntimeOptions(object):
     #
     treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype == 'True' else False,
         _set_treat_missing_as_wildtype)
+    #
+    # attribute associate_test_timeout
+    def _set_associate_test_timeout(self, val):
+        try:
+            # test if val can be converted to int
+            int(val)
+            self._associate_test_timeout = val
+        except:
+            pass
+    #
+    associate_test_timeout = property(lambda self: int(self._associate_test_timeout), _set_associate_test_timeout) 
 
 
 # the singleton object of RuntimeOptions

@@ -838,6 +838,13 @@ class AssoTestsWorker(Process):
         if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
             raise ValueError("No input data")
 
+    def timeout(self, param):
+        self._timeout = True
+        self.logger.warning('Test {} for group {} aborted because it exceeds {}s time limit. Special values '
+            'such as negative p-values might be returned. You can use command '
+            '"vtools admin --set_runtime_option associate_test_timeout" to change this option.'.format(
+                param[0], ':'.join(map(str, param[1])), runOptions.associate_test_timeout))
+
     def run(self):
         # 
         # tell the master process that this worker is ready
@@ -860,7 +867,12 @@ class AssoTestsWorker(Process):
                 break
             # self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
             #
-            self.data = t.AssoData()
+            #
+            # an association test might be determinated if it runs more than
+            # runOptions.associate_test_timeout seconds.
+            # 
+            self._timeout = False
+            self.data = t.AssoData(self._timeout)
             self.pydata = {}
             values = list(grp)
             try:
@@ -880,8 +892,16 @@ class AssoTestsWorker(Process):
 
                 # association tests
                 for test in self.tests:
+                    if runOptions.associate_test_timeout > 0:
+                        self._timeout = False
+                        s = delayedAction(self.timeout, (test.name, grp),
+                            delay=runOptions.associate_test_timeout)
+                    else:
+                        s = None
                     test.setData(self.data, self.pydata)
                     result = test.calculate()
+                    # stop self.timeout from being called if the test is completed before specified time limit
+                    del s
                     # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except KeyboardInterrupt as e:
@@ -890,7 +910,7 @@ class AssoTestsWorker(Process):
             except Exception as e:
                 self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
                 # self.data might have been messed up, create a new one
-                self.data = t.AssoData()
+                self.data = t.AssoData(self._timeout)
                 self.pydata = {}
                 # return no result for any of the tests if an error message is captured.
                 values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])

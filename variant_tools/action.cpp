@@ -1307,6 +1307,10 @@ double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current,
 
 bool AssoAlgorithm::apply(AssoData & d)
 {
+	if (d.timeout()) {
+		throw RuntimeError("test exit because of timeout");
+		return true;
+	}
 	for (size_t j = 0; j < m_actions.size(); ++j) {
 		try {
 			// an action can throw StopIteration to stop the rest of actions to be applied
