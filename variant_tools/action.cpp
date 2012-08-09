@@ -31,6 +31,33 @@
 
 namespace vtools {
 
+class Timer
+{
+public:
+	Timer(int timeout) : m_total_time(timeout)
+	{
+		if (timeout > 0)
+			m_start_time = time(NULL);
+	}
+
+	bool timeout()
+	{
+		return m_total_time > 0 && 
+			static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
+	}
+
+	int remaining()
+	{
+		// always return at least 1 second when timeout is set because 0 means no time limit is set
+		return m_total_time > 0 ? std::max(1, m_total_time - 
+			static_cast<int>(difftime(time(NULL), m_start_time))) : 0;
+	}
+
+private:
+	time_t m_start_time;
+	int m_total_time;
+};
+
 bool SetMaf::apply(AssoData & d, int timeout)
 {
 	matrixf & genotype = d.raw_genotype();
@@ -1308,10 +1335,11 @@ double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current,
 
 bool AssoAlgorithm::apply(AssoData & d, int timeout)
 {
+	Timer timer(timeout);
 	for (size_t j = 0; j < m_actions.size(); ++j) {
 		try {
 			// an action can throw StopIteration to stop the rest of actions to be applied
-			if (!m_actions[j]->apply(d, timeout))
+			if (!m_actions[j]->apply(d, timer.remaining()))
 				break;
 		} catch (RuntimeError & e) {
 			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception (" + e.message() + ")";
@@ -1346,19 +1374,12 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 	// statistics[1]: actual number of permutations (informative about standard error)
 	vectorf statistics(2);
 
-	time_t start_time;
-	time_t cur_time;
-	time(&start_time);
+	Timer timer(timeout);
 	
 	// permutation loop begins
 	for (size_t i = 0; i < m_times; ++i) {
-		if (timeout > 0) {
-			time(&cur_time);
-			if (difftime(cur_time, start_time) > timeout) {
-				throw RuntimeError("test exit because of timeout");
-				return true;
-			}
-		}
+		if (timer.timeout())
+			throw RuntimeError("Could not complete test within specified time limit (cf. runtime option associate_test_timeout).");
 		// apply actions to data
 		for (size_t j = 0; j < m_actions.size(); ++j) {
 			m_actions[j]->apply(d);
