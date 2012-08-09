@@ -57,7 +57,7 @@ public:
 	}
 
 
-	virtual bool apply(AssoData & d, int timeout=0)
+	virtual bool apply(AssoData & d, int timeout = 0)
 	{
 		throw RuntimeError("The base action class should not be called");
 		return true;
@@ -92,7 +92,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -120,7 +120,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -145,7 +145,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0)
+	bool apply(AssoData & d, int timeout = 0)
 	{
 		d.permuteX();
 		return true;
@@ -174,7 +174,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0)
+	bool apply(AssoData & d, int timeout = 0)
 	{
 		d.permuteRawX();
 		return true;
@@ -203,7 +203,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0)
+	bool apply(AssoData & d, int timeout = 0)
 	{
 		d.permuteAllX();
 		return true;
@@ -232,7 +232,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0)
+	bool apply(AssoData & d, int timeout = 0)
 	{
 		d.permuteY();
 		return true;
@@ -262,7 +262,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -292,7 +292,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -321,7 +321,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -351,7 +351,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -380,7 +380,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -410,7 +410,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -434,7 +434,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -459,7 +459,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 
 	std::string name()
@@ -488,7 +488,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -529,7 +529,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -559,7 +559,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -595,7 +595,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -627,7 +627,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -656,7 +656,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -687,7 +687,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -713,7 +713,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -743,7 +743,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -775,7 +775,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -800,7 +800,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -826,7 +826,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -854,7 +854,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -884,7 +884,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -913,7 +913,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -970,7 +970,7 @@ public:
 	}
 
 
-	virtual bool apply(AssoData & d, int timeout=0)
+	virtual bool apply(AssoData & d, int timeout = 0)
 	{
 		throw RuntimeError("The base permutation class should not be called");
 		return true;
@@ -997,6 +997,9 @@ public:
 	// will continue permutation if the required "sig" is captured by the 95% CI
 	// otherwise will quit permutation and use this p-value as the final p-value to report
 	double check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const;
+
+	// calculate p-value in permutation tests
+	double getP(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt) const;
 
 protected:
 	vectora m_actions;
@@ -1025,7 +1028,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{
@@ -1071,7 +1074,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 };
 
@@ -1123,7 +1126,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 private:
 	size_t m_times;
@@ -1184,7 +1187,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 private:
 	size_t m_times;
@@ -1218,7 +1221,7 @@ public:
 	}
 
 
-	bool apply(AssoData & d, int timeout=0);
+	bool apply(AssoData & d, int timeout = 0);
 
 	std::string name()
 	{

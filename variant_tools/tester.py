@@ -366,6 +366,11 @@ class CaseCtrlBurdenTest(NullTest):
             for (x, y, z) in zip(statistics, pvalues, se):
                 res.append(x)
                 res.append(y)
+                if y < 0:
+                    self.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
+                    'A negative p-value is returned, whose absolute value is the p-value estimate based on currently completed permutations. '
+                    'You can use command "vtools admin --set_runtime_option associate_test_timeout" to change the timeout settings.'.format(
+                    self.name, self.gname, timeout))
                 if self.permutations > 0:
                     # actual number of permutations
                     if math.isnan(z): res.append(z)
@@ -600,6 +605,11 @@ class GLMBurdenTest(NullTest):
             for (x, y, z) in zip(regstats, pvalues, regse):
                 res.append(x)
                 res.append(y)
+                if y < 0:
+                    self.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
+                    'A negative p-value is returned, whose absolute value is the p-value estimate based on currently completed permutations. '
+                    'You can use command "vtools admin --set_runtime_option associate_test_timeout" to change the timeout settings.'.format(
+                    self.name, self.gname, timeout))
                 if self.permutations == 0:
                     # Wald statistic
                     res.append(x/z)

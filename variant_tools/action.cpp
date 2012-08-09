@@ -40,18 +40,21 @@ public:
 			m_start_time = time(NULL);
 	}
 
+
 	bool timeout()
 	{
-		return m_total_time > 0 && 
-			static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
+		return m_total_time > 0 &&
+		       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
 	}
+
 
 	int remaining()
 	{
 		// always return at least 1 second when timeout is set because 0 means no time limit is set
-		return m_total_time > 0 ? std::max(1, m_total_time - 
+		return m_total_time > 0 ? std::max(1, m_total_time -
 			static_cast<int>(difftime(time(NULL), m_start_time))) : 0;
 	}
+
 
 private:
 	time_t m_start_time;
@@ -1274,6 +1277,21 @@ bool PyAction::apply(AssoData & d, int timeout)
 }
 
 
+double BasePermutator::getP(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt) const
+{
+	// calculate permutation based p-value
+	double x;
+
+	if (alt == 1) {
+		x = 1.0 + pcount1;
+	} else {
+		x = fmin(pcount1 + 1.0, pcount2 + 1.0);
+	}
+	double pval = x / (current + 1.0);
+	return (alt == 1) ? pval : pval * 2.0;
+}
+
+
 double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current, unsigned alt, double sig) const
 {
 	// the adaptive p-value technique
@@ -1336,6 +1354,7 @@ double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current,
 bool AssoAlgorithm::apply(AssoData & d, int timeout)
 {
 	Timer timer(timeout);
+
 	for (size_t j = 0; j < m_actions.size(); ++j) {
 		try {
 			// an action can throw StopIteration to stop the rest of actions to be applied
@@ -1374,12 +1393,11 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 	// statistics[1]: actual number of permutations (informative about standard error)
 	vectorf statistics(2);
 
+	// permutation timer initialization
 	Timer timer(timeout);
-	
-	// permutation loop begins
+
+	// permutation loop
 	for (size_t i = 0; i < m_times; ++i) {
-		if (timer.timeout())
-			throw RuntimeError("Could not complete test within specified time limit (cf. runtime option associate_test_timeout).");
 		// apply actions to data
 		for (size_t j = 0; j < m_actions.size(); ++j) {
 			m_actions[j]->apply(d);
@@ -1408,6 +1426,13 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 		if (m_sig < 1.0) {
 			pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
 		}
+		// check for timeout and properly return
+		// this event will be flagged by a negative p-value
+		// which will be caught by python codes
+		// and log a warning message for the event
+		if (timer.timeout()) {
+			pvalue = -1.0 * getP(permcount1, permcount2, i, m_alternative);
+		}
 		if (pvalue <= 1.0) {
 			statistics[1] = double(i);
 			break;
@@ -1419,13 +1444,7 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 	if (pvalue <= 1.0) {
 		d.setPvalue(pvalue);
 	} else{
-		if (m_alternative == 1) {
-			pvalue = (permcount1 + 1.0) / (m_times + 1.0);
-		} else{
-			double permcount = fmin(permcount1, permcount2);
-			pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
-		}
-		d.setPvalue(pvalue);
+		d.setPvalue(getP(permcount1, permcount2, m_times, m_alternative));
 	}
 
 	statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
@@ -1535,6 +1554,10 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	// statistics[1]: actual number of permutations (informative on standard error)
 	vectorf statistics(2);
 
+	// permutation timer initialization
+	Timer timer(timeout);
+
+	// permutation loop
 	for (size_t i = 0; i < m_times; ++i) {
 		vectorf vt_statistic(0);
 		// make a copy of data
@@ -1601,6 +1624,13 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 		if (m_sig < 1.0) {
 			pvalue = check(permcount1, permcount2, i, m_alternative, m_sig);
 		}
+		// check for timeout and properly return
+		// this event will be flagged by a negative p-value
+		// which will be caught by python codes
+		// and log a warning message for the event
+		if (timer.timeout()) {
+			pvalue = -1.0 * getP(permcount1, permcount2, i, m_alternative);
+		}
 		if (pvalue <= 1.0) {
 			statistics[1] = double(i);
 			break;
@@ -1617,13 +1647,7 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	if (pvalue <= 1.0) {
 		d.setPvalue(pvalue);
 	} else {
-		if (m_alternative == 1) {
-			pvalue = (permcount1 + 1.0) / (m_times + 1.0);
-		} else {
-			double permcount = fmin(permcount1, permcount2);
-			pvalue = 2.0 * (permcount + 1.0) / (m_times + 1.0);
-		}
-		d.setPvalue(pvalue);
+		d.setPvalue(getP(permcount1, permcount2, m_times, m_alternative));
 	}
 
 	// set statistic, a bit involved
