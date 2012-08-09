@@ -36,15 +36,36 @@ class Timer
 public:
 	Timer(int timeout) : m_total_time(timeout)
 	{
-		if (timeout > 0)
-			m_start_time = time(NULL);
+		m_start_time = time(NULL);
+		m_calls_per_second = 0;
 	}
 
 
-	bool timeout()
+	bool timeout(int caller_id = 0)
 	{
-		return m_total_time > 0 &&
-		       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
+		//count how many times the timeout() function is called
+		//before a detectable time change happens (difftime > 0).
+		if (m_calls_per_second <= 0) {
+			if (static_cast<int>(difftime(time(NULL), m_start_time))) {
+				m_calls_per_second = -1 * m_calls_per_second;
+			} else {
+				m_calls_per_second--;
+			}
+		}
+		//check time() only every second
+		if (m_calls_per_second > 0 && caller_id > m_calls_per_second) {
+			if (caller_id % m_calls_per_second == 0) {
+				return m_total_time > 0 &&
+				       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
+
+			} else {
+				return false;
+			}
+
+		} else {
+			return m_total_time > 0 &&
+			       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
+		}
 	}
 
 
@@ -59,6 +80,7 @@ public:
 private:
 	time_t m_start_time;
 	int m_total_time;
+	int m_calls_per_second;
 };
 
 bool SetMaf::apply(AssoData & d, int timeout)
@@ -1430,7 +1452,7 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 		// this event will be flagged by a negative p-value
 		// which will be caught by python codes
 		// and log a warning message for the event
-		if (timer.timeout()) {
+		if (timer.timeout(i)) {
 			pvalue = -1.0 * getP(permcount1, permcount2, i, m_alternative);
 		}
 		if (pvalue <= 1.0) {
@@ -1628,7 +1650,7 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 		// this event will be flagged by a negative p-value
 		// which will be caught by python codes
 		// and log a warning message for the event
-		if (timer.timeout()) {
+		if (timer.timeout(i)) {
 			pvalue = -1.0 * getP(permcount1, permcount2, i, m_alternative);
 		}
 		if (pvalue <= 1.0) {

@@ -142,6 +142,7 @@ bool AssoData::setGenotypeId()
 		std::vector<double>::iterator low = std::lower_bound(v.begin(), v.end(), m_genotype_id[i]);
 		m_genotype_id[i] = double(low - v.begin());
 	}
+	return true;
 }
 
 
