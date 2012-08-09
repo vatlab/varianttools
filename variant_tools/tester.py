@@ -87,7 +87,7 @@ class NullTest:
         else:
             pass
 
-    def calculate(self):
+    def calculate(self, timeout):
         return []
 
 
@@ -134,7 +134,7 @@ class GroupStat(NullTest):
         else:
             pass
 
-    def calculate(self):
+    def calculate(self, timeout):
         res = []
         try:
             for field in self.fields:
@@ -352,14 +352,14 @@ class CaseCtrlBurdenTest(NullTest):
         return algorithm
 
 
-    def calculate(self):
+    def calculate(self, timeout):
         if self.data.locicounts() <= 1:
             raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 2).")
         res = [self.data.samplecounts()]
         try:
             self.data.setMOI(self.moi)
             self.data.countCaseCtrl()
-            self.algorithm.apply(self.data)
+            self.algorithm.apply(self.data, timeout)
             pvalues = self.data.pvalue()
             statistics = self.data.statistic()
             se = self.data.se()
@@ -587,12 +587,12 @@ class GLMBurdenTest(NullTest):
                 algorithm.append(a_permutationtest)
         return algorithm
 
-    def calculate(self):
+    def calculate(self, timeout):
         res = [self.data.samplecounts()]
         try:
             self.data.setMOI(self.moi)
             self.data.countCaseCtrl()
-            self.algorithm.apply(self.data)
+            self.algorithm.apply(self.data, timeout)
             # get results
             pvalues = self.data.pvalue()
             regstats = self.data.statistic()
@@ -1621,7 +1621,7 @@ class GroupWrite(ExternTest):
         # incorporate args to this class
         self.__dict__.update(vars(args))
 
-    def calculate(self):
+    def calculate(self, timeout):
         self.dump_data(dformat='w', tdir=self.directory)
         res = []
         for field in self.fields:
@@ -1737,7 +1737,7 @@ class SKAT(ExternTest):
         self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
 
-    def calculate(self):
+    def calculate(self, timeout):
         # translate data to string
         res = [len(self.pydata['phenotype'])]
         self.Rstr = self.dump_data(dformat='R', tdir=runOptions.temp_dir)
@@ -1922,7 +1922,7 @@ class ScoreSeq(ExternTest):
             raise ValueError("No statistic is calculated by SCORE-Seq. \nTo trouble shoot, please run: {0}".format(self.gSargs.replace(runOptions.temp_dir+'/', '')))
 
 
-    def calculate(self):
+    def calculate(self, timeout):
         res = [len(self.pydata['phenotype'])]
         self.dump_data(dformat='w', tdir=runOptions.temp_dir)
         self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3} ".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),

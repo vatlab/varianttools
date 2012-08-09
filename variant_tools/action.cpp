@@ -27,10 +27,11 @@
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
 #include "fisher2.h"
+#include "time.h"
 
 namespace vtools {
 
-bool SetMaf::apply(AssoData & d)
+bool SetMaf::apply(AssoData & d, int timeout)
 {
 	matrixf & genotype = d.raw_genotype();
 
@@ -74,7 +75,7 @@ bool SetMaf::apply(AssoData & d)
 }
 
 
-bool FillGMissing::apply(AssoData & d)
+bool FillGMissing::apply(AssoData & d, int timeout)
 {
 	if (!d.hasVar("maf")) {
 		throw RuntimeError("Sample MAF, which has not been calculated, is required for this operation.");
@@ -121,7 +122,7 @@ bool FillGMissing::apply(AssoData & d)
 }
 
 
-bool WeightByInfo::apply(AssoData & d)
+bool WeightByInfo::apply(AssoData & d, int timeout)
 {
 	for (size_t i = 0; i < m_info.size(); ++i) {
 		if (d.hasVar("__var_" + m_info[i])) {
@@ -141,7 +142,7 @@ bool WeightByInfo::apply(AssoData & d)
 }
 
 
-bool BrowningWeight::apply(AssoData & d)
+bool BrowningWeight::apply(AssoData & d, int timeout)
 {
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	matrixf maf(m_model);
@@ -208,7 +209,7 @@ bool BrowningWeight::apply(AssoData & d)
 }
 
 
-bool SetSites::apply(AssoData & d)
+bool SetSites::apply(AssoData & d, int timeout)
 {
 	if (!d.hasVar("maf")) {
 		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to setting variant sites.");
@@ -240,7 +241,7 @@ bool SetSites::apply(AssoData & d)
 }
 
 
-bool CodeXByMOI::apply(AssoData & d)
+bool CodeXByMOI::apply(AssoData & d, int timeout)
 {
 
 	matrixf & genotype = d.raw_genotype();
@@ -271,7 +272,7 @@ bool CodeXByMOI::apply(AssoData & d)
 }
 
 
-bool SumToX::apply(AssoData & d)
+bool SumToX::apply(AssoData & d, int timeout)
 {
 	vectorf & X = d.genotype();
 	matrixf & genotype = d.raw_genotype();
@@ -291,7 +292,7 @@ bool SumToX::apply(AssoData & d)
 }
 
 
-bool BinToX::apply(AssoData & d)
+bool BinToX::apply(AssoData & d, int timeout)
 {
 	vectorf & X = d.genotype();
 	matrixf & genotype = d.raw_genotype();
@@ -319,7 +320,7 @@ bool BinToX::apply(AssoData & d)
 }
 
 
-bool SimpleLinearRegression::apply(AssoData & d)
+bool SimpleLinearRegression::apply(AssoData & d, int timeout)
 {
 	// simple linear regression score test
 	//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
@@ -359,7 +360,7 @@ bool SimpleLinearRegression::apply(AssoData & d)
 }
 
 
-bool SimpleLogisticRegression::apply(AssoData & d)
+bool SimpleLogisticRegression::apply(AssoData & d, int timeout)
 {
 	//!- labnotes vol.2 page 3
 	double xbar = d.getDoubleVar("xbar");
@@ -391,7 +392,7 @@ bool SimpleLogisticRegression::apply(AssoData & d)
 }
 
 
-bool MultipleRegression::apply(AssoData & d)
+bool MultipleRegression::apply(AssoData & d, int timeout)
 {
 
 	vectorf & X = d.genotype();
@@ -429,7 +430,7 @@ bool MultipleRegression::apply(AssoData & d)
 }
 
 
-bool GaussianPval::apply(AssoData & d)
+bool GaussianPval::apply(AssoData & d, int timeout)
 {
 	vectorf & statistic = d.statistic();
 	vectorf & se = d.se();
@@ -456,7 +457,7 @@ bool GaussianPval::apply(AssoData & d)
 }
 
 
-bool StudentPval::apply(AssoData & d)
+bool StudentPval::apply(AssoData & d, int timeout)
 {
 	int ncovar = d.getIntVar("ncovar");
 	vectorf & statistic = d.statistic();
@@ -486,7 +487,7 @@ bool StudentPval::apply(AssoData & d)
 }
 
 
-bool Fisher2X2::apply(AssoData & d)
+bool Fisher2X2::apply(AssoData & d, int timeout)
 {
 	vectorf & genotype = d.genotype();
 	vectorf & phenotype = d.phenotype();
@@ -546,7 +547,7 @@ bool Fisher2X2::apply(AssoData & d)
 }
 
 
-bool MannWhitneyu::apply(AssoData & d)
+bool MannWhitneyu::apply(AssoData & d, int timeout)
 {
 	vectorf & genotype = d.genotype();
 	vectorf & phenotype = d.phenotype();
@@ -612,7 +613,7 @@ bool MannWhitneyu::apply(AssoData & d)
 }
 
 
-bool WSSPvalue::apply(AssoData & d)
+bool WSSPvalue::apply(AssoData & d, int timeout)
 {
 	if (!d.hasVar("RankStats")) {
 		throw ValueError("Cannot find Mann-Whitney test statistic");
@@ -658,7 +659,7 @@ bool WSSPvalue::apply(AssoData & d)
 }
 
 
-bool FindGenotypePattern::apply(AssoData & d)
+bool FindGenotypePattern::apply(AssoData & d, int timeout)
 {
 	//!-Compute unique genotype patterns (string) as ID scores (double)
 	d.setGenotypeId();
@@ -692,7 +693,7 @@ bool FindGenotypePattern::apply(AssoData & d)
 }
 
 
-bool KBACtest::apply(AssoData & d)
+bool KBACtest::apply(AssoData & d, int timeout)
 {
 	vectorf & up = d.getArrayVar("uniqGPattern");
 	vectori & upc = d.getIntArrayVar("uniqGCounts");
@@ -755,7 +756,7 @@ bool KBACtest::apply(AssoData & d)
 }
 
 
-bool RBTtest::apply(AssoData & d)
+bool RBTtest::apply(AssoData & d, int timeout)
 {
 	vectorf & ydat = d.phenotype();
 	matrixf & xdat = d.raw_genotype();
@@ -814,7 +815,7 @@ bool RBTtest::apply(AssoData & d)
 }
 
 
-bool AdaptiveRvSum::apply(AssoData & d)
+bool AdaptiveRvSum::apply(AssoData & d, int timeout)
 {
 	vectorf & ydat = d.phenotype();
 	matrixf & xdat = d.raw_genotype();
@@ -901,7 +902,7 @@ bool AdaptiveRvSum::apply(AssoData & d)
 }
 
 
-bool FindVariantPattern::apply(AssoData & d)
+bool FindVariantPattern::apply(AssoData & d, int timeout)
 {
 	matrixf & xdat = d.raw_genotype();
 	vectori vnum(xdat.front().size(), 0);
@@ -929,7 +930,7 @@ bool FindVariantPattern::apply(AssoData & d)
 }
 
 
-bool VTTest::apply(AssoData & d)
+bool VTTest::apply(AssoData & d, int timeout)
 {
 	// VT method as in Price et al 2010
 	//! - Define <b> 'allZs' </b>, a vector of the Z scores computed under different thresholds
@@ -979,7 +980,7 @@ bool VTTest::apply(AssoData & d)
 }
 
 
-bool VTFisher::apply(AssoData & d)
+bool VTFisher::apply(AssoData & d, int timeout)
 {
 	// VT method using Fisher's test
 	// will send out a stopping signal if the initial statistics are significant
@@ -1087,7 +1088,7 @@ bool VTFisher::apply(AssoData & d)
 }
 
 
-bool CalphaTest::apply(AssoData & d)
+bool CalphaTest::apply(AssoData & d, int timeout)
 {
 
 	/*! * the c-alpha Statistic: sum of the std. error of variant counts in cases <br>
@@ -1158,7 +1159,7 @@ bool CalphaTest::apply(AssoData & d)
 }
 
 
-bool RareCoverTest::apply(AssoData & d)
+bool RareCoverTest::apply(AssoData & d, int timeout)
 {
 	// RareCover method, 2010 PLoS CompBio
 	vectorf & ydat = d.phenotype();
@@ -1229,7 +1230,7 @@ bool RareCoverTest::apply(AssoData & d)
 //////////////
 
 
-bool PyAction::apply(AssoData & d)
+bool PyAction::apply(AssoData & d, int timeout)
 {
 	// Passing d to the function
 	PyObject * args = PyTuple_New(m_func.numArgs());
@@ -1305,16 +1306,12 @@ double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current,
 }
 
 
-bool AssoAlgorithm::apply(AssoData & d)
+bool AssoAlgorithm::apply(AssoData & d, int timeout)
 {
-	if (d.timeout()) {
-		throw RuntimeError("test exit because of timeout");
-		return true;
-	}
 	for (size_t j = 0; j < m_actions.size(); ++j) {
 		try {
 			// an action can throw StopIteration to stop the rest of actions to be applied
-			if (!m_actions[j]->apply(d))
+			if (!m_actions[j]->apply(d, timeout))
 				break;
 		} catch (RuntimeError & e) {
 			std::string msg = "Operator " + m_actions[j]->name() + " raises an exception (" + e.message() + ")";
@@ -1328,7 +1325,7 @@ bool AssoAlgorithm::apply(AssoData & d)
 }
 
 
-bool FixedPermutator::apply(AssoData & d)
+bool FixedPermutator::apply(AssoData & d, int timeout)
 {
 	if (d.pvalue().size()) {
 		// p-value has already been calculated
@@ -1349,8 +1346,19 @@ bool FixedPermutator::apply(AssoData & d)
 	// statistics[1]: actual number of permutations (informative about standard error)
 	vectorf statistics(2);
 
+	time_t start_time;
+	time_t cur_time;
+	time(&start_time);
+	
 	// permutation loop begins
 	for (size_t i = 0; i < m_times; ++i) {
+		if (timeout > 0) {
+			time(&cur_time);
+			if (difftime(cur_time, start_time) > timeout) {
+				throw RuntimeError("test exit because of timeout");
+				return true;
+			}
+		}
 		// apply actions to data
 		for (size_t j = 0; j < m_actions.size(); ++j) {
 			m_actions[j]->apply(d);
@@ -1407,7 +1415,7 @@ bool FixedPermutator::apply(AssoData & d)
 }
 
 
-bool VariablePermutator::apply(AssoData & d)
+bool VariablePermutator::apply(AssoData & d, int timeout)
 {
 	if (d.pvalue().size()) {
 		// p-value has already been calculated
@@ -1618,7 +1626,7 @@ bool VariablePermutator::apply(AssoData & d)
 // 3. apply a test statistic
 // end
 // max(sm1, sm2)
-bool WeightedGenotypeTester::apply(AssoData & d)
+bool WeightedGenotypeTester::apply(AssoData & d, int timeout)
 {
 	// check input actions
 	// the first should be a weighting theme

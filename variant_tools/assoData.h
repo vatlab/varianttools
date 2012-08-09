@@ -83,25 +83,15 @@ public:
 	 *  stringVar gname: association group name
 	 */
 
-	AssoData(PyObject * timeout) :
+	AssoData():
 		m_phenotype(0), m_C(0), m_genotype(0),
 		m_X(0), m_genotype_id(0), m_genotype_index(0),
 		m_pval(0), m_statistic(0), m_se(0), m_model(),
 		m_doubleVars(), m_intVars(), m_arrayVars(),
-		m_intArrayVars(), m_matrixVars(), m_stringVars(),
-		m_timeout(timeout)
+		m_intArrayVars(), m_matrixVars(), m_stringVars()
 	{
-        // here we do not increase the ref count of timeout
-        // to avoid the need to decrease ref count when this object
-        // is released.
 	}
 
-
-	// check if the timeout flag is set from the Python caller
-	bool timeout() const
-	{
-		return m_timeout == Py_True;
-	}
 
 	virtual ~AssoData(){}
 
@@ -494,8 +484,6 @@ private:
 	//
 	MatrixVars m_matrixVars;
 	StringVars m_stringVars;
-	//
-	PyObject * m_timeout;
 };
 
 }
