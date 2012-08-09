@@ -34,38 +34,31 @@ namespace vtools {
 class Timer
 {
 public:
-	Timer(int timeout) : m_total_time(timeout)
+	Timer(int timeout) : m_total_time(timeout), m_calls_per_second(0)
 	{
 		m_start_time = time(NULL);
-		m_calls_per_second = 0;
 	}
 
 
 	bool timeout(int caller_id = 0)
 	{
+		if (m_total_time == 0)
+			return false;
 		//count how many times the timeout() function is called
 		//before a detectable time change happens (difftime > 0).
 		if (m_calls_per_second <= 0) {
-			if (static_cast<int>(difftime(time(NULL), m_start_time))) {
-				m_calls_per_second = -1 * m_calls_per_second;
-			} else {
+			// first detectable change
+			int diff = static_cast<int>(difftime(time(NULL), m_start_time));
+			if (diff)
+				// m_calls_per_second might still be 0 when 1s is passed
+				m_calls_per_second = std::max(1, -1 * m_calls_per_second);
+			else
 				m_calls_per_second--;
-			}
-		}
-		//check time() only every second
-		if (m_calls_per_second > 0 && caller_id > m_calls_per_second) {
-			if (caller_id % m_calls_per_second == 0) {
-				return m_total_time > 0 &&
-				       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
-
-			} else {
-				return false;
-			}
-
-		} else {
-			return m_total_time > 0 &&
-			       static_cast<int>(difftime(time(NULL), m_start_time)) > m_total_time;
-		}
+			return diff >= m_total_time;
+		} else
+			//check time() only every second
+			return (caller_id % m_calls_per_second == 0) && 
+				static_cast<int>(difftime(time(NULL), m_start_time)) >= m_total_time;
 	}
 
 
