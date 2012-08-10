@@ -883,7 +883,7 @@ class AssoTestsWorker(Process):
                 # association tests
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
-                    result = test.calculate(runOptions.associate_test_timeout)
+                    result = test.calculate(runOptions.association_timeout)
                     # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except KeyboardInterrupt as e:

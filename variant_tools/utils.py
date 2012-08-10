@@ -89,9 +89,9 @@ class RuntimeOptions(object):
                 'they consist of all wildtype alleles. This option should be used with caution '
                 'because it convert real missing genotypes and genotypes removed due to, for '
                 'example low quality score, to wildtype genotypes.'),
-            'associate_test_timeout': (3600, 'Cancel associate test and return special values '
-                'when a test lasts more than specified time (in seconds, default to 3600s, '
-                'namely 1 hour). Setting this option to 0 will disable this option.')
+            'association_timeout': (None, 'Cancel associate test and return special values '
+                'when a test lasts more than specified time (in seconds). The default '
+                'value of this option is None, which stands for no time limit.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -110,7 +110,7 @@ class RuntimeOptions(object):
         # how to handle missing data
         self._treat_missing_as_wildtype = self.persistent_options['treat_missing_as_wildtype'][0]
         # association test time out
-        self._associate_test_timeout = self.persistent_options['associate_test_timeout'][0]
+        self._association_timeout = self.persistent_options['association_timeout'][0]
     #
     # attribute command line
     #
@@ -214,16 +214,19 @@ class RuntimeOptions(object):
     treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype == 'True' else False,
         _set_treat_missing_as_wildtype)
     #
-    # attribute associate_test_timeout
-    def _set_associate_test_timeout(self, val):
+    # attribute association_timeout
+    def _set_association_timeout(self, val):
         try:
-            # test if val can be converted to int
-            int(val)
-            self._associate_test_timeout = val
+            if val in ['None', None]:
+                self.__association_timeout = None
+            else:
+                # test if val can be converted to int
+                int(val)
+                self._association_timeout = val
         except:
             pass
     #
-    associate_test_timeout = property(lambda self: int(self._associate_test_timeout), _set_associate_test_timeout) 
+    association_timeout = property(lambda self: 0 if self._association_timeout is None else int(self._association_timeout), _set_association_timeout) 
 
 
 # the singleton object of RuntimeOptions
