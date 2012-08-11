@@ -3568,7 +3568,7 @@ def admin(args):
                     proj.logger.info('Option {} is set to {}'.format(opt, value))
             elif args.reset_runtime_option is not None:
                 if args.reset_runtime_option not in runOptions.persistent_options:
-                    raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.''')
+                    raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.'.format(args.reset_runtime_option))
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
