@@ -49,18 +49,20 @@ else:
 import argparse
 
 class ShelfDB:
-    def __init__(self, filename, mode='n'):
-        if os.path.isfile(filename + '.DB'):
+    def __init__(self, filename, mode='n', logger=None):
+        self.filename = filename
+        if os.path.isfile(self.filename + '.DB'):
             if mode == 'n':
-                os.remove(filename + '.DB')
+                os.remove(self.filename + '.DB')
         elif mode == 'r':
-            raise ValueError('Temporary database {} does not exist.'.format(filename))
+            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
         self.db = DatabaseEngine()
         self.db.connect(filename)
         self.cur = self.db.cursor()
         self.mode = mode
         if mode == 'n':
             self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
+        self.logger = logger
         self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
         self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
 
@@ -93,16 +95,21 @@ class ShelfDB:
         return pickle.loads(self.cur.fetchone()[0])
 
     def close(self):
+        if not os.path.isfile(self.filename + '.DB'):
+            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
         if self.mode == 'n':
             self.db.commit()
             try:
                 self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
                 self.db.commit()
-            except OperationalError:
+            except OperationalError as e:
+                if self.logger:
+                    self.logger.warning('Failed to index temporary database {}: {}. Association tests can still be performed but might be very slow.'.\
+                            format(self.filename, e))
                 pass
             finally:
                 # close the database even if create index failed. In this case
-                # shelf retrival will be slower but still doable
+                # shelf retrieval will be slower but still doable
                 self.db.close()
 
 def istr(d):
@@ -514,7 +521,7 @@ class GenotypeLoader(Process):
                 break
             time.sleep(1)
         #
-        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n')
+        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n', self.logger)
         lenGrp = len(self.group_names)
         try:
             while True:
@@ -522,12 +529,17 @@ class GenotypeLoader(Process):
                 if id is None:
                     break
                 #
-                cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
-                    FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
-                    ORDER BY {2}'''.format(id,
-                        ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
-                        ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
-                        ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
+                try:
+                    cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                        FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
+                        ORDER BY {2}'''.format(id,
+                            ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
+                            ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
+                            ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
+                except OperationalError as e:
+                    # flag the sample as missing
+                    self.cached_samples[id] = -9
+                    raise ValueError('Genotype loader {} failed to load data: {}'.format(1 + self.index, e))
                 # grab data for each group by
                 data = {}
                 cur_group = None
@@ -939,7 +951,7 @@ def associate(args):
                         proj.db.commit()
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # loading from disk cannot really benefit from more than 8 simutaneous read, due to
+            # loading from disk cannot really benefit from more than 8 simultaneous read, due to
             # disk access limits, but I do not want to introduce another parameter to specify
             # number of reading processes.
             nLoaders = min(8, nJobs)
@@ -973,6 +985,15 @@ def associate(args):
             try:
                 while True:
                     time.sleep(1)
+                    if sum([x == -9 for x in cached_samples]):
+                        # some samples were not properly loaded
+                        # the program has to quit because data integrity is compromised
+                        prog.done()
+                        proj.logger.error('An error occurred while loading genotype data. Please make sure the genotype database is intact and accessible before trying to start over.')
+                        for loader in loaders:
+                            loader.terminate()
+                        proj.close()
+                        sys.exit(1)
                     done = sum([x != 0 for x in cached_samples])
                     prog.update(done)
                     if done == len(asso.sample_IDs):
