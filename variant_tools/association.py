@@ -539,7 +539,8 @@ class GenotypeLoader(Process):
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
-                    raise ValueError('Genotype loader {} failed to load data: {}'.format(1 + self.index, e))
+                    self.logger.error('Genotype loader {} failed to load data: {}'.format(1 + self.index, e))
+                    break
                 # grab data for each group by
                 data = {}
                 cur_group = None
