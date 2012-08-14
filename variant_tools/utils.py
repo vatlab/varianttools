@@ -95,7 +95,7 @@ class RuntimeOptions(object):
             'associate_num_of_readers': (None, 'Use the specified number of processes for multi-process '
                 'loading of genotype data to create equivalent number of temporary association testing databases. '
                 'The default is the minimum of the --jobs value and 8. You can set it to a positive integer '
-                'value not exceeding --jobs. Note that due to disk access limits it is not necessarily true that '
+                'value. Note that due to disk access limits it is not necessarily true that '
                 'a larger number of readers will result in better performance.')
         }
         # this will be the raw command that will be saved to log file

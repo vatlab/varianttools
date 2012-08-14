@@ -956,7 +956,7 @@ def associate(args):
             # if runOptions.associate_num_of_readers is set we'll use it directly
             nLoaders = runOptions.associate_num_of_readers
             # if no runOptions.associate_num_of_readers is set we limit it to a max of 8.
-            if nLoaders == 0:
+            if not nLoaders > 0:
                 nLoaders = min(8, nJobs)
             # step 1: getting all genotypes
             # the loaders can start working only after all of them are ready. Otherwise one
