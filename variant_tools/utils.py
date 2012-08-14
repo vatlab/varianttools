@@ -91,7 +91,12 @@ class RuntimeOptions(object):
                 'example low quality score, to wildtype genotypes.'),
             'association_timeout': (None, 'Cancel associate test and return special values '
                 'when a test lasts more than specified time (in seconds). The default '
-                'value of this option is None, which stands for no time limit.')
+                'value of this option is None, which stands for no time limit.'),
+            'associate_num_of_readers': (None, 'Use the specified number of processes for multi-process '
+                'loading of genotype data to create equivalent number of temporary association testing databases. '
+                'The default is the minimum of the --jobs value and 8. You can set it to a positive integer '
+                'value not exceeding --jobs. Note that due to disk access limits it is not necessarily true that '
+                'a larger number of readers will result in better performance.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -111,6 +116,8 @@ class RuntimeOptions(object):
         self._treat_missing_as_wildtype = self.persistent_options['treat_missing_as_wildtype'][0]
         # association test time out
         self._association_timeout = self.persistent_options['association_timeout'][0]
+        # association test number of genotype loaders
+        self._associate_num_of_readers = self.persistent_options['associate_num_of_readers'][0]
     #
     # attribute command line
     #
@@ -218,7 +225,7 @@ class RuntimeOptions(object):
     def _set_association_timeout(self, val):
         try:
             if val in ['None', None]:
-                self.__association_timeout = None
+                self._association_timeout = None
             else:
                 # test if val can be converted to int
                 int(val)
@@ -227,6 +234,20 @@ class RuntimeOptions(object):
             pass
     #
     association_timeout = property(lambda self: 0 if self._association_timeout is None else int(self._association_timeout), _set_association_timeout) 
+
+    # attribute associate_num_of_readers
+    def _set_associate_num_of_readers(self, val):
+        try:
+            if val in ['None', None]:
+                self._associate_num_of_readers = None
+            else:
+                # test if val can be converted to int
+                int(val)
+                self._associate_num_of_readers = val
+        except:
+            pass
+    #
+    associate_num_of_readers = property(lambda self: 0 if self._associate_num_of_readers is None else int(self._associate_num_of_readers), _set_associate_num_of_readers) 
 
 
 # the singleton object of RuntimeOptions

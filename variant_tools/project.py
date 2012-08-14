@@ -852,6 +852,7 @@ class Project:
         #
         runOptions.association_timeout = self.loadProperty('__option_association_timeout', None)
         #
+        runOptions.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
         # create a logger
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)

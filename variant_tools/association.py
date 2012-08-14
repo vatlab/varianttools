@@ -953,9 +953,10 @@ def associate(args):
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simultaneous read, due to
-            # disk access limits, but I do not want to introduce another parameter to specify
-            # number of reading processes.
-            nLoaders = min(8, nJobs)
+            # disk access limits, If no is set we limit it to a maximum of 8.
+            nLoaders = min(runOptions.associate_num_of_readers, nJobs)
+            if nLoaders == 0:
+                nLoaders = min(8, nJobs)
             # step 1: getting all genotypes
             # the loaders can start working only after all of them are ready. Otherwise one
             # worker might block the database when others are trying to retrieve data
