@@ -952,9 +952,10 @@ def associate(args):
                         proj.db.commit()
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # loading from disk cannot really benefit from more than 8 simultaneous read, due to
-            # disk access limits, If no is set we limit it to a maximum of 8.
-            nLoaders = min(runOptions.associate_num_of_readers, nJobs)
+            # loading from disk cannot really benefit from more than 8 simultaneous read, due to disk access limits
+            # if runOptions.associate_num_of_readers is set we'll use it directly
+            nLoaders = runOptions.associate_num_of_readers
+            # if no runOptions.associate_num_of_readers is set we limit it to a max of 8.
             if nLoaders == 0:
                 nLoaders = min(8, nJobs)
             # step 1: getting all genotypes
