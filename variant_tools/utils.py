@@ -92,11 +92,10 @@ class RuntimeOptions(object):
             'association_timeout': (None, 'Cancel associate test and return special values '
                 'when a test lasts more than specified time (in seconds). The default '
                 'value of this option is None, which stands for no time limit.'),
-            'associate_num_of_readers': (None, 'Use the specified number of processes for multi-process '
-                'loading of genotype data to create equivalent number of temporary association testing databases. '
-                'The default is the minimum of the --jobs value and 8. You can set it to a positive integer '
-                'value. Note that due to disk access limits it is not necessarily true that '
-                'a larger number of readers will result in better performance.')
+            'associate_num_of_readers': (None, 'Use specified number of processes to read '
+                'genotype data for association tests. The default value is the minimum of value '
+                'of option --jobs and 8. Note that a large number of reading processes might '
+                'lead to degraded performance or errors due to disk access limits.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -234,7 +233,7 @@ class RuntimeOptions(object):
             pass
     #
     association_timeout = property(lambda self: 0 if self._association_timeout is None else int(self._association_timeout), _set_association_timeout) 
-
+    #
     # attribute associate_num_of_readers
     def _set_associate_num_of_readers(self, val):
         try:
