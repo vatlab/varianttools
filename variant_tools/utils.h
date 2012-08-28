@@ -35,7 +35,7 @@
 #include <sstream>
 #include <ctime>
 #include <cfloat>
-#include <unistd.h>
+//#include <unistd.h>
 #include "gsl/gsl_rng.h"
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_randist.h"
@@ -167,7 +167,7 @@ public:
 	gsl_rng * get()
 	{
 		// time(NULL): number of seconds since 00:00:00 GMT Jan. 1, 1970
-		__seed = static_cast<unsigned long>(time(NULL) + getpid());
+		__seed = static_cast<unsigned long>(time(NULL));
 		gsl_rng_set(rng, __seed);
 		return rng;
 	}

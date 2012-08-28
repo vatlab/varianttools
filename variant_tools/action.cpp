@@ -523,7 +523,7 @@ bool StudentPval::apply(AssoData & d, int timeout)
 				throw ValueError("Standard Error has not been calculated");
 			}
 			double p = gsl_cdf_tdist_Q(statistic[i] / se[i], d.samplecounts() - (ncovar + 2.0));
-			pval[i] = fmin(p, 1.0 - p) * 2.0;
+			pval[i] = std::min(p, 1.0 - p) * 2.0;
 		}
 	} else {
 		throw ValueError("Alternative hypothesis should be one-sided (1) or two-sided (2)");
@@ -694,7 +694,7 @@ bool WSSPvalue::apply(AssoData & d, int timeout)
 		// two-sided (?) FIXME
 		double pval = 0.0;
 		if (!fEqual(wsstat[0], wsstat[1])) {
-			pval = fmin(1.0, fmin(gsl_cdf_ugaussian_Q(wsstat[0]), gsl_cdf_ugaussian_Q(wsstat[1])) * 2.0);
+			pval = std::min(1.0, std::min(gsl_cdf_ugaussian_Q(wsstat[0]), gsl_cdf_ugaussian_Q(wsstat[1])) * 2.0);
 		} else {
 			pval = gsl_cdf_ugaussian_Q(wsstat[0]);
 		}
@@ -1300,7 +1300,7 @@ double BasePermutator::getP(unsigned pcount1, unsigned pcount2, size_t current, 
 	if (alt == 1) {
 		x = 1.0 + pcount1;
 	} else {
-		x = fmin(pcount1 + 1.0, pcount2 + 1.0);
+		x = std::min(pcount1 + 1.0, pcount2 + 1.0);
 	}
 	double pval = x / (current + 1.0);
 	return (alt == 1) ? pval : pval * 2.0;
@@ -1317,7 +1317,7 @@ double BasePermutator::check(unsigned pcount1, unsigned pcount2, size_t current,
 	if (alt == 1) {
 		x = 1.0 + pcount1;
 	} else {
-		x = fmin(pcount1 + 1.0, pcount2 + 1.0);
+		x = std::min(pcount1 + 1.0, pcount2 + 1.0);
 	}
 
 

@@ -138,6 +138,11 @@ static void fisher_exact(
 }
 
 
+// add an init function to make python extension happy
+void init_vt_sqlite3_ext()
+{
+}
+
 /* SQLite invokes this routine once when it loads the extension.
 ** Create new functions, collating sequences, and virtual table
 ** modules here.  This is usually the only exported symbol in
