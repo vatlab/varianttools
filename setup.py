@@ -362,10 +362,25 @@ else:
 # Enable support for loadable extensions in the sqlite3 module by not defining
 # SQLITE_OMIT_LOAD_EXTENSION
 SQLITE_DEFINES = []
-if sys.platform != "win32":
-   SQLITE_DEFINES.append(('MODULE_NAME', '"vt_sqlite3"'))
-else:
+if sys.platform == "win32":
    SQLITE_DEFINES.append(('MODULE_NAME', '\\"vt_sqlite3\\"'))
+   ASSOCIATION_MODULE = []
+else:
+   SQLITE_DEFINES.append(('MODULE_NAME', '"vt_sqlite3"'))
+   ASSOCIATION_MODULE = [
+        Extension('variant_tools._assoTests',
+            sources = [
+                WRAPPER_CPP_FILE,
+                'variant_tools/assoData.cpp',
+                'variant_tools/action.cpp',
+                'variant_tools/utils.cpp',
+                'variant_tools/lm.cpp'
+                ] + LIB_GSL + LIB_STAT,
+            extra_compile_args = gccargs,
+            library_dirs = [],
+            libraries = libs,
+            include_dirs = [".", "variant_tools", "variant_tools/gsl"],
+        )]
 
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
@@ -409,18 +424,5 @@ setup(name = "variant_tools",
             sources = ['sqlite/vt_sqlite3_ext.c'] + SQLITE_GSL + ['variant_tools/fisher2.c'],
             include_dirs = ['sqlite', "variant_tools", "variant_tools/gsl"],
         ),
-        Extension('variant_tools._assoTests',
-            sources = [
-                WRAPPER_CPP_FILE,
-                'variant_tools/assoData.cpp',
-                'variant_tools/action.cpp',
-                'variant_tools/utils.cpp',
-                'variant_tools/lm.cpp'
-                ] + LIB_GSL + LIB_STAT,
-            extra_compile_args = gccargs,
-            library_dirs = [],
-            libraries = libs,
-            include_dirs = [".", "variant_tools", "variant_tools/gsl"],
-        )
-      ]
+      ] + ASSOCIATION_MODULE   # association module is not available under widnows
 )

@@ -38,12 +38,13 @@ from variant_tools import project
 from variant_tools import importer
 from variant_tools import update
 from variant_tools import phenotype
-from variant_tools import liftOver
 from variant_tools import annotation
 from variant_tools import variant
 from variant_tools import compare
 from variant_tools import exporter
-from variant_tools import association
+if sys.platform != 'win32':
+    from variant_tools import liftOver
+    from variant_tools import association
 
 def addCommonArgs(parser):
     parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
@@ -98,15 +99,16 @@ if __name__ == '__main__':
     parser.set_defaults(func=project.show)
     #
     # command liftover
-    parser = subparsers.add_parser('liftover',
-        help='''Set alternative reference genome and update alternative coordinates
-            of all variant tables''',
-        description='''Convert coordinates of existing variants to alternative 
-            coordinates in an alternative reference genome. The UCSC liftover
-            tool will be automatically downloaded if it is not available.''')
-    liftOver.liftOverArguments(parser)
-    addCommonArgs(parser)
-    parser.set_defaults(func=liftOver.liftOver)
+    if sys.platform != 'win32':
+        parser = subparsers.add_parser('liftover',
+            help='''Set alternative reference genome and update alternative coordinates
+                of all variant tables''',
+            description='''Convert coordinates of existing variants to alternative 
+                coordinates in an alternative reference genome. The UCSC liftover
+                tool will be automatically downloaded if it is not available.''')
+        liftOver.liftOverArguments(parser)
+        addCommonArgs(parser)
+        parser.set_defaults(func=liftOver.liftOver)
     #
     # command use
     parser = subparsers.add_parser('use',
@@ -174,13 +176,14 @@ if __name__ == '__main__':
     # command associate
     #
     # This command is not ready and will not be displayed in a formal release
-    parser = subparsers.add_parser('associate',
-        help='''Test association between variants and phenotypes''',
-        description='''Call one or more statistical association tests and
-        return test results as fields to variants tested.''')
-    association.associateArguments(parser)
-    addCommonArgs(parser)
-    parser.set_defaults(func=association.associate)
+    if sys.platform != 'win32':
+        parser = subparsers.add_parser('associate',
+            help='''Test association between variants and phenotypes''',
+            description='''Call one or more statistical association tests and
+            return test results as fields to variants tested.''')
+        association.associateArguments(parser)
+        addCommonArgs(parser)
+        parser.set_defaults(func=association.associate)
     # 
     # command admin
     #
