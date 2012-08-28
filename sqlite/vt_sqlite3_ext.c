@@ -62,27 +62,29 @@ static void hwe_exact(
 	// collapse double homozygotes to simply homozygote
 	double n22 = sqlite3_value_double(argv[2]);
 
+	double n11, n1, n2, pn12, pval, x12, x11, x22, x1, x2, px12;
+
 	if (argc == 4) {
 		n22 += sqlite3_value_double(argv[3]);
 	}
-	double n11 = n - n12 - n22;
+	n11 = n - n12 - n22;
 	//http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1199378/
 	//implements equation 2 below
-	double n1 = 2.0 * n11 + n12;
-	double n2 = 2.0 * n22 + n12;
-	double pn12 = exp(log(2.0) * (n12) + gsl_sf_lngamma(n + 1) -
+	n1 = 2.0 * n11 + n12;
+	n2 = 2.0 * n22 + n12;
+	pn12 = exp(log(2.0) * (n12) + gsl_sf_lngamma(n + 1) -
 		gsl_sf_lngamma(n11 + 1) - gsl_sf_lngamma(n12 + 1) -
 		gsl_sf_lngamma(n22 + 1) - gsl_sf_lngamma(2.0 * n + 1) +
 		gsl_sf_lngamma(n1 + 1) + gsl_sf_lngamma(n2 + 1));
 	//
-	double pval = 0.0;
-	double x12;
-	for (x12 = fmod(n1, 2.0); x12 <= fmin(n1, n2); x12 = x12 + 2.0) {
-		double x11 = (n1 - x12) / 2.0;
-		double x22 = (n2 - x12) / 2.0;
-		double x1 = 2.0 * x11 + x12;
-		double x2 = 2.0 * x22 + x12;
-		double px12 = exp(log(2.0) * (x12) + gsl_sf_lngamma(n + 1) -
+	pval = 0.0;
+	x12;
+	for (x12 = fmod(n1, 2.0); x12 <= (n1 < n2 ? n1 : n2); x12 = x12 + 2.0) {
+		x11 = (n1 - x12) / 2.0;
+		x22 = (n2 - x12) / 2.0;
+		x1 = 2.0 * x11 + x12;
+		x2 = 2.0 * x22 + x12;
+		px12 = exp(log(2.0) * (x12) + gsl_sf_lngamma(n + 1) -
 			gsl_sf_lngamma(x11 + 1) - gsl_sf_lngamma(x12 + 1) -
 			gsl_sf_lngamma(x22 + 1) - gsl_sf_lngamma(2.0 * n + 1) +
 			gsl_sf_lngamma(x1 + 1) + gsl_sf_lngamma(x2 + 1));
@@ -106,13 +108,15 @@ static void fisher_exact(
 	   ref n1-m1      n2-m2
 	 */
 	double contingency_table[4] = { 0, 0, 0, 0 };
+	double pval, expected, percnt, emin, prt;
+	int ok, nrow, ncol, workspace;
 
 	contingency_table[0] = (int)(sqlite3_value_double(argv[0]));
 	contingency_table[1] = (int)(sqlite3_value_double(argv[1]));
 	contingency_table[2] = (int)(sqlite3_value_double(argv[2])) - contingency_table[0];
 	contingency_table[3] = (int)(sqlite3_value_double(argv[3])) - contingency_table[1];
-	double pval = -99.0;
-	int ok = (
+	pval = -99.0;
+	ok = (
 	          contingency_table[0] >= 0 &&
 	          contingency_table[1] >= 0 &&
 	          contingency_table[2] >= 0 &&
@@ -121,13 +125,13 @@ static void fisher_exact(
 	           contingency_table[2] + contingency_table[0] > 0)
 	          );
 	if (ok) {
-		int nrow = 2;
-		int ncol = 2;
-		double expected = -1.0;
-		double percnt = 100.0;
-		double emin = 0.0;
-		double prt = 0.0;
-		int workspace = 300000;
+		nrow = 2;
+		ncol = 2;
+		expected = -1.0;
+		percnt = 100.0;
+		emin = 0.0;
+		prt = 0.0;
+		workspace = 300000;
 		fexact(&nrow, &ncol, contingency_table, &nrow, &expected, &percnt, &emin, &prt, &pval, &workspace);
 	}
 	sqlite3_result_double(context, pval);
