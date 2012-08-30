@@ -473,7 +473,6 @@ class MultiVariantReader(BaseVariantReader):
             export_alt_build,  IDs)
         self.proj = proj
         self.logger = proj.logger
-        self.jobs = max(1, jobs)
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
@@ -484,8 +483,9 @@ class MultiVariantReader(BaseVariantReader):
         IDs.sort()
         # we may need more jobs due to the limit of max columns
         # but we will only have self.jobs active jobs
-        jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
-        block = len(IDs) // (jobs-1) + 1
+        jobs = min(1, jobs)
+        self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
+        block = len(IDs) // (self.jobs-1) + 1
         #
         s = delayedAction(self.logger.info, 'Checking indexes')
         ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
@@ -498,7 +498,7 @@ class MultiVariantReader(BaseVariantReader):
                     cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
                 prog.update(idx)
             prog.done()            
-        for i in range(jobs - 1):
+        for i in range(self.jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
             p = VariantWorker(proj.name, self.getSampleQuery(subIDs), w, proj.logger)
