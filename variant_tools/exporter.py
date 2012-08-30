@@ -207,7 +207,7 @@ class GenoFormatter:
                 else:
                     return ref + self.sep + ref
             else:
-                raise ValueError('Failed to handle genotype {}. This format only handles bi-allelic variants'.format(item))
+                raise ValueError('Failed to handle genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
@@ -223,7 +223,7 @@ class GenoFormatter:
             elif len(item) > 1 and item.count(item[0]) == len(item):
                 return str(self.base + abs(item[0]))
             else:
-                raise ValueError('Failed to handle genotype {}. This format only handles bi-allelic variants'.format(item))
+                raise ValueError('Failed to handle genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
         elif item is None:
             return self.missing
         else:
@@ -233,7 +233,7 @@ class GenoFormatter:
         try:
             return self.vcf_map[item]
         except:
-            raise ValueError('Do not know how to output genotype {} in vcf style.'.format(item))
+            raise ValueError('Do not know how to output genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_ref, rec_alt))
 
 class Constant:
     def __init__(self, val=''):
