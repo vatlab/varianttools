@@ -1981,12 +1981,12 @@ def importVariantsArguments(parser):
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will
             not remove wrongfully imported variants from the master variant table.'''),
-    parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
+    parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Number of processes to import input file. Variant tools by default
-            uses a single process for reading and writing, and can use one or more
-            dedicated importer processes (jobs=2 or more) to process input files. Due
-            to the overhead of inter-process communication, more jobs do not
-            automatically lead to better performance.''')
+            uses four processes to import variants and samples genotypes in 
+            parallel, and you can use more or less processes by adjusting this
+            parameter. Due to the overhead of inter-process communication, more
+            jobs do not automatically lead to better performance.''')
 
 def importVariants(args):
     try:
