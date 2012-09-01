@@ -24,7 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, re
-from multiprocessing import Process, Queue, Pipe, Value, Array
+from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
 import math
 from collections import OrderedDict
@@ -49,7 +49,7 @@ else:
 import argparse
 
 class ShelfDB:
-    def __init__(self, filename, mode='n', logger=None):
+    def __init__(self, filename, mode='n', lock=None, logger=None):
         self.filename = filename
         if os.path.isfile(self.filename + '.DB'):
             if mode == 'n':
@@ -57,7 +57,7 @@ class ShelfDB:
         elif mode == 'r':
             raise ValueError('Temporary database {} does not exist.'.format(self.filename))
         self.db = DatabaseEngine()
-        self.db.connect(filename)
+        self.db.connect(filename, lock=lock)
         self.cur = self.db.cursor()
         self.mode = mode
         if mode == 'n':
@@ -520,8 +520,8 @@ class GenotypeLoader(Process):
             if all(self.ready_flags):
                 break
             time.sleep(1)
-        #
-        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n', self.logger)
+        # these are written to different files so no lock is needed (lock=None)
+        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n', None, self.logger)
         lenGrp = len(self.group_names)
         try:
             while True:
@@ -664,7 +664,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap, result_fields):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap, result_fields, shelf_lock):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.proj = param.proj
@@ -689,6 +689,7 @@ class AssoTestsWorker(Process):
         self.sampleMap = sampleMap
         self.logger = self.proj.logger
         self.result_fields = result_fields
+        self.shelf_lock = shelf_lock
         #
         # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
         if param.num_extern_tests:
@@ -738,7 +739,7 @@ class AssoTestsWorker(Process):
         for ID in self.sample_IDs:
             dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
-                shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r')
+                shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
@@ -1019,10 +1020,12 @@ def associate(args):
             resQueue = Queue()
             # see if all workers are ready
             ready_flags = Array('i', [0]*nJobs)
+            shelf_lock = Lock()
             for j in range(nJobs):
                 # the dictionary has the number of temporary database for each sample
                 AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
-                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0}, results.fields).start()
+                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
+                    results.fields, shelf_lock).start()
             # send jobs ...
             # get initial completed and failed
             # put all jobs to queue, the workers will work on them
