@@ -739,7 +739,10 @@ class AssoTestsWorker(Process):
         for ID in self.sample_IDs:
             dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
-                shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
+                try:
+                    shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
+                except Exception as e:
+                    raise ValueError('Cannot connect to association database: {}'.format(e))
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
