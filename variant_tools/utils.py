@@ -151,7 +151,7 @@ class RuntimeOptions(object):
                     raise ValueError('Invalid pragma {}'.format(item))
             self._sqlite_pragma = pragma
         except:
-            print('Invalid pragma {}'.format(pragma))
+            sys.stderr.write('Invalid pragma {}\n'.format(pragma))
     #
     sqlite_pragma = property(lambda self: self._sqlite_pragma.split(','), _set_sqlite_pragma)
     #
@@ -163,7 +163,7 @@ class RuntimeOptions(object):
                 int(n)   # test if n is an integer
                 self._import_num_of_readers = str(n)
         except:
-            print('Failed to set number of readers to {}'.format(n))
+            sys.stderr.write('Failed to set number of readers to {}\n'.format(n))
     #
     import_num_of_readers = property(lambda self: int(self._import_num_of_readers), _set_import_num_of_readers)
     #
@@ -174,7 +174,7 @@ class RuntimeOptions(object):
             self._cache_dir = path
         try:
             if not os.path.isdir(self._cache_dir):
-                print('Creating cache directory {}'.format(self._cache_dir))
+                sys.stderr.write('Creating cache directory {}\n'.format(self._cache_dir))
                 os.makedirs(self._cache_dir)
         except:
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
@@ -214,7 +214,7 @@ class RuntimeOptions(object):
         elif val in ['1', 'True', 'TRUE', 'true']:
             self._treat_missing_as_wildtype = 'True'
         else:
-            print('Invalid input ({}) for runtime option treat_missing_as_wildtype'.format(val))
+            sys.stderr.write('Invalid input ({}) for runtime option treat_missing_as_wildtype\n'.format(val))
             self._treat_missing_as_wildtype = 'False'
     #
     treat_missing_as_wildtype = property(lambda self: True if self._treat_missing_as_wildtype == 'True' else False,
@@ -815,7 +815,7 @@ class DatabaseEngine:
                     cur.execute('PRAGMA {}'.format(pragma))
                 except:
                     # I cannot raise an error because uers need to open the project to reset this value.
-                    print('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.'.format(pragma))
+                    sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.\n'.format(pragma))
                 #
                 self.database.commit()
             # trying to load extension
