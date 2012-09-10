@@ -813,9 +813,9 @@ class DatabaseEngine:
                 # but we may have syntax error.
                 try:
                     cur.execute('PRAGMA {}'.format(pragma))
-                except:
+                except Exception as e:
                     # I cannot raise an error because uers need to open the project to reset this value.
-                    sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas.\n'.format(pragma))
+                    sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas: {}\n'.format(pragma, e))
                 #
                 self.database.commit()
             # trying to load extension
@@ -847,7 +847,7 @@ class DatabaseEngine:
         else:
             self.database.close()
 
-    def attach(self, db, name=None):
+    def attach(self, db, name=None, lock=None):
         '''Attach another database to this one. Only needed by sqlite'''
         if self.engine == 'mysql':
             # create the database if needed
@@ -856,6 +856,8 @@ class DatabaseEngine:
             return db
         if db.endswith('.DB') or db.endswith('.proj'):
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
+            if lock is not None:
+                lock.acquire()
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db, dbName))
             for pragma in runOptions.sqlite_pragma:
@@ -867,9 +869,13 @@ class DatabaseEngine:
                     self.execute('PRAGMA {}.{}'.format(dbName, pragma))
                 except:
                     pass
+            if lock is not None:
+                lock.release()
             return dbName
         else:
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
+            if lock is not None:
+                lock.acquire()
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db + '.DB' if db != ':memory:' else db, dbName))
             for pragma in runOptions.sqlite_pragma:
@@ -891,6 +897,8 @@ class DatabaseEngine:
                         self.execute('PRAGMA {}.{}'.format(dbName, pragma))
                     except:
                         pass
+            if lock is not None:
+                lock.release()
             return dbName
 
     def detach(self, db):

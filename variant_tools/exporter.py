@@ -29,7 +29,7 @@ import sys
 import gzip
 import re
 import time
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Lock
 from itertools import izip, repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
@@ -449,7 +449,7 @@ class StandaloneVariantReader(BaseVariantReader):
             prog.done()            
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
-        self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, proj.logger)
+        self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, None, proj.logger)
         self.worker.start()
 
     def start(self):
@@ -476,7 +476,8 @@ class MultiVariantReader(BaseVariantReader):
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
-        p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, proj.logger)
+        lock = Lock()
+        p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, lock, proj.logger)
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
@@ -501,7 +502,7 @@ class MultiVariantReader(BaseVariantReader):
         for i in range(self.jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
-            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, proj.logger)
+            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock, proj.logger)
             self.workers.append(p)
             self.readers.append(r)
 
@@ -559,27 +560,31 @@ class MultiVariantReader(BaseVariantReader):
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
-    def __init__(self, dbname, annoDB, query, output, logger):
+    def __init__(self, dbname, annoDB, query, output, lock, logger):
         self.dbname = dbname
         self.annoDB = annoDB
         self.query = query
         self.output = output
+        self.lock = lock
         self.logger = logger
         Process.__init__(self)
 
-    def run(self): 
+    def run(self):
         db = DatabaseEngine()
-        db.connect(self.dbname + '.proj', readonly=True)
+        db.connect(self.dbname + '.proj', readonly=True, lock=self.lock)
         if '{}_genotype.'.format(self.dbname) in self.query:
-            db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname))
+            db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname), lock=self.lock)
         for anno in self.annoDB:
-            db.attach(anno.filename)
+            db.attach(anno.filename, lock=self.lock)
         cur = db.cursor()
         cur.execute(self.query)
         # reporting to the main process that SQL query is done
         self.output.send(None)
+        last_id = None
         for rec in cur:
-            self.output.send(rec)
+            if rec[0] != last_id:
+                last_id = rec[0]
+                self.output.send(rec)
         self.output.send(None)
         db.close()
 
