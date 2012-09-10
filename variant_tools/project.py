@@ -74,6 +74,7 @@ class AnnoDB:
         else:
             raise ValueError("Cannot locate annotation database {}".format(annoDB))
         #
+        self.filename = annoDB
         self.dir = os.path.split(annoDB)[0]
         self.filename = os.path.splitext(os.path.split(annoDB)[-1])[0]
         if '-' in self.filename:

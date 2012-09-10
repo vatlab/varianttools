@@ -449,7 +449,7 @@ class StandaloneVariantReader(BaseVariantReader):
             prog.done()            
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
-        self.worker = VariantWorker(proj.name, self.getQuery(), w, proj.logger)
+        self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, proj.logger)
         self.worker.start()
 
     def start(self):
@@ -476,7 +476,7 @@ class MultiVariantReader(BaseVariantReader):
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
-        p = VariantWorker(proj.name, self.getVariantQuery(), w, proj.logger)
+        p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, proj.logger)
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
@@ -501,7 +501,7 @@ class MultiVariantReader(BaseVariantReader):
         for i in range(self.jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
-            p = VariantWorker(proj.name, self.getSampleQuery(subIDs), w, proj.logger)
+            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, proj.logger)
             self.workers.append(p)
             self.readers.append(r)
 
@@ -559,8 +559,9 @@ class MultiVariantReader(BaseVariantReader):
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
-    def __init__(self, dbname, query, output, logger):
+    def __init__(self, dbname, annoDB, query, output, logger):
         self.dbname = dbname
+        self.annoDB = annoDB
         self.query = query
         self.output = output
         self.logger = logger
@@ -571,6 +572,8 @@ class VariantWorker(Process):
         db.connect(self.dbname + '.proj', readonly=True)
         if '{}_genotype.'.format(self.dbname) in self.query:
             db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname))
+        for anno in self.annoDB:
+            db.attach(anno.filename)
         cur = db.cursor()
         cur.execute(self.query)
         # reporting to the main process that SQL query is done
