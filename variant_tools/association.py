@@ -26,6 +26,7 @@
 import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
+import random
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
@@ -541,7 +542,7 @@ class GenotypeLoader(Process):
                                 ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
                                 ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
-                    executeUntilSuccess(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
+                    executeUntilSucceed(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
