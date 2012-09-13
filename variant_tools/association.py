@@ -26,7 +26,6 @@
 import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
-import random
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
@@ -38,7 +37,7 @@ except:
     import pickle
 
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions
+from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions, executeUntilSucceed
 from .phenotype import Sample
 from .tester import *
 
@@ -81,19 +80,9 @@ class ShelfDB:
             (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
     def _get_py2(self, key):
-        for attempt in range(5):
-            try:
-                self.cur.execute(self.select_query, (key,))
-                if attempt != 0:
-                    self.logger.debug('It took SelfDB {} attempts to retrieve key {}'.format(attempt + 1, key))
-                break
-            except:
-                if attempt == 4:
-                    self.logger.error('SelfDB failed to retrieve key {} after {} attempts'.format(key, attempt + 1))
-                    raise
-                else:
-                    time.sleep(1 + attempt + random.random() * 10)
-        # pickle.loads only accepts string, ...
+        msg = 'Retrieve key {} from ShelfDB'.format(key)
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+         # pickle.loads only accepts string, ...
         return pickle.loads(str(self.cur.fetchone()[0]))
 
     def _add_py3(self, key, value):
@@ -102,18 +91,8 @@ class ShelfDB:
             (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
 
     def _get_py3(self, key):
-        for attempt in range(5):
-            try:
-                self.cur.execute(self.select_query, (key,))
-                if attempt != 0:
-                    self.logger.debug('It took SelfDB {} attempts to retrieve key {}'.format(attempt + 1, key))
-                break
-            except:
-                if attempt == 4:
-                    self.logger.error('SelfDB failed to retrieve key {} after {} attempts'.format(key, attempt + 1))
-                    raise
-                else:
-                    time.sleep(1 + random.random() * 10)
+        msg = 'Retrieve key {} from ShelfDB'.format(key)
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
         # pickle.loads accepts bytes directly
         return pickle.loads(self.cur.fetchone()[0])
 
@@ -552,27 +531,17 @@ class GenotypeLoader(Process):
                 id = self.queue.get()
                 if id is None:
                     break
-                #
                 try:
                     # sometimes on slow disks, SELECT would fail with error message "Cannot connect to database" if there
                     # are multiple reading processes. We are trying five times if this happens before we terminate the process
-                    for attempt in range(5):
-                        try:
-                            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                    select_genotype_query = '''SELECT genotype_{0}.variant_id, GT {1}, {2}
                                 FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
                                 ORDER BY {2}'''.format(id,
                                 ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
                                 ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
-                                ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
-                            if attempt != 0:
-                                self.logger.debug('It took loader {} {} attempts to load sample {}'.format(self.index, attempt + 1, id))
-                            break
-                        except:
-                            if attempt == 4:
-                                self.logger.error('Loader {} failed to load sample {} after {} attempts'.format(self.index, id, attempt + 1))
-                                raise
-                            else:
-                                time.sleep(1 + attempt + random.random()*10)
+                                ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
+                    select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
+                    executeUntilSuccess(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
@@ -600,7 +569,7 @@ class GenotypeLoader(Process):
             db.close()
             # close shelf
             shelf.close()
-        
+
 class ResultRecorder:
     def __init__(self, params, db_name=None, update_existing=False, logger=None):
         self.succ_count = 0
@@ -752,18 +721,8 @@ class AssoTestsWorker(Process):
         #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         # SELECT can fail when the disk is slow which causes database lock problem.
-        for attempt in range(5):
-            try:
-                cur.execute(query, group)
-                if attempt != 0:
-                    self.logger.debug('It took worker {} {} attempts to load variant info for group {}.'.format(self.index, attempt + 1, group))
-                break
-            except:
-                if attempt == 4:
-                    self.logger.error('Worker {} failed to load variant info for group {} after {} attempts.'.format(self.index, group, attempt + 1))
-                    raise
-                else:
-                    time.sleep(1 + attempt + random.random()*10)
+        msg = 'Load variant info for group {} using association worker {}'.format(group, self.index)
+        executeUntilSucceed(cur, query, self.logger, 5, msg, group)
         #
         if not self.var_info:
             data = {x[0]:[] for x in cur.fetchall()}

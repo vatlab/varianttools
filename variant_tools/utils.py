@@ -44,6 +44,7 @@ import gzip
 import threading
 import re
 import stat
+import random
 try:
     # not all platforms/installations of python support bz2
     import bz2
@@ -1354,3 +1355,22 @@ def normalizeVariant(pos, ref, alt):
         ref = '-'
     bin = getMaxUcscBin(pos - 1, pos) if pos else None
     return bin, pos, ref, alt
+
+
+def executeUntilSucceed(cur, query, logger, attempts, operation_msg, data = None):
+    '''try to execute queries a few times before it fails'''
+    for attempt in range(attempts):
+        try:
+            if data:
+                cur.execute(query, data)
+            else:
+                cur.execute(query)
+            if attempt != 0:
+                logger.debug('Operation "' + operation_msg + '" succeeded after {} attempts'.format(attempt + 1))
+            break
+        except:
+            if attempt == attempts - 1:
+                logger.error('Operation "' + operation_msg + '" failed after {} attempts'.format(attempt + 1))
+                raise
+            else:
+                time.sleep(1 + attempt + random.random() * 10)
