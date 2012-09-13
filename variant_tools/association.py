@@ -505,7 +505,7 @@ class GenotypeLoader(Process):
                 # loading genotypes from genotype database
                 db = DatabaseEngine()
                 # readonly allows simultaneous access from several processes
-                db.connect(self.db_name, readonly=True)
+                db.connect(self.db_name, readonly=False)
                 # move __asso_tmp to :memory: can speed up the process a lot
                 db.attach(':memory:', 'cache')
                 # filling __asso_tmp, this is per-process so might use some RAM

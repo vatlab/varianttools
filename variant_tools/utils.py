@@ -802,6 +802,8 @@ class DatabaseEngine:
             # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
             # We may need to reconsider this though because some pragma applies to 
             # readonly databases (e.g. cache_size)
+            if readonly:
+                return
             if lock is not None:
                 lock.acquire()
             cur = self.database.cursor()
