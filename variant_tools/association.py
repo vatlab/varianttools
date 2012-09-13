@@ -26,6 +26,7 @@
 import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
+import random
 import math
 from collections import OrderedDict
 from copy import copy, deepcopy
@@ -80,7 +81,15 @@ class ShelfDB:
             (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
     def _get_py2(self, key):
-        self.cur.execute(self.select_query, (key,))
+        for attempt in range(5):
+            try:
+                self.cur.execute(self.select_query, (key,))
+                break
+            except:
+                if attempt == 4:
+                    raise
+                else:
+                    time.sleep(1 + random.random() * 10)
         # pickle.loads only accepts string, ...
         return pickle.loads(str(self.cur.fetchone()[0]))
 
@@ -90,7 +99,15 @@ class ShelfDB:
             (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
 
     def _get_py3(self, key):
-        self.cur.execute(self.select_query, (key,))
+        for attempt in range(5):
+            try:
+                self.cur.execute(self.select_query, (key,))
+                break
+            except:
+                if attempt == 4:
+                    raise
+                else:
+                    time.sleep(1 + random.random() * 10)
         # pickle.loads accepts bytes directly
         return pickle.loads(self.cur.fetchone()[0])
 
@@ -517,9 +534,10 @@ class GenotypeLoader(Process):
                 cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
                 # tells other processes that I am ready
                 self.ready_flags[self.index] = 1
+                self.logger.debug('Loader {} is ready'.format(self.index))
             if all(self.ready_flags):
                 break
-            time.sleep(1)
+            time.sleep(random.random()*2)
         # these are written to different files so no lock is needed (lock=None)
         shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n', None, self.logger)
         lenGrp = len(self.group_names)
@@ -530,16 +548,29 @@ class GenotypeLoader(Process):
                     break
                 #
                 try:
-                    cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
-                        FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
-                        ORDER BY {2}'''.format(id,
-                            ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
-                            ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
-                            ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
+                    # some times on slow disks, SELECT would fail with error message "Cannot connect to database" if there
+                    # are multiple reading processes. We are trying five times if this happens before we terminate the process
+                    self.logger.debug('Sample {} is being load by genotype loader {}'.format(id, self.index))
+                    for attempt in range(5):
+                        try:
+                            cur.execute('''SELECT genotype_{0}.variant_id, GT {1}, {2} 
+                                FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
+                                ORDER BY {2}'''.format(id,
+                                ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
+                                ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
+                                ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else ''))
+                            break
+                        except:
+                            self.logger.warning('Failed to load sample {} by loader {} after {} attempts'.format(id, self.index, attempt + 1))
+                            if attempt == 4:
+                                raise
+                            else:
+                                time.sleep(1+random.random()*10)
+                    self.logger.debug('Sample {} loaded by genotype loader {}'.format(id, self.index))
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
-                    self.logger.error('Genotype loader {} failed to load data: {}'.format(1 + self.index, e))
+                    self.logger.error('Genotype loader {} failed to load sample {}: {}'.format(self.index, id, e))
                     break
                 # grab data for each group by
                 data = {}
@@ -695,7 +726,7 @@ class AssoTestsWorker(Process):
         if param.num_extern_tests:
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
-        self.db.connect(param.proj.name + '_genotype.DB', readonly=True) 
+        self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
         #
         self.shelves = {}
         #
@@ -714,7 +745,18 @@ class AssoTestsWorker(Process):
             ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
         #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
-        cur.execute(query, group)
+        # SELECT can fail when the disk is slow which causes database lock problem.
+        for attempt in range(5):
+            try:
+                cur.execute(query, group)
+                if attempt != 0:
+                    self.logger.warning('Loading variant info succeeded after {} attempts.'.format(attempt + 1))
+                break
+            except:
+                if attempt == 4:
+                    raise
+                else:
+                    time.sleep(1 + random.random()*10)
         #
         if not self.var_info:
             data = {x[0]:[] for x in cur.fetchall()}
@@ -731,7 +773,11 @@ class AssoTestsWorker(Process):
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
         cur = self.db.cursor()
         # variant info
-        var_info, variant_id = self.getVarInfo(group, where_clause)
+        try:
+            var_info, variant_id = self.getVarInfo(group, where_clause)
+        except:
+            self.logger.debug('Process {} failed to get variant info for group {}'.format(self.index, group))
+            raise
         # get genotypes / genotype info
         genotype = []
         geno_info = {x:[] for x in self.geno_info}
@@ -741,8 +787,9 @@ class AssoTestsWorker(Process):
             if dbID not in self.shelves:
                 try:
                     shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
-                except Exception as e:
-                    raise ValueError('Cannot connect to association database: {}'.format(e))
+                except:
+                    self.logger.debug('connect to shelf failed in index {}'.format(self.index))
+                    raise
                 self.shelves[dbID] = shelf
             else:
                 shelf = self.shelves[dbID]
@@ -865,7 +912,7 @@ class AssoTestsWorker(Process):
             if all(self.ready_flags):
                 break
             else:
-                time.sleep(1)
+                time.sleep(random.random()*2)
         while True:
             # if cached, get genotype from the main process
             grp = self.queue.get()
@@ -884,30 +931,42 @@ class AssoTestsWorker(Process):
             values = list(grp)
             try:
                 # select variants from each group:
-                genotype, which, var_info, geno_info = self.getGenotype(grp)
+                try:
+                    genotype, which, var_info, geno_info = self.getGenotype(grp)
+                except:
+                    self.logger.debug('Process {} get genotype raises an exception'.format(self.index))
+                    raise
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
                 # 
                 # set C++ data object
-                if (len(self.tests) - self.num_extern_tests) > 0:
-                    self.setGenotype(which, genotype, geno_info, grpname)
-                    self.setPhenotype(which)
-                    self.setVarInfo(var_info)
-                # set Python data object, for external tests
-                if self.num_extern_tests:
-                    self.setPyData(which, genotype, var_info, geno_info, 'NA', grpname)
+                try:
+                    if (len(self.tests) - self.num_extern_tests) > 0:
+                        self.setGenotype(which, genotype, geno_info, grpname)
+                        self.setPhenotype(which)
+                        self.setVarInfo(var_info)
+                    # set Python data object, for external tests
+                    if self.num_extern_tests:
+                        self.setPyData(which, genotype, var_info, geno_info, 'NA', grpname)
+                except:
+                    self.logger.debug('Process {} set genotype raises an exception'.format(self.index))
+                    raise
 
                 # association tests
-                for test in self.tests:
-                    test.setData(self.data, self.pydata)
-                    result = test.calculate(runOptions.association_timeout)
-                    # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
-                    values.extend(result)
+                try:
+                    for test in self.tests:
+                        test.setData(self.data, self.pydata)
+                        result = test.calculate(runOptions.association_timeout)
+                        # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
+                        values.extend(result)
+                except:
+                    self.logger.debug('Process {} association test raises an exception'.format(self.index))
+                    raise
             except KeyboardInterrupt as e:
                 # die silently if stopped by Ctrl-C
                 break
             except Exception as e:
-                self.logger.debug('An ERROR has occurred while processing {}: {}'.format(repr(grpname), e))
+                self.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.format(self.index, repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 self.pydata = {}
@@ -985,13 +1044,13 @@ def associate(args):
                 if all(ready_flags):
                     break
                 else:
-                    time.sleep(1)
+                    time.sleep(random.random()*2)
             del s
             # progress bar...
             prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
             try:
                 while True:
-                    time.sleep(1)
+                    time.sleep(random.random()*2)
                     if sum([x == -9 for x in cached_samples]):
                         # some samples were not properly loaded
                         # the program has to quit because data integrity is compromised
@@ -1044,7 +1103,7 @@ def associate(args):
                 if all(ready_flags):
                     break
                 else:
-                    time.sleep(1)
+                    time.sleep(random.random()*2)
             del s
             prog = ProgressBar('Testing for association', len(asso.groups))
             try:
