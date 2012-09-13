@@ -92,7 +92,14 @@ int pysqlite_connection_init(pysqlite_Connection* self, PyObject* args, PyObject
     self->text_factory = (PyObject*)&PyUnicode_Type;
 
     Py_BEGIN_ALLOW_THREADS
-    rc = sqlite3_open(database, &self->db);
+    /* modified by Bo Peng for variant tools where a parameter readonly is passed
+     * when readonly is True, check_same_thread is false. In this case, we try to 
+     * open the database in readonly mode. */
+    if (! check_same_thread)
+        rc = sqlite3_open_v2(database, &self->db, SQLITE_OPEN_READONLY, NULL);
+    else
+        rc = sqlite3_open(database, &self->db);
+
     Py_END_ALLOW_THREADS
 
     if (rc != SQLITE_OK) {
