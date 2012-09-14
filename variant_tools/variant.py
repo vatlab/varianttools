@@ -226,12 +226,12 @@ def select(args, reverse=False):
                 # FROM clause
                 from_clause = 'FROM {} '.format(args.from_table)
                 # avoid duplicate
-                processed_table = set()
-                processed_conn = set()
+                #
+                processed = set()
                 for table, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-                    if table.lower() not in processed_table:
+                    if (table.lower(), conn.lower()) not in processed:
                         from_clause += ' LEFT OUTER JOIN {} ON {}'.format(table, conn)
-                        processed_table.add(table.lower())
+                        processed.add((table.lower(), conn.lower()))
             else:
                 # select all variants
                 where_clause = ' WHERE 1 '
