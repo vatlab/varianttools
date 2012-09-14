@@ -230,11 +230,8 @@ def select(args, reverse=False):
                 processed_conn = set()
                 for table, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
                     if table.lower() not in processed_table:
-                        from_clause += ', {} '.format(table)
+                        from_clause += ' LEFT OUTER JOIN {} ON {}'.format(table, conn)
                         processed_table.add(table.lower())
-                    if conn not in processed_conn:
-                        where_clause += ' AND ({}) '.format(conn)
-                        processed_conn.add(conn)
             else:
                 # select all variants
                 where_clause = ' WHERE 1 '
