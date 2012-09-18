@@ -739,7 +739,7 @@ def TextReader(processor, input, varIdx, getNew, jobs, encoding, logger):
     varIdx: variant index, if specified, only matching variants will be returned
         used by updater, or only new variants will be returned by an variant reader
     getNew: if getNew is true, only return variants that are NOT in varIdx. Otherwise,
-        return variants that re in varIdx.
+        return variants that are in varIdx.
     jobs: number of jobs
     encoding: file encoding
     '''
@@ -1672,9 +1672,14 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        # getNew=True so the reader only read variants not in variantIndex
-        reader = TextReader(self.processor, input_filename, self.variantIndex, True, 
-            runOptions.import_num_of_readers, self.encoding, self.logger)
+        # getNew=True so the reader only read variants not in variantIndex if no additional
+        # variant info is imported
+        if self.variant_info:
+            reader = TextReader(self.processor, input_filename, None, True, 
+                runOptions.import_num_of_readers, self.encoding, self.logger)
+        else:
+            reader = TextReader(self.processor, input_filename, self.variantIndex, True,
+                runOptions.import_num_of_readers, self.encoding, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
