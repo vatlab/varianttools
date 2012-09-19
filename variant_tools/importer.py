@@ -1246,7 +1246,9 @@ class GenotypeImportWorker(Process):
                             col_rngs[0][1] - col_rngs[0][0], len(self.sample_ids)))
                 for idx, id in enumerate(self.sample_ids):
                     try:
-                        if rec[self.ranges[2] + idx] is not None:
+                        # variant info is not read, ranges[1] should be used because ranges[2] is the index after
+                        # variant index
+                        if rec[self.ranges[1] + idx] is not None:
                             self.count[1] += 1
                             writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
                     except IndexError:
