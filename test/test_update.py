@@ -42,14 +42,14 @@ class TestUpdate(ProcessTestCase):
         runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
         runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
-        self.assertFail('vtools update --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
         #need a format file if you want to add field(s) into the variant table using --from_file
         self.assertFail('vtools update variant --from_file txt/annovar.txt.exonic_variant_function')
-        self.assertFail('vtools update variant --format ../format/ANNOVAR_output')
-        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update variant --format ../format/ANNOVAR_exonic_variant_function')
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '78\n')
         #for different version of genome
-        self.assertSucc('vtools update variant --format ../format/ANNOVAR_output --from_file txt/annovar.txt.exonic_variant_function --build hg19')
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function --build hg19')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type is not null" -c'), '81\n')
 
     def testUpdate(self):
