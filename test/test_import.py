@@ -198,7 +198,7 @@ class TestImport(ProcessTestCase):
         
     def testMPImport(self):
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
         samples = outputOfCmd('vtools show samples -l -1')
         genotype = outputOfCmd('vtools show genotypes -l -1')
         variants = outputOfCmd('vtools show table variant -l -1')
@@ -232,7 +232,7 @@ class TestImport(ProcessTestCase):
     
     def testMPImportMultiFiles(self):
         runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18')
+        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
         samples = outputOfCmd('vtools show samples -l -1')
         genotype = outputOfCmd('vtools show genotypes -l -1')
         variants = outputOfCmd('vtools show table variant -l -1')
