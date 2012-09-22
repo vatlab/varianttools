@@ -91,8 +91,8 @@ class TestAsso(ProcessTestCase):
         for i in range(8):
             runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
             vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby')
-            vtoolsout.sort()
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
+            vtoolsout.sort()
             with open('output/assores'+str(i+1)+'.txt','r') as f:
                 infile = f.readlines()
             self.assertEqual([x.rstrip() for x in infile], vtoolsout)
@@ -105,8 +105,8 @@ class TestAsso(ProcessTestCase):
         for i in range(8):
             runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
             vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby')
-            vtoolsout.sort()
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,2,3,4]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
+            vtoolsout.sort()
             with open('output/assores_wss'+str(i+1)+'.txt','r') as f:
                 infile = f.readlines()
             self.assertEqual([x.rstrip() for x in infile], vtoolsout)
