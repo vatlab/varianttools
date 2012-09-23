@@ -544,7 +544,8 @@ class AnnoDBWriter:
     def __init__(self, name, fields, anno_type, description, version, build, logger, use_existing_db=False,
         overwrite_existing_fields=False):
         self.logger = logger
-        self.name = name
+        # remove extension .db
+        self.name = name[:-3] if name.lower().endswith('.db') else name
         self.fields = fields
         self.anno_type = anno_type
         self.description = description
