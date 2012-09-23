@@ -598,6 +598,7 @@ class ResultRecorder:
         #
         self.writer = None
         if db_name:
+            db_name = db_name if not db_name.lower().endswith('.db') else db_name[:-3]
             old_pragma = runOptions.sqlite_pragma
             # make sure each commit will write data to disk, the performance can be bad though.
             runOptions.sqlite_pragma = 'synchronous=FULL,journal_mode=DELETE'
