@@ -779,8 +779,8 @@ class AssoTestsWorker(Process):
 
     def filterGenotype(self, genotype, geno_info, var_info, gname):
         '''
-        Filter genotypes by missingness criteria. Not very efficient because it essentially 
-        copied genotype, var_info and geno_info skipping the loci to be removed.
+        Filter genotypes for missing calls or lack of minor alleles. Not very efficient because 
+        it copies genotype, var_info and geno_info skipping the loci to be removed.
             - genotype is a Individual_list * Variants_list matrix of GT values 0,1,2 and nan
             - var_info is a dictionary with each key being information corresponding Variant_list
             - geno_info is a dictionary with each key having a matrix of the same structure as genotype matrix
@@ -797,8 +797,11 @@ class AssoTestsWorker(Process):
         # Step 2: filter variants by genotype missingness at a locus
         keep_loci = []
         for i in range(len(genotype[0])):
+            # tag individuals missing variant calls
             missingness_vi = list(map(math.isnan, [x[i] for x, y in zip(genotype, which) if y]))
-            keep_loci.append((float(sum(missingness_vi)) / float(len(missingness_vi))) < self.missing_var_ge)
+            # unique genotype codings on the locus
+            gt_codings = list(set([x[i] for x, y in zip(genotype, which) if y and not math.isnan(x[i])]))
+            keep_loci.append((float(sum(missingness_vi)) / float(len(missingness_vi))) < self.missing_var_ge and len(gt_codings) > 1)
         if len(keep_loci) - sum(keep_loci) > 0:
             # filter genotype and geno_info
             for idx in range(len(genotype)):
@@ -809,7 +812,7 @@ class AssoTestsWorker(Process):
             for k in var_info.keys():
                 var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
             #
-            self.logger.debug('In {}, {} out of {} loci will be removed due to having more than {}% missing genotypes after filtering on samples'\
+            self.logger.debug('In {}, {} out of {} loci will be removed due to having no minor allele or having more than {}% missing genotypes'\
                     .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
         # check for non-triviality of genotype matrix
         if len(genotype[0]) == 0:
