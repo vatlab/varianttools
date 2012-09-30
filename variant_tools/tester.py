@@ -156,8 +156,10 @@ class CaseCtrlBurdenTest(NullTest):
     '''Single covariate case/ctrl burden test on aggregated genotypes within an association testing group'''
     def __init__(self, ncovariates, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='Test statistic.'),
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
+                        Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
+                        Field(name='total_mac', index=None, type='INT', adj=None, comment='total minor allele counts in a group (adjusted for MOI)'),
+                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='test statistic.'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         if ncovariates > 1:
             self.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
@@ -212,10 +214,10 @@ class CaseCtrlBurdenTest(NullTest):
 
     def _determine_algorithm(self):
         algorithm = t.AssoAlgorithm([
-            # code genotype matrix by MOI being 0 1 or 2
-            t.CodeXByMOI(),
             # calculate sample MAF
             t.SetMaf(),
+            # code genotype matrix by MOI being 0 1 or 2
+            t.CodeXByMOI(),
             # filter out variants having MAF > mafupper or MAF <= maflower
             t.SetSites(self.mafupper, self.maflower)
             ])
@@ -355,7 +357,6 @@ class CaseCtrlBurdenTest(NullTest):
     def calculate(self, timeout):
         if self.data.locicounts() <= 1:
             raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 2).")
-        res = [self.data.samplecounts()]
         try:
             self.data.setMOI(self.moi)
             self.data.countCaseCtrl()
@@ -363,6 +364,7 @@ class CaseCtrlBurdenTest(NullTest):
             pvalues = self.data.pvalue()
             statistics = self.data.statistic()
             se = self.data.se()
+            res = [self.data.samplecounts(), self.data.locicounts(), self.data.allelecounts()]
             for (x, y, z) in zip(statistics, pvalues, se):
                 res.append(x)
                 res.append(y)
@@ -394,8 +396,10 @@ class GLMBurdenTest(NullTest):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, logger, *method_args)
         # set fields name for output database
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='Test statistic. In the context of regression this is estimate of effect size for x'),
+        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
+                        Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
+                        Field(name='total_mac', index=None, type='INT', adj=None, comment='total minor allele counts in a group (adjusted for MOI)'),
+                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='test statistic. In the context of regression this is estimate of effect size for x'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         self.ncovariates = ncovariates
         if self.permutations == 0:
@@ -517,10 +521,10 @@ class GLMBurdenTest(NullTest):
             w_alternative = self.alternative
         # data pre-processing
         algorithm = t.AssoAlgorithm([
-            # code genotype matrix by MOI being 0 1 or 2
-            t.CodeXByMOI(),
             # calculate sample MAF
             t.SetMaf(),
+            # code genotype matrix by MOI being 0 1 or 2
+            t.CodeXByMOI(),
             # filter out variants having MAF > mafupper or MAF <= maflower
             t.SetSites(self.mafupper, self.maflower)
             ])
@@ -593,7 +597,6 @@ class GLMBurdenTest(NullTest):
         return algorithm
 
     def calculate(self, timeout):
-        res = [self.data.samplecounts()]
         try:
             self.data.setMOI(self.moi)
             self.data.countCaseCtrl()
@@ -602,6 +605,7 @@ class GLMBurdenTest(NullTest):
             pvalues = self.data.pvalue()
             regstats = self.data.statistic()
             regse = self.data.se()
+            res = [self.data.samplecounts(), self.data.locicounts(), self.data.allelecounts()]
             for (x, y, z) in zip(regstats, pvalues, regse):
                 res.append(x)
                 res.append(y)

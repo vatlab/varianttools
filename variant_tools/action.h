@@ -247,7 +247,6 @@ public:
 
 };
 
-
 class SetMaf : public BaseAction
 {
 public:
@@ -271,6 +270,7 @@ public:
 
 
 };
+
 
 // m_model: weight by maf from all, or selected samples (ctrls, low QT samples, etc)
 // m_model == 0 : set weight by maf

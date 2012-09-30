@@ -83,7 +83,7 @@ public:
 	 *  stringVar gname: association group name
 	 */
 
-	AssoData():
+	AssoData() :
 		m_phenotype(0), m_C(0), m_genotype(0),
 		m_X(0), m_genotype_id(0), m_genotype_index(0),
 		m_pval(0), m_statistic(0), m_se(0), m_model(),
@@ -231,6 +231,14 @@ public:
 	unsigned locicounts()
 	{
 		return m_genotype.front().size();
+	}
+
+
+	unsigned allelecounts()
+	{
+		double tmac = std::accumulate(m_arrayVars["mac"].begin(), m_arrayVars["mac"].end(), 0.0);
+
+		return unsigned(tmac);
 	}
 
 

@@ -57,8 +57,8 @@ public:
 			return diff >= m_total_time;
 		} else
 			//check time() only every second
-			return (caller_id % m_calls_per_second == 0) && 
-				static_cast<int>(difftime(time(NULL), m_start_time)) >= m_total_time;
+			return (caller_id % m_calls_per_second == 0) &&
+			       static_cast<int>(difftime(time(NULL), m_start_time)) >= m_total_time;
 	}
 
 
@@ -83,36 +83,39 @@ bool SetMaf::apply(AssoData & d, int timeout)
 	//is problematic for variants on male chrX
 	//but should be Ok if only use the relative mafs (e.g., weightings)
 	vectorf maf(genotype.front().size(), 0.0);
+	// minor allele counts
+	vectorf mac = maf;
 	vectorf valid_all = maf;
-	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 
-	for (size_t j = 0; j < maf.size(); ++j) {
-		// calc maf and loci counts for site j
+	for (size_t j = 0; j < mac.size(); ++j) {
+		// calc mac and loci counts for site j
 		for (size_t i = 0; i < genotype.size(); ++i) {
 			// genotype not missing
 			if (genotype[i][j] == genotype[i][j]) {
 				valid_all[j] += 1.0;
 				if (genotype[i][j] >= 1.0) {
-					maf[j] += genotype[i][j];
+					mac[j] += genotype[i][j];
 				}
 			}
 		}
 
 		if (valid_all[j] > 0.0) {
-			maf[j] = maf[j] / (valid_all[j] * multiplier);
+			maf[j] = mac[j] / (valid_all[j] * 2.0);
 		}
 		//  FIXME : re-code genotype.  will be incorrect for male chrX
 		if (maf[j] > 0.5) {
 			maf[j] = 1.0 - maf[j];
+			mac[j] = valid_all[j] * 2.0 - mac[j];
 			// recode genotypes
 			for (size_t i = 0; i < genotype.size(); ++i) {
 				// genotype not missing
 				if (genotype[i][j] == genotype[i][j]) {
-					genotype[i][j] = multiplier - genotype[i][j];
+					genotype[i][j] = 2.0 - genotype[i][j];
 				}
 			}
 		}
 	}
+	d.setVar("mac", mac);
 	d.setVar("maf", maf);
 	// actual sample size
 	d.setVar("maf_denominator", valid_all);
@@ -261,6 +264,7 @@ bool SetSites::apply(AssoData & d, int timeout)
 	}
 	//FIXME: all weights have to be trimed as well
 	vectorf & maf = d.getArrayVar("maf");
+	vectorf & mac = d.getArrayVar("mac");
 	matrixf & genotype = d.raw_genotype();
 
 	if (m_upper > 1.0) {
@@ -276,6 +280,7 @@ bool SetSites::apply(AssoData & d, int timeout)
 	for (size_t j = 0; j < maf.size(); ++j) {
 		if (maf[j] <= m_lower || maf[j] > m_upper) {
 			maf.erase(maf.begin() + j);
+			mac.erase(mac.begin() + j);
 			for (size_t i = 0; i < genotype.size(); ++i) {
 				genotype[i].erase(genotype[i].begin() + j);
 			}
@@ -288,31 +293,34 @@ bool SetSites::apply(AssoData & d, int timeout)
 
 bool CodeXByMOI::apply(AssoData & d, int timeout)
 {
+	int moi = d.getIntVar("moi");
 
+	// additive mode, nothing to do
+	if (moi == 2) return true;
+	//
 	matrixf & genotype = d.raw_genotype();
-
-	for (size_t i = 0; i < genotype.size(); ++i) {
-		for (size_t j = 0; j < genotype.front().size(); ++j) {
+	// have to reset MAF
+	vectorf valid_all = d.getArrayVar("maf_denominator");
+	vectorf maf(genotype.front().size(), 0.0);
+	vectorf mac = maf;
+	//
+	for (size_t j = 0; j < genotype.front().size(); ++j) {
+		for (size_t i = 0; i < genotype.size(); ++i) {
 			// missing genotype
 			if (genotype[i][j] != genotype[i][j]) continue;
-			switch (d.getIntVar("moi")) {
-			case 0:
-				// recessive
-			{
-				genotype[i][j] = (fEqual(genotype[i][j], 2.0)) ? 1.0 : 0.0;
-			}
-			break;
-			case 1:
-				// dominant
-			{
-				genotype[i][j] = (!fEqual(genotype[i][j], 0.0)) ? 1.0 : 0.0;
-			}
-			break;
-			default:
-				break;
-			}
+			// recessive
+			if (moi == 0) genotype[i][j] = (fEqual(genotype[i][j], 2.0)) ? 1.0 : 0.0;
+			// dominant
+			if (moi == 1) genotype[i][j] = (!fEqual(genotype[i][j], 0.0)) ? 1.0 : 0.0;
+			// re-calculate minor allele counts
+			if (genotype[i][j] >= 1.0) mac[j] += genotype[i][j];
 		}
+		// denominator is total site counts itself for dominant and recessive
+		if (valid_all[j] > 0.0) maf[j] = mac[j] / (valid_all[j] * 1.0);
 	}
+	//
+	d.setVar("mac", mac);
+	d.setVar("maf", maf);
 	return true;
 }
 
