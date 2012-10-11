@@ -790,7 +790,7 @@ class AssoTestsWorker(Process):
         which = [x < self.missing_ind_ge for x in missing_ratios]
         # check for non-triviality of phenotype data
         if sum(which) < 5:
-            raise ValueError("Insufficient samples for {} to be analyzed.".format(repr(gname)))
+            raise ValueError("Sample size too small ({0}) to be analyzed for {1}.".format(sum(which), repr(gname)))
         if len(which) - sum(which) > 0:
             self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {}% missing genotypes'\
                     .format(repr(gname), len(which) - sum(which), len(which), self.missing_ind_ge * 100))
@@ -816,7 +816,7 @@ class AssoTestsWorker(Process):
                     .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
         # check for non-triviality of genotype matrix
         if len(genotype[0]) == 0:
-            raise ValueError("Insufficient variants for {} to be analyzed.".format(repr(gname)))
+            raise ValueError("No variant found in genotype data for {}.".format(repr(gname)))
         return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info, grpname):

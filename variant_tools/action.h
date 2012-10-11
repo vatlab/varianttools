@@ -365,11 +365,12 @@ private:
 
 
 // remove variant sites having MAF <= lower_bound or MAF > upper_bound
+// if use_mac, then remove variant sites having MAC <= lower_bound or MAC > upper_bound
 class SetSites : public BaseAction
 {
 public:
-	SetSites(double upper = 1.0, double lower = 0.0) :
-		BaseAction(), m_upper(upper), m_lower(lower)
+	SetSites(double upper = 1.0, double lower = 0.0, bool use_mac = false) :
+		BaseAction(), m_upper(upper), m_lower(lower), m_use_mac(use_mac)
 	{
 	}
 
@@ -391,6 +392,7 @@ public:
 private:
 	double m_upper;
 	double m_lower;
+	bool m_use_mac;
 };
 
 

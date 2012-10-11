@@ -165,6 +165,8 @@ class CaseCtrlBurdenTest(NullTest):
             self.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
         if self.permutations > 0:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+            if self.variable_thresholds:
+                self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
         self.trait_type = 'disease'
         # no external weight in these tests (for now)
@@ -187,7 +189,7 @@ class CaseCtrlBurdenTest(NullTest):
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--aggregation_theme', type=str, choices = ['CMC','WSS', 'KBAC', 'RBT', 'aSum', 'VT', 'VT_Fisher', 'RareCover', 'Calpha'], default='CMC',
-            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher".
+            help='''Choose from "CMC", "WSS", "KBAC", "RBT", "aSum", "VT", "VT_Fisher", "RareCover", "Calpha".
             Default set to "CMC"''')
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
@@ -377,6 +379,9 @@ class CaseCtrlBurdenTest(NullTest):
                     # actual number of permutations
                     if math.isnan(z): res.append(z)
                     else: res.append(int(z))
+            # finally, if self.variable_thresholds then the VT_MAF must be available
+            if self.data.hasVar('VT_MAF'):
+                res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
             self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
@@ -410,6 +415,8 @@ class GLMBurdenTest(NullTest):
                                     Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
         else:
             self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+            if self.variable_thresholds:
+                self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # check for weighting theme
         if self.permutations == 0 and self.weight in ['Browning', 'KBAC', 'RBT']:
             raise ValueError("Weighting theme {0} requires the use of permutation tests. Please specify number of permutations".format(self.weight))
@@ -621,6 +628,8 @@ class GLMBurdenTest(NullTest):
                     # actual number of permutations
                     if math.isnan(z): res.append(z)
                     else: res.append(int(z))
+            if self.data.hasVar('VT_MAF'):
+                res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
             self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)

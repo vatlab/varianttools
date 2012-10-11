@@ -126,21 +126,27 @@ bool SetMaf::apply(AssoData & d, int timeout)
 bool FillGMissing::apply(AssoData & d, int timeout)
 {
 	if (!d.hasVar("maf")) {
-		throw RuntimeError("Sample MAF, which has not been calculated, is required for this operation.");
+		throw RuntimeError("Sample MAF is required for this operation but has not been calculated.");
 	}
 
 	RNG rng;
 	gsl_rng * gslr = rng.get();
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	vectorf & maf = d.getArrayVar("maf");
+	vectorf & mac = d.getArrayVar("mac");
 	matrixf & genotype = d.raw_genotype();
 	for (size_t j = 0; j < maf.size(); ++j) {
 		// scan for site j
 		for (size_t i = 0; i < genotype.size(); ++i) {
 			// genotype missing; replace with maf
 			if (genotype[i][j] != genotype[i][j]) {
-				if (m_method == "maf") genotype[i][j] = maf[j] * multiplier;
-				else if (m_method == "mlg") {
+				if (m_method == "maf") {
+					genotype[i][j] = maf[j] * multiplier;
+					// update the MAC
+					// FIXME: not updating MAF here
+					// although this would not make much difference
+					mac[j] += genotype[i][j];
+				}else if (m_method == "mlg") {
 					// most likely genotype
 					double p = gsl_rng_uniform(gslr);
 					if (p > maf[j] * maf[j]) genotype[i][j] = 2.0;
@@ -259,26 +265,27 @@ bool BrowningWeight::apply(AssoData & d, int timeout)
 
 bool SetSites::apply(AssoData & d, int timeout)
 {
-	if (!d.hasVar("maf")) {
-		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to setting variant sites.");
+	if (!d.hasVar("maf") || !d.hasVar("mac")) {
+		throw RuntimeError("MAF/MAC has not been calculated. Please calculate MAF/MAC prior to setting variant sites.");
 	}
 	//FIXME: all weights have to be trimed as well
 	vectorf & maf = d.getArrayVar("maf");
 	vectorf & mac = d.getArrayVar("mac");
 	matrixf & genotype = d.raw_genotype();
-
-	if (m_upper > 1.0) {
+	//
+	if (!m_use_mac && m_upper > 1.0) {
 		throw ValueError("Minor allele frequency value should not exceed 1");
 	}
-	if (m_lower < 0.0) {
+	if (!m_use_mac && m_lower < 0.0) {
 		throw ValueError("Minor allele frequency should be a positive value");
 	}
 
-	if (fEqual(m_upper, 1.0) && fEqual(m_lower, 0.0))
+	if (!m_use_mac && fEqual(m_upper, 1.0) && fEqual(m_lower, 0.0))
 		return true;
 
 	for (size_t j = 0; j < maf.size(); ++j) {
-		if (maf[j] <= m_lower || maf[j] > m_upper) {
+		double im = m_use_mac ? mac[j] : maf[j];
+		if (im <= m_lower || im > m_upper) {
 			maf.erase(maf.begin() + j);
 			mac.erase(mac.begin() + j);
 			for (size_t i = 0; i < genotype.size(); ++i) {
@@ -1489,40 +1496,33 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 			return true;
 		}
 	}
-	if (!d.hasVar("maf"))
-		throw RuntimeError("MAF has not been calculated. Please calculate MAF prior to using variable thresholds method.");
-	vectorf & maf = d.getArrayVar("maf");
-
-	RNG rng;
-	gsl_rng * gslr = rng.get();
-
-	// obtain proper MAF thresholds
-	// each element in this vector of MAF thresholds will define one subset of variant sites
+	if (!d.hasVar("mac"))
+		throw RuntimeError("MAC has not been calculated. Please calculate MAC prior to using variable thresholds method.");
+	// MAC thresholds, uniq, sorted
+	// each element in this vector of MAC thresholds will define one subset of variant sites
+	vectorf umac = d.getArrayVar("mac");
+	// make sure umac has no decimal values
+	for (size_t i = 0; i < umac.size(); ++i) {
+		umac[i] = double(int(umac[i] + 0.5));
+	}
 	try {
-		std::sort(maf.begin(), maf.end());
-		std::vector<double>::iterator it = std::unique(maf.begin(), maf.end());
-		maf.resize(it - maf.begin());
-		if (maf.size() == 0) throw "maf is empty";
-		if (fEqual(maf.front(), 0.0)) {
-			maf.erase(maf.begin());
+		std::sort(umac.begin(), umac.end());
+		std::vector<double>::iterator it = std::unique(umac.begin(), umac.end());
+		umac.resize(it - umac.begin());
+		if (umac.size() == 0) throw "mac is empty";
+		if (fEqual(umac.front(), 0.0)) {
+			umac.erase(umac.begin());
 		}
-		if (maf.size() == 0) throw "maf is empty";
-		if (fEqual(maf.back(), 1.0)) {
-			maf.erase(maf.end());
-		}
-		if (maf.size() == 0) throw "maf is empty";
+		if (umac.size() == 0) throw "mac is empty";
 	} catch (...) {
-		// maf \in (0.0, 1.0)
 		// nothing to do
-		// FIXME should throw a Python message
 		d.setPvalue(std::numeric_limits<double>::quiet_NaN());
 		d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 		d.setSE(std::numeric_limits<double>::quiet_NaN());
 		return true;
 	}
-	// now maf should be a sorted vector of unique MAF's from AssoData
-
-	double maflower = maf.front() - std::numeric_limits<double>::epsilon();
+	// now umac should be a sorted vector of unique MAC's from AssoData
+	double maclower = umac.front() - std::numeric_limits<double>::epsilon();
 
 	// ==== optimization for certain methods ====
 	// determine whether to use a quicker permutation routine if the actions are simply "codeX + doRegression"
@@ -1546,11 +1546,11 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	std::vector<size_t> gindex(0);
 
 	if (choice) {
-		// obtain genotype scores for subsets of variants (determined by MAF cut-offs)
+		// obtain genotype scores for subsets of variants (determined by MAC cut-offs)
 		// and store them in "genotypes"
 		AssoData * dtmp = d.clone();
-		for (size_t m = 0; m < maf.size(); ++m) {
-			SetSites(maf[(maf.size() - m - 1)], maflower).apply(*dtmp);
+		for (size_t m = 0; m < umac.size(); ++m) {
+			SetSites(umac[(umac.size() - m - 1)], maclower, true).apply(*dtmp);
 			// m_actions[0] is some coding theme, which will generate genotype scores
 			m_actions[0]->apply(*dtmp);
 			genotypes.push_back(dtmp->genotype());
@@ -1572,6 +1572,7 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	// max_ for maximum over all statistics (for one-sided test)
 	// min_ for maximum over all statistics (with max_, for two-sided test)
 	double max_obstatistic = 0.0, min_obstatistic = 0.0;
+	vectorf vt_obstatistic(0);
 	double pvalue = 9.0;
 	// statistics[0]: statistic
 	// statistics[1]: actual number of permutations (informative on standard error)
@@ -1579,6 +1580,9 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 
 	// permutation timer initialization
 	Timer timer(timeout);
+
+	RNG rng;
+	gsl_rng * gslr = rng.get();
 
 	// permutation loop
 	for (size_t i = 0; i < m_times; ++i) {
@@ -1602,11 +1606,11 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 			}
 		} else {
 			// regular VT method
-			// for each MAF thresholds,
+			// for each MAC threshold,
 			// eliminate sites that are not confined in the thresholds
 			// and apply actions on them
-			for (size_t m = 0; m < maf.size(); ++m) {
-				SetSites(maf[(maf.size() - m - 1)], maflower).apply(*dtmp);
+			for (size_t m = 0; m < umac.size(); ++m) {
+				SetSites(umac[(umac.size() - m - 1)], maclower, true).apply(*dtmp);
 				for (size_t j = 0; j < m_actions.size(); ++j) {
 					m_actions[j]->apply(*dtmp);
 				}
@@ -1619,13 +1623,16 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 		if (i == 0) {
 			max_obstatistic = max_statistic;
 			min_obstatistic = min_statistic;
+			vt_obstatistic = vt_statistic;
 			// if max_ or min_ is NA
 			if (max_obstatistic != max_obstatistic) {
 				d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 				d.setSE(std::numeric_limits<double>::quiet_NaN());
 				d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+				d.setVar("VT_MAF", std::numeric_limits<double>::quiet_NaN());
 				return true;
 			}
+
 		} else {
 			if (max_statistic >= max_obstatistic && min_statistic <= min_obstatistic) {
 				// both the max_ and min_ are "successful"
@@ -1673,11 +1680,18 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 		d.setPvalue(getP(permcount1, permcount2, m_times, m_alternative));
 	}
 
-	// set statistic, a bit involved
+	// set statistic and the MAF that gives the statistic
 	if (m_alternative == 1) {
 		statistics[0] = max_obstatistic;
 	} else {
 		statistics[0] = (permcount1 >= permcount2) ? min_obstatistic : max_obstatistic;
+	}
+	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
+	for (size_t m = 0; m < umac.size(); ++m) {
+		if (fEqual(vt_obstatistic[m], statistics[0])) {
+			d.setVar("VT_MAF", umac[m] / (d.samplecounts() * multiplier));
+			break;
+		}
 	}
 	// set standard error (number of actual permutations)
 	statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
