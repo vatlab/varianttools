@@ -303,7 +303,7 @@ class fileFMT:
             args = self.parseArgs(name, fmt_args)
             self.parseFMT(name, defaults=args) 
         else:
-            url = 'http://vtools.houstonbioinformatics.org/format/{}.fmt'.format(name)
+            url = 'format/{}.fmt'.format(name)
             try:
                 fmt = downloadFile(url, quiet=True)
             except Exception as e:

@@ -349,9 +349,9 @@ def useArguments(parser):
     parser.add_argument('source',
         help='''Use an annotation database ($source.DB or $source.DB.gz) if it is available,
             download or build the database if a description file ($source.ann) is available.
-            Otherwise, this command will download a description file and the corresponding database
-            from web (http://vtools.houstonbioinformatics.org/annoDB/$source.ann and the latest
-            version of the datavase). If all means fail, this command will try to download the
+            Otherwise, this command will download a description file and the corresponding
+            database from web (c.f. runtime variable $search_path) and the latest version 
+            of the datavase). If all means fail, this command will try to download the
             source of the annotation database (or use source files provided by option --files).''')
     parser.add_argument('-f', '--files', nargs='*', default=[],
         help='''A list of source files. If specified, vtools will not try to
@@ -385,7 +385,6 @@ def use(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # try to get source.ann, source.DB, source.DB.gz or get source.ann from 
-            # http://vtools.houstonbioinformatics.org/annoDB
             if os.path.isfile(args.source):
                 # if a local file?
                 s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source))
@@ -403,7 +402,7 @@ def use(args):
             else:
                 res = urlparse.urlsplit(args.source)
                 if not res.scheme:
-                    args.source = 'http://vtools.houstonbioinformatics.org/annoDB/{}.ann'.format(args.source)
+                    args.source = 'annoDB/{}.ann'.format(args.source)
                 # download?
                 if proj.db.engine == 'mysql':
                     raise RuntimeError('MySQL databases are not portable and cannot be downloaded.')

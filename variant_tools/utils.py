@@ -45,6 +45,7 @@ import threading
 import re
 import stat
 import random
+import shutil
 try:
     # not all platforms/installations of python support bz2
     import bz2
@@ -96,7 +97,13 @@ class RuntimeOptions(object):
             'associate_num_of_readers': (None, 'Use specified number of processes to read '
                 'genotype data for association tests. The default value is the minimum of value '
                 'of option --jobs and 8. Note that a large number of reading processes might '
-                'lead to degraded performance or errors due to disk access limits.')
+                'lead to degraded performance or errors due to disk access limits.'),
+            'search_path': ('.:http://vtools.houstonbioinformatics.org/', 'A :-separated list of '
+                'directories and URLs that are used to locate annotation database (.ann, .DB), '
+                'file format (.fmt) and other files. Reset this option allows alternative '
+                'local or online storage of such files. variant tools will append trailing '
+                'directories such as annoDB for certain types of data so only root directories '
+                'should be listed in this search path. ')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
@@ -118,6 +125,8 @@ class RuntimeOptions(object):
         self._association_timeout = self.persistent_options['association_timeout'][0]
         # association test number of genotype loaders
         self._associate_num_of_readers = self.persistent_options['associate_num_of_readers'][0]
+        # search path
+        self._search_path = self.persistent_options['search_path'][0]
     #
     # attribute command line
     #
@@ -248,6 +257,13 @@ class RuntimeOptions(object):
             pass
     #
     associate_num_of_readers = property(lambda self: 0 if self._associate_num_of_readers is None else int(self._associate_num_of_readers), _set_associate_num_of_readers) 
+    #
+    # attribute search_path
+    def _set_search_path(self, val):
+        if val not in ['None', None]:
+            self._search_path = val
+    #
+    search_path = property(lambda self: self._search_path, _set_search_path)
 
 
 # the singleton object of RuntimeOptions
@@ -659,77 +675,85 @@ def decompressIfNeeded(filename, inplace=True):
 #
 # Well, it is not easy to do reliable download
 # 
-def downloadFile(URL, dest_dir = None, quiet = False):
+def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
-    filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
-    dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
-    if os.path.isfile(dest):
-        return dest
-    # use libcurl? Recommended but not always available
-    try:
-        import pycurl
-        if not quiet:
-            prog = ProgressBar(filename)
-        with open(dest, 'wb') as f:
-            c = pycurl.Curl()
-            c.setopt(pycurl.URL, URL)
-            c.setopt(pycurl.WRITEFUNCTION, f.write)
-            if not quiet:
-                c.setopt(pycurl.NOPROGRESS, False)
-                c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
-            c.perform()
-        if not quiet:
-            prog.done()
-        if c.getinfo(pycurl.HTTP_CODE) == 404:
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-            raise RuntimeError('ERROR 404: Not Found.')
+    for path in runOptions.search_path.split(':'):
+        URL = '{}/{}'.format(path, fileToGet)
+        filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
+        dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
         if os.path.isfile(dest):
             return dest
+        # local file?
+        if '://' not in path:
+            if os.path.isfile(URL):
+                shutil.copyfile(URL, dest)
+                return dest
+            continue
+        # use libcurl? Recommended but not always available
+        try:
+            import pycurl
+            if not quiet:
+                prog = ProgressBar(filename)
+            with open(dest, 'wb') as f:
+                c = pycurl.Curl()
+                c.setopt(pycurl.URL, URL)
+                c.setopt(pycurl.WRITEFUNCTION, f.write)
+                if not quiet:
+                    c.setopt(pycurl.NOPROGRESS, False)
+                    c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
+                c.perform()
+            if not quiet:
+                prog.done()
+            if c.getinfo(pycurl.HTTP_CODE) == 404:
+                try:
+                    os.remove(dest)
+                except OSError:
+                    pass
+                raise RuntimeError('ERROR 404: Not Found.')
+            if os.path.isfile(dest):
+                return dest
+            else:
+                raise RuntimeError('Failed to download {} using pycurl'.format(URL))
+        except ImportError:
+            # no pycurl module
+            pass
+        # use wget? Almost universally available under linux
+        try:
+            # for some strange reason, passing wget without shell=True can fail silently.
+            p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+            ret = p.wait()
+            if ret == 0 and os.path.isfile(dest):
+                return dest
+            else:
+                try:
+                    os.remove(dest)
+                except OSError:
+                    pass
+                raise RuntimeError('Failed to download {} using wget'.format(URL))
+        except (RuntimeError, ValueError, OSError):
+            # no wget command
+            pass
+        
+        # use python urllib?
+        if not quiet:
+            prog = ProgressBar(filename)
+        try:
+            urllib.URLopener().open(URL)
+        except IOError as error_code:
+            if error_code[1] == 404:
+                raise RuntimeError('ERROR 404: Not Found.')
+            else:
+                raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
         else:
-            raise RuntimeError('Failed to download {} using pycurl'.format(URL))
-    except ImportError:
-        # no pycurl module
-        pass
-    # use wget? Almost universally available under linux
-    try:
-        # for some strange reason, passing wget without shell=True can fail silently.
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
-        ret = p.wait()
-        if ret == 0 and os.path.isfile(dest):
+            urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+        if not quiet:
+            prog.done()
+        # all methods failed.
+        if os.path.isfile(dest):
             return dest
-        else:
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-            raise RuntimeError('Failed to download {} using wget'.format(URL))
-    except (RuntimeError, ValueError, OSError):
-        # no wget command
-        pass
-    
-    # use python urllib?
-    if not quiet:
-        prog = ProgressBar(filename)
-    try:
-        urllib.URLopener().open(URL)
-    except IOError as error_code:
-        if error_code[1] == 404:
-            raise RuntimeError('ERROR 404: Not Found.')
-        else:
-            raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
-    else:
-        urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
-    if not quiet:
-        prog.done()
-    # all methods failed.
-    if os.path.isfile(dest):
-        return dest
-    else:
-        raise RuntimeError('Failed to download {}'.format(URL))
-    
+    # if all failed
+    raise RuntimeError('Failed to download {}'.format(fileToGet))
+        
 #
 #
 # Database engine
