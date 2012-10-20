@@ -1695,7 +1695,7 @@ class Project:
         if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             filename = name
             mode = 'w' if name.endswith('.tar') else 'w:gz'
-        elif name.isalnum():
+        elif name.replace('_', '').isalnum():
             filename = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'w'
         else:
@@ -1712,10 +1712,10 @@ class Project:
             # add README file
             snapshot.add(readme_file, 'README')
             s = delayedAction(self.logger.info, 'Copying project')
-            snapshot.add('{}.proj'.format(self.name))
+            snapshot.add('{}.proj'.format(self.name), arcname='snapshot.proj')
             del s
             s = delayedAction(self.logger.info, 'Copying genotypes')
-            snapshot.add('{}_genotype.DB'.format(self.name))
+            snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
             del s
             os.remove(readme_file)
 
@@ -1725,24 +1725,39 @@ class Project:
         if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             snapshot_file = name
             mode = 'r' if name.endswith('.tar') else 'r:gz'
-        elif name.isalnum():
+        elif name.replace('_', '').isalnum():
             snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'r'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
         #
         if not os.path.isfile(snapshot_file):
-            raise ValueError('Snapshot {} does not exist'.format(name))
+            # donload it from online?
+            try:
+                print('Downloading snapshot {}.tar.gz from online'.format(name))
+                snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
+            except:
+                raise ValueError('Snapshot {} does not exist locally or online.'.format(name))
         #
         # close project
         self.db.close()
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 s = delayedAction(self.logger.info, 'Load project')
-                snapshot.extract('{}.proj'.format(self.name))
+                try:
+                    snapshot.extract('snapshot.proj')
+                    os.rename('snapshot.proj', '{}.proj'.format(self.name))
+                except:
+                    # an old version of snapshot saves $name.proj
+                    snapshot.extract('{}.proj'.format(self.name))
                 del s
                 s = delayedAction(self.logger.info, 'Load genotypes')
-                snapshot.extract('{}_genotype.DB'.format(self.name))
+                try:
+                    snapshot.extract('snapshot_genotype.DB'.format(self.name))
+                    os.rename('snapshot_genotype.DB', '{}_genotype.DB'.format(self.name))
+                except:
+                    # an old version of snapshot saves $name.proj
+                    snapshot.extract('{}_genotype.DB'.format(self.name))
                 del s
         except Exception as e:
             raise ValueError('Failed to load snapshot: {}'.format(e))
@@ -1765,8 +1780,7 @@ class Project:
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 files = snapshot.getnames()
-                if files != ['README', '{}.proj'.format(self.name),
-                    '{}_genotype.DB'.format(self.name)]:
+                if len(files) != 3 or 'README' not in files:
                     raise ValueError('{}: content of snapshot mismatch: {}'.format(filename, files))
                 snapshot.extract('README', runOptions.cache_dir)
                 with open(os.path.join(runOptions.cache_dir, 'README'), 'r') as readme:
@@ -3257,7 +3271,8 @@ def showArguments(parser):
             'test TST' for details of an association test TST, 'runtime_options'
             for a list of runtime options and their descriptions, 'snapshot' for a
             particular snapshot by name or filename, 'snapshots' for a list of
-            snapshots saved by command 'vtools admin --save_snapshots'. The default
+            publicly available snapshots, and snapshots of the current project
+            saved by command 'vtools admin --save_snapshots'. The default
             parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be names of tables for type 'table',
@@ -3456,6 +3471,10 @@ def show(args):
                     if name is not None:
                         print('{:<15} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*32 + desc, initial_indent='', subsequent_indent=' '*32))[32:]))
+                #
+                snapshots = filesInURL('http://vtools.houstonbioinformatics.org/snapshot', ext='.tar.gz')
+                for ss in snapshots:
+                    print('{:<15} {:15} {}'.format(ss, 'NA', 'Online.'))
     except Exception as e:
         sys.exit(e)
 
