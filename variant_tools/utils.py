@@ -98,7 +98,7 @@ class RuntimeOptions(object):
                 'genotype data for association tests. The default value is the minimum of value '
                 'of option --jobs and 8. Note that a large number of reading processes might '
                 'lead to degraded performance or errors due to disk access limits.'),
-            'search_path': ('.:http://vtools.houstonbioinformatics.org/', 'A :-separated list of '
+            'search_path': ('.;http://vtools.houstonbioinformatics.org/', 'A ;-separated list of '
                 'directories and URLs that are used to locate annotation database (.ann, .DB), '
                 'file format (.fmt) and other files. Reset this option allows alternative '
                 'local or online storage of such files. variant tools will append trailing '
@@ -677,7 +677,7 @@ def decompressIfNeeded(filename, inplace=True):
 # 
 def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
-    for path in runOptions.search_path.split(':'):
+    for path in runOptions.search_path.split(';'):
         URL = '{}/{}'.format(path, fileToGet)
         filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
         dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
