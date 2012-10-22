@@ -45,7 +45,7 @@ from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger
 
 
 # define a field type
@@ -855,34 +855,13 @@ class Project:
         runOptions.association_timeout = self.loadProperty('__option_association_timeout', None)
         #
         runOptions.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
-        # create a logger
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.DEBUG)
-        # output to standard output
-        cout = logging.StreamHandler()
-        levels = {
-            '0': logging.ERROR,
-            '1': logging.INFO,
-            '2': logging.DEBUG,
-            None: logging.INFO
-            }
-        #
         if verbosity is None and not new:
             # try to get saved verbosity level
             verbosity = self.loadProperty('__option_verbosity', None)
         # set global verbosity level and temporary directory
-        runOptions.verbosity=verbosity
-        #
-        cout.setLevel(levels[runOptions.verbosity])
-        cout.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        self.logger.addHandler(cout)
-        # output to a log file
-        ch = logging.FileHandler(self.name + '.log', mode='w' if new else 'a')
-        # NOTE: debug informaiton is always written to the log file
-        ch.setLevel(levels[runOptions.logfile_verbosity])
-        ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-        self.logger.addHandler(ch)
-        # start a new session
+        runOptions.verbosity = verbosity
+        # runOptions.verbosity will affect the creation of logger
+        self.logger = createLogger(self.name + '.log', mode='w' if new else 'a')
         self.logger.debug('')
         self.logger.debug(runOptions.command_line)
         # if option temp_dir is set, the path will be used
@@ -1718,6 +1697,9 @@ class Project:
             snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
             del s
             os.remove(readme_file)
+        # add a warning message if the snapshot starts with 'vt_'
+        if name.startswith('vt_'):
+            self.logger.warning('Snapshots with name starting with vt_ is reserved for public snapshots for documentation and training purposes.') 
 
     def loadSnapshot(self, name):
         '''Load snapshot'''
@@ -1733,11 +1715,15 @@ class Project:
         #
         if not os.path.isfile(snapshot_file):
             # donload it from online?
-            try:
-                print('Downloading snapshot {}.tar.gz from online'.format(name))
-                snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
-            except:
-                raise ValueError('Snapshot {} does not exist locally or online.'.format(name))
+            if name.startswith('vt_'):
+                # only snapshots with name starting with vt_ is downloaded online
+                try:
+                    print('Downloading snapshot {}.tar.gz from online'.format(name))
+                    snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
+                except:
+                    raise ValueError('Failed to download snapshot {}.'.format(name))
+            else:
+                raise ValueError('Snapshot {} does not exist locally.'.format(name))
         #
         # close project
         self.db.close()
@@ -1762,7 +1748,7 @@ class Project:
         except Exception as e:
             raise ValueError('Failed to load snapshot: {}'.format(e))
         finally:
-            # re-connect the main database for proer cleanup
+            # re-connect the main database for proper cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
         
@@ -3456,25 +3442,25 @@ def show(args):
             elif args.type == 'snapshot':
                 if not args.items:
                     raise ValueError('Please provide a list of snapshot name or filenames')
-                print('{:<15} {:<15} {}'.format('snapshot', 'date', 'description'))
+                print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot in args.items:
                     name, date, desc = proj.getSnapshotInfo(snapshot)
                     if name is not None:
-                        print('{:<15} {:<15} {}'.format(name, date, 
-                            '\n'.join(textwrap.wrap(' '*32 + desc, initial_indent='', subsequent_indent=' '*32))[32:]))
+                        print('{:<18} {:<15} {}'.format(name, date, 
+                            '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
-                print('{:<15} {:<15} {}'.format('snapshot', 'date', 'description'))
+                print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
                     name, date, desc = proj.getSnapshotInfo(snapshot_file)
                     if name is not None:
-                        print('{:<15} {:<15} {}'.format(name, date, 
-                            '\n'.join(textwrap.wrap(' '*32 + desc, initial_indent='', subsequent_indent=' '*32))[32:]))
+                        print('{:<18} {:<15} {}'.format(name, date, 
+                            '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
                 #
                 snapshots = filesInURL('http://vtools.houstonbioinformatics.org/snapshot', ext='.tar.gz')
                 for ss in snapshots:
-                    print('{:<15} {:15} {}'.format(ss, 'NA', 'Online.'))
+                    print('{:<18} {:15} {}'.format(ss, 'NA', 'Public snapshot'))
     except Exception as e:
         sys.exit(e)
 
@@ -3531,8 +3517,9 @@ def adminArguments(parser):
         'vtools show snapshots'. ''')
     snapshots.add_argument('--load_snapshot', metavar='NAME',
         help='''Revert the current project to specified snapshot. All changes since
-        the that snapshot will be lost. A filename is allowed to load snapshot from
-        a specific file.''')
+        the that snapshot will be lost. The NAME should be one of the project snapshots
+        or online snapshots listed by command 'vtools show snapshots', or name of a
+        local snapshot file (with extension .tar, .tgz or .tar.gz).''')
     options = parser.add_argument_group('Set values for some various internal options.')
     options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
         help='''Set value to internal options such as the batch size for database
@@ -3605,5 +3592,5 @@ def admin(args):
         sys.exit(e)
 
 if __name__ == '__main__':
-    # for testing purposes only. The main interface is provided in vtools.py
+    # for testing purposes only. The main interface is provided in vtools
     pass
