@@ -1689,7 +1689,7 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	for (size_t m = 0; m < umac.size(); ++m) {
 		if (fEqual(vt_obstatistic[m], statistics[0])) {
-			d.setVar("VT_MAF", umac[m] / (d.samplecounts() * multiplier));
+			d.setVar("VT_MAF", umac[(umac.size() - m - 1)] / (d.samplecounts() * multiplier));
 			break;
 		}
 	}
