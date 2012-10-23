@@ -3243,7 +3243,7 @@ def remove(args):
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test', 'runtime_options', 'snapshot', 'snapshots'],
+        'tests', 'test', 'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3255,7 +3255,8 @@ def showArguments(parser):
             'formats' for all supported import and export formats, 'format FMT' for
             details of format FMT, 'tests' for a list of all association tests, and
             'test TST' for details of an association test TST, 'runtime_options'
-            for a list of runtime options and their descriptions, 'snapshot' for a
+            for a list of runtime options and their descriptions, 'runtime_option
+            OPT' for value of specified runtime option OPT. 'snapshot' for a
             particular snapshot by name or filename, 'snapshots' for a list of
             publicly available snapshots, and snapshots of the current project
             saved by command 'vtools admin --save_snapshots'. The default
@@ -3439,6 +3440,10 @@ def show(args):
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
                     print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
                         subsequent_indent=' '*27)))
+            elif args.type == 'runtime_option':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify name of a runtime option')
+                print(getattr(runOptions, '_' + args.items[0]))
             elif args.type == 'snapshot':
                 if not args.items:
                     raise ValueError('Please provide a list of snapshot name or filenames')
@@ -3468,7 +3473,7 @@ def show(args):
 def executeArguments(parser):
     parser.add_argument('query', nargs='*',
         help='''A SQL query to be executed. The project genotype database is
-        attached as $name_genotype. Annotation databases used in the project
+        attached as genotype. Annotation databases used in the project
         are attached and are available by their names.''')
     parser.add_argument('-d', '--delimiter', default='\t',
         help='Delimiter used to output results, default to tab.')
@@ -3476,6 +3481,9 @@ def executeArguments(parser):
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            # preferred
+            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+            # for backward compatibility
             proj.db.attach('{}_genotype'.format(proj.name))
             cur = proj.db.cursor()
             query = ' '.join(args.query)
