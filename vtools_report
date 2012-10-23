@@ -91,26 +91,30 @@ def getSamples(samples, group_by=[]):
         # do something with group and IDs.
     '''
     output = getoutput(['vtools', 'execute', 'SELECT {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {} {};'\
-        .format('sample_id, {}'.format(', '.join(group_by)) if group_by else 'sample_id',
+        .format('sample_id, sample_name, {}'.format(', '.join(group_by)) if group_by else 'sample_id, sample_name',
             'WHERE {}'.format(' AND '.join(samples)) if samples else '',
             'GROUP BY {}'.format(', '.join(group_by)) if group_by else '')]).split('\n')
     # we return results batch by batch as a generator
     IDs = []
+    names = []
     group = ()
     for line in output:
-        fields = [x.strip() for x in line.split(',')]
+        fields = [x.strip() for x in line.split('\t')]
         ID = fields[0]
-        g = tuple(fields[1:])
+        name = fields[1]
+        g = tuple(fields[2:])
         if group == ():
             group = g
         if g == group:
             IDs.append(ID)
+            names.append(name)
         else:
-            yield (group, IDs)
+            yield (group, IDs, names)
             # start a new group
             group = g
             IDs = [ID]
-    yield (group, IDs)
+            names = [name]
+    yield (group, IDs, names)
 
 #
 # Command trans_ratio
@@ -208,7 +212,7 @@ def variantStat(args):
     print('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions', 
         'num_substitutions', 'min_insertion_size', 'avg_insertion_size', 'max_insertion_size',
         'min_deletion_size', 'avg_deletion_size', 'max_deletion_size']))
-    for group, sample_ids in getSamples(args.samples, args.group_by):
+    for group, sample_ids, sample_names in getSamples(args.samples, args.group_by):
         if len(sample_ids) == 0:
             sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
         #
@@ -235,6 +239,64 @@ def variantStat(args):
             num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
             min_deletion_size, avg_deletion_size, max_deletion_size]))
     
+
+#
+# command discordance_rate
+#
+def discordanceRateArguments(parser):
+    parser.add_argument('-s', '--samples', nargs='*', default=[],
+        help='''Limiting variants from samples that match conditions that
+            use columns shown in command 'vtools show sample' (e.g. 'aff=1',
+            'filename like "MG%%"').''')
+    parser.add_argument('--genotypes', nargs='*', default=[],
+        help='''Limiting genotypes from samples that match conditions that
+            involves genotype fields (e.g. filter by quality score, with fields
+            shown in command 'vtools show genotypes'). If a variant is filtered
+            for one sample but not another, it will be included if runtime option
+            $treat_missing_as_wildtype is set to True, and discarded otherwise.''')
+    
+def discordanceRate(args):
+    for grp, sample_ids, sample_names in getSamples(args.samples):
+        print('\t'.join(sample_names))
+        # get list of variant for each sample
+        rates = []
+        treat_missing_as_wildtype = getoutput(['vtools', 'show', 'runtime_option', 'treat_missing_as_wildtype'])
+        for i, (id_i, name_i) in enumerate(zip(sample_ids, sample_names)):
+            rates.append([0] * len(sample_ids))
+            output_items = []
+            var_i = {}
+            for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i,
+                ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
+                var, gt = line.split()
+                var_i[var] = gt
+            for j, (id_j, name_j) in enumerate(zip(sample_ids, sample_names)):
+                if i > j:
+                    output_items.append('{}/{}'.format(rates[j][i][0], rates[j][i][1]))
+                elif i == j:
+                    output_items.append('0/{0}'.format(len(var_i)))
+                else:
+                    var_j = {}
+                    for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j,
+                        ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
+                        var, gt = line.split()
+                        var_j[var] = gt
+                    if treat_missing_as_wildtype == 'False':
+                        # find variant that exist in both samples
+                        exist_in_both = [item for item in var_i.keys() if item in var_j]
+                        # find variant that has different variant
+                        differ_in_two = [item for item in exist_in_both if var_i[item] != var_j[item]]
+                        rates[i][j] = (len(differ_in_two), len(exist_in_both))
+                    else:
+                        exist_in_any = set(var_i.keys()) | set(var_j.keys())
+                        # remove 0 items to facilitate search
+                        var_i = {x:y for x,y in var_i.items() if y != 0}
+                        var_j = {x:y for x,y in var_j.items() if y != 0}
+                        #
+                        differ_in_two = [item for item in exist_in_any if (not item in var_i) \
+                            or (not item in var_j) or (var_i[item] != var_j[item])]
+                        rates[i][j] = (len(differ_in_two), len(exist_in_any))
+                    output_items.append('{:.3f}'.format(float(rates[i][j][0]) / rates[i][j][1]))
+            print('\t'.join(output_items))
 
 if __name__ == '__main__':
     #
@@ -291,6 +353,21 @@ if __name__ == '__main__':
     variantStatArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=variantStat)
+    #
+    # command discordance_rate
+    parser = subparsers.add_parser('discordance_rate',
+        help='''Report discordance rate, namely the number of genotype calls that differ
+            between a pair of samples divided by the total number of SNPs for which both
+            calls are non-missing, between pairs of samples. The statistics can be
+            calculated for all samples or selected samples specified by parameter --samples.
+            This command output a n by n matrix with sample names in the header. Items (i,j)
+            in this matrix is numbers in the format of diff/all for i<=j, and the actual
+            ratio for i > j. This rate is affected by runtime option treat_missing_as_wildtype
+            which assumes that variants that do not appear in a sample (or filtered by
+            quality score etc) are wildtype alleles.''')
+    discordanceRateArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=discordanceRate)
     #
     # getting args
     args = master_parser.parse_args()
