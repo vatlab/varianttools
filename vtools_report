@@ -271,7 +271,7 @@ def discordanceRate(args):
                 var_i[var] = gt
             for j, (id_j, name_j) in enumerate(zip(sample_ids, sample_names)):
                 if i > j:
-                    output_items.append('{}/{}'.format(rates[j][i][0], rates[j][i][1]))
+                    output_items.append('{:.5f}'.format(float(rates[j][i][0]) / rates[j][i][1]))
                 elif i == j:
                     output_items.append('0/{0}'.format(len(var_i)))
                 else:
@@ -295,7 +295,7 @@ def discordanceRate(args):
                         differ_in_two = [item for item in exist_in_any if (not item in var_i) \
                             or (not item in var_j) or (var_i[item] != var_j[item])]
                         rates[i][j] = (len(differ_in_two), len(exist_in_any))
-                    output_items.append('{:.5f}'.format(float(rates[i][j][0]) / rates[i][j][1]))
+                    output_items.append('{}/{}'.format(rates[i][j][0], rates[i][j][1]))
             print('\t'.join(output_items))
 
 if __name__ == '__main__':
@@ -361,8 +361,8 @@ if __name__ == '__main__':
             calls are non-missing, between pairs of samples. The statistics can be
             calculated for all samples or selected samples specified by parameter --samples.
             This command output a n by n matrix with sample names in the header. Items (i,j)
-            in this matrix is numbers in the format of diff/all for i<=j, and the actual
-            ratio for i > j. This rate is affected by runtime option treat_missing_as_wildtype
+            in this matrix is numbers in the format of diff/all for i >= j, and the actual
+            ratio for i < j. This rate is affected by runtime option treat_missing_as_wildtype
             which assumes that variants that do not appear in a sample (or filtered by
             quality score etc) are wildtype alleles.''')
     discordanceRateArguments(parser)
