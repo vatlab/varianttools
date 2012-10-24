@@ -154,7 +154,7 @@ def transRatio(args):
         keys = list(values.keys())
         keys.sort()
         for k in keys:
-            print('{}\t{:,}\t{:,}\t{:.3f}'.format(k, int(values[k][0]), int(values[k][1]),
+            print('{}\t{:,}\t{:,}\t{:.5f}'.format(k, int(values[k][0]), int(values[k][1]),
                 int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0))
     else:
         print('num_of_transition\tnum_of_transversion\tratio')
@@ -166,7 +166,7 @@ def transRatio(args):
             "(ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
             "(ref='C' AND alt='G') OR (ref='G' AND alt='C')",
             '--output', 'sum({})'.format(args.num_field)]))
-        print('{}\t{}\t{:.3f}'.format(transition, transversion, 
+        print('{}\t{}\t{:.5f}'.format(transition, transversion, 
             transition / float(transversion) if transversion != 0 else 0))
     
 #
@@ -295,7 +295,7 @@ def discordanceRate(args):
                         differ_in_two = [item for item in exist_in_any if (not item in var_i) \
                             or (not item in var_j) or (var_i[item] != var_j[item])]
                         rates[i][j] = (len(differ_in_two), len(exist_in_any))
-                    output_items.append('{:.3f}'.format(float(rates[i][j][0]) / rates[i][j][1]))
+                    output_items.append('{:.5f}'.format(float(rates[i][j][0]) / rates[i][j][1]))
             print('\t'.join(output_items))
 
 if __name__ == '__main__':
