@@ -164,7 +164,10 @@ class CaseCtrlBurdenTest(NullTest):
         if ncovariates > 1:
             self.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
         if self.permutations > 0:
-            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+            self.fields.extend([
+                    Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
+                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
+                    ])
             if self.variable_thresholds:
                 self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
@@ -376,10 +379,11 @@ class CaseCtrlBurdenTest(NullTest):
                     'You can use command "vtools admin --set_runtime_option association_timeout" to change the timeout settings.'.format(
                     self.name, self.gname, timeout))
                 if self.permutations > 0:
-                    # actual number of permutations
+                    # standard error via permutation test
                     if math.isnan(z): res.append(z)
-                    else: res.append(int(z))
-            # finally, if self.variable_thresholds then the VT_MAF must be available
+                    else: res.append(z)
+            if self.data.hasVar('NPERM'):
+                res.append(self.data.getIntVar("NPERM"))
             if self.data.hasVar('VT_MAF'):
                 res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
@@ -414,7 +418,10 @@ class GLMBurdenTest(NullTest):
                                     Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for covariate {}'.format(str(i+2))),
                                     Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
         else:
-            self.fields.append(Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated'))
+            self.fields.extend([
+                    Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
+                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
+                    ])
             if self.variable_thresholds:
                 self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # check for weighting theme
@@ -625,9 +632,11 @@ class GLMBurdenTest(NullTest):
                     # Wald statistic
                     res.append(x/z)
                 else:
-                    # actual number of permutations
+                    # standard error via permutation test
                     if math.isnan(z): res.append(z)
-                    else: res.append(int(z))
+                    else: res.append(z)
+            if self.data.hasVar('NPERM'):
+                res.append(self.data.getIntVar("NPERM"))
             if self.data.hasVar('VT_MAF'):
                 res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:

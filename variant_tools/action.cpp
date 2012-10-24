@@ -1420,12 +1420,13 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 	unsigned permcount1 = 0, permcount2 = 0;
 	double pvalue = 9.0;
 	// statistics[0]: statistic
-	// statistics[1]: actual number of permutations (informative about standard error)
+	// statistics[1]: actual number of permutations
 	vectorf statistics(2);
 
 	// permutation timer initialization
 	Timer timer(timeout);
-
+	// Running statistic calculator
+	RunningStat rs;
 	// permutation loop
 	for (size_t i = 0; i < m_times; ++i) {
 		// apply actions to data
@@ -1440,6 +1441,7 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 				d.setStatistic(std::numeric_limits<double>::quiet_NaN());
 				d.setSE(std::numeric_limits<double>::quiet_NaN());
 				d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+				d.setVar("NPERM", 0);
 				return true;
 			}
 		} else {
@@ -1451,6 +1453,7 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 				if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
 				else ++permcount2;
 			}
+			rs.Push(statistic);
 		}
 		// adaptive p-value calculation checkpoint
 		if (m_sig < 1.0) {
@@ -1470,7 +1473,7 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 		m_permute->apply(d);
 	}
 
-	// Permutation finished. Set p-value, statistic, std error (actual number of permutations), etc
+	// Permutation finished. Set p-value, statistic, std error, actual number of permutations, etc
 	if (pvalue <= 1.0) {
 		d.setPvalue(pvalue);
 	} else{
@@ -1479,9 +1482,9 @@ bool FixedPermutator::apply(AssoData & d, int timeout)
 
 	statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
 	d.setStatistic(statistics[0]);
-	d.setSE(statistics[1]);
+	d.setSE(rs.StandardDeviation());
+	d.setVar("NPERM", int(statistics[1]));
 	return true;
-	//return (double) std::count_if(all_statistic.begin(), all_statistic.end(), std::bind2nd(std::greater_equal<double>(),all_statistic[0]));
 }
 
 
@@ -1575,11 +1578,14 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 	vectorf vt_obstatistic(0);
 	double pvalue = 9.0;
 	// statistics[0]: statistic
-	// statistics[1]: actual number of permutations (informative on standard error)
+	// statistics[1]: actual number of permutations
 	vectorf statistics(2);
 
 	// permutation timer initialization
 	Timer timer(timeout);
+	// Running statistic calculator
+	RunningStat rs_max;
+	RunningStat rs_min;
 
 	RNG rng;
 	gsl_rng * gslr = rng.get();
@@ -1630,6 +1636,7 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 				d.setSE(std::numeric_limits<double>::quiet_NaN());
 				d.setPvalue(std::numeric_limits<double>::quiet_NaN());
 				d.setVar("VT_MAF", std::numeric_limits<double>::quiet_NaN());
+				d.setVar("NPERM", 0);
 				return true;
 			}
 
@@ -1648,6 +1655,8 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 					++permcount2;
 				}
 			}
+			rs_max.Push(max_statistic);
+			rs_min.Push(min_statistic);
 		}
 
 		// adaptive p-value calculation checkpoint
@@ -1680,11 +1689,13 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 		d.setPvalue(getP(permcount1, permcount2, m_times, m_alternative));
 	}
 
-	// set statistic and the MAF that gives the statistic
+	// set statistic, standard deviation and the MAF that gives the statistic
 	if (m_alternative == 1) {
 		statistics[0] = max_obstatistic;
+		d.setSE(rs_max.StandardDeviation());
 	} else {
 		statistics[0] = (permcount1 >= permcount2) ? min_obstatistic : max_obstatistic;
+		d.setSE((permcount1 >= permcount2) ? rs_min.StandardDeviation() : rs_max.StandardDeviation());
 	}
 	double multiplier = (d.getIntVar("moi") > 0) ? d.getIntVar("moi") * 1.0 : 1.0;
 	for (size_t m = 0; m < umac.size(); ++m) {
@@ -1693,10 +1704,10 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 			break;
 		}
 	}
-	// set standard error (number of actual permutations)
+	// set standard error and number of actual permutations
 	statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
 	d.setStatistic(statistics[0]);
-	d.setSE(statistics[1]);
+	d.setVar("NPERM", int(statistics[1]));
 	return true;
 }
 
