@@ -778,13 +778,12 @@ def updateArguments(parser):
             genotype info (e.g. QT) of variants in all or selected samples to
             specified fields (e.g. meanQT). Functions sum, avg, max, and min
             are currently supported. In addition, special functions #(GT),
-            #(alt), #(missing), #(wildtype), #(hom), #(het) and #(other) are
+            #(hom), #(het), #(alt), #(other), #(missing) and #(wildtype) are
             provided to count the number of valid genotypes (not missing),
-            alternative alleles (#(alt)=#(hom) + 2*#(het) + #(other)), missing
-            genotypes (number of sample - #(GT)), number of non-missing wildtype
-            genotype (#(GT) - #(hom) - #(het) - #(other)), homozygote genotypes,
-            heterozygote genotypes, and genotypes with two different alternative
-            alleles.''')
+            homozygote genotypes, heterozygote genotypes, alternative alleles
+            (#(het) + 2*#(hom) + #(other)), genotypes with two different alternative
+            alleles, missing genotypes (number of samples - #(GT)) and number of
+            non-missing wildtype genotypes (#(GT) - #(hom) - #(het) - #(other))''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
