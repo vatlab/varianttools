@@ -66,10 +66,12 @@ class GenotypeStatCalculator(threading.Thread):
                 self.stat.append(('count(*)', 'GT=1'))
             elif item == '#(other)':
                 self.stat.append(('count(*)', 'GT=-1'))
-            elif item == '#(wildtype)':
+            elif item == '#(wtGT)':
                 self.stat.append(('count(*)', 'GT=0'))
+            elif item == '#(mutGT)':
+                self.stat.append(('count(*)', 'GT!=0'))
             elif item.startswith('#'):
-                raise ValueError('{} is not a valid special function (only #(GT), #(alt), #(hom), #(het), #(other), and #(wildtype) are allowed).'.format(item))
+                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
             else:
                 self.stat.append((item, None))
         self.queue = idQueue
@@ -427,12 +429,12 @@ def phenotypeArguments(parser):
             DP is one of the genotype fields) of the sample. Multiple fields (e.g.
             '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
             standard SQL aggregation functions, variant tools supports special functions
-            #(GT), #(wildtype), #(alt), #(hom), #(het) and #(other), which calculates
-            the number of genotypes (the same as count(*)), wildtype genotype, alternative
-            alleles, homozygotes, heterozygotes, and genotypes with two different
-            alternative alleles. Parameters --genotypes and --samples could be used 
-            to limit the genotypes to be considered and the samples for which 
-            genotypes will be set.'''),
+            #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het) and #(other), which
+            counts the number of genotypes (the same as count(*)), wildtype genotypes,
+            mutant genotypes alternative alleles, homozygotes, heterozygotes, and
+            genotypes with two different alternative alleles. Parameters --genotypes
+            and --samples could be used to limit the genotypes to be considered and
+            the samples for which genotypes will be set.'''),
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),

@@ -111,12 +111,14 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
         self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
         #
-        self.assertSucc('vtools update variant --from_stat "m=#(missing)" "w=#(wildtype)" "total=#(GT)"')
-        self.assertSucc('vtools update variant --set "res=total-w-hom-het-other"')
+        self.assertSucc('vtools update variant --from_stat "missing=#(missing)" "wt=#(wtGT)" "mut=#(mutGT)" "total=#(GT)"')
+        self.assertSucc('vtools update variant --set "res=total-wt-hom-het-other"')
         self.assertEqual(output2list('vtools output variant res'), ['0']*6)
         self.assertSucc('vtools update variant --set "res=num-2*hom-het-other"')
         self.assertEqual(output2list('vtools output variant res'), ['0']*6)
-        self.assertSucc('vtools update variant --set "res=4-m-total"')
+        self.assertSucc('vtools update variant --set "res=4-missing-total"')
+        self.assertEqual(output2list('vtools output variant res'), ['0']*6)
+        self.assertSucc('vtools update variant --set "res=mut-hom-het-other"')
         self.assertEqual(output2list('vtools output variant res'), ['0']*6)
         
         #Add fields based on other variants or annotation fields( --set)

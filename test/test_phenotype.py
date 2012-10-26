@@ -97,7 +97,7 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc("vtools phenotype --from_stat 'validGeno=count(*)' --genotypes 'DP_geno>10'")
         # apply some sqlite functions on sample variant tables to provide useful information for genotype qualities
         self.assertSucc('vtools phenotype --from_stat "meanDP=avg(DP_geno)" "minDP=min(DP_geno)" "maxDP=max(DP_geno)"')
-        self.assertSucc("vtools phenotype --from_stat 'wildtype=#(wildtype)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)'")
+        self.assertSucc("vtools phenotype --from_stat 'wildtype=#(wtGT)' 'mutants=#(mutGT)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)'")
 
     def testPhenotypeOutput(self):
         'Test command phenotype with --output'

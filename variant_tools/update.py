@@ -452,7 +452,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         return
 
     # separate special functions...
-    alt = hom = het = other = GT = missing = wildtype = None
+    alt = hom = het = other = GT = missing = wtGT = mutGT = None
 
     # keys to speed up some operations
     MEAN = 0
@@ -481,10 +481,12 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             GT = f
         elif e == '#(missing)':
             missing = f
-        elif e == '#(wildtype)':
-            wildtype = f
+        elif e == '#(wtGT)':
+            wtGT = f
+        elif e == '#(mutGT)':
+            mutGT = f
         elif e.startswith('#('):
-            raise ValueError('Unrecognized parameter {}: only parameters alt, wildtype, missing, hom, het, other and GT are accepted for special function #'.format(stat))
+            raise ValueError('Unrecognized parameter {}: only parameters alt, wtGT, mutGT, missing, hom, het, other and GT are accepted for special function #'.format(stat))
         else:
             m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
             if m is None:
@@ -497,7 +499,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             fieldCalcs.append(None)
             destinations.append(dest)
     #
-    coreDestinations = [alt, hom, het, other, GT, missing, wildtype]
+    coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT]
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -636,8 +638,9 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     #
     headers = [x.lower() for x in proj.db.getHeaders(variant_table)]
     table_attributes = [(alt, 'INT'), (hom, 'INT'),
-            (het, 'INT'), (other, 'INT'), (GT, 'INT'), (missing, 'INT'), (wildtype, 'INT')]
-    fieldsDefaultZero = [alt, hom, het, other, GT, missing, wildtype]
+            (het, 'INT'), (other, 'INT'), (GT, 'INT'),
+            (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT')]
+    fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT]
     
     for index in validGenotypeIndices:
         field = genotypeFields[index]
@@ -688,9 +691,12 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if missing is not None:
             # missing = # sample - #(GT)
             res.append(numSample - value[3])
-        if wildtype is not None:
-            # wildtype = #(GT) - hom - het - other
+        if wtGT is not None:
+            # wtGT = #(GT) - hom - het - other
             res.append(value[3] - value[0] - value[1] - value[2])
+        if mutGT is not None:
+            # mutGT = hom + het + other
+            res.append(value[0] + value[1] + value[2])
         # for genotype_field operations, the value[operation_index] holds the result of the operation
         # except for the "mean" operation which needs to be divided by num_samples that have that variant
         try:
@@ -778,12 +784,13 @@ def updateArguments(parser):
             genotype info (e.g. QT) of variants in all or selected samples to
             specified fields (e.g. meanQT). Functions sum, avg, max, and min
             are currently supported. In addition, special functions #(GT),
-            #(hom), #(het), #(alt), #(other), #(missing) and #(wildtype) are
-            provided to count the number of valid genotypes (not missing),
+            #(hom), #(het), #(alt), #(other), #(missing), #(wtGT) and #(mutGT)
+            are provided to count the number of valid genotypes (not missing),
             homozygote genotypes, heterozygote genotypes, alternative alleles
             (#(het) + 2*#(hom) + #(other)), genotypes with two different alternative
-            alleles, missing genotypes (number of samples - #(GT)) and number of
-            non-missing wildtype genotypes (#(GT) - #(hom) - #(het) - #(other))''')
+            alleles, missing genotypes (number of samples - #(GT)), number of
+            non-missing wildtype genotypes (#(GT) - #(hom) - #(het) - #(other)),
+            and number of non-wildtype genotypes (#(hom) + #(het) + #(other))''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
