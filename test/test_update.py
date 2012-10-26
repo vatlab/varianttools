@@ -110,9 +110,18 @@ class TestUpdate(ProcessTestCase):
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
         self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
-
+        #
+        self.assertSucc('vtools update variant --from_stat "m=#(missing)" "w=#(wildtype)" "total=#(GT)"')
+        self.assertSucc('vtools update variant --set "res=total-w-hom-het-other"')
+        self.assertEqual(output2list('vtools output variant res'), ['0']*6)
+        self.assertSucc('vtools update variant --set "res=num-2*hom-het-other"')
+        self.assertEqual(output2list('vtools output variant res'), ['0']*6)
+        self.assertSucc('vtools update variant --set "res=4-m-total"')
+        self.assertEqual(output2list('vtools output variant res'), ['0']*6)
+        
         #Add fields based on other variants or annotation fields( --set)
     def testGenoAnnoSet(self):
+        'Testing command vtools update --set'
         runCmd('vtools init test -f')
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
         self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
