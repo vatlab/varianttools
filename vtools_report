@@ -113,21 +113,21 @@ def RdeviceFromFilename(filename):
         elif ext.lower() == '.eps':
             device = 'postscript'
     except Exception, e:
-        print e
-        print 'Can not determine which device to use to save file %s. A postscript driver is used.' % name
+        logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(name, e))
         device = 'postscript'
-    return device, params
+    return '{}("{}" {})'.format(device, filename, params)
 
 def executeRScript(script):
     # write script to log file for debugging and customization purposes
-    logger.info('Running R script: {}'.format(script))
+    logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
+    logger.debug(script)
     # start R
     process = subprocess.Popen(['R', '--slave', '--vanilla'], 
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     # send script and get standard output and error
     out, err = process.communicate(script)
-    logger.info(out)
-    logger.warning(err)
+    if err.strip():
+        logger.warning(err)
     return process.wait()
 
 
@@ -388,21 +388,17 @@ def plotFields(args):
         # FIXME: Here we generate the data file (which can be big),
         # create a script dynamically, and pump it to a R process.
         #
-        # The script 
-        dev, param = RdeviceFromFilename(args.hist)
         # note the use of {{, }} for real {}
         script='''
             data <- read.table("{0.data_file}", header=FALSE, col.names=c({1}))
-            {2}("{0.hist}" {3})  # start device
+            {2} # start device
             for (i in 1 : ncol(data)) {{
                 hist(data[,i])
             }}
             dev.off()
-            '''.format(
-                args,
+            '''.format(args,
                 ', '.join(['"{}"'.format(x) for x in args.fields]),
-                dev,
-                param)
+                RdeviceFromFilename(args.hist))
         # 
         # call the script
         executeRScript(script)
