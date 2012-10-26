@@ -66,6 +66,10 @@ class GenotypeStatCalculator(threading.Thread):
                 self.stat.append(('count(*)', 'GT=1'))
             elif item == '#(other)':
                 self.stat.append(('count(*)', 'GT=-1'))
+            elif item == '#(wildtype)':
+                self.stat.append(('count(*)', 'GT=0'))
+            elif item.startswith('#'):
+                raise ValueError('{} is not a valid special function (only #(GT), #(alt), #(hom), #(het), #(other), and #(wildtype) are allowed).'.format(item))
             else:
                 self.stat.append((item, None))
         self.queue = idQueue
@@ -423,11 +427,12 @@ def phenotypeArguments(parser):
             DP is one of the genotype fields) of the sample. Multiple fields (e.g.
             '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
             standard SQL aggregation functions, variant tools supports special functions
-            #(GT), #(alt), #(hom), #(het) and #(other), which calculates the number of
-            genotypes (the same as count(*)), alternative alleles, homozygotes, 
-            heterozygotes, and genotypes with two different alternative alleles.
-            Parameters --genotypes and --samples could be used to limit the genotypes
-            to be considered and the samples for which genotypes will be set.'''),
+            #(GT), #(wildtype), #(alt), #(hom), #(het) and #(other), which calculates
+            the number of genotypes (the same as count(*)), wildtype genotype, alternative
+            alleles, homozygotes, heterozygotes, and genotypes with two different
+            alternative alleles. Parameters --genotypes and --samples could be used 
+            to limit the genotypes to be considered and the samples for which 
+            genotypes will be set.'''),
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
