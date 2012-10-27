@@ -356,8 +356,9 @@ def discordanceRate(args):
 # command plot_fields
 #
 def plotFieldsArguments(parser):
-    parser.add_argument('table', help='variants to be outputted')
     parser.add_argument('fields', nargs='+', help='A list of fields that will be outputted.')
+    parser.add_argument('--variants', default='variant', metavar='TABLE',
+        help='''Limit value of fields to variant in specified variant table. Default to all variants.''')
     parser.add_argument('--data_file', default='plot_fields.dat',
         help='''Name of the output data file.''')
     hist = parser.add_argument_group('Draw histogram')
@@ -382,10 +383,10 @@ def plotFieldsArguments(parser):
 def plotFields(args):
     # step 1, call vtools output
     logger.info('Generating data file {}'.format(args.data_file))
-    outputToFile(['vtools', 'output', args.table] + args.fields,
+    outputToFile(['vtools', 'output', args.variants] + args.fields,
         filename=args.data_file)
     if args.hist is not None:
-        # FIXME: Here we generate the data file (which can be big),
+        # Here we generate the data file (which can be big),
         # create a script dynamically, and pump it to a R process.
         #
         # note the use of {{, }} for real {}
@@ -393,7 +394,11 @@ def plotFields(args):
             data <- read.table("{0.data_file}", header=FALSE, col.names=c({1}))
             {2} # start device
             for (i in 1 : ncol(data)) {{
-                hist(data[,i])
+                tryCatch( {{
+                    hist(data[,i])
+                }}, error = function(err) {{
+                    print(paste('Failed to generate histogram for column ', colnames(data)[i], ': ', err))
+                }})
             }}
             dev.off()
             '''.format(args,
