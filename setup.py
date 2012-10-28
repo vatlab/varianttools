@@ -23,8 +23,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+USE_DISTRIBUTE = False
+try:
+    from distribute_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup, find_packages, Extension
+    USE_DISTRIBUTE = True
+except ImportError:
+    from distutils.core import setup, Extension
 
-from distutils.core import setup, Extension
 try:
    from distutils.command.build_py import build_py_2to3 as build_py
 except ImportError:
@@ -441,6 +448,7 @@ setup(name = "variant_tools",
         'variant_tools.association',
         'variant_tools.pyper',
         'variant_tools.tester',
+        'variant_tools.cgatools',
         SQLITE_PY_FILE,
         WRAPPER_PY_FILE[:-3]          # assotests_pyX.py file without extension
     ],

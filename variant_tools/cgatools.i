@@ -10,10 +10,14 @@
 #include "cgatools/reference/range.hpp"
 %}
 
+%include "std_string.i"
+
 //%include "cgatools/core.hpp"
 //%include "cgatools/util/Streams.hpp"
 %ignore cgatools::util::operator==;
 %ignore cgatools::util::operator!=;
+
+
 
 %include "cgatools/util/Md5.hpp"
 %include "cgatools/reference/range.hpp"
