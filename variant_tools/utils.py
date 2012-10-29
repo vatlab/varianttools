@@ -394,7 +394,7 @@ def createLogger(logfile, mode):
     # output to standard output
     cout = logging.StreamHandler()
     levels = {
-        '0': logging.ERROR,
+        '0': logging.WARNING,
         '1': logging.INFO,
         '2': logging.DEBUG,
         None: logging.INFO
