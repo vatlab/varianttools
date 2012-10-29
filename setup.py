@@ -24,13 +24,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 USE_DISTRIBUTE = False
-try:
-    from distribute_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup, find_packages, Extension
-    USE_DISTRIBUTE = True
-except ImportError:
-    from distutils.core import setup, Extension
+#
+# Use setup tools strangely caused some compatibility issue under
+# macosx, I will have to disable it for now
+# 
+#try:
+#    from distribute_setup import use_setuptools
+#    use_setuptools()
+#    from setuptools import setup, find_packages, Extension
+#    USE_DISTRIBUTE = True
+#except ImportError:
+#    from distutils.core import setup, Extension
+from distutils.core import setup, Extension
 
 try:
    from distutils.command.build_py import build_py_2to3 as build_py
