@@ -38,7 +38,18 @@
 //%include "cgatools/util/Streams.hpp"
 %ignore cgatools::util::operator==;
 %ignore cgatools::util::operator!=;
-
+%ignore cgatools::util::Md5Digest::Md5Digest();
+%ignore cgatools::reference::Location::Location();
+%ignore cgatools::reference::Range::Range();
+%ignore cgatools::reference::Range::Range(const Location&, const Location&);
+%ignore cgatools::reference::operator==(const Range&, const Range&);
+%ignore cgatools::reference::operator!=(const Range&, const Range&);
+%ignore cgatools::reference::operator<(const Range&, const Range&);
+%ignore cgatools::reference::operator<=(const Range&, const Range&);
+%ignore cgatools::reference::operator>(const Range&, const Range&);
+%ignore cgatools::reference::operator>=(const Range&, const Range&);
+%ignore cgatools::reference::AmbiguousRegion::AmbiguousRegion();
+%ignore cgatools::reference::CrrFile::CrrFile();
 
 
 %implicitconv Location;
