@@ -59,6 +59,8 @@ if sys.version_info.major == 2:
 else:
     import vt_sqlite3_py3 as sqlite3
 
+from cgatools import CrrFile, Location, Range
+
 class RuntimeOptions(object):
     # the following make RuntimeOptions a singleton class
     _instance = None
@@ -770,7 +772,10 @@ def decompressIfNeeded(filename, inplace=True):
 def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
     for path in runOptions.search_path.split(';'):
-        URL = '{}/{}'.format(path, fileToGet)
+        if '://' in fileToGet:
+            URL = fileToGet
+        else:
+            URL = '{}/{}'.format(path, fileToGet)
         filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
         dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
         if os.path.isfile(dest):
@@ -845,7 +850,52 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             return dest
     # if all failed
     raise RuntimeError('Failed to download {}'.format(fileToGet))
-        
+
+
+#
+#
+#  reference genome
+#
+class RefGenome:
+    def __init__(self, build):
+        if build in ['hg18', 'build36']:
+            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
+            self.crr = CrrFile(crrFile)
+        elif build in ['hg19', 'build37']:
+            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
+            self.crr = CrrFile(crrFile)
+        else:
+            raise ValueError('Cannot find reference genome for build {}'.format(build))
+        #
+        self.chrIdx = {}
+
+    def getBase(self, chr, pos):
+        try:
+            return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
+        except KeyError:
+            try:
+                self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
+            except ValueError:
+                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+            # ok?
+            return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
+
+    def getSeqence(self, chr, start, end):
+        try:
+            return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
+        except KeyError:
+            try:
+                self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
+            except ValueError:
+                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+            # ok?
+            return self.crr.getSequence(Location(self.chrIdx[chr], start - 1, end))
+   
+    def verify(self, chr, pos, ref):   
+        if len(ref) == 1:
+            return ref == self.getBase(chr, pos)
+        else:
+            return ref == self.getSequence(chr, pos, pos + len(ref))
 #
 #
 # Database engine

@@ -44,7 +44,7 @@ from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
-from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
+from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
     filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger
 
 
@@ -1009,6 +1009,17 @@ class Project:
             self.createIndexOnMasterVariantTable()
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')
+            # check reference genome?
+            cur = self.db.cursor()
+            try:
+                refgenome = RefGenome(self.build)
+                # select first ten variants
+                cur.execute('SELECT chr, pos, ref FROM variant WHERE ref != "-" LIMIT 0, 10;')
+                for chr, pos, ref in cur:
+                    if not refgenome.verify(chr, pos, ref):
+                        self.logger.warning('Reference allele {} at position {} on chromosome {} does not match that of reference genome {}.'.format(ref, pos, chr, self.build))
+            except Exception as e:
+                self.logger.warning('Failed to check reference genome of input variants.: {}'.format(e))
 
     def analyze(self, force=False):
         '''Automatically analyze project to make sure queries are executed optimally.
