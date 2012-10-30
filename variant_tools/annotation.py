@@ -327,9 +327,9 @@ class AnnoDBConfiger:
             if self.direct_url is not None:
                 self.logger.info('Downloading annotation database from {}'.format(self.direct_url))
                 try:
-                    dbFile = downloadFile(self.direct_url, '.')
+                    dbFile = downloadFile(self.direct_url)
                     s = delayedAction(self.logger.info, 'Decompressing {}'.format(dbFile))
-                    dbFile = decompressIfNeeded(dbFile, inplace=True)
+                    dbFile = decompressIfNeeded(dbFile, inplace=False)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except Exception as e:

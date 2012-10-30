@@ -857,6 +857,8 @@ def downloadURL(URL, dest, quiet):
 
 def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
+    if fileToGet.startswith('http://vtools.houstonbioinformatics.org/'):
+        fileToGet = fileToGet[len('http://vtools.houstonbioinformatics.org/'):]
     if '://' in fileToGet:
         # get filename from URL
         filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
@@ -865,10 +867,10 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             dest = os.path.join(dest_dir, filename)
         else:
             if not os.path.isdir(runOptions.local_resource):
-                print 'Create directory ', runOptions.local_resource
                 os.mkdir(runOptions.local_resource)
             dest = os.path.join(runOptions.local_resource, filename)
     else:
+        filename = os.path.split(fileToGet)[-1]
         if dest_dir is not None:
             dest = os.path.join(dest_dir, os.path.split(filename)[-1])
         else:
