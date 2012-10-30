@@ -106,12 +106,17 @@ class RuntimeOptions(object):
                 'file format (.fmt) and other files. Reset this option allows alternative '
                 'local or online storage of such files. variant tools will append trailing '
                 'directories such as annoDB for certain types of data so only root directories '
-                'should be listed in this search path. ')
+                'should be listed in this search path.'),
+            'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
+                'resources such as reference genome, annotation database etc. This directory will '
+                'be shared by projects.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
         # path to the project cache
         self._cache_dir = 'cache'
+        #
+        self._local_resource = self.persistent_options['local_resource'][0]
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
@@ -180,7 +185,7 @@ class RuntimeOptions(object):
     #
     import_num_of_readers = property(lambda self: int(self._import_num_of_readers), _set_import_num_of_readers)
     #
-    # attribute cache_dir
+    # attribute cache_dir, which is not configurable
     #
     def _set_cache_dir(self, path=None):
         if path is not None:
@@ -193,6 +198,20 @@ class RuntimeOptions(object):
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
     #
     cache_dir = property(lambda self: 'cache', _set_cache_dir)
+    #
+    # attribute local_resource
+    #
+    def _set_local_resource(self, path=None):
+        if path is not None:
+            self._local_resource = path
+        try:
+            if not os.path.isdir(self._local_resource):
+                sys.stderr.write('Creating local resource directory {}\n'.format(self._local_resource))
+                os.makedirs(self._local_resource)
+        except:
+            raise RuntimeError('Failed to create local resource directory '.format(self._local_resource))
+    #
+    local_resource = property(lambda self: os.path.expanduser(self._local_resource), _set_local_resource)
     #
     # attribute temp_dir
     #
@@ -218,7 +237,7 @@ class RuntimeOptions(object):
             sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
             self._proj_temp_dir = tempfile.mkdtemp()
     #
-    temp_dir = property(lambda self: self._proj_temp_dir, _set_temp_dir)
+    temp_dir = property(lambda self: os.path.expanduser(self._proj_temp_dir), _set_temp_dir)
     #
     # attribute treat_missing_as_wildtype
     def _set_treat_missing_as_wildtype(self, val):
@@ -769,87 +788,122 @@ def decompressIfNeeded(filename, inplace=True):
 #
 # Well, it is not easy to do reliable download
 # 
-def downloadFile(fileToGet, dest_dir = None, quiet = False):
-    '''Download file from URL to filename.'''
-    for path in runOptions.search_path.split(';'):
-        if '://' in fileToGet:
-            URL = fileToGet
-        else:
-            URL = '{}/{}'.format(path, fileToGet)
-        filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
-        dest = os.path.join(dest_dir if dest_dir is not None else runOptions.cache_dir, filename)
-        if os.path.isfile(dest):
-            return dest
-        # local file?
-        if '://' not in path:
-            if os.path.isfile(URL):
-                shutil.copyfile(URL, dest)
-                return dest
-            continue
-        # use libcurl? Recommended but not always available
-        try:
-            import pycurl
-            if not quiet:
-                prog = ProgressBar(filename)
-            with open(dest, 'wb') as f:
-                c = pycurl.Curl()
-                c.setopt(pycurl.URL, URL)
-                c.setopt(pycurl.WRITEFUNCTION, f.write)
-                if not quiet:
-                    c.setopt(pycurl.NOPROGRESS, False)
-                    c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
-                c.perform()
-            if not quiet:
-                prog.done()
-            if c.getinfo(pycurl.HTTP_CODE) == 404:
-                try:
-                    os.remove(dest)
-                except OSError:
-                    pass
-                raise RuntimeError('ERROR 404: Not Found.')
-            if os.path.isfile(dest):
-                return dest
-            else:
-                raise RuntimeError('Failed to download {} using pycurl'.format(URL))
-        except ImportError:
-            # no pycurl module
-            pass
-        # use wget? Almost universally available under linux
-        try:
-            # for some strange reason, passing wget without shell=True can fail silently.
-            p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
-            ret = p.wait()
-            if ret == 0 and os.path.isfile(dest):
-                return dest
-            else:
-                try:
-                    os.remove(dest)
-                except OSError:
-                    pass
-                raise RuntimeError('Failed to download {} using wget'.format(URL))
-        except (RuntimeError, ValueError, OSError):
-            # no wget command
-            pass
-        
-        # use python urllib?
+def downloadURL(URL, dest, quiet):
+    # use libcurl? Recommended but not always available
+    try:
+        import pycurl
         if not quiet:
             prog = ProgressBar(filename)
-        try:
-            urllib.URLopener().open(URL)
-        except IOError as error_code:
-            if error_code[1] == 404:
-                raise RuntimeError('ERROR 404: Not Found.')
-            else:
-                raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
-        else:
-            urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+        with open(dest, 'wb') as f:
+            c = pycurl.Curl()
+            c.setopt(pycurl.URL, URL)
+            c.setopt(pycurl.WRITEFUNCTION, f.write)
+            if not quiet:
+                c.setopt(pycurl.NOPROGRESS, False)
+                c.setopt(pycurl.PROGRESSFUNCTION, prog.curlUpdate)
+            c.perform()
         if not quiet:
             prog.done()
-        # all methods failed.
+        if c.getinfo(pycurl.HTTP_CODE) == 404:
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
+            raise RuntimeError('ERROR 404: Not Found.')
         if os.path.isfile(dest):
             return dest
+        else:
+            raise RuntimeError('Failed to download {} using pycurl'.format(URL))
+    except ImportError:
+        # no pycurl module
+        pass
+    # use wget? Almost universally available under linux
+    try:
+        # for some strange reason, passing wget without shell=True can fail silently.
+        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+        ret = p.wait()
+        if ret == 0 and os.path.isfile(dest):
+            return dest
+        else:
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
+            raise RuntimeError('Failed to download {} using wget'.format(URL))
+    except (RuntimeError, ValueError, OSError):
+        # no wget command
+        pass
+    
+    # use python urllib?
+    if not quiet:
+        prog = ProgressBar(filename)
+    try:
+        urllib.URLopener().open(URL)
+    except IOError as error_code:
+        if error_code[1] == 404:
+            raise RuntimeError('ERROR 404: Not Found.')
+        else:
+            raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
+    else:
+        urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+    if not quiet:
+        prog.done()
+    # all methods tried
+    if os.path.isfile(dest):
+        return dest
     # if all failed
     raise RuntimeError('Failed to download {}'.format(fileToGet))
+
+def downloadFile(fileToGet, dest_dir = None, quiet = False):
+    '''Download file from URL to filename.'''
+    if '://' in fileToGet:
+        # get filename from URL
+        filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
+        # use root local_resource directory if dest_dir is None
+        if dest_dir is not None:
+            dest = os.path.join(dest_dir, filename)
+        else:
+            if not os.path.isdir(runOptions.local_resource):
+                print 'Create directory ', runOptions.local_resource
+                os.mkdir(runOptions.local_resource)
+            dest = os.path.join(runOptions.local_resource, filename)
+    else:
+        if dest_dir is not None:
+            dest = os.path.join(dest_dir, os.path.split(filename)[-1])
+        else:
+            # use structured local_resource directory if dest_dir is None
+            dest = os.path.join(runOptions.local_resource, fileToGet)
+            dest_dir = os.path.split(dest)[0]
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+    # 
+    # if dest already exists
+    if os.path.isfile(dest):
+        return dest
+    #
+    # otherwise, download the file)
+    # if fileToGet is a complete URL, ignore search path
+    if '://' in fileToGet:
+        return downloadURL(fileToGet, dest, quiet)
+    #
+    # use a search path
+    for path in runOptions.search_path.split(';'):
+        if '://' not in path:
+            # if path is a local directory
+            source_file = '{}/{}'.format(path, fileToGet)
+            #
+            if os.path.isfile(source_file):
+                shutil.copyfile(source_file, dest)
+                return dest
+        else:
+            # is path is a URL
+            URL = '{}/{}'.format(path, fileToGet)
+            try:
+                return downloadURL(URL, dest, quiet)
+            except:
+                continue
+    # failed to get file
+    raise Exception('Failed to download file {}'.format(fileToGet))
 
 
 #
