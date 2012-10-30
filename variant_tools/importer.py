@@ -37,7 +37,7 @@ from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
-    downloadFile, runOptions
+    downloadFile, runOptions, RefGenome
 
 #
 #
@@ -1425,6 +1425,7 @@ class Importer:
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
         #
+        self.refGenome = RefGenome(self.build)
         # try to guess file type
         if not format:
             filename = self.files[0].lower()
@@ -1529,6 +1530,14 @@ class Importer:
             self.count[3] += 1
         else:
             self.count[6] += 1
+        # verify with reference genome, for efficiency, only check the first 100 variants
+        if self.count[3] < 100 and self.refGenome is not None:
+            try:
+                if not self.refGenome.verify(rec[1], rec[2], rec[3]):
+                    self.logger.warning('Reference allele {} at position {} on chromosome {} does not match that of reference genome {}.'.format(rec[3],rec[2], rec[1], self.build))
+            except Exception as e:
+                self.logger.warning('Failed to check reference genome of input variants.: {}'.format(e))
+        #
         var_key = tuple((rec[1], rec[3], rec[4]))
         if var_key in self.variantIndex and rec[2] in self.variantIndex[var_key]:
             variant_id = self.variantIndex[var_key][rec[2]][0]
