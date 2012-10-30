@@ -108,8 +108,9 @@ class RuntimeOptions(object):
                 'directories such as annoDB for certain types of data so only root directories '
                 'should be listed in this search path.'),
             'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
-                'resources such as reference genome, annotation database etc. This directory will '
-                'be shared by projects.')
+                'resources such as reference genomes and annotation database. Files under this '
+                'directory is usually downloaded automatically upon use, but can also be '
+                'synchronized directly from http://vtools.houstonbioinformatics.org/.')
         }
         # this will be the raw command that will be saved to log file
         self._command_line = ''
