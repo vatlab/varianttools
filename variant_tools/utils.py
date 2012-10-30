@@ -791,6 +791,7 @@ def decompressIfNeeded(filename, inplace=True):
 # 
 def downloadURL(URL, dest, quiet):
     # use libcurl? Recommended but not always available
+    filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     try:
         import pycurl
         if not quiet:
