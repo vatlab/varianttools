@@ -19,7 +19,7 @@ source_pattern=
 
 [COSMIC_ID]
 index=13
-adj=lambda x: 'COSMIC'+x
+adj=lambda x: 'COSM'+x
 type=VARCHAR(256)
 
 [Gene_name]
