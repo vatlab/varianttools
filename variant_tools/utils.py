@@ -876,7 +876,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             dest = os.path.join(dest_dir, filename)
         else:
             dest_dir = os.path.join(runOptions.local_resource, os.path.split(local_fileToGet)[0])
-            dest = os.path.join(runOptions.local_resource, url_filename)
+            dest = os.path.join(runOptions.local_resource, local_fileToGet)
     # 
     # otherwise, local file is like
     #
