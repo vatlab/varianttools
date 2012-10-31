@@ -860,48 +860,64 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
     if fileToGet.startswith('http://vtools.houstonbioinformatics.org/'):
         fileToGet = fileToGet[len('http://vtools.houstonbioinformatics.org/'):]
+    #
+    # if a complete URL is given, local file is something like 
+    #
+    # ~/.variant_tools/ftp.completegenomics.com/refgenome/build36.crr
+    # 
+    # unless a specific dest_dir is given
+    #
     if '://' in fileToGet:
         # get filename from URL
         filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
+        local_fileToGet = fileToGet.split('://', 1)[1]
         # use root local_resource directory if dest_dir is None
         if dest_dir is not None:
             dest = os.path.join(dest_dir, filename)
         else:
-            if not os.path.isdir(runOptions.local_resource):
-                os.mkdir(runOptions.local_resource)
-            dest = os.path.join(runOptions.local_resource, filename)
+            dest_dir = os.path.join(runOptions.local_resource, os.path.split(local_fileToGet)[0])
+            dest = os.path.join(runOptions.local_resource, url_filename)
+    # 
+    # otherwise, local file is like
+    #
+    # ~/.variant_tools/format/vcf.fmt
+    #
     else:
         filename = os.path.split(fileToGet)[-1]
+        local_fileToGet = fileToGet
         if dest_dir is not None:
             dest = os.path.join(dest_dir, os.path.split(filename)[-1])
         else:
             # use structured local_resource directory if dest_dir is None
             dest = os.path.join(runOptions.local_resource, fileToGet)
             dest_dir = os.path.split(dest)[0]
-            if not os.path.isdir(dest_dir):
-                os.makedirs(dest_dir)
+    #
+    if not os.path.isdir(dest_dir):
+        os.makedirs(dest_dir)
     # 
-    # if dest already exists
+    # if dest already exists, return it directly
     if os.path.isfile(dest):
         return dest
-    #
-    # otherwise, download the file)
-    # if fileToGet is a complete URL, ignore search path
+    # 
+    # if a URL is given, try that URL first
     if '://' in fileToGet:
-        return downloadURL(fileToGet, dest, quiet)
+        try:
+            return downloadURL(fileToGet, dest, quiet)
+        except:
+            pass
     #
     # use a search path
     for path in runOptions.search_path.split(';'):
         if '://' not in path:
             # if path is a local directory
-            source_file = '{}/{}'.format(path, fileToGet)
+            source_file = '{}/{}'.format(path, local_fileToGet)
             #
             if os.path.isfile(source_file):
                 shutil.copyfile(source_file, dest)
                 return dest
         else:
             # is path is a URL
-            URL = '{}/{}'.format(path, fileToGet)
+            URL = '{}/{}'.format(path, local_fileToGet)
             try:
                 return downloadURL(URL, dest, quiet)
             except:
