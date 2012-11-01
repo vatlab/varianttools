@@ -954,7 +954,7 @@ class RefGenome:
             # ok?
             return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
 
-    def getSeqence(self, chr, start, end):
+    def getSequence(self, chr, start, end):
         try:
             return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
         except KeyError:
@@ -966,10 +966,13 @@ class RefGenome:
             return self.crr.getSequence(Location(self.chrIdx[chr], start - 1, end))
    
     def verify(self, chr, pos, ref):   
-        if len(ref) == 1:
-            return ref == self.getBase(chr, pos)
-        else:
-            return ref == self.getSequence(chr, pos, pos + len(ref))
+        try:
+            if len(ref) == 1:
+                return ref == self.getBase(chr, pos)
+            else:
+                return ref == self.getSequence(chr, pos, pos + len(ref))
+        except Exception as e:
+            raise ValueError('Failed to verify variant (chr={},pos={},ref={}): {}'.format(chr, pos, ref, e))
 #
 #
 # Database engine
