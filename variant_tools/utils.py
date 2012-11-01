@@ -771,6 +771,8 @@ def decompressIfNeeded(filename, inplace=True):
     '''Decompress a file.gz and return file if needed'''
     if filename.lower().endswith('.gz'):
         new_filename = filename[:-3]
+        if os.path.isfile(new_filename):
+            return new_filename
         with gzip.open(filename, 'rb') as input, open(new_filename, 'wb') as output:
             buffer = input.read(100000)
             while buffer:
