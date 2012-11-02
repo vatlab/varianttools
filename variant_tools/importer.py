@@ -1531,7 +1531,7 @@ class Importer:
         else:
             self.count[6] += 1
         # verify with reference genome, for efficiency, only check the first 100 variants
-        if self.count[3] < 100 and self.refGenome is not None:
+        if self.count[3] < 100 and self.refGenome is not None and rec[3] != '-' and rec[2] is not None:
             try:
                 if not self.refGenome.verify(rec[1], rec[2], rec[3]):
                     self.logger.warning('Reference allele {} at position {} on chromosome {} does not match that of reference genome {}.'.format(rec[3],rec[2], rec[1], self.build))

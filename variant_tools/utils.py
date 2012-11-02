@@ -972,7 +972,7 @@ class RefGenome:
             if len(ref) == 1:
                 return ref == self.getBase(chr, pos)
             else:
-                return ref == self.getSequence(chr, pos, pos + len(ref))
+                return ref == self.getSequence(chr, pos, pos + len(ref) - 1)
         except Exception as e:
             raise ValueError('Failed to verify variant (chr={},pos={},ref={}): {}'.format(chr, pos, ref, e))
 #
