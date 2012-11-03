@@ -8,7 +8,7 @@
 hg19=chr, pos, ref, alt
 
 [data sources]
-description=Cosmic coding mutation database
+description=Cosmic coding mutation database.  This data contains mutations affecting 10 or less nucleotides in REF.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://www.sanger.ac.uk/cosmic.  Bamford et al (2004). The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358. 
 version=v61_260912
 anno_type=variant
 direct_url=
