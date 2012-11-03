@@ -30,7 +30,11 @@ import gzip
 import re
 import time
 from multiprocessing import Process, Pipe, Lock
-from itertools import izip, repeat
+if sys.version_info.major == 2:
+    from itertools import izip, repeat
+else:
+    izip = zip
+    from itertools import repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
