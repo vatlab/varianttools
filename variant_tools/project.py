@@ -1009,17 +1009,6 @@ class Project:
             self.createIndexOnMasterVariantTable()
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')
-            # check reference genome?
-            cur = self.db.cursor()
-            try:
-                refgenome = RefGenome(self.build)
-                # select first ten variants
-                cur.execute('SELECT chr, pos, ref FROM variant WHERE ref != "-" LIMIT 0, 10;')
-                for chr, pos, ref in cur:
-                    if not refgenome.verify(chr, pos, ref):
-                        self.logger.warning('Reference allele {} at position {} on chromosome {} does not match that of reference genome {}.'.format(ref, pos, chr, self.build))
-            except Exception as e:
-                self.logger.warning('Failed to check reference genome of input variants.: {}'.format(e))
 
     def analyze(self, force=False):
         '''Automatically analyze project to make sure queries are executed optimally.
@@ -3527,6 +3516,11 @@ def adminArguments(parser):
         help='''Change table NAME to a NEW_NAME.''')
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
+    validate = parser.add_argument_group('Validate reference genome')
+    validate.add_argument('--validate_ref', action='store_true',
+        help='''Check if the reference alleles of variants agree with the reference
+            genome of the project. A reference genome will be automatically 
+            downloaded if it does not exist in the local resource directory.''')
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
@@ -3585,6 +3579,25 @@ def admin(args):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(args.describe_table[0], args.describe_table[1])
                 proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
+            elif args.validate_ref:
+                try:
+                    refgenome = RefGenome(proj.build)
+                except Exception as e:
+                    raise RuntimeError('Failed to obtain reference genome for build {}: {}'.format(proj.build, e))
+                #
+                cur = proj.db.cursor()
+                prog = ProgressBar('Validate reference alleles', proj.db.numOfRows('variant', exact=False))
+                cur.execute('SELECT chr, pos, ref FROM variant WHERE ref != "-";')
+                count = 0
+                err_count = 0
+                for chr, pos, ref in cur:
+                    count += 1
+                    if not refgenome.verify(chr, pos, ref):
+                        err_count += 1
+                        proj.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'.format(chr, pos, ref))
+                    prog.update(count + 1, err_count)
+                prog.done()
+                proj.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count)) 
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
