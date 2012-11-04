@@ -3517,7 +3517,7 @@ def adminArguments(parser):
     rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
     validate = parser.add_argument_group('Validate reference genome')
-    validate.add_argument('--validate_ref', action='store_true',
+    validate.add_argument('--validate_build', action='store_true',
         help='''Check if the reference alleles of variants agree with the reference
             genome of the project. A reference genome will be automatically 
             downloaded if it does not exist in the local resource directory.''')
@@ -3579,7 +3579,7 @@ def admin(args):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(args.describe_table[0], args.describe_table[1])
                 proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
-            elif args.validate_ref:
+            elif args.validate_build:
                 try:
                     refgenome = RefGenome(proj.build)
                 except Exception as e:
