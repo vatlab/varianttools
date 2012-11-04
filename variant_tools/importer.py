@@ -1972,7 +1972,10 @@ def importVariantsArguments(parser):
             If a reference genome that is different from the primary reference genome of the
             project is specified, it will become the alternative reference genome of the
             project. The UCSC liftover tool will be automatically called to map input
-            coordinates between the primary and alternative reference genomes.''')
+            coordinates between the primary and alternative reference genomes. If you
+            are uncertain about the reference genome used in the data, use a recent
+            standard reference genome (e.g. hg19) and validate it after the data is
+            imported (c.f. "vtools admin --validate_build").''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types such as VCF (cf. 'vtools show formats'), or a 

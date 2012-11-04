@@ -3518,9 +3518,10 @@ def adminArguments(parser):
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
     validate = parser.add_argument_group('Validate reference genome')
     validate.add_argument('--validate_build', action='store_true',
-        help='''Check if the reference alleles of variants agree with the reference
-            genome of the project. A reference genome will be automatically 
-            downloaded if it does not exist in the local resource directory.''')
+        help='''Validate the build of project's reference genome by checking if
+            the reference alleles of variants agree with the reference genome 
+            sequence. A reference genome will be automatically downloaded if it
+            does not exist in the local resource directory.''')
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
