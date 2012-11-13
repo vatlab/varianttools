@@ -2808,6 +2808,13 @@ class ProjectsMerger:
                 raise ValueError('Alternative reference genome of project ({} of {}) does not match that of the current project ({})'\
                     .format(alt_build[0], proj_file, self.proj.alt_build))
             #
+            # copy table message and runtime options
+            cur.execute('SELECT name, value FROM __fromDB.project;')
+            for name, value in cur:
+                if name.startswith('__option_') or name.startswith('__desc_of_') or \
+                    name.startswith('__date_of_') or name.startswith('__cmd_of_'):
+                    self.proj.saveProperty(name, value)
+            #
             # analyze and create project tables
             if idx == 0:
                 tables = self.db.tables('__fromDB')
