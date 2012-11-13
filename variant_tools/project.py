@@ -2639,9 +2639,9 @@ class VariantCopier(threading.Thread):
                 #     copy from cache
                 #
                 if all_the_same and (table != 'variant' or keep_all):
-                    query = '''INSERT INTO {0} SELECT * FROM __fromDB.{0};'''.format(table)
+                    query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __fromDB.{0};'''.format(table)
                 else:
-                    query = '''INSERT INTO {0} SELECT * FROM __cacheDB.{0};'''.format(table)
+                    query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __cacheDB.{0};'''.format(table)
                 self.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
                     all_the_same, keep_all))
                 cur.execute(query)
@@ -2854,7 +2854,7 @@ class ProjectsMerger:
         cur = self.db.cursor()
         filenames = []
         #
-        ignored_files = 0
+        duplicated_samples = 0
         for proj in self.projects:
             self.db.attach(proj, '__proj')
             self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
@@ -2866,14 +2866,21 @@ class ProjectsMerger:
             new_sample_id = []
             for old_file_id, filename, header in filename_records:
                 if filename in filenames:
-                    ignored_files += 1
-                    continue
+                    cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
+                        (old_file_id, ))
+                    cnt = cur.fetchone()[0]
+                    duplicated_samples += int(cnt)
+                    cur.execute('SELECT file_id FROM filename WHERE filename = {0};'.format(self.db.PH),
+                        (filename,))
+                    new_file_id = cur.fetchone()[0]
+                    duplicate = True
                 else:
                     filenames.append(filename)
-                #
-                cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(self.db.PH),
-                    (filename, header))
-                new_file_id = cur.lastrowid
+                    #
+                    cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(self.db.PH),
+                        (filename, header))
+                    new_file_id = cur.lastrowid
+                    duplicate = False
                 # get samples
                 cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
                     (old_file_id, ))
@@ -2892,7 +2899,7 @@ class ProjectsMerger:
             status.set(proj, 'new_ids', new_sample_id)
             self.db.detach('__proj')
             self.db.detach('__geno')
-        return ignored_files
+        return duplicated_samples
   
     def merge(self):
         if len(self.projects) == 0:
@@ -2912,7 +2919,9 @@ class ProjectsMerger:
         # this will set for each project
         #  old_ids: sample id of the original projects
         #  new_ids: sample id in the new project
-        ignored_files = self.mapSamples(status)
+        duplicated_samples = self.mapSamples(status)
+        if duplicated_samples > 0:
+            self.logger.warning('{} samples from the same source files have been copied, leading to potentially duplicated samples.'.format(duplicated_samples))
         # stop the database so that it can be opened in thread
         self.proj.db.close()
         #
@@ -3014,8 +3023,10 @@ def initArguments(parser):
     children.add_argument('--children', nargs='+', metavar='DIR',
         help='''A list of a subprojects (directories) that will be merged to create
             this new project. The subprojects must have the same structure (primary
-            and alternative reference genome, variant info and phenotype). Samples
-            imported from the same files will be ignored''')
+            and alternative reference genome, variant info and phenotype). The same
+            variant tables from multiple samples will be merged. Samples from the
+            children projects will be copied even if they were identical samples
+            imported from the same source files.''')
     #sub.add_argument('--sort', action='store_true',
     #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
     #        unset, all variants will be read to RAM and perform a faster merge at a cost of
