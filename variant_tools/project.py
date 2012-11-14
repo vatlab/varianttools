@@ -1669,7 +1669,7 @@ class Project:
             + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
         return info
 
-    def saveSnapshot(self, name, message):
+    def saveSnapshot(self, name, message, files):
         '''Save snapshot'''
         if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             filename = name
@@ -1690,13 +1690,23 @@ class Project:
                 readme.write('Info: {}\n'.format(message))
             # add README file
             snapshot.add(readme_file, 'README')
+            self.logger.debug('Adding README'.format(self.name))
             s = delayedAction(self.logger.info, 'Copying project')
             snapshot.add('{}.proj'.format(self.name), arcname='snapshot.proj')
+            self.logger.debug('Adding {}.proj as snapshot.proj'.format(self.name))
             del s
-            s = delayedAction(self.logger.info, 'Copying genotypes')
-            snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-            del s
+            if os.path.isfile('{}_genotype.DB'.format(self.name)):
+                s = delayedAction(self.logger.info, 'Copying genotypes')
+                snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
+                self.logger.debug('Adding {}_genotype.DBj as snapshot_genotype.DB'.format(self.name))
+                del s
             os.remove(readme_file)
+            if files is not None:
+                for f in files:
+                    self.logger.debug('Adding {}'.format(f))
+                    s = delayedAction(self.logger.info, 'Adding {}'.format(f))
+                    snapshot.add(f)
+                    del s
         # add a warning message if the snapshot starts with 'vt_'
         if name.startswith('vt_'):
             self.logger.warning('Snapshots with name starting with vt_ is reserved for public snapshots for documentation and training purposes.') 
@@ -3543,10 +3553,15 @@ def adminArguments(parser):
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
-        re-loaded using command 'vtools admin --load_snapshot'. A filename with
-        extension .tar, .tgz or .tar.gz can be used to save the snapshot to a specific
-        directory with compression but such snapshots are not listed by command
-        'vtools show snapshots'. ''')
+            re-loaded using command 'vtools admin --load_snapshot'. A filename with
+            extension .tar, .tgz or .tar.gz can be used to save the snapshot to a specific
+            directory with compression but such snapshots are not listed by command
+            'vtools show snapshots'. ''')
+    snapshots.add_argument('--files', nargs='*', metavar='FILE',
+        help='''Additional files that will be saved along with the project and genotype
+            databases. This could include customized format files, project-specific
+            annotations, and results. Files outside of the current project directory
+            are not allowed due to security considerations.''')
     snapshots.add_argument('--load_snapshot', metavar='NAME',
         help='''Revert the current project to specified snapshot. All changes since
         the that snapshot will be lost. The NAME should be one of the project snapshots
@@ -3632,7 +3647,20 @@ def admin(args):
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
-                proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1])
+                if args.files is not None:
+                    cur_dir = os.path.realpath(os.getcwd())
+                    for f in args.files:
+                        if not os.path.isfile(f):
+                            raise ValueError('Cannot include {} in snapshot. File does not exist.'.format(f))
+                        # if the file is not under the current directory
+                        if os.path.commonprefix([cur_dir, os.path.realpath(f)]) != cur_dir:
+                            raise ValueError('Only files under the current project directory could be included in a snapshot.')
+                        # if the file is automatically included
+                        if f == proj.name + '.proj':
+                            raise ValueError('Project database is already included.')
+                        if f == proj.name + '_genotype.proj':
+                            raise ValueError('Project genotype database is already included.')
+                proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1], args.files)
                 proj.logger.info('Snapshot {} has been saved'.format(args.save_snapshot[0]))
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
