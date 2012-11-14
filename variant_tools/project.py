@@ -1739,22 +1739,48 @@ class Project:
         self.db.close()
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
+                all_files = snapshot.getnames()
+                all_files.remove('README')
+                # project
                 s = delayedAction(self.logger.info, 'Load project')
-                try:
+                if 'snapshot.proj' in all_files:
+                    self.logger.debug('Extracting snapshot.proj as {}.proj'.format(self.name))
                     snapshot.extract('snapshot.proj')
                     os.rename('snapshot.proj', '{}.proj'.format(self.name))
-                except:
+                    all_files.remove('snapshot.proj')
+                elif '{}.proj'.format(self.name) in all_files:
+                    self.logger.debug('Extracting {}.proj'.format(self.name))
                     # an old version of snapshot saves $name.proj
                     snapshot.extract('{}.proj'.format(self.name))
+                    all_files.remove('{}.proj'.format(self.name))
+                else:
+                    raise ValueError('Invalid snapshot. Missing project database')
                 del s
+                # genotype
                 s = delayedAction(self.logger.info, 'Load genotypes')
-                try:
+                if 'snapshot_genotype.DB' in all_files:
+                    self.logger.debug('Extracting snapshot_genotype.DB as {}_genotype.DB'.format(self.name))
                     snapshot.extract('snapshot_genotype.DB'.format(self.name))
                     os.rename('snapshot_genotype.DB', '{}_genotype.DB'.format(self.name))
-                except:
+                    all_files.remove('snapshot_genotype.DB')
+                elif '{}_genotype.DB'.format(self.name) in all_files:
+                    self.logger.debug('Extracting {}_genotype.DB'.format(self.name))
                     # an old version of snapshot saves $name.proj
                     snapshot.extract('{}_genotype.DB'.format(self.name))
+                    all_files.remove('{}_genotype.DB'.format(self.name))
+                else:
+                    # this is ok because a project might not have any genotype
+                    pass
                 del s
+                # other files
+                for f in all_files:
+                    s = delayedAction(self.logger.info, 'Extracting {}'.format(f))
+                    self.logger.debug('Extracting {}'.format(f))
+                    if os.path.isfile(f):
+                        self.logger.warning('Ignore existing file {}.'.format(f))
+                        continue
+                    snapshot.extract(f)
+                    del s
         except Exception as e:
             raise ValueError('Failed to load snapshot: {}'.format(e))
         finally:
