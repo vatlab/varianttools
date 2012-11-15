@@ -23,18 +23,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-USE_DISTRIBUTE = False
-#
-# Use setup tools strangely caused some compatibility issue under
-# macosx, I will have to disable it for now
-# 
-#try:
-#    from distribute_setup import use_setuptools
-#    use_setuptools()
-#    from setuptools import setup, find_packages, Extension
-#    USE_DISTRIBUTE = True
-#except ImportError:
-#    from distutils.core import setup, Extension
 from distutils.core import setup, Extension
 
 try:
@@ -56,12 +44,16 @@ SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
 if sys.version_info.major == 2:
     WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py2.cpp'
     WRAPPER_PY_FILE = 'variant_tools/assoTests_py2.py'
+    CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_py2.cpp'
+    CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_py2.py'
     SQLITE_FOLDER = 'sqlite/py2'
     SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py2'
 else:
     SWIG_OPTS.append('-py3')
     WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py3.cpp'
     WRAPPER_PY_FILE = 'variant_tools/assoTests_py3.py'
+    CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_py3.cpp'
+    CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_py3.py'
     SQLITE_FOLDER = 'sqlite/py3'
     SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py3'
 
@@ -99,19 +91,27 @@ SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
     'sqlite/sqlite3.c'
 ]
 
-# generate wrapper files
-if not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) or os.path.getmtime(WRAPPER_CPP_FILE) < \
-        max([os.path.getmtime(x) for x in ASSO_FILES]):
+# generate wrapper files (only in development mode)
+if VTOOLS_VERSION.endswith('svn') and \
+    (not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) or \
+     not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE) \
+      or os.path.getmtime(WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSO_FILES])):
     import subprocess
     print('Generating wrapper files')
     try:
         ret = subprocess.call(['swig', '-python', '-external-runtime', 'variant_tools/swigpyrun.h'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate swig runtime header file. Please install swig.')
+        #
         ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'variant_tools/assoTests.i'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate wrapper file. Please install swig.')
         os.rename('variant_tools/assoTests.py', WRAPPER_PY_FILE)
+        #
+        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'variant_tools/cgatools.i'], shell=False)
+        if ret != 0:
+            sys.exit('Failed to generate wrapper file. Please install swig.')
+        os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig: {}'.format(e))
 
@@ -455,7 +455,8 @@ setup(name = "variant_tools",
         'variant_tools.tester',
         'variant_tools.cgatools',
         SQLITE_PY_FILE,
-        WRAPPER_PY_FILE[:-3]          # assotests_pyX.py file without extension
+        WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
+        CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py
     ],
     scripts = [
         'vtools',
@@ -474,7 +475,7 @@ setup(name = "variant_tools",
             include_dirs = ['sqlite', "variant_tools", "variant_tools/gsl"],
         ),
         Extension('variant_tools._cgatools',
-            sources = ['variant_tools/cgatools.i',
+            sources = [
                 'cgatools/util/BaseUtil.cpp',
                 'cgatools/util/Md5.cpp',
                 'cgatools/util/DelimitedFile.cpp',
@@ -490,11 +491,12 @@ setup(name = "variant_tools",
                 'cgatools/reference/CompactDnaSequence.cpp',
                 'cgatools/reference/CrrFile.cpp',
                 'cgatools/reference/CrrFileWriter.cpp',
-                'cgatools/reference/GeneDataStore.cpp'
+                'cgatools/reference/GeneDataStore.cpp',
+                CGATOOLS_WRAPPER_CPP_FILE,
             ] + LIB_BOOST,
-            libraries = ['bz2', 'z'],
+            #libraries = ['bz2', 'z'],
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
-                ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
+                ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('NO_BZIP2', 1), ('NO_ZLIB', 1)],
             swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
             include_dirs = [".", "cgatools", "boost_1_49_0"],
         ),

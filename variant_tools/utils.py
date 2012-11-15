@@ -56,10 +56,11 @@ except:
 
 if sys.version_info.major == 2:
     import vt_sqlite3_py2 as sqlite3
+    from cgatools_py2 import CrrFile, Location, Range
 else:
     import vt_sqlite3_py3 as sqlite3
+    from cgatools_py3 import CrrFile, Location, Range
 
-from cgatools import CrrFile, Location, Range
 
 class RuntimeOptions(object):
     # the following make RuntimeOptions a singleton class

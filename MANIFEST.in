@@ -40,6 +40,7 @@ include variant_tools/tester.py
 include variant_tools/compare.py
 include variant_tools/pyper.py
 include variant_tools/assoTests.i
+include variant_tools/cgatools.i
 include variant_tools/config.h
 include variant_tools/config_mac.h
 include variant_tools/config_linux.h
@@ -61,6 +62,10 @@ include variant_tools/assoTests_py2.py
 include variant_tools/assoTests_py3.py
 include variant_tools/assoTests_wrap_py2.cpp
 include variant_tools/assoTests_wrap_py3.cpp
+include variant_tools/cgatools_py2.py
+include variant_tools/cgatools_py3.py
+include variant_tools/cgatools_wrap_py2.cpp
+include variant_tools/cgatools_wrap_py3.cpp
 include variant_tools/vt_sqlite3_py2.py
 include variant_tools/vt_sqlite3_py3.py
 #
