@@ -1740,7 +1740,10 @@ class Project:
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 all_files = snapshot.getnames()
-                all_files.remove('.snapshot.info')
+                # old snapshot uses file README. The new format has .snapshot.info and will
+                # treat README as user-provided file.
+                info_file = '.snapshot.info' if '.snapshot.info' in all_files else 'README'
+                all_files.remove(info_file)
                 # project
                 s = delayedAction(self.logger.info, 'Load project')
                 if 'snapshot.proj' in all_files:
@@ -1802,15 +1805,16 @@ class Project:
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 files = snapshot.getnames()
-                if '.snapshot.info' not in files:
+                info_file = '.snapshot.info' if '.snapshot.info' in files else 'README'
+                if info_file not in files:
                     raise ValueError('{}: cannot find snapshot information'.format(snapshot_file))
-                snapshot.extract('.snapshot.info', runOptions.cache_dir)
-                with open(os.path.join(runOptions.cache_dir, '.snapshot.info'), 'r') as readme:
+                snapshot.extract(info_file, runOptions.cache_dir)
+                with open(os.path.join(runOptions.cache_dir, info_file), 'r') as readme:
                     readme.readline()   # header line
                     name = readme.readline()[6:].rstrip()  # snapshot name
                     date = readme.readline()[6:].rstrip()  # date
                     message = ' '.join(readme.read()[6:].split('\n'))  # message
-                os.remove(os.path.join(runOptions.cache_dir, '.snapshot.info'))
+                os.remove(os.path.join(runOptions.cache_dir, info_file))
                 return (name, date, message)
         except Exception as e:
             self.logger.debug('{}: snapshot read error: {}'.format(snapshot_file, e))
