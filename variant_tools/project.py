@@ -1682,15 +1682,15 @@ class Project:
         #
         s = delayedAction(self.logger.info, 'Creating snapshot')
         with tarfile.open(filename, mode) as snapshot:
-            readme_file = os.path.join(runOptions.cache_dir, 'README')
+            readme_file = os.path.join(runOptions.cache_dir, '.snapshot.info')
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
                 readme.write('Name: {}\n'.format(name))
                 readme.write('Date: {}\n'.format(time.strftime('%b%d %H:%M:%S', time.gmtime())))
                 readme.write('Info: {}\n'.format(message))
-            # add README file
-            snapshot.add(readme_file, 'README')
-            self.logger.debug('Adding README'.format(self.name))
+            # add .snapshot.info file
+            snapshot.add(readme_file, '.snapshot.info')
+            self.logger.debug('Adding .snapshot.info'.format(self.name))
             s = delayedAction(self.logger.info, 'Copying project')
             snapshot.add('{}.proj'.format(self.name), arcname='snapshot.proj')
             self.logger.debug('Adding {}.proj as snapshot.proj'.format(self.name))
@@ -1740,7 +1740,7 @@ class Project:
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 all_files = snapshot.getnames()
-                all_files.remove('README')
+                all_files.remove('.snapshot.info')
                 # project
                 s = delayedAction(self.logger.info, 'Load project')
                 if 'snapshot.proj' in all_files:
@@ -1802,18 +1802,18 @@ class Project:
         try:
             with tarfile.open(snapshot_file, mode) as snapshot:
                 files = snapshot.getnames()
-                if len(files) != 3 or 'README' not in files:
-                    raise ValueError('{}: content of snapshot mismatch: {}'.format(filename, files))
-                snapshot.extract('README', runOptions.cache_dir)
-                with open(os.path.join(runOptions.cache_dir, 'README'), 'r') as readme:
+                if '.snapshot.info' not in files:
+                    raise ValueError('{}: cannot find snapshot information'.format(snapshot_file))
+                snapshot.extract('.snapshot.info', runOptions.cache_dir)
+                with open(os.path.join(runOptions.cache_dir, '.snapshot.info'), 'r') as readme:
                     readme.readline()   # header line
                     name = readme.readline()[6:].rstrip()  # snapshot name
                     date = readme.readline()[6:].rstrip()  # date
                     message = ' '.join(readme.read()[6:].split('\n'))  # message
-                os.remove(os.path.join(runOptions.cache_dir, 'README'))
+                os.remove(os.path.join(runOptions.cache_dir, '.snapshot.info'))
                 return (name, date, message)
         except Exception as e:
-            self.logger.debug('{}: snapshot read error: {}'.format(filename, e))
+            self.logger.debug('{}: snapshot read error: {}'.format(snapshot_file, e))
             return (None, None, None)
 
     #
@@ -3367,7 +3367,7 @@ def show(args):
                     print(', '.join([str(x) for x in rec]))
                 nAll = proj.db.numOfRows(table)
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print omitted.format(nAll - args.limit)
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     proj.logger.warning('Project does not have a sample table.')
@@ -3385,7 +3385,7 @@ def show(args):
                     print('\t'.join(['{}'.format(x) for x in rec]))
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print omitted.format(nAll - args.limit)
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
                     proj.logger.info('No annotation database is attached.')
@@ -3461,7 +3461,7 @@ def show(args):
                     print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print omitted.format(nAll - args.limit)
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'tests':
                 # it is very bad idea to use circular import, but I have no choice
                 if args.items:
@@ -3572,7 +3572,7 @@ def adminArguments(parser):
         help='''Update description for TABLE with a NEW_DESCRIPTION.''')
     validate = parser.add_argument_group('Validate reference genome')
     validate.add_argument('--validate_build', action='store_true',
-        help='''Validate the build of project's reference genome by checking if
+        help='''Validate the build of project\'s reference genome by checking if
             the reference alleles of variants agree with the reference genome 
             sequence. A reference genome will be automatically downloaded if it
             does not exist in the local resource directory.''')
@@ -3583,7 +3583,7 @@ def adminArguments(parser):
             extension .tar, .tgz or .tar.gz can be used to save the snapshot to a specific
             directory with compression but such snapshots are not listed by command
             'vtools show snapshots'. ''')
-    snapshots.add_argument('--files', nargs='*', metavar='FILE',
+    snapshots.add_argument('--extra_files', nargs='*', metavar='FILE',
         help='''Additional files that will be saved along with the project and genotype
             databases. This could include customized format files, project-specific
             annotations, and results. Files outside of the current project directory
@@ -3657,7 +3657,7 @@ def admin(args):
                         proj.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'.format(chr, pos, ref))
                     prog.update(count + 1, err_count)
                 prog.done()
-                proj.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count)) 
+                proj.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
@@ -3673,9 +3673,13 @@ def admin(args):
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
-                if args.files is not None:
+                if args.extra_files is not None:
                     cur_dir = os.path.realpath(os.getcwd())
-                    for f in args.files:
+                    for f in args.extra_files:
+                        if f == '.snapshot.info':
+                            raise ValueError('Cannot include ".snapshot.info" in snapshot due to filename conflicts. Please rename the file.')
+                        if os.path.isdir(f):
+                            raise ValueError('Cannot add directory "{0}" into snapshot. You should use wildcard names (e.g., "{0}/*") if you want to save all files under this directory.'.format(f))
                         if not os.path.isfile(f):
                             raise ValueError('Cannot include {} in snapshot. File does not exist.'.format(f))
                         # if the file is not under the current directory
@@ -3686,7 +3690,7 @@ def admin(args):
                             raise ValueError('Project database is already included.')
                         if f == proj.name + '_genotype.proj':
                             raise ValueError('Project genotype database is already included.')
-                proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1], args.files)
+                proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1], args.extra_files)
                 proj.logger.info('Snapshot {} has been saved'.format(args.save_snapshot[0]))
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
