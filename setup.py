@@ -38,6 +38,11 @@ except ImportError:
 
 from variant_tools import VTOOLS_VERSION
 
+EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
+
+if not EMBEDED_BOOST:
+    print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
+
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
     '-outdir', 'variant_tools']
 
@@ -56,6 +61,7 @@ else:
     CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_py3.py'
     SQLITE_FOLDER = 'sqlite/py3'
     SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py3'
+
 
 ASSO_FILES = [
     'variant_tools/assoTests.i',
@@ -492,8 +498,9 @@ setup(name = "variant_tools",
                 'cgatools/reference/CrrFileWriter.cpp',
                 'cgatools/reference/GeneDataStore.cpp',
                 CGATOOLS_WRAPPER_CPP_FILE,
-            ] + LIB_BOOST,
-            libraries = ['z', 'bz2'],
+            ] + (LIB_BOOST if EMBEDED_BOOST else []),
+            libraries = ['z', 'bz2'] + \
+                ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
