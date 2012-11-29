@@ -219,11 +219,102 @@ index=8
 type=VARCHAR(255)
 comment=Raw INFO column in the vcf file. This may be further splitted into various specified info fields, such as DP, etc. 
 
+[AA]
+index=8
+type=CHAR(1)
+adj=ExtractValue('AA=',';')
+comment=ancestral allele
+
+[AC]
+index=8
+type=INT
+adj=ExtractValue('AC=',';')
+comment=allele count in genotypes, for each ALT allele, in the same order as listed
+
+[AF]
+index=8
+type=FLOAT
+adj=ExtractValue('AF=',';')
+comment=allele frequency for each ALT allele in the same order as listed: use this when estimated from primary data, not called genotypes
+
+[AN]
+index=8
+type=INT
+adj=ExtractValue('AN=',';')
+comment=total number of alleles in called genotypes
+
+[BQ]
+index=8
+type=INT
+adj=ExtractValue('BQ=',';')
+comment=RMS base quality at this position
+
+[DB]
+index=8
+type=INT
+adj=ExtractValue('DB=',';')
+comment=dbSNP membership
+
 [DP]
 index=8
 adj=ExtractValue('DP=', ';')
 type=INTEGER
 comment=DP fields in INFO. Total depth of samples in a vcf file.
+
+[H2]
+index=8
+adj=ExtractValue('H2=', ';')
+type=INTEGER
+comment=membership in hapmap2
+
+[H3] 
+index=8
+adj=ExtractValue('H3=', ';')
+type=INTEGER
+comment=membership in hapmap3
+
+[MQ] 
+index=8
+adj=ExtractValue('MQ=', ';')
+type=INTEGER
+comment=mRMS mapping quality, e.g. MQ=52
+
+[MQ0]
+index=8
+adj=ExtractValue('MQ0=', ';')
+type=INTEGER
+comment=Number of MAPQ == 0 reads covering this record
+
+[NS] 
+index=8
+adj=ExtractValue('NS=', ';')
+type=INTEGER
+comment=Number of samples with data
+
+[SB] 
+index=8
+adj=ExtractValue('SB=', ';')
+type=INTEGER
+comment=strand bias at this position
+
+[SOMATIC] 
+index=8
+adj=ExtractValue('SOMATIC=', ';')
+type=INTEGER
+comment=indicates that the record is a somatic mutation, for cancer genomics
+
+[VALIDATED] 
+index=8
+adj=ExtractValue('VALIDATED=', ';')
+type=INTEGER
+comment=validated by follow-up experiment
+
+[1000G] 
+index=8
+adj=ExtractValue('1000G=', ';')
+type=INTEGER
+comment=membership in 1000 Genomes
+
 
 [DP_geno]
 # Passing 'GT:DP\t0/0:64'
