@@ -3392,9 +3392,11 @@ def show(args):
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
-                    proj.logger.info('No annotation database is attached.')
+                    proj.logger.debug('No annotation database is attached.')
                 for table in proj.getVariantTables():
-                    print('\n'.join(['{}.{}'.format(table, field) for field in proj.db.getHeaders(table)]))
+                    tfields = [field for field in proj.db.getHeaders(table) if field not in ('variant_id', 'bin', 'alt_bin')]
+                    if tfields:
+                        print('\n'.join(['{}.{}'.format(table, field) for field in tfields]))
                 for db in proj.annoDB:
                     if args.verbosity == '0':
                         print('\n'.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
