@@ -975,7 +975,8 @@ class RefGenome:
             else:
                 return ref == self.getSequence(chr, pos, pos + len(ref) - 1)
         except Exception as e:
-            raise ValueError('Failed to verify variant (chr={},pos={},ref={}): {}'.format(chr, pos, ref, e))
+            return False
+            # raise ValueError('Failed to verify variant (chr={},pos={},ref={}): {}'.format(chr, pos, ref, e))
 #
 #
 # Database engine
