@@ -66,7 +66,7 @@ class LiftOverTool:
             liftOverURL = 'http://hgdownload.cse.ucsc.edu/admin/exe/{0}/liftOver'.format(liftOverDir)
             try:
                 self.logger.info('Downloading liftOver tool from UCSC')
-                liftOverExe = downloadFile(liftOverURL)
+                liftOverExe = downloadFile(liftOverURL, runOptions.cache_dir)
                 os.chmod(liftOverExe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
             except Exception as e:
                 self.logger.warning('Failed to download UCSC liftOver tool from {0}'.format(liftOverURL))
@@ -84,7 +84,7 @@ class LiftOverTool:
                 chainFileURL = 'http://hgdownload-test.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
                     from_build, chainFile)
                 self.logger.info('Downloading liftOver chain file from UCSC')
-                chainFile = downloadFile(chainFileURL)
+                chainFile = downloadFile(chainFileURL, runOptions.cache_dir)
             except Exception as e:
                 self.logger.warning('Failed to download chain file from {0}'.format(chainFileURL))
                 self.logger.warning('Please check the URL, change --build and/or --alt_build, and try again')
