@@ -73,9 +73,12 @@ class AnnoDB:
             self.db.connect(annoDB)
         else:
             raise ValueError("Cannot locate annotation database {}".format(annoDB))
-        #
-        self.filename = annoDB
+        # annoDB can be ~/.variant_tools/annoDB etc, need to expand ~
+        self.filename = os.path.expanduser(annoDB)
+        # when we save dir, we would better save ~ because $HOME might change ...
         self.dir = os.path.split(annoDB)[0]
+        if self.dir.startswith(os.path.expanduser('~')):
+            self.dir = self.dir.replace(os.path.expanduser('~'), '~', 1)
         self.filename = os.path.splitext(os.path.split(annoDB)[-1])[0]
         if '-' in self.filename:
             self.version = self.filename.split('-', 1)[1]
