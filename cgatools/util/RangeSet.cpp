@@ -35,7 +35,7 @@ namespace cgatools { namespace util {
         return it!=begin() && r.first < (--it)->second;
     }
 
-    bool FastRangeSet::RangeSet::intersects( const reference::Range& r ) const
+    bool FastRangeSet::RangeSet::intersects( const cgatools::reference::Range& r ) const
     {
         return intersects(std::make_pair(r.begin_,r.end_));
     }

@@ -45,7 +45,7 @@ namespace cgatools { namespace util {
         class RangeSet : public std::set<Range> {
         public:
             bool intersects(const Range& r) const;
-            bool intersects(const reference::Range& r) const;
+            bool intersects(const cgatools::reference::Range& r) const;
             bool contains(uint32_t pos) const;
         };
 
