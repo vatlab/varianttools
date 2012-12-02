@@ -3323,9 +3323,10 @@ def showArguments(parser):
             saved by command 'vtools admin --save_snapshots'. The default
             parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
-        help='''Items to display, which can be names of tables for type 'table',
-            name of an annotation database for type 'annotation', name of a format
-            for type 'format', and name of an association test for type 'test'.''')
+        help='''Items to display, which can be, for example, names of tables for
+            type 'table', name of an annotation database for type 'annotation',
+            name of a format for type 'format', and name of an association test
+            for type 'test'.''')
     parser.add_argument('-l', '--limit', metavar='N', type=int,
         help='''Limit output to the first N records.''')
 
