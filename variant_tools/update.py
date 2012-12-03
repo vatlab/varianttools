@@ -636,7 +636,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     if len(variants) == 0:
         raise ValueError('No variant is updated')
     #
-    headers = [x.lower() for x in proj.db.getHeaders(variant_table)]
+    headers = [x.lower() for x in proj.db.getHeaders('variant')]
     table_attributes = [(alt, 'INT'), (hom, 'INT'),
             (het, 'INT'), (other, 'INT'), (GT, 'INT'),
             (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT')]
@@ -659,19 +659,19 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         # We are setting default values on the count fields to 0. The genotype stat fields are set to NULL by default.
         defaultValue = 0 if field in fieldsDefaultZero else None
         if field.lower() in headers:
-            if proj.db.typeOfColumn(variant_table, field) != (fldtype + ' NULL'):
+            if proj.db.typeOfColumn('variant', field) != (fldtype + ' NULL'):
                 proj.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
-                    .format(proj.db.typeOfColumn(variant_table, field), fldtype, field))
+                    .format(proj.db.typeOfColumn('variant', field), fldtype, field))
             proj.logger.info('Resetting values at existing field {}'.format(field))
-            proj.db.execute('Update {} SET {} = {};'.format(variant_table, field, proj.db.PH), (defaultValue, ))
+            proj.db.execute('Update {} SET {} = {};'.format('variant', field, proj.db.PH), (defaultValue, ))
         else:
             proj.logger.info('Adding field {}'.format(field))
-            proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format(variant_table, field, fldtype))
+            proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format('variant', field, fldtype))
             if defaultValue == 0:
-                proj.db.execute ('UPDATE {} SET {} = 0'.format(variant_table, field))              
+                proj.db.execute ('UPDATE {} SET {} = 0'.format('variant', field))              
     #
     prog = ProgressBar('Updating {}'.format(variant_table), len(variants))
-    update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format(variant_table, proj.db.PH,
+    update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
     warning = False
     for count,id in enumerate(variants):
@@ -724,7 +724,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         missing_variants = [x[0] for x in cur.fetchall() if x[0] not in variants]
         if missing_variants:
             prog = ProgressBar('Updating missing variants in {}'.format(variant_table), len(missing_variants))
-            update_query = 'UPDATE {0} SET {2}={3} WHERE variant_id={1};'.format(variant_table, proj.db.PH, missing, numSample)
+            update_query = 'UPDATE {0} SET {2}={3} WHERE variant_id={1};'.format('variant', proj.db.PH, missing, numSample)
             for count,id in enumerate(missing_variants):
                 cur.execute(update_query, [id])
                 if count % proj.db.batch == 0:
