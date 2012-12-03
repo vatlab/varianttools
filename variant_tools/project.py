@@ -1661,7 +1661,7 @@ class Project:
         info =  'Project name:                {}\n'.format(self.name)
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
-        info += 'Database engine:             {}\n'.format(self.db.engine)
+        #info += 'Database engine:             {}\n'.format(self.db.engine)
         #
         # list all runtime options as (name, val) pairs
         opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in runOptions.persistent_options]
