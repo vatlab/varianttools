@@ -1042,6 +1042,7 @@ class DatabaseEngine:
                 cur.execute('CREATE DATABASE {};'.format(self.dbName))
             cur.execute('USE {};'.format(self.dbName))
         else:
+            db = os.path.expanduser(db)
             self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
             self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
             self.database.enable_load_extension(True)
@@ -1105,6 +1106,7 @@ class DatabaseEngine:
                 self.execute('CREATE DATABASE {};'.format(db))
             return db
         if db.endswith('.DB') or db.endswith('.proj'):
+            db = os.path.expanduser(db)
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()
@@ -1123,6 +1125,7 @@ class DatabaseEngine:
                 lock.release()
             return dbName
         else:
+            db = os.path.expanduser(db)
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()
@@ -1190,6 +1193,7 @@ class DatabaseEngine:
             cur.execute('SHOW DATABASES;')
             return db.lower() in [x[0].lower() for x in cur.fetchall()]
         else:
+            db = os.path.expanduser(db)
             return os.path.isfile(db if (db.endswith('.DB') or db.endswith('.proj')) else db + '.DB')
 
     def removeDatabase(self, db):

@@ -980,8 +980,7 @@ class Project:
                 self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
                 self.db.attach(db)
             except Exception as e:
-                self.logger.warning(e)
-                self.logger.warning('Cannot open annotation database {}'.format(db))
+                self.logger.warning('Cannot open annotation database {}: {}'.format(db, e))
         #
         # get existing meta information
         # FIXME: these are not handled correctly for now
