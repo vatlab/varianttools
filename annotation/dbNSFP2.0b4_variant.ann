@@ -1,0 +1,313 @@
+# Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+#
+# ChangeLog:
+#   2011-7-15: Initial import.
+#   2011-8-20: Add citation to Liu et al.
+#   2011-9-1: separate allele frequency in 1000genomes low and high coverage data
+#             into several fields.
+#
+#   2011-9-1: separate dbSNP frequency data and gene ids.
+#   2012-12-5: version 2.0b4 prototype still needs valid url
+
+[linked fields]
+hg19=chr, pos, ref, alt
+hg18=chr, hg18_pos, ref, alt
+
+[data sources]
+description=dbNSFP version 2.0b4, maintained by Xiaoming Liu from UTSPH. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" if you find this database useful.
+version=hg18_hg19_2_0b4
+anno_type=variant
+direct_url=file://dbNSFP2_0b4.zip
+source_type=txt
+source_pattern=dbNSFP2.0b4_variant.chr
+
+[chr]
+index=1
+type=VARCHAR(20) NOT NULL
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative nucleotide allele (as on the + strand)
+
+[aaref]
+index=5
+type=CHAR(1) NULL
+comment=reference amino acid
+
+[aaalt]
+index=6
+type=CHAR(1) NULL
+comment=alternative amino acid
+
+[hg18_pos]
+index=7
+type=INTEGER NULL
+adj=Nullify('.')
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+adj=Nullify('.')
+comment=common gene name
+
+[Uniprot_acc]
+index=9
+type=VARCHAR(128) NULL
+adj=Nullify('.')
+comment=Uniprot accession number. Multiple entries separated by ";".
+
+[Uniprot_id]
+index=10
+type=VARCHAR(64) NULL
+adj=Nullify('.')
+comment=Uniprot ID number. Multiple entries separated by ";".
+
+[Uniprot_aapos]
+index=11
+type=INTEGER NULL
+adj=Nullify('.')
+comment=amino acid position as to Uniprot. Multiple entries separated by ";".
+
+[Interpro_domain]
+index=12
+type=CHAR(48) NULL
+adj=Nullify('.')
+comment=Interpro_domain: domain or conserved site on which the variant locates. Domain annotations come from Interpro database. The number in the brackets following a specific domain is the count of times Interpro assigns the variant position to that domain, typically coming from different predicting databases. Multiple entries separated by ";".
+
+[cds_strand]
+index=13
+type=CHAR(1)
+adj=Nullify('.')
+comment=coding sequence (CDS) strand (+ or -)
+
+[refcodon]
+index=14
+type=char(1)
+adj=Nullify('.')
+comment=reference codon
+
+[SLR_test_statistic]
+index=15
+type=FLOAT NULL
+adj=Nullify('.')
+comment=SLR test statistic for testing natural selection on codons. A negative value indicates negative selection, and a positive value indicates positive selection. Larger magnitude of the value suggests stronger evidence.
+
+[codonpos]
+index=16
+type=INTEGER NULL
+adj=Nullify('.')
+comment=position on the codon (1, 2 or 3)
+
+[fold_degenerate]
+index=17
+type=INTEGER NULL
+adj=Nullify('.')
+comment=degenerate type (0, 2 or 3)
+
+[Ancestral_allele]
+index=18
+type=CHAR(1)
+adj=Nullify('.')
+comment=Ancestral allele (based on 1000 genomes reference data). The following comes from its original README file: ACTG - high-confidence call, ancestral state supproted by the other two sequences actg - low-confindence call, ancestral state supported by one sequence only N    - failure, the ancestral state is not supported by any other sequence -    - the extant species contains an insertion at this postion .    - no coverage in the alignment
+
+[Ensembl_geneid]
+index=19
+type=VARCHAR(48) NULL
+adj=Nullify('.')
+comment=Ensembl gene id
+
+[Ensembl_transcriptid]
+index=20
+type=VARCHAR(48) NULL
+adj=Nullify('.')
+comment=Ensembl transcript ids (separated by ";")
+
+[aapos]
+index=21
+type=INTEGER NULL
+adj=Nullify('.')
+comment=: amino acid position as to the protein "-1" if the variant is a splicing site SNP (2bp on each end of an intron)
+
+[SIFT_score]
+index=22
+type=FLOAT NULL
+adj=Nullify('.')
+comment=SIFT score, If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)"; otherwise it is predicted as "T(olerated)".
+
+[Polyphen2_HDIV_score]
+index=23
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.957,1]; "possibly damaging" if it is in [0.453,0.956]; "benign" if it is in [0,0.452]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
+
+[Polyphen2_HDIV_pred]
+index=24
+type=CHAR(8) NULL
+adj=Nullify('.')
+comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";".
+
+[Polyphen2_HVAR_score]
+index=25
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Polyphen2 score based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.909,1]; "possibly damaging" if it is in [0.447,0.908]; "benign" if it is in [0,0.446]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
+
+[Polyphen2_HVAR_pred]
+index=26
+type=CHAR(8) NULL
+adj=Nullify('.')
+comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";".
+
+[LRT_score]
+index=27
+type=FLOAT NULL
+adj=Nullify('.')
+comment=LRT score
+
+[LRT_pred]
+index=28
+type=CHAR(1) NULL
+adj=Nullify('.')
+comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
+
+[MutationTaster_score]
+index=29
+type=FLOAT NULL
+adj=Nullify('.')
+comment=MutationTaster score
+
+[MutationTaster_pred]
+index=30
+type=CHAR(1) NULL
+adj=Nullify('.')
+comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
+
+[MutationAssessor_score]
+index=31
+type=FLOAT NULL
+adj=Nullify('.')
+comment=MutationAssessor functional impact combined score
+
+[MutationAssessor_pred]
+index=32
+type=CHAR(16) NULL
+adj=Nullify('.')
+comment=MutationAssessor "functional impact of a variant : predicted functional (high, medium), predicted non-functional (low, neutral)" Please refer to Reva et al. Nucl. Acids Res. (2011) 39(17):e118 for details
+
+[GERP_NR]
+index=33
+type=FLOAT NULL
+adj=Nullify('.')
+comment=GERP++ neutral rate
+
+[GERP_RS]
+index=34
+type=FLOAT NULL
+adj=Nullify('.')
+comment=GERP++ RS score, the larger the score, the more conserved the site.
+
+[PhyloP_score]
+index=35
+type=FLOAT NULL
+adj=Nullify('.')
+comment=PhyloP score, the larger the score, the more conserved the site.
+
+[LRT_Omega]
+index=38
+type=FLOAT NULL
+adj=Nullify('.')
+comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)
+
+[UniSNP_ids]
+index=39
+type=CHAR(64) NULL
+adj=Nullify('.')
+comment="rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;..."
+
+[KGp1_AC]
+index=40
+type=INTEGER NULL
+adj=Nullify('.')
+comment=Alternative allele count in the whole 1000Gp1 data.
+
+[KGp1_AF]
+index=41
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the whole 1000Gp1 data.
+
+[KGp1_AFR_AC]
+index=42
+type=INTEGER NULL
+adj=Nullify('.')
+comment=Alternative allele counts in the 1000Gp1 African descendent samples.
+
+[KGp1_AFR_AF]
+index=43
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the 1000Gp1 African descendent samples.
+
+[KGp1_EUR_AC]
+index=44
+type=INTEGER NULL
+adj=Nullify('.')
+comment=Alternative allele counts in the 1000Gp1 European descendent samples.
+
+[KGp1_EUR_AF]
+index=45
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the 1000Gp1 European descendent samples.
+
+[KGp1_AMR_AC]
+index=46
+type=INTEGER NULL
+adj=Nullify('.')
+comment=Alternative allele counts in the 1000Gp1 American descendent samples.
+
+[KGp1_AMR_AF]
+index=47
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the 1000Gp1 American descendent samples.
+
+[KGp1_ASN_AC]
+index=48
+type=INTEGER NULL
+adj=Nullify('.')
+comment=Alternative allele counts in the 1000Gp1 Asian descendent samples.
+
+[KGp1_ASN_AF]
+index=49
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the 1000Gp1 Asian descendent samples.
+
+[ESP6500_AA_AF]
+index=50
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the Afrian American samples of the NHLBI GO Exome Sequencing Project (ESP6500 data set).
+
+[ESP6500_EA_AF]
+index=51
+type=FLOAT NULL
+adj=Nullify('.')
+comment=Alternative allele frequency in the European American samples of the NHLBI GO Exome Sequencing Project (ESP6500 data set).
