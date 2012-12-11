@@ -579,7 +579,7 @@ class VariantWorker(Process):
         if '{}_genotype.'.format(self.dbname) in self.query:
             db.attach('{}_genotype.DB'.format(self.dbname), '{}_genotype'.format(self.dbname), lock=self.lock)
         for anno in self.annoDB:
-            db.attach(anno.filename, lock=self.lock)
+            db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
         cur = db.cursor()
         cur.execute(self.query)
         # reporting to the main process that SQL query is done
