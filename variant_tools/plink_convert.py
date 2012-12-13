@@ -1,7 +1,91 @@
 import sys, os
 import itertools as it
 from variant_tools import cgatools_py3 as cga
-from plinkio import plinkfile as pio
+
+import cplinkio
+
+class PlinkFile: 
+    ##
+    # Opens the plink file at the given path.
+    #
+    # @param path The prefix for a .bed, .fam and .bim without
+    #             the extension. E.g. for the files /plink/myfile.fam,
+    #             /plink/myfile.bim, /plink/myfile.bed use the path
+    #             /plink/myfile
+    #
+    def __init__(self, path):
+        self.path = path
+        self.handle = cplinkio.open( path )
+        self.loci = cplinkio.get_loci( self.handle )
+        self.samples = cplinkio.get_samples( self.handle )
+
+    ##
+    # Returns an iterator from the beginning of
+    # the file.
+    #
+    def __iter__(self):
+        cplinkio.reset_row( self.handle )
+
+        return self
+
+    ##
+    # Returns the prefix path to the plink file, e.g.
+    # without .bim, .bed or .fam.
+    #
+    def get_path(self):
+        return self.path
+
+    ##
+    # Returns a list of the samples.
+    #
+    def get_samples(self):
+        return self.samples
+
+    ##
+    # Returns a list of the loci.
+    #
+    def get_loci(self):
+        return self.loci
+
+    ##
+    # Determines how the snps are stored. It will return
+    # true if a row contains the genotypes of all individuals
+    # from a single locus, false otherwise.
+    #
+    def one_locus_per_row(self):
+        return cplinkio.one_locus_per_row( self.handle )
+
+    ##
+    # Goes to next row.
+    #
+    def next(self):
+        row = cplinkio.next_row( self.handle )
+        if not row:
+            raise StopIteration
+
+        return row
+
+    ##
+    # For python 3.x.
+    #
+    def __next__(self):
+        return self.next( )
+
+    ##
+    # Closes the file.
+    #
+    def close(self):
+        if self.handle:
+            cplinkio.close( self.handle )
+            self.handle = None
+
+    ##
+    # Transposes the file.
+    #
+    def transpose(self, new_path):
+        return cplinkio.transpose( self.path, new_path )
+
+
 
 class PlinkBinaryToVariants:
     """
