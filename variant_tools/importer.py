@@ -1349,6 +1349,15 @@ class GenotypeCopier(Process):
         except:
             pass
         
+# preprocessors
+
+def nullProcessor(input_file, output_file, build, logger=None):
+    if logger is not None:
+        logger.info('Copying {} to {} using build {}'.format(input_file, output_file, build))
+    with open(input_file, 'r') as _input:
+        with open(output_file, 'w') as _output:
+            for line in _input:
+                _output.write(line)
 #
 #
 #  Command import
@@ -1367,35 +1376,10 @@ class Importer:
             raise IOError('Please specify the filename of the input data.')
             sys.exit(1)
         #
-        self.files = []
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        for filename in files:
-            if filename in existing_files:
-                if force:
-                    self.logger.info('Re-importing imported file {}'.format(filename))
-                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                    self.proj.db.attach(self.proj.name + '_genotype')
-                    proj.removeSamples(IDs)
-                    self.proj.db.detach(self.proj.name + '_genotype')
-                    # remove file record
-                    cur = self.db.cursor()
-                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
-                    self.db.commit()
-                    self.files.append(filename)
-                else:
-                    self.logger.info('Ignoring imported file {}'.format(filename))
-            elif not os.path.isfile(filename):
-                raise ValueError('File {} does not exist'.format(filename))
-            else:
-                self.files.append(filename)
         # for #record, #genotype (new or updated), #new variant, SNV, insertion, deletion, complex variants, invalid record, updated record
         self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
-        if len(self.files) == 0:
-            raise ValueError('No file to import')
         #
         if build is None:
             if self.proj.build is not None:
@@ -1431,7 +1415,7 @@ class Importer:
         #
         # try to guess file type
         if not format:
-            filename = self.files[0].lower()
+            filename = files[0].lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
             else:
@@ -1441,6 +1425,59 @@ class Importer:
         except Exception as e:
             self.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+        #
+        if fmt.preprocessor is not None:
+            self.logger.info('Use a preprocessor to generate an input file from {}'.format(', '.join(files)))
+            # if this is the case, only one input stream will be allowed.
+            # process command line
+            command = fmt.preprocessor
+            for idx, input_name in enumerate(files):
+                if '${}'.format(idx + 1) not in command:
+                    self.logger.warning("Input filename {} is not used in the preprocessor for format {} and will be ignored.".format(input_name, fmt.name))
+                command = command.replace('${}'.format(idx + 1), input_name)
+                # replace command with other stuff
+            command = command.replace('$build', self.build)
+            command = command.replace('$logger', "self.logger")
+            #
+            # create a temp file
+            temp_file = os.path.join(runOptions.cache_dir, '_'.join(files).replace(os.sep, '_') + '_' + fmt.name)
+            if '$output' not in command:
+                raise ValueError("A preprocessor must accept a parameter $output for output filename")
+            command = command.replace('$output', temp_file)
+            try:
+                eval(command)
+            except Exception as e:
+                raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
+            #
+            # we record file as cache files
+            files = [temp_file]
+        #
+        self.files = []
+        cur = self.db.cursor()
+        cur.execute('SELECT filename from filename;')
+        existing_files = [x[0] for x in cur.fetchall()]
+        for filename in files:
+            if filename in existing_files:
+                if force:
+                    self.logger.info('Re-importing imported file {}'.format(filename))
+                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                    self.proj.db.attach(self.proj.name + '_genotype')
+                    proj.removeSamples(IDs)
+                    self.proj.db.detach(self.proj.name + '_genotype')
+                    # remove file record
+                    cur = self.db.cursor()
+                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
+                    self.db.commit()
+                    self.files.append(filename)
+                else:
+                    self.logger.info('Ignoring imported file {}'.format(filename))
+            elif not os.path.isfile(filename):
+                raise ValueError('File {} does not exist'.format(filename))
+            else:
+                self.files.append(filename)
+        #
+        if len(self.files) == 0:
+            raise ValueError('No file to import')
         #
         self.sample_name = sample_name
         #
@@ -1965,7 +2002,9 @@ def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable.''')
+            acceptable. If a preprocessor is defined in the format, passed parameters
+            will be passed to the preprocessor as $1, $2 etc to generate a single
+            input stream.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.

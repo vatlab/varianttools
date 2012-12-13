@@ -290,6 +290,7 @@ class fileFMT:
         self.genotype_fields = None
         self.genotype_info = None
         self.encoding = 'utf-8'
+        self.preprocessor = None
         self.logger = logger
         # for export only
         self.export_by_fields = ''
@@ -414,6 +415,8 @@ class fileFMT:
                     self.delimiter = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
+            elif item[0] == 'preprocessor':
+                self.preprocessor = item[1]
             elif item[0] == 'merge_by':
                 self.merge_by_cols = [x-1 for x in eval(item[1])]
             elif item[0] == 'export_by':
@@ -493,6 +496,9 @@ class fileFMT:
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
+        #
+        if self.preprocessor is not None:
+            print('Preprocessor: {}'.format(self.preprocessor))
         #
         print('\nColumns:')
         if self.columns:
@@ -1568,10 +1574,6 @@ class Project:
             check_overlap = False
             for i in range(len(ranges) - 1):
                 for j in range(i+1, len(ranges)):
-                    # skip when either range (a,b) or (c,d) are empty
-                    # i.e., no variants for a sample from a particular file
-                    if not any(ranges[i]) or not any(ranges[j]):
-                        continue
                     # range overlap (a,b) with (c,d) <===> a <= d and b >= c 
                     if ranges[i][0] <= ranges[j][1] and ranges[i][1] >= ranges[j][0]:
                         check_overlap = True
