@@ -1574,6 +1574,10 @@ class Project:
             check_overlap = False
             for i in range(len(ranges) - 1):
                 for j in range(i+1, len(ranges)):
+                    # skip when either range (a,b) or (c,d) are empty
+                    # i.e., no variants for a sample from a particular file
+                    if not any(ranges[i]) or not any(ranges[j]):
+                        continue
                     # range overlap (a,b) with (c,d) <===> a <= d and b >= c 
                     if ranges[i][0] <= ranges[j][1] and ranges[i][1] >= ranges[j][0]:
                         check_overlap = True
