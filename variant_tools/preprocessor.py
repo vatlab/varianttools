@@ -1,9 +1,6 @@
 import sys, os
 import itertools as it
-from .cplinkio import open as plink_open
-from .cplinkio import get_loci, get_samples, reset_row, transpose, next_row
-from .cplinkio import close as plink_close
-from .cplinkio import one_locus_per_row as plink_one_locus_per_row
+from . import cplinkio
 from .utils import ProgressBar, RefGenome
 
 class PlinkFile: 
@@ -17,16 +14,16 @@ class PlinkFile:
     #
     def __init__(self, path):
         self.path = path
-        self.handle = plink_open( path )
-        self.loci = get_loci( self.handle )
-        self.samples = get_samples( self.handle )
+        self.handle = cplinkio.open( path )
+        self.loci = cplinkio.get_loci( self.handle )
+        self.samples = cplinkio.get_samples( self.handle )
 
     ##
     # Returns an iterator from the beginning of
     # the file.
     #
     def __iter__(self):
-        reset_row( self.handle )
+        cplinkio.reset_row( self.handle )
 
         return self
 
@@ -55,13 +52,13 @@ class PlinkFile:
     # from a single locus, false otherwise.
     #
     def one_locus_per_row(self):
-        return plink_one_locus_per_row( self.handle )
+        return cplinkio.one_locus_per_row( self.handle )
 
     ##
     # Goes to next row.
     #
     def next(self):
-        row = next_row( self.handle )
+        row = cplinkio.next_row( self.handle )
         if not row:
             raise StopIteration
 
@@ -78,14 +75,14 @@ class PlinkFile:
     #
     def close(self):
         if self.handle:
-            plink_close( self.handle )
+            cplinkio.close( self.handle )
             self.handle = None
 
     ##
     # Transposes the file.
     #
     def transpose(self, new_path):
-        return transpose( self.path, new_path )
+        return cplinkio.transpose( self.path, new_path )
 
 
 
@@ -129,7 +126,7 @@ class PlinkBinaryToVariants:
                 raise RuntimeError('Cannot find file {0}'.format(dataset + ext))
         self.dataset = dataset
         self.build = build
-        self.cur = PlinkFile.open(self.dataset)
+        self.cur = PlinkFile(self.dataset)
         self.logger = logger
         # a list of sample names (sample ID's in .fam file)'''
         self.samples =  [x.iid for x in self.cur.get_samples()]
@@ -269,33 +266,58 @@ class PlinkBinaryToVariants:
                 status = 0 if ref == major else 1
         return status, strand, major, minor
 
-def decode_plink_bin(p2vObject, ofile, n = 1000):
-    # check major allele
-    which_major = p2vObject.determineMajorAllele(n)
-    # raise on bad match
-    if which_major == -1:
-        raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.format(p2vObject.dataset, p2vObject.build))
-    # output
-    nloci = p2vObject.getLociCounts()
-    batch = int(nloci / 100)
-    prog = ProgressBar('Decoding {0}'.format(p2vObject.dataset), nloci)
-    with open(ofile, 'w') as f:
-        f.write(p2vObject.getHeader())
-        count = 0
-        while True:
-            flag, line = p2vObject.getLine(which_major = which_major)
-            count += 1
-            if not flag:
-                break
-            else:
-                if line is not None:
-                    f.write(line)
-                if count % batch == 0 and count > batch:
-                    prog.update(count)
-    
-def plink_converter(indata, outdir, build, logger):
-    for item in indata:
-        # determine output filename
-        fmt = os.path.split(outdir)[-1]
-        ofile = os.path.join(os.path.split(outdir)[:-1], item) + '.' + fmt
-        decode_plink_bin(PlinkBinaryToVariants(item, build, logger), ofile)
+#
+#
+# Preprocessors of input files
+# They will convert input files to intermediate variant based text files for easy import 
+#
+#
+
+class Preprocessor:
+    def __init__(self):
+        '''Base preprocessor class that converts $files
+        and write intermediate output files to $outdir/file.format'''
+
+    def convert(self, files, outdir_format, logger = None):
+        for item in files:
+            ofile = self._get_output_fn(item, outdir_format)
+            if logger:
+                logger.info('Convert {} to {}'.format(item, ofile))
+        
+    def _get_output_fn(self, fn, outdir_format): 
+        path,ext = os.path.split(outdir_format)
+        return os.path.join(path, fn) + '.' + ext
+
+class PlinkConverter(Preprocessor):
+    def __init__(self, build):
+        self.build = build
+
+    def convert(self, files, outdir_format, logger):
+        for item in files:
+            ofile = self._get_output_fn(item, outdir_format)
+            self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile)
+            
+    def decode_plink(self, p2vObject, ofile, n = 1000):
+        '''decode plink data from p2vObject and output to ofile'''
+        # check major allele
+        which_major = p2vObject.determineMajorAllele(n)
+        # raise on bad match
+        if which_major == -1:
+            raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.format(p2vObject.dataset, p2vObject.build))
+        # output
+        nloci = p2vObject.getLociCounts()
+        batch = int(nloci / 100)
+        prog = ProgressBar('Decoding {0}'.format(p2vObject.dataset), nloci)
+        with open(ofile, 'w') as f:
+            f.write(p2vObject.getHeader())
+            count = 0
+            while True:
+                flag, line = p2vObject.getLine(which_major = which_major)
+                count += 1
+                if not flag:
+                    break
+                else:
+                    if line is not None:
+                        f.write(line)
+                    if count % batch == 0 and count > batch:
+                        prog.update(count)

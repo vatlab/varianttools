@@ -11,7 +11,7 @@ variant=chr,%(pos)s,%(ref)s,%(alt)s
 genotype=%(geno)s
 # call a preprocessor to convert input PLINK files to a variant-based format
 # currently only PLINK binary file bundle (*.bed/bim/fam) is supported
-preprocessor=plink_converter($input, $output, $build, $logger)
+preprocessor=PlinkConverter($build)
 
 [DEFAULT]
 pos=pos

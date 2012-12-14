@@ -43,7 +43,7 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
     downloadFile, runOptions
 # preprocessors
-from .plink_convert import plink_converter
+from .preprocessor import PlinkConverter
 
 #
 #
@@ -1420,26 +1420,19 @@ class Importer:
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         if fmt.preprocessor is not None:
-            self.logger.info('Preprocessing files {} to generate intermediate input file'.format(', '.join(files)))
+            self.logger.info('Preprocessing files {} to generate intermediate input files for import'.format(', '.join(files)))
             # if this is the case, only one input stream will be allowed.
             # process command line
             command = fmt.preprocessor
-            # check preprocessor specification
-            if '$input' not in command:
-                raise ValueError("A preprocessor must accept a parameter $input for input filename")
-            if '$output' not in command:
-                raise ValueError("A preprocessor must accept a parameter $output for output filename")
-            # replace command with other stuff
-            command = command.replace('$input', '[' + ', '.join(files) + ']')
-            # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
-            command = command.replace('$output', "os.path.join(runOptions.cache_dir, fmt.name)")
+            # replace command with other stuff, if applicable
             command = command.replace('$build', "self.build")
-            command = command.replace('$logger', "self.logger")
             #
             # create temp files
-            temp_files = [os.path.join(runOptions.cache_dir, os.path.split(x)[-1] + '.' + fmt.name) for x in files]
+            temp_files = [os.path.join(runOptions.cache_dir, os.path.basename(x) + '.' + fmt.name) for x in files]
             try:
-                eval(command)
+                processor = eval(command)
+                # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
+                processor.convert(files, os.path.join(runOptions.cache_dir, fmt.name), self.logger)
             except Exception as e:
                 raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
             #
@@ -1996,9 +1989,8 @@ def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable. If a preprocessor is defined in the format, passed parameters
-            will be passed to the preprocessor as $1, $2 etc to generate a single
-            input stream.''')
+            acceptable. If a preprocessor is defined in the format, processor specific
+            parameters will be passed as $1, $2 etc to generate a single input stream.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
@@ -2055,4 +2047,3 @@ def importVariants(args):
         proj.close()
     except Exception as e:
         sys.exit(e)
-
