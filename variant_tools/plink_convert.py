@@ -1,7 +1,7 @@
 import sys, os
 import itertools as it
 import cplinkio
-from .utis import ProgressBar, RefGenome
+from .utils import ProgressBar, RefGenome
 
 class PlinkFile: 
     ##
