@@ -1064,7 +1064,11 @@ def probeSampleName(filename, prober, encoding, logger):
                             if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
                                 return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
                             else:
-                                return len(rec), []
+                                header = [x.strip() for x in header_line.split(prober.delimiter)]
+                                if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
+                                    return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+                                else:
+                                    return len(rec), []
                 except IgnoredRecord:
                     continue
                 except Exception as e:

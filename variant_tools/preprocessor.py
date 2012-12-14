@@ -85,7 +85,7 @@ class PlinkBinaryToVariants:
         elif self.status == 0:
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
-            return ','.join([str(chrom), str(pos), allele1, allele2]) + ', ' + str(geno_cur)[1:-1]
+            return ','.join([str(chrom), str(pos), allele1, allele2]) + ',' + str(geno_cur)[1:-1]
         else:
             # have to flip the genotypes coding
             if strand:

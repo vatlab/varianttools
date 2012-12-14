@@ -51,7 +51,7 @@ snparray_str(PyObject *self)
         }
 
         *string_p++ = ',';
-        *string_p++ = ' ';
+        //*string_p++ = ' ';
     }
 
     // We should remove the last ", ".
