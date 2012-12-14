@@ -234,7 +234,7 @@ plinkio_get_loci(PyObject *self, PyObject *args)
 
     c_plink_file = (c_plink_file_t *) plink_file;
 
-    PyObject *module = PyImport_ImportModule( "plinkio.plinkfile" );
+    PyObject *module = PyImport_ImportModule( "variant_tools.plinkfile" );
     if( module == NULL )
     {
         return NULL;
@@ -282,14 +282,14 @@ plinkio_get_samples(PyObject *self, PyObject *args)
     c_plink_file_t *c_plink_file;
     int i;
     
-    if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
+	if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
     }
 
     c_plink_file = (c_plink_file_t *) plink_file;
 
-    PyObject *module = PyImport_ImportModule( "plinkio.plinkfile" );
+    PyObject *module = PyImport_ImportModule( "variant_tools.plinkfile" );
     if( module == NULL )
     {
         return NULL;

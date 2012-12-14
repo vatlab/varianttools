@@ -42,8 +42,9 @@ from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
     downloadFile, runOptions
+
 # preprocessors
-from .preprocessor import PlinkConverter
+from .preprocessor import *
 
 #
 #
@@ -1425,14 +1426,17 @@ class Importer:
             # process command line
             command = fmt.preprocessor
             # replace command with other stuff, if applicable
-            command = command.replace('$build', "self.build")
+            command = command.replace('$build', "'{}'".format(self.build))
             #
             # create temp files
             temp_files = [os.path.join(runOptions.cache_dir, os.path.basename(x) + '.' + fmt.name) for x in files]
             try:
                 processor = eval(command)
                 # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
-                processor.convert(files, os.path.join(runOptions.cache_dir, fmt.name), self.logger)
+                processor.convert(files, temp_files, self.logger)
+                for output in temp_files:
+                    if not os.path.isfile():
+                        raise ValueError("Preprocessed file {} does not exist.".format(output))
             except Exception as e:
                 raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
             #
