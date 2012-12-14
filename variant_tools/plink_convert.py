@@ -1,6 +1,9 @@
 import sys, os
 import itertools as it
-import cplinkio
+from .cplinkio import open as plink_open
+from .cplinkio import get_loci, get_samples, reset_row, transpose, next_row
+from .cplinkio import close as plink_close
+from .cplinkio import one_locus_per_row as plink_one_locus_per_row
 from .utils import ProgressBar, RefGenome
 
 class PlinkFile: 
@@ -14,16 +17,16 @@ class PlinkFile:
     #
     def __init__(self, path):
         self.path = path
-        self.handle = cplinkio.open( path )
-        self.loci = cplinkio.get_loci( self.handle )
-        self.samples = cplinkio.get_samples( self.handle )
+        self.handle = plink_open( path )
+        self.loci = get_loci( self.handle )
+        self.samples = get_samples( self.handle )
 
     ##
     # Returns an iterator from the beginning of
     # the file.
     #
     def __iter__(self):
-        cplinkio.reset_row( self.handle )
+        reset_row( self.handle )
 
         return self
 
@@ -52,13 +55,13 @@ class PlinkFile:
     # from a single locus, false otherwise.
     #
     def one_locus_per_row(self):
-        return cplinkio.one_locus_per_row( self.handle )
+        return plink_one_locus_per_row( self.handle )
 
     ##
     # Goes to next row.
     #
     def next(self):
-        row = cplinkio.next_row( self.handle )
+        row = next_row( self.handle )
         if not row:
             raise StopIteration
 
@@ -75,14 +78,14 @@ class PlinkFile:
     #
     def close(self):
         if self.handle:
-            cplinkio.close( self.handle )
+            plink_close( self.handle )
             self.handle = None
 
     ##
     # Transposes the file.
     #
     def transpose(self, new_path):
-        return cplinkio.transpose( self.path, new_path )
+        return transpose( self.path, new_path )
 
 
 
