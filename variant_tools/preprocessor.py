@@ -85,15 +85,15 @@ class PlinkBinaryToVariants:
         elif self.status == 0:
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
-            return ', '.join([str(chrom), str(pos), allele1, allele2]) + ', ' + str(geno_cur)[1:-1]
+            return ','.join([str(chrom), str(pos), allele1, allele2]) + ', ' + str(geno_cur)[1:-1]
         else:
             # have to flip the genotypes coding
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
             # self.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
-            return ', '.join([str(chrom), str(pos), allele2, allele1]) + ', ' + \
-                ', '.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
+            return ','.join([str(chrom), str(pos), allele2, allele1]) + ',' + \
+                ','.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
             
     def getLociCounts(self):
         # FIXME: not efficient
@@ -101,7 +101,7 @@ class PlinkBinaryToVariants:
         
     def getHeader(self):
         '''a line of headers for the output text file'''
-        return ', '.join(
+        return ','.join(
             ['#chr', 'pos', 'ref', 'alt'] + self.samples
             )
         
@@ -232,7 +232,7 @@ class PlinkConverter(Preprocessor):
         if os.path.exists(ofile):
             os.remove(ofile)
         with open(ofile, 'a') as f:
-            f.write(p2vObject.getHeader())
+            f.write(p2vObject.getHeader() + '\n')
             count = 0
             while True:
                 flag, line = p2vObject.getLine(which_major = which_major)
@@ -242,6 +242,6 @@ class PlinkConverter(Preprocessor):
                     break
                 else:
                     if line is not None:
-                        f.write(line)
+                        f.write(line + '\n')
                     if count % batch == 0 and count > batch:
                         prog.update(count)
