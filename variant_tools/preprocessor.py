@@ -70,12 +70,11 @@ class PlinkBinaryToVariants:
           otherwise return None
         @return a locus genotypes string
         '''
-        # 0 based chrom, 0 based position
-        # FIXME is it correct to do chrom - 1 and pos - 1 for cga input?
         try:
-            ref = self.hgref.getBase(chrom - 1, pos - 1)
+            ref = self.hgref.getBase(chrom, pos)
         except Exception as e:
             self.logger.warning('Cannot find locus {0}:{1}. Input variant is ignored'.format(chrom, pos))
+            self.status = -1
             self.cur.close()
             return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
@@ -214,20 +213,25 @@ class PlinkConverter(Preprocessor):
 
     def convert(self, files, output_files, logger):
         for item, ofile in zip(files, output_files):
-            self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile)
+            self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile, logger=logger)
             
-    def decode_plink(self, p2vObject, ofile, n = 1000):
+    def decode_plink(self, p2vObject, ofile, n = 1000, logger = None):
         '''decode plink data from p2vObject and output to ofile'''
+        if logger: logger.info("Determining major/minor allele from data")
         # check major allele
         which_major = p2vObject.determineMajorAllele(n)
         # raise on bad match
         if which_major == -1:
-            raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.format(p2vObject.dataset, p2vObject.build))
+            raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.\
+                                  format(p2vObject.dataset, p2vObject.build))
+        if logger: logger.info("allele{} is major allele".format(which_major))
         # output
         nloci = p2vObject.getLociCounts()
         batch = int(nloci / 100)
         prog = ProgressBar('Decoding {0}'.format(p2vObject.dataset), nloci)
-        with open(ofile, 'w') as f:
+        if os.path.exists(ofile):
+            os.remove(ofile)
+        with open(ofile, 'a') as f:
             f.write(p2vObject.getHeader())
             count = 0
             while True:
