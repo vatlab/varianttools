@@ -8,13 +8,14 @@
 description=Input format for variants with multiple sample genotypes
 delimiter=','
 variant=chr,%(pos)s,%(ref)s,%(alt)s
-# call a preprocessor to convert input files ($1.bim etc) to a variant-based format
-preprocessor=plink_convert("$build", "$1.bim", "$1.ast", $logger)
 genotype=%(geno)s
+# call a preprocessor to convert input PLINK files to a variant-based format
+# currently only PLINK binary file bundle (*.bed/bim/fam) is supported
+preprocessor=plink_converter($input, $output, $build, $logger)
 
 [DEFAULT]
 pos=pos
-pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+pos_comment=Field for position.
 
 ref=ref
 ref_comment=Field for reference allele. 
@@ -23,8 +24,7 @@ alt=alt
 alt_comment=Field for alternative allele.
 
 geno=GT
-geno_comment=Field to extract genotype from .vcf file. You can set it to
-    safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
+geno_comment=Field to extract genotype from input csv file.
 
 [chr]
 index=1

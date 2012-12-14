@@ -1,8 +1,7 @@
 import sys, os
 import itertools as it
-from variant_tools import cgatools_py3 as cga
-
 import cplinkio
+from .utis import ProgressBar, RefGenome
 
 class PlinkFile: 
     ##
@@ -95,14 +94,15 @@ class PlinkBinaryToVariants:
     c.f., http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
 
     @param    dataset: path + prefix for a .bed, .fam and .bim without extensions
-    @param      hgref: path to human genome reference file, e.g., build37.crr
+    @param      build:
+    @param     logger:
 
     Note: implementation of this class is based on libplinkio
     https://bitbucket.org/mattias_franberg/libplinkio
 
     The SNP will be encoded as follows:
     * 0 - Homozygous major
-    * 1 - Hetrozygous
+    * 1 - Heterozygous
     * 2 - Homozygous minor
     * 3 - Missing value
 
@@ -119,20 +119,21 @@ class PlinkBinaryToVariants:
 
     self.determineMajorAllele() Attempts to resolve this issue
     """
-    def __init__(self, dataset, hgref, logger):
+    def __init__(self, dataset, build, logger):
         # check file path
         for ext in ['.fam', '.bed', '.bim']:
             if not os.path.exists(dataset + ext):
                 raise RuntimeError('Cannot find file {0}'.format(dataset + ext))
         self.dataset = dataset
-        self.cur = pio.open(self.dataset)
+        self.build = build
+        self.cur = PlinkFile.open(self.dataset)
         self.logger = logger
         # a list of sample names (sample ID's in .fam file)'''
         self.samples =  [x.iid for x in self.cur.get_samples()]
         # iterator for variants info: chr, pos, allele1, allele2
         self.variants = it.chain(self.cur.get_loci())
         # reference genome object and ATCG dictionary
-        self.hgref = cga.CrrFile(hgref)
+        self.hgref = RefGenome(build)
         self.CSTRANDS = {'A':'T',
                          'G':'C',
                          'T':'A',
@@ -154,10 +155,16 @@ class PlinkBinaryToVariants:
         '''
         # 0 based chrom, 0 based position
         # FIXME is it correct to do chrom - 1 and pos - 1 for cga input?
-        ref = self.hgref.getBase(cga.Location(chrom - 1, pos - 1))
+        try:
+            ref = self.hgref.getBase(chrom - 1, pos - 1)
+        except Exception as e:
+            self.logger.warning('Cannot find locus {0}:{1}. Input variant is ignored'.format(chrom, pos))
+            self.cur.close()
+            return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
-            self.logger.info('Invalid locus {0}:{1} (given allele1 is {2}<->{3}., allele2 is {4}<->{5} but reference is {6})\n'.format(chrom, pos, self.CSTRANDS[allele1], allele1, self.CSTRANDS[allele2], allele2, ref))
+            self.logger.warning('Invalid locus {0}:{1} (given allele1 is {2}<->{3}., allele2 is {4}<->{5} but reference is {6})'.\
+                                    format(chrom, pos, self.CSTRANDS[allele1], allele1, self.CSTRANDS[allele2], allele2, ref))
             return None
         elif self.status == 0:
             if strand: self.logger.info('Use alternative strand at {0}:{1}\n'.format(chrom, pos))
@@ -170,6 +177,9 @@ class PlinkBinaryToVariants:
             return ', '.join([str(chrom), str(pos), allele2, allele1]) + ', ' + \
                 ', '.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
             
+    def getLociCounts(self):
+        return len(self.cur.get_loci())
+        
     def getHeader(self):
         '''a line of headers for the output text file'''
         return ', '.join(
@@ -206,7 +216,7 @@ class PlinkBinaryToVariants:
         @return: a guess of major allele based on the first n samples. -1 for bad matching
         '''
         # new temporary connection
-        cur = pio.open(self.dataset)
+        cur = PlinkFile.open(self.dataset)
         variants = it.chain(cur.get_loci())
         # counters
         m_ones = zeros = ones = 0
@@ -256,39 +266,33 @@ class PlinkBinaryToVariants:
                 status = 0 if ref == major else 1
         return status, strand, major, minor
 
-class Logger:
-    def __init__(self):
-        self.info = sys.stderr.write
-        self.debug = sys.stderr.write
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description='This is a standalone binary PLINK to text format converter. For specification of the output text file please read the *.fmt file distributed with this script.')
-    parser.add_argument('data', help = 'prefix of the PLINK binary files data-set')
-    parser.add_argument('-b', '--build', choices = ['hg19','hg18'], help = 'human genome build')
-    args = parser.parse_args()
-    logger = Logger()
-    if args.build == 'hg19':
-        hgref = '~/.variant_tools/ftp.completegenomics.com/ReferenceFiles/build37.crr'
-    else:
-        hgref = '~/.variant_tools/ftp.completegenomics.com/ReferenceFiles/build36.crr'
-    hgref = os.path.expanduser(hgref)
-    if not os.path.exists(hgref):
-        sys.exit('Cannot find file {0}'.format(hgref))
-    p2v = PlinkBinaryToVariants(os.path.expanduser(args.data), hgref, logger)
+def decode_plink_bin(p2vObject, ofile, n = 1000):
     # check major allele
-    n = 1000
-    logger.info('checking first {0} loci\n'.format(n))
-    which_major = p2v.determineMajorAllele(1000)
-    logger.info('check status {0}\n'.format(which_major))
-    # quit on bad match
+    which_major = p2vObject.determineMajorAllele(n)
+    # raise on bad match
     if which_major == -1:
-        sys.exit('Too many unmatched loci: perhaps wrong hg reference is used?')
+        raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.format(p2vObject.dataset, p2vObject.build))
     # output
-    print(p2v.getHeader())
-    while True:
-        flag, line = p2v.getLine(which_major = which_major)
-        if not flag:
-            break
-        else:
-            print(line)
+    nloci = p2vObject.getLociCounts()
+    batch = int(nloci / 100)
+    prog = ProgressBar('Decoding {0}'.format(p2vObject.dataset), nloci)
+    with open(ofile, 'w') as f:
+        f.write(p2vObject.getHeader())
+        count = 0
+        while True:
+            flag, line = p2vObject.getLine(which_major = which_major)
+            count += 1
+            if not flag:
+                break
+            else:
+                if line is not None:
+                    f.write(line)
+                if count % batch == 0 and count > batch:
+                    prog.update(count)
+    
+def plink_converter(indata, outdir, build, logger):
+    for item in indata:
+        # determine output filename
+        fmt = os.path.split(outdir)[-1]
+        ofile = os.path.join(os.path.split(outdir)[:-1], item) + '.' + fmt
+        decode_plink_bin(PlinkBinaryToVariants(item, build, logger), ofile)

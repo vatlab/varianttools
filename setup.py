@@ -470,8 +470,9 @@ setup(name = "variant_tools",
         'variant_tools.annotation',
         'variant_tools.liftOver',
         'variant_tools.association',
-        'variant_tools.pyper',
         'variant_tools.tester',
+        'variant_tools.pyper',
+        'variant_tools.plink_convert',
         SQLITE_PY_FILE,
         WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
         CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py

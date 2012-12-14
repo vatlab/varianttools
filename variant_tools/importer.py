@@ -42,6 +42,8 @@ from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
     downloadFile, runOptions
+# preprocessors
+from .plink_convert import plink_converter
 
 #
 #
@@ -1349,15 +1351,6 @@ class GenotypeCopier(Process):
         except:
             pass
         
-# preprocessors
-
-def nullProcessor(input_file, output_file, build, logger=None):
-    if logger is not None:
-        logger.info('Copying {} to {} using build {}'.format(input_file, output_file, build))
-    with open(input_file, 'r') as _input:
-        with open(output_file, 'w') as _output:
-            for line in _input:
-                _output.write(line)
 #
 #
 #  Command import
@@ -1427,30 +1420,31 @@ class Importer:
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         if fmt.preprocessor is not None:
-            self.logger.info('Use a preprocessor to generate an input file from {}'.format(', '.join(files)))
+            self.logger.info('Preprocessing files {} to generate intermediate input file'.format(', '.join(files)))
             # if this is the case, only one input stream will be allowed.
             # process command line
             command = fmt.preprocessor
-            for idx, input_name in enumerate(files):
-                if '${}'.format(idx + 1) not in command:
-                    self.logger.warning("Input filename {} is not used in the preprocessor for format {} and will be ignored.".format(input_name, fmt.name))
-                command = command.replace('${}'.format(idx + 1), input_name)
-                # replace command with other stuff
-            command = command.replace('$build', self.build)
-            command = command.replace('$logger', "self.logger")
-            #
-            # create a temp file
-            temp_file = os.path.join(runOptions.cache_dir, '_'.join(files).replace(os.sep, '_') + '_' + fmt.name)
+            # check preprocessor specification
+            if '$input' not in command:
+                raise ValueError("A preprocessor must accept a parameter $input for input filename")
             if '$output' not in command:
                 raise ValueError("A preprocessor must accept a parameter $output for output filename")
-            command = command.replace('$output', temp_file)
+            # replace command with other stuff
+            command = command.replace('$input', '[' + ', '.join(files) + ']')
+            # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
+            command = command.replace('$output', "os.path.join(runOptions.cache_dir, fmt.name)")
+            command = command.replace('$build', "self.build")
+            command = command.replace('$logger', "self.logger")
+            #
+            # create temp files
+            temp_files = [os.path.join(runOptions.cache_dir, os.path.split(x)[-1] + '.' + fmt.name) for x in files]
             try:
                 eval(command)
             except Exception as e:
                 raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
             #
             # we record file as cache files
-            files = [temp_file]
+            files = temp_files
         #
         self.files = []
         cur = self.db.cursor()
