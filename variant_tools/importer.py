@@ -1435,7 +1435,7 @@ class Importer:
                 # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
                 processor.convert(files, temp_files, self.logger)
                 for output in temp_files:
-                    if not os.path.isfile():
+                    if not os.path.isfile(output):
                         raise ValueError("Preprocessed file {} does not exist.".format(output))
             except Exception as e:
                 raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
