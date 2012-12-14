@@ -224,7 +224,7 @@ class PlinkConverter(Preprocessor):
         if which_major == -1:
             raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.\
                                   format(p2vObject.dataset, p2vObject.build))
-        if logger: logger.info("allele{} is major allele".format(which_major))
+        if logger: logger.debug("allele{} is major allele".format(which_major))
         # output
         nloci = p2vObject.getLociCounts()
         batch = int(nloci / 100)
