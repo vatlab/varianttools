@@ -213,7 +213,17 @@ class PlinkConverter(Preprocessor):
 
     def convert(self, files, output_files, logger):
         for item, ofile in zip(files, output_files):
-            self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile, logger=logger)
+            if os.path.exists(item + ".bed"):
+                self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile, logger=logger)
+            else:
+                import glob
+                files = '/'.join([x for x in glob.glob(item + '*')])
+                if files:
+                    supported = ['*.bed/*.bim/*.fam']
+                    raise ValueError("Unsupported input file '{}' (supported file types are {})".\
+                                         format(files, ';'.join(supported)))
+                else:
+                    raise ValueError("Cannot find input files '{}'".format(item + '*'))
             
     def decode_plink(self, p2vObject, ofile, n = 1000, logger = None):
         '''decode plink data from p2vObject and output to ofile'''
