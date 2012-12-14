@@ -167,17 +167,20 @@ class PlinkBinaryToVariants:
                                     format(chrom, pos, self.CSTRANDS[allele1], allele1, self.CSTRANDS[allele2], allele2, ref))
             return None
         elif self.status == 0:
-            if strand: self.logger.info('Use alternative strand at {0}:{1}\n'.format(chrom, pos))
+            if strand:
+                self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
             return ', '.join([str(chrom), str(pos), allele1, allele2]) + ', ' + str(geno_cur)[1:-1]
         else:
             # have to flip the genotypes coding
-            if strand: self.logger.info('Use alternative strand for {0}:{1}\n'.format(chrom, pos))
-            # self.logger.info('Allele coding flipped for {0}:{1}\n'.format(chrom, pos))
+            if strand:
+                self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+            # self.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
             return ', '.join([str(chrom), str(pos), allele2, allele1]) + ', ' + \
                 ', '.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
             
     def getLociCounts(self):
+        # FIXME: not efficient
         return len(self.cur.get_loci())
         
     def getHeader(self):
@@ -198,11 +201,12 @@ class PlinkBinaryToVariants:
             return False, None
         else:
             if which_major == 1:
-                # allele 1 is indeed the major allele
+                # allele 1 is the major allele
                 return True, self.getValidatedLocusGenotype(int(locus.chromosome), int(locus.bp_position),
                                          locus.allele1.upper(), locus.allele2.upper(),
                                          genotypes)
             else:
+                # allele 2 is the major allele
                 return True, self.getValidatedLocusGenotype(int(locus.chromosome), int(locus.bp_position),
                                          locus.allele2.upper(), locus.allele1.upper(),
                                          genotypes)
@@ -211,12 +215,12 @@ class PlinkBinaryToVariants:
     def determineMajorAllele(self, n=1000):
         '''The logic here is that for the first n loci we
         - assume the allele1 in *.bim is major allele
-        - try to map to hg reference and see how many genotype coding has to be flipped
+        - try to map to hg reference and see how many genotype coding have to be flipped
         - if too many (over half) have to be flipped we conclude that allele2 should be major allele
-        @return: a guess of major allele based on the first n samples. -1 for bad matching
+        @return: a guess of major allele based on the first n sample loci. -1 for bad matching
         '''
         # new temporary connection
-        cur = PlinkFile.open(self.dataset)
+        cur = PlinkFile(self.dataset)
         variants = it.chain(cur.get_loci())
         # counters
         m_ones = zeros = ones = 0
@@ -290,6 +294,7 @@ class Preprocessor:
 
 class PlinkConverter(Preprocessor):
     def __init__(self, build):
+        Preprocessor.__init__(self)
         self.build = build
 
     def convert(self, files, outdir_format, logger):
@@ -315,6 +320,7 @@ class PlinkConverter(Preprocessor):
                 flag, line = p2vObject.getLine(which_major = which_major)
                 count += 1
                 if not flag:
+                    prog.done()
                     break
                 else:
                     if line is not None:
