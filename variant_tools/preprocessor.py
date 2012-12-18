@@ -43,8 +43,8 @@ class PlinkBinaryToVariants:
                 raise RuntimeError('Cannot find file {0}'.format(dataset + ext))
         self.dataset = dataset
         self.build = build
-        self.cur = PlinkFile(self.dataset)
         self.logger = logger
+        self.cur = PlinkFile(self.dataset)
         # a list of sample names (sample ID's in .fam file)'''
         self.samples =  [x.iid for x in self.cur.get_samples()]
         # iterator for variants info: chr, pos, allele1, allele2
@@ -155,7 +155,7 @@ class PlinkBinaryToVariants:
                 m_ones += 1
         # check if so many are negative values
         if m_ones > float(n) / 2.0:
-            return -1
+            return -9
         if ones > float(n - m_ones) / 2.0:
             # allele 2 seems to be major allele
             return 2
@@ -199,9 +199,8 @@ class Preprocessor:
         and write intermediate output files to $outdir/file.format'''
         pass
 
-    def convert(self, files, outdir_format, logger = None):
-        for item in files:
-            ofile = self._get_output_fn(item, outdir_format)
+    def convert(self, files, output_files, logger = None):
+        for item, ofile in zip(files, output_files):
             if logger:
                 logger.info('Convert {} to {}'.format(item, ofile))
         
@@ -231,7 +230,7 @@ class PlinkConverter(Preprocessor):
         # check major allele
         which_major = p2vObject.determineMajorAllele(n)
         # raise on bad match
-        if which_major == -1:
+        if which_major == -9:
             raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.\
                                   format(p2vObject.dataset, p2vObject.build))
         if logger: logger.debug("allele{} is major allele".format(which_major))
