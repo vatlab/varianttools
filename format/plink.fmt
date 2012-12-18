@@ -5,12 +5,11 @@
 # a description of the format of this file.
 
 [format description]
-description=Input format for variants with multiple sample genotypes
+description=Input format for PLINK dataset. Currently only PLINK binary PED file format is supported (*.bed, *.bim & *.fam)
 delimiter=','
 variant=chr,pos,ref,alt
 genotype=GT
 # call a preprocessor to convert input PLINK files to a variant-based format
-# currently only PLINK binary file bundle (*.bed/bim/fam) is supported
 preprocessor=PlinkConverter($build)
 
 [chr]
