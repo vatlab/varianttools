@@ -43,6 +43,9 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
     downloadFile, runOptions
 
+# preprocessors
+from .preprocessor import *
+
 #
 #
 # Functors to process input 
@@ -1061,7 +1064,11 @@ def probeSampleName(filename, prober, encoding, logger):
                             if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
                                 return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
                             else:
-                                return len(rec), []
+                                header = [x.strip() for x in header_line.split(prober.delimiter)]
+                                if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
+                                    return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+                                else:
+                                    return len(rec), []
                 except IgnoredRecord:
                     continue
                 except Exception as e:
@@ -1367,35 +1374,10 @@ class Importer:
             raise IOError('Please specify the filename of the input data.')
             sys.exit(1)
         #
-        self.files = []
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        for filename in files:
-            if filename in existing_files:
-                if force:
-                    self.logger.info('Re-importing imported file {}'.format(filename))
-                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                    self.proj.db.attach(self.proj.name + '_genotype')
-                    proj.removeSamples(IDs)
-                    self.proj.db.detach(self.proj.name + '_genotype')
-                    # remove file record
-                    cur = self.db.cursor()
-                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
-                    self.db.commit()
-                    self.files.append(filename)
-                else:
-                    self.logger.info('Ignoring imported file {}'.format(filename))
-            elif not os.path.isfile(filename):
-                raise ValueError('File {} does not exist'.format(filename))
-            else:
-                self.files.append(filename)
         # for #record, #genotype (new or updated), #new variant, SNV, insertion, deletion, complex variants, invalid record, updated record
         self.count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.total_count = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.import_alt_build = False
-        if len(self.files) == 0:
-            raise ValueError('No file to import')
         #
         if build is None:
             if self.proj.build is not None:
@@ -1431,7 +1413,7 @@ class Importer:
         #
         # try to guess file type
         if not format:
-            filename = self.files[0].lower()
+            filename = files[0].lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
             else:
@@ -1441,6 +1423,56 @@ class Importer:
         except Exception as e:
             self.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+        #
+        if fmt.preprocessor is not None:
+            self.logger.info('Preprocessing data [{}] to generate intermediate input files for import'.format(', '.join(files)))
+            # if this is the case, only one input stream will be allowed.
+            # process command line
+            command = fmt.preprocessor
+            # replace command with other stuff, if applicable
+            command = command.replace('$build', "'{}'".format(self.build))
+            #
+            # create temp files
+            temp_files = [os.path.join(runOptions.cache_dir, os.path.basename(x) + '.' + fmt.name) for x in files]
+            try:
+                processor = eval(command)
+                # intermediate files will be named as "cache_dir/$inputfilename.$(fmt.name)"
+                processor.convert(files, temp_files, self.logger)
+                for output in temp_files:
+                    if not os.path.isfile(output):
+                        raise ValueError("Preprocessed file {} does not exist.".format(output))
+            except Exception as e:
+                raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
+            #
+            # we record file as cache files
+            files = temp_files
+        #
+        self.files = []
+        cur = self.db.cursor()
+        cur.execute('SELECT filename from filename;')
+        existing_files = [x[0] for x in cur.fetchall()]
+        for filename in files:
+            if filename in existing_files:
+                if force:
+                    self.logger.info('Re-importing imported file {}'.format(filename))
+                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                    self.proj.db.attach(self.proj.name + '_genotype')
+                    proj.removeSamples(IDs)
+                    self.proj.db.detach(self.proj.name + '_genotype')
+                    # remove file record
+                    cur = self.db.cursor()
+                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
+                    self.db.commit()
+                    self.files.append(filename)
+                else:
+                    self.logger.info('Ignoring imported file {}'.format(filename))
+            elif not os.path.isfile(filename):
+                raise ValueError('File {} does not exist'.format(filename))
+            else:
+                self.files.append(filename)
+        #
+        if len(self.files) == 0:
+            raise ValueError('No file to import')
         #
         self.sample_name = sample_name
         #
@@ -1965,7 +1997,8 @@ def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable.''')
+            acceptable. If a preprocessor is defined in the format, input files will 
+            be processed by the preprocessor before they are imported.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
@@ -2022,4 +2055,3 @@ def importVariants(args):
         proj.close()
     except Exception as e:
         sys.exit(e)
-

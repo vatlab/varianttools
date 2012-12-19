@@ -400,6 +400,19 @@ LIB_BOOST = [
     'boost_1_49_0/libs/filesystem/v2/src/v2_path.cpp',
     'boost_1_49_0/libs/system/src/error_code.cpp'
 ]
+LIB_PLINKIO = [
+    'libplinkio/cplinkio.c',
+    'libplinkio/snparray.c',
+    'libplinkio/fam.c',
+    'libplinkio/fam_parse.c',
+    'libplinkio/bim.c',
+    'libplinkio/bim_parse.c',
+    'libplinkio/bed.c',
+    'libplinkio/plinkio.c',
+    'libplinkio/file.c',
+    'libplinkio/bed_header.c',
+    'libplinkio/libcsv.c', 
+]
 
 LIB_STAT = ['variant_tools/fisher2.c']
 
@@ -448,6 +461,8 @@ setup(name = "variant_tools",
         'variant_tools.__init__',
         'variant_tools.utils',
         'variant_tools.project',
+        'variant_tools.preprocessor',
+        'variant_tools.plinkfile',
         'variant_tools.importer',
         'variant_tools.update',
         'variant_tools.exporter',
@@ -457,8 +472,8 @@ setup(name = "variant_tools",
         'variant_tools.annotation',
         'variant_tools.liftOver',
         'variant_tools.association',
-        'variant_tools.pyper',
         'variant_tools.tester',
+        'variant_tools.pyper',
         SQLITE_PY_FILE,
         WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
         CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py
@@ -478,6 +493,10 @@ setup(name = "variant_tools",
         Extension('variant_tools._vt_sqlite3_ext',
             sources = ['sqlite/vt_sqlite3_ext.c'] + SQLITE_GSL + ['variant_tools/fisher2.c'],
             include_dirs = ['sqlite', "variant_tools", "variant_tools/gsl"],
+        ),
+        Extension('variant_tools.cplinkio',
+            sources = LIB_PLINKIO,
+            include_dirs = ['libplinkio'],
         ),
         Extension('variant_tools._cgatools',
             sources = [

@@ -290,6 +290,7 @@ class fileFMT:
         self.genotype_fields = None
         self.genotype_info = None
         self.encoding = 'utf-8'
+        self.preprocessor = None
         self.logger = logger
         # for export only
         self.export_by_fields = ''
@@ -414,6 +415,8 @@ class fileFMT:
                     self.delimiter = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
+            elif item[0] == 'preprocessor':
+                self.preprocessor = item[1]
             elif item[0] == 'merge_by':
                 self.merge_by_cols = [x-1 for x in eval(item[1])]
             elif item[0] == 'export_by':
@@ -493,6 +496,9 @@ class fileFMT:
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
+        #
+        if self.preprocessor is not None:
+            print('Preprocessor: {}'.format(self.preprocessor))
         #
         print('\nColumns:')
         if self.columns:
