@@ -39,6 +39,8 @@ include variant_tools/association.py
 include variant_tools/tester.py
 include variant_tools/compare.py
 include variant_tools/pyper.py
+include variant_tools/plinkfile.py
+include variant_tools/preprocessor.py
 include variant_tools/assoTests.i
 include variant_tools/cgatools.i
 include variant_tools/config.h
@@ -126,6 +128,10 @@ include cgatools/core.hpp
 recursive-include cgatools/util *.hpp *.cpp
 recursive-include cgatools/reference *.hpp *.cpp
 #
+# libplinkio
+include libplinkio/LICENCE
+recursive-include libplinkio *.h *.c
+
 # test
 include test/*.py
 include test/vcf/*
