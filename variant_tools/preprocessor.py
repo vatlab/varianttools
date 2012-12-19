@@ -79,13 +79,13 @@ class PlinkBinaryToVariants:
             return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
-            self.logger.warning('Invalid locus {0}:{1} (given allele1 is {2}<->{3}., allele2 is {4}<->{5} but reference is {6})'.\
-                                    format(chrom, pos, self.CSTRANDS[allele1], allele1, self.CSTRANDS[allele2], allele2, ref))
+            self.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
+                                    format(chrom, pos, allele1, allele2, ref))
             return None
         elif self.status == 0:
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
-            return ','.join([str(chrom), str(pos), allele1, allele2]) + ',' + str(geno_cur)[1:-1]
+            return ','.join([str(chrom), str(pos), allele1, allele2]) + ',' + str(geno_cur)
         else:
             # have to flip the genotypes coding
             if strand:
@@ -165,10 +165,21 @@ class PlinkBinaryToVariants:
 
     def _matchref(self, ref, major, minor):
         '''try best to match reference allele
+        @param    ref: reference base coding
+        @param  major: major allele coding
+        @param  minor: minor allele coding
         @return self.status (0 for no need to flip, 1 for having to flip)
         @return strand (0 for original, 1 for alternative),
         @return major and minor alleles (might be from alternative strand)
+
+        Notice
+        ------
+        In *.bim file allele1 or allele2 (major/minor) can be 0 when only one allele is found
+        in data. Such loci is not considered a variant site and will be ignored
         '''
+        if major not in ['A','T','C','G'] or minor not in ['A','T','C','G']:
+            # invalid coding
+            return -1, 0, major, minor
         status = strand = 0
         if ref in [major, minor]:
             # allele found, determine flip status
@@ -231,7 +242,7 @@ class PlinkConverter(Preprocessor):
         which_major = p2vObject.determineMajorAllele(n)
         # raise on bad match
         if which_major == -9:
-            raise ValueError ('Invalid dataset {0}: too many unmatched loci to {1}. Perhaps wrong reference genome is used?'.\
+            raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}.'.\
                                   format(p2vObject.dataset, p2vObject.build))
         if logger: logger.debug("allele{} is major allele".format(which_major))
         # output

@@ -53,7 +53,8 @@ snparray_str(PyObject *self)
     char *as_string = (char *) malloc( string_length );
     char *string_p = as_string;
 
-    *string_p++ = '[';
+    /* commented out by Gao Wang */
+    /* *string_p++ = '['; */
 
     for(i = 0; i < snp_array->length; i++)
     {
@@ -66,13 +67,18 @@ snparray_str(PyObject *self)
             *string_p++ = 'E';
         }
 
+	/* modified by Gao Wang */
         *string_p++ = ',';
-        //*string_p++ = ' ';
+        /* string_p++ = ' '; */
     }
 
     // We should remove the last ", ".
-    string_p -= 2;
-    *string_p++ = ']';
+    /* string_p -= 2; */
+    /* modified by Gao Wang */
+    /* We should remove the last ",". */
+    string_p -= 1; 
+    /* commented out by Gao Wang */
+    /* *string_p++ = ']'; */
     *string_p++ = '\0';
 
     PyObject *py_string = PyUnicode_FromString( as_string );

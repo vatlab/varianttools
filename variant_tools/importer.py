@@ -1425,7 +1425,7 @@ class Importer:
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         if fmt.preprocessor is not None:
-            self.logger.info('Preprocessing files {} to generate intermediate input files for import'.format(', '.join(files)))
+            self.logger.info('Preprocessing data [{}] to generate intermediate input files for import'.format(', '.join(files)))
             # if this is the case, only one input stream will be allowed.
             # process command line
             command = fmt.preprocessor
