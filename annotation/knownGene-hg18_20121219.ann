@@ -5,14 +5,14 @@
 # for a description of the format of this file.
 
 [linked fields]
-hg19=chr, txStart, txEnd
+hg18=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
 description=UCSC Known Genes
-version=hg19_20121219
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg19_20121219.DB.gz
+version=hg18_20121219
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg18_20121219.DB.gz
 source_type=txt
 
 [name]
