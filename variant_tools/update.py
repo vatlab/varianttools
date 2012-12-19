@@ -419,10 +419,32 @@ def setFieldValue(proj, table, items, build):
             ','.join(['{}={}'.format(x, proj.db.PH) for x in new_fields]), proj.db.PH)
         proj.logger.debug('Using query {}'.format(query))
         prog = ProgressBar('Updating {}'.format(table), len(results))
-        for count, res in enumerate(results):
-            cur.execute(query, res)
+        # this particular query will return a bunch of bogus NULL values for range-based databases,
+        # which needs to be filtered out.
+        update_status = {}
+        count = 0
+        for res in results:
+            # if result is None, wait and see if there is a real one
+            if res[0] is None:
+                # if there are multiple None, ignore
+                if res[-1] in update_status:
+                    count += 1
+                # otherwise, record the result for later use
+                else:
+                    update_status[res[-1]] = res
+            else:
+                # successful, clear the query 
+                update_status[res[-1]] = None
+                cur.execute(query, res)
+                count += 1
             if count % 10000 == 0:
                 prog.update(count)
+        # update those items that are indeed None
+        for res in update_status.values():
+            if res is not None:
+                cur.execute(query, res)
+                if count % 10000 == 0:
+                    prog.update(count)
         prog.done()
 
 
