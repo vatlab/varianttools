@@ -1997,8 +1997,8 @@ def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable. If a preprocessor is defined in the format, processor specific
-            parameters will be passed as $1, $2 etc to generate a single input stream.''')
+            acceptable. If a preprocessor is defined in the format, input files will 
+            be processed by the preprocessor before they are imported.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
             unspecified, it is assumed to be the primary reference genome of the project.
