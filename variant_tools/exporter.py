@@ -716,8 +716,7 @@ class Exporter:
         return formatters
 
     def exportTfam(self, fname):
-        if fname == '$table':
-            fname = self.table
+        fname = fname.replace('$table', self.table)
         fname += '.tfam' if not fname.endswith('.tfam') else ''
         if os.path.exists(fname):
             os.remove(fname)
