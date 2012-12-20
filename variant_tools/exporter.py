@@ -611,6 +611,7 @@ class Exporter:
         #
         # samples
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
+        self.samples = []
         if samples:
             self.logger.info('File and sample names of {} selected samples are outputted in project log file.'.format(len(self.IDs)))
             cur = self.db.cursor()
@@ -618,6 +619,7 @@ class Exporter:
                 cur.execute('SELECT filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\
                     .format(self.db.PH), (ID,))
                 for rec in cur:
+                    self.samples.append('{}'.format(rec[1]))
                     self.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
         # 
         # build
@@ -713,9 +715,24 @@ class Exporter:
                 i += 1
         return formatters
 
+    def exportTfam(self, fname):
+        fname += '.tfam' if not fname.endswith('.tfam') else ''
+        if os.path.exists(fname):
+            os.remove(fname)
+        self.logger.info('Sample names are exported to {}'.format(fname))
+        # a tfam file is the first 6 columns of a ped file
+        # FID, ID, paternal ID, maternal ID, sex, phenotype
+        # Will output ID only; other fields will be populated with placeholders
+        with open(fname, 'a') as f:
+            for i in range(len(self.samples)):
+                f.write('\t'.join([str(i), self.samples[i], '0', '0', '0', '-9']) + '\n')
+        return True
+    
     def exportData(self):
         '''Export data in specified format'''
-        #
+        # export sample names into separated file in PLINK tfam format
+        if self.format.export_tfam:
+            self.exportTfam(self.table)
         # get all fields
         var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
         geno_fields = []

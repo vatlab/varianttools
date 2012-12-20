@@ -295,6 +295,7 @@ class fileFMT:
         # for export only
         self.export_by_fields = ''
         self.order_by_fields = ''
+        self.export_tfam = False
         # for import only
         self.merge_by_cols = None
         #
@@ -421,6 +422,9 @@ class fileFMT:
                 self.merge_by_cols = [x-1 for x in eval(item[1])]
             elif item[0] == 'export_by':
                 self.export_by_fields = item[1]
+            elif item[0] == 'export_tfam':
+                # export sample names into separated file in PLINK tfam format
+                self.export_tfam = eval(item[1])
             elif item[0] == 'sort_output_by':
                 self.order_by_fields = item[1]
             elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
