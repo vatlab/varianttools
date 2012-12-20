@@ -716,7 +716,7 @@ class Exporter:
         return formatters
 
     def exportTfam(self, fname):
-        if fname == '':
+        if fname == '$table':
             fname = self.table
         fname += '.tfam' if not fname.endswith('.tfam') else ''
         if os.path.exists(fname):
@@ -736,11 +736,12 @@ class Exporter:
             additionalFiles = [x.strip() for x in self.format.additional_exports.split(',')]
             for item in additionalFiles:
                 base, ext = os.path.splitext(item)
-                if len(ext) == 0: base, ext = ext, base
+                if len(ext) == 0 or len(base) == 0:
+                    raise ValueError('Invalid filename specification "{}".'.format(item))
                 try:
                     eval('{}'.format('self.export{}(base)'.format(ext[1:].capitalize())))
                 except Exception as e:
-                    raise ValueError('Additional export to file {} is not supported'.format(item))
+                    raise ValueError('Additional export to file *{} is not supported'.format(ext))
         else:
             pass
         # get all fields

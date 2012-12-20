@@ -20,7 +20,7 @@ style=genotype
 style_comment=(export) Style of genotype format, can be 'genotype' for genotype separated by tab
     (e.g. A C), or 'numeric' for 0, 1, or 2 for number of alternative alleles.
 
-tfamfile=output.tfam
+tfamfile=$table.tfam
 tfamfile_comment=(export) Name of the tfam file to be outputed. Filename that does not
 	ends with .tfam will be ignored.
 
