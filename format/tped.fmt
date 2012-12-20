@@ -10,7 +10,7 @@ description=Output to TPED format with the first four columns chr name gen_pos p
     information about reference genome.
 variant=chr,pos,ref,alt
 export_by=chr,pos,ref
-export_tfam=True
+additional_exports=.tfam
 
 [DEFAULT]
 #seq_file=ftp://ftp.sanger.ac.uk/pub/1000genomes/tk2/main_project_reference/human_g1k_v37.fasta.gz

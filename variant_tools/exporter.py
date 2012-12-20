@@ -716,6 +716,8 @@ class Exporter:
         return formatters
 
     def exportTfam(self, fname):
+        if fname == '':
+            fname = self.table
         fname += '.tfam' if not fname.endswith('.tfam') else ''
         if os.path.exists(fname):
             os.remove(fname)
@@ -730,9 +732,17 @@ class Exporter:
     
     def exportData(self):
         '''Export data in specified format'''
-        # export sample names into separated file in PLINK tfam format
-        if self.format.export_tfam:
-            self.exportTfam(self.table)
+        if self.format.additional_exports:
+            additionalFiles = [x.strip() for x in self.format.additional_exports.split(',')]
+            for item in additionalFiles:
+                base, ext = os.path.splitext(item)
+                if len(ext) == 0: base, ext = ext, base
+                try:
+                    eval('{}'.format('self.export{}(base)'.format(ext[1:].capitalize())))
+                except Exception as e:
+                    raise ValueError('Additional export to file {} is not supported'.format(item))
+        else:
+            pass
         # get all fields
         var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
         geno_fields = []
