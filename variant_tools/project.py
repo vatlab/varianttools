@@ -295,7 +295,7 @@ class fileFMT:
         # for export only
         self.export_by_fields = ''
         self.order_by_fields = ''
-        self.additional_exports = False
+        self.additional_exports = None
         # for import only
         self.merge_by_cols = None
         #
