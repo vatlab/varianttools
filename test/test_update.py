@@ -136,6 +136,21 @@ class TestUpdate(ProcessTestCase):
         self.assertOutput(('vtools execute "select chr,pos, ref, alt, evs_gene from variant\
                          where evs_gene is not null"'), '22\t49524956\tG\tA\tACR\n')
         self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '1\n')
+
+    def testSetMultiValues(self):
+        runCmd('vtools import txt/variants.txt --format basic --build hg19')
+        runCmd('vtools use refGene')
+        runCmd('vtools update variant --set "gname=refGene.name2"')
+        lines = output2list('vtools output variant chr pos ref alt gname refGene.name2')
+        # does not count duplicate lines
+        line_count = len(set(lines))
+        for line in lines:
+            values = line.split('\t')
+            self.assertEqual(values[-2], values[-1])
+        runCmd('vtools update variant --set "vname=refGene.name"')
+        lines = output2list('vtools output variant chr pos ref alt vname refGene.name')
+        # there should be more lines
+        self.assertNotEqual(line_count, len(set(lines)))
         
 if __name__ == '__main__':
     unittest.main()

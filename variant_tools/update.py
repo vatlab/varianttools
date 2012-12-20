@@ -423,29 +423,45 @@ def setFieldValue(proj, table, items, build):
         # which needs to be filtered out.
         update_status = {}
         count = 0
+        count_multi_value = 0
+        last_id = None
+        last_values = []
         for res in results:
-            # if result is None, wait and see if there is a real one
-            if res[0] is None:
-                # if there are multiple None, ignore
-                if res[-1] in update_status:
-                    count += 1
-                # otherwise, record the result for later use
-                else:
-                    update_status[res[-1]] = res
-            else:
-                # successful, clear the query 
-                update_status[res[-1]] = None
-                cur.execute(query, res)
-                count += 1
+            if last_id is None:
+                last_id = res[-1]
+                last_values = [res]
+            elif last_id != res[-1]:
+                # handle last record
+                values = [x for x in last_values if x[0] is not None]
+                if len(values) > 1:
+                    # check duplicates
+                    values = list(set(values))
+                    if len(values) > 1:
+                        proj.logger.debug('Multiple field values {} exist for variant with id {}'.format(
+                            ', '.join(['\t'.join([str(y) for y in x[:-1]]) for x in values]), last_id))
+                        count_multi_value += 1
+                cur.execute(query, values[0])
+                last_id = res[-1]
+                last_values = [res]
+            else:  # if id is the same
+                last_values.append(res)
+            count += 1
             if count % 10000 == 0:
                 prog.update(count)
-        # update those items that are indeed None
-        for res in update_status.values():
-            if res is not None:
-                cur.execute(query, res)
-                if count % 10000 == 0:
-                    prog.update(count)
+        # for the last one.
+        if last_id is not None:
+            # handle last record
+            values = [x for x in last_values if x[0] is not None]
+            if len(values) > 1:
+                values = list(set(values))
+                if len(values) > 1:
+                    proj.logger.debug('Multiple field values {} exist for variant with id {}'.format(
+                        ', '.join(['\t'.join([str(y) for y in x[:-1]]) for x in values]), last_id))
+                    count_multi_value += 1
+            cur.execute(query, values[0])
         prog.done()
+        if count_multi_value != 0:
+            proj.logger.warning('Multiple field values are available for {} variants. Arbitrary valid values are chosen.'.format(count_multi_value))
 
 
 def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
