@@ -168,7 +168,7 @@ class CaseCtrlBurdenTest(NullTest):
                     Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
                     Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
                     ])
-            if self.variable_thresholds:
+            if hasattr(self, 'variable_thresholds') and self.variable_thresholds:
                 self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
         self.trait_type = 'disease'
@@ -216,6 +216,11 @@ class CaseCtrlBurdenTest(NullTest):
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
+        if self.aggregation_theme.startswith('VT'):
+            self.variable_thresholds = True
+        else:
+            self.variable_thresholds = False
+            
 
     def _determine_algorithm(self):
         algorithm = t.AssoAlgorithm([
@@ -808,6 +813,7 @@ class VTtest(CaseCtrlBurdenTest):
         self.aggregation_theme = 'VT'
         if self.cfisher:
             self.aggregation_theme = 'VT_Fisher'
+        self.variable_thresholds = True 
 
 
 class KBAC(CaseCtrlBurdenTest):
