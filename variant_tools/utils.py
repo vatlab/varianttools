@@ -213,9 +213,9 @@ class RuntimeOptions(object):
         if path is not None:
             self._local_resource = path
         try:
-            if not os.path.isdir(self._local_resource):
+            if not os.path.isdir(os.path.expanduser(self._local_resource)):
                 sys.stderr.write('Creating local resource directory {}\n'.format(self._local_resource))
-                os.makedirs(self._local_resource)
+                os.makedirs(os.path.expanduser(self._local_resource))
         except:
             raise RuntimeError('Failed to create local resource directory '.format(self._local_resource))
     #
@@ -239,8 +239,8 @@ class RuntimeOptions(object):
         if self._temp_dir is None:
             self._proj_temp_dir = tempfile.mkdtemp() 
         try:
-            if not os.path.isdir(self._proj_temp_dir):
-                os.makedirs(self._proj_temp_dir)
+            if not os.path.isdir(os.path.expanduser(self._proj_temp_dir)):
+                os.makedirs(os.path.expanduser(self._proj_temp_dir))
         except:
             sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
             self._proj_temp_dir = tempfile.mkdtemp()

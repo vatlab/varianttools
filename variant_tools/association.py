@@ -240,7 +240,7 @@ class AssociationTestManager:
             if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
                 for test in self.tests:
                     if test.trait_type == 'disease':
-                        raise ValueError("{0} cannot handle non-binary phenotype".format(test.__class__.__name__))
+                        raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".format(test.__class__.__name__, '/'.join([str(int(x)) for x in item])))
         # step 4-1: check if 'SSeq_common' is valid to use
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
@@ -374,9 +374,9 @@ class AssociationTestManager:
             # add intercept
             covariates.insert(0, [1]*len(sample_IDs))
             try:
-                phenotypes = [map(float, x) for x in phenotypes]
-                covariates = [map(float, x) for x in covariates]
-            except ValueError:
+                phenotypes = [list(map(float, x)) for x in phenotypes]
+                covariates = [list(map(float, x)) for x in covariates]
+            except:
                 raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values: '
                                  'missing values should be removed from analysis or '
                                  'inferred with numeric values')

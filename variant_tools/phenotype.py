@@ -264,11 +264,10 @@ class Sample:
         cur.execute('SELECT {} FROM sample;'.format(expression))
         fldType = None
         for rec in cur:
+            if rec[0] is None: # missing
+                continue
             if fldType is None:
                 fldType = type(rec[0])
-                continue
-            elif rec[0] is None: # missing
-                continue
             if type(rec[0]) != fldType:
                 if type(rec[0]) is float and fldType is int:
                     fltType = float
