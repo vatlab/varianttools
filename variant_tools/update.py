@@ -507,6 +507,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     fieldCalcs = []
     for stat in from_stat:
         f, e = [x.strip() for x in stat.split('=')]
+        if f in ['chr', 'pos', 'ref', 'alt']:
+            raise ValueError('Cannot overwrite existing field "{}"!'.format(f))
         if e == '#(alt)':
             alt = f
         elif e == '#(hom)':

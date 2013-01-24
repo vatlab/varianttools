@@ -365,7 +365,7 @@ class CaseCtrlBurdenTest(NullTest):
 
 
     def calculate(self, timeout):
-        if self.data.locicounts() <= 1:
+        if self.data.locicounts() <= 1 and self.aggregation_theme != 'CMC':
             raise ValueError("Cannot apply burden test on input data (number of variant sites has to be at least 2).")
         try:
             self.data.setMOI(self.moi)

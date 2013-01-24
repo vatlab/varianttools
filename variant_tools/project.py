@@ -1741,8 +1741,8 @@ class Project:
         #
         if not os.path.isfile(snapshot_file):
             # donload it from online?
-            if name.startswith('vt_'):
-                # only snapshots with name starting with vt_ is downloaded online
+            if name.startswith('vt_') or name.startswith('vat_'):
+                # only snapshots with name starting with vt_ or vat_ is downloaded online
                 try:
                     print('Downloading snapshot {}.tar.gz from online'.format(name))
                     snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
