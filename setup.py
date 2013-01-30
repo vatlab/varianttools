@@ -36,7 +36,7 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-from variant_tools import VTOOLS_VERSION
+from source import VTOOLS_VERSION
 
 EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
 
@@ -44,39 +44,39 @@ if not EMBEDED_BOOST:
     print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
 
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
-    '-outdir', 'variant_tools']
+    '-outdir', 'source']
 
 if sys.version_info.major == 2:
-    WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py2.cpp'
-    WRAPPER_PY_FILE = 'variant_tools/assoTests_py2.py'
-    CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_py2.cpp'
-    CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_py2.py'
+    WRAPPER_CPP_FILE = 'source/assoTests_wrap_py2.cpp'
+    WRAPPER_PY_FILE = 'source/assoTests_py2.py'
+    CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_py2.cpp'
+    CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_py2.py'
     SQLITE_FOLDER = 'sqlite/py2'
-    SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py2'
+    SQLITE_PY_FILE = 'source/vt_sqlite3_py2'
 else:
     SWIG_OPTS.append('-py3')
-    WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_py3.cpp'
-    WRAPPER_PY_FILE = 'variant_tools/assoTests_py3.py'
-    CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_py3.cpp'
-    CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_py3.py'
+    WRAPPER_CPP_FILE = 'source/assoTests_wrap_py3.cpp'
+    WRAPPER_PY_FILE = 'source/assoTests_py3.py'
+    CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_py3.cpp'
+    CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_py3.py'
     SQLITE_FOLDER = 'sqlite/py3'
-    SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_py3'
+    SQLITE_PY_FILE = 'source/vt_sqlite3_py3'
 
 
 ASSOC_HEADER = [
-    'variant_tools/assoTests.i',
-    'variant_tools/assoTests.h',
-    'variant_tools/assoData.h',
-    'variant_tools/action.h',
-    'variant_tools/utils.h',
-    'variant_tools/lm.h'
+    'source/assoTests.i',
+    'source/assoTests.h',
+    'source/assoData.h',
+    'source/action.h',
+    'source/utils.h',
+    'source/lm.h'
 ]
 
 ASSOC_FILES = [
-    'variant_tools/assoData.cpp',
-    'variant_tools/action.cpp',
-    'variant_tools/utils.cpp',
-    'variant_tools/lm.cpp'
+    'source/assoData.cpp',
+    'source/action.cpp',
+    'source/utils.cpp',
+    'source/lm.cpp'
 ]
 
 SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
@@ -409,24 +409,24 @@ LIB_CGATOOLS = [
    'cgatools/reference/GeneDataStore.cpp'
 ]
 
-LIB_STAT = ['variant_tools/fisher2.c']
+LIB_STAT = ['source/fisher2.c']
 
-VTOOLS_FILES = ['variant_tools.__init__',
-        'variant_tools.utils',
-        'variant_tools.project',
-        'variant_tools.preprocessor',
-        'variant_tools.plinkfile',
-        'variant_tools.importer',
-        'variant_tools.update',
-        'variant_tools.exporter',
-        'variant_tools.phenotype',
-        'variant_tools.variant',
-        'variant_tools.compare',
-        'variant_tools.annotation',
-        'variant_tools.liftOver',
-        'variant_tools.association',
-        'variant_tools.tester',
-        'variant_tools.pyper'
+VTOOLS_FILES = ['source.__init__',
+        'source.utils',
+        'source.project',
+        'source.preprocessor',
+        'source.plinkfile',
+        'source.importer',
+        'source.update',
+        'source.exporter',
+        'source.phenotype',
+        'source.variant',
+        'source.compare',
+        'source.annotation',
+        'source.liftOver',
+        'source.association',
+        'source.tester',
+        'source.pyper'
 ]
 
 
@@ -438,19 +438,19 @@ if VTOOLS_VERSION.endswith('svn') and \
     import subprocess
     print('Generating wrapper files')
     try:
-        ret = subprocess.call(['swig', '-python', '-external-runtime', 'variant_tools/swigpyrun.h'], shell=False)
+        ret = subprocess.call(['swig', '-python', '-external-runtime', 'source/swigpyrun.h'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate swig runtime header file.')
         #
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'variant_tools/assoTests.i'], shell=False)
+        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'source/assoTests.i'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate wrapper file for association module.')
-        os.rename('variant_tools/assoTests.py', WRAPPER_PY_FILE)
+        os.rename('source/assoTests.py', WRAPPER_PY_FILE)
         #
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'variant_tools/cgatools.i'], shell=False)
+        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'source/cgatools.i'], shell=False)
         if ret != 0:
             sys.exit('Failed to generate wrapper file for cgatools.')
-        os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+        os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig')
 
@@ -479,7 +479,7 @@ else:
             extra_compile_args = gccargs,
             library_dirs = [],
             libraries = libs,
-            include_dirs = [".", "variant_tools", "gsl"],
+            include_dirs = [".", "source", "gsl"],
         )]
 
 setup(name = "variant_tools",
@@ -490,17 +490,18 @@ setup(name = "variant_tools",
     author_email = 'bpeng@mdanderson.org',
     maintainer = 'Bo Peng',
     maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    py_modules = VTOOLS_FILES + [
-        SQLITE_PY_FILE,
-        WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
-        CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py
-    ],
+    # py_modules = VTOOLS_FILES + [
+    #     SQLITE_PY_FILE,
+    #     WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
+    #     CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py
+    # ],
+    packages = ['variant_tools'],
     scripts = [
         'vtools',
         'vtools_report'
     ],
     cmdclass = {'build_py': build_py },
-    package_dir = {'variant_tools': 'variant_tools'},
+    package_dir = {'variant_tools': 'source'},
     ext_modules = [
         Extension('variant_tools._vt_sqlite3',
             sources = SQLITE_FILES,
@@ -509,7 +510,7 @@ setup(name = "variant_tools",
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             sources = ['sqlite/vt_sqlite3_ext.c'] + SQLITE_GSL + LIB_STAT,
-            include_dirs = ['sqlite', "variant_tools", "gsl"],
+            include_dirs = [".", 'sqlite', "source", "gsl"],
         ),
         Extension('variant_tools.cplinkio',
             sources = LIB_PLINKIO,

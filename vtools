@@ -34,17 +34,17 @@ from variant_tools.utils import runOptions
 # save the command line that has been processed by the shell. It might not work as shown.
 runOptions.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else "'{}'".format(x) for x in sys.argv[1:]])
 
-from variant_tools import project
-from variant_tools import importer
-from variant_tools import update
-from variant_tools import phenotype
-from variant_tools import annotation
-from variant_tools import variant
-from variant_tools import compare
-from variant_tools import exporter
+import variant_tools.project as project
+import variant_tools.importer as importer
+import variant_tools.update as update
+import variant_tools.phenotype as phenotype
+import variant_tools.annotation as annotation
+import variant_tools.variant as variant
+import variant_tools.compare as compare
+import variant_tools.exporter as exporter
 if sys.platform != 'win32':
-    from variant_tools import liftOver
-    from variant_tools import association
+    import variant_tools.liftOver as liftOver
+    import variant_tools.association as association
 
 def addCommonArgs(parser):
     parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
