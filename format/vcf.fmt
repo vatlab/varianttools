@@ -14,7 +14,7 @@ genotype_info=%(geno_info)s
 export_by=chr,%(pos)s,%(ref)s
 
 [DEFAULT]
-format_string=
+format_string=GT
 format_string_comment=FORMAT string that is outputted in the 9th column of
     exported vcf file. Please specified an appropriate value corresponding to the
     parameter --geno_info because this column cannot be automatically determined.

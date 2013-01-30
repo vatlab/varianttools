@@ -82,7 +82,7 @@ class ShelfDB:
 
     def _get_py2(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 10, msg, data = (key,))
          # pickle.loads only accepts string, ...
         return pickle.loads(str(self.cur.fetchone()[0]))
 
@@ -93,7 +93,7 @@ class ShelfDB:
 
     def _get_py3(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 10, msg, data = (key,))
         # pickle.loads accepts bytes directly
         return pickle.loads(self.cur.fetchone()[0])
 
@@ -542,7 +542,7 @@ class GenotypeLoader(Process):
                                 ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
                                 ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
-                    executeUntilSucceed(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
+                    executeUntilSucceed(cur, select_genotype_query, self.logger, 10, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
@@ -724,7 +724,7 @@ class AssoTestsWorker(Process):
         cur = self.db.cursor()
         # SELECT can fail when the disk is slow which causes database lock problem.
         msg = 'Load variant info for group {} using association worker {}'.format(group, self.index)
-        executeUntilSucceed(cur, query, self.logger, 5, msg, group)
+        executeUntilSucceed(cur, query, self.logger, 10, msg, group)
         #
         if not self.var_info:
             data = {x[0]:[] for x in cur.fetchall()}
