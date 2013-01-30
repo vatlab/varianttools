@@ -751,8 +751,8 @@ class AssoTestsWorker(Process):
             if dbID not in self.shelves:
                 try:
                     shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
-                except:
-                    self.logger.error('Process {} failed to connect to shelf {}'.format(self.index, dbID))
+                except Exception as e:
+                    self.logger.error('Process {} failed to connect to shelf {}:{}'.format(self.index, dbID, e))
                     raise
                 self.shelves[dbID] = shelf
             else:
