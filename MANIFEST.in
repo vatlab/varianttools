@@ -78,7 +78,9 @@ include sqlite/sqlite3ext.h
 include sqlite/vt_sqlite3_ext.c
 recursive-include sqlite/py2 *.h *.c
 recursive-include sqlite/py3 *.h *.c
-recursive-include variant_tools/gsl *.h *.c
+#
+# gsr
+recursive-include gsl *.h *.c
 #
 # boost
 recursive-include boost_1_49_0/boost *.hpp *.ipp
