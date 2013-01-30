@@ -62,10 +62,10 @@ try:
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
 except ImportError as e:
-    sys.exit('Failed to import module vt_sqlite3 ({})\n'
+    sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install") and you are NOT running command vtools from within '
-        'the source directory.'''.format(e))
+        'the source directory.'.format(e))
 
 
 class RuntimeOptions(object):
