@@ -385,14 +385,21 @@ bool SimpleLinearRegression::apply(AssoData & d, int timeout)
 	// simple linear regression score test
 	//!- See page 23 and 41 of Kutner's Applied Linear Stat. Model, 5th ed.
 
-	double xbar = d.getDoubleVar("xbar");
-	double ybar = d.getDoubleVar("ybar");
 	vectorf & X = d.genotype();
 	vectorf & Y = d.phenotype();
 
 	if (X.size() != Y.size()) {
 		throw ValueError("Genotype/Phenotype length not equal!");
 	}
+	//
+	double ybar = d.getDoubleVar("ybar");
+	double xbar;
+	try {
+		xbar = d.getDoubleVar("xbar");
+	} catch (...) {
+		xbar = (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size());
+	}
+	//
 	double numerator = 0.0, denominator = 0.0, ysigma = 0.0;
 	for (size_t i = 0; i != X.size(); ++i) {
 		numerator += (X[i] - xbar) * Y[i];
@@ -423,12 +430,18 @@ bool SimpleLinearRegression::apply(AssoData & d, int timeout)
 bool SimpleLogisticRegression::apply(AssoData & d, int timeout)
 {
 	//!- labnotes vol.2 page 3
-	double xbar = d.getDoubleVar("xbar");
 	vectorf & X = d.genotype();
 	vectorf & Y = d.phenotype();
 
 	if (X.size() != Y.size()) {
 		throw ValueError("Genotype/Phenotype length not equal");
+	}
+	//
+	double xbar;
+	try {
+		xbar = d.getDoubleVar("xbar");
+	} catch (...) {
+		xbar = (double)std::accumulate(X.begin(), X.end(), 0.0) / (1.0 * X.size());
 	}
 	//
 	//double ebo = (1.0 * n1) / (1.0 * (Y.size()-n1));

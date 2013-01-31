@@ -430,30 +430,27 @@ VTOOLS_FILES = ['source.__init__',
 ]
 
 
-# generate wrapper files (only in development mode)
-if VTOOLS_VERSION.endswith('svn') and \
-    (not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) or \
-     not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE) \
-      or os.path.getmtime(WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+# Generate wrapper files (only in development mode)
+if VTOOLS_VERSION.endswith('svn'):
     import subprocess
-    print('Generating wrapper files')
+    #
     try:
-        ret = subprocess.call(['swig', '-python', '-external-runtime', 'source/swigpyrun.h'], shell=False)
-        if ret != 0:
-            sys.exit('Failed to generate swig runtime header file.')
-        #
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'source/assoTests.i'], shell=False)
-        if ret != 0:
-            sys.exit('Failed to generate wrapper file for association module.')
-        os.rename('source/assoTests.py', WRAPPER_PY_FILE)
-        #
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'source/cgatools.i'], shell=False)
-        if ret != 0:
-            sys.exit('Failed to generate wrapper file for cgatools.')
-        os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+       ret = subprocess.call(['swig', '-python', '-external-runtime', 'source/swigpyrun.h'], shell=False)
+       if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
-        sys.exit('Failed to generate wrapper file. Please install swig')
-
+        sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
+    # 
+    if (not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) \
+      or os.path.getmtime(WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'source/assoTests.i'], shell=False)
+        if ret != 0: sys.exit('Failed to generate wrapper file for association module.')
+        os.rename('source/assoTests.py', WRAPPER_PY_FILE)
+    #
+    if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE)):
+        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'source/cgatools.i'], shell=False)
+        if ret != 0: sys.exit('Failed to generate wrapper file for cgatools.')
+        os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+         
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
     libs = ['stdc++']

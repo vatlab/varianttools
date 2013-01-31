@@ -168,8 +168,6 @@ class CaseCtrlBurdenTest(NullTest):
                     Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
                     Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
                     ])
-            if hasattr(self, 'variable_thresholds') and self.variable_thresholds:
-                self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
         self.trait_type = 'disease'
         # no external weight in these tests (for now)
@@ -211,16 +209,11 @@ class CaseCtrlBurdenTest(NullTest):
             It is only applicable to one sided test of CMC and VT_Fisher.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
-        if self.aggregation_theme.startswith('VT'):
-            self.variable_thresholds = True
-        else:
-            self.variable_thresholds = False
-            
 
     def _determine_algorithm(self):
         algorithm = t.AssoAlgorithm([
@@ -389,8 +382,6 @@ class CaseCtrlBurdenTest(NullTest):
                     else: res.append(z)
             if self.data.hasVar('NPERM'):
                 res.append(self.data.getIntVar("NPERM"))
-            if self.data.hasVar('VT_MAF'):
-                res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
             self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
@@ -493,7 +484,7 @@ class GLMBurdenTest(NullTest):
             ''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -686,7 +677,7 @@ class CFisher(CaseCtrlBurdenTest):
             help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -738,7 +729,7 @@ class WSSRankTest(CaseCtrlBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -801,7 +792,7 @@ class VTtest(CaseCtrlBurdenTest):
             It is only applicatable to one sided test with "--cfisher" option.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -813,7 +804,6 @@ class VTtest(CaseCtrlBurdenTest):
         self.aggregation_theme = 'VT'
         if self.cfisher:
             self.aggregation_theme = 'VT_Fisher'
-        self.variable_thresholds = True 
 
 
 class KBAC(CaseCtrlBurdenTest):
@@ -854,7 +844,7 @@ class KBAC(CaseCtrlBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -903,7 +893,7 @@ class RBT(CaseCtrlBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
 
         args = parser.parse_args(method_args)
@@ -992,7 +982,7 @@ class Calpha(CaseCtrlBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
 
         args = parser.parse_args(method_args)
@@ -1040,7 +1030,7 @@ class RareCover(CaseCtrlBurdenTest):
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1110,7 +1100,7 @@ class LinRegBurden(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1147,7 +1137,7 @@ class CollapseQt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1189,7 +1179,7 @@ class BurdenQt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1256,7 +1246,7 @@ class WeightedBurdenQt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1309,7 +1299,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1381,7 +1371,7 @@ class LogitRegBurden(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1419,7 +1409,7 @@ class CollapseBt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1462,7 +1452,7 @@ class BurdenBt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1528,7 +1518,7 @@ class WeightedBurdenBt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1582,7 +1572,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
-            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive model.
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode.
             Default set to additive''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
