@@ -763,7 +763,7 @@ class EmbeddedTextReader:
     #
     def __init__(self, processor, input, varIdx, getNew, encoding, logger):
         self.num_records = 0
-        self.skipped_lines = 0
+        self.unprocessable_lines = 0
         self.processor = processor
         self.input = input
         self.varIdx = varIdx
@@ -799,7 +799,7 @@ class EmbeddedTextReader:
                         yield (line_no, bins, rec)
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    self.skipped_lines += 1
+                    self.unprocessable_lines += 1
 
 
 class ReaderWorker(Process):
@@ -833,7 +833,7 @@ class ReaderWorker(Process):
     def run(self): 
         first = True
         num_records = 0
-        skipped_lines = 0
+        unprocessable_lines = 0
         line_no = 0
         with openFile(self.input) as input_file:
             for line in input_file:
@@ -862,14 +862,14 @@ class ReaderWorker(Process):
                         self.output.send((line_no, bins, rec))
                 except Exception as e:
                     self.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
-                    skipped_lines += 1
+                    unprocessable_lines += 1
         # if still first (this thread has not read anything), still send the columnRange stuff
         if first:
             self.output.send(self.processor.columnRange)
         # everything is done, stop the pipe
         self.output.send(None)
         # and send the summary statistics
-        self.output.send((num_records, skipped_lines))
+        self.output.send((num_records, unprocessable_lines))
         self.output.close()
 
 
@@ -879,7 +879,7 @@ class StandaloneTextReader:
     '''
     def __init__(self, processor, input, varIdx, getNew, encoding, logger):
         self.num_records = 0
-        self.skipped_lines = 0
+        self.unprocessable_lines = 0
         #
         self.reader, w = Pipe(False)
         self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0, encoding, logger)
@@ -891,7 +891,7 @@ class StandaloneTextReader:
         while True:
             val = self.reader.recv()
             if val is None:
-                self.num_records, self.skipped_lines = self.reader.recv()
+                self.num_records, self.unprocessable_lines = self.reader.recv()
                 break
             else:
                 yield val
@@ -905,7 +905,7 @@ class MultiTextReader:
         self.readers = []
         self.workers = []
         self.num_records = 0
-        self.skipped_lines = 0
+        self.unprocessable_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
             p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i, encoding, logger)
@@ -934,7 +934,7 @@ class MultiTextReader:
                     still_working -= 1
                     nr, sl = reader.recv()
                     self.num_records += nr
-                    self.skipped_lines += sl
+                    self.unprocessable_lines += sl
                     self.readers[idx] = None
                 elif filled:
                     yield heappushpop(heap, val)
@@ -1696,7 +1696,7 @@ class Importer:
                 last_count = self.count[0]
                 prog.update(self.count[0])
         prog.done()
-        self.count[7] = reader.skipped_lines
+        self.count[7] = reader.unprocessable_lines
         # stop writers
         if genotype_status != 0:
             writer.close()
@@ -1730,7 +1730,7 @@ class Importer:
                 last_count = self.count[0]
                 prog.update(self.count[0])
         prog.done()
-        self.count[7] = reader.skipped_lines
+        self.count[7] = reader.unprocessable_lines
         self.db.commit()
 
     def finalize(self):
