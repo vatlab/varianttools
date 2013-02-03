@@ -73,6 +73,7 @@ class AnnoDBConfiger:
         self.delimiter = '\t'
         self.version = None
         self.encoding = 'utf-8'
+        self.skipped_lines = None
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
         # some fields have to be determined.
@@ -142,6 +143,11 @@ class AnnoDBConfiger:
                 self.direct_url = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
+            elif item[0] == 'skipped_lines':
+                try:
+                    self.skipped_lines = int(item[1])
+                except:
+                    raise ValueError('"skipped_lines" should be an integer number.')
             elif item[0] == 'source_url':
                 self.source_url = item[1]
             elif item[0] == 'source_pattern':
@@ -269,7 +275,7 @@ class AnnoDBConfiger:
             skipped_lines = 0
             lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.logger)
+            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.skipped_lines, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             all_records = 0
             skipped_records = 0

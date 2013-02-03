@@ -291,6 +291,7 @@ class fileFMT:
         self.genotype_info = None
         self.encoding = 'utf-8'
         self.preprocessor = None
+        self.skipped_lines = None
         self.logger = logger
         # for export only
         self.export_by_fields = ''
@@ -427,6 +428,11 @@ class fileFMT:
                 self.additional_exports = item[1]
             elif item[0] == 'sort_output_by':
                 self.order_by_fields = item[1]
+            elif item[0] == 'skipped_lines':
+                try:
+                    self.skipped_lines = int(item[1])
+                except:
+                    raise ValueError('"skipped_lines" should be an integer number.')
             elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
                 setattr(self, item[0] if item[0].endswith('_info') else item[0]+'_fields', [x.strip() for x in item[1].split(',') if x.strip()])
         #

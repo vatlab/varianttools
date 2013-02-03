@@ -740,7 +740,7 @@ class LineProcessor:
 # Read record from disk file
 #
 
-def TextReader(processor, input, varIdx, getNew, jobs, encoding, logger):
+def TextReader(processor, input, varIdx, getNew, jobs, encoding, skipped_lines, logger):
     '''
     input: input file
     varIdx: variant index, if specified, only matching variants will be returned
@@ -751,17 +751,17 @@ def TextReader(processor, input, varIdx, getNew, jobs, encoding, logger):
     encoding: file encoding
     '''
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, logger)
+        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, skipped_lines, logger)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, logger)
+        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, skipped_lines, logger)
     else:
-        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, logger)
+        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, skipped_lines, logger)
 
 class EmbeddedTextReader:
     #
     # This reader read the file from the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, getNew, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, encoding, skipped_lines, logger):
         self.num_records = 0
         self.unprocessable_lines = 0
         self.processor = processor
@@ -769,6 +769,7 @@ class EmbeddedTextReader:
         self.varIdx = varIdx
         self.getNew = getNew
         self.encoding = encoding
+        self.skipped_lines = skipped_lines
         self.logger = logger
 
     def records(self): 
@@ -779,7 +780,10 @@ class EmbeddedTextReader:
                 line_no += 1
                 line = line.decode(self.encoding)
                 try:
-                    if line.startswith('#'):
+                    if self.skipped_lines is not None:
+                        if line_no <= self.skipped_lines:
+                            continue
+                    elif line.startswith('#'):
                         continue
                     for bins,rec in self.processor.process(line):
                         if first:
@@ -808,7 +812,7 @@ class ReaderWorker(Process):
     to process input line. If multiple works are started,
     they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     '''
-    def __init__(self, processor, input, varIdx, getNew, output, step, index, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, output, step, index, encoding, skipped_lines, logger):
         '''
         processor:  line processor
         input:      input filename
@@ -828,6 +832,7 @@ class ReaderWorker(Process):
         self.getNew = getNew
         self.index = index
         self.encoding = encoding
+        self.skipped_lines = skipped_lines
         self.logger = logger
 
     def run(self): 
@@ -842,7 +847,10 @@ class ReaderWorker(Process):
                     continue
                 line = line.decode(self.encoding)
                 try:
-                    if line.startswith('#'):
+                    if self.skipped_lines is not None:
+                        if line_no <= self.skipped_lines:
+                            continue
+                    elif line.startswith('#'):
                         continue
                     for bins,rec in self.processor.process(line):
                         if first:
@@ -877,12 +885,12 @@ class StandaloneTextReader:
     ''' This processor fire up 1 worker to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, encoding, skipped_lines, logger):
         self.num_records = 0
         self.unprocessable_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0, encoding, logger)
+        self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0, encoding, skipped_lines, logger)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -901,14 +909,14 @@ class MultiTextReader:
     '''This processor fire up num workers to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, jobs, encoding, logger):
+    def __init__(self, processor, input, varIdx, getNew, jobs, encoding, skipped_lines, logger):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.unprocessable_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i, encoding, logger)
+            p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i, encoding, skipped_lines, logger)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1177,7 +1185,7 @@ class ImportStatus:
 # 
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
-    def __init__(self, variantIndex, filelist, processor, encoding, genotype_field, genotype_info, ranges, 
+    def __init__(self, variantIndex, filelist, processor, encoding, skipped_lines, genotype_field, genotype_info, ranges, 
         geno_count, proc_index, status, logger):
         '''
         variantIndex: a dictionary that returns ID for each variant.
@@ -1192,6 +1200,7 @@ class GenotypeImportWorker(Process):
         self.variantIndex = variantIndex
         self.filelist = filelist
         self.encoding = encoding
+        self.skipped_lines = skipped_lines
         self.processor = processor
         #
         self.genotype_field = genotype_field
@@ -1235,7 +1244,7 @@ class GenotypeImportWorker(Process):
     def _importData(self):
         self.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
             min(self.sample_ids), max(self.sample_ids)))
-        reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.logger)
+        reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.skipped_lines, self.logger)
         writer = GenotypeWriter(self.genotype_file, self.genotype_info, self.genotype_status, self.sample_ids)
         fld_cols = None
         last_count = 0
@@ -1515,6 +1524,7 @@ class Importer:
         #
         self.input_type = fmt.input_type
         self.encoding = fmt.encoding
+        self.skipped_lines = fmt.skipped_lines
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
         self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
             .format(', '.join(['{}={}'.format(x, self.db.PH) for x in self.variant_info]), self.db.PH)
@@ -1657,7 +1667,7 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, False, self.jobs - 1, self.encoding, self.logger)
+        reader = TextReader(self.processor, input_filename, None, False, self.jobs - 1, self.encoding, self.skipped_lines, self.logger)
         if genotype_status != 0:
             writer = GenotypeWriter(
                 # write directly to the genotype table
@@ -1715,10 +1725,10 @@ class Importer:
         # variant info is imported
         if self.variant_info:
             reader = TextReader(self.processor, input_filename, None, True, 
-                runOptions.import_num_of_readers, self.encoding, self.logger)
+                runOptions.import_num_of_readers, self.encoding, self.skipped_lines, self.logger)
         else:
             reader = TextReader(self.processor, input_filename, self.variantIndex, True,
-                runOptions.import_num_of_readers, self.encoding, self.logger)
+                runOptions.import_num_of_readers, self.encoding, self.skipped_lines, self.logger)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
@@ -1941,7 +1951,7 @@ class Importer:
                 for i in range(self.jobs):
                     if importers[i] is None or not importers[i].is_alive():
                         importers[i] = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
-                            self.processor, self.encoding, self.genotype_field, self.genotype_info, self.ranges,
+                            self.processor, self.encoding, self.skipped_lines, self.genotype_field, self.genotype_info, self.ranges,
                             genotype_import_count[i], i, status, self.logger)
                         importers[i].start()
                         break
@@ -1965,7 +1975,7 @@ class Importer:
                 new_count = 0
                 for i in range(self.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding,
+                        importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding, self.skipped_lines,
                             self.genotype_field, self.genotype_info, self.ranges,
                             genotype_import_count[i], i, status, self.logger)
                         importers[i] = importer

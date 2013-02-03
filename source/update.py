@@ -150,6 +150,7 @@ class Updater:
         #
         self.input_type = fmt.input_type
         self.encoding = fmt.encoding
+        self.skipped_lines = fmt.skipped_lines
         fbin, fchr, fpos = ('alt_bin', 'alt_chr', 'alt_pos') if self.import_alt_build else ('bin', 'chr', 'pos')
         from_table = 'AND variant.variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         self.update_variant_query = 'UPDATE variant SET {0} WHERE variant.variant_id = {1};'\
@@ -227,7 +228,7 @@ class Updater:
             # in the case of variant, we filter from the reading stage to save some time
             None if (self.table == 'variant' or self.input_type != 'variant') else self.variantIndex,
             # getNew is False so we only get variants that are available in variantIndex
-            False, self.jobs - 1, self.encoding, self.logger)
+            False, self.jobs - 1, self.encoding, self.skipped_lines, self.logger)
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:
