@@ -285,7 +285,7 @@ class Updater:
                 last_count = self.count[0]
                 self.db.commit()
                 prog.update(self.count[0])
-        self.count[7] = reader.skipped_lines
+        self.count[7] = reader.unprocessable_lines
         self.db.commit()
         prog.done(self.count[0])
 
