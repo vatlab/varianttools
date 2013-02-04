@@ -190,7 +190,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         comp = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        self.assertEqual(comp, [])
+        self.assertEqual(comp, ['9468354\t-\tA\t1'])
         
         
     def testUseVariant(self):
@@ -218,7 +218,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         pos_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        self.assertEqual(pos_out,[])
+        self.assertEqual(pos_out,['9468354\t-\tA\t1'])
         #using another way to export this table
         runCmd('vtools init test -f')
         runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
@@ -227,7 +227,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         def_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        self.assertEqual(def_out, [])
+        self.assertEqual(def_out, ['9468354\t-\tA\t1'])
     
     
 if __name__ == '__main__':

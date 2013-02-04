@@ -348,7 +348,8 @@ def setFieldValue(proj, table, items, build):
         for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if fldType is None:
-                    raise ValueError('Cannot determine the value of a new field {} because the values are all NULL'.format(field))
+                    proj.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
+                    fldType = str
                 proj.checkFieldName(field, exclude=table)
                 proj.logger.info('Adding field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
@@ -399,7 +400,8 @@ def setFieldValue(proj, table, items, build):
         for field, fldType in zip(new_fields, fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if fldType is None:
-                    raise ValueError('Cannot determine the value of a new field {} because the values are all NULL'.format(field))
+                    proj.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
+                    fldType = str
                 proj.checkFieldName(field, exclude=table)
                 proj.logger.info('Adding field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
@@ -441,7 +443,12 @@ def setFieldValue(proj, table, items, build):
                         proj.logger.debug('Multiple field values {} exist for variant with id {}'.format(
                             ', '.join(['\t'.join([str(y) for y in x[:-1]]) for x in values]), last_id))
                         count_multi_value += 1
-                cur.execute(query, values[0])
+                    cur.execute(query, values[0])
+                elif len(values) == 0:
+                    # only none result exists
+                    cur.execute(query, last_values[-1])
+                else:
+                    cur.execute(query, values[0])
                 last_id = res[-1]
                 last_values = [res]
             else:  # if id is the same
@@ -459,7 +466,11 @@ def setFieldValue(proj, table, items, build):
                     proj.logger.debug('Multiple field values {} exist for variant with id {}'.format(
                         ', '.join(['\t'.join([str(y) for y in x[:-1]]) for x in values]), last_id))
                     count_multi_value += 1
-            cur.execute(query, values[0])
+                    cur.execute(query, values[0])
+                elif len(values) == 0:
+                    cur.execute(query, last_values[-1])
+                else:
+                    cur.execute(query, values[0])
         prog.done()
         if count_multi_value != 0:
             proj.logger.warning('Multiple field values are available for {} variants. Arbitrary valid values are chosen.'.format(count_multi_value))
