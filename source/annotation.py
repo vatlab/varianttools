@@ -73,7 +73,7 @@ class AnnoDBConfiger:
         self.delimiter = '\t'
         self.version = None
         self.encoding = 'utf-8'
-        self.skipped_lines = None
+        self.header = None
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
         # some fields have to be determined.
@@ -143,11 +143,15 @@ class AnnoDBConfiger:
                 self.direct_url = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
-            elif item[0] == 'skipped_lines':
-                try:
-                    self.skipped_lines = int(item[1])
-                except:
-                    raise ValueError('"skipped_lines" should be an integer number.')
+            elif item[0] == 'header':
+                if item[1] in ('none', 'None'):
+                    self.header = None
+                else:
+                    try:
+                        self.header = int(item[1])
+                    except:
+                        # in this case header is a pattern
+                        self.header = item[1]
             elif item[0] == 'source_url':
                 self.source_url = item[1]
             elif item[0] == 'source_pattern':
@@ -272,10 +276,9 @@ class AnnoDBConfiger:
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
             self.logger.info('Importing annotation data from {0}'.format(f))
-            skipped_lines = 0
             lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.skipped_lines, self.logger)
+            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.header, self.logger)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             all_records = 0
             skipped_records = 0
@@ -291,7 +294,7 @@ class AnnoDBConfiger:
             db.commit()
             prog.done()
             self.logger.info('{0} records are handled, {1} ignored.'\
-                .format(all_records, p.skipped_lines + skipped_records))
+                .format(all_records, p.unprocessable_lines + skipped_records))
 
     def importFromSource(self, source_files):
         '''Importing data from source files'''

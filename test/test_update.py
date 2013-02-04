@@ -86,10 +86,10 @@ class TestUpdate(ProcessTestCase):
         self.assertEqual(cnt, 60)
         self.assertEqual(total, hom*2+het+other)
         self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" -s "filename like \'%CEU%\'"')
-        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_num) from CEU'").split('\n')[0]), 6383)
+        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_num) from variant'").split('\n')[0]), 6383)
         self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" "CEU_hom=#(hom)" "CEU_het=#(het)" "CEU_other=#(other)"  --samples "filename like \'%CEU%\'"')
         self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
-        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from CEU'").split('\n')[0]), 1601)
+        self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from variant'").split('\n')[0]), 1601)
         self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
         
     def testGenotypeSumStats(self):
