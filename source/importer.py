@@ -774,17 +774,28 @@ class EmbeddedTextReader:
 
     def records(self): 
         first = True
+        in_header = True
         line_no = 0
         with openFile(self.input) as input_file:
             for line in input_file:
                 line_no += 1
                 line = line.decode(self.encoding)
                 try:
-                    if self.header is not None:
-                        if line_no <= self.header:
+                    if in_header:
+                        # default behavior
+                        if self.header is None:
+                            if not line.startswith('#'):
+                                in_header = False
+                        # skip a few lines
+                        elif type(self.header) == int:
+                            if line_no > self.header:
+                                in_header = False
+                        # a pattern
+                        else:
+                            if not self.header.match(line):
+                                in_header = False
+                        if in_header:
                             continue
-                    elif line.startswith('#'):
-                        continue
                     for bins,rec in self.processor.process(line):
                         if first:
                             self.columnRange = self.processor.columnRange
@@ -837,6 +848,7 @@ class ReaderWorker(Process):
 
     def run(self): 
         first = True
+        in_header = True
         num_records = 0
         unprocessable_lines = 0
         line_no = 0
@@ -847,11 +859,21 @@ class ReaderWorker(Process):
                     continue
                 line = line.decode(self.encoding)
                 try:
-                    if self.header is not None:
-                        if line_no <= self.header:
+                    if in_header:
+                        # default behavior
+                        if self.header is None:
+                            if not line.startswith('#'):
+                                in_header = False
+                        # skip a few lines
+                        elif type(self.header) == int:
+                            if line_no > self.header:
+                                in_header = False
+                        # a pattern
+                        else:
+                            if not self.header.match(line):
+                                in_header = False
+                        if in_header:
                             continue
-                    elif line.startswith('#'):
-                        continue
                     for bins,rec in self.processor.process(line):
                         if first:
                             self.output.send(self.processor.columnRange)

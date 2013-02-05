@@ -30,6 +30,7 @@ import ConfigParser
 import shutil
 import urlparse
 import gzip
+import re
 import zipfile
 from multiprocessing import Process, Pipe
 
@@ -151,7 +152,7 @@ class AnnoDBConfiger:
                         self.header = int(item[1])
                     except:
                         # in this case header is a pattern
-                        self.header = item[1]
+                        self.header = re.compile(item[1])
             elif item[0] == 'source_url':
                 self.source_url = item[1]
             elif item[0] == 'source_pattern':

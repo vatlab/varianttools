@@ -436,7 +436,7 @@ class fileFMT:
                         self.header = int(item[1])
                     except:
                         # in this case header is a pattern
-                        self.header = item[1]
+                        self.header = re.compile(item[1])
             elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
                 setattr(self, item[0] if item[0].endswith('_info') else item[0]+'_fields', [x.strip() for x in item[1].split(',') if x.strip()])
         #
