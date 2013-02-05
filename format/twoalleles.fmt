@@ -1,0 +1,53 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=Import variants (chr, pos, ref, alt) from chr, pos, allele1, and allele2, using a reference genome to determine which one is reference
+delimiter=%(sep)s
+variant=chr,pos,ref,alt
+
+[DEFAULT]
+sep=','
+sep_comment=delimiter used to separate input fields
+
+ref_genome=hg19
+ref_genome_commant=Reference genome of the input data
+
+chr_col=1
+chr_col_comment=Column index for the chromosome field
+
+pos_col=2
+pos_col_comment=Column index for the position field
+
+a1_col=3
+ref_col_comment=Column index for the reference field
+
+a2_col=4
+alt_col_comment=Column index for the alternative field
+
+[chr]
+index=%(chr_col)s
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=%(pos_col)s
+type=INTEGER NOT NULL
+adj=lambda x: x.split(':')[1]
+comment=1-based position
+
+[ref]
+index=%(chr_col)s, %(pos_col)s
+type=VARCHAR(20)
+adj=RefAtPos(build="%(ref_genome)s")
+comment=Obtain reference allele from reference genome
+
+[alt]
+index=%(chr_pos)s, %(pos_col)s, %(a1_col)s, %(a2_col)s
+type=VARCHAR(20)
+adj=AltAtPos(build="%(ref_genome)s")
+comment=Obtain reference allele from reference genome
