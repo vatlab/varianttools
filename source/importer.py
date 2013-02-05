@@ -395,11 +395,15 @@ class _DatabaseQuerier:
         '''
         self.default = default
         self.cur = cursor
+        self.single_cond = len(cond_fields) == 1
         self.query = 'SELECT {} FROM {} WHERE {}'.format(res_field,
             name, ' AND '.join(['{}=?'.format(x) for x in cond_fields]))
 
     def __call__(self, item):
-        self.cur.execute(self.query, item)
+        if self.single_cond:
+            self.cur.execute(self.query, (item,))
+        else:
+            self.cur.execute(self.query, item)
         res = self.cur.fetchall()
         if len(res) == 1:
             return res[0][0]
@@ -408,15 +412,18 @@ class _DatabaseQuerier:
         else:
             return self.default
 
-def DatabaseQuerier(dbfile, res_field, cond_fields, default=None):
+def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     global __databases
     if dbfile not in __databases:
         db = DatabaseEngine()
         if not os.path.isfile(dbfile):
             raise ValueError('Database file {} does not exist'.format(dbfile))
-        db.connect(dbfile)
+        db.connect(dbfile, readonly=True)
         cur = db.cursor()
         tables = db.tables()
+        if not tables:
+            raise ValueError('Incorrect annotation database with tables {}'.format(', '.join(tables)))
+        #
         try:
             name = [x for x in tables if x.endswith('_info')][0][:-5]
         except Exception as e:
@@ -425,9 +432,9 @@ def DatabaseQuerier(dbfile, res_field, cond_fields, default=None):
             raise ValueError('Incorrect database (missing table {})'.format(name))
         if not name + '_field':
             raise ValueError('Incorrect database (missing field table)')
-        for fld in cond_fields.split(','):
-            if not db.hasIndex('{}_idx'.format(fld)):
-                cur.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
+        #for fld in cond_fields.split(','):
+        #    if not db.hasIndex('{}_idx'.format(fld)):
+        #        cur.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
         __databases[dbfile] = (cur, name)
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
         res_field, cond_fields.split(','), default)
