@@ -337,10 +337,7 @@ class BaseVariantReader:
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
-        if self.export_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields)
-            order_clause = ' ORDER BY {}'.format(order_fields)
-        elif self.order_by_fields:
+        if self.order_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields)
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
@@ -370,10 +367,7 @@ class BaseVariantReader:
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
-        if self.export_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ',variant_id')
-            order_clause = ' ORDER BY {}'.format(order_fields)
-        elif self.order_by_fields:
+        if self.order_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields + ',variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
@@ -401,10 +395,7 @@ class BaseVariantReader:
         # WHERE clause
         where_clause = ''
         # GROUP BY clause
-        if self.export_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.export_by_fields + ', variant_id')
-            order_clause = ' ORDER BY {}'.format(order_fields)
-        elif self.order_by_fields:
+        if self.order_by_fields:
             order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields + ', variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
@@ -827,13 +818,18 @@ class Exporter:
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False
             try:
-                if nFieldBy != 4 and nFieldBy != 0:
+                if nFieldBy != 0:
                     if not rec_stack:
                         rec_stack.append(raw_rec)
                         continue
                     # if the same, wait for the next record
                     elif rec_stack[-1][2:(nFieldBy+2)] == raw_rec[2:(2+nFieldBy)]:
-                        rec_stack.append(raw_rec)
+                        # we will try to merge records?
+                        if rec_stack[-1] != raw_rec:
+                            self.logger.debug('Record {} is ignored with another record with the same {}.'.format(
+                                sep.join([str(x) for x in raw_rec]), self.format.export_by_fields))
+                            rec_stack[-1] = tuple([x if x is not None else y for x,y in zip(rec_stack[-1], raw_rec)])
+                        #rec_stack.append(raw_rec)
                         continue
                     elif len(rec_stack) == 1:
                         rec_ref = rec_stack[0][0]
@@ -907,7 +903,7 @@ class Exporter:
                 else:
                     rec_ref = [rec_stack[i][0] for i in range(n)]
                     rec_alt = [rec_stack[i][1] for i in range(n)]
-                    rec = [[rec_stack[i][x] for i in range(n)] for x in range(len(raw_rec))]
+                    rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(2, len(raw_rec))]
                 # step one: apply formatters
                 if multi_records:
                     try:
