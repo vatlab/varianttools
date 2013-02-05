@@ -8,6 +8,7 @@
 description=Import variants (chr, pos, ref, alt) in csv format, or output arbitrary specified fields in csv format
 delimiter=','
 variant=chr,pos,ref,alt
+export_by=chr,pos,ref,alt
 sort_output_by=%(order_by)s
 
 [DEFAULT]
