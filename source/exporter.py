@@ -83,7 +83,7 @@ class JoinRecords:
     
     def __call__(self, item):
         try:
-            if type(item) == tuple:
+            if type(item) == tuple or type(item) == list:
                 return self.sep.join([str(x) for x in item])
             else:
                 return str(item)
