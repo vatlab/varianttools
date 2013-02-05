@@ -455,7 +455,6 @@ class AltAtPos:
 
     def __call__(self, item):
         # enter chromosome and pos
-        print('CHECK {}'.format(item))
         ref = self.refGenome.getBase(item[0], int(item[1]))
         if item[2] == item[3]:
             raise ValueError('Identical alleles provided to AltAtPos')
