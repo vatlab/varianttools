@@ -41,7 +41,7 @@ from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
-    downloadFile, runOptions
+    downloadFile, runOptions, RefGenome
 
 # preprocessors
 from .preprocessor import *
@@ -439,47 +439,34 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
         res_field, cond_fields.split(','), default)
 
-class SequenceExtractor:
-    '''This sequence extractor extract subsequence from a pre-specified sequence'''
-    def __init__(self, filename):
-        if not os.path.isfile(filename):
-            filename = downloadFile(filename)
-        if not os.path.isfile(filename):
-            raise valueError('Failed to obtain sequence file {}'.format(filename))
-        # a dictionary for seq for each chromosome
-        self.seq = {}
-        # we assume that the input file has format
-        #
-        # >chr9
-        # seq
-        # >chr10
-        # seq
-        #
-        current_chr = None
-        # openFile can open .gz file directly
-        cnt = lineCount(filename)
-        prog = ProgressBar('Reading ref genome sequences', cnt)
-        with openFile(filename) as input:   
-            # for each chromosome? need to fix it here
-            for idx, line in enumerate(input):
-                line = line.decode()
-                if line.startswith('>'):
-                    chr = line[1:].split()[0]
-                    if chr.startswith('chr'):
-                        chr = chr[3:] 
-                    self.seq[chr] = array.array('b', [])
-                else:
-                    self.seq[chr].fromstring(line.rstrip())
-                if idx % 10000 == 0:
-                    prog.update(idx)
-        # use another key with 'chr' to point to the same item so that the dictionary 
-        # works with both ['2'] and ['chr2']
-        for key in self.seq:
-            self.seq['chr' + key] = self.seq[key]
-        prog.done()
+class RefAtPos:
+    '''This function returns the reference allele from a position'''
+    def __init__(self, build):
+        self.refGenome = RefGenome(build)
 
     def __call__(self, item):
-        return self.seq[item[0]][item[1]]
+        # enter chromosome and pos
+        return self.refGenome.getBase(item[0], int(item[1]))
+
+class AltAtPos:
+    '''This function returns the alternative allele from two-given alleles, and reference allele from a position'''
+    def __init__(self, build):
+        self.refGenome = RefGenome(build)
+
+    def __call__(self, item):
+        # enter chromosome and pos
+        print('CHECK {}'.format(item))
+        ref = self.refGenome.getBase(item[0], int(item[1]))
+        if item[2] == item[3]:
+            raise ValueError('Identical alleles provided to AltAtPos')
+        if ref == item[2]:
+            return item[3]
+        elif ref == item[3]:
+            return item[2]
+        else:
+            raise ValueError('Two non-ref alleles are provided: chr={}, pos={}, ref={}, observed {} {}'.format(
+                item[0], item[1], ref, item[2], item[3]))
+
 
 # this is a dictionary to save extractors for each file used
 g_SeqExtractor = {}
