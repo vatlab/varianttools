@@ -79,7 +79,7 @@ class AnnoDB:
         self.dir = os.path.split(annoDB)[0]
         if self.dir.startswith(os.path.expanduser('~')):
             self.dir = self.dir.replace(os.path.expanduser('~'), '~', 1)
-        self.filename = os.path.splitext(os.path.split(annoDB)[-1])[0]
+        self.filename = os.path.split(annoDB)[-1]
         if '-' in self.filename:
             self.version = self.filename.split('-', 1)[1]
             self.name = self.filename.split('-')[0]
