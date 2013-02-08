@@ -322,3 +322,9 @@ index=9, 10:
 adj=FieldFromFormat('DP', ':')
 type=INTEGER
 comment=DP fields in FORMAT. Depth for each sample genotype in a vcf file.
+
+[GQ_geno]
+index=9, 10:
+adj=FieldFromFormat('GQ', ':')
+type=INTEGER
+comment=Genotype quality. The value of Q(max_gt) from Illumina platform
