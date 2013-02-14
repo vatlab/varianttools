@@ -9,10 +9,10 @@ hg19=chr, start, refNCBI, alt
 
 [data sources]
 anno_type=variant
-description=dbSNP version 135
-version=hg19_135-1
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp135.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg19_135-1.DB.gz
+description=dbSNP version 137
+version=hg19_137
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp137.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg19_137.DB.gz
 source_type=txt
 
 [chr]
