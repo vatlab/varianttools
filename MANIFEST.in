@@ -82,7 +82,7 @@ recursive-include boost_1_49_0/boost *.hpp *.ipp
 recursive-include boost_1_49_0/libs/detail *.cpp
 recursive-include boost_1_49_0/libs/iostreams/src *.cpp
 recursive-include boost_1_49_0/libs/regex/src *.cpp *.hpp
-recursive-include boost_1_49_0/libs/filesystem/v2/src *.cpp *.hpp
+recursive-include boost_1_49_0/libs/filesystem/v2/src *.cpp 
 recursive-include boost_1_49_0/libs/filesystem/v3/src *.cpp *.hpp
 recursive-include boost_1_49_0/libs/system/src *.cpp *.hpp
 #
@@ -126,7 +126,7 @@ recursive-include cgatools/util *.hpp *.cpp
 recursive-include cgatools/reference *.hpp *.cpp
 #
 # libplinkio
-include libplinkio/LICENCE
+include libplinkio/LICENSE
 recursive-include libplinkio *.h *.c
 
 # test
