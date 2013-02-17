@@ -31,6 +31,12 @@ except ImportError:
    from distutils.command.build_py import build_py
 
 import sys, os
+#
+# if building source package, we will need to have wrapper files for both
+# versions of Python
+#
+SDIST = 'sdist' in sys.argv
+
 try:
     import argparse
 except ImportError:
@@ -43,24 +49,20 @@ EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
 if not EMBEDED_BOOST:
     print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
 
-SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
+SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
     '-outdir', 'source']
 
 if sys.version_info.major == 2:
-    WRAPPER_CPP_FILE = 'source/assoTests_wrap_py2.cpp'
-    WRAPPER_PY_FILE = 'source/assoTests_py2.py'
-    CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_py2.cpp'
-    CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_py2.py'
-    SQLITE_FOLDER = 'sqlite/py2'
-    SQLITE_PY_FILE = 'source/vt_sqlite3_py2'
+    PYVERSION = 'py2'
 else:
-    SWIG_OPTS.append('-py3')
-    WRAPPER_CPP_FILE = 'source/assoTests_wrap_py3.cpp'
-    WRAPPER_PY_FILE = 'source/assoTests_py3.py'
-    CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_py3.cpp'
-    CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_py3.py'
-    SQLITE_FOLDER = 'sqlite/py3'
-    SQLITE_PY_FILE = 'source/vt_sqlite3_py3'
+    PYVERSION = 'py3'
+
+SQLITE_FOLDER = 'sqlite/{}'
+WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
+WRAPPER_PY_FILE = 'source/assoTests_{}.py'
+CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
+CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
+SQLITE_PY_FILE = 'source/vt_sqlite3_{}.py'
 
 
 ASSOC_HEADER = [
@@ -79,7 +81,7 @@ ASSOC_FILES = [
     'source/lm.cpp'
 ]
 
-SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
+SQLITE_FILES = [os.path.join(SQLITE_FOLDER.format(PYVERSION), x) for x in [
         'cache.c',
         'connection.c',
         'cursor.c',
@@ -90,9 +92,7 @@ SQLITE_FILES = [ os.path.join(SQLITE_FOLDER, x) for x in [
         'statement.c',
         'util.c'
     ]
-] + [
-    'sqlite/sqlite3.c'
-]
+] + [ 'sqlite/sqlite3.c' ]
 
 SQLITE_GSL = [
     'gsl/error.c',
@@ -430,7 +430,9 @@ VTOOLS_FILES = ['source.__init__',
 ]
 
 
+#
 # Generate wrapper files (only in development mode)
+#
 if VTOOLS_VERSION.endswith('svn'):
     import subprocess
     #
@@ -439,17 +441,50 @@ if VTOOLS_VERSION.endswith('svn'):
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
-    # 
-    if (not os.path.isfile(WRAPPER_PY_FILE) or not os.path.isfile(WRAPPER_CPP_FILE) \
-      or os.path.getmtime(WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE, 'source/assoTests.i'], shell=False)
-        if ret != 0: sys.exit('Failed to generate wrapper file for association module.')
-        os.rename('source/assoTests.py', WRAPPER_PY_FILE)
     #
-    if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE)):
-        ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, 'source/cgatools.i'], shell=False)
-        if ret != 0: sys.exit('Failed to generate wrapper file for cgatools.')
-        os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+    # generate wrapper files for both versions of python. This will make sure sdist gets
+    # all files needed for the source package
+    #
+    for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
+        if (not os.path.isfile(WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(WRAPPER_CPP_FILE.format(PYVER)) \
+          or os.path.getmtime(WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+            ret = subprocess.call(['swig'] + SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), 'source/assoTests.i'], shell=False)
+            if ret != 0:
+                sys.exit('Failed to generate wrapper file for association module.')
+            os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
+        #
+        if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))):
+            ret = subprocess.call(['swig'] + SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i'], shell=False)
+            if ret != 0:
+                sys.exit('Failed to generate wrapper file for cgatools.')
+            os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
+# 
+# Although wrapper files for another version of python are not used, they
+# will be installed due to a bug of setuptools. This will cause trouble
+# during the creation of executables. It is therefore safer to move these
+# files away.
+#
+for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
+    CGATOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
+    if sys.version_info.major == 2:
+        filename1 = filename.format('py2')
+        filename2 = filename.format('py3')
+    else:
+        filename1 = filename.format('py3')
+        filename2 = filename.format('py2')
+    # if FILENAME was moved to FIELANEM_temp
+    if os.path.isfile(filename1 + '_temp') and not os.path.isfile(filename1):
+        os.rename(filename1 + '_temp', filename1)
+    #
+    if SDIST:
+        # if building source, rename all _temp files back
+        if os.path.isfile(filename2 + '_temp') and not os.path.isfile(filename2):
+            os.rename(filename2 + '_temp', filename2)
+    else:
+        # otherwise, move file for another version of python away
+        if os.path.isfile(filename2):
+            os.rename(filename2, filename2 + '_temp')
+
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
@@ -471,7 +506,7 @@ else:
    SQLITE_DEFINES.append(('MODULE_NAME', '"vt_sqlite3"'))
    ASSOCIATION_MODULE = [
         Extension('variant_tools._assoTests',
-            sources = [WRAPPER_CPP_FILE] + ASSOC_FILES
+            sources = [WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
                   + LIB_GSL + LIB_STAT,
             extra_compile_args = gccargs,
             library_dirs = [],
@@ -487,11 +522,11 @@ setup(name = "variant_tools",
     author_email = 'bpeng@mdanderson.org',
     maintainer = 'Bo Peng',
     maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    # py_modules = VTOOLS_FILES + [
-    #     SQLITE_PY_FILE,
-    #     WRAPPER_PY_FILE[:-3],          # assotests_pyX.py file without extension
-    #     CGATOOLS_WRAPPER_PY_FILE[:-3]  # cgatools_pyX.py
-    # ],
+    py_modules = VTOOLS_FILES + [
+        SQLITE_PY_FILE.format(PYVERSION)[:-3],
+        WRAPPER_PY_FILE.format(PYVERSION)[:-3],          # assotests_pyX.py file without extension
+        CGATOOLS_WRAPPER_PY_FILE.format(PYVERSION)[:-3]  # cgatools_pyX.py
+    ],
     packages = ['variant_tools'],
     scripts = [
         'vtools',
@@ -503,7 +538,7 @@ setup(name = "variant_tools",
         Extension('variant_tools._vt_sqlite3',
             sources = SQLITE_FILES,
             define_macros = SQLITE_DEFINES,
-            include_dirs = ['sqlite', SQLITE_FOLDER],
+            include_dirs = ['sqlite', SQLITE_FOLDER.format(PYVERSION)],
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             sources = ['sqlite/vt_sqlite3_ext.c'] + SQLITE_GSL + LIB_STAT,
@@ -514,7 +549,7 @@ setup(name = "variant_tools",
             include_dirs = ['libplinkio'],
         ),
         Extension('variant_tools._cgatools',
-            sources = [CGATOOLS_WRAPPER_CPP_FILE] + LIB_CGATOOLS
+            sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_CGATOOLS
                   + (LIB_BOOST if EMBEDED_BOOST else []),
             libraries = ['z', 'bz2'] + \
                 ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
@@ -525,3 +560,4 @@ setup(name = "variant_tools",
         ),
       ] + ASSOCIATION_MODULE   # association module is not available under windows
 )
+
