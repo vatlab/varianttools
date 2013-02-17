@@ -35,6 +35,8 @@ import sys
 import subprocess
 import shutil
 import argparse
+import zipfile
+import platform
 
 def ModifyVersion(version):
     # modify source/__init__.py to write version string
@@ -141,7 +143,7 @@ def ObtainPyInstaller():
         curdir = os.getcwd()
         os.chdir('pyinstaller')
         try:
-            print('Updating pyinstaller...')
+            print('Updating pyinstaller ...')
             with open(os.devnull, 'w') as fnull:
                 ret = subprocess.call('git pull', shell=True, stdout=fnull)
                 if ret != 0:
@@ -150,11 +152,11 @@ def ObtainPyInstaller():
             print('Failed to get latest version of pyinstaller. Using existing version.: {}'.format(e))
         os.chdir(curdir)
 
-def BuildExecutables():
+def BuildExecutables(version):
     # use py installer to create executable
     for exe in ['vtools', 'vtools_report']:
         try:
-            print('Building executable {}...'.format(exe))
+            print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
                 ret = subprocess.call('python pyinstaller/pyinstaller.py -F --log-level=ERROR {} '.format(exe), shell=True, stdout=fnull)
                 if ret != 0:
@@ -162,7 +164,13 @@ def BuildExecutables():
         except Exception as e:
             sys.exit('Failed to create executable for command {}: {}'.format(exe, e))
     # after the creation of commands, create a zip file with OS and version information
-    # FIXME
+    zipfilename = os.path.join('dist', 'variant_tools-{}.{}.{}.zip'.format(version, platform.system(), platform.machine()))
+    print('Adding executables to file {}'.format(zipfilename))
+    with zipfile.ZipFile(zipfilename, 'w') as dist_file:
+        vtools_cmd = 'vtools.exe' if os.name == 'win32' else 'vtools'
+        dist_file.write(os.path.join('dist', vtools_cmd), vtools_cmd)
+        vtools_report_cmd = 'vtools_report.exe' if os.name == 'win32' else 'vtools_report'
+        dist_file.write(os.path.join('dist', vtools_report_cmd), vtools_report_cmd)
 
 def TagRelease(version):
     try:
@@ -171,12 +179,12 @@ def TagRelease(version):
             sys.exit('Cannot tag release because there is uncommitted changes. Please commit the changes and try again.')
         with open(os.devnull, 'w') as fnull:
             print('Tagging release {}...'.format(version))
-            #ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
-            #    'svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/tag/v{} '
-            #    ' -m "Version {} released at {}"'.format(version, version, time.asctime()),
-            #    shell=True, stdout=fnull)
-            #if ret != 0:
-            #    sys.exit('Failed to tag release {}.'.format(version))
+            ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
+                'svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/tag/v{} '
+                ' -m "Version {} released at {}"'.format(version, version, time.asctime()),
+                shell=True, stdout=fnull)
+            if ret != 0:
+                sys.exit('Failed to tag release {}.'.format(version))
     except Exception as e:
         sys.exit('Failed to tag release {}: {}'.format(version, e))
 
@@ -195,7 +203,7 @@ if __name__ == '__main__':
     BuildVariantTools()
     BuildSourcePackage()
     ObtainPyInstaller()
-    BuildExecutables()
+    BuildExecutables(version)
     # if everything is OK, tag the release
     if args.tag:
         TagRelease(version)
