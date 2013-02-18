@@ -437,7 +437,7 @@ if VTOOLS_VERSION.endswith('svn'):
     import subprocess
     #
     try:
-       ret = subprocess.call(['swig', '-python', '-external-runtime', 'source/swigpyrun.h'], shell=False)
+       ret = subprocess.call(['swig -python -external-runtime source/swigpyrun.h'], shell=True)
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
@@ -448,13 +448,13 @@ if VTOOLS_VERSION.endswith('svn'):
     for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
         if (not os.path.isfile(WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(WRAPPER_CPP_FILE.format(PYVER)) \
           or os.path.getmtime(WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
-            ret = subprocess.call(['swig'] + SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), 'source/assoTests.i'], shell=False)
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), 'source/assoTests.i']), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for association module.')
             os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
         #
         if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))):
-            ret = subprocess.call(['swig'] + SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i'], shell=False)
+            ret = subprocess.call('swig' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i']), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
@@ -483,6 +483,8 @@ for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
     else:
         # otherwise, move file for another version of python away
         if os.path.isfile(filename2):
+            if os.path.isfile(filename2 + '_temp'):
+                os.remove(filename2 + '_temp')
             os.rename(filename2, filename2 + '_temp')
 
          
