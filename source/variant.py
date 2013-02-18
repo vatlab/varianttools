@@ -173,8 +173,10 @@ def select(args, reverse=False):
             if args.to_table:
                 if len(args.to_table) > 2:
                     raise ValueError('Only a table name and an optional message is allowed for parameter to_table')
-                if args.to_table[0].startswith('_'):
-                    raise ValueError('Name of variant table cannot start with underscore.')
+                if not args.to_table[0][0].isalpha():
+                    raise ValueError('Name of variant table should start with a letter.')
+                if not args.to_table[0][0].replace('_', '').isalnum():
+                    raise ValueError('Name of variant table should not contain special characters such as -.')
                 args.table_desc = args.to_table[1] if len(args.to_table) == 2 else ''
                 args.to_table = args.to_table[0]
             # table?
