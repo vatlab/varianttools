@@ -89,8 +89,8 @@ class TestRemove(ProcessTestCase):
     def testRemoveFields(self):
         #add a field in the variant table
         runCmd('vtools update variant --set gene_name=testNSFP.genename')
-        self.assertOutput('vtools show table variant -l 1','''variant_id, bin, chr, pos, ref, alt, DP, gene_name\n1, 585, 1, 533, G, C, None, None''', numOfLines=2)
-        runCmd('vtools remove fields gene_name DP') 
+        self.assertOutput('vtools show table variant -l 1','''variant_id, bin, chr, pos, ref, alt, CEU_cases_num, DP, gene_name\n1, 585, 1, 533, G, C, 3, None, None''', numOfLines=2)
+        runCmd('vtools remove fields CEU_cases_num gene_name DP') 
         self.assertOutput('vtools show table variant -l 1', '''variant_id, bin, chr, pos, ref, alt\n1, 585, 1, 533, G, C''', numOfLines=2)
 
     def testRemovePheno(self):
