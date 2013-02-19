@@ -346,8 +346,6 @@ class AnnoDBConfiger:
                     self.logger.debug(e)
                     self.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
-        if not source_files:
-            raise ValueError('Please specify source files via commandline option --files or keyword source_url in the configuration file.')
         self.importFromSource(source_files)
         #
         if rebuild:
