@@ -824,12 +824,9 @@ class Exporter:
                         continue
                     # if the same, wait for the next record
                     elif rec_stack[-1][2:(nFieldBy+2)] == raw_rec[2:(2+nFieldBy)]:
-                        # we will try to merge records?
+                        # the record needs to be merged even with the same export_by_fields (e.g. chr pos ref with two alts)
                         if rec_stack[-1] != raw_rec:
-                            self.logger.debug('Record {} is ignored with another record with the same {}.'.format(
-                                sep.join([str(x) for x in raw_rec]), self.format.export_by_fields))
-                            rec_stack[-1] = tuple([x if x is not None else y for x,y in zip(rec_stack[-1], raw_rec)])
-                        #rec_stack.append(raw_rec)
+                            rec_stack.append(raw_rec)
                         continue
                     elif len(rec_stack) == 1:
                         rec_ref = rec_stack[0][0]
