@@ -454,7 +454,7 @@ if VTOOLS_VERSION.endswith('svn'):
             os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
         #
         if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))):
-            ret = subprocess.call('swig' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i']), shell=True)
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i']), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
