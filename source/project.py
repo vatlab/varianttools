@@ -993,7 +993,10 @@ class Project:
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]')):
             try:
+                # remove path, remove version string, and suffix
                 db_name = os.path.split(db)[-1].split('-')[0]
+                if db_name.endswith('.DB'):
+                    db_name = db_name[:-3]
                 linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
                 anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
                 linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
