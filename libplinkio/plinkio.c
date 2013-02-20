@@ -16,8 +16,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "file.h"
 
-#include <plinkio.h>
+#include "plinkio.h"
 
 /**
  * Concatenates the given strings and returns the concatenated

@@ -78,7 +78,6 @@ static void hwe_exact(
 		gsl_sf_lngamma(n1 + 1) + gsl_sf_lngamma(n2 + 1));
 	//
 	pval = 0.0;
-	x12;
 	for (x12 = fmod(n1, 2.0); x12 <= (n1 < n2 ? n1 : n2); x12 = x12 + 2.0) {
 		x11 = (n1 - x12) / 2.0;
 		x22 = (n2 - x12) / 2.0;

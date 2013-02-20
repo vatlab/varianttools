@@ -149,7 +149,7 @@ def ObtainPyInstaller():
                 if ret != 0:
                     print('Failed to get latest version of pyinstaller. Using existing version.')
         except Exception as e:
-            print('Failed to get latest version of pyinstaller. Using existing version.: {}'.format(e))
+            print('Failed to get latest version of pyinstaller ({}). Using existing version.'.format(e))
         os.chdir(curdir)
 
 def BuildExecutables(version):

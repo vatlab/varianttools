@@ -1636,7 +1636,7 @@ class GroupWrite(ExternTest):
         parser = argparse.ArgumentParser(description='''Group data writer. It will create 3 files for each group: a phenotype file
                 with rows representing samples , the 1st column is sample name, the 2nd column is the quantitative or binary phenotype
                 and remaining columns are covariates if there are any; a genotype file with rows representing variants and the columns represent sample genotypes
-                (order of the rows matches the genotype file). Coding of genotypes are minor allele counts (0/1/2). Missing values are denoted as “NA”; a mapping file
+                (order of the rows matches the genotype file). Coding of genotypes are minor allele counts (0/1/2). Missing values are denoted as "NA"; a mapping file
                 that matches the group ID and variant ID in pairs.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests

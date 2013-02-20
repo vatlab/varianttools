@@ -136,7 +136,7 @@ static PyObject *
 plinkio_open(PyObject *self, PyObject *args)
 {
     const char *path;
-    struct pio_file_t plink_file = { 0 };
+    struct pio_file_t plink_file = { {0} };
     c_plink_file_t *c_plink_file;
     
     if( !PyArg_ParseTuple( args, "s", &path ) )
@@ -179,7 +179,6 @@ plinkio_next_row(PyObject *self, PyObject *args)
 {
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
-    int i;
     
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
