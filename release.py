@@ -129,14 +129,14 @@ def ObtainPyInstaller(pyinstaller_dir):
     #   if yes, try to update to the newest version
     pyinstaller_dir = os.path.expanduser(pyinstaller_dir.rstrip('/'))
     if pyinstaller_dir.endswith('pyinstaller'): pyinstaller_dir = pyinstaller_dir[:-12]
+    if not os.path.isdir(pyinstaller_dir): pyinstaller_dir = os.getcwd()
     git_dir = os.path.join(pyinstaller_dir, 'pyinstaller')
     curdir = os.getcwd()
     if not os.path.isdir(git_dir):
-        os.chdir(pyinstaller_dir)
         try:
             print('Downloading pyinstaller...')
             with open(os.devnull, 'w') as fnull:
-                ret = subprocess.call('git clone git://github.com/pyinstaller/pyinstaller.git', shell=True, stdout=fnull)
+                ret = subprocess.call('git clone git://github.com/pyinstaller/pyinstaller.git {}'.format(git_dir), shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to clone pyinstaller. Please check if you have git installed.'
                         'You can also get pyinstaller manually anf decompress it under the pyinstaller directory.')
@@ -154,7 +154,7 @@ def ObtainPyInstaller(pyinstaller_dir):
                     print('Failed to get latest version of pyinstaller. Using existing version.')
         except Exception as e:
             print('Failed to get latest version of pyinstaller ({}). Using existing version.'.format(e))
-    os.chdir(curdir)
+            os.chdir(curdir)
     return git_dir
 
 def BuildExecutables(version, git_dir):
@@ -163,7 +163,6 @@ def BuildExecutables(version, git_dir):
         try:
             print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
-                print(git_dir)
                 ret = subprocess.call('python {} -F --log-level=ERROR {} '.format(os.path.join(git_dir, 'pyinstaller.py'), exe), shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to create executable for command {}'.format(exe))
