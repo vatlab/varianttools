@@ -99,12 +99,12 @@ def GenerateSWIGWrappers():
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(ver))
              
 
-def BuildVariantTools():
+def BuildVariantTools(extra_args):
     # build variant tools
     try:
         print('Building and installing variant tools ...')
         with open(os.devnull, 'w') as fnull:
-            ret = subprocess.call('python setup.py install', shell=True, stdout=fnull)
+            ret = subprocess.call('python setup.py install ' + ' '.join(extra_args), shell=True, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to build and install variant tools.')
     except Exception as e:
@@ -190,17 +190,20 @@ def TagRelease(version):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Create source distribution and executables for a variant tools release')
+    parser = argparse.ArgumentParser(description='''Create source distribution and executables for
+        a variant tools release. In addition to optional parameters version and tag, extra parameters
+        would be specified and will be passed directly to the 'python setup.py install' process. ''')
     parser.add_argument('--version',
         help='Modify source/__init__.py to the specified version string and make the release.')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release')
-    args = parser.parse_args()
+    # allow recognied parameters to be set to the build process
+    args, argv = parser.parse_known_args()
     #
     version = ModifyVersion(args.version)
     SetUpEnvironment(version)
     GenerateSWIGWrappers()
-    BuildVariantTools()
+    BuildVariantTools(argv)
     BuildSourcePackage()
     ObtainPyInstaller()
     BuildExecutables(version)
