@@ -123,11 +123,16 @@ def BuildSourcePackage():
         sys.exit('Failed to build source pacakge of variant tools: {}'.format(e))
 
 
-def ObtainPyInstaller():
+def ObtainPyInstaller(pyinstaller_dir):
     # check if pyinstaller is available
     #   if not, use git clone to get it
     #   if yes, try to update to the newest version
-    if not os.path.isdir('pyinstaller'):
+    pyinstaller_dir = os.path.expanduser(pyinstaller_dir.rstrip('/'))
+    if pyinstaller_dir.endswith('pyinstaller'): pyinstaller_dir = pyinstaller_dir[:-12]
+    git_dir = os.path.join(pyinstaller_dir, 'pyinstaller')
+    curdir = os.getcwd()
+    if not os.path.isdir(git_dir):
+        os.chdir(pyinstaller_dir)
         try:
             print('Downloading pyinstaller...')
             with open(os.devnull, 'w') as fnull:
@@ -140,8 +145,7 @@ def ObtainPyInstaller():
                 'You can get pyinstaller manually anf decompress it under the pyinstaller directory '
                 'if you are having trouble getting git installed.')
     else:
-        curdir = os.getcwd()
-        os.chdir('pyinstaller')
+        os.chdir(git_dir)
         try:
             print('Updating pyinstaller ...')
             with open(os.devnull, 'w') as fnull:
@@ -150,15 +154,17 @@ def ObtainPyInstaller():
                     print('Failed to get latest version of pyinstaller. Using existing version.')
         except Exception as e:
             print('Failed to get latest version of pyinstaller ({}). Using existing version.'.format(e))
-        os.chdir(curdir)
+    os.chdir(curdir)
+    return git_dir
 
-def BuildExecutables(version):
+def BuildExecutables(version, git_dir):
     # use py installer to create executable
     for exe in ['vtools', 'vtools_report']:
         try:
             print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
-                ret = subprocess.call('python pyinstaller/pyinstaller.py -F --log-level=ERROR {} '.format(exe), shell=True, stdout=fnull)
+                print(git_dir)
+                ret = subprocess.call('python {} -F --log-level=ERROR {} '.format(os.path.join(git_dir, 'pyinstaller.py'), exe), shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to create executable for command {}'.format(exe))
         except Exception as e:
@@ -197,6 +203,8 @@ if __name__ == '__main__':
         help='Modify source/__init__.py to the specified version string and make the release.')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release')
+    parser.add_argument('--pyinstaller_dir', default = '.',
+        help='path to the directory where pyinstaller git clone is located.')
     # allow recognied parameters to be set to the build process
     args, argv = parser.parse_known_args()
     #
@@ -205,8 +213,8 @@ if __name__ == '__main__':
     GenerateSWIGWrappers()
     BuildVariantTools(argv)
     BuildSourcePackage()
-    ObtainPyInstaller()
-    BuildExecutables(version)
+    git_dir = ObtainPyInstaller(args.pyinstaller_dir)
+    BuildExecutables(version, git_dir)
     # if everything is OK, tag the release
     if args.tag:
         TagRelease(version)
