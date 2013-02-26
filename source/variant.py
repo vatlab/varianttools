@@ -27,7 +27,8 @@
 import sys
 import re
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount, delayedAction
+from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
+    delayedAction, validateTableName
 from .phenotype import Sample
 
 
@@ -173,17 +174,12 @@ def select(args, reverse=False):
             if args.to_table:
                 if len(args.to_table) > 2:
                     raise ValueError('Only a table name and an optional message is allowed for parameter to_table')
-                if not args.to_table[0][0].isalpha():
-                    raise ValueError('Name of variant table should start with a letter.')
-                if not args.to_table[0][0].replace('_', '').isalnum():
-                    raise ValueError('Name of variant table should not contain special characters such as -.')
+                validateTableName(args.to_table[0], exclude=['variant'])
                 args.table_desc = args.to_table[1] if len(args.to_table) == 2 else ''
                 args.to_table = args.to_table[0]
             # table?
             if not proj.isVariantTable(args.from_table):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
-            if args.to_table == 'variant':
-                raise ValueError('Cannot overwrite master variant table. Please choose another name for the variant table')
             if not args.to_table and not args.output and not args.count:
                 proj.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
                 return

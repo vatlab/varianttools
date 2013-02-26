@@ -47,6 +47,7 @@ class TestCompare(ProcessTestCase):
         self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 -c'), ['0\t0\t6\t6'])
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --A_and_B')
+        self.assertFail('vtools compare d_plekhn1 ns_damaging --A_and_B unique')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --A_and_B common')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --A_and_B common')
@@ -72,6 +73,7 @@ class TestCompare(ProcessTestCase):
         self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 -c'), ['0\t0\t6\t6'])
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection')
+        self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection unique')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')

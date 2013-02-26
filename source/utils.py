@@ -344,6 +344,20 @@ SQL_KEYWORDS = set([
     'LOG', 'POW', 'SIN', 'SLEEP', 'SORT', 'STD', 'VALUES', 'SUM'
 ])
 
+
+def validateTableName(name, exclude=[]):
+    '''Check if a table name can be used (e.g. not a SQL keyword).'''
+    if name.upper() in SQL_KEYWORDS:
+        raise ValueError("Table name '{}' is not allowed because it is a reserved word.".format(name))
+    if not name[0].isalpha():
+        raise ValueError('Name of variant table should start with a letter.')
+    if not name.replace('_', '').isalnum():
+        raise ValueError('Name of variant table should not contain special characters such as -.')
+    if name in exclude:
+        raise ValueError('Cannot create or overwrite a table with name {}'.format(name))
+
+        
+
 #
 # Utility functions
 #

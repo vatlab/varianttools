@@ -26,7 +26,7 @@
 
 import sys
 from .project import Project
-from .utils import ProgressBar, runOptions 
+from .utils import ProgressBar, runOptions, validateTableName
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
@@ -86,8 +86,7 @@ def compareTwoTables(proj, args):
             (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.tables[0], args.tables[1])]:
         if table is None:
             continue
-        if table == 'variant':
-            raise ValueError('Cannot overwrite master variant table')
+        validateTableName(table, exclude=['variant'])
         if proj.db.hasTable(table):
             new_table = proj.db.backupTable(table)
             proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
@@ -164,13 +163,10 @@ def compareMultipleTables(proj, args):
         if not table_with_desc:
             continue
         table = table_with_desc[0]
+        validateTableName(table, exclude=['variant'])
         desc = table_with_desc[1] if len(table_with_desc) == 2 else ''
         if len(table_with_desc) > 2:
             raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
-        if table == 'variant':
-            raise ValueError('Cannot overwrite master variant table')
-        if table.startswith('_'):
-            raise ValueError('Name of variant table cannot start with underscore.')
         if proj.db.hasTable(table):
             new_table = proj.db.backupTable(table)
             proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
@@ -195,19 +191,17 @@ def compare(args):
                 if not proj.isVariantTable(table):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             # this is the old behavior
-            if len(args.tables) == 2 and ((args.B_diff_A is None and args.A_diff_B is None and \
-                args.A_and_B is None and args.A_or_B is None and args.intersection == [] and \
-                args.union == [] and args.difference == [] and args.count) or args.B_diff_A is not None
-                or args.A_diff_B is not None or args.A_and_B is not None or args.A_or_B is not None):
-                if args.intersection != [] or args.union != [] or args.difference != []:
-                    raise ValueError('Parameters for the old and new interface cannot be mixed.')
+            if args.intersection or args.union or args.difference:
+                if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
+                    raise ValueError('Cannot mix deprecated and new parameters.')
+                compareMultipleTables(proj, args)
+            elif args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
+                compareTwoTables(proj, args)
+            elif args.count:
                 compareTwoTables(proj, args)
             else:
-                # new interface, ignores all the A_XX_B parameters
-                if args.intersection == [] and args.union == [] and args.difference == []:
-                    proj.logger.warning('No action parameter is specified. Nothing to do.')
-                    return
-                compareMultipleTables(proj, args)
+                proj.logger.warning('No action parameter is specified. Nothing to do.')
+                return
     except Exception as e:
         sys.exit(e) 
 
