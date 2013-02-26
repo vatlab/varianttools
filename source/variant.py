@@ -265,7 +265,10 @@ def select(args, reverse=False):
                     NUM_BLOCKS = len(IDs) // BLOCK_SIZE + 1
                     myIDs = list(IDs)
                     myIDs.sort()
-                    merged_table = None
+                    merged_table = '__variants_from_samples'
+                    query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
+                    # proj.logger.debug(query)
+                    cur.execute(query)
                     prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
                     count = 0
                     for i in range(NUM_BLOCKS):
@@ -273,21 +276,12 @@ def select(args, reverse=False):
                         block_IDs = myIDs[(i*BLOCK_SIZE):((i+1)*BLOCK_SIZE)]
                         if len(block_IDs) == 0:
                             continue
-                        merged_table = '__variants_from_samples_{}'.format(i)
-                        query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-                        # proj.logger.debug(query)
-                        cur.execute(query)
                         query = 'INSERT INTO {} {} {};'.format(merged_table,
                             # also merge last batch
                             '\nSELECT variant_id FROM __variants_from_samples_{} UNION '.format(i-1) if i > 1 else '',
                             '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
                         #proj.logger.debug(query)
                         cur.execute(query)
-                        if i > 1:
-                            # remove last batch
-                            query = 'DROP TABLE __variants_from_samples_{}'.format(i-1)
-                            #proj.logger.debug(query)
-                            cur.execute(query)
                         count += len(block_IDs)
                         if prog:
                             prog.update(count)
@@ -359,6 +353,10 @@ def select(args, reverse=False):
                 query = 'SELECT DISTINCT {}.variant_id {} {}'.format(args.from_table,
                     from_clause, where_clause)
                 outputVariants(proj, args.from_table, args.output, args, query, reverse)
+            # 
+            # clean up temporary table
+            if args.samples and proj.db.hasTable('__variants_from_samples'): 
+                cur.execute('DROP TABLE __variants_from_samples')
     except Exception as e:
         sys.exit(e) 
 
