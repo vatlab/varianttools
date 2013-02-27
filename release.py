@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: pyinstaller.py $
+# $File: release.py $
 # $LastChangedDate: 2013-01-30 18:29:35 -0600 (Wed, 30 Jan 2013) $
 # $Rev: 1663 $
 #
@@ -154,7 +154,7 @@ def ObtainPyInstaller(pyinstaller_dir):
                     print('Failed to get latest version of pyinstaller. Using existing version.')
         except Exception as e:
             print('Failed to get latest version of pyinstaller ({}). Using existing version.'.format(e))
-            os.chdir(curdir)
+    os.chdir(curdir)
     return git_dir
 
 def BuildExecutables(version, git_dir):
