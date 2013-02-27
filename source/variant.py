@@ -276,9 +276,7 @@ def select(args, reverse=False):
                         block_IDs = myIDs[(i*BLOCK_SIZE):((i+1)*BLOCK_SIZE)]
                         if len(block_IDs) == 0:
                             continue
-                        query = 'INSERT INTO {} {} {};'.format(merged_table,
-                            # also merge last batch
-                            '\nSELECT variant_id FROM __variants_from_samples_{} UNION '.format(i-1) if i > 1 else '',
+                        query = 'INSERT INTO {} {};'.format(merged_table,
                             '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
                         #proj.logger.debug(query)
                         cur.execute(query)

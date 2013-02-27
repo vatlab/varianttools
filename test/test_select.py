@@ -110,6 +110,11 @@ class TestSelect(ProcessTestCase):
     def testSelectLargeSample(self):
         runCmd('vtools import vcf/500SAMP.vcf')
         self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
+        runCmd('vtools init test -f')
+        runCmd('vtools admin --load_snapshot proj/caseCtrl.tar.gz')
+        self.assertSucc('vtools select variant --samples "aff=1" -t ctrl')
+        self.assertOutput("vtools select ctrl -c", '43\n')
+        self.assertOutput('vtools select variant --samples "aff=2" -c', '24\n')
 
     
 if __name__ == '__main__':
