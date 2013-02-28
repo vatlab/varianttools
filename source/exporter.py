@@ -893,6 +893,7 @@ class Exporter:
         if rec_stack:
             try:
                 n = len(rec_stack)
+                multi_records = n > 1
                 if n == 1:
                     rec_ref = rec_stack[0][0]
                     rec_alt = rec_stack[0][1]
