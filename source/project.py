@@ -3486,7 +3486,10 @@ def show(args):
                 records = cur.fetchall()
                 for rec in records:
                     # sample fields
-                    sampleFields = '\t'.join(['{}'.format(x) for x in rec[1:]])
+                    if args.verbosity != '2' and len(rec[2]) > 25:
+                        sampleFields = '{}\t{}...{}'.format(rec[1], rec[2][:8], rec[2][-14:])
+                    else:
+                        sampleFields = '{}\t{}'.format(rec[1], rec[2])
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
                     cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, sampleId))
