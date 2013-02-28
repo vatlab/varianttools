@@ -27,15 +27,40 @@
 SQLITE_EXTENSION_INIT1
 
 /*
-** Demo: The half() SQL function returns half of its input value.
+** The least() returns the minimal number. It is similar to min(X,Y,...) but ignores NULL values
 */
-static void halfFunc(
+static void least_func(
                      sqlite3_context * context,
                      int argc,
                      sqlite3_value ** argv
                      )
 {
-	sqlite3_result_double(context, 0.5 * sqlite3_value_double(argv[0]));
+  int i;
+  int mask;    /* 0 for min() or 0xffffffff for max() */
+  int iBest;
+  double least_value;
+  double value;
+
+  assert( argc>1 );
+  iBest = -1;
+
+  for(i=0; i<argc; i++){
+	// if null, ignore
+    if( sqlite3_value_type(argv[i])==SQLITE_NULL )
+		continue;
+	// if first non-NULL value, record
+	else if (iBest = -1) {
+		iBest = i;
+		least_value = sqlite3_value_double(argv[i]);
+		continue;
+	}
+	value = sqlite3_value_double(argv[iBest]);
+    if( value < least_value ){
+      iBest = i;
+	  least_value = value;
+    }
+  }
+  sqlite3_result_value(context, argv[iBest == -1 ? 0 : iBest]);
 }
 
 
@@ -154,7 +179,6 @@ int sqlite3_extension_init(
                            )
 {
 	SQLITE_EXTENSION_INIT2(pApi)
-	sqlite3_create_function(db, "half", 1, SQLITE_ANY, 0, halfFunc, 0, 0);
 	//http://www.sqlite.org/c3ref/create_function.html
 	//The first parameter is the database connection to which the SQL function is to be added
 	//The second parameter is the name of the SQL function to be created or redefined.
@@ -162,6 +186,7 @@ int sqlite3_extension_init(
 	//The fourth parameter, eTextRep, specifies what text encoding this SQL function prefers for its parameters.
 	//The fifth parameter is an arbitrary pointer.
 	//The sixth, seventh and eighth parameters, xFunc, xStep and xFinal, are pointers to C-language functions that implement the SQL function or aggregate.
+	sqlite3_create_function(db, "least", -1, SQLITE_ANY, 0, least_func, 0, 0);
 	sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
 	return 0;
