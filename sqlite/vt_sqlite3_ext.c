@@ -30,37 +30,33 @@ SQLITE_EXTENSION_INIT1
 ** The least() returns the minimal number. It is similar to min(X,Y,...) but ignores NULL values
 */
 static void least_func(
-                     sqlite3_context * context,
-                     int argc,
-                     sqlite3_value ** argv
-                     )
+                       sqlite3_context * context,
+                       int argc,
+                       sqlite3_value ** argv
+                       )
 {
-  int i;
-  int mask;    /* 0 for min() or 0xffffffff for max() */
-  int iBest;
-  double least_value;
-  double value;
+	int i;
+	int iBest = -1;
+	double least_value = 0;
+	double value = 0;
 
-  assert( argc>1 );
-  iBest = -1;
-
-  for(i=0; i<argc; i++){
-	// if null, ignore
-    if( sqlite3_value_type(argv[i])==SQLITE_NULL )
-		continue;
-	// if first non-NULL value, record
-	else if (iBest = -1) {
-		iBest = i;
-		least_value = sqlite3_value_double(argv[i]);
-		continue;
+	for (i = 0; i < argc; i++) {
+		// if null, ignore
+		if (sqlite3_value_type(argv[i]) == SQLITE_NULL)
+			continue;
+		// if first non-NULL value, record
+		else if (iBest == -1) {
+			iBest = i;
+			least_value = sqlite3_value_double(argv[i]);
+			continue;
+		}
+		value = sqlite3_value_double(argv[i]);
+		if (value < least_value) {
+			iBest = i;
+			least_value = value;
+		}
 	}
-	value = sqlite3_value_double(argv[iBest]);
-    if( value < least_value ){
-      iBest = i;
-	  least_value = value;
-    }
-  }
-  sqlite3_result_value(context, argv[iBest == -1 ? 0 : iBest]);
+	sqlite3_result_value(context, argv[iBest == -1 ? 0 : iBest]);
 }
 
 
@@ -141,13 +137,13 @@ static void fisher_exact(
 	contingency_table[3] = (int)(sqlite3_value_double(argv[3])) - contingency_table[1];
 	pval = -99.0;
 	ok = (
-	          contingency_table[0] >= 0 &&
-	          contingency_table[1] >= 0 &&
-	          contingency_table[2] >= 0 &&
-	          contingency_table[3] >= 0 &&
-	          (contingency_table[0] + contingency_table[1] +
-	           contingency_table[2] + contingency_table[0] > 0)
-	          );
+	      contingency_table[0] >= 0 &&
+	      contingency_table[1] >= 0 &&
+	      contingency_table[2] >= 0 &&
+	      contingency_table[3] >= 0 &&
+	      (contingency_table[0] + contingency_table[1] +
+	       contingency_table[2] + contingency_table[0] > 0)
+	      );
 	if (ok) {
 		nrow = 2;
 		ncol = 2;
@@ -166,6 +162,7 @@ static void fisher_exact(
 void init_vt_sqlite3_ext()
 {
 }
+
 
 /* SQLite invokes this routine once when it loads the extension.
 ** Create new functions, collating sequences, and virtual table

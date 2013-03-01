@@ -37,6 +37,7 @@ class TestSelect(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
+
     def removeProj(self):
         runCmd('vtools remove project')
     
@@ -110,6 +111,17 @@ class TestSelect(ProcessTestCase):
     def testSelectLargeSample(self):
         runCmd('vtools import vcf/500SAMP.vcf')
         self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
+
+
+    def testFunctionLeast(self):
+        'Testing a self-defined sql function least'
+        self.assertSucc('vtools update variant --set "nil=NULL"')
+        # the least function will ignore value from nil
+        self.assertSucc('vtools update variant --set "lst=least(hom, het, nil)"')
+        counts = output2list('vtools output variant hom het lst')
+        for line in counts:
+            values = [int(x) for x in line.split()]
+            self.assertEqual(min(values[0], values[1]), values[2])
 
     
 if __name__ == '__main__':
