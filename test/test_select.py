@@ -117,7 +117,7 @@ class TestSelect(ProcessTestCase):
         'Testing a self-defined sql function least'
         self.assertSucc('vtools update variant --set "nil=NULL"')
         # the least function will ignore value from nil
-        self.assertSucc('vtools update variant --set "lst=least(hom, het, nil)"')
+        self.assertSucc('vtools update variant --set "lst=least_not_null(hom, het, nil)"')
         counts = output2list('vtools output variant hom het lst')
         for line in counts:
             values = [int(x) for x in line.split()]

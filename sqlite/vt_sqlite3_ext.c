@@ -29,7 +29,7 @@ SQLITE_EXTENSION_INIT1
 /*
 ** The least() returns the minimal number. It is similar to min(X,Y,...) but ignores NULL values
 */
-static void least_func(
+static void least_not_null_func(
                        sqlite3_context * context,
                        int argc,
                        sqlite3_value ** argv
@@ -183,7 +183,7 @@ int sqlite3_extension_init(
 	//The fourth parameter, eTextRep, specifies what text encoding this SQL function prefers for its parameters.
 	//The fifth parameter is an arbitrary pointer.
 	//The sixth, seventh and eighth parameters, xFunc, xStep and xFinal, are pointers to C-language functions that implement the SQL function or aggregate.
-	sqlite3_create_function(db, "least", -1, SQLITE_ANY, 0, least_func, 0, 0);
+	sqlite3_create_function(db, "least_not_null", -1, SQLITE_ANY, 0, least_not_null_func, 0, 0);
 	sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
 	return 0;
