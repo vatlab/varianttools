@@ -703,7 +703,7 @@ class ProgressBar:
                 m3Len = len(msg[3])
             else:
                 # display failed count in red
-                msg[3] = ' {:,}/\033[1;31m{:,}\033[1;m'.format(int(self.count), int(self.failed_count))
+                msg[3] = ' {:,}/\033[1;31m{:,}\033[0m'.format(int(self.count), int(self.failed_count))
                 m3Len = len(msg[3]) - 12  # the color strings should not be counted as length of message
         else:
             msg[3] = ' '
@@ -721,7 +721,7 @@ class ProgressBar:
                 if failed_front == 0:
                     msg[2] = ' [{}>{}]'.format('=' * front, ' ' * back)
                 else:
-                    msg[2] = ' [{}\033[1;31m{}\033[1;m>{}]'.format('=' * front, '=' * failed_front, ' ' * back)
+                    msg[2] = ' [{}\033[1;31m{}\033[0m>{}]'.format('=' * front, '=' * failed_front, ' ' * back)
         else:
             width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4])
             msg[6] = ' '*width
@@ -759,7 +759,7 @@ class ProgressBar:
             msg[3] = ' {:,}'.format(self.finished + self.count)
             m3Len = len(msg[3])
         else:
-            msg[3] = ' {:,}/\033[1;31m{:,}\033[1;m'.format(self.finished + self.count, self.failed_count)
+            msg[3] = ' {:,}/\033[1;31m{:,}\033[0m'.format(self.finished + self.count, self.failed_count)
             m3Len = len(msg[3]) - 12
         msg[5] += ' in {}{}'.format('' if second_elapsed < 86400 else '{} days '.format(int(second_elapsed/86400)),
                 time.strftime('%H:%M:%S', time.gmtime(second_elapsed)))
@@ -774,7 +774,7 @@ class ProgressBar:
                     failed_front = int(float(self.failed_count)/self.count*front)
                 else:
                     failed_front = 0
-                msg[2] = ' [{}\033[1;31m{}\033[1;m]'.format('=' * (front - failed_front), '=' * failed_front)
+                msg[2] = ' [{}\033[1;31m{}\033[0m]'.format('=' * (front - failed_front), '=' * failed_front)
         sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
