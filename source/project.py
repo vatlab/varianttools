@@ -210,35 +210,33 @@ class AnnoDB:
 
     def checkLinkedFields(self, proj):
         # 
-        # check if all fields are correctly linked. Basically, an annotation database
-        # is linked through fields linked_fields
+        # check if all fields are correctly linked. If many of the values are not linked
+        # it might be linked through wrong linked_by fields.
         #
-        # step 1: count the number of distinct values in the annotation database
         try:
             proj.db.attach(self.filename)
         except:
-            # the database might already been attached
+            # the database might already been attached (repeated use ..)
             pass
         cur = proj.db.cursor()
-        cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1}.{1}'.format(', '.join(self.build), self.name))
-        cnt_all = cur.fetchone()[0]
+        # how many values are there in the annotation database?
+        cur.execute('SELECT DISTINCT {0} FROM {1}.{1}'.format(', '.join(self.build), self.name))
+        val_annoDB = set(cur.fetchall())
+        # how many values are there in the project?
+        cur.execute('SELECT DISTINCT {0} FROM {1}'.format(', '.join(self.linked_by), 
+            ', '.join(['{}'.format(x.rsplit('.', 1)[0] if '.' in x else 'variant') for x in self.linked_by if '.' in x])))
+        val_proj = set(cur.fetchall())
         #
-        # step 2: how many are successfully linked to the main database?
-        cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1}.{1} {2} WHERE {3}'.format(', '.join(self.build), self.name,
-            ''.join([', {}'.format(x.rsplit('.', 1)[0]) for x in self.linked_by if '.' in x]),
-            ', '.join(['{0}={1}.{2}'.format(x, self.name, y) for x,y in zip(self.linked_by, self.build)])))
-        cnt_connected = cur.fetchone()[0]
-        proj.logger.info('{} of {} distinct values of field {} in database {} has been connected to the project through field {}.'.format(cnt_connected,
-            cnt_all, ', '.join(self.build), self.name, ', '.join(self.linked_by)))
-        if cnt_all != cnt_connected:
-            proj.logger.info('{} unlinked values has been written to the log file.'.format(cnt_all - cnt_connected))
-            cur.execute('SELECT DISTINCT {0} FROM {1}.{1} {2} WHERE {3}'.format(', '.join(self.build), self.name,
-                ''.join([', {}'.format(x.rsplit('.', 1)[0]) for x in self.linked_by if '.' in x]),
-                ', '.join(['{0}!={1}.{2}'.format(x, self.name, y) for x,y in zip(self.linked_by, self.build)])))
-            proj.logger.debug('{} unlinkable values of field {} in database {}: '.format(cnt_all - cnt_connected, 
-                ', '.join(self.build), self.name))
-            for rec in cur:
-                proj.logger.debug(', '.join(rec))
+        val_common = val_annoDB & val_proj 
+        proj.logger.info('{} out of {} {} are annotated through annotation database {}'.format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
+        #
+        # if not all values are used
+        if len(val_common) < len(val_annoDB):
+            proj.logger.warning('{} out of {} values in annotation database {} are not linked to the project.'.format(len(val_annoDB) - len(val_common),
+                len(val_annoDB), self.name))
+            val_unused = list(val_annoDB - val_common)[:100]
+            val_unused.sort()
+            proj.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused), ', '.join([','.join(x) for x in val_unused])))
         
 
     def describe(self, verbose=False):
