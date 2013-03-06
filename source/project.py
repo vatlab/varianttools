@@ -236,7 +236,9 @@ class AnnoDB:
                 len(val_annoDB), self.name))
             val_unused = list(val_annoDB - val_common)[:100]
             val_unused.sort()
-            proj.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused), ', '.join([','.join(x) for x in val_unused])))
+            proj.logger.info(val_unused)
+            proj.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
+                ', '.join([','.join([str(y) for y in x]) for x in val_unused])))
         
 
     def describe(self, verbose=False):
