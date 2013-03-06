@@ -207,6 +207,38 @@ class AnnoDB:
                     cur.execute('CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(table, field))
                 except Exception as e:
                     proj.logger.debug(e)
+
+    def checkLinkedFields(self, proj):
+        # 
+        # check if all fields are correctly linked. Basically, an annotation database
+        # is linked through fields linked_fields
+        #
+        # step 1: count the number of distinct values in the annotation database
+        try:
+            proj.db.attach(self.filename)
+        except:
+            # the database might already been attached
+            pass
+        cur = proj.db.cursor()
+        cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1}.{1}'.format(', '.join(self.build), self.name))
+        cnt_all = cur.fetchone()[0]
+        #
+        # step 2: how many are successfully linked to the main database?
+        cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1}.{1} {2} WHERE {3}'.format(', '.join(self.build), self.name,
+            ''.join([', {}'.format(x.rsplit('.', 1)[0]) for x in self.linked_by if '.' in x]),
+            ', '.join(['{0}={1}.{2}'.format(x, self.name, y) for x,y in zip(self.linked_by, self.build)])))
+        cnt_connected = cur.fetchone()[0]
+        proj.logger.info('{} of {} distinct values of field {} in database {} has been connected to the project through field {}.'.format(cnt_connected,
+            cnt_all, ', '.join(self.build), self.name, ', '.join(self.linked_by)))
+        if cnt_all != cnt_connected:
+            proj.logger.info('{} unlinked values has been written to the log file.'.format(cnt_all - cnt_connected))
+            cur.execute('SELECT DISTINCT {0} FROM {1}.{1} {2} WHERE {3}'.format(', '.join(self.build), self.name,
+                ''.join([', {}'.format(x.rsplit('.', 1)[0]) for x in self.linked_by if '.' in x]),
+                ', '.join(['{0}!={1}.{2}'.format(x, self.name, y) for x,y in zip(self.linked_by, self.build)])))
+            proj.logger.debug('{} unlinkable values of field {} in database {}: '.format(cnt_all - cnt_connected, 
+                ', '.join(self.build), self.name))
+            for rec in cur:
+                proj.logger.debug(', '.join(rec))
         
 
     def describe(self, verbose=False):
@@ -1071,6 +1103,10 @@ class Project:
         self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
         self.saveProperty('{}_anno_type'.format(db.name), str(db.anno_type))
         self.saveProperty('{}_linked_fields'.format(db.name), str(db.build))
+        # 
+        # if a field database, connect and check 
+        if db.linked_by:
+            db.checkLinkedFields(self)
 
     def close(self):
         '''Write everything to disk...'''
