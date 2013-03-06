@@ -224,7 +224,7 @@ class AnnoDB:
         val_annoDB = set(cur.fetchall())
         # how many values are there in the project?
         cur.execute('SELECT DISTINCT {0} FROM {1}'.format(', '.join(self.linked_by), 
-            ', '.join(['{}'.format(x.rsplit('.', 1)[0] if '.' in x else 'variant') for x in self.linked_by if '.' in x])))
+            ', '.join(set(['{}'.format(x.rsplit('.', 1)[0] if '.' in x else 'variant') for x in self.linked_by if '.' in x]))))
         val_proj = set(cur.fetchall())
         #
         val_common = val_annoDB & val_proj 
@@ -236,9 +236,8 @@ class AnnoDB:
                 len(val_annoDB), self.name))
             val_unused = list(val_annoDB - val_common)[:100]
             val_unused.sort()
-            proj.logger.info(val_unused)
             proj.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
-                ', '.join([','.join([str(y) for y in x]) for x in val_unused])))
+                ', '.join([':'.join([str(y) for y in x]) for x in val_unused])))
         
 
     def describe(self, verbose=False):
