@@ -30,7 +30,7 @@ adj=MapValue({'6-Sep': 'SEPT6', 'AF15Q14': 'CASC5',
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
 	'IGH@': 'IGH', 
 	'PRO1073':'UNQ530/PRO1073',},
-	useDefault=False), ConvertGeneName(convertTo='geneSymbol')
+	useDefault=False), GeneNameStandardizer(convertTo='geneSymbol')
 type=VARCHAR(255)
 
 [kgID]
@@ -40,7 +40,7 @@ adj=MapValue({'6-Sep': 'SEPT6', 'AF15Q14': 'CASC5',
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
 	'IGH@': 'IGH', 
 	'PRO1073':'UNQ530/PRO1073',},
-	useDefault=False), ConvertGeneName(convertTo='kgID')
+	useDefault=False), GeneNameStandardizer(convertTo='kgID')
 type=VARCHAR(255)
 
 
