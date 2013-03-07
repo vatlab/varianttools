@@ -413,17 +413,15 @@ class IncreaseBy:
         return str(int(item) + self.inc) if item.isdigit() else None
 
 class MapValue:
-    '''Map value to another one, return default if unmapped'''
-    def __init__(self, map, default=None, useDefault=True):
+    '''Map value to another one, return the item itself if unmapped'''
+    def __init__(self, map):
         self.map = map
-        self.default = default
-        self.useDefault = useDefault
 
     def __call__(self, item):
         try:
             return self.map[item]
         except:
-            return self.default if self.useDefault else item
+            return item
         
 class RemoveLeading:
     '''Remove specified leading string if the input string starts with it. Used

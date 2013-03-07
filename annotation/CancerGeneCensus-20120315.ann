@@ -29,8 +29,7 @@ adj=MapValue({'6-Sep': 'SEPT6', 'AF15Q14': 'CASC5',
 	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46', 
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
 	'IGH@': 'IGH', 
-	'PRO1073':'UNQ530/PRO1073',},
-	useDefault=False), GeneNameStandardizer(convertTo='geneSymbol')
+	'PRO1073':'UNQ530/PRO1073'}), ConvertGeneName(convertTo='geneSymbol')
 type=VARCHAR(255)
 
 [kgID]
@@ -39,8 +38,7 @@ adj=MapValue({'6-Sep': 'SEPT6', 'AF15Q14': 'CASC5',
 	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46', 
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
 	'IGH@': 'IGH', 
-	'PRO1073':'UNQ530/PRO1073',},
-	useDefault=False), GeneNameStandardizer(convertTo='kgID')
+	'PRO1073':'UNQ530/PRO1073'}), ConvertGeneName(convertTo='kgID')
 type=VARCHAR(255)
 
 
