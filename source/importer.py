@@ -66,6 +66,110 @@ class ExtractField:
         except:
             return self.default
 
+
+g_geneNameStandardizer = {}
+
+class _GeneNameStandardizer:
+    def __init__(self, convertTo='geneSymbol'):
+        self.convertTo = convertTo
+        # CREATE TABLE `kgAlias` (
+        #  `kgID` varchar(40) NOT NULL default '',
+        #  `alias` varchar(80) default NULL,
+        #  KEY `kgID` (`kgID`),
+        #  KEY `alias` (`alias`)
+        #) 
+        kgAliasFile = downloadFile('ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgAlias.txt.gz')
+        #CREATE TABLE `kgXref` (
+        #  `kgID` varchar(255) NOT NULL,
+        #  `mRNA` varchar(255) NOT NULL,
+        #  `spID` varchar(255) NOT NULL,
+        #  `spDisplayID` varchar(255) NOT NULL,
+        #  `geneSymbol` varchar(255) NOT NULL,
+        #  `refseq` varchar(255) NOT NULL,
+        #  `protAcc` varchar(255) NOT NULL,
+        #  `description` longblob NOT NULL,
+        #  `rfamAcc` varchar(255) NOT NULL,
+        #  `tRnaName` varchar(255) NOT NULL,
+        #  KEY `kgID` (`kgID`),
+        #  KEY `mRNA` (`mRNA`),
+        #  KEY `spID` (`spID`),
+        #  KEY `spDisplayID` (`spDisplayID`),
+        #  KEY `geneSymbol` (`geneSymbol`),
+        #  KEY `refseq` (`refseq`),
+        #  KEY `protAcc` (`protAcc`),
+        #  KEY `rfamAcc` (`rfamAcc`),
+        #  KEY `tRnaName` (`tRnaName`)
+        #) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+        #
+        kgXRefFile = downloadFile('ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgXref.txt.gz')
+        self.nameMap = self.processAlias(kgAliasFile, kgXRefFile)
+
+    def processAlias(self, kgAliasFile, kgXRefFile):
+        aliasMap = {}
+        XrefMap = {}
+        with openFile(kgAliasFile) as kgAlias:
+            for line in kgAlias:
+                kgID, alias = line.decode('UTF8').strip().split('\t', 1)
+                aliasMap[alias.upper()] = kgID
+        try:
+            resIndex = {
+                'kgID': 0,
+                'mRNA': 1,
+                'spID': 2,
+                'spDisplayID':3,
+                'geneSymbol': 4,
+                'refseq': 5,
+                'protAcc': 6,
+                'description': 7,
+                'rfamAcc': 8,
+                'tRnaName': 9
+            }[self.convertTo]
+        except KeyError as e:
+            raise ValueError('Incorrect conversion type {}. Allowed types for GeneNameStandardizer '
+                'are kgID, mRNA, spID, spDisplayID, geneSymbol, refseq, protAcc, description, rfamAcc, and tRnaName'.format(self.convertTo))
+        with openFile(kgXRefFile) as kgXRef:
+            for line in kgXRef:
+                try:
+                    fields = line.decode('UTF8').strip().split('\t', 9)
+                except:
+                    # ignore invalid lines
+                    continue
+                XrefMap[fields[0]] = fields[resIndex]
+        # get the final map
+        nameMap = {}
+        for alias in aliasMap:
+            # if not, just ignore the alias
+            try:
+                name = XrefMap[aliasMap[alias]]
+            except:
+                # if does not exist, just pass
+                continue
+            #
+            if name == alias:
+                continue
+            # if there is alreay another name
+            if alias in nameMap:
+                #nameMap[alias].append(name)
+                sys.stderr.write('Multiple {} names for alias {}: {} used\n'.format(self.convertTo, alias, name))
+            nameMap[alias] = name
+        #
+        return nameMap
+
+    def __call__(self, item):
+        try:
+            #if item.upper() in self.nameMap:
+            #    print item.upper(), '==> ', self.nameMap[item.upper()]
+            return self.nameMap[item.upper()]
+        except Exception as e:
+            return item
+
+def ConvertGeneName(convertTo='geneSymbol'):
+    global g_geneNameStandardizer
+    if convertTo not in g_geneNameStandardizer:
+        g_geneNameStandardizer[convertTo] = _GeneNameStandardizer(convertTo)
+    return g_geneNameStandardizer[convertTo];
+
+
 class CheckSplit:
     def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
@@ -310,15 +414,16 @@ class IncreaseBy:
 
 class MapValue:
     '''Map value to another one, return default if unmapped'''
-    def __init__(self, map, default=None):
+    def __init__(self, map, default=None, useDefault=True):
         self.map = map
         self.default = default
+        self.useDefault = useDefault
 
     def __call__(self, item):
         try:
             return self.map[item]
         except:
-            return self.default
+            return self.default if self.useDefault else item
         
 class RemoveLeading:
     '''Remove specified leading string if the input string starts with it. Used
