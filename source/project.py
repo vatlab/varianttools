@@ -45,7 +45,8 @@ from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger, \
+    getSnapshotInfo
 
 
 # define a field type
@@ -1863,35 +1864,6 @@ class Project:
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
         
-    def getSnapshotInfo(self, name):
-        '''return meta information for all snapshots'''
-        if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
-            snapshot_file = name
-            mode = 'r' if name.endswith('.tar') else 'r:gz'
-        elif name.isalnum():
-            snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
-            mode = 'r'
-        else:
-            raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
-        #
-        try:
-            with tarfile.open(snapshot_file, mode) as snapshot:
-                files = snapshot.getnames()
-                info_file = '.snapshot.info' if '.snapshot.info' in files else 'README'
-                if info_file not in files:
-                    raise ValueError('{}: cannot find snapshot information'.format(snapshot_file))
-                snapshot.extract(info_file, runOptions.cache_dir)
-                with open(os.path.join(runOptions.cache_dir, info_file), 'r') as readme:
-                    readme.readline()   # header line
-                    name = readme.readline()[6:].rstrip()  # snapshot name
-                    date = readme.readline()[6:].rstrip()  # date
-                    message = ' '.join(readme.read()[6:].split('\n'))  # message
-                os.remove(os.path.join(runOptions.cache_dir, info_file))
-                return (name, date, message)
-        except Exception as e:
-            self.logger.debug('{}: snapshot read error: {}'.format(snapshot_file, e))
-            return (None, None, None)
-
     #
     # temporary table which are created in separate database
     # because it is very slow for delite to remove temporary table
@@ -3585,7 +3557,7 @@ def show(args):
                     raise ValueError('Please provide a list of snapshot name or filenames')
                 print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot in args.items:
-                    name, date, desc = proj.getSnapshotInfo(snapshot)
+                    name, date, desc = getSnapshotInfo(snapshot, proj.logger)
                     if name is not None:
                         print('{:<18} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
@@ -3594,7 +3566,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
                 print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
-                    name, date, desc = proj.getSnapshotInfo(snapshot_file)
+                    name, date, desc = getSnapshotInfo(snapshot_file, proj.logger)
                     if name is not None:
                         print('{:<18} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))

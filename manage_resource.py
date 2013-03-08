@@ -27,24 +27,25 @@
 import os
 import sys
 import argparse
+import logging
 from variant_tools.utils import ResourceManager
-
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
-    parser.add_argument('--generate_local_manifest', nargs='*',
+    parser.add_argument('--generate_local_manifest', nargs='?', default=False,
         help='''Generate a manifest of local resource files. If a directory is not specified,
             $HOME/.variant_tools will be assumed. The manifest will be saved to 
             MANIFEST_local.txt.''')
     #
     args = parser.parse_args()
-    if args.generate_local_manifest is not None:
-        manager = ResourceManager()
-        manifest = manager.generateLocalManifest(None if args.generate_local_manifest == [] else args.generate_local_manifest)
-        with open('MANIFEST_local.txt', 'w') as manifest_file:
-            for record in manifest:
-                manifest_file.write('{}\t{}\t\n'.format(record[0], record[1]))
+    logging.basicConfig()
+    logger = logging.getLogger()
+    if args.generate_local_manifest is not False:
+        manager = ResourceManager(logger)
+        # --generte_local_manifest without parameter will pass None, which will
+        # use ~/.variant_tools.
+        manifest = manager.generateLocalManifest('MANIFEST_local.txt', args.generate_local_manifest)
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
 
 

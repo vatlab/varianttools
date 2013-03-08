@@ -48,6 +48,8 @@ import stat
 import random
 import shutil
 import hashlib
+import ConfigParser
+import tarfile
 
 try:
     # not all platforms/installations of python support bz2
@@ -781,43 +783,150 @@ class ProgressBar:
         sys.stderr.flush()
 
 
+def getSnapshotInfo(name, logger=None):
+    '''return meta information for all snapshots'''
+    if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
+        snapshot_file = name
+        mode = 'r' if name.endswith('.tar') else 'r:gz'
+    elif name.isalnum():
+        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+        mode = 'r'
+    else:
+        raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
+    #
+    try:
+        with tarfile.open(snapshot_file, mode) as snapshot:
+            files = snapshot.getnames()
+            info_file = '.snapshot.info' if '.snapshot.info' in files else 'README'
+            if info_file not in files:
+                raise ValueError('{}: cannot find snapshot information'.format(snapshot_file))
+            readme = snapshot.extractfile(info_file)
+            readme.readline()   # header line
+            name = readme.readline()[6:].rstrip()  # snapshot name
+            date = readme.readline()[6:].rstrip()  # date
+            message = ' '.join(readme.read()[6:].split('\n'))  # message
+            readme.close()
+            return (name, date, message)
+    except Exception as e:
+        if logger is not None:
+            logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
+        return (None, None, None)
+
+
+
 class ResourceManager:
-    def __init__(self):
+    def __init__(self, logger=None):
         # get a manifest of remote files
         self.manifest = None
+        self.logger = logger
 
-    def generateLocalManifest(self, resource_dir=None):
-        #
+    def generateLocalManifest(self, dest_file, resource_dir=None):
+        '''Returns a manifest for all files under a default or
+        specified resource directory. It is used by program manage_resource
+        to forcefully generate a manifest file.'''
         if resource_dir is None:
             resource_dir = os.path.expanduser('~/.variant_tools')
         #
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
-            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files])
-        prog = ProgressBar('Checking local files', sum([x[1] for x in filenames]))
-        manifest = []
+            # ignore hidden files and directories (starts with .)
+            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files if not x.startswith('.')])
+        prog = ProgressBar('Scanning local files', sum([x[1] for x in filenames]))
         total_size = 0
-        for filename, filesize in filenames:
-            manifest.append((filename[len(resource_dir)+1:], self.calculateMD5(filename)))
-            total_size += filesize
-            prog.update(total_size)
+        with open(dest_file, 'w') as manifest:
+            for filename, filesize in filenames:
+                rel_path = os.path.relpath(filename, resource_dir)
+                md5 = self.calculateMD5(filename)
+                comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
+                manifest.write('{}\t{}\t{}\t{}\n'.format(rel_path, filesize, md5, comment))
+                total_size += filesize
+                prog.update(total_size)
         prog.done()
-        return manifest
+    
+    def getCommentFromConfigFile(self, filename, section, option):
+        '''Get comment from annotation description file.'''
+        try:
+            parser = ConfigParser.SafeConfigParser()
+            parser.read(filename) 
+            return parser.get(section, option)
+        except Exception as e:
+            if self.logger is not None:
+                self.logger.warning('Failed to get comment file config file {}: {}'.format(filename, e))
+            return ''
+
+    def getComment(self, filename):
+        '''Get the comment from filename according to its type'''
+        if filename.lower().endswith('.fmt'):       # file format
+            return self.getCommentFromConfigFile(filename, 'format description', 'description')
+        elif filename.lower().endswith('.db.gz'):   # annotation database
+            if os.path.isfile(filename[:-6] + '.ann'):
+                # we do not have a project .... let us parse .ann file directly
+                return self.getCommentFromConfigFile(filename[:-6] + '.ann', 'data sources', 'description')
+            else:
+                return ''
+        elif filename.lower().endswith('ann'):      # annotation
+            return self.getCommentFromConfigFile(filename, 'data sources', 'description')
+        elif filename.lower().endswith('.tar.gz'):  # snapshot
+            (name, date, message) = getSnapshotInfo(filename, self.logger)
+            return '' if message is None else message
+        else:      # other files, e.g. crr file
+            return ''
         
-        
-    def getRemoteResources(self):
+    def getRemoteManifest(self):
+        '''Get a manifest of files on the server and parse it.'''
         try:
             (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt')
         except:
             raise RuntimeError('Failed to connect to variant tools resource website.')
         #
-        files = {}
+        self.manifest = {}
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
-                filename, md5, comment = line.decode('UTF8').split('\t', 2)
-                files[filename] = (md5, comment)
-        return files
+                filename, sz, md5, comment = line.decode('UTF8').split('\t', 3)
+                self.manifest[filename] = (sz, md5, comment)
+
+    def selectFiles(self, criteria, logger=None):
+        '''Select files from the remote manifest and see what needs to be downloaded'''
+        selected = {}
+        for filename, properties in self.manifest.iteritems():
+            for criterion in criteria:
+                # if match filename or comment
+                if criterion in filename or criterion in record[2]:
+                    selected[filename] = properties
+        # 
+        if logger is not None:
+            logger.info('{} files are selected from {} files using criteria {}'.format(len(selected), len(self.manifest), ', '.join(criteria)))
+        self.manifest = selected
+
+    def excludeExistingLocalFiles(self, resource_dir=None):
+        '''Go throughlocal files, check if they are in manifest. If they are
+        check if they are identical to remote files'''
+        if resource_dir is None:
+            resource_dir = os.path.expanduser('~/.variant_tools')
+        #
+        # go through directories
+        filenames = []
+        for root, dirs, files in os.walk(resource_dir):
+            # ignore hidden files and directories (starts with .)
+            # get relative filenames
+            for f in files:
+                rel_name = os.path.relpath(os.path.join(root, f), resource_dir)
+                if rel_name in self.manifest:
+                    filenames.append((os.path.join(root, f), rel_name, os.path.getsize(os.path.join(root, f))))
+        prog = ProgressBar('Scanning local files', sum([x[2] for x in filenames]))
+        total_size = 0
+        for filename, rel_name, filesize in filenames:
+            # if file size are different, will be copied
+            if filesize == self.manifest[rel_name][0] and self.calculateMD5(filename) == self.manifest[rel_name][1]:
+                self.manifest.pop(rel_name)
+            prog.update(total_size)
+        prog.done()
+
+    def downloadResources(self):
+        '''Download resources'''
+        for filename in self.manifest:
+            downloadFile(filename)
 
     def calculateMD5(self, filename, block_size=2**20):
         # calculate md5 for specified file
