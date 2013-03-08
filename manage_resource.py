@@ -28,8 +28,26 @@ import os
 import sys
 import argparse
 import logging
+import time
 from variant_tools.utils import ResourceManager
+import base64
+from ftplib import FTP
 
+def uploadFile(local_file, remote_file, username, password, logger):
+    # upload a local file to houstonbioinformatics.org
+    ftp = FTP('www.houstonbioinformatics.org')
+    ftp.login(username, password)
+    ftp.cwd('vtools')
+    d, f = os.path.split(remote_file)
+    if d:
+        logger.info('CWD {}'.format(d))
+        ftp.cwd(d)
+    new_f = '{}_{}'.format(f, time.strftime('%b%d', time.gmtime()))
+    logger.info('RENAME {} {}'.format(f, new_f))
+    ftp.rename(f, new_f)
+    logger.info('STOR {}'.format(f))
+    ftp.storbinary('STOR {}'.format(f), open(local_file, 'rb'))
+    ftp.quit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
@@ -37,15 +55,52 @@ if __name__ == '__main__':
         help='''Generate a manifest of local resource files. If a directory is not specified,
             $HOME/.variant_tools will be assumed. The manifest will be saved to 
             MANIFEST_local.txt.''')
+    parser.add_argument('--upload', metavar='FILENAME',
+        help='''Upload file with name FILENAME to the server. The file should 
+            be under the local resource directory ~/.variant_tools.
+            A user name and password could be specified via parameters --username
+            and --password. The username and password will be saved for future use.''')
+    parser.add_argument('--username', nargs='?',
+        help='''User name used to connect to vtools.houstonbioinformatics.org.''')
+    parser.add_argument('--password', nargs='?',
+        help='''Password used to connect to vtools.houstonbioinformatics.org.''')
     #
     args = parser.parse_args()
-    logging.basicConfig()
-    logger = logging.getLogger()
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('RES')
     if args.generate_local_manifest is not False:
         manager = ResourceManager(logger)
         # --generte_local_manifest without parameter will pass None, which will
         # use ~/.variant_tools.
-        manifest = manager.generateLocalManifest('MANIFEST_local.txt', args.generate_local_manifest)
+        manager.scanDirectory(args.generate_local_manifest)
+        manager.writeManifest('MANIFEST_local.txt')
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
+    #
+    if args.upload:
+        if args.username is None or args.password is None:
+            try:
+                with open(os.path.expanduser('~/.vtools_resource'), 'r') as account:
+                    args.username = base64.b64decode(account.readline().decode().strip())
+                    args.password = base64.b64decode(account.readline().decode().strip())
+            except:
+                sys.exit('Please provide username and password.')
+            logger.info('Using stored username and password')
+        else:
+            try:
+                with open(os.path.expanduser('~/.vtools_resource'), 'w') as account:
+                    account.write('{}\n'.format(base64.b64encode(args.username)))
+                    account.write('{}\n'.format(base64.b64encode(args.password)))
+            except Exception as e:
+                sys.exit('Failed to save username and password: {}'.format(e))
+
+        resource_dir = os.path.expanduser('~/.variant_tools')
+        rel_path = os.path.relpath(args.upload, resource_dir)
+        manager = ResourceManager(logger)
+        # get information about file
+        manager.getRemoteManifest()
+        manager.addResource(args.upload)
+        manager.writeManifest('MANIFEST.tmp')
+        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.username, args.password, logger)
+        uploadFile(args.upload, rel_path, args.username, args.password, logger)
 
 

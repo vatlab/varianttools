@@ -817,10 +817,10 @@ def getSnapshotInfo(name, logger=None):
 class ResourceManager:
     def __init__(self, logger=None):
         # get a manifest of remote files
-        self.manifest = None
+        self.manifest = {}
         self.logger = logger
 
-    def generateLocalManifest(self, dest_file, resource_dir=None):
+    def scanDirectory(self, resource_dir=None):
         '''Returns a manifest for all files under a default or
         specified resource directory. It is used by program manage_resource
         to forcefully generate a manifest file.'''
@@ -834,16 +834,34 @@ class ResourceManager:
             filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files if not x.startswith('.')])
         prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[1] for x in filenames]))
         total_size = 0
-        with open(dest_file, 'w') as manifest:
-            for filename, filesize in filenames:
-                rel_path = os.path.relpath(filename, resource_dir)
-                md5 = self.calculateMD5(filename)
-                comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
-                manifest.write('{}\t{}\t{}\t{}\n'.format(rel_path, filesize, md5, comment))
-                total_size += filesize
-                prog.update(total_size)
+        for filename, filesize in filenames:
+            info = self.addResource(filename, resource_dir)
+            total_size += info[0]
+            prog.update(total_size)
         prog.done()
     
+    def writeManifest(self, dest_file):
+        keys = self.manifest.keys()
+        keys.sort()
+        with open(dest_file, 'w') as manifest:
+            for key in keys:
+                manifest.write('{0}\t{1[0]}\t{1[1]}\t{1[2]}\n'.format(key, self.manifest[key]))
+        
+    def addResource(self, filename, resource_dir=None):
+        if resource_dir is None:
+            resource_dir = os.path.expanduser('~/.variant_tools')
+        #
+        # if resource_dir is specified, filename 
+        #
+        rel_path = os.path.relpath(filename, resource_dir)
+        if rel_path.startswith('.'):
+            raise ValueError('Cannot add a resource that is not under the resoure directory {}'.format(resource_dir))
+        filesize = os.path.getsize(filename)
+        md5 = self.calculateMD5(filename)
+        comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
+        self.manifest[rel_path] = (filesize, md5, comment)
+        return self.manifest[rel_path]
+        
     def getCommentFromConfigFile(self, filename, section, option):
         '''Get comment from annotation description file.'''
         try:
