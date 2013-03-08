@@ -47,7 +47,7 @@ adj=RefAtPos(build="%(ref_genome)s")
 comment=Obtain reference allele from reference genome
 
 [alt]
-index=%(chr_pos)s, %(pos_col)s, %(a1_col)s, %(a2_col)s
+index=%(chr_col)s, %(pos_col)s, %(a1_col)s, %(a2_col)s
 type=VARCHAR(20)
 adj=AltAtPos(build="%(ref_genome)s")
 comment=Obtain reference allele from reference genome
