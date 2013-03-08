@@ -832,7 +832,7 @@ class ResourceManager:
         for root, dirs, files in os.walk(resource_dir):
             # ignore hidden files and directories (starts with .)
             filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files if not x.startswith('.')])
-        prog = ProgressBar('Scanning local files', sum([x[1] for x in filenames]))
+        prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[1] for x in filenames]))
         total_size = 0
         with open(dest_file, 'w') as manifest:
             for filename, filesize in filenames:
@@ -908,12 +908,13 @@ class ResourceManager:
                 rel_name = os.path.relpath(os.path.join(root, f), resource_dir)
                 if rel_name in self.manifest:
                     filenames.append((os.path.join(root, f), rel_name, os.path.getsize(os.path.join(root, f))))
-        prog = ProgressBar('Scanning local files', sum([x[2] for x in filenames]))
+        prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[2] for x in filenames]))
         total_size = 0
         for filename, rel_name, filesize in filenames:
             # if file size are different, will be copied
             if filesize == self.manifest[rel_name][0] and self.calculateMD5(filename) == self.manifest[rel_name][1]:
                 self.manifest.pop(rel_name)
+            total_size += filesize
             prog.update(total_size)
         prog.done()
 
