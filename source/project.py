@@ -3763,7 +3763,10 @@ def admin(args):
             elif args.update_resource is not None:
                 res = ResourceManager(proj.logger)
                 res.getRemoteManifest()
-                res.selectFiles(args.update_resource)
+                res.selectFiles(type='all', criteria=args.update_resource)
+                res.excludeExistingLocalFiles()
+                proj.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+                res.downloadResources()
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:

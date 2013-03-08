@@ -884,7 +884,7 @@ class ResourceManager:
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
                 filename, sz, md5, comment = line.decode('UTF8').split('\t', 3)
-                self.manifest[filename] = (sz, md5, comment.strip())
+                self.manifest[filename] = (int(sz), md5, comment.strip())
 
     def selectFiles(self, type='all', criteria=[], logger=None):
         '''Select files from the remote manifest and see what needs to be downloaded'''
@@ -893,26 +893,17 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('{}/'.format(type))}
         # 
         if criteria:
-            selected = {}
-            for filename, properties in self.manifest.iteritems():
-                for criterion in criteria:
-                    # if match filename or comment
-                    if criterion in filename or criterion in properties[2]:
-                        selected[filename] = properties
-            # 
-            self.manifest = selected
+            # need to match all ceritia
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if \
+                all([c in x or x in y[2] for c in criteria])}
 
-    def excludeExistingLocalFiles(self, resource_dir=None):
+    def excludeExistingLocalFiles(self):
         '''Go throughlocal files, check if they are in manifest. If they are
         check if they are identical to remote files'''
-        if resource_dir is None:
-            resource_dir = os.path.expanduser('~/.variant_tools')
-        #
+        resource_dir = os.path.expanduser(runOptions.local_resource)
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
-            # ignore hidden files and directories (starts with .)
-            # get relative filenames
             for f in files:
                 rel_name = os.path.relpath(os.path.join(root, f), resource_dir)
                 if rel_name in self.manifest:
@@ -929,7 +920,11 @@ class ResourceManager:
     def downloadResources(self):
         '''Download resources'''
         for filename in self.manifest:
-            downloadFile(filename)
+            dest_dir = os.path.join(runOptions.local_resource, os.path.split(filename)[0])
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+            downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
+                os.path.join(runOptions.local_resource, filename), False)
 
     def calculateMD5(self, filename, block_size=2**20):
         # calculate md5 for specified file
@@ -942,16 +937,6 @@ class ResourceManager:
                 md5.update(data)
         return md5.hexdigest()
 
-
-def downloadOrUpdateResources(criteria, build, alt_build):
-    #
-    res = ResourceManager()
-    #res.getRemoteResource(criteria, build, alt_build)
-    #res.getLocalResource()
-    # get files to download
-    #res.downloadFiles()
-    
-    #
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
     with open(infile, 'rb') as input, gzip.open(outfile, 'wb') as output:
