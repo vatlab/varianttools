@@ -38,13 +38,18 @@ def uploadFile(local_file, remote_file, username, password, logger):
     ftp = FTP('www.houstonbioinformatics.org')
     ftp.login(username, password)
     ftp.cwd('vtools')
+    # go to directory...
     d, f = os.path.split(remote_file)
     if d:
         logger.info('CWD {}'.format(d))
         ftp.cwd(d)
-    new_f = '{}_{}'.format(f, time.strftime('%b%d', time.gmtime()))
-    logger.info('RENAME {} {}'.format(f, new_f))
-    ftp.rename(f, new_f)
+    try:
+        new_f = '{}_{}'.format(f, time.strftime('%b%d', time.gmtime()))
+        ftp.rename(f, new_f)
+        logger.info('RENAME {} {}'.format(f, new_f))
+    except:
+        # if a new file, we do not need to rename the old file
+        pass
     logger.info('STOR {}'.format(f))
     ftp.storbinary('STOR {}'.format(f), open(local_file, 'rb'))
     ftp.quit()
