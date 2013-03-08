@@ -794,12 +794,14 @@ class ResourceManager:
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
-            filenames.extend([os.path.join(root, x) for x in files])
-        prog = ProgressBar('Checking local files', len(filenames))
+            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files])
+        prog = ProgressBar('Checking local files', sum([x[1] for x in filenames]))
         manifest = []
-        for idx, filename in enumerate(filenames):
+        total_size = 0
+        for filename, filesize in filenames:
             manifest.append((filename[len(resource_dir)+1:], self.calculateMD5(filename)))
-            prog.update(idx)
+            total_size += filesize
+            prog.update(total_size)
         prog.done()
         return manifest
         
@@ -826,7 +828,7 @@ class ResourceManager:
                 if not data:
                     break
                 md5.update(data)
-        return md5.digest()
+        return md5.hexdigest()
 
 
 def downloadOrUpdateResources(criteria, build, alt_build):

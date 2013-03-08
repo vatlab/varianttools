@@ -24,14 +24,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-#
-# use pyinstaller to build binaries. This script relies on other tools
-# such as git and is only intended to be used by developers of variant
-# tools.
-#
-
-
 import os
+import sys
 import argparse
 from variant_tools.utils import ResourceManager
 
@@ -48,11 +42,9 @@ if __name__ == '__main__':
     if args.generate_local_manifest is not None:
         manager = ResourceManager()
         manifest = manager.generateLocalManifest(None if args.generate_local_manifest == [] else args.generate_local_manifest)
-        files = manifest.keys()
-        files.sort()
-        with open('MANIFEST_local.txt', 'w') as manifest:
-            for filename in files:
-                manifest.write('{}\t{}\n'.format(filename, manifest[filename]))
-        sys.stderr('Local manifest has been saved to MANIFEST_local.txt\n') 
+        with open('MANIFEST_local.txt', 'w') as manifest_file:
+            for record in manifest:
+                manifest_file.write('{}\t{}\t\n'.format(record[0], record[1]))
+        sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
 
 
