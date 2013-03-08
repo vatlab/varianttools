@@ -47,6 +47,8 @@ import re
 import stat
 import random
 import shutil
+import hashlib
+
 try:
     # not all platforms/installations of python support bz2
     import bz2
@@ -779,6 +781,63 @@ class ProgressBar:
         sys.stderr.flush()
 
 
+class ResourceManager:
+    def __init__(self):
+        # get a manifest of remote files
+        self.manifest = None
+
+    def generateLocalManifest(self, resource_dir=None):
+        #
+        if resource_dir is None:
+            resource_dir = os.path.expanduser('~/.variant_tools')
+        #
+        # go through directories
+        filenames = []
+        for root, dirs, files in os.walk(resource_dir):
+            filenames.extend([os.path.join(root, x) for x in files])
+        prog = ProgressBar('Checking local files', len(filenames))
+        manifest = []
+        for idx, filename in enumerate(filenames):
+            manifest.append((filename[len(resource_dir)+1:], self.calculateMD5(filename)))
+            prog.update(idx)
+        prog.done()
+        return manifest
+        
+        
+    def getRemoteResources(self):
+        try:
+            (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt')
+        except:
+            raise RuntimeError('Failed to connect to variant tools resource website.')
+        #
+        files = {}
+        with open(manifest_file, 'r') as manifest:
+            for line in manifest:
+                filename, md5, comment = line.decode('UTF8').split('\t', 2)
+                files[filename] = (md5, comment)
+        return files
+
+    def calculateMD5(self, filename, block_size=2**20):
+        # calculate md5 for specified file
+        md5 = hashlib.md5()
+        with open(filename, 'rb') as f:
+            while True:
+                data = f.read(block_size)
+                if not data:
+                    break
+                md5.update(data)
+        return md5.digest()
+
+
+def downloadOrUpdateResources(criteria, build, alt_build):
+    #
+    res = ResourceManager()
+    #res.getRemoteResource(criteria, build, alt_build)
+    #res.getLocalResource()
+    # get files to download
+    #res.downloadFiles()
+    
+    #
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
     with open(infile, 'rb') as input, gzip.open(outfile, 'wb') as output:

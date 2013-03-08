@@ -3684,6 +3684,12 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
+    resource = parser.add_argument_group('Download or update resources')
+    resource.add_argument('--update_resource', nargs='*', metavar='CRITERIA',
+        help='''Download resource all resources or resources matching specified criteria.
+            The criteria can be any string matching the path or filename of the resource.
+            If no criterion is specified, all resources matching the project build or 
+            the latest genome build, and all file format etc will be downloaded.''')
 
 
 def admin(args):
@@ -3777,6 +3783,8 @@ def admin(args):
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
                 proj.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
+            elif args.update_resource is not None:
+                downloadOrUpdateResources(args.update_resource, proj.build, proj.alt_build)
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
