@@ -3472,7 +3472,7 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(type='format')
                 for fmt, prop in res.manifest.iteritems():
-                    print('{}\n{}\n'.format(fmt[len('format/'):-len('.fmt')],
+                    print('{}\n{}\n'.format(fmt[7:-4],
                         '\n'.join(textwrap.wrap(prop[2], initial_indent=' '*10,
                             subsequent_indent=' '*10))))
             elif args.type == 'format':
@@ -3575,9 +3575,11 @@ def show(args):
                         print('{:<18} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
                 #
-                snapshots = filesInURL('http://vtools.houstonbioinformatics.org/snapshot', ext='.tar.gz')
-                for ss in snapshots:
-                    print('{:<18} {:15} {}'.format(ss, 'NA', 'Public snapshot'))
+                res = ResourceManager(proj.logger)
+                res.getRemoteManifest()
+                res.selectFiles(type='snapshot')
+                for ss, prop in res.manifest.iteritems():
+                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', prop[2]))
     except Exception as e:
         sys.exit(e)
 
