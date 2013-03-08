@@ -884,20 +884,23 @@ class ResourceManager:
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
                 filename, sz, md5, comment = line.decode('UTF8').split('\t', 3)
-                self.manifest[filename] = (sz, md5, comment)
+                self.manifest[filename] = (sz, md5, comment.strip())
 
-    def selectFiles(self, criteria, logger=None):
+    def selectFiles(self, type='all', criteria=[], logger=None):
         '''Select files from the remote manifest and see what needs to be downloaded'''
-        selected = {}
-        for filename, properties in self.manifest.iteritems():
-            for criterion in criteria:
-                # if match filename or comment
-                if criterion in filename or criterion in record[2]:
-                    selected[filename] = properties
+        # if no ceriteria is specified, keep all files
+        if type != 'all':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('{}/'.format(type))}
         # 
-        if logger is not None:
-            logger.info('{} files are selected from {} files using criteria {}'.format(len(selected), len(self.manifest), ', '.join(criteria)))
-        self.manifest = selected
+        if criteria:
+            selected = {}
+            for filename, properties in self.manifest.iteritems():
+                for criterion in criteria:
+                    # if match filename or comment
+                    if criterion in filename or criterion in properties[2]:
+                        selected[filename] = properties
+            # 
+            self.manifest = selected
 
     def excludeExistingLocalFiles(self, resource_dir=None):
         '''Go throughlocal files, check if they are in manifest. If they are

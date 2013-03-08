@@ -46,7 +46,7 @@ from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
     filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger, \
-    getSnapshotInfo
+    getSnapshotInfo, ResourceManager
 
 
 # define a field type
@@ -3468,9 +3468,13 @@ def show(args):
             elif args.type == 'formats':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'.format(', '.join(args.items)))
-                FMTs = filesInURL('http://vtools.houstonbioinformatics.org/format', ext='.fmt')
-                for fmt in FMTs:
-                    print(fmt)
+                res = ResourceManager(proj.logger)
+                res.getRemoteManifest()
+                res.selectFiles(type='format')
+                for fmt, prop in res.manifest.iteritems():
+                    print('{}\n{}\n'.format(fmt[len('format/'):-len('.fmt')],
+                        '\n'.join(textwrap.wrap(prop[2], initial_indent=' '*10,
+                            subsequent_indent=' '*10))))
             elif args.type == 'format':
                 if not args.items:
                     raise ValueError('Please specify a format to display')
@@ -3660,8 +3664,7 @@ def adminArguments(parser):
     resource.add_argument('--update_resource', nargs='*', metavar='CRITERIA',
         help='''Download resource all resources or resources matching specified criteria.
             The criteria can be any string matching the path or filename of the resource.
-            If no criterion is specified, all resources matching the project build or 
-            the latest genome build, and all file format etc will be downloaded.''')
+            All resources will be downloaded if no criteria is specified.''')
 
 
 def admin(args):
@@ -3756,7 +3759,9 @@ def admin(args):
                 proj.loadSnapshot(args.load_snapshot)
                 proj.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
             elif args.update_resource is not None:
-                downloadOrUpdateResources(args.update_resource, proj.build, proj.alt_build)
+                res = ResourceManager(proj.logger)
+                res.getRemoteManifest()
+                res.selectFiles(args.update_resource)
             else:
                 proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
