@@ -1761,7 +1761,9 @@ class SKAT(ExternTest):
             self.Rargs.append('pr <- Get_Resampling_Pvalue(re)$p.value')
         else:
             self.Rargs.append('pr <- -9')
+        self.Rargs.append('write("BEGIN-OUTPUT", stdout())')
         self.Rargs.append('write(c(stat {0}, max(p,pr)), stdout())'.format(', re$p.value.noadj' if self.small_sample else ''))
+        self.Rargs.append('write("END-OUTPUT", stdout())')
         self.logger.debug("SKAT commands in action:\n\n###\n{0}\n###\n".format('\n'.join(self.Rargs)))
 
 
@@ -1779,7 +1781,9 @@ class SKAT(ExternTest):
                 if error:
                     self.logger.debug("WARNING message from SKAT package for group {0}: \n{1}".format(self.pydata['name'], error.decode(sys.getdefaultencoding())))
             # res: (sample_size, pvalue, stat, pvalue.adj)
-            res.extend(list(map(float, out.decode(sys.getdefaultencoding()).split())))
+            out = out.decode(sys.getdefaultencoding()).split()
+            out = out[out.index("BEGIN-OUTPUT") + 1:out.index("END-OUTPUT")]
+            res.extend(list(map(float, out)))
         except Exception as e:
             self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)

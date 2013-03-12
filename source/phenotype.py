@@ -186,12 +186,12 @@ class Sample:
                 if by_sample:
                     key = (None if fields[0] == 'None' else fields[0],)
                     if key in records:
-                        raise ValueError('Duplicate sample name ({}). Only the last record will be used'.format(key))
+                        raise ValueError('Duplicate sample name ({}).'.format(key))
                     records[key] = fields[1:]
                 else:
                     key = (fields[0], None if fields[1] == 'None' else fields[1])
                     if key in records:
-                        raise ValueError('Duplicate filename and sample name ({},{}). Only the last record will be used'.format(key[0], key[1]))
+                        raise ValueError('Duplicate filename and sample name ({},{}).'.format(key[0], key[1]))
                     records[key] = fields[2:]
             #
             new_fields = headers[(1 if by_sample else 2):]

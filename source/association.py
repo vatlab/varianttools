@@ -82,7 +82,7 @@ class ShelfDB:
 
     def _get_py2(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 10, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
          # pickle.loads only accepts string, ...
         return pickle.loads(str(self.cur.fetchone()[0]))
 
@@ -93,7 +93,7 @@ class ShelfDB:
 
     def _get_py3(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 10, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
         # pickle.loads accepts bytes directly
         return pickle.loads(self.cur.fetchone()[0])
 
@@ -245,7 +245,6 @@ class AssociationTestManager:
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
         #
-        proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         #
         # We automatically index genotypes before when we retrieved genotypes for each group.
         # With the new load genotype method, genotypes are loaded in batch so indexing does not
@@ -255,6 +254,7 @@ class AssociationTestManager:
         #
         #
         # step 5: indexes genotype tables if needed
+        # proj.db.attach('{}_genotype.DB'.format(proj.name), '__fromGeno')
         # unindexed_IDs = []
         # for id in self.sample_IDs:
         #     if not proj.db.hasIndex('__fromGeno.genotype_{}_index'.format(id)):
@@ -388,7 +388,7 @@ class AssociationTestManager:
             else:
                 raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
                     '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno),
-                    '' if not covar else (' and/or covariate' + ', '.join(covar))))
+                    '' if not covar else (' and/or covariate(s) ' + ', '.join(covar))))
 
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
@@ -416,14 +416,14 @@ class AssociationTestManager:
         #   chr VARCHAR(20),
         #   pos INT
         #
-        cur.execute('DROP TABLE IF EXISTS __fromGeno.__asso_tmp;')
-        cur.execute('DROP INDEX IF EXISTS __fromGeno.__asso_tmp_index;')
+        cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
+        cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
         # this table has
         #  variant_id
         #  groups (e.g. chr, pos)
         #  variant_info
         cur.execute('''\
-            CREATE TABLE __fromGeno.__asso_tmp (
+            CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL, _ignored INT, 
               {} {} {});
               '''.format(
@@ -447,19 +447,19 @@ class AssociationTestManager:
         self.from_clause = ', '.join(from_clause)
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups (ignored is 0)
-        query = 'INSERT INTO __fromGeno.__asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.format(
+        query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.format(
             self.table, group_fields,
             self.from_clause, self.where_clause)
         s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".format(':'.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('''\
-            CREATE INDEX __fromGeno.__asso_tmp_index ON __asso_tmp ({});
+            CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
             '''.format(','.join(['{} ASC'.format(x) for x in field_names])))
         del s
         # get group by
         cur.execute('''\
-            SELECT DISTINCT {} FROM __fromGeno.__asso_tmp;
+            SELECT DISTINCT {} FROM __asso_tmp;
             '''.format(', '.join(field_names)))
         groups = cur.fetchall()
         self.logger.info('{} groups are found'.format(len(groups)))
@@ -509,15 +509,16 @@ class GenotypeLoader(Process):
                 db = DatabaseEngine()
                 # readonly allows simultaneous access from several processes
                 db.connect(self.db_name, readonly=False)
+                db.attach('{0}.proj'.format(self.proj.name), '__fromVariants')
                 # move __asso_tmp to :memory: can speed up the process a lot
                 db.attach(':memory:', 'cache')
                 # filling __asso_tmp, this is per-process so might use some RAM
                 cur = db.cursor()
                 # variant info of the original __asso_tmp table are not copied because they are not used.
                 # we only copy records that are not ignored
-                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __asso_tmp WHERE _ignored = 0;'.format(
+                # No index is created for the in-ram database yet performance is satisfactory
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __fromVariants.__asso_tmp WHERE _ignored = 0;'.format(
                         ', '.join(self.group_names)))
-                cur.execute('CREATE INDEX cache.__asso_tmp_idx ON __asso_tmp (variant_id)')
                 # tells other processes that I am ready
                 self.ready_flags[self.index] = 1
                 self.logger.debug('Loader {} is ready'.format(self.index))
@@ -542,7 +543,7 @@ class GenotypeLoader(Process):
                                 ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
                                 ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
-                    executeUntilSucceed(cur, select_genotype_query, self.logger, 10, select_genotype_msg)
+                    executeUntilSucceed(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
@@ -704,6 +705,7 @@ class AssoTestsWorker(Process):
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
+        self.db.attach(param.proj.name + '.proj', '__fromVariant')
         #
         self.shelves = {}
         #
@@ -718,13 +720,13 @@ class AssoTestsWorker(Process):
 
     def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info}
-        query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
+        query = 'SELECT variant_id {0} FROM __fromVariant.__asso_tmp WHERE ({1})'.format(
             ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
         #self.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         # SELECT can fail when the disk is slow which causes database lock problem.
         msg = 'Load variant info for group {} using association worker {}'.format(group, self.index)
-        executeUntilSucceed(cur, query, self.logger, 10, msg, group)
+        executeUntilSucceed(cur, query, self.logger, 5, msg, group)
         #
         if not self.var_info:
             data = {x[0]:[] for x in cur.fetchall()}
@@ -962,7 +964,7 @@ def associate(args):
                             sys.exit(0)
                         # mark existing groups as ignored
                         cur = proj.db.cursor()
-                        query = 'UPDATE __fromGeno.__asso_tmp SET _ignored = 1 WHERE {}'.format(
+                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.format(
                             ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
                         for grp in existing_groups:
                             cur.execute(query, grp)
