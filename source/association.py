@@ -705,7 +705,7 @@ class AssoTestsWorker(Process):
             self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
-        self.db.attach(param.proj.name + '.proj', '__fromVariant')
+        self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
         #
         self.shelves = {}
         #

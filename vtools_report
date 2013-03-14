@@ -484,6 +484,77 @@ def plotGenoFields(args):
         # call the script
         executeRScript(script)
 
+#
+# meta analysis
+#
+
+from variant_tools.meta import MetaAnalysis
+def metaAnalysisArguments(parser):
+    parser.add_argument('--beta',
+            metavar = 'col',
+            type = int,
+            default = 0,
+            help='''column number of beta''')
+    parser.add_argument('--pval',
+            metavar = 'col',
+            type = int,
+            default = 0,
+            help='''column number of p-value''')
+    parser.add_argument('-n', '--size',
+            metavar = 'col',
+            type = int,
+            default = 0,
+            help='''column number of sample size''')
+    parser.add_argument('--link',
+            metavar = 'col',
+            type=int,
+            nargs = '+',
+            default = [0],
+            help='''columns that links entries of two datasets''')
+    parser.add_argument('--to_db',
+            metavar = 'database',
+            type = str,
+            help='''will write the results also to a sqlite3 database compatible
+            with vtools associate result format''')
+    parser.add_argument('files',
+            nargs = '+',
+            metavar = 'file',
+            help='''Input text files in the format of $vtools associate
+            output (supports plain text, gz or bz2 compressed text files)''')
+
+def metaAnalysis(args):
+    fs, beta, pval, size, linker = \
+            args.files, args.beta - 1, args.pval - 1, args.size - 1, [x - 1 for x in args.link]
+    for x in [beta, pval, size] + linker:
+        if x < 0:
+            raise ValueError('Invalid column specification for "--beta/--pval/-n/--link": '
+                                 'should be positive integers')
+    ma = MetaAnalysis(fs, beta, pval, size, linker, logger) 
+    # calculate p_meta and print results
+    print('\t'.join(ma.header))
+    if args.to_db:
+        ma.createDB(args.to_db)
+    res = []
+    for grp in ma.groups:
+        p = ma.calculate(grp)
+        s = ma.sample_size[grp] 
+        if p > 0:
+            print(('\t'.join(list(grp) + ['{:.3E}'.format(p).replace('E+00', ''), str(s)] + ['\t'.join(list(map(str,d[1][grp]))) for d in ma.data])))
+        if args.to_db:
+            res.append(list(grp))
+            res[-1].extend([p, s])
+            for d in ma.data:
+                res[-1].extend(d[1][grp])
+    if args.to_db:
+        try:
+            ma.writeDB(res)
+        except KeyboardInterrupt:
+            ma.done()
+        # sys.stderr.write("Tuning database ...\n")
+        ma.done()
+        # sys.stderr.write("Done!\n")
+   
+
 if __name__ == '__main__':
     #
     master_parser = argparse.ArgumentParser(description='''A collection of functions that
@@ -575,6 +646,13 @@ if __name__ == '__main__':
     plotGenoFieldsArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=plotGenoFields)
+    #
+    # command meta_analysis
+    parser = subparsers.add_parser('meta_analysis',
+        help = '''Meta analysis on multiple sets of association testing results.''')
+    metaAnalysisArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=metaAnalysis)
     #
     # getting args
     args = master_parser.parse_args()

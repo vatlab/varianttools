@@ -41,6 +41,7 @@ include source/compare.py
 include source/pyper.py
 include source/plinkfile.py
 include source/preprocessor.py
+include source/meta.py
 include source/assoTests.i
 include source/cgatools.i
 include source/swigpyrun.h

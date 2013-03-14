@@ -33,16 +33,30 @@
 #include "assoData.h"
 #include "action.h"
 #include "assoTests.h"
+#include "gsl/gsl_errno.h"
+#include "gsl/gsl_sf_gamma.h"
+#include "gsl/gsl_cdf.h"
 %}
 
-
+// gsl functions initialization
+%inline %{
+void my_error_handler(const char * reason, const char * file,
+                       int line, int gsl_errno)
+{
+    fprintf(stderr, "GSL Error %d:\t%s", gsl_errno, reason);
+}
+int gsl_initialize()
+{
+    gsl_set_error_handler(&my_error_handler);
+    return 1;
+}
+%} 
 
 %init
 %{
     vtools::initialize();
+    gsl_initialize();
 %}
-
-
 
 %include exception.i
 
@@ -99,3 +113,13 @@ namespace std
 %include "assoData.h"
 %include "action.h"
 %include "assoTests.h"
+
+// gsl functions
+extern double gsl_cdf_gaussian_P(double x, double sigma); 
+extern double gsl_cdf_gaussian_Q(double x, double sigma); 
+extern double gsl_cdf_gaussian_Pinv(double P, double sigma); 
+extern double gsl_cdf_gaussian_Qinv(double Q, double sigma); 
+extern double gsl_cdf_ugaussian_P(double x); 
+extern double gsl_cdf_ugaussian_Q(double x); 
+extern double gsl_cdf_ugaussian_Pinv(double P); 
+extern double gsl_cdf_ugaussian_Qinv(double Q); 
