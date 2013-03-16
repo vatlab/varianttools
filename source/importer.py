@@ -2173,7 +2173,7 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            if args.jobs == 1:
+            if args.jobs <= 1:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
