@@ -89,7 +89,10 @@ class AnnoDBConfiger:
         if not proj.build is None:
             if (not self.build.keys()[0] == '*') and (not proj.build in self.build.keys()) and (proj.alt_build is None or \
                 proj.alt_build not in self.build.keys()):
-                raise ValueError('Annotation database cannot be used for the existing project.')
+                raise ValueError('Annotation database cannot be used because it is based on a reference '
+                    'genome that is different from the one used by the project. Please use a version of '
+                    'annotation databse for the project (vtools show annotations), or liftover the existing '
+                    'project (vtoos liftover) to make it compatible with the annotation database.')
 
     def remove(self):
         '''Remove an annotation database'''
