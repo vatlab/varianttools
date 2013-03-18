@@ -51,6 +51,7 @@ import shutil
 import hashlib
 import ConfigParser
 import tarfile
+import binascii
 
 try:
     # not all platforms/installations of python support bz2
@@ -350,18 +351,26 @@ SQL_KEYWORDS = set([
 ])
 
 
-def validateTableName(name, exclude=[]):
-    '''Check if a table name can be used (e.g. not a SQL keyword).'''
-    if name.upper() in SQL_KEYWORDS:
-        raise ValueError("Table name '{}' is not allowed because it is a reserved word.".format(name))
-    if not name[0].isalpha():
-        raise ValueError('Name of variant table should start with a letter.')
-    if not name.replace('_', '').isalnum():
-        raise ValueError('Name of variant table should not contain special characters such as -.')
-    if name in exclude:
-        raise ValueError('Cannot create or overwrite a table with name {}'.format(name))
+def decodeTableName(name):
+    '''Decode a table to its name that could contain special characters'''
+    if name.startswith('_'):
+        if '_' in name[1:]:
+            realname, suffix = name[1:].split('_', 1)
+            realname = binascii.unhexlify(realname)
+            return '_'.join([realname, suffix])
+        else:
+            return binascii.unhexlify(name[1:])
+    else:
+        return name
 
-        
+def encodeTableName(name):
+    '''Get a normalized name for variant table'''
+    # if the table name is not ALPHA + ALPHANUM, use an internal name
+    if name.upper() in SQL_KEYWORDS or not name[0].isalpha() or not name.replace('_', '').isalnum():
+        return '_' + binascii.hexlify(name)
+    else:
+        return name
+
 
 #
 # Utility functions

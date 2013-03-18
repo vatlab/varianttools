@@ -46,7 +46,7 @@ from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
     filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger, \
-    getSnapshotInfo, ResourceManager
+    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
 
 
 # define a field type
@@ -3386,7 +3386,7 @@ def show(args):
                 print('{:<20} {:>10} {:>8}  {}'.format('table', '#variants', 'date', 'message'))
                 for table in proj.getVariantTables():
                     desc, date, cmd = proj.descriptionOfTable(table) 
-                    print('{:<20} {: >10,} {:>8}  {}'.format(table, proj.db.numOfRows(table), date, 
+                    print('{:<20} {: >10,} {:>8}  {}'.format(decodeTableName(table), proj.db.numOfRows(table), date, 
                         '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
@@ -3396,25 +3396,25 @@ def show(args):
                 # showing an annotation database
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
-                if not proj.db.hasTable(table):
-                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, table)):
-                        table = '{}_genotype.{}'.format(proj.name, table)
+                if not proj.db.hasTable(encodeTableName(table)):
+                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, encodeTableName(table))):
+                        table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
                     else:
                         raise ValueError('Table {} does not exist'.format(table))
                 # print description of table
-                desc, date, cmd = proj.descriptionOfTable(table)
+                desc, date, cmd = proj.descriptionOfTable(encodeTableName(table))
                 if date:  # if date is available, project has such information
                     print('# Description:   {}'.format(desc))
                     print('# Creation date: {}'.format(date))
                     print('# From command:  {}'.format(cmd))
                 # print content of table
-                headers = proj.db.getHeaders(table)
+                headers = proj.db.getHeaders(encodeTableName(table))
                 print(', '.join(headers))
                 cur = proj.db.cursor()
-                cur.execute('SELECT * FROM {} {};'.format(table, limit_clause))
+                cur.execute('SELECT * FROM {} {};'.format(encodeTableName(table), limit_clause))
                 for rec in cur:
                     print(', '.join([str(x) for x in rec]))
-                nAll = proj.db.numOfRows(table)
+                nAll = proj.db.numOfRows(encodeTableName(table))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'samples':

@@ -26,7 +26,7 @@
 
 import sys
 from .project import Project
-from .utils import ProgressBar, runOptions, validateTableName
+from .utils import ProgressBar, runOptions, encodeTableName, decodeTableName
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
@@ -63,12 +63,12 @@ def compareTwoTables(proj, args):
     variant_B = set()
     if args.count or not direct_query:
         # read variants in tables[0]
-        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.tables[0], exact=False), args.tables[0]))
-        cur.execute('SELECT variant_id from {};'.format(args.tables[0]))
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
+        cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[0])))
         variant_A = set([x[0] for x in cur.fetchall()])
         # read variants in tables[1]
-        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(args.tables[1], exact=False), args.tables[1]))
-        cur.execute('SELECT variant_id from {};'.format(args.tables[1]))
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[1]), exact=False), args.tables[1]))
+        cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[1])))
         variant_B = set([x[0] for x in cur.fetchall()])
     #
     if args.count:
@@ -86,21 +86,23 @@ def compareTwoTables(proj, args):
             (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.tables[0], args.tables[1])]:
         if table is None:
             continue
-        validateTableName(table, exclude=['variant'])
-        if proj.db.hasTable(table):
-            new_table = proj.db.backupTable(table)
-            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
-        proj.createVariantTable(table)
+        if table == 'variant':
+            raise ValueError('Cannot overwrite the master variant table')
+        if proj.db.hasTable(encodeTableName(table)):
+            new_table = proj.db.backupTable(encodeTableName(table))
+            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, decodeTableName(new_table)))
+        proj.createVariantTable(encodeTableName(table))
         if direct_query:
             #proj.db.startProgress('Creating table {}'.format(table))
             cur = proj.db.cursor()
-            query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=table, table_A=table_A, table_B=table_B)
+            query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=encodeTableName(table),
+                table_A=encodeTableName(table_A), table_B=encodeTableName(table_B))
             proj.logger.debug(query)
             cur.execute(query)
             #proj.db.stopProgress()
         else:
             prog = ProgressBar('Writing to ' + table, len(var))
-            query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
+            query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)
             # sort var so that variant_id will be in order, which might
             # improve database performance
             for count,id in enumerate(sorted(var)):
@@ -127,8 +129,8 @@ def compareMultipleTables(proj, args):
     variants = []
     for table in args.tables:
         # read variants in tables[0]
-        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(table, exact=False), table))
-        cur.execute('SELECT variant_id from {};'.format(table))
+        proj.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
+        cur.execute('SELECT variant_id from {};'.format(encodeTableName(table)))
         variants.append(set([x[0] for x in cur.fetchall()]))
     #
     var_diff = set()
@@ -163,23 +165,24 @@ def compareMultipleTables(proj, args):
         if not table_with_desc:
             continue
         table = table_with_desc[0]
-        validateTableName(table, exclude=['variant'])
+        if table == 'variant':
+            raise ValueError('Cannot overwrite the master variant table')
         desc = table_with_desc[1] if len(table_with_desc) == 2 else ''
         if len(table_with_desc) > 2:
             raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
-        if proj.db.hasTable(table):
-            new_table = proj.db.backupTable(table)
-            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, new_table))
-        proj.createVariantTable(table)
+        if proj.db.hasTable(encodeTableName(table)):
+            new_table = proj.db.backupTable(encodeTableName(table))
+            proj.logger.warning('Existing table {} is renamed to {}.'.format(table, decodeTableName(new_table)))
+        proj.createVariantTable(encodeTableName(table))
         prog = ProgressBar('Writing to ' + table, len(var))
-        query = 'INSERT INTO {} VALUES ({});'.format(table, proj.db.PH)
+        query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)
         # sort var so that variant_id will be in order, which might
         # improve database performance
         for count,id in enumerate(sorted(var)):
             cur.execute(query, (id,))
             if count % 10000 == 0:
                 prog.update(count)
-        proj.describeTable(table, desc, True, True)
+        proj.describeTable(encodeTableName(table), desc, True, True)
         prog.done()       
         proj.db.commit()
 
@@ -188,7 +191,7 @@ def compare(args):
         with Project(verbosity=args.verbosity) as proj:
             # table?
             for table in args.tables:
-                if not proj.isVariantTable(table):
+                if not proj.isVariantTable(encodeTableName(table)):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             # this is the old behavior
             if args.intersection or args.union or args.difference:
