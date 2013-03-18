@@ -3663,10 +3663,17 @@ def adminArguments(parser):
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
     resource = parser.add_argument_group('Download or update resources')
-    resource.add_argument('--update_resource', nargs='*', metavar='CRITERIA',
-        help='''Download resource all resources or resources matching specified criteria.
-            The criteria can be any string matching the path or filename of the resource.
-            All resources will be downloaded if no criteria is specified.''')
+    resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
+        const='current', 
+        choices=['current', 'all', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        help='''Download resources of specified type, which can be 'current' (latest version
+            of all resources excluding snapshots), 'all' (all resources including obsolete
+            databases), 'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
+            'annotation' (all annotation databases), 'format' (all formats), and
+            'snapshot' (all online snapshots). Identical resources that are available locally 
+            (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
+            option 'all' and 'annotation' will download all versions of annotation databases
+            which can be slow and take a lot of disk spaces.''')
 
 
 def admin(args):
@@ -3760,10 +3767,10 @@ def admin(args):
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
                 proj.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
-            elif args.update_resource is not None:
+            elif args.update_resource:
                 res = ResourceManager(proj.logger)
                 res.getRemoteManifest()
-                res.selectFiles(type='all', criteria=args.update_resource)
+                res.selectFiles(resource_type=args.update_resource)
                 res.excludeExistingLocalFiles()
                 proj.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()

@@ -830,8 +830,7 @@ class ResourceManager:
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
-            # ignore hidden files and directories (starts with .)
-            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files if not x.startswith('.')])
+            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files])
         prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[1] for x in filenames]))
         total_size = 0
         for filename, filesize in filenames:
@@ -845,7 +844,7 @@ class ResourceManager:
         keys.sort()
         with open(dest_file, 'w') as manifest:
             for key in keys:
-                manifest.write('{0}\t{1[0]}\t{1[1]}\t{1[2]}\n'.format(key, self.manifest[key]))
+                manifest.write('{0}\t{1[0]}\t{1[1]}\t{1[2]}\t{1[3]}\n'.format(key, self.manifest[key]))
         
     def addResource(self, filename, resource_dir=None):
         if resource_dir is None:
@@ -858,8 +857,9 @@ class ResourceManager:
             raise ValueError('Cannot add a resource that is not under the resoure directory {}'.format(resource_dir))
         filesize = os.path.getsize(filename)
         md5 = self.calculateMD5(filename)
+        refGenome = self.getRefGenome(filename)
         comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
-        self.manifest[rel_path] = (filesize, md5, comment)
+        self.manifest[rel_path] = (filesize, md5, refGenome, comment)
         return self.manifest[rel_path]
         
     def getCommentFromConfigFile(self, filename, section, option):
@@ -872,6 +872,32 @@ class ResourceManager:
             if self.logger is not None:
                 self.logger.warning('Failed to get comment file config file {}: {}'.format(filename, e))
             return ''
+
+    def getRefGenome(self, filename):
+        ann_file = filename
+        if filename.lower().endswith('.db.gz'):   # annotation database
+            if os.path.isfile(filename[:-6] + '.ann'):
+                ann_file = filename[:-6] + '.ann'
+            else:
+                if self.logger is not None:
+                    self.logger.warning('No .ann file could be found for database {}'.format(filename))
+                return '*'
+        elif filename.endswith('.ann'):
+            ann_file = filename
+        elif filename.endswith('build36.crr'):
+            return 'hg18'
+        elif filename.endswith('build37.crr'):
+            return 'hg19'
+        else:
+            return '*'
+        try:
+            parser = ConfigParser.SafeConfigParser()
+            parser.read(ann_file)
+            return ','.join([x[0] for x in parser.items('linked fields')])
+        except Exception as e:
+            if self.logger is not None:
+                self.logger.warning('Failed to get reference genome from .ann file {}: {}'.format(filename, e))
+            return '*'
 
     def getComment(self, filename):
         '''Get the comment from filename according to its type'''
@@ -901,19 +927,41 @@ class ResourceManager:
         self.manifest = {}
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
-                filename, sz, md5, comment = line.decode('UTF8').split('\t', 3)
-                self.manifest[filename] = (int(sz), md5, comment.strip())
+                filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 3)
+                self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
 
-    def selectFiles(self, type='all', criteria=[], logger=None):
+    def selectFiles(self, resource_type, logger=None):
         '''Select files from the remote manifest and see what needs to be downloaded'''
         # if no ceriteria is specified, keep all files
-        if type != 'all':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('{}/'.format(type))}
-        # 
-        if criteria:
-            # need to match all ceritia
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if \
-                all([c in x or x in y[2] for c in criteria])}
+        if resource_type == 'all':
+            return
+        elif resource_type == 'format':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('format/')}
+        elif resource_type == 'snapshot':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('snapshot/')}
+        elif resource_type == 'annotation':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
+        elif resource_type == 'hg18':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
+        elif resource_type in ('hg19', 'current'):
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg19' in y[2]}
+        # remove obsolete annotation databases 
+        if resource_type in ('hg18', 'hg19', 'current'):
+            try:
+                annoDBs = [(x, x.split('-')[0], x.split('-', 1)[1]) for x in self.manifest.keys() if x.startswith('annoDB/') and x.endswith('.DB.gz')]
+            except:
+                raise ValueError('Annotation database should always be versioned.')
+            # find the latest version of each db
+            versions = {}
+            for db in annoDBs:
+                if db[1] in versions:
+                    if versions[db[1]] < db[2]:
+                        versions[db[1]] = db[2]
+                else:
+                    versions[db[1]] = db[2]
+            # only keep the latest version
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if not x.startswith('annoDB/') or x.endswith('.ann') or \
+                x.split('-')[1] == versions[x.split('-')[0]]}
 
     def excludeExistingLocalFiles(self):
         '''Go throughlocal files, check if they are in manifest. If they are
