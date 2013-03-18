@@ -1015,7 +1015,7 @@ class ResourceManager:
             md5 = self.calculateMD5(os.path.join(runOptions.local_resource, filename))
             if md5 != fileprop[1]:
                 if self.logger is not None:
-                    self.logger.warning('MD5 mismatch. File {} on the server might have been tampered.'.format(filename))
+                    self.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
 
     def calculateMD5(self, filename, block_size=2**20):
         # calculate md5 for specified file
