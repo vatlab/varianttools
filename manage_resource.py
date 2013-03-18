@@ -37,14 +37,14 @@ def uploadFile(local_file, remote_file, username, password, logger):
     # upload a local file to houstonbioinformatics.org
     ftp = FTP('www.houstonbioinformatics.org')
     ftp.login(username, password)
-    ftp.cwd('vtools')
+    ftp.cwd('/vtools')
     # go to directory...
     d, f = os.path.split(remote_file)
     if d:
-        logger.info('CWD {}'.format(d))
         ftp.cwd(d)
+        logger.info('CWD {}'.format(ftp.pwd()))
     try:
-        new_f = '{}_{}'.format(f, time.strftime('%b%d', time.gmtime()))
+        new_f = '{}_{}.bak'.format(f, time.strftime('%b%d', time.gmtime()))
         ftp.rename(f, new_f)
         logger.info('RENAME {} {}'.format(f, new_f))
     except:
@@ -56,12 +56,16 @@ def uploadFile(local_file, remote_file, username, password, logger):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
-    parser.add_argument('--generate_local_manifest', nargs='?', default=False,
+    parser.add_argument('--generate_local_manifest', nargs='?', const='~/.variant_tools',
         help='''Generate a manifest of local resource files. If a directory is not specified,
             $HOME/.variant_tools will be assumed. The manifest will be saved to 
             MANIFEST_local.txt.''')
-    parser.add_argument('--upload', metavar='FILENAME',
-        help='''Upload file with name FILENAME to the server. The file should 
+    parser.add_argument('--diff', nargs='?', const='~/.variant_tools',
+        help='''Compare local resource files under specified directory with those on the
+            server and list missing, new, and modified files. If a directory is not specified,
+            $HOME/.variant_tools will be assumed.  ''')
+    parser.add_argument('--upload', metavar='FILE', nargs='+',
+        help='''Upload specified files to the server. The file should 
             be under the local resource directory ~/.variant_tools.
             A user name and password could be specified via parameters --username
             and --password. The username and password will be saved for future use.''')
@@ -73,15 +77,35 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('RES')
-    if args.generate_local_manifest is not False:
+    if args.generate_local_manifest is not None:
         manager = ResourceManager(logger)
+        print args.generate_local_manifest
         # --generte_local_manifest without parameter will pass None, which will
         # use ~/.variant_tools.
         manager.scanDirectory(args.generate_local_manifest)
         manager.writeManifest('MANIFEST_local.txt')
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
+    elif args.diff is not None:
+        manager = ResourceManager(logger)
+        manager.scanDirectory('~/.variant_tools')
+        local_manifest = {x:y for x,y in manager.manifest.items()}
+        manager.manifest.clear()
+        manager.getRemoteManifest()
+        remote_manifest = manager.manifest
+        #
+        # compare manifests
+        #
+        # new local files
+        for f, p in local_manifest.items():
+            if f not in remote_manifest:
+                print('NEW       {}'.format(f))
+            elif p[0] != remote_manifest[f][0] or p[1] != remote_manifest[f][1]:
+                print('MODIFIED  {}'.format(f))
+        for f, p in remote_manifest.items():
+            if f not in local_manifest:
+                print('MISSING   {}'.format(f))
     #
-    if args.upload:
+    elif args.upload:
         if args.username is None or args.password is None:
             try:
                 with open(os.path.expanduser('~/.vtools_resource'), 'r') as account:
@@ -99,13 +123,16 @@ if __name__ == '__main__':
                 sys.exit('Failed to save username and password: {}'.format(e))
 
         resource_dir = os.path.expanduser('~/.variant_tools')
-        rel_path = os.path.relpath(args.upload, resource_dir)
         manager = ResourceManager(logger)
-        # get information about file
         manager.getRemoteManifest()
-        manager.addResource(args.upload)
+        # get information about file
+        for filename in args.upload:
+            rel_path = os.path.relpath(filename, resource_dir)
+            manager.addResource(filename)
+            uploadFile(filename, rel_path, args.username, args.password, logger)
         manager.writeManifest('MANIFEST.tmp')
         uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.username, args.password, logger)
-        uploadFile(args.upload, rel_path, args.username, args.password, logger)
+    else:
+        logger.warning('No option has been provided. Please use -h to get a list of actions.')
 
 

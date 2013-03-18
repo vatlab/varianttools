@@ -826,6 +826,11 @@ class ResourceManager:
         to forcefully generate a manifest file.'''
         if resource_dir is None:
             resource_dir = os.path.expanduser('~/.variant_tools')
+        else:
+            resource_dir = os.path.expanduser(resource_dir)
+        if not os.path.isdir(resource_dir):
+            if self.logger is not None:
+                self.logger.error('Resource directory {} does not exist'.format(resource_dir))
         #
         # go through directories
         filenames = []
@@ -927,7 +932,7 @@ class ResourceManager:
         self.manifest = {}
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
-                filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 3)
+                filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 4)
                 self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
 
     def selectFiles(self, resource_type, logger=None):
