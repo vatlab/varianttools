@@ -249,10 +249,13 @@ def avgDepth(args):
 # Command variant_stat
 #
 def variantStatArguments(parser):
-    parser.add_argument('-s', '--samples', nargs='*', default=[],
+    parser.add_argument('-s', '--samples', nargs='*', const=['1'],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%%"').''')
+            'filename like "MG%%"'). If this parameter is specified without
+            a value, variants belonging to any of the samples will be counted.
+            If this parameter is left unspecified, all variants, including those
+            that do not belong to any samples will be counted.''')
     parser.add_argument('-g', '--group_by', nargs='*', default=[],
         help='''Group samples by certain conditions such as 'aff=1'. A common
             usage is to group variants by 'filename' and 'sample_name' so that
@@ -266,32 +269,56 @@ def variantStat(args):
     print('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions', 
         'num_substitutions', 'min_insertion_size', 'avg_insertion_size', 'max_insertion_size',
         'min_deletion_size', 'avg_deletion_size', 'max_deletion_size']))
-    for group, sample_ids, sample_names in getSamples(args.samples, args.group_by):
-        if len(sample_ids) == 0:
-            sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
-        #
+    if not args.samples and not args.group_by:   # no sample is specified:
         # 2a) Get the counts for snps and substitutions:
         #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 and length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
         num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 and length(alt) = 1)",
-            '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
+            '--count'])
         num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
-            '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
+            '--count'])
         #
         # 2b) Get the metrics to characterize the insertions
         #     command: vtools select variant "ref = '-'" --samples 'sample_id IN $sample_ids' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
         num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
-            ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
+            ['vtools', 'select', args.table, "ref='-'",
             '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
         #        
         # 2c) Get the metrics to characterize the deletions
         #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'       
         num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
-            ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
+            ['vtools', 'select', args.table, "alt='-'",
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
         #
         print('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
             num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
             min_deletion_size, avg_deletion_size, max_deletion_size]))
+    else:
+        for group, sample_ids, sample_names in getSamples(args.samples, args.group_by):
+            if len(sample_ids) == 0:
+                sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
+            #
+            # 2a) Get the counts for snps and substitutions:
+            #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 and length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
+            num_snps = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) = 1 and length(alt) = 1)",
+                '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
+            num_substitutions = getoutput(['vtools', 'select', args.table, "ref != '-'", "alt != '-'", "(length(ref) > 1 or length(alt) > 1)",
+                '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)), '--count'])
+            #
+            # 2b) Get the metrics to characterize the insertions
+            #     command: vtools select variant "ref = '-'" --samples 'sample_id IN $sample_ids' --output 'count(alt)', 'avg(length(alt))' 'min(length(alt))' 'max(length(alt))'
+            num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
+                ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
+                '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
+            #        
+            # 2c) Get the metrics to characterize the deletions
+            #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'       
+            num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
+                ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
+                '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
+            #
+            print('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
+                num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
+                min_deletion_size, avg_deletion_size, max_deletion_size]))
     
 
 #
