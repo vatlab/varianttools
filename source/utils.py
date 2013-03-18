@@ -1056,7 +1056,7 @@ def downloadURL(URL, dest, quiet):
             prog = ProgressBar(filename)
         with open(dest, 'wb') as f:
             c = pycurl.Curl()
-            c.setopt(pycurl.URL, URL)
+            c.setopt(pycurl.URL, str(URL))
             c.setopt(pycurl.WRITEFUNCTION, f.write)
             if not quiet:
                 c.setopt(pycurl.NOPROGRESS, False)
