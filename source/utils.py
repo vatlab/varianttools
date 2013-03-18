@@ -933,6 +933,8 @@ class ResourceManager:
         with open(manifest_file, 'r') as manifest:
             for line in manifest:
                 filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 4)
+                # ref genome might be unsorted
+                refGenome = ','.join(sorted(refGenome.split(',')))
                 self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
 
     def selectFiles(self, resource_type, logger=None):
@@ -948,25 +950,29 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
         elif resource_type == 'hg18':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
-        elif resource_type in ('hg19', 'current'):
+        elif resource_type == 'hg19':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg19' in y[2]}
         # remove obsolete annotation databases 
-        if resource_type in ('hg18', 'hg19', 'current'):
-            try:
-                annoDBs = [(x, x.split('-')[0], x.split('-', 1)[1]) for x in self.manifest.keys() if x.startswith('annoDB/') and x.endswith('.DB.gz')]
-            except:
-                raise ValueError('Annotation database should always be versioned.')
+        if resource_type in ('hg18', 'hg19', 'current', 'annotation'):
+            # y[2] is reference genome
+            annoDBs = [(x.split('-', 1), y[2]) for x,y in self.manifest.iteritems() if x.startswith('annoDB/') and not x.endswith('.ann')]
             # find the latest version of each db
             versions = {}
-            for db in annoDBs:
-                if db[1] in versions:
-                    if versions[db[1]] < db[2]:
-                        versions[db[1]] = db[2]
+            for db, refGenome in annoDBs:
+                if refGenome not in versions:
+                    versions[refGenome] = {}
+                if len(db) < 2:
+                    # no version 
+                    versions[refGenome][db[0]] = None
+                    continue
+                if db[0] in versions[refGenome]:
+                    if versions[refGenome][db[0]] < db[1]:
+                        versions[refGenome][db[0]] = db[1]
                 else:
-                    versions[db[1]] = db[2]
+                    versions[refGenome][db[0]] = db[1]
             # only keep the latest version
             self.manifest = {x:y for x,y in self.manifest.iteritems() if not x.startswith('annoDB/') or x.endswith('.ann') or \
-                x.split('-')[1] == versions[x.split('-')[0]]}
+                (x.split('-', 1)[1] if '-' in x else None) == versions[y[2]][x.split('-', 1)[0]]}
 
     def excludeExistingLocalFiles(self):
         '''Go throughlocal files, check if they are in manifest. If they are

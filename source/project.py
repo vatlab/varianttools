@@ -3669,11 +3669,11 @@ def adminArguments(parser):
         help='''Download resources of specified type, which can be 'current' (latest version
             of all resources excluding snapshots), 'all' (all resources including obsolete
             databases), 'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
-            'annotation' (all annotation databases), 'format' (all formats), and
+            'annotation' (all current annotation databases), 'format' (all formats), and
             'snapshot' (all online snapshots). Identical resources that are available locally 
             (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
-            option 'all' and 'annotation' will download all versions of annotation databases
-            which can be slow and take a lot of disk spaces.''')
+            option 'all' will download all versions of annotation databases which can be
+            slow and take a lot of disk spaces.''')
 
 
 def admin(args):
