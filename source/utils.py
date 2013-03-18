@@ -45,6 +45,7 @@ import copy
 import threading
 import re
 import stat
+import signal
 import random
 import shutil
 import hashlib
@@ -605,11 +606,9 @@ class ProgressBar:
         self.main = message
         self.main_start_time = time.time()
         self.message = self.main
-        try:
-            h,w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0'*8))[:2]
-            self.term_width = w
-        except:
-            self.term_width = 79
+        # get terminal width
+        self.handle_resize()
+        signal.signal(signal.SIGWINCH, self.handle_resize)
         # total count, including failed ones
         self.count = 0
         self.failed_count = 0
@@ -620,6 +619,14 @@ class ProgressBar:
         self.finished = 0
         self.reset('', totalCount)
 
+    def handle_resize(self, signum=None, frame=None):
+        'Tries to catch resize signals sent from the terminal.'
+        try:
+            h, w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0' * 8))[:2]
+            self.term_width = w
+        except:
+            self.term_width = 79
+        
     def reset(self, msg='', totalCount = None):
         if msg:
             self.message = '{} - {}'.format(self.main, msg)
@@ -997,7 +1004,8 @@ class ResourceManager:
 
     def downloadResources(self):
         '''Download resources'''
-        for filename, fileprop in self.manifest.iteritems():
+        for filename in sorted(self.manifest.keys()):
+            fileprop = self.manifest[filename]
             dest_dir = os.path.join(runOptions.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
