@@ -33,8 +33,48 @@ from variant_tools.utils import ResourceManager
 import base64
 from ftplib import FTP
 
+def getOrSaveAuthentication(username, password, logger):
+    if username is None or password is None:
+        try:
+            with open(os.path.expanduser('~/.vtools_resource'), 'r') as account:
+                return (base64.b64decode(account.readline().decode().strip()),
+                    base64.b64decode(account.readline().decode().strip()))
+        except:
+            sys.exit('Please provide username and password.')
+        logger.info('Using stored username and password')
+    else:
+        try:
+            with open(os.path.expanduser('~/.vtools_resource'), 'w') as account:
+                account.write('{}\n'.format(base64.b64encode(username)))
+                account.write('{}\n'.format(base64.b64encode(password)))
+        except Exception as e:
+            sys.exit('Failed to save username and password: {}'.format(e))
+        return (username, password)
+
+def deprecateFile(filename, username, password, logger):
+    # rename a file to another name if it exists
+    ftp = FTP('www.houstonbioinformatics.org')
+    ftp.login(username, password)
+    ftp.cwd('/vtools')
+    # go to directory...
+    d, f = os.path.split(filename)
+    if d:
+        ftp.cwd(d)
+        logger.info('CWD {}'.format(ftp.pwd()))
+    try:
+        new_f = '{}_{}.bak'.format(f, time.strftime('%b%d', time.gmtime()))
+        ftp.rename(f, new_f)
+        logger.info('RENAME {} {}'.format(f, new_f))
+    except:
+        # if a new file, we do not need to rename the old file
+        logger.info('Do not need to remove {} because it does not exist.'.format(f))
+        pass
+    ftp.quit()
+
 def uploadFile(local_file, remote_file, username, password, logger):
     # upload a local file to houstonbioinformatics.org
+    # This is inefficient for multiple files (repeated login and out), but does not
+    # really matter
     ftp = FTP('www.houstonbioinformatics.org')
     ftp.login(username, password)
     ftp.cwd('/vtools')
@@ -60,15 +100,19 @@ if __name__ == '__main__':
         help='''Generate a manifest of local resource files. If a directory is not specified,
             $HOME/.variant_tools will be assumed. The manifest will be saved to 
             MANIFEST_local.txt.''')
-    parser.add_argument('--diff', nargs='?', const='~/.variant_tools',
-        help='''Compare local resource files under specified directory with those on the
-            server and list missing, new, and modified files. If a directory is not specified,
-            $HOME/.variant_tools will be assumed.  ''')
+    parser.add_argument('--list', nargs='*',
+        help='''List all remote and local resources under ~/.variant_tools and mark them
+            as identical, missing, new, and modified. If any argument is given, only
+            resources with filename containing specified words are displayed.''')
     parser.add_argument('--upload', metavar='FILE', nargs='+',
         help='''Upload specified files to the server. The file should 
             be under the local resource directory ~/.variant_tools.
             A user name and password could be specified via parameters --username
             and --password. The username and password will be saved for future use.''')
+    parser.add_argument('--remove', metavar='FILENAME', nargs='+',
+        help='''Remove specified files from the online manifest so that it will no
+            longer be listed as part of the resource. The file itself, if exists, will
+            be renamed but not removed from the server.''') 
     parser.add_argument('--username', nargs='?',
         help='''User name used to connect to vtools.houstonbioinformatics.org.''')
     parser.add_argument('--password', nargs='?',
@@ -85,53 +129,56 @@ if __name__ == '__main__':
         manager.scanDirectory(args.generate_local_manifest)
         manager.writeManifest('MANIFEST_local.txt')
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
-    elif args.diff is not None:
+    elif args.list is not None:
         manager = ResourceManager(logger)
-        manager.scanDirectory('~/.variant_tools')
+        manager.scanDirectory('~/.variant_tools', args.list)
         local_manifest = {x:y for x,y in manager.manifest.items()}
         manager.manifest.clear()
         manager.getRemoteManifest()
         remote_manifest = manager.manifest
         #
         # compare manifests
-        #
-        # new local files
-        for f, p in local_manifest.items():
-            if f not in remote_manifest:
-                print('NEW       {}'.format(f))
-            elif p[0] != remote_manifest[f][0] or p[1] != remote_manifest[f][1]:
-                print('MODIFIED  {}'.format(f))
-        for f, p in remote_manifest.items():
+        for f, p in sorted(remote_manifest.iteritems()):
+            if args.list and not all([x in f for x in args.list]):
+                continue
             if f not in local_manifest:
                 print('MISSING   {}'.format(f))
-    #
+            elif p[0] != local_manifest[f][0] or p[1] != local_manifest[f][1]:
+                print('MODIFIED  {}'.format(f))
+            else:
+                print('IDENTICAL {}'.format(f))
+        for f, p in sorted(local_manifest.items()):
+            if f not in remote_manifest:
+                print('NEW      {}'.format(f))
     elif args.upload:
-        if args.username is None or args.password is None:
-            try:
-                with open(os.path.expanduser('~/.vtools_resource'), 'r') as account:
-                    args.username = base64.b64decode(account.readline().decode().strip())
-                    args.password = base64.b64decode(account.readline().decode().strip())
-            except:
-                sys.exit('Please provide username and password.')
-            logger.info('Using stored username and password')
-        else:
-            try:
-                with open(os.path.expanduser('~/.vtools_resource'), 'w') as account:
-                    account.write('{}\n'.format(base64.b64encode(args.username)))
-                    account.write('{}\n'.format(base64.b64encode(args.password)))
-            except Exception as e:
-                sys.exit('Failed to save username and password: {}'.format(e))
-
-        resource_dir = os.path.expanduser('~/.variant_tools')
+        username, password = getOrSaveAuthentication(args.username, args.password, logger)
         manager = ResourceManager(logger)
         manager.getRemoteManifest()
+        resource_dir = os.path.expanduser('~/.variant_tools')
         # get information about file
         for filename in args.upload:
             rel_path = os.path.relpath(filename, resource_dir)
             manager.addResource(filename)
-            uploadFile(filename, rel_path, args.username, args.password, logger)
+            uploadFile(filename, rel_path, username, password, logger)
         manager.writeManifest('MANIFEST.tmp')
-        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.username, args.password, logger)
+        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password, logger)
+    elif args.remove:
+        username, password = getOrSaveAuthentication(args.username, args.password, logger)
+        manager = ResourceManager(logger)
+        manager.getRemoteManifest()
+        removed_count = 0
+        for filename in args.remove:
+            if filename in manager.manifest:
+                manager.manifest.pop(filename)
+                deprecateFile(filename, username, password, logger)
+                logger.info('Remove {} from manifest'.format(filename))
+                removed_count += 1
+            else:
+                logger.warning('{} does not exist in the manifest'.format(filename))
+        # upload manifest
+        if removed_count > 0:
+            manager.writeManifest('MANIFEST.tmp')
+            uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password, logger)
     else:
         logger.warning('No option has been provided. Please use -h to get a list of actions.')
 

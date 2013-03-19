@@ -836,7 +836,7 @@ class ResourceManager:
         self.manifest = {}
         self.logger = logger
 
-    def scanDirectory(self, resource_dir=None):
+    def scanDirectory(self, resource_dir=None, filters=[]):
         '''Returns a manifest for all files under a default or
         specified resource directory. It is used by program manage_resource
         to forcefully generate a manifest file.'''
@@ -851,7 +851,8 @@ class ResourceManager:
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
-            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files])
+            filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files \
+                if not filters or all([y in os.path.relpath(os.path.join(root,x), resource_dir) for y in filters])])
         prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[1] for x in filenames]))
         total_size = 0
         for filename, filesize in filenames:
@@ -1013,18 +1014,25 @@ class ResourceManager:
 
     def downloadResources(self):
         '''Download resources'''
-        for filename in sorted(self.manifest.keys()):
+        for cnt, filename in enumerate(sorted(self.manifest.keys())):
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(runOptions.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
-            downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
-                os.path.join(runOptions.local_resource, filename), False)
-            # check md5
-            md5 = self.calculateMD5(os.path.join(runOptions.local_resource, filename))
-            if md5 != fileprop[1]:
+            try:
+                downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
+                    os.path.join(runOptions.local_resource, filename), False,
+                    message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
+                # check md5
+                md5 = self.calculateMD5(os.path.join(runOptions.local_resource, filename))
+                if md5 != fileprop[1]:
+                    if self.logger is not None:
+                        self.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
+            except KeyboardInterrupt as e:
+                raise e
+            except Exception as e:
                 if self.logger is not None:
-                    self.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
+                    self.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
 
     def calculateMD5(self, filename, block_size=2**20):
         # calculate md5 for specified file
@@ -1070,13 +1078,15 @@ def decompressIfNeeded(filename, inplace=True):
 #
 # Well, it is not easy to do reliable download
 # 
-def downloadURL(URL, dest, quiet):
+def downloadURL(URL, dest, quiet, message=None):
     # use libcurl? Recommended but not always available
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
+    if message is None:
+        message = filename
     try:
         import pycurl
         if not quiet:
-            prog = ProgressBar(filename)
+            prog = ProgressBar(message)
         with open(dest, 'wb') as f:
             c = pycurl.Curl()
             c.setopt(pycurl.URL, str(URL))
@@ -1119,7 +1129,7 @@ def downloadURL(URL, dest, quiet):
     
     # use python urllib?
     if not quiet:
-        prog = ProgressBar(filename)
+        prog = ProgressBar(message)
     try:
         urllib.URLopener().open(URL)
     except IOError as error_code:
