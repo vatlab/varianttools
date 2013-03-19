@@ -28,6 +28,7 @@ import sys, os
 import argparse
 import subprocess
 import logging
+from variant_tools.utils import RefGenome
 
 #
 # These functions are utility functions used by all reports
@@ -380,6 +381,52 @@ def discordanceRate(args):
             print('\t'.join(output_items))
 
 #
+# command sequence
+#
+def sequenceArguments(parser):
+    parser.add_argument('region', help='''Chromosome region in the format of
+        chr:start-end (e.g. chr21:33,031,597-33,041,570). Chromosome positions
+        are 1-based and are inclusive at both ends so the chromosome region
+        has a length of end-start+1 bp. A reversed sequence will be given if
+        starting position is after the ending position.''')
+    parser.add_argument('--build', nargs='?', 
+        help='''Output sequence at specified build of reference genome. The primary
+            reference genome of the project will be used if by default.''')
+    #parser.add_argument('--mutants', nargs='?',
+    #    help='''Adding mutants in specified table to the returned reference
+    #        sequence. Multiple alternative alleles at the same location
+    #        are not well-supported now.''')
+    
+def sequence(args):
+    # get build
+    if args.build is None:
+        args.build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
+    if not args.build:
+        raise RuntimeError('Failed to get build of reference from the current project.')
+    #
+    ref = RefGenome(args.build)
+    # get chromosomal region
+    try:
+        chr, location = args.region.split(':')
+        start, end = location.split('-')
+        start = int(start.replace(',', ''))
+        end = int(end.replace(',', ''))
+        if start == 0 or end == 0:
+            raise ValueError('0 is not allowed as starting or ending position')
+    except Exception as e:
+        raise ValueError('Incorrect format for chromosomal region: {}'.format(e))
+    # get reference seq
+    if start <= end:
+        seq = ref.getSequence(chr, start, end)
+        print('>ref|{}'.format(args.region))
+    else:
+        seq = ref.getSequence(chr, end, start)[::-1]
+        print('>ref|{}:{}-{} (reversed)'.format(chr, end, start))
+    # break into pieces of 100 bp
+    print('\n'.join([seq[i:i+100] for i in range(0, len(seq), 100)]))
+
+
+#
 # command plot_fields
 #
 def plotFieldsArguments(parser):
@@ -652,6 +699,18 @@ if __name__ == '__main__':
     discordanceRateArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=discordanceRate)
+    #
+    # command sequence
+    parser = subparsers.add_parser('sequence',
+        help = '''Obtain DNA sequence in specified chromosomal region. This command by default 
+            outputs nucleotide sequence at the reference genome.''')
+        #If a variant table is
+        #    given, it will attempt to generate a sequence with alternative alleles, using
+        #    IUB/IUPAC amino acid code. A warning message will be given if there are multiple
+        #    such sequences due to multiple alternative alleles at certain loci.''')
+    sequenceArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=sequence)
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',

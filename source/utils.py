@@ -1244,7 +1244,7 @@ class RefGenome:
             except ValueError:
                 self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
             # ok?
-            return self.crr.getSequence(Location(self.chrIdx[chr], start - 1, end))
+            return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
    
     def verify(self, chr, pos, ref):   
         try:
