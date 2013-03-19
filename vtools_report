@@ -419,10 +419,10 @@ def sequence(args):
         # get reference seq
         if start <= end:
             seq = ref.getSequence(chr, start, end)
-            print('>ref|{}'.format(region))
+            print('>ref|{}|{}'.format(args.build, region))
         else:
             seq = ref.getSequence(chr, end, start)[::-1]
-            print('>ref|{}:{}-{} (reversed)'.format(chr, end, start))
+            print('>ref|{}|{}:{}-{} (reversed)'.format(chr, args.build, end, start))
         # break into pieces of 100 bp
         print('\n'.join([seq[i:i+100] for i in range(0, len(seq), 100)]))
 
