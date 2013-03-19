@@ -9,10 +9,10 @@
 hg19=chr, pos, ref, alt
 
 [data sources]
-description=NHLBI GO Exome Sequencing Project (Exome Variant Server,  NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [6500 samples, July, 2012].)
-version=hg19_20120806
-source_url=http://evs.gs.washington.edu/evs_bulk_data/ESP6500.snps.vcf.tar.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/evs-esp6500-hg19_20120806.DB.gz
+description=NHLBI GO Exome Sequencing Project (Exome Variant Server, NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [6500 samples, February, 2013].)
+version=6500
+source_url=http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI.snps_indels.vcf.tar.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/evs-6500.DB.gz
 anno_type=variant
 source_type=txt
 
@@ -35,12 +35,13 @@ comment=dbSNP reference SNP identifier (if available)
 
 [ref]
 index=4
-type=CHAR(1) NOT NULL
+type=VARCHAR(255) NOT NULL
 comment=Variant alternate allele.
 
 [alt]
 index=5
-type=CHAR(1) NOT NULL
+type=VARCHAR(255) NOT NULL
+adj=CheckSplit()
 comment=Reference allele.
 
 [dbSNPVersion]

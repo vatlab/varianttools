@@ -9,16 +9,17 @@
 hg19=chr, pos, ref, alt
 
 [data sources]
+description=NHLBI GO Exome Sequencing Project (Exome Variant Server, NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [6500 samples, February, 2013].)
+version=6500
+source_url=http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI.snps_indels.vcf.tar.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/evs-6500.DB.gz
 anno_type=variant
-description=NHLBI GO Exome Sequencing Project (Exome Variant Server,  NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [November, 2011].)
-version=hg19_20111107
-source_url=http://vtools.houstonbioinformatics.org/annoDB/evs-hg19_20111107.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/evs-hg19_20111107.DB.gz
 source_type=txt
 
 [chr]
 index=1
 type=VARCHAR(20) NOT NULL
+adj=RemoveLeading('chr')
 comment=Chromosome that the variant was found in.
 
 [pos]
@@ -29,129 +30,165 @@ comment=Location on the chromosome (NCBI 37 or hg19), 1-based.
 [rs_id]
 index=3
 type=VARCHAR(20)
+adj=Nullify('.')
 comment=dbSNP reference SNP identifier (if available) 
 
-[alt]
+[ref]
 index=4
-type=CHAR(1) NOT NULL
+type=VARCHAR(255) NOT NULL
 comment=Variant alternate allele.
 
-[ref]
+[alt]
 index=5
-type=CHAR(1) NOT NULL
+type=VARCHAR(255) NOT NULL
+adj=CheckSplit()
 comment=Reference allele.
 
+[dbSNPVersion]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('DBSNP=', ';')
+comment=dbSNP version which established the rs_id
+
 [EuropeanAmericanAltCount]
-index=6
+index=8
 type=INTEGER NOT NULL
-comment=The observed alt allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+adj=ExtractValue('EA_AC=', ';'), ExtractField(1, ',')
+comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [EuropeanAmericanRefCount]
-index=7
+index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('EA_AC=', ';'), ExtractField(2, ',')
 comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [AfricanAmericanAltCount]
 index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('AA_AC=', ';'), ExtractField(1, ',')
 comment=The observed alt allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [AfricanAmericanRefCount]
-index=9
+index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('AA_AC=', ';'), ExtractField(2, ',')
 comment=The observed ref allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [AllAltCount]
-index=10
+index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('TAC=', ';'), ExtractField(1, ',')
 comment=The observed alt allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [AllRefCount]
-index=11
+index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('TAC=', ';'), ExtractField(2, ',')
 comment=The observed ref allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
 
 [EuropeanAmericanMaf] 
-index=12
+index=8
 type=FLOAT NOT NULL
+adj=ExtractValue('MAF=', ';'), ExtractField(1, ','), lambda x: float(x)/100.0
 comment=The European American minor-allele frequency in percent.
 
 [AfricanAmericanMaf] 
-index=13
+index=8
 type=FLOAT NOT NULL
+adj=ExtractValue('MAF=', ';'), ExtractField(2, ','), lambda x: float(x)/100.0
 comment=The African American minor-allele frequency in percent.
 
 [AllMaf] 
-index=14
+index=8
 type=FLOAT NOT NULL
+adj=ExtractValue('MAF=', ';'), ExtractField(3, ','), lambda x: float(x)/100.0
 comment=The minor-allele frequency in percent for all populations.
 
 [AvgSampleReadDepth]
-index=15
+index=8
 type=INTEGER NOT NULL
+adj=ExtractValue('DP=', ';')
 comment=The average sample read depth.
 
 [Genes]
-index=16
-type=VARCHAR(20) NOT NULL
+index=8
+type=VARCHAR(255) 
+adj=ExtractValue('GL=', ';'), Nullify('none')
 comment=One or more genes for which the SNP is in the coding region (CCDS). 
 
 [GeneAccession]
-index=17
-type=VARCHAR(20) NOT NULL
+index=8
+type=VARCHAR(255) 
+adj=ExtractValue('GM=', ';'), Nullify('none')
 comment=NCBI mRNA transcripts accession number.
 
 [FunctionGvs]
-index=18
-type=VARCHAR(20) NOT NULL
+index=8
+type=VARCHAR(255) 
+adj=ExtractValue('FG=', ';')
 comment=The GVS functions are calculated by the Exome Variant Server; they are based on the alleles for all populations and individuals; the bases in the coding region are divided into codons (if a multiple of 3), and the resulting amino acids are examined.
 
 [AminoAcidChange]
-index=19
+index=8
 type=VARCHAR(20)
-comment:The corresponding amino acid change for a SNP. 
+adj=ExtractValue('AAC=', ';'), Nullify('none'), Nullify('none, none')
+comment=The corresponding amino acid change for a SNP. 
 
 [ProteinPos]
-index=20
+index=8
 type=VARCHAR(20)
+adj=ExtractValue('PP=', ';'), Nullify('NA,NA'), Nullify('NA')
 comment=The coresponding amino acid postion in a protein relative to the whole protein length. 
 
 [cDNAPos]
-index=21
+index=8
 type=INTEGER
+adj=ExtractValue('CDP=', ';'), Nullify('NA,NA'), Nullify('NA')
 comment=The coresponding cDNA postion for a SNP. 
 
 [ConservationScorePhastCons]
-index=22
+index=8
 type=FLOAT
+adj=ExtractValue('CP=', ';'), Nullify('NA')
 comment=A number between 0 and 1 that describes the degree of sequence conservation among 17 vertebrate species; these numbers are downloaded from the UCSC Genome site and are defined as the "posterior probability that the corresponding alignment column was generated by the conserved state of the phylo-HMM, given the model parameters and the multiple alignment" (see UCSC description). 
 
 [ConservationScoreGERP]
-index=23
+index=8
 type=FLOAT
+adj=ExtractValue('CG=', ';'), Nullify('NA')
 comment=The rejected-substitution score from the program GERP, a number between -11.6 and 5.82 that describes the degree of sequence conservation among 34 mammalian species, with 5.82 being the most conserved; these scores were provided by Gregory M. Cooper of the University of Washington Department of Genome Sciences to the EVS project. 
 
 [GranthamScore]
-index=24
+index=8
 type=INTEGER
+adj=ExtractValue('GS=', ';'), Nullify('NA,NA'), Nullify('NA')
 comment=Grantham Scores categorize codon replacements into classes of increasing chemical dissimilarity based on the publication by Granthan R.in 1974, Amino acid difference formula to help explain protein evolution. Science 1974 185:862-864.	
 
 [PolyPhenPrediction]
-index=25
+index=8
 type=VARCHAR(20)
+adj=ExtractValue('PH=', ';')
 comment=Prediction of possible impact of an amino acid substitution on protein structure and function based on Polymorphism Phenotyping (PolyPhen) program. 
 
 [ChimpAllele]
-index=27
+index=8
 type=CHAR(1)
+adj=ExtractValue('AA=', ';')  
 comment=Chimp alleles are acquired from UCSC human/chimp alignment files. If the variation does not fall within an alignment block, or if it is an indel, the chimp allele is listed as "unknown". If the variation falls within a gap in the alignment, it is listed as "-". 
 
 [ClinicalLink]
-index=28
+index=8
 type=VARCHAR(100)
+adj=ExtractValue('CA=', ';')  
 comment=The potential clinical implications associated with a SNP (limited). 
 
+[ExomeChip]
+index=8
+type=VARCHAR(20)
+adj=ExtractValue('EXOME_CHIP=', ';')  
+comment=Whether a SNP is on the Illumina HumanExome Chip
+
 [FilterStatus]
-index=29
+index=7
 type=VARCHAR(25)
-comment=The column indicates if a SNP passes or fails on the filtering critieria listed. Depth:	Total read depth less than 2520, or, greater than 2520000; Strand Bias: Strand bias less than -10, or, greater than 10; Allele Balance: Allele balance greater than 65; Near Indels: Within 5bp from known Indel; Quality: Quality less than 20; Sample Coverage: Number of samples with coverage less than 1700; AOI: inflation in number of alleles that are non-reference/non-alternative greater than 3; CBR10 and cbr-15: Cycle bias filters, CBR10 greater than 10 and cbr-15 less than -15
+comment=A machine-learning technique called support vector machine (SVM) classification was applied for variant filtering. After the initial SNP calls were generated, we re-examined the BAM files to collect additional information about each variant site. Based on the information, variants are initially filtered by individual thresholds. For example, variants with posterior probability <99% (glfMultiples SNP quality <20), were <5bp away from an indel detected in the 1000 Genomes Pilot Project, had total depth across samples of <5,379 or >5,379,000 reads (~1-1000 reads per sample), having >65% of reads as heterozygotes carrying the variant allele or where the absolute squared correlation between allele (variant or reference) and strand (forward or reverse) was >0.15 were marked as problematic SNPs. Sites failed 3 or more criteria are used as negative examples to train SVM classifier. HapMap3 and OMNI polymorphic sites were used as positive examples. The SVM classifier produces scores for each site, and we marked ~8.5% of sites at threshold 0.3 as SVM filter-failed. The unfiltered set had Ti/Tv = 2.63, and the filtered set had Ti/Tv =2.78.
