@@ -149,7 +149,7 @@ if __name__ == '__main__':
                 print('IDENTICAL {}'.format(f))
         for f, p in sorted(local_manifest.items()):
             if f not in remote_manifest:
-                print('NEW      {}'.format(f))
+                print('NEW       {}'.format(f))
     elif args.upload:
         username, password = getOrSaveAuthentication(args.username, args.password, logger)
         manager = ResourceManager(logger)

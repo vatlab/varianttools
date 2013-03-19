@@ -234,7 +234,7 @@ def select(args, reverse=False):
             else:
                 # select all variants
                 where_clause = ' WHERE 1 '
-                from_clause = 'FROM {} '.format(encodeTalbeName(args.from_table))
+                from_clause = 'FROM {} '.format(encodeTableName(args.from_table))
             # if limiting to specified samples
             if args.samples:
                 # we save genotype in a separate database to keep the main project size tolerable.

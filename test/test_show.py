@@ -41,6 +41,7 @@ class TestShow(ProcessTestCase):
         
     def removeProj(self):
         runCmd('vtools remove project')
+
     def testShow(self):
         'Test command vtools show'
         self.assertSucc('vtools show -h')

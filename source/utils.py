@@ -617,7 +617,11 @@ class ProgressBar:
         self.message = self.main
         # get terminal width
         self.handle_resize()
-        signal.signal(signal.SIGWINCH, self.handle_resize)
+        try:
+            signal.signal(signal.SIGWINCH, self.handle_resize)
+        except ValueError:
+            # signal only works in main thread, so this might not work in all cases
+            pass
         # total count, including failed ones
         self.count = 0
         self.failed_count = 0
@@ -1083,6 +1087,8 @@ def downloadURL(URL, dest, quiet, message=None):
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     if message is None:
         message = filename
+    if len(message) > 30:
+        message = message[:10] + '...' + message[-16:]
     try:
         import pycurl
         if not quiet:

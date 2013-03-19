@@ -3396,7 +3396,7 @@ def show(args):
                 # showing an annotation database
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
-                if not proj.db.hasTable(encodeTableName(table)):
+                elif not proj.db.hasTable(encodeTableName(table)):
                     if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, encodeTableName(table))):
                         table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
                     else:
@@ -3472,10 +3472,10 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'.format(', '.join(args.items)))
                 res = ResourceManager(proj.logger)
                 res.getRemoteManifest()
-                res.selectFiles(type='format')
+                res.selectFiles(resource_type='format')
                 for fmt, prop in res.manifest.iteritems():
                     print('{}\n{}\n'.format(fmt[7:-4],
-                        '\n'.join(textwrap.wrap(prop[2], initial_indent=' '*10,
+                        '\n'.join(textwrap.wrap(prop[3], initial_indent=' '*10,
                             subsequent_indent=' '*10))))
             elif args.type == 'format':
                 if not args.items:
@@ -3579,9 +3579,9 @@ def show(args):
                 #
                 res = ResourceManager(proj.logger)
                 res.getRemoteManifest()
-                res.selectFiles(type='snapshot')
+                res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
-                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', prop[2]))
+                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', prop[3]))
     except Exception as e:
         sys.exit(e)
 
