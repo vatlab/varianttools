@@ -3401,20 +3401,22 @@ def show(args):
                         table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
                     else:
                         raise ValueError('Table {} does not exist'.format(table))
+                else:
+                    table = encodeTableName(table)
                 # print description of table
-                desc, date, cmd = proj.descriptionOfTable(encodeTableName(table))
+                desc, date, cmd = proj.descriptionOfTable(table)
                 if date:  # if date is available, project has such information
                     print('# Description:   {}'.format(desc))
                     print('# Creation date: {}'.format(date))
                     print('# From command:  {}'.format(cmd))
                 # print content of table
-                headers = proj.db.getHeaders(encodeTableName(table))
+                headers = proj.db.getHeaders(table)
                 print(', '.join(headers))
                 cur = proj.db.cursor()
-                cur.execute('SELECT * FROM {} {};'.format(encodeTableName(table), limit_clause))
+                cur.execute('SELECT * FROM {} {};'.format(table, limit_clause))
                 for rec in cur:
                     print(', '.join([str(x) for x in rec]))
-                nAll = proj.db.numOfRows(encodeTableName(table))
+                nAll = proj.db.numOfRows(table)
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'samples':
