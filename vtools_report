@@ -385,10 +385,13 @@ def discordanceRate(args):
 #
 def sequenceArguments(parser):
     parser.add_argument('region', nargs='+', help='''One or more chromosome regions in
-        the format of chr:start-end (e.g. chr21:33,031,597-33,041,570). Chromosome
-        positions are 1-based and are inclusive at both ends so the chromosome region
-        has a length of end-start+1 bp. A reversed sequence will be given if
-        starting position is after the ending position.''')
+        the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), or Field:Value
+        for a region-based annotation database (e.g. refGene.name2:TRIM2 or
+        refGene_exon.name:NM_000947). Chromosome positions are 1-based and are inclusive
+        at both ends so the chromosome region has a length of end-start+1 bp. A reversed
+        sequence will be given if starting position is after the ending position. For the
+        second case, multiple sequences will be printed if the name matches more than one
+        chromosome regions.''')
     parser.add_argument('--build', nargs='?', 
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
@@ -398,7 +401,71 @@ def sequenceArguments(parser):
     #    help='''Adding mutants in specified table to the returned reference
     #        sequence. Multiple alternative alleles at the same location
     #        are not well-supported now.''')
-    
+
+
+def expandRegions(args):
+    regions = []
+    for region in args.region:
+        try:
+            chr, location = region.split(':', 1)
+            start, end = location.split('-')
+            start = int(start.replace(',', ''))
+            end = int(end.replace(',', ''))
+            if start == 0 or end == 0:
+                raise ValueError('0 is not allowed as starting or ending position')
+            if start > end:
+                regions.append((chr, start, end, '(reversed)'))
+            else:
+                regions.append((chr, start, end, ''))
+        except Exception as e:
+            # this is not a format for chr:start-end, try field:name
+            try:
+                field, value = region.split(':', 1)
+                annoDB = None
+                # now we need to figure out how to get start and end position...
+                lines = getoutput(['vtools', 'show', 'fields'])
+                for line in lines.split('\n'):
+                    try:
+                        if '\t' in line:
+                            field_name, comment = line.split(None, 1)
+                        else:
+                            field_name = line.strip()
+                    except:
+                        continue
+                    if '.' not in field_name:
+                        continue
+                    if field == field_name or field == field_name.split('.')[-1]:
+                        annoDB = field_name.split('.')[0]
+                        field = field_name.split('.')[1]
+                        break
+                if annoDB is None:
+                    raise ValueError('Cannot locate field {} in the current project'.format(field))
+                # now we have annotation database
+                # but we need to figure out how to use it
+                anno_type = getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
+                if anno_type.strip() != 'range':
+                    raise ValueError('Only field from a range-based annotation database could be used.')
+                # get the fields?
+                build = eval(getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
+                if args.build in build:
+                    chr_field, start_field, end_field = build[args.build]
+                else:
+                    raise ValueError('Specified build {} does not match that of the annotation database.'.format(args.build))
+                #
+                # find the regions
+                output = getoutput(['vtools', 'execute', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                    chr_field, start_field, end_field, annoDB, annoDB, field, value)])
+                for idx, line in enumerate(output.split('\n')):
+                    try:
+                        chr, start, end = line.split()
+                        regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
+                    except:
+                        pass
+                #'vtools execute "SELECT build FROM {}.{}_info"'
+            except Exception as e:
+                raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
+    return regions
+
 def sequence(args):
     # get build
     if args.build is None:
@@ -408,23 +475,13 @@ def sequence(args):
     #
     ref = RefGenome(args.build)
     # get chromosomal region
-    for region in args.region:
-        try:
-            chr, location = region.split(':')
-            start, end = location.split('-')
-            start = int(start.replace(',', ''))
-            end = int(end.replace(',', ''))
-            if start == 0 or end == 0:
-                raise ValueError('0 is not allowed as starting or ending position')
-        except Exception as e:
-            raise ValueError('Incorrect format for chromosomal region: {}'.format(e))
+    for chr, start, end, comment in expandRegions(args):
         # get reference seq
         if start <= end:
             seq = ref.getSequence(chr, start, end)
-            print('>ref|{}|{}'.format(args.build, region))
         else:
             seq = ref.getSequence(chr, end, start)[::-1]
-            print('>ref|{}|{}:{}-{} (reversed)'.format(chr, args.build, end, start))
+        print('>ref|{}|{}:{}-{} {}'.format(chr, args.build, end, start, comment))
         # break into pieces of 70 bp
         if args.numbered:
             fmt = '{{:>{0}}} '.format(len(str(len(seq))))
