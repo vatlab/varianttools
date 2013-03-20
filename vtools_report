@@ -392,6 +392,8 @@ def sequenceArguments(parser):
     parser.add_argument('--build', nargs='?', 
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
+    parser.add_argument('--numbered', action='store_true',
+        help='''If specified, add number to the left and insert a space at every 10 basepair''')
     #parser.add_argument('--mutants', nargs='?',
     #    help='''Adding mutants in specified table to the returned reference
     #        sequence. Multiple alternative alleles at the same location
@@ -423,8 +425,14 @@ def sequence(args):
         else:
             seq = ref.getSequence(chr, end, start)[::-1]
             print('>ref|{}|{}:{}-{} (reversed)'.format(chr, args.build, end, start))
-        # break into pieces of 100 bp
-        print('\n'.join([seq[i:i+100] for i in range(0, len(seq), 100)]))
+        # break into pieces of 70 bp
+        if args.numbered:
+            fmt = '{{:>{0}}} '.format(len(str(len(seq))))
+            print('\n'.join([
+                fmt.format(1+i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(6)])
+                for i in range(0, len(seq), 60)]))
+        else:
+            print('\n'.join([seq[i:i+70] for i in range(0, len(seq), 70)]))
 
 
 #
