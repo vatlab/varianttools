@@ -49,6 +49,12 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools remove tables')
         self.assertSucc('vtools remove tables unaffected')
         self.assertFail('vtools show table unaffected')
+        #
+        # remove table with strange names
+        runCmd('vtools select variant -t "NAME WITH #$%"')
+        self.assertTrue('NAME WITH #$%' in outputOfCmd('vtools show tables'))
+        self.assertSucc('vtools remove tables "NAME WITH #$%"')
+        self.assertFalse('NAME WITH #$%' in outputOfCmd('vtools show tables'))
         
         # Removing field CEU_num from variant table CEU
         count1 = len(outputOfCmd('vtools show fields').split('\n'))

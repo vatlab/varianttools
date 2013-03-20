@@ -27,7 +27,8 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, getGenotypes, getSamplenames, output2list, getGenotypeInfo
+from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample,\
+    getGenotypes, getSamplenames, output2list, getGenotypeInfo, outputOfCmd
 
 class TestAdmin(ProcessTestCase):
 
@@ -69,19 +70,25 @@ class TestAdmin(ProcessTestCase):
 
     def testRenameTable(self):
         'test rename tables'
-        # FIXME: fail: rename master variant table
-        # FIXME: fail: rename to existing table
-        # FIXME: fail: rename to table with leading underscore
-        # FIXME: test vtools show tables output
-        # FIXME: test date and description of renamed table should not change
-        pass
+        self.assertSucc('vtools select variant -t "%ad name"')
+        self.assertTrue('%ad name' in outputOfCmd('vtools show tables'))
+        self.assertTrue('vtools show table "%ad name"')
+        self.assertFail('vtools admin --rename_table variant not_allowed')
+        self.assertSucc('vtools admin --rename_table "%ad name" UNIQUE')
+        self.assertTrue('vtools show table UNIQUE')
+        self.assertTrue('UNIQUE' in outputOfCmd('vtools show tables'))
+        self.assertSucc('vtools admin --rename_table UNIQUE "%ad newname"')
+        self.assertTrue('vtools show table "%ad newname"')
+        self.assertTrue('%ad newname' in outputOfCmd('vtools show tables'))
 
     def testDescribeTable(self):
         'test describe tables'
-        # FIXME: fail, describe non-existing table
-        # FIXME: test changed description
-        # FIXME: data of table should not change
-        pass
+        self.assertSucc('vtools select variant -t "%%" "DESD"')
+        self.assertTrue('%%' in outputOfCmd('vtools show tables'))
+        self.assertTrue('DESD' in outputOfCmd('vtools show tables'))
+        self.assertSucc('vtools admin --describe_table %% "NN NN"')
+        self.assertFalse('DESD' in outputOfCmd('vtools show tables'))
+        self.assertTrue('NN NN' in outputOfCmd('vtools show tables'))
 
     def testRuntimeOption(self):
         'test set runtime options'

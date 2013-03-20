@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, output2list
+from testUtils import ProcessTestCase, runCmd, initTest, output2list, outputOfCmd
 
 class TestCompare(ProcessTestCase):
     def setUp(self):
@@ -62,6 +62,13 @@ class TestCompare(ProcessTestCase):
         self.assertEqual(output2list('vtools show table BdiffA')[1:], ['714'])
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1 -c --A_or_B A_OR_B')
+        #
+        # compare tables with non alphanum names
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --A_and_B "KK@"')
+        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.assertSucc('vtools compare "d@p" ns_damaging --A_and_B "K&K@"')
+        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
 
  
     def testCompareNewInterface(self):
@@ -88,6 +95,13 @@ class TestCompare(ProcessTestCase):
         self.assertEqual(output2list('vtools show table BdiffA')[4:], ['714'])
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1 -c --union A_OR_B')
+        #
+        # handling of non-alphanum names
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --union "KK@"')
+        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.assertSucc('vtools compare "d@p" ns_damaging --intersection "K&K@"')
+        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
 
 if __name__ == '__main__':
     unittest.main()

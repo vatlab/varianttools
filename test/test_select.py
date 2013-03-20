@@ -52,10 +52,9 @@ class TestSelect(ProcessTestCase):
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
         self.assertOutput("vtools select variant -c", '915\n')
-        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t "ns"')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output chr pos ref alt')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output variant_id testNSFP.CHBJPT_total_lc')
-
         # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t ns')
         #the follosing test should add --output (or -o)
@@ -63,6 +62,12 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select variant -o \'max(testNSFP.polyphen2_score)\' --header max')
         self.assertOutput("vtools execute 'select count(*) from ns'", '7\n')
         self.assertOutput("vtools select ns -c", '7\n')
+        # use strange characters 
+        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t "* ns@"')
+        self.assertSucc('vtools select "* ns@" \'testNSFP.chr is not null\' -t "ns@sub"')
+        self.assertTrue('* ns@' in '\n'.join(output2list('vtools show tables')))
+        self.assertSucc('vtools show table "* ns@"')
+        self.assertSucc('vtools show table "ns@sub"')
         
     def testSelectSample(self):
         self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '338\n')

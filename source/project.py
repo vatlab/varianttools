@@ -3234,12 +3234,12 @@ def remove(args):
                 removed = []
                 for table in args.items:
                     if '?' in table or '*' in table:
-                        for tbl in allTables:
+                        for tbl in [decodeTableName(x) for x in allTables]:
                             if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
-                                proj.removeVariantTable(tbl)
-                                removed.append(table)
+                                proj.removeVariantTable(encodeTableName(tbl))
+                                removed.append(tbl)
                     else:
-                        proj.removeVariantTable(table)
+                        proj.removeVariantTable(encodeTableName(table))
                         removed.append(table)
             elif args.type == 'samples':
                 if len(args.items) == 0:
@@ -3695,23 +3695,23 @@ def admin(args):
                     raise ValueError('Cannot rename the master variant table')
                 if args.rename_table[1] == 'variant':
                     raise ValueError('Cannot rename a table to the master variant table')
-                if args.rename_table[0] not in proj.getVariantTables():
+                if encodeTableName(args.rename_table[0]) not in proj.getVariantTables():
                     raise ValueError('Table {} does no exist or is not a variant table.'.format(args.rename_table[0]))
-                if args.rename_table[1] in proj.db.tables():
+                if encodeTableName(args.rename_table[1]) in proj.db.tables():
                     raise ValueError('Table {} already exists in the project'.format(args.rename_table[1]))
                 if args.rename_table[0] == args.rename_table[1]:
                     raise ValueError('Cannot rename a table to itself.')
-                proj.db.renameTable(args.rename_table[0], args.rename_table[1])
+                proj.db.renameTable(encodeTableName(args.rename_table[0]), encodeTableName(args.rename_table[1]))
                 proj.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
                 # change the meta information of the table
                 cur = proj.db.cursor()
                 for key in ('desc', 'date', 'cmd'):
                     cur.execute('UPDATE project SET name="__{}_of_{}" WHERE name="__{}_of_{}"'.format(
-                        key, args.rename_table[1], key, args.rename_table[0]))
+                        key, encodeTableName(args.rename_table[1]), key, encodeTableName(args.rename_table[0])))
             elif args.describe_table:
-                if not proj.db.hasTable(args.describe_table[0]):
+                if not proj.db.hasTable(encodeTableName(args.describe_table[0])):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
-                proj.describeTable(args.describe_table[0], args.describe_table[1])
+                proj.describeTable(encodeTableName(args.describe_table[0]), args.describe_table[1])
                 proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
             elif args.validate_build:
                 try:
