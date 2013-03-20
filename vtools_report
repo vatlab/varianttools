@@ -481,7 +481,7 @@ def sequence(args):
             seq = ref.getSequence(chr, start, end)
         else:
             seq = ref.getSequence(chr, end, start)[::-1]
-        print('>ref|{}|{}:{}-{} {}'.format(chr, args.build, end, start, comment))
+        print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr, end, start, comment))
         # break into pieces of 70 bp
         if args.numbered:
             fmt = '{{:>{0}}} '.format(len(str(len(seq))))
