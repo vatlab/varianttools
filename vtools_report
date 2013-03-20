@@ -396,7 +396,10 @@ def sequenceArguments(parser):
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
     parser.add_argument('--numbered', action='store_true',
-        help='''If specified, add number to the left and insert a space at every 10 basepair''')
+        help='''If specified, add position number to the left and insert a space at every 10 basepair''')
+    parser.add_argument('--char_per_line', type=int,
+        help='''Number of characters (excluding space and leading numbers) per line. Default to
+            70 in regular and 60 in numbered format.''')
     #parser.add_argument('--mutants', nargs='?',
     #    help='''Adding mutants in specified table to the returned reference
     #        sequence. Multiple alternative alleles at the same location
@@ -426,10 +429,7 @@ def expandRegions(args):
                 lines = getoutput(['vtools', 'show', 'fields'])
                 for line in lines.split('\n'):
                     try:
-                        if '\t' in line:
-                            field_name, comment = line.split(None, 1)
-                        else:
-                            field_name = line.strip()
+                        field_name = line.split()[0]
                     except:
                         continue
                     if '.' not in field_name:
@@ -461,7 +461,8 @@ def expandRegions(args):
                         regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
                     except:
                         pass
-                #'vtools execute "SELECT build FROM {}.{}_info"'
+                if not idx:
+                    logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
     return regions
@@ -479,17 +480,25 @@ def sequence(args):
         # get reference seq
         if start <= end:
             seq = ref.getSequence(chr, start, end)
+            reversed_seq = False
         else:
-            seq = ref.getSequence(chr, end, start)[::-1]
+            start, end = end, start
+            reversed_seq = True
+            seq = ref.getSequence(chr, start, end)[::-1]
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr, start, end, comment))
         # break into pieces of 70 bp
         if args.numbered:
-            fmt = '{{:>{0}}} '.format(len(str(len(seq))))
+            char_per_line = 60 if args.char_per_line is None else args.char_per_line
+            block_per_line = char_per_line / 10
+            if block_per_line * 10 != char_per_line:
+                raise ValueError('char_per_line should be a multiple of 10 in numbered format')
+            fmt = '{{:>{0}}} '.format(len(str(end)))
             print('\n'.join([
-                fmt.format(1+i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(6)])
-                for i in range(0, len(seq), 60)]))
+                fmt.format(end - i if reversed_seq else start + i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
+                for i in range(0, len(seq), char_per_line)]))
         else:
-            print('\n'.join([seq[i:i+70] for i in range(0, len(seq), 70)]))
+            char_per_line = 70 if args.char_per_line is None else args.char_per_line
+            print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
 
 
 #
