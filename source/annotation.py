@@ -239,7 +239,7 @@ class AnnoDBConfiger:
             else:
                 filename = os.path.split(self.source_url)[-1]
                 self.logger.info('Downloading {}'.format(filename))
-                tempFile = downloadFile(self.source_url)
+                tempFile = downloadFile(self.source_url, dest_dir=runOptions.cache_dir)
         except Exception as e:
             self.logger.error(e)
             raise ValueError('Failed to download database source from {}'.format(self.source_url))
