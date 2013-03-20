@@ -963,6 +963,14 @@ class ResourceManager:
         # if no ceriteria is specified, keep all files
         if resource_type == 'all':
             return
+        elif resource_type == 'existing':
+            resource_dir = os.path.expanduser(runOptions.local_resource)
+            # go through directories
+            filenames = set()
+            for root, dirs, files in os.walk(resource_dir):
+                filenames |= set([os.path.relpath(os.path.join(root, f), resource_dir) for f in files])
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x in filenames}
+            return
         elif resource_type == 'format':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('format/')}
         elif resource_type == 'snapshot':

@@ -3619,6 +3619,19 @@ def execute(args):
 
 
 def adminArguments(parser):
+    resource = parser.add_argument_group('Download or update resources')
+    resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
+        const='current', 
+        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        help='''Download resources of specified type, which can be 'current' (latest version
+            of all resources excluding snapshots), 'all' (all resources including obsolete
+            databases), 'existing' (only update resources that exist locally), 
+            'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
+            'annotation' (all current annotation databases), 'format' (all formats), and
+            'snapshot' (all online snapshots). Identical resources that are available locally 
+            (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
+            option 'all' will download all versions of annotation databases which can be
+            slow and take a lot of disk spaces.''')
     merge = parser.add_argument_group('Merge samples')
     merge.add_argument('--merge_samples', action='store_true',
         help='''Merge samples with the same sample names by combining genotypes
@@ -3664,18 +3677,6 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
-    resource = parser.add_argument_group('Download or update resources')
-    resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
-        const='current', 
-        choices=['current', 'all', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
-        help='''Download resources of specified type, which can be 'current' (latest version
-            of all resources excluding snapshots), 'all' (all resources including obsolete
-            databases), 'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
-            'annotation' (all current annotation databases), 'format' (all formats), and
-            'snapshot' (all online snapshots). Identical resources that are available locally 
-            (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
-            option 'all' will download all versions of annotation databases which can be
-            slow and take a lot of disk spaces.''')
 
 
 def admin(args):
