@@ -28,7 +28,7 @@ import sys, os
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome
+from variant_tools.utils import RefGenome, ProgressBar
 
 #
 # These functions are utility functions used by all reports
@@ -502,6 +502,123 @@ def sequence(args):
 
 
 #
+# command sam_info
+#
+def samInfoArguments(parser):
+    parser.add_argument('table', help='''Name of a variant table for which information
+        in specified SAM/BAM files will be obtained.''')
+    parser.add_argument('--info', nargs='+', default=['coverage'],
+        choices=['coverage', 'mpileup_genotype', 'calls', 'base_quality', 
+            'mapping_quality', 'position_in_read', 'size_of_aligned_read'],
+        help='''Type of information to be obtained from the SAM/BAM file. Only depth
+            is supported, which is the number of reads that cover the region of the
+            variant.''')
+    parser.add_argument('--files', nargs='+',
+        help='''A list of SAM/BAM files from which information about each variant will
+            be obtained.''')
+    parser.add_argument('--quality_threshold', default=0,
+        help='''Reads with a quality score less than this threshold will be ignored.''')
+        
+
+
+def samInfo(args):
+    try:
+        import pysam
+    except ImportError as e:
+        raise ImportError('''Failed to import module pysam. Please install pysam from
+            https://code.google.com/p/pysam/ and try again.''')
+    #
+    # from a list of SAM/BAM files
+    #
+    # I am not sure if this is acceptable but I am opening all files at once
+    try:
+        sams = [pysam.Samfile(x, 'rb') for x in args.files]
+    except Exception as e:
+        raise ValueError('Failed to open all input files: {}'.format(e))
+    #
+    # get all variants... again, this is not memory efficient because I am getting 
+    # all variants at the same time
+    try:
+        variants = getoutput(['vtools', 'output', args.table, 'chr', 'pos', 'ref', 'alt']).split('\n')
+    except Exception as e:
+        raise ValueError('Failed to get variants from table {}: {}'.format(args.table, e))
+    #
+    prog = ProgressBar(args.table, len(variants))
+    for variant in variants:
+        chr, pos, ref, alt = variant.split()
+        #
+        # we do not consider the length of variant at this point
+        #
+        chr = 'chr' + str(chr)
+        begin = int(pos) - 1
+        #if ref == '-':
+        #    end = pos + len(alt) - 1
+        #elif alt == '-':
+        #    end = pos + len(ref) - 1
+        #else:
+        #    end = pos
+        coverage = []
+        for sam in sams:
+            # we have single points (not a region) so we can use the fetch
+            # function to get AlignedRead. This method is however very slow,
+            # for some reason unknown to me.
+            #
+            # for read in sam.fetch(chr, begin, begin + 1):
+            #    call_qual = ...
+            #    if call_qual >= args.quality_threshold:
+            #        count += 1
+            # coverage.append(count)
+            # 
+            # so we use the pileup method. The problem with this function is that
+            # the pileupcolumn object returned from this function actually iterate
+            # over a region larger than specified....
+            #
+            cnt = 0  # valid coverage of this file
+            for pileupcolumn in sam.pileup(chr, begin, begin + 1):
+                if pileupcolumn.pos == begin:
+                    # if there is no threshold, all reads count
+                    if args.quality_threshold == 0:
+                        cnt = pileupcolumn.n
+                    else:
+                        for pileupread in pileupcolumn.pileups:
+                            call_qual_char = pileupread.alignment.qual[pileupread.qpos]
+                            call_qual = ord(call_qual_char) - 33
+                            if call_qual >= args.quality_threshold:
+                                cnt += 1
+#                    for pileupread in pileupcolumn.pileups:
+#                        read_name = pileupread.alignment.qname
+#                        call = pileupread.alignment.seq[pileupread.qpos] # qpos is 0-based
+#                        call_qual_char = pileupread.alignment.qual[pileupread.qpos]
+#                        call_qual = ord(call_qual_char) - quality_standard
+#                        map_qual = pileupread.alignment.mapq
+#                        position_in_read = pileupread.qpos
+#                        size_of_alignment = pileupread.alignment.alen
+#                        size_of_query_alignment = pileupread.alignment.qlen
+#                        size_of_read = pileupread.alignment.rlen
+#                        is_reverse = pileupread.alignment.is_reverse
+#                        read_start = pileupread.alignment.pos
+#                        alignment_start = pileupread.alignment.qstart
+#                        
+#                        # sys.stdout.write(read_name + " " + call + '\n')
+#                        if call_qual >= quality_threshold:
+#                            coverage += 1
+#                            if is_reverse == True:
+#                                read_calls.append(call.lower())
+#                            else:
+#                                read_calls.append(call.upper())
+#                            size_of_alignments.append(size_of_alignment)
+#                            size_of_query_alignments.append(size_of_query_alignment)
+#                            size_of_reads.append(size_of_read)
+#                            base_qualities.append(call_qual)
+#                            mapping_qualities.append(map_qual)
+#                            read_starts.append(read_start)
+#                            alignment_starts.append(alignment_start)
+#                            position_in_reads.append(position_in_read)
+            coverage.append(cnt)
+#
+        print('{}\t{}\t{}\t{}\t{}'.format(chr, pos, ref, alt, '\t'.join([str(x) for x in coverage])))
+
+#
 # command plot_fields
 #
 def plotFieldsArguments(parser):
@@ -786,6 +903,17 @@ if __name__ == '__main__':
     sequenceArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=sequence)
+    #
+    # command sam_info
+    parser = subparsers.add_parser('sam_info',
+        help = '''Obtain information regarding variants in a variant table from specified
+            SAM/BAM files. Such information includes coverage and distribution of genotypes
+            at these sites, which is not always available, especially for samples with no
+            genotype information at these locations (but perhaps due to low coverage or other
+            reasons). This command requires the availability of a python model pysam.''')
+    samInfoArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=samInfo)
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',
