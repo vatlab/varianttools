@@ -947,16 +947,19 @@ class ResourceManager:
         '''Get a manifest of files on the server and parse it.'''
         try:
             (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt')
+            #
+            self.manifest = {}
+            with open(manifest_file, 'r') as manifest:
+                for line in manifest:
+                    filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 4)
+                    # ref genome might be unsorted
+                    refGenome = ','.join(sorted(refGenome.split(',')))
+                    self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
         except:
             raise RuntimeError('Failed to connect to variant tools resource website.')
-        #
-        self.manifest = {}
-        with open(manifest_file, 'r') as manifest:
-            for line in manifest:
-                filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 4)
-                # ref genome might be unsorted
-                refGenome = ','.join(sorted(refGenome.split(',')))
-                self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
+        finally:
+            # remove manifest_file
+            urllib.urlcleanup()
 
     def selectFiles(self, resource_type, logger=None):
         '''Select files from the remote manifest and see what needs to be downloaded'''
