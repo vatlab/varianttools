@@ -386,17 +386,18 @@ def discordanceRate(args):
 def sequenceArguments(parser):
     parser.add_argument('region', nargs='+', help='''One or more chromosome regions in
         the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), or Field:Value
-        for a region-based annotation database (e.g. refGene.name2:TRIM2 or
+        from a region-based annotation database (e.g. refGene.name2:TRIM2 or
         refGene_exon.name:NM_000947). Chromosome positions are 1-based and are inclusive
         at both ends so the chromosome region has a length of end-start+1 bp. A reversed
-        sequence will be given if starting position is after the ending position. For the
+        sequence will be outputted if starting position is after the ending position. For the
         second case, multiple sequences will be printed if the name matches more than one
-        chromosome regions.''')
+        chromosomal regions.''')
     parser.add_argument('--build', nargs='?', 
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
-    parser.add_argument('--numbered', action='store_true',
-        help='''If specified, add position number to the left and insert a space at every 10 basepair''')
+    parser.add_argument('--numbered', nargs='?', const='left', choices=['left', 'right'],
+        help='''If specified, add position of the first or last basepair of each line to
+            the left or right of the line, and insert a space at every 10 basepair''')
     parser.add_argument('--char_per_line', type=int,
         help='''Number of characters (excluding space and leading numbers) per line. Default to
             70 in regular and 60 in numbered format.''')
@@ -492,10 +493,20 @@ def sequence(args):
             block_per_line = char_per_line / 10
             if block_per_line * 10 != char_per_line:
                 raise ValueError('char_per_line should be a multiple of 10 in numbered format')
-            fmt = '{{:>{0}}} '.format(len(str(end)))
-            print('\n'.join([
-                fmt.format(end - i if reversed_seq else start + i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
-                for i in range(0, len(seq), char_per_line)]))
+            if args.numbered == 'left':
+                fmt = '{{:>{0}}} '.format(len(str(end)))
+                print('\n'.join([
+                    fmt.format(end - i if reversed_seq else start + i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
+                    for i in range(0, len(seq), char_per_line)]))
+            else:
+                fmt = ' {{:>{0}}}'.format(len(str(end)))
+                last_line = len(seq) / char_per_line * char_per_line
+                residue = last_line + char_per_line - len(seq)
+                print('\n'.join([
+                    ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)]) + 
+                    ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
+                        else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
+                    for i in range(0, len(seq), char_per_line)]))
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
             print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
