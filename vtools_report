@@ -610,7 +610,7 @@ def samInfo(args):
     except IOError as e:
         raise ValueError('Failed to open all input files: {}'.format(e))
     finally:
-        for sam in samfiles:
+        for sam in sams:
             sam.close()
 
 #
