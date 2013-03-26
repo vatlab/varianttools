@@ -62,11 +62,14 @@ except:
 
 try:
     if sys.version_info.major == 2:
+        import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
         from cgatools_py2 import CrrFile, Location, Range
     else:
+        import pickle
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
+
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
@@ -832,6 +835,73 @@ def getSnapshotInfo(name, logger=None):
             logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
         return (None, None, None)
 
+    
+class ShelfDB:
+    '''A sqlite implementation of shelf'''
+    def __init__(self, filename, mode='n', lock=None, logger=None):
+        self.filename = filename
+        if os.path.isfile(self.filename + '.DB'):
+            if mode == 'n':
+                os.remove(self.filename + '.DB')
+        elif mode == 'r':
+            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
+        self.db = DatabaseEngine()
+        self.db.connect(filename, lock=lock)
+        self.cur = self.db.cursor()
+        self.mode = mode
+        if mode == 'n':
+            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
+        self.logger = logger
+        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
+        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
+
+        if sys.version_info.major >= 3:
+            self.add = self._add_py3
+            self.get = self._get_py3
+        else:
+            self.add = self._add_py2
+            self.get = self._get_py2
+
+    # python 2 and 3 have slightly different types and methods for pickling.
+    def _add_py2(self, key, value):
+        # return value from dumps needs to be converted to buffer (bytes)
+        self.cur.execute(self.insert_query, 
+            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+
+    def _get_py2(self, key):
+        msg = 'Retrieve key {} from ShelfDB'.format(key)
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+         # pickle.loads only accepts string, ...
+        return pickle.loads(str(self.cur.fetchone()[0]))
+
+    def _add_py3(self, key, value):
+        # return values for dumps is already bytes...
+        self.cur.execute(self.insert_query, 
+            (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
+
+    def _get_py3(self, key):
+        msg = 'Retrieve key {} from ShelfDB'.format(key)
+        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+        # pickle.loads accepts bytes directly
+        return pickle.loads(self.cur.fetchone()[0])
+
+    def close(self):
+        if not os.path.isfile(self.filename + '.DB'):
+            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
+        if self.mode == 'n':
+            self.db.commit()
+            try:
+                self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
+                self.db.commit()
+            except OperationalError as e:
+                if self.logger:
+                    self.logger.warning('Failed to index temporary database {}: {}. Association tests can still be performed but might be very slow.'.\
+                            format(self.filename, e))
+                pass
+            finally:
+                # close the database even if create index failed. In this case
+                # shelf retrieval will be slower but still doable
+                self.db.close()
 
 
 class ResourceManager:

@@ -106,7 +106,6 @@ class GroupStat(NullTest):
                 Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
             )
 
-
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Group statistics calculator, usually is
                used with other method to produce statistics for each association testing group.''',
@@ -1603,11 +1602,25 @@ class ExternTest(NullTest):
             self.nvar = len(self.pydata['genotype'][0])
             self.nsample = len(self.pydata['genotype'])
             with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([':'.join(self.pydata['coordinate'][idx]) + '\t' + '\t'.join([g[idx] for g in self.pydata['genotype']]) for idx in range(self.nvar)]))
+                if len(self.pydata['geno_info']) == 0:
+                    f.writelines('\n'.join([
+                        ':'.join(self.pydata['coordinate'][idx]) + \
+                        '\t' + '\t'.join([g[idx] for g in self.pydata['genotype']]) \
+                        for idx in range(self.nvar)]))
+                else:
+                    f.writelines('\n'.join([
+                        ':'.join(self.pydata['coordinate'][idx]) + \
+                        '\t' + '\t'.join([g[idx] + ":" + ":".join(ginfo[idx]) for g, ginfo in zip(self.pydata['genotype'], self.pydata['geno_info'])]) \
+                        for idx in range(self.nvar)]))
             with open(os.path.join(tdir, '{0}_pheno.txt'.format(self.gname)), 'w') as f:
                 f.writelines('\n'.join([self.pydata['sample_name'][idx] + '\t' + '\t'.join([self.pydata['phenotype'][idx]] + [c[idx] for c in self.pydata['covariates']]) for idx in range(self.nsample)]))
             with open(os.path.join(tdir, '{0}_mapping.txt'.format(self.gname)), 'w') as f:
-                f.writelines('\n'.join([self.gname + '\t' +  ':'.join(self.pydata['coordinate'][idx]) for idx in range(self.nvar)]))
+                f.writelines('\n'.join([
+                    self.gname + '\t' +  \
+                    ':'.join(self.pydata['coordinate'][idx]) + \
+                    ('\t' + '\t'.join([str(i) for i in self.pydata['var_info'][idx]]) \
+                     if len(self.pydata['var_info']) > 0 else '') \
+                                        for idx in range(self.nvar)]))
             return 0
         elif dformat == 'R':
             # output data to R script as a string

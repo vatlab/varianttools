@@ -85,7 +85,7 @@ void AssoData::weightX(const vectorf & weight)
 
 void AssoData::weightX(const matrixf & weight)
 {
-	if (weight.size() != m_genotype.size() || weight.front() != m_genotype.front()) {
+	if (weight.size() != m_genotype.size() || weight.front().size() != m_genotype.front().size()) {
 		throw ValueError("Genotype and genotype information data do not match in scale");
 	}
 	for (size_t i = 0; i < m_genotype.size(); ++i) {

@@ -38,7 +38,8 @@ except:
     import pickle
 
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, runOptions, executeUntilSucceed
+from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
+     runOptions, executeUntilSucceed, ShelfDB
 from .phenotype import Sample
 from .tester import *
 
@@ -46,82 +47,7 @@ if sys.version_info.major == 2:
     from vt_sqlite3_py2 import OperationalError
 else:
     from vt_sqlite3_py3 import OperationalError
-
 import argparse
-
-class ShelfDB:
-    def __init__(self, filename, mode='n', lock=None, logger=None):
-        self.filename = filename
-        if os.path.isfile(self.filename + '.DB'):
-            if mode == 'n':
-                os.remove(self.filename + '.DB')
-        elif mode == 'r':
-            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
-        self.db = DatabaseEngine()
-        self.db.connect(filename, lock=lock)
-        self.cur = self.db.cursor()
-        self.mode = mode
-        if mode == 'n':
-            self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
-        self.logger = logger
-        self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
-        self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
-
-        if sys.version_info.major >= 3:
-            self.add = self._add_py3
-            self.get = self._get_py3
-        else:
-            self.add = self._add_py2
-            self.get = self._get_py2
-
-    # python 2 and 3 have slightly different types and methods for pickling.
-    def _add_py2(self, key, value):
-        # return value from dumps needs to be converted to buffer (bytes)
-        self.cur.execute(self.insert_query, 
-            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
-
-    def _get_py2(self, key):
-        msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
-         # pickle.loads only accepts string, ...
-        return pickle.loads(str(self.cur.fetchone()[0]))
-
-    def _add_py3(self, key, value):
-        # return values for dumps is already bytes...
-        self.cur.execute(self.insert_query, 
-            (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
-
-    def _get_py3(self, key):
-        msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
-        # pickle.loads accepts bytes directly
-        return pickle.loads(self.cur.fetchone()[0])
-
-    def close(self):
-        if not os.path.isfile(self.filename + '.DB'):
-            raise ValueError('Temporary database {} does not exist.'.format(self.filename))
-        if self.mode == 'n':
-            self.db.commit()
-            try:
-                self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
-                self.db.commit()
-            except OperationalError as e:
-                if self.logger:
-                    self.logger.warning('Failed to index temporary database {}: {}. Association tests can still be performed but might be very slow.'.\
-                            format(self.filename, e))
-                pass
-            finally:
-                # close the database even if create index failed. In this case
-                # shelf retrieval will be slower but still doable
-                self.db.close()
-
-def istr(d):
-    try:
-        x = int(d)
-        x = str(x)
-    except:
-        x = str(d)
-    return x
 
 def associateArguments(parser):
     data = parser.add_argument_group('Genotype, phenotype, and covariates')
@@ -223,16 +149,18 @@ class AssociationTestManager:
         self.table = table
         #
         # step 1: get missing filter conditions
-        self.missing_ind_ge, self.missing_var_ge = self.getMissingFilters(discard_samples, discard_variants)
+        self.missing_ind_ge, self.missing_var_ge = \
+          self.getMissingFilters(discard_samples, discard_variants)
         #
         # step 2: get testers
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
         #
         # step 3: get samples and related phenotypes
-        self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = self.getPhenotype(samples, phenotypes, covariates)
+        self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = \
+          self.getPhenotype(samples, phenotypes, covariates)
         #
-        # step 4: check if tests are compatible with phenotypes
+        # step 4-1: check if tests are compatible with phenotypes
         for idx, item in enumerate([list(set(x)) for x in self.phenotypes]):
             if (list(map(float, item)) == [2.0, 1.0] or list(map(float, item)) == [1.0, 2.0]):
                 self.phenotypes[idx] = [i - 1.0 for i in self.phenotypes[idx]]
@@ -240,8 +168,21 @@ class AssociationTestManager:
             if not (list(map(float, item)) == [0.0, 1.0] or list(map(float, item)) == [1.0, 0.0]):
                 for test in self.tests:
                     if test.trait_type == 'disease':
-                        raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".format(test.__class__.__name__, '/'.join([str(int(x)) for x in item])))
-        # step 4-1: check if 'SSeq_common' is valid to use
+                        raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".\
+                                         format(test.__class__.__name__, '/'.join([str(int(x)) for x in item])))
+        # step 4-2: input extern weights found in var_info or geno_info
+        for m in methods:
+            if not "--extern_weight" in m:
+                continue
+            extern_weight = []
+            for item in re.match(r'.*?--extern_weight(.*?)--|.*?--extern_weight(.*?)$', m).groups():
+                if item is not None:
+                    extern_weight.extend(item.strip().split())
+            for item in extern_weight:
+                if not item in geno_info + var_info:
+                    raise ValueError('External weight "{}" is not specified by --var_info or --geno_info'.\
+                                     format(item))
+        # step 4-3: check if 'SSeq_common' is valid to use
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
         #
@@ -275,7 +216,11 @@ class AssociationTestManager:
         # sample level missingness filter
         for expr in discard_samples:
             try:
-                sep = re.search(r'>|=|<|>=|<=', expr).group(0)
+                sep = re.search(r'>|=|<|>=|<=', expr)
+                if sep is not None:
+                    sep = sep.group(0)
+                else:
+                    raise ValueError
                 e, value = [x.strip() for x in expr.split(sep)]
                 if e == '%(NA)' and sep == '>':
                     # missing individual level genotypes greater than
@@ -283,11 +228,16 @@ class AssociationTestManager:
                 else:
                     raise ValueError('Invalid expression {}'.format(expr))
             except ValueError:
-                raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
+                raise ValueError('Unrecognized expression {}: '
+                                 'currently supported expressions are "%(NA)>NUM".'.format(expr))
         # variant level missingness filter
         for expr in discard_variants:
             try:
-                sep = re.search(r'>|=|<|>=|<=', expr).group(0)
+                sep = re.search(r'>|=|<|>=|<=', expr)
+                if sep is not None:
+                    sep = sep.group(0)
+                else:
+                    raise ValueError
                 e, value = [x.strip() for x in expr.split(sep)]
                 if e == '%(NA)' and sep == '>':
                     # missing variant level genotypes greater than
@@ -295,12 +245,15 @@ class AssociationTestManager:
                 else:
                     raise ValueError('Invalid expression {}'.format(expr))
             except ValueError:
-                raise ValueError('Unrecognized expression {}: currently supported expressions are "%(NA)>NUM".'.format(expr))
+                raise ValueError('Unrecognized expression {}: '
+            'currently supported expressions are "%(NA)>NUM".'.format(expr))
         # check input values
         if missing_ind_ge > 1.0 or missing_ind_ge < 0.0:
-            raise ValueError('Invalid parameter "{}" for expression %(NA): value should fall between 0 and 1'.format(missing_ind_ge))
+            raise ValueError('Invalid parameter "{}" for expression %(NA): '
+                             'value should fall between 0 and 1'.format(missing_ind_ge))
         if missing_var_ge > 1.0 or missing_var_ge < 0.0:
-            raise ValueError('Invalid parameter "{}" for expression %(NA): value should fall between 0 and 1'.format(missing_var_ge))
+            raise ValueError('Invalid parameter "{}" for expression %(NA): '
+                             'value should fall between 0 and 1'.format(missing_var_ge))
         if missing_ind_ge == 0.0:
             missing_ind_ge = 1.0E-8
         if missing_var_ge == 0.0:
@@ -311,7 +264,8 @@ class AssociationTestManager:
         '''Get a list of methods from parameter methods, passing method specific and common
         args to its constructor. This function sets self.tests as a list of statistical tests'''
         if not methods:
-            raise ValueError('Please specify at least one statistical test. Please use command "vtools show tests" for a list of tests')
+            raise ValueError('Please specify at least one statistical test. '
+                             'Please use command "vtools show tests" for a list of tests')
         tests = []
         for m in methods:
             name = m.split()[0]
@@ -333,20 +287,24 @@ class AssociationTestManager:
                     method = eval(name)(ncovariates, self.logger, args)
                 # check if method is valid
                 if not hasattr(method, 'fields'):
-                    raise ValueError('Invalid association test method {}: missing attribute fields'.format(name))
+                    raise ValueError('Invalid association test method {}: '
+                                     'missing attribute fields'.format(name))
                 if not method.fields:
-                    self.logger.warning('Association test {} has invalid or empty fields. No result will be generated.'.format(name))
+                    self.logger.warning('Association test {} has invalid or empty fields. '
+                                        'No result will be generated.'.format(name))
                 tests.append(method)
             except NameError as e:
                 self.logger.debug(e)
-                raise ValueError('Failed to load association test {0}: {1}. Please use command "vtools show tests" to list usable tests'.format(name, e))
+                raise ValueError('Failed to load association test {0}: {1}. '
+                                 'Please use command "vtools show tests" to list usable tests'.format(name, e))
         return tests
 
     def getPhenotype(self, condition, pheno, covar):
-        '''Get a list of samples from specified condition. This function sets self.sample_IDs, self.phenotypes and self.covariates'''
+        '''Get a list of samples from specified condition.
+        This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
-            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.format(
-                ', '.join(pheno + (covar if covar is not None else []))) + \
+            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.\
+            format(', '.join(pheno + (covar if covar is not None else []))) + \
                 (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '')
             self.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
@@ -365,10 +323,12 @@ class AssociationTestManager:
                 [x.append(y) for x,y in zip(phenotypes, p)]
                 [x.append(y) for x,y in zip(covariates, c)]
             if len(sample_IDs) == 0:
-                raise ValueError('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in condition])))
+                raise ValueError('No sample is selected by condition: {}'.\
+                                 format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
                 if len(condition) > 0:
-                    self.logger.info('{} samples are selected by condition: {}'.format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
+                    self.logger.info('{} samples are selected by condition: {}'.\
+                                     format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
                 else:
                     self.logger.info('{} samples are found'.format(len(sample_IDs)))
             # add intercept
@@ -447,20 +407,18 @@ class AssociationTestManager:
         self.from_clause = ', '.join(from_clause)
         self.where_clause = ('WHERE ' + ' AND '.join(where_clause)) if where_clause else ''
         # This will be the tmp table to extract variant_id by groups (ignored is 0)
-        query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.format(
-            self.table, group_fields,
-            self.from_clause, self.where_clause)
-        s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".format(':'.join(group_by)))
+        query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.\
+          format(self.table, group_fields, self.from_clause, self.where_clause)
+        s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".\
+                          format(':'.join(group_by)))
         self.logger.debug('Running query {}'.format(query))
         cur.execute(query)
-        cur.execute('''\
-            CREATE INDEX __asso_tmp_index ON __asso_tmp ({});
-            '''.format(','.join(['{} ASC'.format(x) for x in field_names])))
+        cur.execute('CREATE INDEX __asso_tmp_index ON __asso_tmp ({});'.\
+                    format(','.join(['{} ASC'.format(x) for x in field_names])))
         del s
         # get group by
-        cur.execute('''\
-            SELECT DISTINCT {} FROM __asso_tmp;
-            '''.format(', '.join(field_names)))
+        cur.execute('SELECT DISTINCT {} FROM __asso_tmp;'.\
+                    format(', '.join(field_names)))
         groups = cur.fetchall()
         self.logger.info('{} groups are found'.format(len(groups)))
         self.db.commit()
@@ -517,8 +475,9 @@ class GenotypeLoader(Process):
                 # variant info of the original __asso_tmp table are not copied because they are not used.
                 # we only copy records that are not ignored
                 # No index is created for the in-ram database yet performance is satisfactory
-                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} FROM __fromVariants.__asso_tmp WHERE _ignored = 0;'.format(
-                        ', '.join(self.group_names)))
+                cur.execute('CREATE TABLE cache.__asso_tmp AS SELECT variant_id, {} '
+                            'FROM __fromVariants.__asso_tmp WHERE _ignored = 0;'.\
+                            format(', '.join(self.group_names)))
                 # tells other processes that I am ready
                 self.ready_flags[self.index] = 1
                 self.logger.debug('Loader {} is ready'.format(self.index))
@@ -526,7 +485,8 @@ class GenotypeLoader(Process):
                 break
             time.sleep(random.random()*2)
         # these are written to different files so no lock is needed (lock=None)
-        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)), 'n', None, self.logger)
+        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)),
+                        'n', None, self.logger)
         lenGrp = len(self.group_names)
         try:
             while True:
@@ -534,20 +494,22 @@ class GenotypeLoader(Process):
                 if id is None:
                     break
                 try:
-                    # sometimes on slow disks, SELECT would fail with error message "Cannot connect to database" if there
-                    # are multiple reading processes. We are trying five times if this happens before we terminate the process
-                    select_genotype_query = '''SELECT genotype_{0}.variant_id, GT {1}, {2}
-                                FROM cache.__asso_tmp, genotype_{0} WHERE (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3})
-                                ORDER BY {2}'''.format(id,
-                                ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
-                                ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
-                                ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
+                    # sometimes on slow disks, SELECT would fail with error message
+                    # "Cannot connect to database" if there are multiple reading processes.
+                    # We are trying five times if this happens before we terminate the process
+                    select_genotype_query = '''\
+                    SELECT genotype_{0}.variant_id, GT {1}, {2} FROM cache.__asso_tmp, genotype_{0} WHERE 
+                    (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3}) ORDER BY {2}'''.\
+                    format(id, ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
+                           ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
+                           ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
                     executeUntilSucceed(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
-                    self.logger.error('Genotype loader {} failed to load sample {}: {}'.format(self.index, id, e))
+                    self.logger.error('Genotype loader {} failed to load sample {}: {}'.\
+                                      format(self.index, id, e))
                     break
                 # grab data for each group by
                 data = {}
@@ -752,9 +714,11 @@ class AssoTestsWorker(Process):
             dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
                 try:
-                    shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)), 'r', lock=self.shelf_lock)
+                    shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)),
+                                    'r', lock=self.shelf_lock)
                 except Exception as e:
-                    self.logger.error('Process {} failed to connect to shelf {}: {}'.format(self.index, dbID, e))
+                    self.logger.error('Process {} failed to connect to shelf {}: {}'.\
+                                      format(self.index, dbID, e))
                     raise
                 self.shelves[dbID] = shelf
             else:
@@ -794,8 +758,10 @@ class AssoTestsWorker(Process):
         if sum(which) < 5:
             raise ValueError("Sample size too small ({0}) to be analyzed for {1}.".format(sum(which), repr(gname)))
         if len(which) - sum(which) > 0:
-            self.logger.debug('In {}, {} out of {} samples will be removed due to having more than {}% missing genotypes'\
-                    .format(repr(gname), len(which) - sum(which), len(which), self.missing_ind_ge * 100))
+            self.logger.debug('In {}, {} out of {} samples will be removed due to '
+                              'having more than {}% missing genotypes'.\
+                              format(repr(gname), len(which) - sum(which), len(which),
+                                     self.missing_ind_ge * 100))
         # Step 2: filter variants by genotype missingness at a locus
         keep_loci = []
         for i in range(len(genotype[0])):
@@ -805,8 +771,8 @@ class AssoTestsWorker(Process):
             gt_codings = list(set([x[i] for x, y in zip(genotype, which) if y and not math.isnan(x[i])]))
             keep_loci.append((float(sum(missingness_vi)) / float(len(missingness_vi))) < self.missing_var_ge and len(gt_codings) > 1)
         if len(keep_loci) - sum(keep_loci) > 0:
-            # filter genotype and geno_info
             for idx in range(len(genotype)):
+                # filter genotype and geno_info
                 genotype[idx] = [i for i, j in zip(genotype[idx], keep_loci) if j]
                 for k in geno_info.keys():
                     geno_info[k][idx] = [i for i, j in zip(geno_info[k][idx], keep_loci) if j]
@@ -814,8 +780,10 @@ class AssoTestsWorker(Process):
             for k in var_info.keys():
                 var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
             #
-            self.logger.debug('In {}, {} out of {} loci will be removed due to having no minor allele or having more than {}% missing genotypes'\
-                    .format(repr(gname), len(keep_loci) - sum(keep_loci), len(keep_loci), self.missing_ind_ge * 100))
+            self.logger.debug('In {}, {} out of {} loci will be removed due to '
+                              'having no minor allele or having more than {}% missing genotypes'.\
+                              format(repr(gname), len(keep_loci) - sum(keep_loci),
+                                     len(keep_loci), self.missing_ind_ge * 100))
         # check for non-triviality of genotype matrix
         if len(genotype[0]) == 0:
             raise ValueError("No variant found in genotype data for {}.".format(repr(gname)))
@@ -845,12 +813,21 @@ class AssoTestsWorker(Process):
             if field not in ['chr', 'pos']:
                 self.data.setVar('__var_' + field, data[field])
 
-    def setPyData(self, which, geno, var_info, geno_Info, missing_code, grpname):
+    def setPyData(self, which, geno, var_info, geno_info, missing_code, grpname):
         '''set all data to a python dictionary in str format'''
+        def istr(d):
+            try:
+                x = int(d)
+                x = str(x)
+            except:
+                x = str(d)
+            return x
+        #
         if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
         #
         self.pydata['name'] = grpname
+        #
         if missing_code:
             self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
         else:
@@ -860,8 +837,29 @@ class AssoTestsWorker(Process):
             self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
         except:
             self.pydata['coordinate'] = []
-        #FIXME: will not use other var_info and geno_info for now
-        #
+        # var_info
+        self.pydata['var_info'] = []
+        self.pydata['var_info_header'] = []
+        for k, item in var_info.items():
+             if k != 'chr' and k != 'pos':
+                 self.pydata['var_info_header'].append(k)
+                 self.pydata['var_info'].append(item)
+        self.pydata['var_info'] = zip(*self.pydata['var_info'])
+        # geno_info
+        self.pydata['geno_info'] = []
+        self.pydata['geno_info_header'] = []
+        for k, item in geno_info.items():
+            self.pydata['geno_info_header'].append(k)
+            if missing_code:
+                self.pydata['geno_info'].append([map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(item) if which[idx]])
+            else:
+                self.pydata['geno_info'].append([map(istr, x) for idx, x in enumerate(item) if which[idx]])
+        # convert geno_info to 3 dimensions:
+        # D1: samples
+        # D2: variants
+        # D3: geno_info 
+        self.pydata['geno_info'] = zip(*self.pydata['geno_info'])
+        self.pydata['geno_info'] = [zip(*item) for item in self.pydata['geno_info']]
         self.pydata['sample_name'] = self.sample_names
         self.pydata['phenotype'] = map(str, [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]])
         if self.covariates:
@@ -870,6 +868,8 @@ class AssoTestsWorker(Process):
         #
         if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
             raise ValueError("No input data")
+        if len(self.pydata['geno_info']) > 0 and len(self.pydata['genotype']) != len(self.pydata['geno_info']):
+            raise ValueError("Genotype and genotype information do not match")
 
 
     def run(self):
@@ -922,7 +922,8 @@ class AssoTestsWorker(Process):
                 # die silently if stopped by Ctrl-C
                 break
             except Exception as e:
-                self.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.format(self.index, repr(grpname), e))
+                self.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
+                                  format(self.index, repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 self.pydata = {}
@@ -958,20 +959,22 @@ def associate(args):
                     num_groups = len(asso.groups)
                     asso.groups = list(set(asso.groups).difference(set(existing_groups)))
                     if len(asso.groups) != num_groups:
-                        proj.logger.info('{} out of {} groups with existing results are ignored. You can use option --force to re-analyze all groups.'.format(
-                            num_groups - len(asso.groups), num_groups))
+                        proj.logger.info('{} out of {} groups with existing results are ignored. '
+                                         'You can use option --force to re-analyze all groups.'.\
+                                         format(num_groups - len(asso.groups), num_groups))
                         if len(asso.groups) == 0:
                             sys.exit(0)
                         # mark existing groups as ignored
                         cur = proj.db.cursor()
-                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.format(
-                            ' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
+                          format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
                         for grp in existing_groups:
                             cur.execute(query, grp)
                         proj.db.commit()
             sampleQueue = Queue()
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # loading from disk cannot really benefit from more than 8 simultaneous read, due to disk access limits
+            # loading from disk cannot really benefit from more than 8 simultaneous read
+            # due to disk access limits
             # if runOptions.associate_num_of_readers is set we'll use it directly
             nLoaders = runOptions.associate_num_of_readers
             # if no runOptions.associate_num_of_readers is set we limit it to a max of 8.
@@ -1011,7 +1014,9 @@ def associate(args):
                         # some samples were not properly loaded
                         # the program has to quit because data integrity is compromised
                         prog.done()
-                        proj.logger.error('An error occurred while loading genotype data. Please make sure the genotype database is intact and accessible before trying to start over.')
+                        proj.logger.error('An error occurred while loading genotype data. '
+                                          'Please make sure the genotype database is intact '
+                                          'and is accessible before trying to start over.')
                         for loader in loaders:
                             loader.terminate()
                         proj.close()
@@ -1075,7 +1080,8 @@ def associate(args):
                     prog.update(count, results.failed())
                     # proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
             except KeyboardInterrupt as e:
-                proj.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.format(count, len(asso.groups)))
+                proj.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
+                                  format(count, len(asso.groups)))
                 results.done()
                 proj.close()
                 sys.exit(1)
@@ -1083,14 +1089,16 @@ def associate(args):
             prog.done()
             results.done()
             # summary
-            proj.logger.info('Association tests on {} groups have completed. {} failed.'.format(results.completed(), results.failed()))
+            proj.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                             format(results.completed(), results.failed()))
             # use the result database in the project
             if args.to_db:
                 proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
             # tells the maintenance process to stop
             maintenance_flag.value = 0
             # wait for the maitenance process to stop
-            s = delayedAction(proj.logger.info, "Maintaining database. This might take a few minutes.", delay=10)
+            s = delayedAction(proj.logger.info,
+                              "Maintaining database. This might take a few minutes.", delay=10)
             maintenance.join()
             del s
     except Exception as e:
