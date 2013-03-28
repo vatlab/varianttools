@@ -361,6 +361,9 @@ class hg19_gatk_23(BaseVariantCaller):
         os.chdir(saved_dir)
 
     def align(self, input_files, output):
+        if not output.endswith('.bam'):
+            self.logger.error('Plase specify a .bam file in the --output parameter')
+            sys.exit(1)
         if os.path.isfile(output):
             self.logger.warning('Using existing output file {}'.format(output))
             return
@@ -424,11 +427,21 @@ class hg19_gatk_23(BaseVariantCaller):
                 os.rename(sam_file + '_tmp', sam_file)
                 sam_files.append(sam_file)
         # 
+        # convert sam to bam files
+        for sam_file in sam_files:
+            bam_file = sam_file[:-4] + '.bam'
+            if os.path.isfile(bam_file):
+                self.logger.warning('Using existing bam file {}'.format(bam_file))
+            else:
+                self.call('samtools view -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
+                    self.resource_dir, sam_file, bam_file))
+                os.rename(bam_file + '_tmp', bam_file)
+        #
         # merge sam files?
         if len(sam_files) > 1:
-            self.call('samtools merge {} {}'.format(output, ' '.join(sam_files))) 
+            self.call('samtools merge {} {}'.format(output, ' '.join([x[:-4] + '.bam' for x in sam_files]))) 
         else:
-            os.rename(sam_files[0], output)
+            shutil.copy(sam_files[0], output)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
