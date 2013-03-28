@@ -125,9 +125,11 @@ class BaseVariantCaller:
     def checkCmd(self, cmd):
         '''Check if a cmd exist'''
         if not hasattr(shutil, 'which'):
-            raise SystemError('Please use Python 3.3 or higher for the use of shutil.which function')
+            self.logger.error('Please use Python 3.3 or higher for the use of shutil.which function')
+            sys.exit(1)
         if shutil.which(cmd) is None:
-            raise SystemError('Command {} does not exist. Please install it and try again.'.format(cmd))
+            self.logger.error('Command {} does not exist. Please install it and try again.'.format(cmd))
+            sys.exit(1)
         
     def downloadFile(self, URL, dest, quiet=False):
         '''Download a file from URL and save to dest '''
@@ -285,6 +287,7 @@ class BaseVariantCaller:
         if os.path.isfile('bwaidx.amb'):
             self.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
         else:
+            self.checkCmd('bwa')
             self.call('bwa index -p bwaidx -a bwtsw {}'.format(ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
@@ -292,6 +295,7 @@ class BaseVariantCaller:
         if os.path.isfile('{}.fai'.format(ref_file)):
             self.logger.warning('Using existing samtools sequence index {}.fai'.format(ref_file))
         else:
+            self.checkCmd('samtools')
             self.call('samtools faidx {}'.format(ref_file))
 
     def checkResource(self):
