@@ -440,7 +440,7 @@ class hg19_gatk_23(BaseVariantCaller):
         os.chdir(self.resource_dir)
         files = ['ucsc.hg19.fasta.gz', 'bwaidx.amb', 'ucsc.hg19.fasta.fai']
         if not all([os.path.isfile(x) for x in files]):
-            sys.exit('''Resource does not exist. Please run "varcaller.py prepare_resource"
+            sys.exit('''Resource does not exist. Please run "call_variants.py prepare_resource"
                 befor you execute this command.''')
         for cmd in ['wget',     # to download resource
                     'bwa',      # alignment

@@ -1,4 +1,4 @@
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -10,7 +10,7 @@ delimiter=','
 variant=chr,pos,ref,alt
 genotype=GT
 # call a preprocessor to convert input PLINK files to a variant-based format
-preprocessor=PlinkConverter($build)
+preprocessor=PlinkConverter($build, chrom_namemap = {'23':'X', '24':'Y', '26':'M'})
 
 [chr]
 index=1

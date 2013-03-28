@@ -1,3 +1,29 @@
+#!/usr/bin/env python
+#
+# $File: preprocessor.py $
+# $LastChangedDate: 2013-03-26 17:15:07 -0500 (Tue, 26 Mar 2013) $
+# $Rev: 1775 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://varianttools.sourceforge.net for details.
+#
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
 import sys, os
 import itertools as it
 from .utils import ProgressBar, RefGenome
@@ -36,7 +62,7 @@ class PlinkBinaryToVariants:
 
     self.determineMajorAllele() Attempts to resolve this issue
     """
-    def __init__(self, dataset, build, logger):
+    def __init__(self, dataset, build, chrom_namemap = {}, logger = None):
         # check file path
         for ext in ['.fam', '.bed', '.bim']:
             if not os.path.exists(dataset + ext):
@@ -57,6 +83,8 @@ class PlinkBinaryToVariants:
                          'C':'G'}
         # status 0 for not flip, 1 for flip, -1 for bad match
         self.status = 0
+        # chromosome naming convention map
+        self.cmap = chrom_namemap
 
     def getValidatedLocusGenotype(self, chrom, pos, allele1, allele2, geno_cur):
         '''Use cgatools to obtain validated genotype for given locus.
@@ -70,29 +98,35 @@ class PlinkBinaryToVariants:
           otherwise return None
         @return a locus genotypes string
         '''
+        if chrom in self.cmap:
+            chrom = self.cmap[chrom]
         try:
             ref = self.hgref.getBase(chrom, pos)
         except Exception as e:
-            self.logger.warning('Cannot find locus {0}:{1}. Input variant is ignored'.format(chrom, pos))
+            self.logger.warning('Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
+                                'Input variant is ignored'.format(chrom, pos, self.build))
             self.status = -1
-            self.cur.close()
             return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
-            self.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
+            if self.status == -2:
+                self.logger.warning('Monomorphic site "{0}:{1}" ignored'.\
+                                    format(chrom, pos))
+            else:
+                self.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
                                     format(chrom, pos, allele1, allele2, ref))
             return None
         elif self.status == 0:
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
-            return ','.join([str(chrom), str(pos), allele1, allele2]) + ',' + str(geno_cur)
+            return ','.join([chrom, str(pos), allele1, allele2]) + ',' + str(geno_cur)
         else:
             # have to flip the genotypes coding
             if strand:
                 self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
             # self.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
-            return ','.join([str(chrom), str(pos), allele2, allele1]) + ',' + \
+            return ','.join([chrom, str(pos), allele2, allele1]) + ',' + \
                 ','.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
             
     def getLociCounts(self):
@@ -115,17 +149,20 @@ class PlinkBinaryToVariants:
         except StopIteration:
             self.cur.close()
             return False, None
+        except:
+            self.logger.error('Failed to retrieve locus {0}:{1} '
+                                '(plinkio error)'.format(locus.chromosome, locus.bp_position))
+            return True, None
+        if which_major == 1:
+            # allele 1 is the major allele
+            return True, self.getValidatedLocusGenotype(str(locus.chromosome), int(locus.bp_position),
+                                                        locus.allele1.upper(), locus.allele2.upper(),
+                                                        genotypes)
         else:
-            if which_major == 1:
-                # allele 1 is the major allele
-                return True, self.getValidatedLocusGenotype(int(locus.chromosome), int(locus.bp_position),
-                                         locus.allele1.upper(), locus.allele2.upper(),
-                                         genotypes)
-            else:
-                # allele 2 is the major allele
-                return True, self.getValidatedLocusGenotype(int(locus.chromosome), int(locus.bp_position),
-                                         locus.allele2.upper(), locus.allele1.upper(),
-                                         genotypes)
+            # allele 2 is the major allele
+            return True, self.getValidatedLocusGenotype(str(locus.chromosome), int(locus.bp_position),
+                                                        locus.allele2.upper(), locus.allele1.upper(),
+                                                        genotypes)
 
 
     def determineMajorAllele(self, n=1000):
@@ -179,7 +216,10 @@ class PlinkBinaryToVariants:
         '''
         if major not in ['A','T','C','G'] or minor not in ['A','T','C','G']:
             # invalid coding
-            return -1, 0, major, minor
+            if major == '0' or minor == '0':
+                return -2, 0, major, minor 
+            else:
+                return -1, 0, major, minor
         status = strand = 0
         if ref in [major, minor]:
             # allele found, determine flip status
@@ -217,14 +257,16 @@ class Preprocessor:
         
 
 class PlinkConverter(Preprocessor):
-    def __init__(self, build):
+    def __init__(self, build, chrom_namemap = {}):
         Preprocessor.__init__(self)
         self.build = build
+        self.cmap = chrom_namemap
 
     def convert(self, files, output_files, logger):
         for item, ofile in zip(files, output_files):
             if os.path.exists(item + ".bed"):
-                self.decode_plink(PlinkBinaryToVariants(item, self.build, logger), ofile, logger=logger)
+                self.decode_plink(PlinkBinaryToVariants(item, self.build, self.cmap, logger),
+                                  ofile, logger=logger)
             else:
                 import glob
                 files = '/'.join([x for x in glob.glob(item + '*')])
