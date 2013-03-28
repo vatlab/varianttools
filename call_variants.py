@@ -12,6 +12,7 @@ import copy
 import gzip
 import bz2
 import time
+from collections import defaultdict
 
 #
 # Runtime environment
@@ -31,6 +32,9 @@ class RuntimeEnvironment(object):
         self._max_jobs = 1
         self._logger = None
         #
+        # additional parameters for args
+        self.cmd_args = defaultdict(str)
+        #
         # running_jobs implements a simple multi-processing queue system. Basically,
         # this variable holds the (popen, cmd, upon_succ) object for running jobs.
         #
@@ -43,6 +47,7 @@ class RuntimeEnvironment(object):
         #      wait till all jobs are completed
         self.running_jobs = []
     
+
     #
     # max number of jobs
     #
@@ -390,7 +395,7 @@ class BaseVariantCaller:
             env.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
         else:
             self.checkCmd('bwa')
-            self.call('bwa index -p bwaidx -a bwtsw {}'.format(ref_file))
+            self.call('bwa index {} -p bwaidx -a bwtsw {}'.format(env.cmd_args['bwa_index'], ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
         '''Create index for reference genome used by samtools'''
@@ -398,7 +403,7 @@ class BaseVariantCaller:
             env.logger.warning('Using existing samtools sequence index {}.fai'.format(ref_file))
         else:
             self.checkCmd('samtools')
-            self.call('samtools faidx {}'.format(ref_file))
+            self.call('samtools faidx {} {}'.format(env.cmd_args['samtools_faidx'], ref_file))
 
     def checkResource(self):
         '''Check if needed resource is available.'''
@@ -416,7 +421,102 @@ class BaseVariantCaller:
         filenames = []
         for filename in input_files:
             filenames.extend(self.decompress(filename, working_dir))
+        filenames.sort()
         return filenames
+
+    def bwa_aln(self, fasta_files, working_dir):
+        '''Use bwa aln to process fasta files'''
+        for input_file in fasta_files:
+            dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
+            if os.path.isfile(dest_file):
+                env.logger.warning('Using existing alignent index file {}'.format(dest_file))
+            else:
+                # input file should be in fasta format (-t 4 means 4 threads)
+                fmt = self.fastaVersion(input_file)
+                opt = ' -I ' if fmt == 'Illumina 1.3+' else ''
+                self.call('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.cmd_args['bwa_aln'], self.resource_dir, 
+                    input_file, dest_file), 
+                    upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
+        # wait for all bwa aln jobs to be completed
+        self.wait()
+
+    def bwa_sampe(self, fasta_files, working_dir):
+        '''Use bwa sampe to generate aligned sam files for paird end reads'''
+        sam_files = []
+        for idx in range(len(fasta_files)//2):
+            f1 = fasta_files[2*idx]
+            f2 = fasta_files[2*idx + 1]
+            sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
+            if os.path.isfile(sam_file):
+                env.logger.warning('Using existing sam file {}'.format(sam_file))
+            else:
+                self.call('bwa sampe {0} {1}/bwaidx {2}/{3}.sai {2}/{4}.sai {5} {6} > {7}_tmp'.format(
+                    env.cmd_args['bwa_sampe'], self.resource_dir, 
+                    working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
+            sam_files.append(sam_file)
+        # wait for all jobs to be completed
+        self.wait()
+        return sam_files
+
+    def bwa_samse(self, fasta_files, working_dir):
+        '''Use bwa sampe to generate aligned sam files'''
+        sam_files = []
+        for f in fasta_file:
+            sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
+            if os.path.isfile(sam_file):
+                env.logger.warning('Using existing sam file {}'.format(sam_file))
+            else:
+                self.call('bwa samse {0} {1}/bwaidx {2}/{3}.sai {4} > {5}_tmp'.format(
+                    env.cmd_args['bwa_samse'], self.resource_dir,
+                    working_dir, os.path.basename(f), f, sam_file),
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
+            sam_files.append(sam_file)
+        # wait for all jobs to be completed
+        self.wait()
+        return sam_files        
+
+    def sam2bam(self, sam_files):
+        '''Convert sam file to sorted bam files.'''
+        bam_files = []
+        for sam_file in sam_files:
+            bam_file = sam_file[:-4] + '.bam'
+            if os.path.isfile(bam_file):
+                env.logger.warning('Using existing bam file {}'.format(bam_file))
+            else:
+                self.call('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
+                    env.cmd_args['samtools_view'], self.resource_dir, sam_file, bam_file),
+                    upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
+            bam_files.append(bam_file)
+        # wait for all sam->bam jobs to be completed
+        self.wait()
+        #
+        # sort bam files
+        sorted_bam_files = []
+        for bam_file in bam_files:
+            sorted_bam_file = bam_file[:-4] + '_sorted.bam'
+            if os.path.isfile(sorted_bam_file):
+                env.logger.warning('Using existing sorted bam file {}'.format(bam_file))
+            else:
+                self.call('samtools sort {} {} {}_tmp'.format(
+                    env.cmd_args['samtools_sort'], bam_file, sorted_bam_file[:-4]),
+                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
+            sorted_bam_files.append(sorted_bam_file)
+        self.wait()
+        return sorted_bam_files
+
+    def mergeBAMs(self, bam_files, output):
+        '''merge sam files'''
+        # use Picard merge, not samtools merge: 
+        # Picard keeps RG information from all Bam files, whereas samtools uses only 
+        # information from the first bam file
+        self.call('''java -Xmx4g -jar MergeSamFiles.jar {} {} USE_THREADING=true
+    	    VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
+    	    OUTPUT= {}'''.format(env.cmd_args['picard_MergeSamFiles'], ' '.join(bam_files), output).replace('\n', ' '))
+
+    def indexBAM(self, bam_file):
+        '''Index the input bam file'''
+        self.call('samtools index {0} {0}.bai'.format(bam_file))
 
     def align(self):
         '''Align to the reference genome'''
@@ -472,23 +572,13 @@ class hg19_gatk_23(BaseVariantCaller):
         working_dir = os.path.split(output)[0]
         env.logger.info('Setting working directory to {}'.format(working_dir))
         #
+        # step 1: decompress to get a list of fasta files
         fasta_files = self.getFastaFiles(input_files, working_dir)
-        fasta_files.sort()
-        for input_file in fasta_files:
-            dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
-            if os.path.isfile(dest_file):
-                env.logger.warning('Using existing alignent index file {}'.format(dest_file))
-            else:
-                # input file should be in fasta format (-t 4 means 4 threads)
-                fmt = self.fastaVersion(input_file)
-                opt = ' -I ' if fmt == 'Illumina 1.3+' else ''
-                self.call('bwa aln {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, self.resource_dir, 
-                    input_file, dest_file), 
-                    upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
-        # wait for all bwa aln jobs to be completed
-        self.wait()
         #
-        # generate .bam files for each pair of pairend reads
+        # step 2: call bwa aln to produce .sai files
+        self.bwa_aln(fasta_files, working_dir)
+        #
+        # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
         paired = True
         if len(fasta_files) // 2 * 2 != len(fasta_files):
             env.logger.warning('Odd number of fasta files provided, not handled as paired end reads.')
@@ -507,51 +597,21 @@ class hg19_gatk_23(BaseVariantCaller):
                 break
         #
         # sam files?
-        sam_files = []
         if paired:
-            for idx in range(len(fasta_files)//2):
-                f1 = fasta_files[2*idx]
-                f2 = fasta_files[2*idx + 1]
-                sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
-                if os.path.isfile(sam_file):
-                    env.logger.warning('Using existing sam file {}'.format(sam_file))
-                else:
-                    self.call('bwa sampe {0}/bwaidx {1}/{2}.sai {1}/{3}.sai {4} {5} > {6}_tmp'.format(self.resource_dir, 
-                        working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
-                        upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
-                sam_files.append(sam_file)
-            # wait for all jobs to be completed
-            self.wait()
+            sam_files = self.bwa_sampe(fasta_files, working_dir)
         else:
-            for f in fasta_file:
-                sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
-                if os.path.isfile(sam_file):
-                    env.logger.warning('Using existing sam file {}'.format(sam_file))
-                else:
-                    self.call('bwa samse {0}/bwaidx {1}/{2}.sai {3} > {4}_tmp'.format(self.resource_dir,
-                        working_dir, os.path.basename(f), f, sam_file),
-                        upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
-                sam_files.append(sam_file)
-            # wait for all jobs to be completed
-            self.wait()
+            sam_files = self.bwa_samse(fasta_files, working_dir)
         # 
-        # convert sam to bam files
-        for sam_file in sam_files:
-            bam_file = sam_file[:-4] + '.bam'
-            if os.path.isfile(bam_file):
-                env.logger.warning('Using existing bam file {}'.format(bam_file))
-            else:
-                self.call('samtools view -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
-                    self.resource_dir, sam_file, bam_file),
-                    upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
-        # wait for all sam->bam jobs to be completed
-        self.wait()
+        # step 4: convert sam to sorted bam files
+        bam_files = self.sam2bam(sam_files)
         #
-        # merge sam files?
-        if len(sam_files) > 1:
-            self.call('samtools merge {} {}'.format(output, ' '.join([x[:-4] + '.bam' for x in sam_files]))) 
-        else:
+        # step 5: merge sorted bam files to output file
+        if len(bam_files) > 1:
+            self.mergeBAMs(bam_files, output)
             shutil.copy(sam_files[0], output)
+        #
+        # step 6: index the output bam file
+        self.indexBAM(output)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
@@ -569,7 +629,9 @@ if __name__ == '__main__':
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling. ''')
+        calling. As an advanced usage, if you know the exact command used, you can
+        pass extra parameters to these commands through additional parameters. A
+        partial list of such parameters include bwa_aln, samtools_sort.''')
     master_parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
         choices=['hg19_gatk_23'],
         help='Name of the pipeline to be used to call variants.')
@@ -612,7 +674,7 @@ if __name__ == '__main__':
     call.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs.''')
     #
-    args = master_parser.parse_args()
+    args, argv = master_parser.parse_kwnown_args()
     #
     if hasattr(args, 'output'):
         working_dir = os.path.split(args.output)[0]
@@ -624,6 +686,21 @@ if __name__ == '__main__':
         # screen only logging
         env.logger = None
     #
+    # handling additional parameters
+    commands = ['bwa_index', 'samtools_faidx', 'bwa_aln', 'bwa_sampe', 'bwa_samse',
+        'samtools_view', 'samtools_sort', 'picard_MergeSamFiles']
+    for idx in range(len(argv)//2):
+        if not argv[2*idx].startswith('--'):
+            sys.exit('Additional parameter should starts with --')
+        # set additional parameters
+        cmd = argv[2*idx][2:]
+        param = argv[2*idx+1]
+        if cmd in commands:
+            env.cmd_args[cmd] = param
+        else:
+            sys.exit('Additional parameter {} is not supported. Please use one of {}'.format(cmd, ', '.join(commands)))
+        env.logger.info('Additional parameter {} will be passed to command {}'.format())
+
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
     pipeline = eval(args.pipeline)(args.resource_dir)
