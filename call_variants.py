@@ -258,10 +258,11 @@ class BaseVariantCaller:
     #
     # PREPARE RESOURCE
     #
-    def downloadGATKResourceBundle(self, URL):
-        '''Utility function to download GATK resource bundle.'''
+    def downloadGATKResourceBundle(self, URL, files):
+        '''Utility function to download GATK resource bundle. If files specified by
+        files already exist, use the existing downloaded files.'''
         #
-        if os.path.isfile('ucsc.{}.fasta.gz'.format(self.build)):
+        if all([os.path.isfile(x) for x in files]):
             self.logger.warning('Using existing GATK resource')
         else:
             self.call('wget -r {}'.format(URL))
@@ -274,7 +275,7 @@ class BaseVariantCaller:
         # decompress all .gz files
         for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and not x.endswith('tar.gz')]:
             if os.path.isfile(gzipped_file[:-3]):
-                self.logger.warning('Using existing {}'.format(gzipped_file[:-3]))
+                self.logger.warning('Using existing decompressed file {}'.format(gzipped_file[:-3]))
             else:
                 self.decompress(gzipped_file, '.')
  
@@ -349,8 +350,8 @@ class hg19_gatk_23(BaseVariantCaller):
         os.chdir(self.resource_dir)
         #
         # these are pipeline specific
-        self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*')
-        self.buildBWAIndex('ucsc.hg19.fasta')
+        self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*', files=['ucsc.hg19.fasta.gz'])
+        self.buildBWARefIndex('ucsc.hg19.fasta')
         self.buildSamToolsRefIndex('ucsc.hg19.fasta')
         # 
         os.chdir(saved_dir)
