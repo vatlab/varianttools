@@ -382,11 +382,11 @@ class hg19_gatk_23(BaseVariantCaller):
                 os.rename(dest_file + '_tmp', dest_file)
         #
         # generate .bam files for each pair of pairend reads
-        paried = True
-        if len(fasta_files) / 2 * 2 != len(fasta_files):
+        paired = True
+        if len(fasta_files) // 2 * 2 != len(fasta_files):
             self.logger.warning('Odd number of fasta files provided, not handled as paired end reads.')
             paired = False
-        for idx in range(len(fasta_files)/2):
+        for idx in range(len(fasta_files)//2):
             f1 = fasta_files[2*idx]
             f2 = fasta_files[2*idx + 1]
             if len(f1) != len(f2):
@@ -402,15 +402,15 @@ class hg19_gatk_23(BaseVariantCaller):
         # sam files?
         sam_files = []
         if paired:
-            for idx in range(len(fasta_files)/2):
+            for idx in range(len(fasta_files)//2):
                 f1 = fasta_files[2*idx]
                 f2 = fasta_files[2*idx + 1]
                 sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
                 if os.path.isfile(sam_file):
                     self.logger.warning('Using existing sam file {}'.format(sam_file))
                 else:
-                    self.call('bwa sampe {0}/bwaidx {1}/{2}.sai {3} > {4}_tmp'.format(self.resource_dir, 
-                        working_dir, os.path.basename(f), sam_file))
+                    self.call('bwa sampe {0}/bwaidx {1}/{2}.sai {1}/{3}.sai {4} {5} > {6}_tmp'.format(self.resource_dir, 
+                        working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file))
                     os.rename(sam_file + '_tmp', sam_file)
                 sam_files.append(sam_file)
         else:
