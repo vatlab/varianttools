@@ -398,17 +398,18 @@ class BaseVariantCaller:
     def checkPicard(self):
         '''Check if picard is available'''
         if env.options['PICARD_PATH']:
-            if not os.path.isfile(os.path.join(env.options['PICARD_PATH'], 'SortSam.jar')):
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
                 env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'.format(env.options['PICARD_PATH']))
                 sys.exit(1)
         elif 'CLASSPATH' in os.environ:
-            if not any([os.path.isfile(os.path.join(x, 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
+            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
                 env.logger.error('$CLASSPATH does not contain a path that contain picard jar files.')
                 sys.exit(1)
             else:
                 for x in os.environ['CLASSPATH'].split(os.sep):
-                    if os.path.isfile(os.path.join(x, 'SortSam.jar')):
-                        env.options['PICARD_PATH'] = x
+                    if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
+                        env.logger.info('Using picard under {}'.format(x))
+                        env.options['PICARD_PATH'] = os.path.expanduser(x)
                         break
         else:
             env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environmental variable $CLASSPATH.')
@@ -417,17 +418,18 @@ class BaseVariantCaller:
     def checkGATK(self):
         '''Check if GATK is available'''
         if env.options['GATK_PATH']:
-            if not os.path.isfile(os.path.join(env.options['GATK_PATH'], 'SortSam.jar')):
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']), 'GenomeAnalysisTK.jar')):
                 env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'.format(env.options['GATK_PATH']))
                 sys.exit(1)
         elif 'CLASSPATH' in os.environ:
-            if not any([os.path.isfile(os.path.join(x, 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
+            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
                 env.logger.error('$CLASSPATH does not contain a path that contain GATK jar files.')
                 sys.exit(1)
             else:
                 for x in os.environ['CLASSPATH'].split(os.sep):
-                    if os.path.isfile(os.path.join(x, 'GenomeAnalysisTK.jar')):
-                        env.options['GATK_PATH'] = x
+                    if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
+                        env.logger.info('Using GATK under {}'.format(x))
+                        env.options['GATK_PATH'] = os.path.expanduser(x)
                         break
         else:
             env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environmental variable $CLASSPATH.')
@@ -557,8 +559,8 @@ class BaseVariantCaller:
         # information from the first bam file
         self.call('''java -Xmx4g -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
     	    VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-    	    OUTPUT= {}'''.format(env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                ' '.join(bam_files), output).replace('\n', ' '))
+    	    OUTPUT={}'''.format(env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
+                ' '.join(['INPUT={}'.format(x) for x in bam_files]), output).replace('\n', ' '))
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
