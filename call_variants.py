@@ -380,11 +380,27 @@ def decompress(filename, dest_dir=None):
     #
     # if it is a tar file
     if mode is not None:
-        dest_files = []
         env.logger.info('Extracting fastq sequences from tar file {}'.format(filename))
         #
         # MOTE: open a compressed tar file can take a long time because it needs to scan
-        # the whole file to determine its content
+        # the whole file to determine its content. I am therefore creating a manifest
+        # file for the tar file in the dest_dir, and avoid re-opening when the tar file
+        # is processed again.
+        manifest = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename) + '.manifest')
+        all_extracted = False
+        dest_files = []
+        if os.path.isfile(manifest):
+            all_extracted = True
+            for f in [x.strip() for x in open(manifest).readlines()]:
+                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
+                if os.path.isfile(dest_file):
+                    dest_files.append(dest_file)
+                    env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                else:
+                    all_extracted = False
+        #
+        if all_extracted:
+            return dest_files
         #
         # create a temporary directory to avoid corrupted file due to interrupted decompress
         try:
@@ -392,19 +408,25 @@ def decompress(filename, dest_dir=None):
         except:
             # directory might already exist
             pass
+        #
+        dest_files = []
         with tarfile.open(filename, mode) as tar:
             files = tar.getnames()
-            for filename in files:
+            # save content to a manifest
+            with open(manifest, 'w') as manifest:
+                for f in files:
+                    manifest.write(f + '\n')
+            for f in files:
                 # if there is directory structure within tar file, decompress all to the current directory
-                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename))
+                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
                 dest_files.append(dest_file)
                 if os.path.isfile(dest_file):
                     env.logger.warning('Using existing extracted file {}'.format(dest_file))
                 else:
-                    env.logger.info('Extracting {} to {}'.format(filename, dest_file))
-                    tar.extract(filename, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+                    env.logger.info('Extracting {} to {}'.format(f, dest_file))
+                    tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
                     # move to the top directory with the right name only after the file has been properly extracted
-                    shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), filename), dest_file)
+                    shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
         return dest_files
     # return source file if 
     return [filename]
@@ -554,7 +576,7 @@ class BaseVariantCaller:
         for bam_file in bam_files:
             sorted_bam_file = bam_file[:-4] + '_sorted.bam'
             if os.path.isfile(sorted_bam_file):
-                env.logger.warning('Using existing sorted bam file {}'.format(bam_file))
+                env.logger.warning('Using existing sorted bam file {}'.format(sorted_bam_file))
             else:
                 run_command('samtools sort {} {} {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_SORT'], bam_file, sorted_bam_file[:-4]),
@@ -583,7 +605,8 @@ class BaseVariantCaller:
         if os.path.isfile('{}.bai'.format(bam_file)):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
-            run_command('samtools index {0} {0}_tmp.bai'.format(bam_file),
+            run_command('samtools index {0} {1} {1}_tmp.bai'.format(
+                env.options['OPT_SAMTOOLS_INDEX'], bam_file),
                 upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
 
     def align(self, input_files, output):
@@ -638,7 +661,6 @@ class hg19_gatk_23(BaseVariantCaller):
         self.buildBWARefIndex('ucsc.hg19.fasta')
         self.buildSamToolsRefIndex('ucsc.hg19.fasta')
         # 
-        self.downloadPicard()
         os.chdir(saved_dir)
 
     def align(self, input_files, output):
@@ -689,7 +711,8 @@ class hg19_gatk_23(BaseVariantCaller):
         # step 5: merge sorted bam files to output file
         if len(bam_files) > 1:
             self.mergeBAMs(bam_files, output)
-            shutil.copy(sam_files[0], output)
+        else:
+            shutil.copy(bam_files[0], output)
         #
         # step 6: index the output bam file
         self.indexBAM(output)
@@ -794,6 +817,7 @@ if __name__ == '__main__':
         ('OPT_BWA_SAMSE', ''),
         ('OPT_SAMTOOLS_VIEW', ''),
         ('OPT_SAMTOOLS_SORT', ''),
+        ('OPT_SAMTOOLS_INDEX', ''),
         ('OPT_PICARD_MERGESAMFILES' ''),
         ]
     # set default value
