@@ -246,12 +246,11 @@ def checkPicard():
         if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(':')]):
             env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'.format(os.environ['CLASSPATH']))
             sys.exit(1)
-        else:
-            for x in os.environ['CLASSPATH'].split(os.sep):
-                if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
-                    env.logger.info('Using picard under {}'.format(x))
-                    env.options['PICARD_PATH'] = os.path.expanduser(x)
-                    break
+        for x in os.environ['CLASSPATH'].split(':'):
+            if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
+                env.logger.info('Using picard under {}'.format(x))
+                env.options['PICARD_PATH'] = os.path.expanduser(x)
+                break
     else:
         env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
         sys.exit(1)
@@ -267,7 +266,7 @@ def checkGATK():
             env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'.format(os.environ['CLASSPATH']))
             sys.exit(1)
         else:
-            for x in os.environ['CLASSPATH'].split(os.sep):
+            for x in os.environ['CLASSPATH'].split(':'):
                 if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
                     env.logger.info('Using GATK under {}'.format(x))
                     env.options['GATK_PATH'] = os.path.expanduser(x)
@@ -576,14 +575,16 @@ class BaseVariantCaller:
     	        VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
     	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
                     env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output).replace('\n', ' '))
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output[:-4] + '_tmp.bam').replace('\n', ' '),
+                upon_succ=(os.rename, output[:-4] + '_tmp.bam', output))
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
         if os.path.isfile('{}.bai'.format(bam_file)):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
-            run_command('samtools index {0} {0}.bai'.format(bam_file))
+            run_command('samtools index {0} {0}_tmp.bai'.format(bam_file),
+                upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
 
     def align(self, input_files, output):
         '''Align to the reference genome'''
@@ -819,10 +820,13 @@ if __name__ == '__main__':
         pipeline.prepareResourceIfNotExist()
     elif args.action == 'align':
         env.jobs = args.jobs
+        checkPicard()
         pipeline.checkResource()
         pipeline.align(args.input_files, args.output)
     elif args.action == 'call':
         env.jobs = args.jobs
+        checkPicard()
+        checkGATK()
         pipeline.checkResource()
         pipeline.callVariants(args.input_files, args.output)
 
