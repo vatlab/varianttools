@@ -48,7 +48,6 @@ class RuntimeEnvironment(object):
         #      wait till all jobs are completed
         self.running_jobs = []
     
-
     #
     # max number of jobs
     #
@@ -61,7 +60,6 @@ class RuntimeEnvironment(object):
 
     jobs = property(lambda self:self._max_jobs, _setMaxJobs)
 
-    
     #
     # a global logger
     #
@@ -156,7 +154,263 @@ class RuntimeEnvironment(object):
 # create a runtime environment object
 env = RuntimeEnvironment()
 
+
 #
+# A simple job management scheme 
+#
+def run_command(cmd, upon_succ=None, wait=True):
+    '''Call an external command, raise an error if it fails.
+    If upon_succ is specified, the specified function and parameters will be
+    evalulated after the job has been completed successfully.
+    '''
+    if wait or env.jobs == 1:
+        try:
+            env.logger.info('Running {}'.format(cmd))
+            retcode = subprocess.call(cmd, shell=True)
+            if retcode < 0:
+                sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
+            elif retcode > 0:
+                sys.exit("Command {} returned {}".format(cmd, retcode))
+        except OSError as e:
+            sys.exit("Execution of command {} failed: {}".format(cmd, e))
+        # everything is OK
+        if upon_succ:
+            # call the function (upon_succ) using others as parameters.
+            upon_succ[0](*(upon_succ[1:]))
+    else:
+        # if do not wait, look for running jobs
+        while True:
+            # if there are enough jobs running, wait
+            if running_jobs() >= env.jobs:
+                time.sleep(5)
+            else:
+                break
+        # there is a slot, start running
+        env.logger.info('Running {}'.format(cmd))
+        proc = subprocess.Popen(cmd, shell=True)
+        env.running_jobs.append([proc, cmd, upon_succ])
+
+def running_jobs():
+    '''check the number of running jobs'''
+    count = 0
+    for idx, job in enumerate(env.running_jobs):
+        ret = job[0].poll()
+        if ret is None:  # still running
+            count += 1
+        elif ret != 0:
+            raise RuntimeError('Job {} failed.'.format(job[1]))
+        else:
+            # finish up
+            if job[2]:
+                # call the upon_succ function
+                job[2][0](*(job[2][1:]))
+            env.running_jobs[idx] = None
+    # remove all completed jobs and exit
+    env.running_jobs = [x for x in env.running_jobs if x]
+    return count
+
+
+def wait_all():
+    '''Wait for all pending jobs to complete'''
+    if not env.running_jobs:
+        return
+    for job in env.running_jobs:
+        ret = job[0].wait()
+        if ret != 0:
+            raise RuntimeError('Job {} failed.'.format(job[1]))
+        # run the upon_succ function
+        if job[2]:
+            job[2][0](*(job[2][1:]))
+    # all jobs are completed
+    env.running_jobs = []
+
+#
+# Check the existence of commands
+#
+def checkCmd(cmd):
+    '''Check if a cmd exist'''
+    if not hasattr(shutil, 'which'):
+        env.logger.error('Please use Python 3.3 or higher for the use of shutil.which function')
+        sys.exit(1)
+    if shutil.which(cmd) is None:
+        env.logger.error('Command {} does not exist. Please install it and try again.'.format(cmd))
+        sys.exit(1)
+
+def checkPicard():
+    '''Check if picard is available, set PICARD_PATH if the path is specified in CLASSPATH'''
+    if env.options['PICARD_PATH']:
+        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
+            env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'.format(env.options['PICARD_PATH']))
+            sys.exit(1)
+    elif 'CLASSPATH' in os.environ:
+        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(':')]):
+            env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'.format(os.environ['CLASSPATH']))
+            sys.exit(1)
+        else:
+            for x in os.environ['CLASSPATH'].split(os.sep):
+                if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
+                    env.logger.info('Using picard under {}'.format(x))
+                    env.options['PICARD_PATH'] = os.path.expanduser(x)
+                    break
+    else:
+        env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
+        sys.exit(1)
+
+def checkGATK():
+    '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path is specified in CLASSPATH'''
+    if env.options['GATK_PATH']:
+        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']), 'GenomeAnalysisTK.jar')):
+            env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'.format(env.options['GATK_PATH']))
+            sys.exit(1)
+    elif 'CLASSPATH' in os.environ:
+        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(':')]):
+            env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'.format(os.environ['CLASSPATH']))
+            sys.exit(1)
+        else:
+            for x in os.environ['CLASSPATH'].split(os.sep):
+                if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
+                    env.logger.info('Using GATK under {}'.format(x))
+                    env.options['GATK_PATH'] = os.path.expanduser(x)
+                    break
+    else:
+        env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environment variable $CLASSPATH.')
+        sys.exit(1) 
+
+#
+# Utility functions
+# 
+def downloadFile(URL, dest, quiet=False):
+    '''Download a file from URL and save to dest'''
+    # for some strange reason, passing wget without shell=True can fail silently.
+    env.logger.info('Downloading {}'.format(URL))
+    if os.path.isfile(dest):
+        env.logger.warning('Using existing downloaded file {}.'.format(dest))
+        return dest
+    p = subprocess.Popen('wget {} -O {}_tmp {}'.format('-q' if quiet else '', dest, URL), shell=True)
+    ret = p.wait()
+    if ret == 0 and os.path.isfile(dest + '_tmp'):
+        os.rename(dest + '_tmp', dest)
+        return dest
+    else:
+        try:
+            os.remove(dest + '_tmp')
+        except OSError:
+            pass
+        raise RuntimeError('Failed to download {} using wget'.format(URL))
+
+def fastqVersion(fastq_file):
+    '''Detect the version of input fastq file. This can be very inaccurate'''
+    #
+    # This function assumes each read take 4 lines, and the last line contains
+    # quality code. It collects about 1000 quality code and check their range,
+    # and use it to determine if it is Illumina 1.3+
+    #
+    qual_scores = ''
+    with open(fastq_file) as fastq:
+        while len(qual_scores) < 1000:
+            line = fastq.readline()
+            if not line.startswith('@'):
+                raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
+            line = fastq.readline()
+            line = fastq.readline()
+            if not line.startswith('+'):
+                env.logger.warning('Suspiciout FASTA file {}: third line does not start with "+".'.foramt(fastq_file))
+                return 'Unknown'
+            line = fastq.readline()
+            qual_scores += line.strip()
+    #
+    min_qual = min([ord(x) for x in qual_scores])
+    max_qual = max([ord(x) for x in qual_scores])
+    env.logger.debug('FASTA file with quality score ranging {} to {}'.format(min_qual, max_qual))
+    # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
+    # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
+    if min_qual >= 64 or max_qual > 90:
+        # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
+        return 'Illumina 1.3+'
+    else:
+        # no option is needed for bwa
+        return 'Sanger'
+
+def decompress(filename, dest_dir=None):
+    '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
+    dest_dir (current directory if unspecified), and return a list of files. Uncompressed
+    files will be returned untouched.'''
+    mode = None
+    if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
+        mode = 'r:gz'
+    elif filename.lower().endswith('.tbz2') or filename.lower().endswith('.tgz'):
+        mode = 'r:bz2'
+    elif filename.lower().endswith('.tar'):
+        mode = 'r'
+    elif filename.lower().endswith('.gz'):
+        dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-3])
+        if os.path.isfile(dest_file):
+            env.logger.warning('Using existing decompressed file {}'.format(dest_file))
+        else:
+            env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
+            with gzip.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
+                buffer = input.read(10000000)
+                while buffer:
+                    output.write(buffer)
+                    buffer = input.read(10000000)
+            # only rename the temporary file to the right one after finishing everything
+            # this avoids corrupted files
+            os.rename(dest_file + '_tmp', dest_file)
+        return [dest_file]
+    elif filename.lower().endswith('.bz2'):
+        dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
+        if os.path.isfile(dest_file):
+            env.logger.warning('Using existing decompressed file {}'.format(dest_file))
+        else:
+            env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
+            with bz2.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
+                buffer = input.read(10000000)
+                while buffer:
+                    output.write(buffer)
+                    buffer = input.read(10000000)
+            # only rename the temporary file to the right one after finishing everything
+            # this avoids corrupted files
+            os.rename(dest_file + '_tmp', dest_file)
+        return [dest_file]
+    elif filename.lower().endswith('.zip'):
+        bundle = zipfile.ZipFile(filename)
+        dest_dir = '.' if dest_dir is None else dest_dir
+        bundle.extractall(dest_dir)
+        env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
+        return [os.path.join(dest_dir, name) for name in bundle.namelist()]
+    #
+    # if it is a tar file
+    if mode is not None:
+        dest_files = []
+        env.logger.info('Extracting fastq sequences from tar file {}'.format(filename))
+        #
+        # MOTE: open a compressed tar file can take a long time because it needs to scan
+        # the whole file to determine its content
+        #
+        # create a temporary directory to avoid corrupted file due to interrupted decompress
+        try:
+            os.mkdir('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+        except:
+            # directory might already exist
+            pass
+        with tarfile.open(filename, mode) as tar:
+            files = tar.getnames()
+            for filename in files:
+                # if there is directory structure within tar file, decompress all to the current directory
+                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename))
+                dest_files.append(dest_file)
+                if os.path.isfile(dest_file):
+                    env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                else:
+                    env.logger.info('Extracting {} to {}'.format(filename, dest_file))
+                    tar.extract(filename, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+                    # move to the top directory with the right name only after the file has been properly extracted
+                    shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), filename), dest_file)
+        return dest_files
+    # return source file if 
+    return [filename]
+   
+
 #  Variant Caller
 #
 class BaseVariantCaller:
@@ -170,208 +424,6 @@ class BaseVariantCaller:
             os.makedirs(self.resource_dir)
 
     #
-    # UTILITY FUNCTIONS
-    #
-    def checkCmd(self, cmd):
-        '''Check if a cmd exist'''
-        if not hasattr(shutil, 'which'):
-            env.logger.error('Please use Python 3.3 or higher for the use of shutil.which function')
-            sys.exit(1)
-        if shutil.which(cmd) is None:
-            env.logger.error('Command {} does not exist. Please install it and try again.'.format(cmd))
-            sys.exit(1)
-        
-    def downloadFile(self, URL, dest, quiet=False):
-        '''Download a file from URL and save to dest '''
-        # for some strange reason, passing wget without shell=True can fail silently.
-        env.logger.info('Downloading {}'.format(URL))
-        if os.path.isfile(dest):
-            env.logger.warning('Using existing downloaded file {}.'.format(dest))
-            return dest
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
-        ret = p.wait()
-        if ret == 0 and os.path.isfile(dest):
-            return dest
-        else:
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-            raise RuntimeError('Failed to download {} using wget'.format(URL))
-
-    def call(self, cmd, upon_succ=None, wait=True):
-        '''Call an external command, raise an error if it fails.
-        If upon_succ is specified, the specified function and parameters will be
-        evalulated after the job has been completed successfully.
-        '''
-        if wait or env.jobs == 1:
-            try:
-                env.logger.info('Running {}'.format(cmd))
-                retcode = subprocess.call(cmd, shell=True)
-                if retcode < 0:
-                    sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
-                elif retcode > 0:
-                    sys.exit("Command {} returned {}".format(cmd, retcode))
-            except OSError as e:
-                sys.exit("Execution of command {} failed: {}".format(cmd, e))
-            # everything is OK
-            if upon_succ:
-                # call the function (upon_succ) using others as parameters.
-                upon_succ[0](*(upon_succ[1:]))
-        else:
-            # if do not wait, look for running jobs
-            while True:
-                # if there are enough jobs running, wait
-                if self.poll() >= env.jobs:
-                    time.sleep(5)
-                else:
-                    break
-            # there is a slot, start running
-            env.logger.info('Running {}'.format(cmd))
-            proc = subprocess.Popen(cmd, shell=True)
-            env.running_jobs.append([proc, cmd, upon_succ])
-
-    def poll(self):
-        '''check the number of running jobs'''
-        count = 0
-        for idx, job in enumerate(env.running_jobs):
-            ret = job[0].poll()
-            if ret is None:  # still running
-                count += 1
-            elif ret != 0:
-                raise RuntimeError('Job {} failed.'.format(job[1]))
-            else:
-                # finish up
-                if job[2]:
-                    # call the upon_succ function
-                    job[2][0](*(job[2][1:]))
-                env.running_jobs[idx] = None
-        # remove all completed jobs and exit
-        env.running_jobs = [x for x in env.running_jobs if x]
-        return count
-
-
-    def wait(self):
-        '''Wait for all pending jobs to complete'''
-        if not env.running_jobs:
-            return
-        for job in env.running_jobs:
-            ret = job[0].wait()
-            if ret != 0:
-                raise RuntimeError('Job {} failed.'.format(job[1]))
-            # run the upon_succ function
-            if job[2]:
-                job[2][0](*(job[2][1:]))
-        # all jobs are completed
-        env.running_jobs = []
-    
-    def fastaVersion(self, fasta_file):
-        '''Detect the version of input fasta file. This can be very inaccurate'''
-        #
-        # This function assumes each read take 4 lines, and the last line contains
-        # quality code. It collects about 1000 quality code and check their range,
-        # and use it to determine if it is Illumina 1.3+
-        #
-        qual_scores = ''
-        with open(fasta_file) as fasta:
-            while len(qual_scores) < 1000:
-                line = fasta.readline()
-                if not line.startswith('@'):
-                    raise ValueError('Wrong FASTA file {}'.foramt(fasta_file))
-                line = fasta.readline()
-                line = fasta.readline()
-                if not line.startswith('+'):
-                    env.logger.warning('Suspiciout FASTA file {}: third line does not start with "+".'.foramt(fasta_file))
-                    return 'Unknown'
-                line = fasta.readline()
-                qual_scores += line.strip()
-        #
-        min_qual = min([ord(x) for x in qual_scores])
-        max_qual = max([ord(x) for x in qual_scores])
-        env.logger.debug('FASTA file with quality score ranging {} to {}'.format(min_qual, max_qual))
-        if min_qual >= 64:
-            # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
-            return 'Illumina 1.3+'
-        else:
-            # no option is needed for bwa
-            return 'Sanger'
-
-    def decompress(self, filename, dest_dir=None):
-        '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
-        dest_dir (current directory if unspecified), and return a list of files. Uncompressed
-        files will be returned untouched.'''
-        mode = None
-        if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
-            mode = 'r:gz'
-        elif filename.lower().endswith('.tbz2') or filename.lower().endswith('.tgz'):
-            mode = 'r:bz2'
-        elif filename.lower().endswith('.tar'):
-            mode = 'r'
-        elif filename.lower().endswith('.gz'):
-            dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-3])
-            if os.path.isfile(dest_file):
-                env.logger.warning('Using existing decompressed file {}'.format(dest_file))
-            else:
-                env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-                with gzip.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
-                    buffer = input.read(10000000)
-                    while buffer:
-                        output.write(buffer)
-                        buffer = input.read(10000000)
-                # only rename the temporary file to the right one after finishing everything
-                # this avoids corrupted files
-                os.rename(dest_file + '_tmp', dest_file)
-            return [dest_file]
-        elif filename.lower().endswith('.bz2'):
-            dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
-            if os.path.isfile(dest_file):
-                env.logger.warning('Using existing decompressed file {}'.format(dest_file))
-            else:
-                env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-                with bz2.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
-                    buffer = input.read(10000000)
-                    while buffer:
-                        output.write(buffer)
-                        buffer = input.read(10000000)
-                # only rename the temporary file to the right one after finishing everything
-                # this avoids corrupted files
-                os.rename(dest_file + '_tmp', dest_file)
-            return [dest_file]
-        elif filename.lower().endswith('.zip'):
-            bundle = zipfile.ZipFile(filename)
-            dest_dir = '.' if dest_dir is None else dest_dir
-            bundle.extractall(dest_dir)
-            env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
-            return [os.path.join(dest_dir, name) for name in bundle.namelist()]
-        #
-        # if it is a tar file
-        if mode is not None:
-            dest_files = []
-            env.logger.info('Extracting fasta sequences from tar file {}'.format(filename))
-            #
-            # MOTE: open a compressed tar file can take a long time because it needs to scan
-            # the whole file to determine its content
-            #
-            # create a temporary directory to avoid corrupted file due to interrupted decompress
-            os.mkdir('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
-            with tarfile.open(filename, mode) as tar:
-                files = tar.getnames()
-                for filename in files:
-                    # if there is directory structure within tar file, decompress all to the current directory
-                    dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename))
-                    dest_files.append(dest_file)
-                    if os.path.isfile(dest_file):
-                        env.logger.warning('Using existing extracted file {}'.format(dest_file))
-                    else:
-                        env.logger.info('Extracting {} to {}'.format(filename, dest_file))
-                        tar.extract(filename, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
-                        # move to the top directory with the right name only after the file has been properly extracted
-                        shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), filename), dest_file)
-            return dest_files
-        # return source file if 
-        return [filename]
-       
-    #
     # PREPARE RESOURCE
     #
     def downloadGATKResourceBundle(self, URL, files):
@@ -381,7 +433,7 @@ class BaseVariantCaller:
         if all([os.path.isfile(x) for x in files]):
             env.logger.warning('Using existing GATK resource')
         else:
-            self.call('wget -r {}'.format(URL))
+            run_command('wget -r {}'.format(URL))
             # walk into the directory and get everything to the top directory
             # this is because wget -r saves files under URL/file
             for root, dirs, files in os.walk('.'):
@@ -393,47 +445,7 @@ class BaseVariantCaller:
             if os.path.isfile(gzipped_file[:-3]):
                 env.logger.warning('Using existing decompressed file {}'.format(gzipped_file[:-3]))
             else:
-                self.decompress(gzipped_file, '.')
- 
-    def checkPicard(self):
-        '''Check if picard is available'''
-        if env.options['PICARD_PATH']:
-            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
-                env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'.format(env.options['PICARD_PATH']))
-                sys.exit(1)
-        elif 'CLASSPATH' in os.environ:
-            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
-                env.logger.error('$CLASSPATH does not contain a path that contain picard jar files.')
-                sys.exit(1)
-            else:
-                for x in os.environ['CLASSPATH'].split(os.sep):
-                    if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
-                        env.logger.info('Using picard under {}'.format(x))
-                        env.options['PICARD_PATH'] = os.path.expanduser(x)
-                        break
-        else:
-            env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environmental variable $CLASSPATH.')
-            sys.exit(1)
-
-    def checkGATK(self):
-        '''Check if GATK is available'''
-        if env.options['GATK_PATH']:
-            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']), 'GenomeAnalysisTK.jar')):
-                env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'.format(env.options['GATK_PATH']))
-                sys.exit(1)
-        elif 'CLASSPATH' in os.environ:
-            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
-                env.logger.error('$CLASSPATH does not contain a path that contain GATK jar files.')
-                sys.exit(1)
-            else:
-                for x in os.environ['CLASSPATH'].split(os.sep):
-                    if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
-                        env.logger.info('Using GATK under {}'.format(x))
-                        env.options['GATK_PATH'] = os.path.expanduser(x)
-                        break
-        else:
-            env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environmental variable $CLASSPATH.')
-            sys.exit(1)
+                decompress(gzipped_file, '.')
 
     def buildBWARefIndex(self, ref_file):
         '''Create BWA index for reference genome file'''
@@ -441,17 +453,18 @@ class BaseVariantCaller:
         if os.path.isfile('bwaidx.amb'):
             env.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
         else:
-            self.checkCmd('bwa')
-            self.call('bwa index {} -p bwaidx -a bwtsw {}'.format(env.options['OPT_BWA_INDEX'], ref_file))
+            checkCmd('bwa')
+            run_command('bwa index {} -p bwaidx -a bwtsw {}'.format(env.options['OPT_BWA_INDEX'], ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
         '''Create index for reference genome used by samtools'''
         if os.path.isfile('{}.fai'.format(ref_file)):
             env.logger.warning('Using existing samtools sequence index {}.fai'.format(ref_file))
         else:
-            self.checkCmd('samtools')
-            self.call('samtools faidx {} {}'.format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
+            checkCmd('samtools')
+            run_command('samtools faidx {} {}'.format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
 
+    # interface
     def checkResource(self):
         '''Check if needed resource is available.'''
         pass
@@ -464,63 +477,62 @@ class BaseVariantCaller:
     # align and create bam file
     #
     def getFastaFiles(self, input_files, working_dir):
-        '''Decompress input files to get a list of fasta files'''
+        '''Decompress input files to get a list of fastq files'''
         filenames = []
         for filename in input_files:
-            filenames.extend(self.decompress(filename, working_dir))
+            filenames.extend(decompress(filename, working_dir))
         filenames.sort()
         return filenames
 
-    def bwa_aln(self, fasta_files, working_dir):
-        '''Use bwa aln to process fasta files'''
-        for input_file in fasta_files:
+    def bwa_aln(self, fastq_files, working_dir):
+        '''Use bwa aln to process fastq files'''
+        for input_file in fastq_files:
             dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
             if os.path.isfile(dest_file):
                 env.logger.warning('Using existing alignent index file {}'.format(dest_file))
             else:
-                # input file should be in fasta format (-t 4 means 4 threads)
-                fmt = self.fastaVersion(input_file)
-                opt = ' -I ' if fmt == 'Illumina 1.3+' else ''
-                self.call('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
+                # input file should be in fastq format (-t 4 means 4 threads)
+                opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
+                run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
                     input_file, dest_file), 
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
         # wait for all bwa aln jobs to be completed
-        self.wait()
+        wait_all()
 
-    def bwa_sampe(self, fasta_files, working_dir):
+    def bwa_sampe(self, fastq_files, working_dir):
         '''Use bwa sampe to generate aligned sam files for paird end reads'''
         sam_files = []
-        for idx in range(len(fasta_files)//2):
-            f1 = fasta_files[2*idx]
-            f2 = fasta_files[2*idx + 1]
+        for idx in range(len(fastq_files)//2):
+            f1 = fastq_files[2*idx]
+            f2 = fastq_files[2*idx + 1]
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                self.call('bwa sampe {0} {1}/bwaidx {2}/{3}.sai {2}/{4}.sai {5} {6} > {7}_tmp'.format(
+                run_command('bwa sampe {0} {1}/bwaidx {2}/{3}.sai {2}/{4}.sai {5} {6} > {7}_tmp'.format(
                     env.options['OPT_BWA_SAMPE'], self.resource_dir, 
                     working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
-        self.wait()
+        wait_all()
         return sam_files
 
-    def bwa_samse(self, fasta_files, working_dir):
+    def bwa_samse(self, fastq_files, working_dir):
         '''Use bwa sampe to generate aligned sam files'''
         sam_files = []
-        for f in fasta_file:
+        for f in fastq_file:
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                self.call('bwa samse {0} {1}/bwaidx {2}/{3}.sai {4} > {5}_tmp'.format(
+                run_command('bwa samse {0} {1}/bwaidx {2}/{3}.sai {4} > {5}_tmp'.format(
                     env.options['OPT_BWA_SAMSE'], self.resource_dir,
                     working_dir, os.path.basename(f), f, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
-        self.wait()
+        wait_all()
         return sam_files        
 
     def sam2bam(self, sam_files):
@@ -531,12 +543,12 @@ class BaseVariantCaller:
             if os.path.isfile(bam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
-                self.call('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
+                run_command('samtools view {} -bt {}/ucsc.hg19.fastq.fai {} > {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, sam_file, bam_file),
                     upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
-        self.wait()
+        wait_all()
         #
         # sort bam files
         sorted_bam_files = []
@@ -545,30 +557,36 @@ class BaseVariantCaller:
             if os.path.isfile(sorted_bam_file):
                 env.logger.warning('Using existing sorted bam file {}'.format(bam_file))
             else:
-                self.call('samtools sort {} {} {}_tmp'.format(
+                run_command('samtools sort {} {} {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_SORT'], bam_file, sorted_bam_file[:-4]),
                     upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
             sorted_bam_files.append(sorted_bam_file)
-        self.wait()
+        wait_all()
         return sorted_bam_files
 
     def mergeBAMs(self, bam_files, output):
         '''merge sam files'''
         # use Picard merge, not samtools merge: 
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
-        # information from the first bam file
-        self.call('''java -Xmx4g -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
+        # inf from the first bam file
+        run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
     	    VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-    	    OUTPUT={}'''.format(env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
+    	    OUTPUT={}'''.format(env.optons['OPT_JAVA'],
+                env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
                 ' '.join(['INPUT={}'.format(x) for x in bam_files]), output).replace('\n', ' '))
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
-        self.call('samtools index {0} {0}.bai'.format(bam_file))
+        run_command('samtools index {0} {0}.bai'.format(bam_file))
 
-    def align(self):
+    def align(self, input_files, output):
         '''Align to the reference genome'''
-        pass
+        if not output.endswith('.bam'):
+            env.logger.error('Plase specify a .bam file in the --output parameter')
+            sys.exit(1)
+        if os.path.isfile(output):
+            env.logger.warning('Using existing output file {}'.format(output))
+            sys.exit(0)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
@@ -583,22 +601,22 @@ class hg19_gatk_23(BaseVariantCaller):
         BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
 
     def checkResource(self):
-        '''Check if needed resource is available.'''
+        '''Check if needed resource is available. This pipeline requires
+        GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
         saved_dir = os.getcwd()
         os.chdir(self.resource_dir)
         files = ['ucsc.hg19.fasta.gz', 'bwaidx.amb', 'ucsc.hg19.fasta.fai']
         if not all([os.path.isfile(x) for x in files]):
-            sys.exit('''Resource does not exist. Please run "call_variants.py prepare_resource"
-                befor you execute this command.''')
+            sys.exit('''GATK resource bundle does not exist in directory {}. Please run "call_variants.py prepare_resource" befor you execute this command.'''.format(self.resource_dir))
         #
         for cmd in ['wget',     # to download resource
                     'bwa',      # alignment
                     'samtools'  # merge sam files
                     ]:
-            self.checkCmd(cmd)
+            checkCmd(cmd)
         #
-        self.checkPicard()
-        self.checkGATK()
+        checkPicard()
+        checkGATK()
         #
         os.chdir(saved_dir)
 
@@ -610,36 +628,38 @@ class hg19_gatk_23(BaseVariantCaller):
         #
         # these are pipeline specific
         self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*', files=['ucsc.hg19.fasta.gz'])
-        self.buildBWARefIndex('ucsc.hg19.fasta')
-        self.buildSamToolsRefIndex('ucsc.hg19.fasta')
+        self.buildBWARefIndex('ucsc.hg19.fastq')
+        self.buildSamToolsRefIndex('ucsc.hg19.fastq')
         # 
         self.downloadPicard()
         os.chdir(saved_dir)
 
     def align(self, input_files, output):
-        if not output.endswith('.bam'):
-            env.logger.error('Plase specify a .bam file in the --output parameter')
-            sys.exit(1)
-        if os.path.isfile(output):
-            env.logger.warning('Using existing output file {}'.format(output))
-            return
-        working_dir = os.path.split(output)[0]
+        '''Align reads to hg19 reference genome and return a sorted, indexed bam file.'''
+        BaseVariantCaller.align(self, input_files, output)
+        #
+        # the working dir is a directory under output, the middle files are saved to this
+        # directory to avoid name conflict
+        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        #
         env.logger.info('Setting working directory to {}'.format(working_dir))
         #
-        # step 1: decompress to get a list of fasta files
-        fasta_files = self.getFastaFiles(input_files, working_dir)
+        # step 1: decompress to get a list of fastq files
+        fastq_files = self.getFastaFiles(input_files, working_dir)
         #
         # step 2: call bwa aln to produce .sai files
-        self.bwa_aln(fasta_files, working_dir)
+        self.bwa_aln(fastq_files, working_dir)
         #
         # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
         paired = True
-        if len(fasta_files) // 2 * 2 != len(fasta_files):
-            env.logger.warning('Odd number of fasta files provided, not handled as paired end reads.')
+        if len(fastq_files) // 2 * 2 != len(fastq_files):
+            env.logger.warning('Odd number of fastq files provided, not handled as paired end reads.')
             paired = False
-        for idx in range(len(fasta_files)//2):
-            f1 = fasta_files[2*idx]
-            f2 = fasta_files[2*idx + 1]
+        for idx in range(len(fastq_files)//2):
+            f1 = fastq_files[2*idx]
+            f2 = fastq_files[2*idx + 1]
             if len(f1) != len(f2):
                 env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
                 paired = False
@@ -652,9 +672,9 @@ class hg19_gatk_23(BaseVariantCaller):
         #
         # sam files?
         if paired:
-            sam_files = self.bwa_sampe(fasta_files, working_dir)
+            sam_files = self.bwa_sampe(fastq_files, working_dir)
         else:
-            sam_files = self.bwa_samse(fasta_files, working_dir)
+            sam_files = self.bwa_samse(fastq_files, working_dir)
         # 
         # step 4: convert sam to sorted bam files
         bam_files = self.sam2bam(sam_files)
@@ -683,17 +703,32 @@ if __name__ == '__main__':
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling. In addition to parameters displayed in this help message, this command
-        accepts a number of environmental parameters, which includes PICARD_PATH (path
-        to picard, should have a number of .jar files under it), GATK_PATH (path to gatk,
-        should have GenomeAnalysisTK.jar under it), OPT_BWA_INDEX (additional option to
-        bwa index), OPT_SAMTOOLS_FAIDX, OPT_BWA_ALN, OPT_BWA_SAMPE, OPT_BWA_SAMSE,
-        OPT_SAMTOOLS_VIEW, OPT_SAMTOOLS_SORT, OPT_PICARD_MERGESAMFILES. PICARD_PATH
-        and GATK_PATH is optional if environmental variable CLASSPATH is available 
-        and point to directories with Picard and GATK jar files.''')
-    master_parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
-        choices=['hg19_gatk_23'],
-        help='Name of the pipeline to be used to call variants.')
+        calling.''')
+
+    def addCommonArguments(parser, args):
+        if 'pipeline' in args:
+            parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
+                choices=['hg19_gatk_23'],
+                help='Name of the pipeline to be used to call variants.')
+        if 'resource_dir' in args:
+            parser.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
+                help='''A directory for resources used by variant caller. Default to
+                    ~/.variant_tools/var_caller.''')
+        if 'set' in args:
+            parser.add_argument('--set', nargs='*',
+                help='''Set runtime variables in the format of NAME=value. NAME can be
+                    PICARD_PATH (path to picard, should have a number of .jar files 
+                    under it), GATK_PATH (path to gatk, should have GenomeAnalysisTK.jar
+                    under it), OPT_JAVA (parameter to the java command, default to value
+                    "-Xmx4g"), OPT_BWA_INDEX (additional option to bwa index),
+                    OPT_SAMTOOLS_FAIDX, OPT_BWA_ALN, OPT_BWA_SAMPE, OPT_BWA_SAMSE,
+                    OPT_SAMTOOLS_VIEW, OPT_SAMTOOLS_SORT, OPT_PICARD_MERGESAMFILES.
+                    PICARD_PATH and GATK_PATH is optional if environment variable
+                    CLASSPATH is available and point to directories with Picard and
+                    GATK jar files.''')
+        if 'jobs' in args:
+            parser.add_argument('-j', '--jobs', default=1, type=int,
+                help='''Maximum number of concurrent jobs.''')
     #
     subparsers = master_parser.add_subparsers(title='Available operations', dest='action')
     #
@@ -703,25 +738,21 @@ if __name__ == '__main__':
         help='Prepare resources for subsequent variant calling operations.',
         description='''This operation downloads GATK resource bundle and creates
             indexed reference genomes to be used by other tools.''')
-    resource.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
-        help='A directory for resources used by variant caller')
+    addCommonArguments(resource, ['pipeline', 'resource_dir'])
     #
     # action align
     #
     align = subparsers.add_parser('align',
         help='''Align raw reads to reference genome and return a compressed BAM file.
             The input files should be reads for the same sample, which could be individual
-            fasta files, a tar file with all fasta files, or their gziped or bzipped
+            fastq files, a tar file with all fastq files, or their gziped or bzipped
             versions. Filenames ending with _1 _2 will be considered as paired end reads.''')
     align.add_argument('input_files', nargs='+',
-        help='''One or more .txt, .fa, .fasta, .tar, .tar.gz, .tar.bz2, .tbz2, .tgz files
+        help='''One or more .txt, .fa, .fastq, .tar, .tar.gz, .tar.bz2, .tbz2, .tgz files
             that contain raw reads of a single sample.''')
     align.add_argument('--output', required=True,
         help='''Output aligned reads to a sorted BAM file $output.bam. ''')
-    align.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
-        help='A directory for resources used by variant caller')
-    align.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs.''')
+    addCommonArguments(align, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     # action call
     call = subparsers.add_parser('call',
@@ -730,10 +761,9 @@ if __name__ == '__main__':
         help='''One or more BAM files.''')
     call.add_argument('--output', required=True,
         help='''Output called variants to the specified VCF file''')
-    call.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs.''')
+    addCommonArguments(call, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
-    args, argv = master_parser.parse_known_args()
+    args = master_parser.parse_args()
     #
     if hasattr(args, 'output'):
         working_dir = os.path.split(args.output)[0]
@@ -746,19 +776,35 @@ if __name__ == '__main__':
         env.logger = None
     #
     # handling additional parameters
-    options = ['PICARD_PATH', 'GATK_PATH', 'OPT_BWA_INDEX', 'OPT_SAMTOOLS_FAIDX',
-        'OPT_BWA_ALN', 'OPT_BWA_SAMPE', 'OPT_BWA_SAMSE',
-        'OPT_SAMTOOLS_VIEW', 'OPT_SAMTOOLS_SORT', 'OPT_PICARD_MERGESAMFILES']
-    for arg in argv:
-        if '=' not in arg:
-            sys.exit('Additional parameter should have form NAME=value')
-        name, value = arg.split('=', 1)
-        if name not in options:
-            env.logger.error('Unrecognized environmental variable {}: {} are allowed.'.format(
-                name, ', '.join(options)))
-            sys.exit(1)
-        env.options[name] = value
-        env.logger.info('Environmental variable {} is set to {}'.format(name, value))
+    options = [
+        ('PICARD_PATH', ''),
+        ('GATK_PATH', ''),
+        ('OPT_JAVA', '-Xmx4g'),
+        ('OPT_BWA_INDEX', ''),
+        ('OPT_SAMTOOLS_FAIDX', ''),
+        ('OPT_BWA_ALN', ''),
+        ('OPT_BWA_SAMPE', ''),
+        ('OPT_BWA_SAMSE', ''),
+        ('OPT_SAMTOOLS_VIEW', ''),
+        ('OPT_SAMTOOLS_SORT', ''),
+        ('OPT_PICARD_MERGESAMFILES' ''),
+        ]
+    # set default value
+    for opt in options:
+        if opt[1]:
+            env.options[opt[0]] = opt[1]
+    # override using command line values
+    if hasattr(args, 'set') and args.set is not None:
+        for arg in args.set:
+            if '=' not in arg:
+                sys.exit('Additional parameter should have form NAME=value')
+            name, value = arg.split('=', 1)
+            if name not in [x[0] for x in options]:
+                env.logger.error('Unrecognized environment variable {}: {} are allowed.'.format(
+                    name, ', '.join([x[0] for x in options])))
+                sys.exit(1)
+            env.options[name] = value
+            env.logger.info('Environment variable {} is set to {}'.format(name, value))
 
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
