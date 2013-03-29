@@ -11,6 +11,7 @@ import tarfile
 import copy
 import gzip
 import bz2
+import zipfile
 import time
 from collections import defaultdict
 
@@ -33,7 +34,7 @@ class RuntimeEnvironment(object):
         self._logger = None
         #
         # additional parameters for args
-        self.cmd_args = defaultdict(str)
+        self.options = defaultdict(str)
         #
         # running_jobs implements a simple multi-processing queue system. Basically,
         # this variable holds the (popen, cmd, upon_succ) object for running jobs.
@@ -336,6 +337,12 @@ class BaseVariantCaller:
                 # this avoids corrupted files
                 os.rename(dest_file + '_tmp', dest_file)
             return [dest_file]
+        elif filename.lower().endswith('.zip'):
+            bundle = zipfile.ZipFile(filename)
+            dest_dir = '.' if dest_dir is None else dest_dir
+            bundle.extractall(dest_dir)
+            env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
+            return [os.path.join(dest_dir, name) for name in bundle.namelist()]
         #
         # if it is a tar file
         if mode is not None:
@@ -388,6 +395,44 @@ class BaseVariantCaller:
             else:
                 self.decompress(gzipped_file, '.')
  
+    def checkPicard(self):
+        '''Check if picard is available'''
+        if env.options['PICARD_PATH']:
+            if not os.path.isfile(os.path.join(env.options['PICARD_PATH'], 'SortSam.jar')):
+                env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'.format(env.options['PICARD_PATH']))
+                sys.exit(1)
+        elif 'CLASSPATH' in os.environ:
+            if not any([os.path.isfile(os.path.join(x, 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
+                env.logger.error('$CLASSPATH does not contain a path that contain picard jar files.')
+                sys.exit(1)
+            else:
+                for x in os.environ['CLASSPATH'].split(os.sep):
+                    if os.path.isfile(os.path.join(x, 'SortSam.jar')):
+                        env.options['PICARD_PATH'] = x
+                        break
+        else:
+            env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environmental variable $CLASSPATH.')
+            sys.exit(1)
+
+    def checkGATK(self):
+        '''Check if GATK is available'''
+        if env.options['GATK_PATH']:
+            if not os.path.isfile(os.path.join(env.options['GATK_PATH'], 'SortSam.jar')):
+                env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'.format(env.options['GATK_PATH']))
+                sys.exit(1)
+        elif 'CLASSPATH' in os.environ:
+            if not any([os.path.isfile(os.path.join(x, 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(os.sep)]):
+                env.logger.error('$CLASSPATH does not contain a path that contain GATK jar files.')
+                sys.exit(1)
+            else:
+                for x in os.environ['CLASSPATH'].split(os.sep):
+                    if os.path.isfile(os.path.join(x, 'GenomeAnalysisTK.jar')):
+                        env.options['GATK_PATH'] = x
+                        break
+        else:
+            env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environmental variable $CLASSPATH.')
+            sys.exit(1)
+
     def buildBWARefIndex(self, ref_file):
         '''Create BWA index for reference genome file'''
         # bwa index -p hg19bwaidx -a bwtsw wg.fa
@@ -395,7 +440,7 @@ class BaseVariantCaller:
             env.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
         else:
             self.checkCmd('bwa')
-            self.call('bwa index {} -p bwaidx -a bwtsw {}'.format(env.cmd_args['bwa_index'], ref_file))
+            self.call('bwa index {} -p bwaidx -a bwtsw {}'.format(env.options['OPT_BWA_INDEX'], ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
         '''Create index for reference genome used by samtools'''
@@ -403,7 +448,7 @@ class BaseVariantCaller:
             env.logger.warning('Using existing samtools sequence index {}.fai'.format(ref_file))
         else:
             self.checkCmd('samtools')
-            self.call('samtools faidx {} {}'.format(env.cmd_args['samtools_faidx'], ref_file))
+            self.call('samtools faidx {} {}'.format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
 
     def checkResource(self):
         '''Check if needed resource is available.'''
@@ -434,7 +479,7 @@ class BaseVariantCaller:
                 # input file should be in fasta format (-t 4 means 4 threads)
                 fmt = self.fastaVersion(input_file)
                 opt = ' -I ' if fmt == 'Illumina 1.3+' else ''
-                self.call('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.cmd_args['bwa_aln'], self.resource_dir, 
+                self.call('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
                     input_file, dest_file), 
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
         # wait for all bwa aln jobs to be completed
@@ -451,7 +496,7 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 self.call('bwa sampe {0} {1}/bwaidx {2}/{3}.sai {2}/{4}.sai {5} {6} > {7}_tmp'.format(
-                    env.cmd_args['bwa_sampe'], self.resource_dir, 
+                    env.options['OPT_BWA_SAMPE'], self.resource_dir, 
                     working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
@@ -468,7 +513,7 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 self.call('bwa samse {0} {1}/bwaidx {2}/{3}.sai {4} > {5}_tmp'.format(
-                    env.cmd_args['bwa_samse'], self.resource_dir,
+                    env.options['OPT_BWA_SAMSE'], self.resource_dir,
                     working_dir, os.path.basename(f), f, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
@@ -485,7 +530,7 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
                 self.call('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
-                    env.cmd_args['samtools_view'], self.resource_dir, sam_file, bam_file),
+                    env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, sam_file, bam_file),
                     upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
@@ -499,7 +544,7 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sorted bam file {}'.format(bam_file))
             else:
                 self.call('samtools sort {} {} {}_tmp'.format(
-                    env.cmd_args['samtools_sort'], bam_file, sorted_bam_file[:-4]),
+                    env.options['OPT_SAMTOOLS_SORT'], bam_file, sorted_bam_file[:-4]),
                     upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
             sorted_bam_files.append(sorted_bam_file)
         self.wait()
@@ -510,9 +555,10 @@ class BaseVariantCaller:
         # use Picard merge, not samtools merge: 
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
         # information from the first bam file
-        self.call('''java -Xmx4g -jar MergeSamFiles.jar {} {} USE_THREADING=true
+        self.call('''java -Xmx4g -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
     	    VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-    	    OUTPUT= {}'''.format(env.cmd_args['picard_MergeSamFiles'], ' '.join(bam_files), output).replace('\n', ' '))
+    	    OUTPUT= {}'''.format(env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
+                ' '.join(bam_files), output).replace('\n', ' '))
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
@@ -542,11 +588,16 @@ class hg19_gatk_23(BaseVariantCaller):
         if not all([os.path.isfile(x) for x in files]):
             sys.exit('''Resource does not exist. Please run "call_variants.py prepare_resource"
                 befor you execute this command.''')
+        #
         for cmd in ['wget',     # to download resource
                     'bwa',      # alignment
                     'samtools'  # merge sam files
                     ]:
             self.checkCmd(cmd)
+        #
+        self.checkPicard()
+        self.checkGATK()
+        #
         os.chdir(saved_dir)
 
     def prepareResourceIfNotExist(self):
@@ -560,6 +611,7 @@ class hg19_gatk_23(BaseVariantCaller):
         self.buildBWARefIndex('ucsc.hg19.fasta')
         self.buildSamToolsRefIndex('ucsc.hg19.fasta')
         # 
+        self.downloadPicard()
         os.chdir(saved_dir)
 
     def align(self, input_files, output):
@@ -629,9 +681,14 @@ if __name__ == '__main__':
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling. As an advanced usage, if you know the exact command used, you can
-        pass extra parameters to these commands through additional parameters. A
-        partial list of such parameters include bwa_aln, samtools_sort.''')
+        calling. In addition to parameters displayed in this help message, this command
+        accepts a number of environmental parameters, which includes PICARD_PATH (path
+        to picard, should have a number of .jar files under it), GATK_PATH (path to gatk,
+        should have GenomeAnalysisTK.jar under it), OPT_BWA_INDEX (additional option to
+        bwa index), OPT_SAMTOOLS_FAIDX, OPT_BWA_ALN, OPT_BWA_SAMPE, OPT_BWA_SAMSE,
+        OPT_SAMTOOLS_VIEW, OPT_SAMTOOLS_SORT, OPT_PICARD_MERGESAMFILES. PICARD_PATH
+        and GATK_PATH is optional if environmental variable CLASSPATH is available 
+        and point to directories with Picard and GATK jar files.''')
     master_parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
         choices=['hg19_gatk_23'],
         help='Name of the pipeline to be used to call variants.')
@@ -674,7 +731,7 @@ if __name__ == '__main__':
     call.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs.''')
     #
-    args, argv = master_parser.parse_kwnown_args()
+    args, argv = master_parser.parse_known_args()
     #
     if hasattr(args, 'output'):
         working_dir = os.path.split(args.output)[0]
@@ -687,19 +744,19 @@ if __name__ == '__main__':
         env.logger = None
     #
     # handling additional parameters
-    commands = ['bwa_index', 'samtools_faidx', 'bwa_aln', 'bwa_sampe', 'bwa_samse',
-        'samtools_view', 'samtools_sort', 'picard_MergeSamFiles']
-    for idx in range(len(argv)//2):
-        if not argv[2*idx].startswith('--'):
-            sys.exit('Additional parameter should starts with --')
-        # set additional parameters
-        cmd = argv[2*idx][2:]
-        param = argv[2*idx+1]
-        if cmd in commands:
-            env.cmd_args[cmd] = param
-        else:
-            sys.exit('Additional parameter {} is not supported. Please use one of {}'.format(cmd, ', '.join(commands)))
-        env.logger.info('Additional parameter {} will be passed to command {}'.format())
+    options = ['PICARD_PATH', 'GATK_PATH', 'OPT_BWA_INDEX', 'OPT_SAMTOOLS_FAIDX',
+        'OPT_BWA_ALN', 'OPT_BWA_SAMPE', 'OPT_BWA_SAMSE',
+        'OPT_SAMTOOLS_VIEW', 'OPT_SAMTOOLS_SORT', 'OPT_PICARD_MERGESAMFILES']
+    for arg in argv:
+        if '=' not in arg:
+            sys.exit('Additional parameter should have form NAME=value')
+        name, value = arg.split('=', 1)
+        if name not in options:
+            env.logger.error('Unrecognized environmental variable {}: {} are allowed.'.format(
+                name, ', '.join(options)))
+            sys.exit(1)
+        env.options[name] = value
+        env.logger.info('Environmental variable {} is set to {}'.format(name, value))
 
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
