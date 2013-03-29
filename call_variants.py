@@ -543,7 +543,7 @@ class BaseVariantCaller:
             if os.path.isfile(bam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
-                run_command('samtools view {} -bt {}/ucsc.hg19.fastq.fai {} > {}_tmp'.format(
+                run_command('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, sam_file, bam_file),
                     upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
             bam_files.append(bam_file)
@@ -569,22 +569,28 @@ class BaseVariantCaller:
         # use Picard merge, not samtools merge: 
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
         # inf from the first bam file
-        run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
-    	    VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-    	    OUTPUT={}'''.format(env.optons['OPT_JAVA'],
-                env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                ' '.join(['INPUT={}'.format(x) for x in bam_files]), output).replace('\n', ' '))
+        if os.path.isfile(output):
+            env.logger.warning('Using existing merged bam file {}'.format(output))
+        else:
+            run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
+    	        VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
+    	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
+                    env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output).replace('\n', ' '))
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
-        run_command('samtools index {0} {0}.bai'.format(bam_file))
+        if os.path.isfile('{}.bai'.format(bam_file)):
+            env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
+        else:
+            run_command('samtools index {0} {0}.bai'.format(bam_file))
 
     def align(self, input_files, output):
         '''Align to the reference genome'''
         if not output.endswith('.bam'):
             env.logger.error('Plase specify a .bam file in the --output parameter')
             sys.exit(1)
-        if os.path.isfile(output):
+        if os.path.isfile(output) and os.path.isfile(output + '.bai'):
             env.logger.warning('Using existing output file {}'.format(output))
             sys.exit(0)
 
@@ -628,8 +634,8 @@ class hg19_gatk_23(BaseVariantCaller):
         #
         # these are pipeline specific
         self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*', files=['ucsc.hg19.fasta.gz'])
-        self.buildBWARefIndex('ucsc.hg19.fastq')
-        self.buildSamToolsRefIndex('ucsc.hg19.fastq')
+        self.buildBWARefIndex('ucsc.hg19.fasta')
+        self.buildSamToolsRefIndex('ucsc.hg19.fasta')
         # 
         self.downloadPicard()
         os.chdir(saved_dir)
@@ -770,7 +776,7 @@ if __name__ == '__main__':
         if not os.path.isdir(working_dir):
             os.makedirs(working_dir)
         # screen + log file logging
-        env.logger = os.path.join(working_dir, 'call_variant.log')
+        env.logger = os.path.join(working_dir, os.path.basename(args.output) + '.log')
     else:
         # screen only logging
         env.logger = None
