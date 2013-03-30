@@ -600,14 +600,18 @@ class BaseVariantCaller:
                     ' '.join(['INPUT={}'.format(x) for x in bam_files]), output[:-4] + '_tmp.bam').replace('\n', ' '),
                 upon_succ=(os.rename, output[:-4] + '_tmp.bam', output))
 
-    def indexBAM(self, bam_file):
+    def indexBAMs(self, bam_files):
         '''Index the input bam file'''
-        if os.path.isfile('{}.bai'.format(bam_file)):
-            env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
-        else:
-            run_command('samtools index {0} {1} {1}_tmp.bai'.format(
-                env.options['OPT_SAMTOOLS_INDEX'], bam_file),
-                upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
+        for bam_file in bam_files:
+            if os.path.isfile('{}.bai'.format(bam_file)):
+                env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
+            else:
+                run_command('samtools index {0} {1} {1}_tmp.bai'.format(
+                    env.options['OPT_SAMTOOLS_INDEX'], bam_file),
+                    upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'),
+                    wait=False)
+        #
+        wait_all()
 
     def align(self, input_files, output):
         '''Align to the reference genome'''
@@ -618,9 +622,143 @@ class BaseVariantCaller:
             env.logger.warning('Using existing output file {}'.format(output))
             sys.exit(0)
 
+    def realignIndels(self, input_files):
+        '''Create realigner target and realign indels'''
+        targets = []
+        for bam_file in input_files:
+            target = os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals'
+            if os.path.isfile(target):
+                env.logger.warning('Using existing realigner target {}'.format(target))
+            else:
+                run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                    -R {4}/ucsc.hg19.fasta
+                    -T RealignerTargetCreator
+                    --mismatchFraction 0.0
+                    -known {4}/dbsnp_137.hg19.vcf
+                    -known {4}/hapmap_3.3.hg19.vcf
+                    -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+                    -known {4}/1000G_phase1.indels.hg19.vcf
+                    -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
+                    target).replace('\n', ' '), upon_succ=(os.rename, target + '_tmp', target), wait=False)
+            targets.append(target)
+        # wait for the completion of gatk RealignerTargetCreator
+        wait_all()
+        # 
+        # realign around known indels
+        cleaned_bam_files = []
+        for bam_file, target in zip(input_files, targets):
+            cleaned_bam_file = os.path.basename(bam_file)[:-4] + '.clean.bam'
+            if os.path.isfile(cleaned_bam_file):
+                env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
+            else:
+                run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                    -R {4}/ucsc.hg19.fasta
+                    -T IndelRealigner 
+                    --targetIntervals {5}
+                    -known {4}/dbsnp_137.hg19.vcf
+                    -known {4}/hapmap_3.3.hg19.vcf
+                    -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+                    -known {4}/1000G_phase1.indels.hg19.vcf
+                    --consensusDeterminationModel USE_READS
+                    -compress 0 -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
+                    target, cleaned_bam_file[:-4] + '_tmp.bam').replace('\n', ' '),
+                    upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file), wait=False)
+            cleaned_bam_files.append(cleaned_bam_file)
+        # wait for the completion of gatk IndelRealigner
+        wait_all()
+        # 
+        return cleaned_bam_files
+
+    def markDuplicates(self, input_files):
+        '''Mark duplicate using picard'''
+        dedup_bam_files = []
+        for bam_file in input_files:
+            dedup_bam_file = os.path.basename(bam_file)[:-4] + '.dedup.bam'
+            metrics_file = os.path.basename(bam_file)[:-4] + '.metrics'
+            if os.path.isfile(dedup_bam_file):
+                env.logger.warning('Using existing realigner target {}'.format(target))
+            else:
+                run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
+                    INPUT={3}
+                    OUTPUT={4}
+                    METRICS_FILE={5}
+                    VALIDATION_STRINGENCY=LENIENT
+                    '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                            env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
+                            metrics_file).replace('\n', ' '), 
+                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file), wait=False)
+            dedup_bam_files.append(dedup_bam_file)
+        # wait for the completion of picard markduplicates
+        wait_all()
+        # 
+        return dedup_bam_files
+
+    def recalibrate(self, input_files):
+        '''Create realigner target and realign indels'''
+        targets = []
+        for bam_file in input_files:
+            target = os.path.basename(bam_file)[:-4] + '.grp'
+            if os.path.isfile(target):
+                env.logger.warning('Using existing base recalibrator target {}'.format(target))
+            else:
+                run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                    -T BaseRecalibrator
+                    -R {4}/ucsc.hg19.fasta
+                    -cov ReadGroupCovariate
+                    -cov QualityScoreCovariate
+                    -cov CycleCovariate
+                    -cov ContextCovariate
+                    -knownSites {4}/dbsnp_137.hg19.vcf
+                    -knownSites {4}/hapmap_3.3.hg19.vcf
+                    -knownSites {4}/1000G_omni2.5.hg19.vcf
+                    -knownSites {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+                    -knownSites {4}/1000G_phase1.indels.hg19.vcf
+                    -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_BASERECALIBRATOR'], bam_file, self.resource_dir,
+                    target).replace('\n', ' '), upon_succ=(os.rename, target + '_tmp', target), wait=False)
+            targets.append(target)
+        # wait for the completion of gatk BaseRecalibrator
+        wait_all()
+        #
+        # recalibrate
+        recal_bam_files = []
+        for bam_file, target in zip(input_files, targets):
+            recal_bam_file = os.path.basename(bam_file)[:-4] + '.recal.bam'
+            if os.path.isfile(recal_bam_file):
+                env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
+            else:
+                run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                    -R {4}/ucsc.hg19.fasta
+                    -T PrintReads
+                    -BQSR {5}
+                    -baq=CalculationMode.CALCULATE_AS_NECESSARY
+                    -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_PRINTREADS'], bam_file, self.resource_dir,
+                    target, recal_bam_file[:-4] + '_tmp.bam').replace('\n', ' '),
+                    upon_succ=(os.rename, recal_bam_file[:-4] + '_tmp.bam', recal_bam_file), wait=False)
+            recal_bam_files.append(recal_bam_file)
+        # wait for the completion of gatk printreads
+        wait_all()
+        # 
+        return recal_bam_files
+
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
-        pass
+        if not output.endswith('.vcf'):
+           env.logger.error('Please specify a .vcf file in the --output parameter')
+           sys.exit(1)
+        if os.path.isfile(output):
+            env.logger.warning('Using existing output file {}'.format(output))
+            sys.exit(0)
+        for bam_file in input_files:
+            if not os.path.isfile(bam_file):
+                env.logger.error('Input file {} does not exist'.format(bam_file))
+                sys.exit(1)
+            if not os.path.isfile(bam_file + '.bai'):
+                env.logger.error('Input bam file {} is not indexed.'.format(bam_file))
+                sys.exit(1)
 
 
 class hg19_gatk_23(BaseVariantCaller):
@@ -715,26 +853,51 @@ class hg19_gatk_23(BaseVariantCaller):
             shutil.copy(bam_files[0], output)
         #
         # step 6: index the output bam file
-        self.indexBAM(output)
+        self.indexBAMs([output])
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
-        if os.path.isfile(output):
-            env.logger.warning('Using existing output file {}'.format(output))
-            return
-        working_dir = os.path.split(output)[0]
+        BaseVariantCaller.callVariants(self, input_files, output)
+        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        #
         env.logger.info('Setting working directory to {}'.format(working_dir))
-
+        #
+        # step 1: create indel realignment targets
+        cleaned_bam_files = self.realignIndels(input_files)
+        self.indexBAMs(cleaned_bam_files)
+        #
+        # step 2: Mark duplicate
+        dedup_bam_files = self.markDuplicates(cleaned_bam_files)
+        self.indexBAMs(dedup_bam_files)
+        #
+        # step 3: recalibration
+        recal_bam_files = self.recalibrate(dedup_bam_files)
+        self.indexBAMs(recal_bam_files)
+        
 
 if __name__ == '__main__':
     #
-    # vars
-    master_parser = argparse.ArgumentParser(description='''A pipeline to call variants
-        from raw sequence files, or single-sample bam files. It works (tested) only
-        for Illumina sequence data, and for human genome with build hg19 of the
-        reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling.''')
-
+    options = [
+        ('PICARD_PATH', ''),
+        ('GATK_PATH', ''),
+        ('OPT_JAVA', '-Xmx4g'),
+        ('OPT_BWA_INDEX', ''),
+        ('OPT_SAMTOOLS_FAIDX', ''),
+        ('OPT_BWA_ALN', ''),
+        ('OPT_BWA_SAMPE', ''),
+        ('OPT_BWA_SAMSE', ''),
+        ('OPT_SAMTOOLS_VIEW', ''),
+        ('OPT_SAMTOOLS_SORT', ''),
+        ('OPT_SAMTOOLS_INDEX', ''),
+        ('OPT_PICARD_MERGESAMFILES', ''),
+        ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
+        ('OPT_GATK_INDELREALIGNER', ''),
+        ('OPT_PICARD_MARKDUPLICATES', ''),
+        ('OPT_GATK_BASERECALIBRATOR', ''),
+        ('OPT_GATK_PRINTREADS', ''),
+        ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
             parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
@@ -749,17 +912,23 @@ if __name__ == '__main__':
                 help='''Set runtime variables in the format of NAME=value. NAME can be
                     PICARD_PATH (path to picard, should have a number of .jar files 
                     under it), GATK_PATH (path to gatk, should have GenomeAnalysisTK.jar
-                    under it), OPT_JAVA (parameter to the java command, default to value
-                    "-Xmx4g"), OPT_BWA_INDEX (additional option to bwa index),
-                    OPT_SAMTOOLS_FAIDX, OPT_BWA_ALN, OPT_BWA_SAMPE, OPT_BWA_SAMSE,
-                    OPT_SAMTOOLS_VIEW, OPT_SAMTOOLS_SORT, OPT_PICARD_MERGESAMFILES.
-                    PICARD_PATH and GATK_PATH is optional if environment variable
-                    CLASSPATH is available and point to directories with Picard and
-                    GATK jar files.''')
+                    under it) for path to JAR files (can be ignored if the paths are
+                    specified in environment variable $CLASSPATH), additional options
+                    to command java (OPT_JAVA, parameter to the java command, default
+                    to value "-Xmx4g"), and options to individual subcommands such as
+                    OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
+                    The following options are acceptable: {}'''.format(', '.join(
+                    [x[0] for x in options])))
         if 'jobs' in args:
             parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
     #
+    master_parser = argparse.ArgumentParser(description='''A pipeline to call variants
+        from raw sequence files, or single-sample bam files. It works (tested) only
+        for Illumina sequence data, and for human genome with build hg19 of the
+        reference genome. This pipeline uses BWA for alignment and GATK for variant
+        calling.''')
+
     subparsers = master_parser.add_subparsers(title='Available operations', dest='action')
     #
     # action prepare_resource
@@ -806,20 +975,6 @@ if __name__ == '__main__':
         env.logger = None
     #
     # handling additional parameters
-    options = [
-        ('PICARD_PATH', ''),
-        ('GATK_PATH', ''),
-        ('OPT_JAVA', '-Xmx4g'),
-        ('OPT_BWA_INDEX', ''),
-        ('OPT_SAMTOOLS_FAIDX', ''),
-        ('OPT_BWA_ALN', ''),
-        ('OPT_BWA_SAMPE', ''),
-        ('OPT_BWA_SAMSE', ''),
-        ('OPT_SAMTOOLS_VIEW', ''),
-        ('OPT_SAMTOOLS_SORT', ''),
-        ('OPT_SAMTOOLS_INDEX', ''),
-        ('OPT_PICARD_MERGESAMFILES' ''),
-        ]
     # set default value
     for opt in options:
         if opt[1]:
@@ -836,7 +991,7 @@ if __name__ == '__main__':
                 sys.exit(1)
             env.options[name] = value
             env.logger.info('Environment variable {} is set to {}'.format(name, value))
-
+    #
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
     pipeline = eval(args.pipeline)(args.resource_dir)
