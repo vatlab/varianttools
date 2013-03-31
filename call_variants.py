@@ -505,6 +505,55 @@ class BaseVariantCaller:
         filenames.sort()
         return filenames
 
+    def readGroup(self, filename, output):
+        '''Get read group information from names of fastq files.'''
+        # Extract read group information from filename such as
+        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
+        # according to the lane that produced them and whether they
+        # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
+        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
+        # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
+        #
+        # This function return a read group string like ‘@RG\tID:foo\tSM:bar’
+        #
+        # ID* Read group identifier. Each @RG line must have a unique ID. The value of ID is used in the RG
+        #     tags of alignment records. Must be unique among all read groups in header section. Read group
+        #     IDs may be modifid when merging SAM fies in order to handle collisions.
+        # CN Name of sequencing center producing the read.
+        # DS Description.
+        # DT Date the run was produced (ISO8601 date or date/time).
+        # FO Flow order. The array of nucleotide bases that correspond to the nucleotides used for each
+        #     flow of each read. Multi-base flows are encoded in IUPAC format, and non-nucleotide flows by
+        #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
+        # KS The array of nucleotide bases that correspond to the key sequence of each read.
+        # LB Library.
+        # PG Programs used for processing the read group.
+        # PI Predicted median insert size.
+        # PL Platform/technology used to produce the reads. Valid values: CAPILLARY, LS454, ILLUMINA,
+        #     SOLID, HELICOS, IONTORRENT and PACBIO.
+        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for SOLiD). Unique identifier.
+        # SM Sample. Use pool name where a pool is being sequenced.
+        #
+        # sample name is obtained from output filename
+        SM = os.path.basename(output).split('.')[0]
+        PL = 'ILLUMINA'  # always assume illumina in this script
+        PG = 'BWA'
+        # I do not know what this platform is, just return some info
+        if not filename.endswith('_sequence.txt'):
+            env.logger.error('Sequence filename {} does not ends with sequence.txt. Read group is set arbitrarily.'.format(filename))
+            ID = filename.split('.')[0]
+            PU = ID
+        else:
+            pieces = fastq_filename.split('_')
+            if len(pieces) in [6, 7]:
+                # GERALD  18-09-2011  p-illumina.8  s  8  1  sequence.txt
+                ID = '{}.{}'.format(pieces[0], pieces[5])
+                PU = pieces[5]
+        #
+        rg = r'@RG\tID:{}\tPG:{}\tPL:{}:PU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
+        env.logger.info('Setting read group tag to {}'.format(rg))
+        return rg
+
     def bwa_aln(self, fastq_files, working_dir):
         '''Use bwa aln to process fastq files'''
         for input_file in fastq_files:
@@ -526,12 +575,13 @@ class BaseVariantCaller:
         for idx in range(len(fastq_files)//2):
             f1 = fastq_files[2*idx]
             f2 = fastq_files[2*idx + 1]
+            rg = self.getReadGroup(f1, working_dir)
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa sampe {0} {1}/bwaidx {2}/{3}.sai {2}/{4}.sai {5} {6} > {7}_tmp'.format(
-                    env.options['OPT_BWA_SAMPE'], self.resource_dir, 
+                run_command('bwa sampe {0} -r {1} {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
+                    env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
                     working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
@@ -544,11 +594,12 @@ class BaseVariantCaller:
         sam_files = []
         for f in fastq_file:
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
+            rg = self.getReadGroup(f, working_dir)
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa samse {0} {1}/bwaidx {2}/{3}.sai {4} > {5}_tmp'.format(
-                    env.options['OPT_BWA_SAMSE'], self.resource_dir,
+                run_command('bwa samse {0} -r {1} {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
+                    env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
                     working_dir, os.path.basename(f), f, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
