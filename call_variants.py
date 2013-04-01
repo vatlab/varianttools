@@ -13,6 +13,7 @@ import gzip
 import bz2
 import zipfile
 import time
+import re
 from collections import defaultdict
 
 #
@@ -505,7 +506,7 @@ class BaseVariantCaller:
         filenames.sort()
         return filenames
 
-    def readGroup(self, filename, output):
+    def getReadGroup(self, fastq_filename, output_bam):
         '''Get read group information from names of fastq files.'''
         # Extract read group information from filename such as
         # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
@@ -534,23 +535,32 @@ class BaseVariantCaller:
         # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for SOLiD). Unique identifier.
         # SM Sample. Use pool name where a pool is being sequenced.
         #
-        # sample name is obtained from output filename
-        SM = os.path.basename(output).split('.')[0]
-        PL = 'ILLUMINA'  # always assume illumina in this script
+        filename = os.path.basename(fastq_filename)
+        output = os.path.basename(output_bam)
+        # sample name is obtained from output filename without file extension
+        SM = output.split('.', 1)[0]
+        # always assume ILLUMINA for this script and BWA for processing
+        PL = 'ILLUMINA'  
         PG = 'BWA'
-        # I do not know what this platform is, just return some info
-        if not filename.endswith('_sequence.txt'):
-            env.logger.error('Sequence filename {} does not ends with sequence.txt. Read group is set arbitrarily.'.format(filename))
-            ID = filename.split('.')[0]
-            PU = ID
-        else:
-            pieces = fastq_filename.split('_')
-            if len(pieces) in [6, 7]:
-                # GERALD  18-09-2011  p-illumina.8  s  8  1  sequence.txt
-                ID = '{}.{}'.format(pieces[0], pieces[5])
-                PU = pieces[5]
         #
-        rg = r'@RG\tID:{}\tPG:{}\tPL:{}:PU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
+        # PU is for flowcell and lane information, ID should be unique for each readgroup
+        # ID is temporarily obtained from input filename without exteion
+        ID = filename.split('.')[0]
+        # try to get lan information from s_x_1/2 pattern
+        try:
+            PU = re.search('s_([^_]+)_', filename).group(1)
+        except AttributeError as e:
+            env.logger.error('Cannot find lane information from filename {}: {}'.format(filename, e))
+            PU = 'NA'
+        # try to get some better ID
+        try:
+            # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
+            m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
+            ID = '{}.{}'.format(m.group(1), m.group(4))
+        except AttributeError as e:
+            env.logger.warning('Input fasta filename {} does not match a known pattern. ID is directly obtained from filename.'.format(filename))
+        #
+        rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
         env.logger.info('Setting read group tag to {}'.format(rg))
         return rg
 
@@ -580,7 +590,7 @@ class BaseVariantCaller:
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa sampe {0} -r {1} {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
+                run_command('bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
                     env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
                     working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
@@ -598,7 +608,7 @@ class BaseVariantCaller:
             if os.path.isfile(sam_file):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa samse {0} -r {1} {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
+                run_command('bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
                     env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
                     working_dir, os.path.basename(f), f, sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
