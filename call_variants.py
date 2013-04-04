@@ -169,6 +169,8 @@ def run_command(cmd, upon_succ=None, wait=True):
     If upon_succ is specified, the specified function and parameters will be
     evalulated after the job has been completed successfully.
     '''
+    # merge mulit-line command into one line and remove extra white space and tabs
+    cmd = ' '.join(cmd.split())
     if wait or env.jobs == 1:
         try:
             env.logger.info('Running {}'.format(cmd))
@@ -705,7 +707,7 @@ class BaseVariantCaller:
     	        VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
     	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
                     env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output[:-4] + '_tmp.bam').replace('\n', ' '),
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output[:-4] + '_tmp.bam'),
                 upon_succ=(os.rename, output[:-4] + '_tmp.bam', output))
 
     def indexBAM(self, bam_file):
@@ -742,7 +744,7 @@ class BaseVariantCaller:
                 -known {4}/1000G_phase1.indels.hg19.vcf
                 -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                target).replace('\n', ' '), upon_succ=(os.rename, target + '_tmp', target))
+                target), upon_succ=(os.rename, target + '_tmp', target))
         # 
         # realign around known indels
         cleaned_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
@@ -760,7 +762,7 @@ class BaseVariantCaller:
                 --consensusDeterminationModel USE_READS
                 -compress 0 -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                target, cleaned_bam_file[:-4] + '_tmp.bam').replace('\n', ' '),
+                target, cleaned_bam_file[:-4] + '_tmp.bam'),
                 upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file))
         # 
         return cleaned_bam_file
@@ -779,7 +781,7 @@ class BaseVariantCaller:
                 VALIDATION_STRINGENCY=LENIENT
                 '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
                         env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
-                        metrics_file).replace('\n', ' '), 
+                        metrics_file), 
                 upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file))
         return dedup_bam_file
 
@@ -803,7 +805,7 @@ class BaseVariantCaller:
                 -knownSites {4}/1000G_phase1.indels.hg19.vcf
                 -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_BASERECALIBRATOR'], bam_file, self.resource_dir,
-                target).replace('\n', ' '), upon_succ=(os.rename, target + '_tmp', target))
+                target), upon_succ=(os.rename, target + '_tmp', target))
         #
         # recalibrate
         if os.path.isfile(recal_bam_file):
@@ -815,7 +817,7 @@ class BaseVariantCaller:
                 -BQSR {5}
                 -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_PRINTREADS'], bam_file, self.resource_dir,
-                target, recal_bam_file[:-4] + '_tmp.bam').replace('\n', ' '),
+                target, recal_bam_file[:-4] + '_tmp.bam'),
                 upon_succ=(os.rename, recal_bam_file[:-4] + '_tmp.bam', recal_bam_file))
         # 
         return recal_bam_file
@@ -893,31 +895,47 @@ class hg19_gatk_23(BaseVariantCaller):
         # 
         os.chdir(saved_dir)
 
+#     def bam2fastq_obsolete(self, input_file, output_files):
+#         '''This function extracts raw reads from an input BAM file to one or 
+#         more fastq files. It uses a two step process recommended by
+#         Illumina to save RAM, but the first step is way too slow (21 + 9 hours,
+#         instead of a direct 9 hours according to Illumina documentation.'''
+#         BaseVariantCaller.bam2fastq(self, input_file, output_files)
+#         #
+#         # the working dir is a directory under output, the middle files are saved to this
+#         # directory to avoid name conflict
+#         working_dir = os.path.join(os.path.split(output_files[0])[0],
+#             os.path.basename(output_files[0]) + '_bam2fastq_cache')
+#         if not os.path.isdir(working_dir):
+#             os.makedirs(working_dir)
+#         #
+#         sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
+#         if os.path.isfile(sorted_bam):
+#             env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
+#         else:
+#             run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
+#                 upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
+#         if all([os.path.isfile(x) for x in output_files]):
+#             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
+#         else:
+#             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
+#                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
+#                 env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
+#                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+
     def bam2fastq(self, input_file, output_files):
         '''This function extracts raw reads from an input BAM file to one or 
-            more fastq files.'''
+        more fastq files.'''
         BaseVariantCaller.bam2fastq(self, input_file, output_files)
         #
-        # the working dir is a directory under output, the middle files are saved to this
-        # directory to avoid name conflict
-        working_dir = os.path.join(os.path.split(output_files[0])[0],
-            os.path.basename(output_files[0]) + '_bam2fastq_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
-        if os.path.isfile(sorted_bam):
-            env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
-        else:
-            run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
-                upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
         if all([os.path.isfile(x) for x in output_files]):
             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
         else:
             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-                env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
+                env.options['PICARD_PATH'], input_file, output_files[0], output_files[1]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+
 
     def align(self, input_files, output):
         '''Align reads to hg19 reference genome and return a sorted, indexed bam file.'''
