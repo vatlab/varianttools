@@ -15,6 +15,11 @@ import zipfile
 import time
 import re
 from collections import defaultdict
+# try:
+#     # might not need to use pysam
+#     import pysam
+# except ImportError:
+#     pass
 
 #
 # Runtime environment
@@ -276,6 +281,13 @@ def checkGATK():
         env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environment variable $CLASSPATH.')
         sys.exit(1) 
 
+# def checkPySam():
+#     '''Check if PySam (a python wrapper to samtools) is installed.'''
+#     try:
+#         import pysam
+#     except ImportError:
+#         env.logger.error('Please install pysam for python3.3 and try again.')
+# 
 #
 # Utility functions
 # 
@@ -432,6 +444,30 @@ def decompress(filename, dest_dir=None):
     # return source file if 
     return [filename]
    
+# def hasReadGroup(bamfile):
+#     '''Check if a bamfile has read group information, if not we will have to add 
+#     @RG tag to the bam file. Note that technically speaking, read group contains
+#     flowcell and lane information and should be lane-specific. That is to say a
+#     bam file for the same sample might have several @RG with the same SM (sample
+#     name) value. However, because GATK only uses SM to identify samples (treats 
+#     different RG with the same SM as the same sample), it is OK to add a single 
+#     RG tag to a SAM/BAM file is it contains reads for the same sample.'''
+#     # the following code consulted a addReadGroups2BAMs.py file available online
+#     sam_handle = pysam.Samfile(bamfile, 'r')
+#     sam_line = sam_handle.next()
+#     read_info = sam_line.qname
+#     sam_handle.close()
+#     instrument, run_id, flowcell_id, lane = read_info.split(":")[:4]
+#     info = {#'sample_name': sample_name,
+#             #'locality': locality,
+#             #'inline_tag': inline_tag,
+#             #'third_read_tag': third_read_tag,
+#             'instrument':instrument,  
+#             'run_id': run_id,
+#             'flowcell_id': flowcell_id,
+#             'lane': lane}
+#     return info
+
 
 #  Variant Caller
 #
@@ -569,10 +605,12 @@ class BaseVariantCaller:
         for input_file in fastq_files:
             dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
             if os.path.isfile(dest_file):
-                env.logger.warning('Using existing alignent index file {}'.format(dest_file))
+                env.logger.warning('Using existing alignment index file {}'.format(dest_file))
             else:
                 # input file should be in fastq format (-t 4 means 4 threads)
                 opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
+                if opt == ' -I ':
+                    env.logger.info('Using -I option for bwa aln command because the sequences seem to be in Illumina 1.3+ format.')
                 run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
                     input_file, dest_file), 
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
@@ -846,6 +884,7 @@ class hg19_gatk_23(BaseVariantCaller):
         #
         checkPicard()
         checkGATK()
+        # checkPySam()
         #
         os.chdir(saved_dir)
 
@@ -1027,7 +1066,7 @@ if __name__ == '__main__':
     #
     if hasattr(args, 'output'):
         working_dir = os.path.split(args.output)[0]
-        if not os.path.isdir(working_dir):
+        if working_dir and not os.path.isdir(working_dir):
             os.makedirs(working_dir)
         # screen + log file logging
         env.logger = os.path.join(working_dir, os.path.basename(args.output) + '.log')
