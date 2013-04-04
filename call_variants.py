@@ -905,10 +905,19 @@ class hg19_gatk_23(BaseVariantCaller):
         if not os.path.isdir(working_dir):
             os.makedirs(working_dir)
         #
-        run_command('samtools sort -n -m 2000000000 {} {}/sorted_by_name'.format(input_file, working_dir))
-        run_command('''java {} -jar {}/SamToFastq.jar INPUT={}/sorted_by_name.bam 
-            FASTQ={} SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-                env.options['PICARD_PATH'], working_dir, output_files[0], output_files[1]))
+        sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
+        if os.path.isfile(sorted_bam):
+            env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
+        else:
+            run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
+                upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
+        if all([os.path.isfile(x) for x in output_files]):
+            env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
+        else:
+            run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
+                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
+                env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
+                upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
 
     def align(self, input_files, output):
         '''Align reads to hg19 reference genome and return a sorted, indexed bam file.'''
