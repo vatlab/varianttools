@@ -322,7 +322,11 @@ def fastqVersion(fastq_file):
     qual_scores = ''
     with open(fastq_file) as fastq:
         while len(qual_scores) < 1000:
-            line = fastq.readline()
+            try:
+                line = fastq.readline()
+            except Exception as e:
+                env.logger.error('Failed to read fastq file {}: {}'.format(fastq_file, e))
+                sys.exit(1)
             if not line.startswith('@'):
                 raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
             line = fastq.readline()
@@ -345,6 +349,17 @@ def fastqVersion(fastq_file):
         # no option is needed for bwa
         return 'Sanger'
 
+def existAndNewerThan(filenameA, filenameB):
+    '''Check if filenameA is newer than filenameB. The oldest timestamp of filenameA
+    and newest timestam of filenameB will be used if filenameA or filenameB is a list.'''
+    exist = all([os.path.isfile(x) for x in filenameA]) if type(filenameA) == list else os.path.isfile(filenameA)
+    if not exist:
+        return False
+    timestampA = min([os.path.getmtime(x) for x in filenameA]) if type(filenameA) == list else os.path.getmtime(filenameA)
+    timestampB = max([os.path.getmtime(x) for x in filenameB]) if type(filenameB) == list else os.path.getmtime(filenameB)
+    # newer by at least 10 seconds.
+    return timestampA - timestampB > 10
+
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
     dest_dir (current directory if unspecified), and return a list of files. Uncompressed
@@ -358,7 +373,7 @@ def decompress(filename, dest_dir=None):
         mode = 'r'
     elif filename.lower().endswith('.gz'):
         dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-3])
-        if os.path.isfile(dest_file):
+        if existAndNewerThan(dest_file, filename):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
@@ -373,7 +388,7 @@ def decompress(filename, dest_dir=None):
         return [dest_file]
     elif filename.lower().endswith('.bz2'):
         dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
-        if os.path.isfile(dest_file):
+        if existAndNewerThan(dest_file, filename):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
@@ -404,11 +419,11 @@ def decompress(filename, dest_dir=None):
         manifest = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename) + '.manifest')
         all_extracted = False
         dest_files = []
-        if os.path.isfile(manifest):
+        if existAndNewerThan(manifest, filename):
             all_extracted = True
             for f in [x.strip() for x in open(manifest).readlines()]:
                 dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
-                if os.path.isfile(dest_file):
+                if existAndNewerThan(dest_file, filename):
                     dest_files.append(dest_file)
                     env.logger.warning('Using existing extracted file {}'.format(dest_file))
                 else:
@@ -435,13 +450,17 @@ def decompress(filename, dest_dir=None):
                 # if there is directory structure within tar file, decompress all to the current directory
                 dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
                 dest_files.append(dest_file)
-                if os.path.isfile(dest_file):
+                if existAndNewerThan(dest_file, filename):
                     env.logger.warning('Using existing extracted file {}'.format(dest_file))
                 else:
                     env.logger.info('Extracting {} to {}'.format(f, dest_file))
                     tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
                     # move to the top directory with the right name only after the file has been properly extracted
                     shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
+            # set dest_files to the same modification time. This is used to mark the right time when the 
+            # files are created and avoid the use of archieved but should-not-be-used files that might 
+            # be generated later
+            [os.utime(x) for x in dest_files]
         return dest_files
     # return source file if 
     return [filename]
@@ -502,7 +521,7 @@ class BaseVariantCaller:
         #
         # decompress all .gz files
         for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and not x.endswith('tar.gz')]:
-            if os.path.isfile(gzipped_file[:-3]):
+            if existAndNewerThan(gzipped_file[:-3], gzipped_file):
                 env.logger.warning('Using existing decompressed file {}'.format(gzipped_file[:-3]))
             else:
                 decompress(gzipped_file, '.')
@@ -545,11 +564,19 @@ class BaseVariantCaller:
     #
     # align and create bam file
     #
-    def getFastaFiles(self, input_files, working_dir):
+    def getFastqFiles(self, input_files, working_dir):
         '''Decompress input files to get a list of fastq files'''
         filenames = []
         for filename in input_files:
-            filenames.extend(decompress(filename, working_dir))
+            for fastq_file in decompress(filename, working_dir):
+                try:
+                    with open(fastq_file) as fastq:
+                        line = fastq.readline()
+                        if not line.startswith('@'):
+                            raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
+                    filenames.append(fastq_file)
+                except Exception as e:
+                    env.logger.error('Ignoring non-fastq file {}: {}'.format(fastq_file, e))
         filenames.sort()
         return filenames
 
@@ -615,7 +642,7 @@ class BaseVariantCaller:
         '''Use bwa aln to process fastq files'''
         for input_file in fastq_files:
             dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
-            if os.path.isfile(dest_file):
+            if existAndNewerThan(dest_file, input_file):
                 env.logger.warning('Using existing alignment index file {}'.format(dest_file))
             else:
                 # input file should be in fastq format (-t 4 means 4 threads)
@@ -636,7 +663,7 @@ class BaseVariantCaller:
             f2 = fastq_files[2*idx + 1]
             rg = self.getReadGroup(f1, working_dir)
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
-            if os.path.isfile(sam_file):
+            if existAndNewerThan(sam_file, [f1, f2]):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command('bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
@@ -654,7 +681,7 @@ class BaseVariantCaller:
         for f in fastq_file:
             sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
             rg = self.getReadGroup(f, working_dir)
-            if os.path.isfile(sam_file):
+            if existAndNewerThan(sam_file, f):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command('bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
@@ -671,7 +698,7 @@ class BaseVariantCaller:
         bam_files = []
         for sam_file in sam_files:
             bam_file = sam_file[:-4] + '.bam'
-            if os.path.isfile(bam_file):
+            if existAndNewerThan(bam_file, sam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
                 run_command('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
@@ -685,7 +712,7 @@ class BaseVariantCaller:
         sorted_bam_files = []
         for bam_file in bam_files:
             sorted_bam_file = bam_file[:-4] + '_sorted.bam'
-            if os.path.isfile(sorted_bam_file):
+            if existAndNewerThan(sorted_bam_file, bam_file):
                 env.logger.warning('Using existing sorted bam file {}'.format(sorted_bam_file))
             else:
                 run_command('samtools sort {} {} {}_tmp'.format(
@@ -700,7 +727,7 @@ class BaseVariantCaller:
         # use Picard merge, not samtools merge: 
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
         # inf from the first bam file
-        if os.path.isfile(output):
+        if existAndNewerThan(output, bam_files):
             env.logger.warning('Using existing merged bam file {}'.format(output))
         else:
             run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
@@ -712,7 +739,7 @@ class BaseVariantCaller:
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
-        if os.path.isfile('{}.bai'.format(bam_file)):
+        if existAndNewerThan('{}.bai'.format(bam_file), bam_file):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
             run_command('samtools index {0} {1} {1}_tmp.bai'.format(
@@ -724,14 +751,14 @@ class BaseVariantCaller:
         if not output.endswith('.bam'):
             env.logger.error('Plase specify a .bam file in the --output parameter')
             sys.exit(1)
-        if os.path.isfile(output) and os.path.isfile(output + '.bai'):
+        if existAndNewerThan([output, output + '.bai'], input_files):
             env.logger.warning('Using existing output file {}'.format(output))
             sys.exit(0)
 
     def realignIndels(self, bam_file, working_dir):
         '''Create realigner target and realign indels'''
         target = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
-        if os.path.isfile(target):
+        if existAndNewerThan(target, bam_file):
             env.logger.warning('Using existing realigner target {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -748,7 +775,7 @@ class BaseVariantCaller:
         # 
         # realign around known indels
         cleaned_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
-        if os.path.isfile(cleaned_bam_file):
+        if existAndNewerThan(cleaned_bam_file, target):
             env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -771,7 +798,7 @@ class BaseVariantCaller:
         '''Mark duplicate using picard'''
         dedup_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
         metrics_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
-        if os.path.isfile(dedup_bam_file):
+        if existAndNewerThan(dedup_bam_file, bam_file):
             env.logger.warning('Using existing bam files after marking duplicate {}'.format(dedup_bam_file))
         else:
             run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
@@ -788,7 +815,7 @@ class BaseVariantCaller:
     def recalibrate(self, bam_file, recal_bam_file, working_dir):
         '''Create realigner target and realign indels'''
         target = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.grp')
-        if os.path.isfile(target):
+        if existAndNewerThan(target, bam_file):
             env.logger.warning('Using existing base recalibrator target {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -808,7 +835,7 @@ class BaseVariantCaller:
                 target), upon_succ=(os.rename, target + '_tmp', target))
         #
         # recalibrate
-        if os.path.isfile(recal_bam_file):
+        if existAndNewerThan(recal_bam_file, target):
             env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -827,22 +854,22 @@ class BaseVariantCaller:
         if not output.endswith('.bam'):
            env.logger.error('Please specify a .bam file in the --output parameter')
            sys.exit(1)
-        if os.path.isfile(output) and os.path.isfile(output + '.bai'):
-            env.logger.warning('Using existing output file {}'.format(output))
-            sys.exit(0)
         if not os.path.isfile(input_file):
             env.logger.error('Input file {} does not exist'.format(input_file))
             sys.exit(1)
         if not os.path.isfile(input_file + '.bai'):
             env.logger.error('Input bam file {} is not indexed.'.format(input_file))
             sys.exit(1)
+        if existAndNewerThan([output, output + '.bai'], [input_file, input_file + '.bai']):
+            env.logger.warning('Using existing output file {}'.format(output))
+            sys.exit(0)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
         if not output.endswith('.vcf'):
            env.logger.error('Please specify a .vcf file in the --output parameter')
            sys.exit(1)
-        if os.path.isfile(output):
+        if existAndNewerThan(output, input_files):
             env.logger.warning('Using existing output file {}'.format(output))
             sys.exit(0)
         for bam_file in input_files:
@@ -950,7 +977,7 @@ class hg19_gatk_23(BaseVariantCaller):
         env.logger.info('Setting working directory to {}'.format(working_dir))
         #
         # step 1: decompress to get a list of fastq files
-        fastq_files = self.getFastaFiles(input_files, working_dir)
+        fastq_files = self.getFastqFiles(input_files, working_dir)
         #
         # step 2: call bwa aln to produce .sai files
         self.bwa_aln(fastq_files, working_dir)
