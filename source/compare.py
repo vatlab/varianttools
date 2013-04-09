@@ -45,7 +45,7 @@ def compareArguments(parser):
         help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name
              is specified. An optional message can be added to describe the table.''')
     parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*', default=[],
-        help='''Save variants in the first, but in the others (T1 - T2 - T3...) to TABLE
+        help='''Save variants in the first, but not in the others (T1 - T2 - T3...) to TABLE
               if a name is specified. An optional message can be added to describe the table.''')
     parser.add_argument('-c', '--count', action='store_true',
         help='''Output number of variants for specified option (e.g. --union -c).''')
