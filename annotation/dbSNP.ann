@@ -100,3 +100,12 @@ index=17
 type=VARCHAR(20) NULL
 comment=Type of mapping inferred from size on reference.
 
+[submitterCount]
+index=20
+type=VARCHAR(255) NULL
+comment=Number of distinct submitter handles for submitted SNPs for this ref SNP
+
+[submitters]
+index=21
+type=VARCHAR(255) NULL
+comment=List of submitter handles
