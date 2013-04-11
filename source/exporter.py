@@ -148,33 +148,116 @@ class GenoFormatter:
         else:
             self.missing = ''
         self.base = base
+        #
         self.vcf_map = {
-              0: '0/0',
-              1: '0/1',
-              2: '1/1',
-              None: '.',
-              -1: './1',
-              (-1,-1): '1/2',
-              (0,0): '0/0',
-              (0,1): '0/2',
-              (0,2): '2/2',
-              (None, None): '.',
-              (0, None): '0/0',
-              (None,0):'0/0',
-              (1, None):'0/1',
-              (None,1):'0/2',
-              (None,2):'2/2',
-              (2,None):'1/1', 
-              (None, None, None):'.',
-              (1,None,None):'./1',
-              (None,1,None):'./2',
-              (2,None,None):'1/1',
-              (None,2,None):'2/2',
-              (None,None,1):'0/3', 
-              (None,None,2):'3/3',
-              (None, -1, -1):'2/3',
-              (-1, None, -1):'1/3'
-            }
+            # When we output a single sample, it can have genotype
+            #   0, 1, 2, and (-1, -1)
+            # as we imported from .vcf file.
+            #
+            0: '0/0',
+            1: '0/1',
+            2: '1/1',
+            (-1,-1): '1/2',
+            #
+            # if one of the two alternative variants is filtered out, we can have
+            # a single -1 variant. Note that we cannot yet import partial missing
+            # data.
+            -1: './1',
+            #
+            # when two or more samples are outputted, one sample might not have
+            # any genotype for a variant, or more than one variant. There can 
+            # be more than one variant at a location though.
+            #
+            None: '.',
+            (None, None): '.',
+            (None, None, None): '.',
+            # 
+            # Having two valid and complete genotypes for both variants is
+            # as far as I can imagine, not possible. However, because it is
+            # true that the variant is homogenous wildtype at both variants,
+            # (0,0) is listed here.
+            (0,0): '0/0',
+            #
+            #(0,1): '0/1',
+            #(0,2): '2/2',
+            #
+            # However, if there are two variants, one sample can have 0, 1, 2, and
+            # the None for another variant (because that variant exists in other
+            # samples). Note that the second item is for another variant
+            (0, None): '0/0',
+            (None,0):  '0/0',
+            (1, None): '0/1',
+            (None, 1): '0/2',
+            (2,None):  '1/1', 
+            (None, 2): '2/2',
+            # the single -1 case 
+            (-1, None): './1',
+            (None, -1): './2',
+            #
+            # the same goes to the case with three alternative alleles
+            (0, None, None): '0/0',
+            (None, 0, None): '0/0',
+            (None, None, 0): '0/0', 
+            (1, None, None): '0/1',
+            (None, 1, None): '0/2',
+            (None, None, 1): '0/3', 
+            (2, None, None): '1/1',
+            (None, 2, None): '2/2',
+            (None, None, 2): '3/3',
+            # the -1 case is more complicated because there can be one or two -1
+            (-1, None, None): './1',
+            (None, -1, None): './2',
+            (None, None, -1): './3',
+            (-1, -1, None):   '1/2',
+            (-1, None, -1):   '1/3'
+            (None, -1, -1):   '2/3',
+        }
+        #
+        self.numeric_map = {
+            # number of non-wildtype alleles
+            # FIXME: We are treating multiple alternative alleles as the same
+            # non-wildtype allele, which might be wrong for some formats.
+            0: 0,
+            1: 1,
+            2: 2,
+            (-1, -1): 2,  # two DIFFERENT alternative alleles
+            #
+            -1: 1,
+            #
+            None: None,
+            (None, None): None,
+            (None, None, None): None,
+            # 
+            (0,0): 0,
+            #
+            (0, None): 0,
+            (None,0):  0,
+            (1, None): 1,
+            (None, 1): 1,
+            (2,None):  2, 
+            (None, 2): 2,
+            # 
+            (-1, None): 1,
+            (None, -1): 1,
+            #
+            (0, None, None): 0,
+            (None, 0, None): 0,
+            (None, None, 0): 0,
+            (1, None, None): 1,
+            (None, 1, None): 1,
+            (None, None, 1): 1,
+            (2, None, None): 2,
+            (None, 2, None): 2,
+            (None, None, 2): 2,
+            #
+            (-1, None, None): 1,
+            (None, -1, None): 1,
+            (None, None, -1): 1,
+            (-1, -1, None):   2,
+            (-1, None, -1):   2,
+            (None, -1, -1):   2,
+        }
+        #
         if style == 'genotype':
             self.__call__ = self.fmt_genotype
         elif style == 'numeric':
@@ -187,17 +270,21 @@ class GenoFormatter:
     def fmt_genotype(self, item):
         global rec_ref, rec_alt
         if type(item) == int:
+            # single genotype case
             ref = self.null if rec_ref == '-' else rec_ref
             alt = self.null if rec_alt == '-' else rec_alt
-            if item == 1:
+            #
+            # 0, 1, 2, -1
+            if item == 0:
+                return ref + self.sep + ref
+            elif item == 1:
                 return ref + self.sep + alt
             elif item == 2:
                 return alt + self.sep + alt
-            elif item == -1:
+            else: 
                 return alt + self.sep + self.null
-            else:
-                return ref + self.sep + ref
         elif type(item) == tuple:
+            # Two aleternative alleles
             if item == (-1, -1):
                 return (self.null if rec_alt[0] == '-' else rec_alt[0]) + self.sep + (self.null if rec_alt[1] == '-' else rec_alt[1])
             elif len(item) > 1 and item.count(item[0]) == len(item):
@@ -210,34 +297,32 @@ class GenoFormatter:
                     return alt + self.sep + alt
                 else:
                     return ref + self.sep + ref
+            #
+            # the cases for (None, None) and (None, None, None)
+            elif all([x is None for x in item]):
+                return self.missing + self.sep + self.missing
             else:
-                raise ValueError('Failed to handle genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
+                raise ValueError('Failed to export genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
-            raise ValueError('Do not know how to handle genotype {}'.format(item))
+            raise ValueError('Failed to export genotype {}'.format(item))
 
     def fmt_numeric(self, item):
-        if type(item) == int:
-            # 0, 1, 2 + base
-            return str(self.base + abs(item))
-        elif type(item) == tuple:
-            if item == (-1, -1):
-                return str(self.base + 2)
-            elif len(item) > 1 and item.count(item[0]) == len(item):
-                return str(self.base + abs(item[0]))
+        try:
+            cnt = self.numeric_map[item]
+            if cnt is None:
+                return self.missing
             else:
-                raise ValueError('Failed to handle genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
-        elif item is None:
-            return self.missing
-        else:
-            raise ValueError('Do not know how to handle genotype {}'.format(item))
+                return cnt + self.base
+        except:
+            raise ValueError('Failed to export genotype {} in numeric style'.format(item))
 
     def fmt_vcf(self, item):
         try:
             return self.vcf_map[item]
         except:
-            raise ValueError('Do not know how to output genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_ref, rec_alt))
+            raise ValueError('Failed to export genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_ref, rec_alt))
 
 class Constant:
     def __init__(self, val=''):

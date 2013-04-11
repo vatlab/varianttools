@@ -329,6 +329,10 @@ def FieldFromFormat(name, sep=';', default=None):
 class VcfGenotype:
     def __init__(self, default=None):
         '''Define an extractor that extract genotype from a .vcf file'''
+        #
+        # FIXME: the current genotype handling mechanism cannot handle partial
+        # missing data (e.g. ./1) and phase.
+        #
         self.default = default
         self.map = {'0/0': default, '0|0': default,
             '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
