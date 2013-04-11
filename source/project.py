@@ -215,7 +215,7 @@ class AnnoDB:
         # it might be linked through wrong linked_by fields.
         #
         try:
-            proj.db.attach(self.filename)
+            proj.db.attach(os.path.join(self.dir, self.filename))
         except:
             # the database might already been attached (repeated use ..)
             pass
