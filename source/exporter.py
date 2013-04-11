@@ -142,10 +142,12 @@ class GenoFormatter:
         if style == 'numeric':
             self.missing = 'NA'
         elif style == 'genotype':
+            self.missing = '.'
+        elif stype == 'plink':
             # PED format seems to use ACTG, and 0 for missing.
             # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
-            self.missing = '0'
-        else:
+            self.missing = '0':
+        elif style :
             self.missing = ''
         self.base = base
         #
@@ -264,6 +266,8 @@ class GenoFormatter:
             self.__call__ = self.fmt_numeric
         elif style == 'vcf':
             self.__call__ = self.fmt_vcf
+        elif style == 'plink':
+            self.__call__ = self.fmt_plink
         else:
             raise ValueError('Only genotype and numeric styles are allowed')
 
@@ -307,6 +311,31 @@ class GenoFormatter:
             return self.missing + self.sep + self.missing
         else:
             raise ValueError('Failed to export genotype {}'.format(item))
+
+    def fmt_plink(self, item):
+        global rec_ref, rec_alt
+        if type(item) == int:
+            # single genotype case
+            ref = self.null if rec_ref == '-' else rec_ref
+            alt = self.null if rec_alt == '-' else rec_alt
+            #
+            # 0, 1, 2, -1
+            if item == 0:
+                return ref + self.sep + ref
+            elif item == 1:
+                return ref + self.sep + alt
+            elif item == 2:
+                return alt + self.sep + alt
+            else:  # (./A), considered as missing
+                return self.missing + self.sep + self.missing
+        # multi-allele case, ignore
+        elif type(item) == tuple:
+            raise ValueError('plink format cannot handle multiple alleles {}'.format(item))
+        elif item is None:
+            return self.missing + self.sep + self.missing
+        else:
+            raise ValueError('Failed to export genotype {}'.format(item))
+
 
     def fmt_numeric(self, item):
         try:

@@ -9,6 +9,9 @@ description=Output to TPED format with the first four columns chr name gen_pos p
     rest for genotypes. Variant tools cannot import from this format because it does not contain
     information about reference genome.
 variant=chr,pos,ref,alt
+# COMMENT:
+# export_by=chr,pos,ref will ignore all multi-allele genotypes
+# export_by=chr,pos,ref,alt will output multi-allele genotypes as two variants
 export_by=chr,pos,ref
 additional_exports=%(tfamfile)s
 
@@ -16,9 +19,11 @@ additional_exports=%(tfamfile)s
 name=
 name_comment=(export) Field for name of variants, can be dbSNP.name if dbSNP is available
 
-style=genotype
-style_comment=(export) Style of genotype format, can be 'genotype' for genotype separated by tab
-    (e.g. A C), or 'numeric' for 0, 1, or 2 for number of alternative alleles.
+style=plink
+style_comment=(export) Style of genotype format, can be 'plink' for genotype separated by tab
+    (e.g. A C), or 'numeric' for 0, 1, or 2 for number of alternative alleles. The plink style
+	will output half-missing (./A) genotype as full missing (0), and skip multi-allele genotype
+	(e.g. ref=A, alt=T,G, genotype=T/G) (when export_by=chr,pos,ref).
 
 tfamfile=$table.tfam
 tfamfile_comment=(export) Name of the tfam file to be outputed. Filename that does not
