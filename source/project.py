@@ -1688,6 +1688,10 @@ class Project:
             # step 5, rename genotype back
             self.db.renameTable(new_table, 'genotype_{}'.format(ids[0]))
             self.db.commit()
+        # finally, remove filenames that are associated with no sample. The individual files can then
+        # be imported again, which I am not sure is good or bad
+        self.db.execute('DELETE FROM filename WHERE filename.file_id NOT IN (SELECT file_id FROM sample)')
+        self.db.commit()
         prog.done()
 
     def createVariantMap(self, table='variant', alt_build=False):
