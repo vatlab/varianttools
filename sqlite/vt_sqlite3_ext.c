@@ -164,10 +164,9 @@ void init_vt_sqlite3_ext()
 }
 
 
-/* SQLite invokes this routine once when it loads the extension.
-** Create new functions, collating sequences, and virtual table
-** modules here.  This is usually the only exported symbol in
-** the shared library.
+/* SQLite invokes sqlite3_extension_init, which is defined later
+** and will call this function to register variant tools defined
+** functions.
 */
 int sqlite3_my_extension_init(
                            sqlite3 * db,
@@ -189,6 +188,17 @@ int sqlite3_my_extension_init(
 	return 0;
 }
 
+/*
+ * The following code is from extension-functions.c (http://www.sqlite.org/contrib)
+ *
+ * The only change is the removal of duplicated lines 
+ *
+ *   #include "sqlite3ext.h"
+ *   SQLITE_EXTENSION_INIT1
+ *
+ * and change sqlite3_extension_init to call sqlite3_my_extension_init
+ * which initialize the functions added by variant tools.
+ */
 
 /*
 This library will provide common mathematical and string functions in
