@@ -143,7 +143,7 @@ class GenoFormatter:
             self.missing = 'NA'
         elif style == 'genotype':
             self.missing = '.'
-        elif stype == 'plink':
+        elif style == 'plink':
             # PED format seems to use ACTG, and 0 for missing.
             # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
             self.missing = '0'

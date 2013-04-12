@@ -9,13 +9,19 @@
 description=Input format illumina snps.txt file, created by CASAVA version 1.8
 	(http://www.illumina.com/support/documentation.ilmn). This format imports chr,
 	pos, ref, alt of most likely genotype, and a Q score for the most likely genotype.
-variant=seq_name, pos, ref, alt
+variant=seq_name, pos, ref, %(alt)s
 genotype=%(geno)s
 genotype_info=%(geno_info)s
 
 [DEFAULT]
 geno=max_gt
+geno_comment=Genotype to load, can be max_gt or max_gt_poly_site
+
 geno_info=Q_max_gt
+geno_info_comment=Should be Q_max_gt for geno=max_gt, and Q_max_gt_ploy_site for geno=max_gt_poly_site
+
+alt=alt_max_gt
+alt_comment=Alternative allele, should be alt_max_gt for geno=max_gt (default), and alt_max_gt_poly_site for geno=max_gt_polysite
 
 [seq_name]
 index=1
@@ -49,12 +55,12 @@ type=INT
 comment=A Q-value expressing the probability of the homozygous reference genotype, subject to the expected rate of haplotype difference as expressed by the (Watterson) theta parameter.
 
 [max_gt]
-index=7
-adj=lambda x: 1 if x[0] != x[1] else 2
-type=CHAR(1)
+index=5,7
+type=INT
+adj=lambda x: 0 if (x[0] == x[1][0] and x[0] == x[1][1]) else (1 if x[1][0] != x[1][1] else 2)
 comment=The most likely genotype (subject to theta, as above)
 
-[alt]
+[alt_max_gt]
 index=5, 7
 # The input can be 'C, AC', 'C, CC' etc. We should get A for the first and None for the second
 # and the record with None will be discarded because valid alternative allele is required.
@@ -69,9 +75,18 @@ comment=A Q-value expressing the probability that the genotype is not the most l
 
 
 [max_gt_poly_site]
-index=9
+index=5,9
 type=CHAR(2)
+adj=lambda x: 0 if (x[0] == x[1][0] and x[0] == x[1][1]) else (1 if x[1][0] != x[1][1] else 2)
 comment=The most likely genotype assuming this site is polymorphic with an expected allele frequency of 0.5 (theta is still used to calculate the probability of a third allele -- i.e. the chance of observing two non- reference alleles).
+
+[alt_max_gt_poly_site]
+index=5, 9
+# The input can be 'C, AC', 'C, CC' etc. We should get A for the first and None for the second
+# and the record with None will be discarded because valid alternative allele is required.
+adj=lambda x: None if (x[1][0] == x[0][0] and x[1][1] == x[0][0]) else (x[1][0] if x[0][0] == x[1][1] else x[1][1])
+type=CHAR(1)
+comment=Derived alternative allele from max_gt | poly_site
 
 
 [Q_max_gt_poly_site]

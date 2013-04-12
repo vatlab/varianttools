@@ -1216,8 +1216,7 @@ class Project:
         cur.execute('''\
             CREATE TABLE filename (
                 file_id INTEGER PRIMARY KEY {0},
-                filename VARCHAR(256) NOT NULL,
-                header BLOB NULL
+                filename VARCHAR(256) NOT NULL
             )'''.format(self.db.AI))
         # create index
         try:
@@ -1661,18 +1660,15 @@ class Project:
             # step 3: collect filenames
             #
             filenames = []
-            header = ''
             for id in ids:
-                cur.execute('SELECT filename, header FROM sample JOIN filename ON sample.file_id = filename.file_id WHERE sample_id = {}'.format(self.db.PH), (id,))
+                cur.execute('SELECT filename FROM sample JOIN filename ON sample.file_id = filename.file_id WHERE sample_id = {}'.format(self.db.PH), (id,))
                 rec = cur.fetchone()
                 filenames.extend(rec[0].split(','))
-                if rec[1] is not None:
-                    header = rec[1]
             #
             filenames = ','.join(sorted(list(set(filenames))))
             try:
-                cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(
-                    self.db.PH), (filenames, header))
+                cur.execute('INSERT INTO filename (filename) VALUES ({0});'.format(
+                    self.db.PH), (filenames,))
                 file_id = cur.lastrowid
             except:
                 # existing file id??
@@ -2951,11 +2947,11 @@ class ProjectsMerger:
             self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
             #
             # handling filename
-            cur.execute('SELECT file_id, filename, header FROM __proj.filename;')
+            cur.execute('SELECT file_id, filename FROM __proj.filename;')
             filename_records = cur.fetchall()
             old_sample_id = []
             new_sample_id = []
-            for old_file_id, filename, header in filename_records:
+            for old_file_id, filename in filename_records:
                 if filename in filenames:
                     cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
                         (old_file_id, ))
@@ -2968,8 +2964,8 @@ class ProjectsMerger:
                 else:
                     filenames.append(filename)
                     #
-                    cur.execute('INSERT INTO filename (filename, header) VALUES ({0}, {0});'.format(self.db.PH),
-                        (filename, header))
+                    cur.execute('INSERT INTO filename (filename) VALUES ({0});'.format(self.db.PH),
+                        (filename, ))
                     new_file_id = cur.lastrowid
                     duplicate = False
                 # get samples

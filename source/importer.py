@@ -1665,16 +1665,7 @@ class Importer:
 
     def recordFileAndSample(self, filename, sampleNames):
         cur = self.db.cursor()
-        # get header of file
-        header = ''
-        with openFile(filename) as input:
-            for line in input:
-                line = line.decode(self.encoding)
-                if line.startswith('#'):
-                    header += line
-                else:
-                    break
-        cur.execute("INSERT INTO filename (filename, header) VALUES ({0}, {0});".format(self.db.PH), (filename, header))
+        cur.execute("INSERT INTO filename (filename) VALUES ({0});".format(self.db.PH), (filename,))
         filenameID = cur.lastrowid
         sample_ids = []
         s = delayedAction(self.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
