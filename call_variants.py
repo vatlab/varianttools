@@ -174,12 +174,18 @@ def run_command(cmd, upon_succ=None, wait=True):
     if wait or env.jobs == 1:
         try:
             env.logger.info('Running {}'.format(cmd))
-            retcode = subprocess.call(cmd, shell=True)
+            proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+            (out_message, err_message) = proc.communicate()
+            retcode = proc.returncode
             if retcode < 0:
+                env.logger.error("Command {} was terminated by signal {}".format(cmd, -retcode))
                 sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
             elif retcode > 0:
+                [env.logger.error(x) for x in err_message.split('\n')[-20:]]
+                env.logger.error("Command {} returned {}".format(cmd, retcode))
                 sys.exit("Command {} returned {}".format(cmd, retcode))
         except OSError as e:
+            env.logger.error("Execution of command {} failed: {}".format(cmd, e))
             sys.exit("Execution of command {} failed: {}".format(cmd, e))
         # everything is OK
         if upon_succ:
@@ -195,7 +201,7 @@ def run_command(cmd, upon_succ=None, wait=True):
                 break
         # there is a slot, start running
         env.logger.info('Running {}'.format(cmd))
-        proc = subprocess.Popen(cmd, shell=True)
+        proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
         env.running_jobs.append([proc, cmd, upon_succ])
 
 def running_jobs():
@@ -205,9 +211,19 @@ def running_jobs():
         ret = job[0].poll()
         if ret is None:  # still running
             count += 1
-        elif ret != 0:
-            raise RuntimeError('Job {} failed.'.format(job[1]))
+        elif ret < 0:
+            env.logger.error("Command {} was terminated by signal {}".format(job[1], -ret))
+            sys.exit("Command {} was terminated by signal {}".format(job[1], -ret))
+        elif ret > 0:
+            (out_message, err_message) = job[0].communicate()
+            # print error message
+            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
+            env.logger.error('Job {} failed.'.format(job[1]))
+            sys.exit('Job {} failed.'.format(job[1]))
         else:
+            (out_message, err_message) = job[0].communicate()
+            if err_message:
+                [env.logger.error(x) for x in err_message.split('\n')[-20:]]
             # finish up
             if job[2]:
                 # call the upon_succ function
@@ -223,9 +239,18 @@ def wait_all():
     if not env.running_jobs:
         return
     for job in env.running_jobs:
-        ret = job[0].wait()
-        if ret != 0:
+        # wait and get error message
+        (out_message, err_message) = job[0].communicate()
+        retcode = job[0].returncode
+        if retcode < 0:
+            env.logger.error("Command {} was terminated by signal {}".format(job[1], -retcode))
+            sys.exit("Command {} was terminated by signal {}".format(job[1], -retcode))
+        elif retcode > 0:
+            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
+            env.logger.error('Job {} failed.'.format(job[1]))
             raise RuntimeError('Job {} failed.'.format(job[1]))
+        if err_message:
+            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
         # run the upon_succ function
         if job[2]:
             job[2][0](*(job[2][1:]))
@@ -328,7 +353,7 @@ def fastqVersion(fastq_file):
                 env.logger.error('Failed to read fastq file {}: {}'.format(fastq_file, e))
                 sys.exit(1)
             if not line.startswith('@'):
-                raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
+                raise ValueError('Wrong FASTA file {}'.format(fastq_file))
             line = fastq.readline()
             line = fastq.readline()
             if not line.startswith('+'):
@@ -1091,7 +1116,7 @@ if __name__ == '__main__':
                     The following options are acceptable: {}'''.format(', '.join(
                     [x[0] for x in options])))
         if 'jobs' in args:
-            parser.add_argument('-j', '--jobs', default=1, type=int,
+            parser.add_argument('-j', '--jobs', default=2, type=int,
                 help='''Maximum number of concurrent jobs.''')
     #
     master_parser = argparse.ArgumentParser(description='''A pipeline to call variants
