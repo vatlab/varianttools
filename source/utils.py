@@ -384,7 +384,6 @@ class ColoredFormatter(logging.Formatter):
         logging.Formatter.__init__(self, msg)
         self.LEVEL_COLOR = {
             'DEBUG': 'BLUE',
-            'INFO': 'BLACK',
             'WARNING': 'PURPLE',
             'ERROR': 'RED',
             'CRITICAL': 'RED_BG',
