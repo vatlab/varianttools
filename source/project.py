@@ -3581,7 +3581,8 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
-                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', prop[3]))
+                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
+                        initial_indent='', subsequent_indent=' '*35))[35:]))
     except Exception as e:
         sys.exit(e)
 

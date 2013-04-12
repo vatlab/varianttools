@@ -146,7 +146,7 @@ class GenoFormatter:
         elif stype == 'plink':
             # PED format seems to use ACTG, and 0 for missing.
             # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
-            self.missing = '0':
+            self.missing = '0'
         elif style :
             self.missing = ''
         self.base = base
@@ -211,7 +211,7 @@ class GenoFormatter:
             (None, -1, None): './2',
             (None, None, -1): './3',
             (-1, -1, None):   '1/2',
-            (-1, None, -1):   '1/3'
+            (-1, None, -1):   '1/3',
             (None, -1, -1):   '2/3',
         }
         #
