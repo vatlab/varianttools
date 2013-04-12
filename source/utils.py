@@ -619,11 +619,17 @@ class ProgressBar:
         self.message = self.main
         # get terminal width
         self.handle_resize()
-        try:
-            signal.signal(signal.SIGWINCH, self.handle_resize)
-        except:
-            # signal only works in main thread, so this might not work in all cases
-            pass
+        #
+        # It appears that resizing window has caused some threads or processes to
+        # stop silently, leading to for example partially imported data. The reason
+        # is still unver investigation (might not be related to this) but this feature
+        # (resize progress bar dynamically) is temporarily removed.
+        #
+        #try:
+        #    signal.signal(signal.SIGWINCH, self.handle_resize)
+        #except:
+        #    # signal only works in main thread, so this might not work in all cases
+        #    pass
         # total count, including failed ones
         self.count = 0
         self.failed_count = 0
