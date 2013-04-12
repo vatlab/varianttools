@@ -621,7 +621,7 @@ class ProgressBar:
         self.handle_resize()
         try:
             signal.signal(signal.SIGWINCH, self.handle_resize)
-        except ValueError:
+        except:
             # signal only works in main thread, so this might not work in all cases
             pass
         # total count, including failed ones
