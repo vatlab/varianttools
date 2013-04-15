@@ -15,11 +15,6 @@ import zipfile
 import time
 import re
 from collections import defaultdict
-# try:
-#     # might not need to use pysam
-#     import pysam
-# except ImportError:
-#     pass
 
 #
 # Runtime environment
@@ -161,6 +156,12 @@ class RuntimeEnvironment(object):
 env = RuntimeEnvironment()
 
 
+def elapsed_time(start):
+    '''Return the elapsed time in human readable format since start time'''
+    second_elapsed = int(time.time() - start)
+    return ('' if second_elapsed < 86400 else '{} days '.format(second_elapsed // 86400)) + \
+        time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
+ 
 #
 # A simple job management scheme 
 #
@@ -173,17 +174,19 @@ def run_command(cmd, upon_succ=None, wait=True):
     cmd = ' '.join(cmd.split())
     if wait or env.jobs == 1:
         try:
+            s = time.time()
             env.logger.info('Running {}'.format(cmd))
             proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
             (out_message, err_message) = proc.communicate()
             retcode = proc.returncode
             if retcode < 0:
-                env.logger.error("Command {} was terminated by signal {}".format(cmd, -retcode))
+                env.logger.error("Command {} was terminated by signal {} after executing {}".format(cmd, -retcode, elapsed_time(s)))
                 sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
             elif retcode > 0:
-                [env.logger.error(x) for x in err_message.split('\n')[-20:]]
-                env.logger.error("Command {} returned {}".format(cmd, retcode))
+                [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
+                env.logger.error("Command {} returned {} after executing {}".format(cmd, retcode, elapsed_time(s)))
                 sys.exit("Command {} returned {}".format(cmd, retcode))
+            env.logger.error('Command {} completed successfully in {}'.format(cmd, elapsed_time(s)))
         except OSError as e:
             env.logger.error("Execution of command {} failed: {}".format(cmd, e))
             sys.exit("Execution of command {} failed: {}".format(cmd, e))
@@ -202,7 +205,7 @@ def run_command(cmd, upon_succ=None, wait=True):
         # there is a slot, start running
         env.logger.info('Running {}'.format(cmd))
         proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
-        env.running_jobs.append([proc, cmd, upon_succ])
+        env.running_jobs.append([proc, cmd, upon_succ, time.time()])
 
 def running_jobs():
     '''check the number of running jobs'''
@@ -212,23 +215,24 @@ def running_jobs():
         if ret is None:  # still running
             count += 1
         elif ret < 0:
-            env.logger.error("Command {} was terminated by signal {}".format(job[1], -ret))
+            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job[1], -ret, elapsed_time(job[3])))
             sys.exit("Command {} was terminated by signal {}".format(job[1], -ret))
         elif ret > 0:
             (out_message, err_message) = job[0].communicate()
             # print error message
-            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
-            env.logger.error('Job {} failed.'.format(job[1]))
+            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
+            env.logger.error('Execution of command {} failed after {}.'.format(job[1], elapsed_time(job[3])))
             sys.exit('Job {} failed.'.format(job[1]))
         else:
             (out_message, err_message) = job[0].communicate()
             if err_message:
-                [env.logger.error(x) for x in err_message.split('\n')[-20:]]
+                [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
             # finish up
             if job[2]:
                 # call the upon_succ function
                 job[2][0](*(job[2][1:]))
             env.running_jobs[idx] = None
+            env.logger.error('Command {} completed successfully in {}'.format(job[1], elapsed_time(job[3])))
     # remove all completed jobs and exit
     env.running_jobs = [x for x in env.running_jobs if x]
     return count
@@ -243,17 +247,18 @@ def wait_all():
         (out_message, err_message) = job[0].communicate()
         retcode = job[0].returncode
         if retcode < 0:
-            env.logger.error("Command {} was terminated by signal {}".format(job[1], -retcode))
+            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job[1], -retcode, elapsed_time(job[3])))
             sys.exit("Command {} was terminated by signal {}".format(job[1], -retcode))
         elif retcode > 0:
-            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
-            env.logger.error('Job {} failed.'.format(job[1]))
+            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
+            env.logger.error('Execution of command {} failed after.'.format(job[1], elapsed_time(job[3])))
             raise RuntimeError('Job {} failed.'.format(job[1]))
         if err_message:
-            [env.logger.error(x) for x in err_message.split('\n')[-20:]]
+            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
         # run the upon_succ function
         if job[2]:
             job[2][0](*(job[2][1:]))
+        env.logger.error('Command {} completed successfully in {}'.format(job[1], elapsed_time(job[3])))
     # all jobs are completed
     env.running_jobs = []
 
@@ -1078,7 +1083,7 @@ if __name__ == '__main__':
     options = [
         ('PICARD_PATH', ''),
         ('GATK_PATH', ''),
-        ('OPT_JAVA', '-Xmx4g'),
+        ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit'),
         ('OPT_BWA_INDEX', ''),
         ('OPT_SAMTOOLS_FAIDX', ''),
         ('OPT_BWA_ALN', ''),
@@ -1087,7 +1092,7 @@ if __name__ == '__main__':
         ('OPT_SAMTOOLS_VIEW', ''),
         ('OPT_SAMTOOLS_SORT', ''),
         ('OPT_SAMTOOLS_INDEX', ''),
-        ('OPT_PICARD_MERGESAMFILES', ''),
+        ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
         ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
         ('OPT_GATK_INDELREALIGNER', ''),
         ('OPT_PICARD_MARKDUPLICATES', ''),

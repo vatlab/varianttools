@@ -3383,10 +3383,11 @@ def show(args):
             elif args.type == 'tables':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'.format(', '.join(args.items)))
-                print('{:<20} {:>10} {:>8}  {}'.format('table', '#variants', 'date', 'message'))
+                width = max([len(decodeTableName(x)) for x in proj.getVariantTables()])
+                print(('{:<' + str(width+2) + '} {:>10} {:>8}  {}').format('table', '#variants', 'date', 'message'))
                 for table in proj.getVariantTables():
                     desc, date, cmd = proj.descriptionOfTable(table) 
-                    print('{:<20} {: >10,} {:>8}  {}'.format(decodeTableName(table), proj.db.numOfRows(table), date, 
+                    print(('{:<' + str(width+2) + '} {: >10,} {:>8}  {}').format(decodeTableName(table), proj.db.numOfRows(table), date, 
                         '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))

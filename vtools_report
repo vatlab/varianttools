@@ -73,7 +73,7 @@ def getoutput(cmd):
     if True not in [x.startswith('-v') for x in cmd]:
         cmd.append('-v{}'.format(verbosity))
     # call vtools and return its output
-    logger.info('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
+    logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])}).strip().decode()
@@ -83,7 +83,7 @@ def outputToFile(cmd, filename):
     if True not in [x.startswith('-v') for x in cmd]:
         cmd.append('-v{}'.format(verbosity))
     # call vtools and return its output
-    logger.info('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
+    logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     with open(filename, 'w') as output:
@@ -338,6 +338,11 @@ def discordanceRateArguments(parser):
             $treat_missing_as_wildtype is set to True, and discarded otherwise.''')
     
 def discordanceRate(args):
+    #
+    # It is possible to use SQL to speed up this funciton. E.g. instead of
+    # getting all variants and their genotypes, use something like
+    #   SELECT count(a.variant_id) FROM genotype_1 a, genotype_2 b ON a.variant_id = b.variant_id;
+    # 
     for grp, sample_ids, sample_names in getSamples(args.samples):
         print('\t'.join(sample_names))
         # get list of variant for each sample
