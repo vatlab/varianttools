@@ -2005,3 +2005,24 @@ def executeUntilSucceed(cur, query, logger, attempts, operation_msg, data = None
                 raise
             else:
                 time.sleep(1 + attempt + random.random() * 10)
+
+def parenthetic_contents(string):
+    """Generate parenthesized contents in string as pairs (level, contents)."""
+    stack = []
+    for i, c in enumerate(string):
+        if c == '(':
+            stack.append(i)
+        elif c == ')' and stack:
+            start = stack.pop()
+            yield (len(stack), string[start + 1: i])
+            
+def longest_parenthetic_content(string):
+    """Generate longest parenthesized contents in string"""
+    stack = []
+    for i, c in enumerate(string):
+        if c == '(':
+            stack.append(i)
+        elif c == ')' and stack:
+            start = stack.pop()
+            if len(stack) == 0:
+                return string[start + 1: i]

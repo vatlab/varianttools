@@ -426,7 +426,7 @@ VTOOLS_FILES = ['source.__init__',
         'source.liftOver',
         'source.association',
         'source.tester',
-        'source.pyper'
+        'source.str4r'
 ]
 
 

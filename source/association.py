@@ -143,6 +143,8 @@ class AssociationTestManager:
         self.var_info = var_info
         self.geno_info = geno_info
         self.genotypes = genotypes
+        self.phenotype_names = phenotypes
+        self.covariate_names = covariates
         # table?
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
@@ -643,6 +645,8 @@ class AssoTestsWorker(Process):
         self.sample_IDs = param.sample_IDs
         self.phenotypes = param.phenotypes
         self.covariates = param.covariates
+        self.phenotype_names = param.phenotype_names
+        self.covariate_names = param.covariate_names
         self.var_info = param.var_info
         self.geno_info = param.geno_info
         self.tests = param.tests
@@ -813,14 +817,14 @@ class AssoTestsWorker(Process):
             if field not in ['chr', 'pos']:
                 self.data.setVar('__var_' + field, data[field])
 
-    def setPyData(self, which, geno, var_info, geno_info, missing_code, grpname):
-        '''set all data to a python dictionary in str format'''
-        def istr(d):
+    def setPyData(self, which, geno, var_info, geno_info,
+                  missing_code, grpname, recode_missing = True):
+        '''set all data to a python dictionary'''
+        def fstr(x):
             try:
-                x = int(d)
-                x = str(x)
+                float(x)
             except:
-                x = str(d)
+                x = str(x)
             return x
         #
         if len(self.phenotypes) > 1:
@@ -828,10 +832,10 @@ class AssoTestsWorker(Process):
         #
         self.pydata['name'] = grpname
         #
-        if missing_code:
-            self.pydata['genotype'] = [map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(geno) if which[idx]]
+        if recode_missing:
+            self.pydata['genotype'] = [[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(geno) if which[idx]]
         else:
-            self.pydata['genotype'] = [map(istr, x) for idx, x in enumerate(geno) if which[idx]]
+            self.pydata['genotype'] = [x for idx, x in enumerate(geno) if which[idx]]
         #
         try:
             self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
@@ -843,28 +847,30 @@ class AssoTestsWorker(Process):
         for k, item in var_info.items():
              if k != 'chr' and k != 'pos':
                  self.pydata['var_info_header'].append(k)
-                 self.pydata['var_info'].append(item)
+                 self.pydata['var_info'].append(map(fstr, item))
         self.pydata['var_info'] = zip(*self.pydata['var_info'])
         # geno_info
         self.pydata['geno_info'] = []
         self.pydata['geno_info_header'] = []
         for k, item in geno_info.items():
             self.pydata['geno_info_header'].append(k)
-            if missing_code:
-                self.pydata['geno_info'].append([map(istr, [missing_code if math.isnan(e) else e for e in x]) for idx, x in enumerate(item) if which[idx]])
+            if recode_missing:
+                self.pydata['geno_info'].append([[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(item) if which[idx]])
             else:
-                self.pydata['geno_info'].append([map(istr, x) for idx, x in enumerate(item) if which[idx]])
+                self.pydata['geno_info'].append([x for idx, x in enumerate(item) if which[idx]])
         # convert geno_info to 3 dimensions:
         # D1: samples
         # D2: variants
         # D3: geno_info 
         self.pydata['geno_info'] = zip(*self.pydata['geno_info'])
         self.pydata['geno_info'] = [zip(*item) for item in self.pydata['geno_info']]
-        self.pydata['sample_name'] = self.sample_names
-        self.pydata['phenotype'] = map(str, [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]])
+        self.pydata['sample_name'] = map(str, self.sample_names)
+        self.pydata['phenotype_name'] = self.phenotype_names
+        self.pydata['covariate_name'] = self.covariate_names
+        self.pydata['phenotype'] = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
         if self.covariates:
             # skip the first covariate, a vector of '1''s
-            self.pydata['covariates'] = [map(str, [x for idx, x in enumerate(y) if which[idx]]) for y in self.covariates[1:]]
+            self.pydata['covariates'] = [[x for idx, x in enumerate(y) if which[idx]] for y in self.covariates[1:]]
         #
         if len(self.pydata['genotype']) == 0 or len(self.pydata['phenotype']) == 0 or len(self.pydata['genotype'][0]) == 0:
             raise ValueError("No input data")
@@ -911,7 +917,7 @@ class AssoTestsWorker(Process):
                     self.setVarInfo(var_info)
                 # set Python data object, for external tests
                 if self.num_extern_tests:
-                    self.setPyData(which, genotype, var_info, geno_info, 'NA', grpname)
+                    self.setPyData(which, genotype, var_info, geno_info, None, grpname)
                 # association tests
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
