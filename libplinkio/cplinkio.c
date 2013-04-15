@@ -455,7 +455,10 @@ PyInit_cplinkio(void)
     py_snp_array_prototype.tp_new = PyType_GenericNew;
     if( PyType_Ready( &py_snp_array_prototype ) < 0 )
     {
-        return;
+	// the orignal code has 'return;', which leads to a compiling error
+	// I am not sure if NULL is the right value to return here tough. 
+	//         -- Bo Peng
+        return NULL;
     }
 
     module = PyModule_Create( &moduledef );
