@@ -1449,6 +1449,7 @@ class DatabaseEngine:
                 #
                 self.database.commit()
             # trying to load extension
+            loaded = False
             for path in sys.path:
                 ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
                 if ext:
@@ -1457,6 +1458,7 @@ class DatabaseEngine:
                         cur.execute('SELECT load_extension("{}");'.format(ext[0]))
                     except Exception as e:
                         raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                    loaded = True
                     break
                 ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
                 if ext:
@@ -1465,6 +1467,7 @@ class DatabaseEngine:
                         cur.execute('SELECT load_extension("{}");'.format(ext[0]))
                     except Exception as e:
                         raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                    loaded = True
                     break
                 #
                 # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
@@ -1475,7 +1478,10 @@ class DatabaseEngine:
                         cur.execute('SELECT load_extension("{}");'.format(ext[0]))
                     except Exception as e:
                         raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                    loaded = True
                     break
+            if not loaded:
+                env.logger.warning('Failed to load sqlite extension module. No extended SQL functions can be used.')
             if lock is not None:
                 lock.release()
 
