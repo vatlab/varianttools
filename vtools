@@ -30,9 +30,9 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-from variant_tools.utils import runOptions
+from variant_tools.utils import env
 # save the command line that has been processed by the shell. It might not work as shown.
-runOptions.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else "'{}'".format(x) for x in sys.argv[1:]])
+env.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else "'{}'".format(x) for x in sys.argv[1:]])
 
 import variant_tools.project as project
 import variant_tools.importer as importer

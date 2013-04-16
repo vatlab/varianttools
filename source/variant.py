@@ -28,7 +28,7 @@ import sys
 import re
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
-    delayedAction, encodeTableName, decodeTableName
+    delayedAction, encodeTableName, decodeTableName, env
 from .phenotype import Sample
 
 
@@ -106,7 +106,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
     # LIMIT clause
     limit_clause = '' if args.limit is None or args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
     query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
-    proj.logger.debug('Running query {}'.format(query))
+    env.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
     cur.execute(query)
@@ -115,12 +115,12 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
             sys.stdout.write(args.delimiter.join([re.sub('[\W]+', ' ', x) for x in output_fields]) + '\n')
         elif args.header == ['-']:
-            proj.logger.info('Reading header from standard input')
+            env.logger.info('Reading header from standard input')
             sys.stdout.write(sys.stdin.read().rstrip() + '\n')
         else:
             # other wise, use the user-provided header
             if len(args.header) != len(output_fields):
-                proj.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
+                env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
             sys.stdout.write(args.delimiter.join(args.header) + '\n')
     # output with a warning to potentially duplicated lines
     has_duplicate = False
@@ -134,7 +134,7 @@ def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
                 last_line = line
         sys.stdout.write(line)
     if has_duplicate:
-        proj.logger.warning('Duplicate records are outputted. This may due to '
+        env.logger.warning('Duplicate records are outputted. This may due to '
             'multiple entries of variants in the annotation database. Piping standard output '
             'to a uniq command ("vtools output ... | uniq") will remove these entries.')
 
@@ -182,7 +182,7 @@ def select(args, reverse=False):
             if not proj.isVariantTable(encodeTableName(args.from_table)):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
             if not args.to_table and not args.output and not args.count:
-                proj.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
+                env.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
                 return
             if len(args.condition) > 0:    
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
@@ -208,14 +208,14 @@ def select(args, reverse=False):
                     #    proj.db.hasIndex('{0}.{0}_{1}'.format(db, fld)):
                     #    continue
                     #
-                    #s = delayedAction(proj.logger.info, 'Indexing {}'.format(field))
+                    #s = delayedAction(env.logger.info, 'Indexing {}'.format(field))
                     #cur = proj.db.cursor()
                     #try:
                     #    query = 'CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(db, fld)
-                    #    proj.logger.debug(query)
+                    #    env.logger.debug(query)
                     #    cur.execute(query)
                     #except Exception as e:
-                    #    proj.logger.debug('Failed to create index: {}'.format(e))
+                    #    env.logger.debug('Failed to create index: {}'.format(e))
                     #del s
                 # 
                 fields_info = sum([proj.linkFieldToTable(x, encodeTableName(args.from_table)) for x in fields], [])
@@ -241,18 +241,18 @@ def select(args, reverse=False):
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
                 if len(IDs) == 0:
-                    proj.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in args.samples])))
+                    env.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in args.samples])))
                     # nothing will be selected
                     where_clause += ' AND 0'
                 #
                 # This special case does not hold because sometimes variants are imported without sample information.
                 #
                 #elif len(IDs) == proj.db.numOfRows('sample'):
-                #    proj.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                #    env.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                 #    # we do not have to add anything to where_clause
                 elif len(IDs) < 50:  
                     # we allow 14 tables in other 'union' or from condition...
-                    proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                    env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         encodeTableName(args.from_table), 
                         '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in IDs])) 
@@ -260,7 +260,7 @@ def select(args, reverse=False):
                     # we have to create a temporary table and select variants sample by sample
                     # this could be done in parallel if there are a large number of samples, but that needs a lot more
                     # code, and perhaps RAM
-                    proj.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+                    env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     cur = proj.db.cursor()
                     BLOCK_SIZE = 64
                     NUM_BLOCKS = len(IDs) // BLOCK_SIZE + 1
@@ -268,7 +268,7 @@ def select(args, reverse=False):
                     myIDs.sort()
                     merged_table = '__variants_from_samples'
                     query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-                    # proj.logger.debug(query)
+                    # env.logger.debug(query)
                     cur.execute(query)
                     prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
                     count = 0
@@ -279,7 +279,7 @@ def select(args, reverse=False):
                             continue
                         query = 'INSERT INTO {} {};'.format(merged_table,
                             '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
-                        #proj.logger.debug(query)
+                        #env.logger.debug(query)
                         cur.execute(query)
                         count += len(block_IDs)
                         if prog:
@@ -308,7 +308,7 @@ def select(args, reverse=False):
             if args.count and not args.to_table and not args.output:
                 query = 'SELECT COUNT(DISTINCT {}.variant_id) {} {};'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-                proj.logger.debug('Running query {}'.format(query))
+                env.logger.debug('Running query {}'.format(query))
                 proj.db.startProgress('Counting variants')
                 cur = proj.db.cursor()
                 cur.execute(query)
@@ -323,7 +323,7 @@ def select(args, reverse=False):
             elif args.to_table:
                 if proj.db.hasTable(encodeTableName(args.to_table)):
                     new_table = proj.db.backupTable(encodeTableName(args.to_table))
-                    proj.logger.warning('Existing table {} is renamed to {}.'.format(args.to_table, decodeTableName(new_table)))
+                    env.logger.warning('Existing table {} is renamed to {}.'.format(args.to_table, decodeTableName(new_table)))
                 #
                 proj.createVariantTable(encodeTableName(args.to_table))
                 proj.describeTable(encodeTableName(args.to_table), args.table_desc, True, True)
@@ -334,7 +334,7 @@ def select(args, reverse=False):
                 else:
                     query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
                         format(encodeTableName(args.to_table), encodeTableName(args.from_table), from_clause, where_clause)
-                proj.logger.debug('Running query {}'.format(query))
+                env.logger.debug('Running query {}'.format(query))
                 #
                 cur = proj.db.cursor()
                 proj.db.startProgress('Running')
@@ -343,7 +343,7 @@ def select(args, reverse=False):
                 proj.db.commit()
                 #
                 count = proj.db.numOfRows(encodeTableName(args.to_table))
-                proj.logger.info('{} variants selected.'.format(count))
+                env.logger.info('{} variants selected.'.format(count))
                 if args.output:
                     outputVariants(proj, encodeTableName(args.to_table), args.output, args)
                 if args.count:

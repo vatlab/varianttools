@@ -31,7 +31,7 @@ import time
 import re
 from collections import defaultdict
 from .project import Project
-from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS
+from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env
 
 class GenotypeStatStatus:
     def __init__(self):
@@ -50,7 +50,7 @@ class GenotypeStatStatus:
         return len(self.tasks)
 
 class GenotypeStatCalculator(threading.Thread):
-    def __init__(self, dbName, stat, idQueue, status, genotypes, logger):
+    def __init__(self, dbName, stat, idQueue, status, genotypes):
         '''Use sql to process sample passed from queue, set results in status'''
         self.dbName = dbName
         # query, where, idx
@@ -79,7 +79,6 @@ class GenotypeStatCalculator(threading.Thread):
         self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
-        self.logger = logger
         threading.Thread.__init__(self, name='Calculate genotype statistics')
 
     def run(self):
@@ -103,7 +102,7 @@ class GenotypeStatCalculator(threading.Thread):
                 query = 'SELECT {} FROM genotype_{} {};'\
                     .format(', '.join([x[0] for x in self.stat]), ID,
                         'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
-                self.logger.debug(query)
+                env.logger.debug(query)
                 try:
                     cur.execute(query)
                     res = cur.fetchone()
@@ -113,14 +112,14 @@ class GenotypeStatCalculator(threading.Thread):
                         query = 'SELECT {} FROM genotype_{} {};'\
                             .format(expr, ID,
                                 'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
-                        self.logger.debug(query)
+                        env.logger.debug(query)
                         try:
                             cur.execute(query)
                             v = cur.fetchone()
                             if v is not None:
                                 res[idx] = v[0]
                         except Exception as e:
-                            self.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
+                            env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
             else:
                 res = [None] * len(self.stat)
                 for idx, (expr, where) in enumerate(self.stat):
@@ -132,14 +131,14 @@ class GenotypeStatCalculator(threading.Thread):
                             where_clause = 'WHERE {}'.format(where)
                     query = 'SELECT {} FROM genotype_{} {};'\
                         .format(expr, ID, where_clause)
-                    self.logger.debug(query)
+                    env.logger.debug(query)
                     try:
                         cur.execute(query)
                         v = cur.fetchone()
                         if v is not None:
                             res[idx] = v[0]
                     except Exception as e:
-                        self.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
+                        env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
             #
             # set result
             self.status.set(ID, res)
@@ -150,13 +149,12 @@ class Sample:
     def __init__(self, proj, jobs=4):
         self.proj = proj
         self.jobs = jobs
-        self.logger = proj.logger
         self.db = proj.db
 
     def load(self, filename, allowed_fields, samples):
         '''Load phenotype information from a file'''
         if not self.db.hasTable('sample'):
-            self.logger.warning('Project does not have a sample table.')
+            env.logger.warning('Project does not have a sample table.')
             return
         # num sample, num new field, num update field
         count = [0, 0, 0]
@@ -215,16 +213,16 @@ class Sample:
             if field.lower() == 'sample_name':
                 raise ValueError('Command vtools phenotype cannot be used to update sample names. Please use command "vtools admin" for this purpose.')
             if by_sample and field.lower() == 'filename':
-                self.logger.debug('Ignoring field {}'.format(field))
+                env.logger.debug('Ignoring field {}'.format(field))
                 continue
             if allowed_fields and field.lower() not in [x.lower() for x in allowed_fields]:
-                self.logger.debug('Ignoring field {}'.format(field))
+                env.logger.debug('Ignoring field {}'.format(field))
                 continue
             # if adding a new field
             if field.lower() not in [x.lower() for x in cur_fields]:
                 self.proj.checkFieldName(field, exclude='sample')
                 fldtype = typeOfValues([x[idx] for x in records.values()])
-                self.logger.info('Adding field {}'.format(field))
+                env.logger.info('Adding field {}'.format(field))
                 self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 count[1] += 1  # new
             else:
@@ -235,7 +233,7 @@ class Sample:
                     cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
                     ids = [x[0] for x in cur.fetchall()]
                     if len(ids) == 0:
-                        self.logger.warning('Sample name {} does not match any sample'.format(key[0]))
+                        env.logger.warning('Sample name {} does not match any sample'.format(key[0]))
                         continue
                     for id in [x for x in ids if x in allowed_samples]:
                         count[0] += 1
@@ -244,14 +242,14 @@ class Sample:
                     cur.execute('SELECT sample.sample_id FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id WHERE filename.filename = {0} AND sample.sample_name = {0}'.format(self.db.PH), key)
                     ids = [x[0] for x in cur.fetchall()]
                     if len(ids) == 0:
-                        self.logger.warning('Filename {} and sample name {} does not match any sample'.format(key[0], key[1]))
+                        env.logger.warning('Filename {} and sample name {} does not match any sample'.format(key[0], key[1]))
                         continue
                     if len(ids) != 1:
                         raise ValueError('Filename and sample should uniquely determine a sample')
                     for id in [x for x in ids if x in allowed_samples]:
                         count[0] += 1
                         cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
-        self.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
+        env.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
             count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
         self.db.commit()
 
@@ -282,7 +280,7 @@ class Sample:
         if field.lower() not in [x.lower() for x in cur_fields]:
             if field.upper in SQL_KEYWORDS:
                 raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
-            self.logger.info('Adding field {}'.format(field))
+            env.logger.info('Adding field {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                 {int: 'INT',
                  float: 'FLOAT',
@@ -299,7 +297,7 @@ class Sample:
             cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(field, 
                 None if expression == 'NULL' else expression, self.db.PH), (ID,))
             count[0] += 1
-        self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
+        env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
 
@@ -316,7 +314,7 @@ class Sample:
         status = GenotypeStatStatus()
         for j in range(nJobs):
             GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
-                stat, idQueue, status, genotypes, self.logger).start()
+                stat, idQueue, status, genotypes).start()
         #
         # put all jobs to queue, the workers will work on them
         for ID in IDs:
@@ -354,7 +352,7 @@ class Sample:
             res = status.get(ID)
             for idx, (field, expr) in enumerate(stat):
                 if new_field[field]:
-                    self.logger.debug('Adding field {}'.format(field))
+                    env.logger.debug('Adding field {}'.format(field))
                     # determine the type of value
                     self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                         typeOfValues([str(status.get(x)[idx]) for x in IDs])))
@@ -363,7 +361,7 @@ class Sample:
                 cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
                 count[0] += 1
         # report result
-        self.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
+        env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
         self.db.commit()
 
@@ -372,18 +370,18 @@ class Sample:
         limit_clause = '' if limit < 0 else ' LIMIT 0,{}'.format(limit)
         query = 'SELECT {} FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {} {}'.format(
             ','.join(fields), '' if not samples else 'WHERE ' + samples, limit_clause)
-        self.logger.debug(query)
+        env.logger.debug(query)
         cur = self.db.cursor()
         cur.execute(query)
         if header is not None:
             if len(header) == 0:
                 print(delimiter.join(fields))
             elif header == ['-']:
-                self.logger.info('Reading header from standard input')
+                env.logger.info('Reading header from standard input')
                 print(sys.stdin.read().rstrip())
             else:
                 if len(header) != len(fields):
-                    self.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(header), len(fields)))
+                    env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(header), len(fields)))
                 print(delimiter.join(header))
         for rec in cur:
             print(delimiter.join([na if x is None else str(x) for x in rec]))

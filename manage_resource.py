@@ -27,13 +27,12 @@
 import os
 import sys
 import argparse
-import logging
 import time
-from variant_tools.utils import ResourceManager
+from variant_tools.utils import ResourceManager, env
 import base64
 from ftplib import FTP
 
-def getOrSaveAuthentication(username, password, logger):
+def getOrSaveAuthentication(username, password):
     if username is None or password is None:
         try:
             with open(os.path.expanduser('~/.vtools_resource'), 'r') as account:
@@ -41,7 +40,7 @@ def getOrSaveAuthentication(username, password, logger):
                     base64.b64decode(account.readline().decode().strip()))
         except:
             sys.exit('Please provide username and password.')
-        logger.info('Using stored username and password')
+        env.logger.info('Using stored username and password')
     else:
         try:
             with open(os.path.expanduser('~/.vtools_resource'), 'w') as account:
@@ -51,7 +50,7 @@ def getOrSaveAuthentication(username, password, logger):
             sys.exit('Failed to save username and password: {}'.format(e))
         return (username, password)
 
-def deprecateFile(filename, username, password, logger):
+def deprecateFile(filename, username, password):
     # rename a file to another name if it exists
     ftp = FTP('www.houstonbioinformatics.org')
     ftp.login(username, password)
@@ -60,18 +59,18 @@ def deprecateFile(filename, username, password, logger):
     d, f = os.path.split(filename)
     if d:
         ftp.cwd(d)
-        logger.info('CWD {}'.format(ftp.pwd()))
+        env.logger.info('CWD {}'.format(ftp.pwd()))
     try:
         new_f = '{}_{}.bak'.format(f, time.strftime('%b%d', time.gmtime()))
         ftp.rename(f, new_f)
-        logger.info('RENAME {} {}'.format(f, new_f))
+        env.logger.info('RENAME {} {}'.format(f, new_f))
     except:
         # if a new file, we do not need to rename the old file
-        logger.info('Do not need to remove {} because it does not exist.'.format(f))
+        env.logger.info('Do not need to remove {} because it does not exist.'.format(f))
         pass
     ftp.quit()
 
-def uploadFile(local_file, remote_file, username, password, logger):
+def uploadFile(local_file, remote_file, username, password):
     # upload a local file to houstonbioinformatics.org
     # This is inefficient for multiple files (repeated login and out), but does not
     # really matter
@@ -82,15 +81,15 @@ def uploadFile(local_file, remote_file, username, password, logger):
     d, f = os.path.split(remote_file)
     if d:
         ftp.cwd(d)
-        logger.info('CWD {}'.format(ftp.pwd()))
+        env.logger.info('CWD {}'.format(ftp.pwd()))
     try:
         new_f = '{}_{}.bak'.format(f, time.strftime('%b%d', time.gmtime()))
         ftp.rename(f, new_f)
-        logger.info('RENAME {} {}'.format(f, new_f))
+        env.logger.info('RENAME {} {}'.format(f, new_f))
     except:
         # if a new file, we do not need to rename the old file
         pass
-    logger.info('STOR {}'.format(f))
+    env.logger.info('STOR {}'.format(f))
     ftp.storbinary('STOR {}'.format(f), open(local_file, 'rb'))
     ftp.quit()
 
@@ -119,10 +118,9 @@ if __name__ == '__main__':
         help='''Password used to connect to vtools.houstonbioinformatics.org.''')
     #
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('RES')
+    env.logger = None  # no log file
     if args.generate_local_manifest is not None:
-        manager = ResourceManager(logger)
+        manager = ResourceManager()
         print args.generate_local_manifest
         # --generte_local_manifest without parameter will pass None, which will
         # use ~/.variant_tools.
@@ -130,7 +128,7 @@ if __name__ == '__main__':
         manager.writeManifest('MANIFEST_local.txt')
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
     elif args.list is not None:
-        manager = ResourceManager(logger)
+        manager = ResourceManager()
         manager.scanDirectory('~/.variant_tools', args.list)
         local_manifest = {x:y for x,y in manager.manifest.items()}
         manager.manifest.clear()
@@ -151,35 +149,35 @@ if __name__ == '__main__':
             if f not in remote_manifest:
                 print('NEW       {}'.format(f))
     elif args.upload:
-        username, password = getOrSaveAuthentication(args.username, args.password, logger)
-        manager = ResourceManager(logger)
+        username, password = getOrSaveAuthentication(args.username, args.password)
+        manager = ResourceManager()
         manager.getRemoteManifest()
         resource_dir = os.path.expanduser('~/.variant_tools')
         # get information about file
         for filename in args.upload:
             rel_path = os.path.relpath(filename, resource_dir)
             manager.addResource(filename)
-            uploadFile(filename, rel_path, username, password, logger)
+            uploadFile(filename, rel_path, username, password)
         manager.writeManifest('MANIFEST.tmp')
-        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password, logger)
+        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password)
     elif args.remove:
-        username, password = getOrSaveAuthentication(args.username, args.password, logger)
-        manager = ResourceManager(logger)
+        username, password = getOrSaveAuthentication(args.username, args.password)
+        manager = ResourceManager()
         manager.getRemoteManifest()
         removed_count = 0
         for filename in args.remove:
             if filename in manager.manifest:
                 manager.manifest.pop(filename)
-                deprecateFile(filename, username, password, logger)
-                logger.info('Remove {} from manifest'.format(filename))
+                deprecateFile(filename, username, password)
+                env.logger.info('Remove {} from manifest'.format(filename))
                 removed_count += 1
             else:
-                logger.warning('{} does not exist in the manifest'.format(filename))
+                env.logger.warning('{} does not exist in the manifest'.format(filename))
         # upload manifest
         if removed_count > 0:
             manager.writeManifest('MANIFEST.tmp')
-            uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password, logger)
+            uploadFile('MANIFEST.tmp', 'MANIFEST.txt', username, password)
     else:
-        logger.warning('No option has been provided. Please use -h to get a list of actions.')
+        env.logger.warning('No option has been provided. Please use -h to get a list of actions.')
 
 

@@ -31,7 +31,7 @@ import stat
 import subprocess
     
 from .project import Project
-from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction, runOptions
+from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction, env
 
 #
 class LiftOverTool:
@@ -39,7 +39,6 @@ class LiftOverTool:
     '''
     def __init__(self, proj):
         self.proj = proj
-        self.logger = proj.logger
         self.db = proj.db
     
     def obtainLiftOverTool(self):
@@ -49,7 +48,7 @@ class LiftOverTool:
                 env={'PATH':os.pathsep.join(['.', os.environ['PATH']])})
         except:
             # otherwise download the tool
-            self.logger.debug('Failed to execute liftOver -h')
+            env.logger.debug('Failed to execute liftOver -h')
             if 'Darwin' in platform.system():
                 # FIXME: Need to test PowerPC for directory macOSX.ppc
                 liftOverDir = 'macOSX.i386'
@@ -59,19 +58,19 @@ class LiftOverTool:
                 else:
                     liftOverDir = 'linux.i386'
             else:
-                self.logger.error('You platform does not support USCS liftOver tool. Please use a linux or MacOSX based machine.')
-                self.logger.error('Optionally, you can compile liftOver for your platform and make it available to this script')
+                env.logger.error('You platform does not support USCS liftOver tool. Please use a linux or MacOSX based machine.')
+                env.logger.error('Optionally, you can compile liftOver for your platform and make it available to this script')
                 return False
             #
             liftOverURL = 'http://hgdownload.cse.ucsc.edu/admin/exe/{0}/liftOver'.format(liftOverDir)
             try:
-                self.logger.info('Downloading liftOver tool from UCSC')
-                liftOverExe = downloadFile(liftOverURL, runOptions.cache_dir)
+                env.logger.info('Downloading liftOver tool from UCSC')
+                liftOverExe = downloadFile(liftOverURL, env.cache_dir)
                 os.chmod(liftOverExe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
             except Exception as e:
-                self.logger.warning('Failed to download UCSC liftOver tool from {0}'.format(liftOverURL))
-                self.logger.warning('Please check the URL or manually download the file.')
-                self.logger.debug(str(e))
+                env.logger.warning('Failed to download UCSC liftOver tool from {0}'.format(liftOverURL))
+                env.logger.warning('Please check the URL or manually download the file.')
+                env.logger.debug(str(e))
                 return False
         return True
  
@@ -83,20 +82,20 @@ class LiftOverTool:
             try:
                 chainFileURL = 'http://hgdownload-test.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
                     from_build, chainFile)
-                self.logger.info('Downloading liftOver chain file from UCSC')
-                chainFile = downloadFile(chainFileURL, runOptions.cache_dir)
+                env.logger.info('Downloading liftOver chain file from UCSC')
+                chainFile = downloadFile(chainFileURL, env.cache_dir)
             except Exception as e:
-                self.logger.warning('Failed to download chain file from {0}'.format(chainFileURL))
-                self.logger.warning('Please check the URL, change --build and/or --alt_build, and try again')
-                self.logger.warning('Optionally, you can download the right chain file and rename it to the one that is needed')
-                self.logger.debug(e)
+                env.logger.warning('Failed to download chain file from {0}'.format(chainFileURL))
+                env.logger.warning('Please check the URL, change --build and/or --alt_build, and try again')
+                env.logger.warning('Optionally, you can download the right chain file and rename it to the one that is needed')
+                env.logger.debug(e)
                 return None
         return chainFile
 
     def exportVariantsInBedFormat(self, filename):
         '''Export variants in bed format'''
         cur = self.db.cursor()
-        self.logger.info('Exporting variants in BED format');
+        env.logger.info('Exporting variants in BED format');
         cur.execute('SELECT variant_id, chr, pos FROM variant;')
         # output ID so that we can re-insert
         prog = ProgressBar('Exporting variants', self.db.numOfRows("variant"))
@@ -111,8 +110,8 @@ class LiftOverTool:
                         var_in.write('{0}\t{1}\t{2}\t{3}\n'.format(rec[1] if len(rec[1]) > 2 else 'chr' + rec[1],
                             int(rec[2]) - 1, rec[2], rec[0]))
                 except Exception as e:
-                    self.logger.debug('Invalid record {}'.format(rec))
-                    self.logger.debug(e)
+                    env.logger.debug('Invalid record {}'.format(rec))
+                    env.logger.debug(e)
                 if count % self.db.batch == 0:
                     prog.update(count)
         prog.done()
@@ -120,14 +119,14 @@ class LiftOverTool:
 
     def runLiftOver(self, input, chain, output, unmapped):
         '''Executing UCUSC liftOver tool'''
-        self.logger.info('Running UCSC liftOver tool')
+        env.logger.info('Running UCSC liftOver tool')
         proc = subprocess.Popen(['liftOver', input, chain, output, unmapped],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH':os.pathsep.join([runOptions.cache_dir, os.environ['PATH']])})
+                env={'PATH':os.pathsep.join([env.cache_dir, os.environ['PATH']])})
         proc.wait()
         err = proc.stderr.read().decode().strip()
         if err:
-            self.logger.info(err)
+            env.logger.info(err)
 
     def updateAltCoordinates(self, flip=False):
         '''Download and use the UCSC LiftOver tool to translate coordinates from primary
@@ -144,7 +143,7 @@ class LiftOverTool:
         if not chainFile:
             return {}
         # Update the master variant table.
-        s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
+        s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
         cur = self.db.cursor()
         headers = self.db.getHeaders('variant')
         for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
@@ -153,29 +152,29 @@ class LiftOverTool:
             self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
         del s
         # export existing variants to a temporary file
-        num_variants = self.exportVariantsInBedFormat(os.path.join(runOptions.temp_dir, 'var_in.bed'))
+        num_variants = self.exportVariantsInBedFormat(os.path.join(env.temp_dir, 'var_in.bed'))
         if num_variants == 0:
             return {}
-        self.runLiftOver(os.path.join(runOptions.temp_dir, 'var_in.bed'), chainFile,
-            os.path.join(runOptions.temp_dir, 'var_out.bed'), os.path.join(runOptions.temp_dir, 'unmapped.bed'))           
+        self.runLiftOver(os.path.join(env.temp_dir, 'var_in.bed'), chainFile,
+            os.path.join(env.temp_dir, 'var_out.bed'), os.path.join(env.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(runOptions.temp_dir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(env.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
                 if err_count == 0:
-                    self.logger.debug('First 100 unmapped variants:')
+                    env.logger.debug('First 100 unmapped variants:')
                 if err_count < 100:
-                    self.logger.debug(line.rstrip())
+                    env.logger.debug(line.rstrip())
                 err_count += 1
         if err_count != 0:
-            self.logger.info('{0} records failed to map.'.format(err_count))
+            env.logger.info('{0} records failed to map.'.format(err_count))
         #
         #
-        mapped_file = os.path.join(runOptions.temp_dir, 'var_out.bed')
+        mapped_file = os.path.join(env.temp_dir, 'var_out.bed')
         if flip:
-            self.logger.info('Flipping primary and alternative reference genome')
+            env.logger.info('Flipping primary and alternative reference genome')
             cur.execute('UPDATE variant SET alt_bin=bin, alt_chr=chr, alt_pos=pos;')
             cur.execute('UPDATE variant SET bin=NULL, chr=NULL, pos=NULL')
             query = 'UPDATE variant SET bin={0}, chr={0}, pos={0} WHERE variant_id={0};'.format(self.db.PH)
@@ -196,8 +195,8 @@ class LiftOverTool:
         if self.proj.build == alt_build:
             raise ValueError('Cannot set alternative build the same as primary build')
         if self.proj.alt_build is not None and self.proj.alt_build != alt_build:
-            self.logger.warning('Setting a different alternative reference genome.')
-            self.logger.warning('The original alternative genome {} will be overwritten.'.format(self.proj.alt_build))
+            env.logger.warning('Setting a different alternative reference genome.')
+            env.logger.warning('The original alternative genome {} will be overwritten.'.format(self.proj.alt_build))
         self.proj.alt_build = alt_build
         self.proj.saveProperty('alt_build', alt_build)
         self.updateAltCoordinates(flip)
@@ -221,20 +220,20 @@ class LiftOverTool:
             raise RuntimeError('Failed to obtain UCSC chain file {}'.format(chainFile))
         # export existing variants to a temporary file
         self.runLiftOver(map_in, chainFile,
-            os.path.join(runOptions.temp_dir, 'var_out.bed'), os.path.join(runOptions.temp_dir, 'unmapped.bed'))           
+            os.path.join(env.temp_dir, 'var_out.bed'), os.path.join(env.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(runOptions.temp_dir, 'unmapped.bed')) as var_err:
+        with open(os.path.join(env.temp_dir, 'unmapped.bed')) as var_err:
             for line in var_err:
                 if line.startswith('#'):
                     continue
                 if err_count == 0:
-                    self.logger.debug('First 100 unmapped variants:')
+                    env.logger.debug('First 100 unmapped variants:')
                 if err_count < 100:
-                    self.logger.debug(line.rstrip())
+                    env.logger.debug(line.rstrip())
                 err_count += 1
         #
-        return os.path.join(runOptions.temp_dir, 'var_out.bed'), err_count
+        return os.path.join(env.temp_dir, 'var_out.bed'), err_count
     
 #
 #

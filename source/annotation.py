@@ -37,7 +37,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
-    normalizeVariant, compressFile, SQL_KEYWORDS, extractField, runOptions
+    normalizeVariant, compressFile, SQL_KEYWORDS, extractField, env
 from .importer import LineProcessor, TextReader
   
 class AnnoDBConfiger:
@@ -56,7 +56,6 @@ class AnnoDBConfiger:
             configuration file. In the latter case, a filename is allowed.
         '''
         self.proj = proj
-        self.logger = proj.logger
         self.jobs = jobs
         #
         # data that will be available after parsing
@@ -96,12 +95,12 @@ class AnnoDBConfiger:
 
     def remove(self):
         '''Remove an annotation database'''
-        self.logger.info('Removing database {}'.format(self.name))
+        env.logger.info('Removing database {}'.format(self.name))
         self.proj.db.removeDatabase(self.name)
 
     def parseConfigFile(self, filename):
         '''Read from an ini style configuration file'''
-        self.logger.debug('Checking configuration file {}'.format(filename))
+        env.logger.debug('Checking configuration file {}'.format(filename))
         self.path = os.path.split(filename)[0]
         # get filename, remove extension, and keep version as things after -.
         self.name = os.path.splitext(os.path.split(filename)[-1])[0]
@@ -129,11 +128,11 @@ class AnnoDBConfiger:
                 for field in fields:
                     # field can be expressions such as pos + 100
                     if extractField(field) not in sections:
-                        self.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
+                        env.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
                 self.build[item[0]] = fields
-            self.logger.debug('Reference genomes: {}'.format(self.build))
+            env.logger.debug('Reference genomes: {}'.format(self.build))
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             raise ValueError('Failed to obtain build information of annotation file {}'.format(filename))
         # source information
         self.anno_type = 'variant'
@@ -195,13 +194,13 @@ class AnnoDBConfiger:
                     adj=parser.get(section, 'adj', raw=True) if 'adj' in items else None,
                     comment=parser.get(section, 'comment', raw=True) if 'comment' in items else ''))
             except Exception as e:
-                self.logger.debug(e)
-                self.logger.error('Invalid section {} in configuration file {}'.format(section, filename))
+                env.logger.debug(e)
+                env.logger.error('Invalid section {} in configuration file {}'.format(section, filename))
                 return False
         # Do not sort fields, use the order sepcified in the .ann file.
         #self.fields.sort(key=lambda k: k.index.split()[0])
         for field in self.fields:
-            self.logger.debug("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
+            env.logger.debug("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
 
 
     def getSourceFiles(self):
@@ -231,17 +230,17 @@ class AnnoDBConfiger:
                 db = DababaseEngine(engine='mysql', user=user, passwd=password)
                 cur = db.cursor()
                 res = db.execute(query)
-                filename = os.path.join(runOptions.cache_dir, '{}_sql.txt'.format(self.name))
+                filename = os.path.join(env.cache_dir, '{}_sql.txt'.format(self.name))
                 with open(filename, 'w') as output:
                     for rec in res:
                         output.write('{}\n'.format(','.join([str(x) for x in rec])))
                 return [filename]
             else:
                 filename = os.path.split(self.source_url)[-1]
-                self.logger.info('Downloading {}'.format(filename))
-                tempFile = downloadFile(self.source_url, dest_dir=runOptions.cache_dir)
+                env.logger.info('Downloading {}'.format(filename))
+                tempFile = downloadFile(self.source_url, dest_dir=env.cache_dir)
         except Exception as e:
-            self.logger.error(e)
+            env.logger.error(e)
             raise ValueError('Failed to download database source from {}'.format(self.source_url))
         #
         if not os.path.isfile(tempFile):
@@ -251,8 +250,8 @@ class AnnoDBConfiger:
             return [tempFile]
         # if zip file?
         bundle = zipfile.ZipFile(tempFile)
-        bundle.extractall(runOptions.cache_dir)
-        return [os.path.join(runOptions.cache_dir, name) for name in bundle.namelist()]
+        bundle.extractall(env.cache_dir)
+        return [os.path.join(env.cache_dir, name) for name in bundle.namelist()]
     
     def importTxtRecords(self, db, source_files):
         #
@@ -271,18 +270,18 @@ class AnnoDBConfiger:
                 else:
                     build_info.append((pos_idx, ))
             except Exception as e:
-                self.logger.error('No field {} for build {}: {}'.format(items[1], key, e))
+                env.logger.error('No field {} for build {}: {}'.format(items[1], key, e))
         #
-        processor = LineProcessor(self.fields, build_info, self.delimiter, None, self.logger)
+        processor = LineProcessor(self.fields, build_info, self.delimiter, None)
         # files?
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
         for f in source_files:
-            self.logger.info('Importing annotation data from {0}'.format(f))
+            env.logger.info('Importing annotation data from {0}'.format(f))
             lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
-            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.header, self.logger)
+            p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.header)
             prog = ProgressBar(os.path.split(f)[-1], lc)
             all_records = 0
             skipped_records = 0
@@ -291,13 +290,13 @@ class AnnoDBConfiger:
                     cur.execute(insert_query, bins + rec)
                 except Exception as e:
                     skipped_records += 1
-                    self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                    env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 if all_records % update_after == 0:
                     prog.update(all_records)
                     db.commit()
             db.commit()
             prog.done()
-            self.logger.info('{0} records are handled, {1} ignored.'\
+            env.logger.info('{0} records are handled, {1} ignored.'\
                 .format(all_records, p.unprocessable_lines + skipped_records))
 
     def importFromSource(self, source_files):
@@ -311,10 +310,10 @@ class AnnoDBConfiger:
         if self.source_pattern is not None:
             source_files = [x for x in source_files if self.source_pattern in x]
         #
-        self.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
+        env.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
         #
         writer = AnnoDBWriter(self.name, self.fields, self.anno_type, self.description,
-            self.version, self.build, self.logger)
+            self.version, self.build)
         # read records from files
         if self.source_type == 'txt':
             self.importTxtRecords(writer.db, source_files)
@@ -334,26 +333,26 @@ class AnnoDBConfiger:
                 try:
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except ValueError as e:
-                    self.logger.debug(e)
-                    self.logger.info('Existing database cannot be used.')
+                    env.logger.debug(e)
+                    env.logger.info('Existing database cannot be used.')
             # if there is a direct URL?
             if self.direct_url is not None:
-                self.logger.info('Downloading annotation database from {}'.format(self.direct_url))
+                env.logger.info('Downloading annotation database from {}'.format(self.direct_url))
                 try:
                     dbFile = downloadFile(self.direct_url)
-                    s = delayedAction(self.logger.info, 'Decompressing {}'.format(dbFile))
+                    s = delayedAction(env.logger.info, 'Decompressing {}'.format(dbFile))
                     dbFile = decompressIfNeeded(dbFile, inplace=False)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except Exception as e:
-                    self.logger.debug(e)
-                    self.logger.info('Failed to download database or downloaded database unusable.')
+                    env.logger.debug(e)
+                    env.logger.info('Failed to download database or downloaded database unusable.')
         # have to build from source
         self.importFromSource(source_files)
         #
         if rebuild:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
-            self.logger.info('Creating compressed database {}'.format(dbFile))
+            env.logger.info('Creating compressed database {}'.format(dbFile))
             compressFile(self.name + '.DB', dbFile)
         return AnnoDB(self.proj, self.name, linked_by, anno_type, linked_fields)
 
@@ -400,12 +399,12 @@ def use(args):
             # try to get source.ann, source.DB, source.DB.gz or get source.ann from 
             if os.path.isfile(args.source):
                 # if a local file?
-                s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source))
+                s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source))
                 # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
                 annoDB = decompressIfNeeded(args.source, inplace=False)
                 del s
             elif os.path.isfile(args.source + '.DB.gz'):
-                s = delayedAction(proj.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
+                s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
                 annoDB = decompressIfNeeded(args.source + '.DB.gz', inplace=False)
                 del s
             elif os.path.isfile(args.source + '.DB'):
@@ -420,15 +419,15 @@ def use(args):
                 if proj.db.engine == 'mysql':
                     raise RuntimeError('MySQL databases are not portable and cannot be downloaded.')
                 #
-                proj.logger.info('Downloading annotation database from {}'.format(args.source))
+                env.logger.info('Downloading annotation database from {}'.format(args.source))
                 try:
                     annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.', quiet=args.source.endswith('.ann'))
-                    s = delayedAction(proj.logger.info, 'Decompressing {}'.format(annoDB))
+                    s = delayedAction(env.logger.info, 'Decompressing {}'.format(annoDB))
                     # for downloaded file, we decompress inplace
                     annoDB = decompressIfNeeded(annoDB, inplace=True)
                     del s
                 except Exception as e:
-                    proj.logger.debug(e)
+                    env.logger.debug(e)
                     raise ValueError('Failed to download database.')
             #
             # annDB is now a local file
@@ -458,13 +457,13 @@ def use(args):
                     try:
                         return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields))
                     except Exception as e:
-                        proj.logger.debug(e)
+                        env.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.jobs)
                     try:
                         return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild, args.anno_type, args.linked_fields))
                     except Exception as e:
-                        proj.logger.debug(e)
+                        env.logger.debug(e)
                 # do not know what to do
                 #FIXME if line 470 fails due to "No reference genome information" then the error prompt below is misleading(wanggao) 
                 raise ValueError('Cannot find annotation database {}'.format(annoDB))

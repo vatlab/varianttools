@@ -36,7 +36,7 @@ if sys.version_info.major == 2:
 else:
     import assoTests_py3 as t
 from .project import Field
-from .utils import runOptions, downloadFile, parenthetic_contents
+from .utils import env, downloadFile, parenthetic_contents
 from .str4r import Str4R
 
 def freq(frequency):
@@ -49,7 +49,7 @@ def freq(frequency):
         raise argparse.ArgumentTypeError(e)
     return value
 
-def run_command(cmd, instream = None, logger = None, msg = '', upon_succ=None):
+def run_command(cmd, instream = None, msg = '', upon_succ=None):
     # merge mulit-line command into one line and remove extra white space and tabs
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
@@ -69,8 +69,8 @@ def run_command(cmd, instream = None, logger = None, msg = '', upon_succ=None):
         elif tc.returncode > 0:
             raise ValueError ("{0}".format(error))
         else:
-            if error and logger:
-                logger.debug("[WARNING] {0}: {1}".format(msg, error))
+            if error:
+                env.logger.debug("[WARNING] {0}: {1}".format(msg, error))
     except OSError as e:
         raise OSError ("Execution of command '{0}' failed: {1}".format(cmd, e))
     # everything is OK
@@ -94,10 +94,9 @@ def getAllTests():
 
 class NullTest:
     '''A base class that defines a common interface for association tests'''
-    def __init__(self, logger=None, *method_args):
+    def __init__(self, *method_args):
         '''Args is arbitrary arguments, might need an additional parser to
         parse it'''
-        self.logger = logger
         # trait type
         self.trait_type = None
         # group name
@@ -126,9 +125,9 @@ class NullTest:
 
 class GroupStat(NullTest):
     '''Calculates basic statistics for each testing group'''
-    def __init__(self, ncovariates, logger=None, *method_args):
+    def __init__(self, ncovariates, *method_args):
         #
-        NullTest.__init__(self, logger, *method_args)
+        NullTest.__init__(self, *method_args)
         # set fields according to parameter --stat
         if 'num_variants' in self.stat:
             self.fields.append(
@@ -175,7 +174,7 @@ class GroupStat(NullTest):
                 elif field.name == 'sample_size':
                     res.append(self.data.samplecounts())
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -187,15 +186,15 @@ class GroupStat(NullTest):
 
 class CaseCtrlBurdenTest(NullTest):
     '''Single covariate case/ctrl burden test on aggregated genotypes within an association testing group'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        NullTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        NullTest.__init__(self, *method_args)
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
                         Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
                         Field(name='total_mac', index=None, type='INT', adj=None, comment='total minor allele counts in a group (adjusted for MOI)'),
                         Field(name='statistic', index=None, type='FLOAT', adj=None, comment='test statistic.'),
                         Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
         if ncovariates > 1:
-            self.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
+            env.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
         if self.permutations > 0:
             self.fields.extend([
                     Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
@@ -405,7 +404,7 @@ class CaseCtrlBurdenTest(NullTest):
                 res.append(x)
                 res.append(y)
                 if y < 0:
-                    self.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
+                    env.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
                     'A negative p-value is returned, whose absolute value is the p-value estimate based on currently completed permutations. '
                     'You can use command "vtools admin --set_runtime_option association_timeout" to change the timeout settings.'.format(
                     self.name, self.gname, timeout))
@@ -416,7 +415,7 @@ class CaseCtrlBurdenTest(NullTest):
             if self.data.hasVar('NPERM'):
                 res.append(self.data.getIntVar("NPERM"))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -431,9 +430,9 @@ class CaseCtrlBurdenTest(NullTest):
 
 class GLMBurdenTest(NullTest):
     '''Generalized Linear regression test on aggregated genotypes within an association testing group'''
-    def __init__(self, ncovariates, logger=None, *method_args):
+    def __init__(self, ncovariates, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
-        NullTest.__init__(self, logger, *method_args)
+        NullTest.__init__(self, *method_args)
         # set fields name for output database
         self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
                         Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
@@ -534,7 +533,7 @@ class GLMBurdenTest(NullTest):
             a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
         if self.use_indicator:
             if not (self.weight == 'None' and len(self.extern_weight) == 0):
-                self.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
+                env.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
                 self.extern_weight = []
                 self.weight = 'None'
         try:
@@ -575,7 +574,7 @@ class GLMBurdenTest(NullTest):
         # special actions for KBAC and RBT weighting themes
 #        if self.weight in ['KBAC', 'RBT']:
 #            if not self.NA_adjust:
-#                self.logger.warning("In order to use weighting theme {0}, missing genotypes will be replaced by the most likely genotype based on MAF".format(self.weight))
+#                env.logger.warning("In order to use weighting theme {0}, missing genotypes will be replaced by the most likely genotype based on MAF".format(self.weight))
 #            algorithm.append(t.FillGMissing(method="mlg"))
         if self.weight == 'KBAC':
             algorithm.append(t.FindGenotypePattern())
@@ -654,7 +653,7 @@ class GLMBurdenTest(NullTest):
                 res.append(x)
                 res.append(y)
                 if y < 0:
-                    self.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
+                    env.logger.warning('Association test {} for group {} aborted because it exceeds {}s time limit. '
                     'A negative p-value is returned, whose absolute value is the p-value estimate based on currently completed permutations. '
                     'You can use command "vtools admin --set_runtime_option association_timeout" to change the timeout settings.'.format(
                     self.name, self.gname, timeout))
@@ -670,7 +669,7 @@ class GLMBurdenTest(NullTest):
             if self.data.hasVar('VT_MAF'):
                 res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -684,10 +683,10 @@ class GLMBurdenTest(NullTest):
 # case/ctrl single covariate tests
 class CFisher(CaseCtrlBurdenTest):
     '''Fisher's exact test on collapsed variant loci, Li & Leal 2008'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.midp and self.alternative == 2:
-            self.logger.warning("midp option will be ignored for two-tailed test")
+            env.logger.warning("midp option will be ignored for two-tailed test")
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Collapsing test for case-control data (CMC test, Li & Leal 2008).
@@ -726,8 +725,8 @@ class CFisher(CaseCtrlBurdenTest):
 
 class WSSRankTest(CaseCtrlBurdenTest):
     '''Weighted sum method using rank test statistic, Madsen & Browning 2009'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
 
 
     def parseArgs(self, method_args):
@@ -775,14 +774,14 @@ class WSSRankTest(CaseCtrlBurdenTest):
         #
         self.aggregation_theme = 'WSS'
         if self.permutations and self.alternative == 2:
-            self.logger.warning("Two-sided test is only available for asymptotic version of the test. Setting permutations to zero ...")
+            env.logger.warning("Two-sided test is only available for asymptotic version of the test. Setting permutations to zero ...")
             self.permutations = 0
 
 
 class VTtest(CaseCtrlBurdenTest):
     '''VT statistic for disease traits, Price et al 2010'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for VTtest method")
 
@@ -843,8 +842,8 @@ class VTtest(CaseCtrlBurdenTest):
 
 class KBAC(CaseCtrlBurdenTest):
     '''Kernel Based Adaptive Clustering method, Liu & Leal 2010'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for KBAC method")
 
@@ -893,8 +892,8 @@ class KBAC(CaseCtrlBurdenTest):
 
 class RBT(CaseCtrlBurdenTest):
     '''Replication Based Test for protective and deleterious variants, Ionita-Laza et al 2011'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for RBT method")
 
@@ -943,8 +942,8 @@ class RBT(CaseCtrlBurdenTest):
 
 class aSum(CaseCtrlBurdenTest):
     '''Adaptive Sum score test for protective and deleterious variants, Han & Pan 2010'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for aSum method")
 
@@ -986,8 +985,8 @@ class aSum(CaseCtrlBurdenTest):
 
 class Calpha(CaseCtrlBurdenTest):
     '''c-alpha test for unusual distribution of variants between cases and controls, Neale et al 2011'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''c-alpha test for unusual distribution of variants between 
@@ -1033,8 +1032,8 @@ class Calpha(CaseCtrlBurdenTest):
 
 class RareCover(CaseCtrlBurdenTest):
     '''A "covering" method for detecting rare variants association, Bhatia et al 2010.'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        CaseCtrlBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
         if self.permutations == 0:
             raise ValueError("Please specify number of permutations for RareCover method")
 
@@ -1081,8 +1080,8 @@ class RareCover(CaseCtrlBurdenTest):
 # quantitative traits in regression framework
 class LinRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for quantitative traits'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Linear regression test. p-value
             is based on the significance level of the regression coefficient for genotypes. If --group_by
@@ -1147,8 +1146,8 @@ class LinRegBurden(GLMBurdenTest):
 
 class CollapseQt(GLMBurdenTest):
     '''Collapsing method for quantitative traits, Li & Leal 2008'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for quantitative traits (Li & Leal 2008).
@@ -1190,8 +1189,8 @@ class CollapseQt(GLMBurdenTest):
 
 class BurdenQt(GLMBurdenTest):
     '''Burden test for quantitative traits, Morris & Zeggini 2009'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for quantitative traits (Morris & Zeggini 2009).
@@ -1233,8 +1232,8 @@ class BurdenQt(GLMBurdenTest):
 
 class WeightedBurdenQt(GLMBurdenTest):
     '''Weighted genotype burden tests for quantitative traits, using one or many arbitrary external weights as well as one of 4 internal weighting themes'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted genotype burden tests for quantitative traits,
@@ -1296,8 +1295,8 @@ class WeightedBurdenQt(GLMBurdenTest):
 
 class VariableThresholdsQt(GLMBurdenTest):
     '''Variable thresholds method for quantitative traits, in the spirit of Price et al 2010'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for quantitative traits (in the spirit of Price et al 2010).
@@ -1351,8 +1350,8 @@ class VariableThresholdsQt(GLMBurdenTest):
 # disease traits
 class LogitRegBurden(GLMBurdenTest):
     '''A versatile framework of association tests for disease traits'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Logistic regression test. p-value
@@ -1419,8 +1418,8 @@ class LogitRegBurden(GLMBurdenTest):
 
 class CollapseBt(GLMBurdenTest):
     '''Collapsing method for disease traits, Li & Leal 2008'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold collapsing method for disease traits (Li & Leal 2008).
@@ -1463,8 +1462,8 @@ class CollapseBt(GLMBurdenTest):
 
 class BurdenBt(GLMBurdenTest):
     '''Burden test for disease traits, Morris & Zeggini 2009'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Fixed threshold burden test for disease traits (Morris & Zeggini 2009).
@@ -1505,8 +1504,8 @@ class BurdenBt(GLMBurdenTest):
 
 class WeightedBurdenBt(GLMBurdenTest):
     '''Weighted genotype burden tests for disease traits, using one or many arbitrary external weights as well as one of 4 internal weighting themes'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted genotype burden tests for disease traits,
@@ -1569,8 +1568,8 @@ class WeightedBurdenBt(GLMBurdenTest):
 
 class VariableThresholdsBt(GLMBurdenTest):
     '''Variable thresholds method for disease traits, in the spirit of Price et al 2010'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        GLMBurdenTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        GLMBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Variable thresholds in burden test for disease traits (in the spirit of Price et al 2010).
@@ -1628,8 +1627,8 @@ class VariableThresholdsBt(GLMBurdenTest):
 
 class ExternTest(NullTest):
     '''Base class for tests using external programs'''
-    def __init__(self, logger=None, *method_args):
-        NullTest.__init__(self, logger, *method_args)
+    def __init__(self, *method_args):
+        NullTest.__init__(self, *method_args)
 
     def dump(self, tdir):
         def istr(d):
@@ -1680,8 +1679,8 @@ class ExternTest(NullTest):
     
 class GroupWrite(ExternTest):
     '''Write data to disk for each testing group'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        ExternTest.__init__(self, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        ExternTest.__init__(self, *method_args)
         self.fields.extend([
                 Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group'),
                 Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
@@ -1718,7 +1717,7 @@ class GroupWrite(ExternTest):
                 elif field.name == 'sample_size':
                     res.append(self.nsample)
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -1729,9 +1728,9 @@ class GroupWrite(ExternTest):
 #
 
 class RTest(ExternTest):
-    def __init__(self, ncovariates, logger = None, *method_args):
+    def __init__(self, ncovariates, *method_args):
         '''Properly parse command arguments to parts of R script'''
-        ExternTest.__init__(self, logger, *method_args)
+        ExternTest.__init__(self, *method_args)
         self.ncovariates = ncovariates
         # step 1: load customer script
         self.source()
@@ -1739,7 +1738,7 @@ class RTest(ExternTest):
         self.parseInput()
         # step 3: parse output, prepare output database field. field type have to be explicitly specified.
         self.parseOutput()
-        self.logger.debug("R Program in action:\n{0}".format('\n'.join(self.Rscript)))
+        env.logger.debug("R Program in action:\n{0}".format('\n'.join(self.Rscript)))
         # step 4: self.calculate
         # 4.1  format python data into S4 object string that matches the input: self.loadData()
         # 4.2 finish script for the output part: self.formatOutput
@@ -1767,7 +1766,7 @@ class RTest(ExternTest):
                 if os.path.exists(script):
                     found = True
                     basename = os.path.splitext(script)[0]
-                    self.logger.info("Loading R script '{0}'".format(script))
+                    env.logger.info("Loading R script '{0}'".format(script))
                     with open(script, 'r') as f:
                         self.Rscript = [i.strip() for i in f.readlines()]
                     break
@@ -1969,11 +1968,11 @@ class RTest(ExternTest):
         cmd = "R --slave --vanilla"
         try:
             out = run_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata)),
-                              self.logger, "R message for {0}".format(self.pydata['name'])).split()
+                              "R message for {0}".format(self.pydata['name'])).split()
             out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
             res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -2020,7 +2019,7 @@ class RTest(ExternTest):
             for idx, item in enumerate(params_list):
                 if len(item) == 1 and idx == 0:
                     self.datvar = item[0]
-                    self.logger.debug("Data set variable name is '{0}'".format(self.datvar))
+                    env.logger.debug("Data set variable name is '{0}'".format(self.datvar))
                     rparams.append(self.datvar)
                 elif len(item) == 2 and idx == 0:
                     raise ValueError("[R script error] Missing required argument: the input data set variable.")
@@ -2066,8 +2065,8 @@ class RTest(ExternTest):
 
 class SKAT(RTest):
     '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        RTest.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        RTest.__init__(self, ncovariates, *method_args)
         # Check for R/SKAT installation
         try:
             run_command(["R", "-e", "library('SKAT')"])
@@ -2122,10 +2121,10 @@ class SKAT(RTest):
         args = parser.parse_args(method_args)
         self.__dict__.update(vars(args))
         if self.trait_type == 'quantitative' and self.small_sample:
-            self.logger.warning('Small sample-size adjustment does not apply to quantitative traits.')
+            env.logger.warning('Small sample-size adjustment does not apply to quantitative traits.')
             self.small_sample = False
         if self.resampling_kurtosis and not self.small_sample:
-            self.logger.warning('Kurtosis adjustment is only effective with "--small_sample" option.')
+            env.logger.warning('Kurtosis adjustment is only effective with "--small_sample" option.')
             self.resampling_kurtosis = 0
         self.params = None
 
@@ -2185,7 +2184,7 @@ class SKAT(RTest):
                         ))
         self.Rscript.append('}')
         # write
-        self.script = os.path.join(runOptions.cache_dir, basename + ".R")
+        self.script = os.path.join(env.cache_dir, basename + ".R")
         with open(self.script, "w") as f:
                   f.write('\n'.join(self.Rscript))
         return os.path.splitext(self.script)[0]
@@ -2195,9 +2194,9 @@ class SKAT(RTest):
 #
 class ScoreSeq(ExternTest):
     '''Score statistic / SCORE-Seq software (Tang & Lin 2011)'''
-    def __init__(self, ncovariates, logger=None, *method_args):
+    def __init__(self, ncovariates, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
-        NullTest.__init__(self, logger, *method_args)
+        NullTest.__init__(self, *method_args)
         # set fields name for output database
         if self.MAFL is not None:
             self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
@@ -2234,17 +2233,17 @@ class ScoreSeq(ExternTest):
                 os.mkdir(self.archive)
         # Check for SCORE-Seq installation
         self.algorithm = self._determine_algorithm()
-        self.logger.debug("Running command {0}".format(self.Sargs))
+        env.logger.debug("Running command {0}".format(self.Sargs))
 
     def getSCORE_Seq(self):
         '''Obtain the SCORE_Seq tool, download from http://www.bios.unc.edu/~dlin/software/SCORE-Seq/ if needed.'''
         try:
             Popen(['SCORE-Seq'], stdout=PIPE, stderr=PIPE,
-                env={'PATH':os.pathsep.join(['.', runOptions.cache_dir, os.environ['PATH']])})
+                env={'PATH':os.pathsep.join(['.', env.cache_dir, os.environ['PATH']])})
             return 'SCORE-Seq'
         except:
             # otherwise download the tool
-            self.logger.debug('Failed to execute SCORE-Seq -h')
+            env.logger.debug('Failed to execute SCORE-Seq -h')
             if not platform.system() == 'Linux':
                 raise OSError("You platform does not support SCORE-Seq program. It is available for Linux only.")
             elif not platform.architecture()[0] == '64bit':
@@ -2253,15 +2252,15 @@ class ScoreSeq(ExternTest):
             SCORE_Seq_URL = 'http://www.bios.unc.edu/~dlin/software/SCORE-Seq/v3.0/dist/SCORE-Seq-3.0-linux-64.zip'
             SCORE_Seq_URL_backup = 'http://www.houstonbioinformatics.org/vtools/programs/SCORE-Seq-3.0-linux-64.zip'
             try:
-                self.logger.info('Downloading SCORE-Seq program (V3.0) from UNC')
+                env.logger.info('Downloading SCORE-Seq program (V3.0) from UNC')
                 try:
-                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, runOptions.temp_dir)
+                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, env.temp_dir)
                 except:
-                    self.logger.info('Using backup URL from houstonbioinformatics.org')
-                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL_backup, runOptions.temp_dir)
+                    env.logger.info('Using backup URL from houstonbioinformatics.org')
+                    SCORE_Seq_zip = downloadFile(SCORE_Seq_URL_backup, env.temp_dir)
                 bundle = zipfile.ZipFile(SCORE_Seq_zip)
-                bundle.extractall(runOptions.cache_dir)
-                SCORE_Seq_Exe = os.path.join(runOptions.cache_dir, 'SCORE-Seq')
+                bundle.extractall(env.cache_dir)
+                SCORE_Seq_Exe = os.path.join(env.cache_dir, 'SCORE-Seq')
                 os.chmod(SCORE_Seq_Exe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
             except Exception as e:
                 raise RuntimeError('Failed to download SCORE-Seq from {}. Please check the URL or manually download the program: {}'.format(SCORE_Seq_URL, e))
@@ -2331,7 +2330,7 @@ class ScoreSeq(ExternTest):
             self.stats[item] = float('nan')
         fail = None
         try:
-            with open(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)), 'r') as f:
+            with open(os.path.join(env.temp_dir, '{0}_result.out'.format(self.gname)), 'r') as f:
                 colnames = [x for x in f.readline().split()[1:]]
                 stats = [float(x) if not x == "NA" else float('nan') for x in f.readline().split()[1:]]
             for (x,y) in zip(colnames, stats):
@@ -2343,35 +2342,35 @@ class ScoreSeq(ExternTest):
         # archive or clean up output
         if self.archive:
             with zipfile.ZipFile(os.path.join(self.archive, self.gname + '.zip'), 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
-                os.chdir(runOptions.temp_dir)
+                os.chdir(env.temp_dir)
                 for item in os.listdir("."):
                     if item.split('_')[0] == self.gname:
                         z.write(item)
                 os.chdir(self.curr_dir)
         #
         if fail == 1:
-            raise ValueError("No output from SCORE-Seq.\nTo trouble shoot, please run: {0}".format(self.gSargs.replace(runOptions.temp_dir+'/', '')))
+            raise ValueError("No output from SCORE-Seq.\nTo trouble shoot, please run: {0}".format(self.gSargs.replace(env.temp_dir+'/', '')))
         if fail == 2:
-            raise ValueError("No statistic is calculated by SCORE-Seq. \nTo trouble shoot, please run: {0}".format(self.gSargs.replace(runOptions.temp_dir+'/', '')))
+            raise ValueError("No statistic is calculated by SCORE-Seq. \nTo trouble shoot, please run: {0}".format(self.gSargs.replace(env.temp_dir+'/', '')))
 
 
     def calculate(self, timeout):
         res = [len(self.pydata['phenotype'])]
-        self.dump(tdir=runOptions.temp_dir)
-        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3} ".format(os.path.join(runOptions.temp_dir, '{0}_pheno.txt'.format(self.gname)),
-                os.path.join(runOptions.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(runOptions.temp_dir, '{0}_mapping.txt'.format(self.gname)),
-                os.path.join(runOptions.temp_dir, '{0}_msg.log'.format(self.gname)))
+        self.dump(tdir=env.temp_dir)
+        self.gSargs = self.Sargs + " -pfile {0} -gfile {1} -mfile {2} -msglog {3} ".format(os.path.join(env.temp_dir, '{0}_pheno.txt'.format(self.gname)),
+                os.path.join(env.temp_dir, '{0}_geno.txt'.format(self.gname)), os.path.join(env.temp_dir, '{0}_mapping.txt'.format(self.gname)),
+                os.path.join(env.temp_dir, '{0}_msg.log'.format(self.gname)))
         if self.MAFL is not None:
-            self.gSargs += " -ofileC {}".format(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)))
+            self.gSargs += " -ofileC {}".format(os.path.join(env.temp_dir, '{0}_result.out'.format(self.gname)))
         else:
-            self.gSargs += " -ofile {} -vtlog {} ".format(os.path.join(runOptions.temp_dir, '{0}_result.out'.format(self.gname)),
-                    os.path.join(runOptions.temp_dir, '{0}_vt.log'.format(self.gname)))
+            self.gSargs += " -ofile {} -vtlog {} ".format(os.path.join(env.temp_dir, '{0}_result.out'.format(self.gname)),
+                    os.path.join(env.temp_dir, '{0}_vt.log'.format(self.gname)))
         try:
             out, error = Popen(shlex.split(self.gSargs), stdout = PIPE, stderr= PIPE).communicate()
             self._process_output()
             res.extend([x for x in [self.stats[y] for y in self.colnames]])
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".\
+            env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
@@ -2379,8 +2378,8 @@ class ScoreSeq(ExternTest):
 
 class SSeq_common(ScoreSeq):
     '''Score statistic / SCORE-Seq software (Tang & Lin 2011), for common variants analysis'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        ScoreSeq.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        ScoreSeq.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''
@@ -2416,8 +2415,8 @@ class SSeq_common(ScoreSeq):
 
 class SSeq_rare(ScoreSeq):
     '''Score statistic / SCORE-Seq software (Tang & Lin 2011), for rare variants analysis'''
-    def __init__(self, ncovariates, logger=None, *method_args):
-        ScoreSeq.__init__(self, ncovariates, logger, *method_args)
+    def __init__(self, ncovariates, *method_args):
+        ScoreSeq.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,

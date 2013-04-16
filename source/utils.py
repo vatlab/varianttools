@@ -77,12 +77,12 @@ except ImportError as e:
         'the source directory.'.format(e))
 
 
-class RuntimeOptions(object):
-    # the following make RuntimeOptions a singleton class
+class RuntimeEnvironments(object):
+    # the following make RuntimeEnvironments a singleton class
     _instance = None
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(RuntimeOptions, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(RuntimeEnvironments, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self):
@@ -152,6 +152,8 @@ class RuntimeOptions(object):
         self._associate_num_of_readers = self.persistent_options['associate_num_of_readers'][0]
         # search path
         self._search_path = self.persistent_options['search_path'][0]
+        # logger
+        self._logger = None
     #
     # attribute command line
     #
@@ -303,10 +305,37 @@ class RuntimeOptions(object):
             self._search_path = val
     #
     search_path = property(lambda self: self._search_path, _set_search_path)
+    #
+    # attribute logger
+    def _set_logger(self, logfile=None):
+        # create a logger
+        self._logger = logging.getLogger()
+        self._logger.setLevel(logging.DEBUG)
+        # output to standard output
+        cout = logging.StreamHandler()
+        levels = {
+            '0': logging.WARNING,
+            '1': logging.INFO,
+            '2': logging.DEBUG,
+            None: logging.INFO
+        }
+        #
+        cout.setLevel(levels[self._verbosity])
+        cout.setFormatter(ColoredFormatter('%(levelname)s: %(message)s'))
+        self._logger.addHandler(cout)
+        # output to a log file
+        if logfile is not None:
+            ch = logging.FileHandler(logfile.lstrip('>'), mode = ('a' if logfile.startswith('>>') else 'w'))
+            # NOTE: debug informaiton is always written to the log file
+            ch.setLevel(levels[self._logfile_verbosity])
+            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
+            self._logger.addHandler(ch)
+    #
+    logger = property(lambda self: self._logger, _set_logger)
 
 
-# the singleton object of RuntimeOptions
-runOptions = RuntimeOptions()
+# the singleton object of RuntimeEnvironments
+env = RuntimeEnvironments()
 
 SQL_KEYWORDS = set([
     'ADD', 'ALL', 'ALTER', 'ANALYZE', 'AND', 'AS', 'ASC', 'ASENSITIVE', 'BEFORE',
@@ -444,30 +473,6 @@ class ColoredFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
-def createLogger(logfile, mode):
-    # create a logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    # output to standard output
-    cout = logging.StreamHandler()
-    levels = {
-        '0': logging.WARNING,
-        '1': logging.INFO,
-        '2': logging.DEBUG,
-        None: logging.INFO
-    }
-    #
-    cout.setLevel(levels[runOptions.verbosity])
-    cout.setFormatter(ColoredFormatter('%(levelname)s: %(message)s'))
-    logger.addHandler(cout)
-    # output to a log file
-    ch = logging.FileHandler(logfile, mode)
-    # NOTE: debug informaiton is always written to the log file
-    ch.setLevel(levels[runOptions.logfile_verbosity])
-    ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-    logger.addHandler(ch)
-    return logger
-
 def lineCount(filename, encoding='UTF-8'):
     '''Estimate the number of lines using file size and line size. This
     function does not attemp to calculate line count exactly because files
@@ -563,7 +568,7 @@ class delayedAction:
     '''Call the passed function with param after a few seconds. It is most often 
     used to display certain message only if an action takes a long time.
 
-        action = delayedAction(self.logger.info, 'This might take a while', 5)
+        action = delayedAction(env.logger.info, 'This might take a while', 5)
         some_action_that_might_take_a_while
         del action
 
@@ -606,7 +611,7 @@ class ProgressBar:
     2. it accept update for successful and failed counts
     '''
     def __init__(self, message, totalCount = None, initCount=0, initFailedCount=0):
-        if runOptions.verbosity == '0':
+        if env.verbosity == '0':
             self.update = self.empty
             self.curlUpdate = self.empty
             self.urllibUpdate = self.empty
@@ -811,13 +816,13 @@ class ProgressBar:
         sys.stderr.flush()
 
 
-def getSnapshotInfo(name, logger=None):
+def getSnapshotInfo(name):
     '''return meta information for all snapshots'''
     if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
         snapshot_file = name
         mode = 'r' if name.endswith('.tar') else 'r:gz'
     elif name.isalnum():
-        snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+        snapshot_file = os.path.join(env.cache_dir, 'snapshot_{}.tar'.format(name))
         mode = 'r'
     else:
         raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
@@ -836,14 +841,13 @@ def getSnapshotInfo(name, logger=None):
             readme.close()
             return (name, date, message)
     except Exception as e:
-        if logger is not None:
-            logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
+        env.logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
         return (None, None, None)
 
     
 class ShelfDB:
     '''A sqlite implementation of shelf'''
-    def __init__(self, filename, mode='n', lock=None, logger=None):
+    def __init__(self, filename, mode='n', lock=None):
         self.filename = filename
         if os.path.isfile(self.filename + '.DB'):
             if mode == 'n':
@@ -856,7 +860,6 @@ class ShelfDB:
         self.mode = mode
         if mode == 'n':
             self.cur.execute('CREATE TABLE data (key VARCHAR(255), val TEXT);')
-        self.logger = logger
         self.insert_query = 'INSERT INTO data VALUES ({0}, {0});'.format(self.db.PH)
         self.select_query = 'SELECT val FROM data WHERE key = {0};'.format(self.db.PH)
 
@@ -875,7 +878,7 @@ class ShelfDB:
 
     def _get_py2(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, 5, msg, data = (key,))
          # pickle.loads only accepts string, ...
         return pickle.loads(str(self.cur.fetchone()[0]))
 
@@ -886,7 +889,7 @@ class ShelfDB:
 
     def _get_py3(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
-        executeUntilSucceed(self.cur, self.select_query, self.logger, 5, msg, data = (key,))
+        executeUntilSucceed(self.cur, self.select_query, 5, msg, data = (key,))
         # pickle.loads accepts bytes directly
         return pickle.loads(self.cur.fetchone()[0])
 
@@ -899,9 +902,8 @@ class ShelfDB:
                 self.db.execute('CREATE INDEX data_idx ON data (key ASC);')
                 self.db.commit()
             except OperationalError as e:
-                if self.logger:
-                    self.logger.warning('Failed to index temporary database {}: {}. Association tests can still be performed but might be very slow.'.\
-                            format(self.filename, e))
+                env.logger.warning('Failed to index temporary database {}: {}. Association tests can still be performed but might be very slow.'.\
+                        format(self.filename, e))
                 pass
             finally:
                 # close the database even if create index failed. In this case
@@ -910,10 +912,9 @@ class ShelfDB:
 
 
 class ResourceManager:
-    def __init__(self, logger=None):
+    def __init__(self):
         # get a manifest of remote files
         self.manifest = {}
-        self.logger = logger
 
     def scanDirectory(self, resource_dir=None, filters=[]):
         '''Returns a manifest for all files under a default or
@@ -924,8 +925,7 @@ class ResourceManager:
         else:
             resource_dir = os.path.expanduser(resource_dir)
         if not os.path.isdir(resource_dir):
-            if self.logger is not None:
-                self.logger.error('Resource directory {} does not exist'.format(resource_dir))
+            env.logger.error('Resource directory {} does not exist'.format(resource_dir))
         #
         # go through directories
         filenames = []
@@ -970,8 +970,7 @@ class ResourceManager:
             parser.read(filename) 
             return parser.get(section, option)
         except Exception as e:
-            if self.logger is not None:
-                self.logger.warning('Failed to get comment file config file {}: {}'.format(filename, e))
+            env.logger.warning('Failed to get comment file config file {}: {}'.format(filename, e))
             return ''
 
     def getRefGenome(self, filename):
@@ -980,8 +979,7 @@ class ResourceManager:
             if os.path.isfile(filename[:-6] + '.ann'):
                 ann_file = filename[:-6] + '.ann'
             else:
-                if self.logger is not None:
-                    self.logger.warning('No .ann file could be found for database {}'.format(filename))
+                env.logger.warning('No .ann file could be found for database {}'.format(filename))
                 return '*'
         elif filename.endswith('.ann'):
             ann_file = filename
@@ -996,8 +994,7 @@ class ResourceManager:
             parser.read(ann_file)
             return ','.join([x[0] for x in parser.items('linked fields')])
         except Exception as e:
-            if self.logger is not None:
-                self.logger.warning('Failed to get reference genome from .ann file {}: {}'.format(filename, e))
+            env.logger.warning('Failed to get reference genome from .ann file {}: {}'.format(filename, e))
             return '*'
 
     def getComment(self, filename):
@@ -1013,7 +1010,7 @@ class ResourceManager:
         elif filename.lower().endswith('ann'):      # annotation
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
         elif filename.lower().endswith('.tar.gz'):  # snapshot
-            (name, date, message) = getSnapshotInfo(filename, self.logger)
+            (name, date, message) = getSnapshotInfo(filename)
             return '' if message is None else message
         else:      # other files, e.g. crr file
             return ''
@@ -1036,13 +1033,13 @@ class ResourceManager:
             # remove manifest_file
             urllib.urlcleanup()
 
-    def selectFiles(self, resource_type, logger=None):
+    def selectFiles(self, resource_type):
         '''Select files from the remote manifest and see what needs to be downloaded'''
         # if no ceriteria is specified, keep all files
         if resource_type == 'all':
             return
         elif resource_type == 'existing':
-            resource_dir = os.path.expanduser(runOptions.local_resource)
+            resource_dir = os.path.expanduser(env.local_resource)
             # go through directories
             filenames = set()
             for root, dirs, files in os.walk(resource_dir):
@@ -1084,7 +1081,7 @@ class ResourceManager:
     def excludeExistingLocalFiles(self):
         '''Go throughlocal files, check if they are in manifest. If they are
         check if they are identical to remote files'''
-        resource_dir = os.path.expanduser(runOptions.local_resource)
+        resource_dir = os.path.expanduser(env.local_resource)
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
@@ -1106,23 +1103,21 @@ class ResourceManager:
         '''Download resources'''
         for cnt, filename in enumerate(sorted(self.manifest.keys())):
             fileprop = self.manifest[filename]
-            dest_dir = os.path.join(runOptions.local_resource, os.path.split(filename)[0])
+            dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
             try:
                 downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
-                    os.path.join(runOptions.local_resource, filename), False,
+                    os.path.join(env.local_resource, filename), False,
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
-                md5 = self.calculateMD5(os.path.join(runOptions.local_resource, filename))
+                md5 = self.calculateMD5(os.path.join(env.local_resource, filename))
                 if md5 != fileprop[1]:
-                    if self.logger is not None:
-                        self.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
+                    env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
-                if self.logger is not None:
-                    self.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
+                env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
 
     def calculateMD5(self, filename, block_size=2**20):
         # calculate md5 for specified file
@@ -1258,8 +1253,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
         if dest_dir is not None:
             dest = os.path.join(dest_dir, filename)
         else:
-            dest_dir = os.path.join(runOptions.local_resource, os.path.split(local_fileToGet)[0])
-            dest = os.path.join(runOptions.local_resource, local_fileToGet)
+            dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
+            dest = os.path.join(env.local_resource, local_fileToGet)
     # 
     # otherwise, local file is like
     #
@@ -1272,7 +1267,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             dest = os.path.join(dest_dir, os.path.split(filename)[-1])
         else:
             # use structured local_resource directory if dest_dir is None
-            dest = os.path.join(runOptions.local_resource, fileToGet)
+            dest = os.path.join(env.local_resource, fileToGet)
             dest_dir = os.path.split(dest)[0]
     #
     if not os.path.isdir(dest_dir):
@@ -1290,7 +1285,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             pass
     #
     # use a search path
-    for path in runOptions.search_path.split(';'):
+    for path in env.search_path.split(';'):
         if '://' not in path:
             # if path is a local directory
             source_file = '{}/{}'.format(path, local_fileToGet)
@@ -1399,10 +1394,10 @@ class DatabaseEngine:
     def describeEngine(self):
         if self.engine == 'mysql':
             return 'mysql'
-        elif runOptions.sqlite_pragma == []:
+        elif env.sqlite_pragma == []:
             return 'sqlite (no pragma)'
         else:
-            return 'sqlite (with pragma {})'.format(', '.join(runOptions.sqlite_pragma))
+            return 'sqlite (with pragma {})'.format(', '.join(env.sqlite_pragma))
     #
     # Connection
     #
@@ -1436,7 +1431,7 @@ class DatabaseEngine:
             if lock is not None:
                 lock.acquire()
             cur = self.database.cursor()
-            for pragma in runOptions.sqlite_pragma:
+            for pragma in env.sqlite_pragma:
                 # if a pragma is only applicable to certain database, check its name
                 if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
                     continue
@@ -1492,7 +1487,7 @@ class DatabaseEngine:
                 lock.acquire()
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db, dbName))
-            for pragma in runOptions.sqlite_pragma:
+            for pragma in env.sqlite_pragma:
                 if '.' in pragma and pragma.split('.', 1)[0] != dbName:
                     # if pragma is for a specific table with another name, ignore
                     pass
@@ -1511,7 +1506,7 @@ class DatabaseEngine:
                 lock.acquire()
             self.execute('''ATTACH DATABASE '{0}' as {1};'''.format(
                 db + '.DB' if db != ':memory:' else db, dbName))
-            for pragma in runOptions.sqlite_pragma:
+            for pragma in env.sqlite_pragma:
                 # database specific pragma
                 if '.' in pragma.split('=')[0]:
                     # pragma for another database
@@ -1819,7 +1814,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     for info in proj.linkFieldToTable('{}.{}'.format(tokens[i-2][1], toval), table):
                         fields.append(info.field)
                 except ValueError as e:
-                    proj.logger.debug(e)
+                    env.logger.debug(e)
             else:
                 # A: try to expand A and identify fields
                 try:
@@ -1828,7 +1823,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     # use expanded field, ONLY the last one should have the expanded fieldname
                     res.append((toktype, info.field))
                 except ValueError as e:
-                    proj.logger.debug(e)
+                    env.logger.debug(e)
                     res.append((toktype, toval))
         else:
             # fasttrack for symbols or function names
@@ -1988,7 +1983,7 @@ def normalizeVariant(pos, ref, alt):
     return bin, pos, ref, alt
 
 
-def executeUntilSucceed(cur, query, logger, attempts, operation_msg, data = None):
+def executeUntilSucceed(cur, query, attempts, operation_msg, data = None):
     '''try to execute queries a few times before it fails'''
     for attempt in range(attempts):
         try:
@@ -1997,11 +1992,11 @@ def executeUntilSucceed(cur, query, logger, attempts, operation_msg, data = None
             else:
                 cur.execute(query)
             if attempt != 0:
-                logger.debug('Operation "' + operation_msg + '" succeeded after {} attempts'.format(attempt + 1))
+                env.logger.debug('Operation "' + operation_msg + '" succeeded after {} attempts'.format(attempt + 1))
             break
         except:
             if attempt == attempts - 1:
-                logger.error('Operation "' + operation_msg + '" failed after {} attempts'.format(attempt + 1))
+                env.logger.error('Operation "' + operation_msg + '" failed after {} attempts'.format(attempt + 1))
                 raise
             else:
                 time.sleep(1 + attempt + random.random() * 10)

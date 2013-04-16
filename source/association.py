@@ -39,7 +39,7 @@ except:
 
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
-     runOptions, executeUntilSucceed, ShelfDB
+     env, executeUntilSucceed, ShelfDB
 from .phenotype import Sample
 from .tester import *
 
@@ -139,7 +139,6 @@ class AssociationTestManager:
         unknown_args, samples, genotypes, group_by, discard_samples, discard_variants):
         self.proj = proj
         self.db = proj.db
-        self.logger = proj.logger
         self.var_info = var_info
         self.geno_info = geno_info
         self.genotypes = genotypes
@@ -284,19 +283,19 @@ class AssociationTestManager:
                         sys.path.pop()
                     else:
                         _temp = __import__(m_module, globals(), locals(), [m_name], -1)
-                    method = getattr(_temp, m_name)(ncovariates, self.logger, args)
+                    method = getattr(_temp, m_name)(ncovariates, args)
                 else:
-                    method = eval(name)(ncovariates, self.logger, args)
+                    method = eval(name)(ncovariates, args)
                 # check if method is valid
                 if not hasattr(method, 'fields'):
                     raise ValueError('Invalid association test method {}: '
                                      'missing attribute fields'.format(name))
                 if not method.fields:
-                    self.logger.warning('Association test {} has invalid or empty fields. '
+                    env.logger.warning('Association test {} has invalid or empty fields. '
                                         'No result will be generated.'.format(name))
                 tests.append(method)
             except NameError as e:
-                self.logger.debug(e)
+                env.logger.debug(e)
                 raise ValueError('Failed to load association test {0}: {1}. '
                                  'Please use command "vtools show tests" to list usable tests'.format(name, e))
         return tests
@@ -308,7 +307,7 @@ class AssociationTestManager:
             query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.\
             format(', '.join(pheno + (covar if covar is not None else []))) + \
                 (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '')
-            self.logger.debug('Select phenotype and covariates using query {}'.format(query))
+            env.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
             data = []
@@ -329,10 +328,10 @@ class AssociationTestManager:
                                  format(' AND '.join(['({})'.format(x) for x in condition])))
             else:
                 if len(condition) > 0:
-                    self.logger.info('{} samples are selected by condition: {}'.\
+                    env.logger.info('{} samples are selected by condition: {}'.\
                                      format(len(sample_IDs), ' AND '.join(['({})'.format(x) for x in condition])))
                 else:
-                    self.logger.info('{} samples are found'.format(len(sample_IDs)))
+                    env.logger.info('{} samples are found'.format(len(sample_IDs)))
             # add intercept
             covariates.insert(0, [1]*len(sample_IDs))
             try:
@@ -344,7 +343,7 @@ class AssociationTestManager:
                                  'inferred with numeric values')
             return sample_IDs, sample_names, phenotypes, covariates
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             if str(e).startswith('Invalid (non-numeric) coding'):
                 raise ValueError(e)
             else:
@@ -411,9 +410,9 @@ class AssociationTestManager:
         # This will be the tmp table to extract variant_id by groups (ignored is 0)
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.\
           format(self.table, group_fields, self.from_clause, self.where_clause)
-        s = delayedAction(self.logger.info, "Grouping variants by '{}', please be patient ...".\
+        s = delayedAction(env.logger.info, "Grouping variants by '{}', please be patient ...".\
                           format(':'.join(group_by)))
-        self.logger.debug('Running query {}'.format(query))
+        env.logger.debug('Running query {}'.format(query))
         cur.execute(query)
         cur.execute('CREATE INDEX __asso_tmp_index ON __asso_tmp ({});'.\
                     format(','.join(['{} ASC'.format(x) for x in field_names])))
@@ -422,12 +421,12 @@ class AssociationTestManager:
         cur.execute('SELECT DISTINCT {} FROM __asso_tmp;'.\
                     format(', '.join(field_names)))
         groups = cur.fetchall()
-        self.logger.info('{} groups are found'.format(len(groups)))
+        env.logger.info('{} groups are found'.format(len(groups)))
         self.db.commit()
         #
         # the output can be too long
         #
-        #self.logger.debug('Group by: {}'.format(':'.join(map(str, groups))))
+        #env.logger.debug('Group by: {}'.format(':'.join(map(str, groups))))
         return field_names, field_types, groups
 
 
@@ -453,7 +452,6 @@ class GenotypeLoader(Process):
         self.geno_cond = param.genotypes
         self.group_names = param.group_names
         self.db_name = param.proj.name + '_genotype.DB'
-        self.logger = param.proj.logger
         self.ready_flags = ready_flags
         self.index = index
         self.queue = queue
@@ -482,13 +480,13 @@ class GenotypeLoader(Process):
                             format(', '.join(self.group_names)))
                 # tells other processes that I am ready
                 self.ready_flags[self.index] = 1
-                self.logger.debug('Loader {} is ready'.format(self.index))
+                env.logger.debug('Loader {} is ready'.format(self.index))
             if all(self.ready_flags):
                 break
             time.sleep(random.random()*2)
         # these are written to different files so no lock is needed (lock=None)
-        shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{0}'.format(self.index)),
-                        'n', None, self.logger)
+        shelf = ShelfDB(os.path.join(env.temp_dir, 'geno_{0}'.format(self.index)),
+                        'n', None)
         lenGrp = len(self.group_names)
         try:
             while True:
@@ -506,11 +504,11 @@ class GenotypeLoader(Process):
                            ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
                            ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
-                    executeUntilSucceed(cur, select_genotype_query, self.logger, 5, select_genotype_msg)
+                    executeUntilSucceed(cur, select_genotype_query, 5, select_genotype_msg)
                 except OperationalError as e:
                     # flag the sample as missing
                     self.cached_samples[id] = -9
-                    self.logger.error('Genotype loader {} failed to load sample {}: {}'.\
+                    env.logger.error('Genotype loader {} failed to load sample {}: {}'.\
                                       format(self.index, id, e))
                     break
                 # grab data for each group by
@@ -537,7 +535,7 @@ class GenotypeLoader(Process):
             shelf.close()
 
 class ResultRecorder:
-    def __init__(self, params, db_name=None, update_existing=False, logger=None):
+    def __init__(self, params, db_name=None, update_existing=False):
         self.succ_count = 0
         self.failed_count = 0
         #
@@ -564,21 +562,20 @@ class ResultRecorder:
         self.writer = None
         if db_name:
             db_name = db_name if not db_name.lower().endswith('.db') else db_name[:-3]
-            old_pragma = runOptions.sqlite_pragma
+            old_pragma = env.sqlite_pragma
             # make sure each commit will write data to disk, the performance can be bad though.
-            runOptions.sqlite_pragma = 'synchronous=FULL,journal_mode=DELETE'
+            env.sqlite_pragma = 'synchronous=FULL,journal_mode=DELETE'
             self.writer = AnnoDBWriter(db_name, self.fields,
                 'field',                       # field annotation databases
                 'Annotation database used to record results of association tests. Created on {}'.format(
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
                 '1.0',                         # version 1.0
                 {'*': self.group_names},       # link by group fields
-                logger,
                 True,                          # allow updating an existing database
                 update_existing                # allow updating an existing field
             )
             # restore system sqlite_pragma
-            runOptions.sqlite_pragma = ','.join(old_pragma)
+            env.sqlite_pragma = ','.join(old_pragma)
             #
             self.cur = self.writer.db.cursor()
             if self.writer.update_existing:
@@ -658,11 +655,9 @@ class AssoTestsWorker(Process):
         self.num_extern_tests = param.num_extern_tests
         self.queue = grpQueue
         self.resQueue = resQueue
-        self.logger = param.proj.logger
         self.ready_flags = ready_flags
         self.index = index
         self.sampleMap = sampleMap
-        self.logger = self.proj.logger
         self.result_fields = result_fields
         self.shelf_lock = shelf_lock
         #
@@ -676,7 +671,7 @@ class AssoTestsWorker(Process):
         self.shelves = {}
         #
         self.g_na = float('NaN')
-        if runOptions.treat_missing_as_wildtype:
+        if env.treat_missing_as_wildtype:
             self.g_na = 0.0
 
     def __del__(self):
@@ -688,11 +683,11 @@ class AssoTestsWorker(Process):
         var_info = {x:[] for x in self.var_info}
         query = 'SELECT variant_id {0} FROM __fromVariant.__asso_tmp WHERE ({1})'.format(
             ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
-        #self.logger.debug('Running query: {}'.format(query))
+        #env.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         # SELECT can fail when the disk is slow which causes database lock problem.
         msg = 'Load variant info for group {} using association worker {}'.format(group, self.index)
-        executeUntilSucceed(cur, query, self.logger, 5, msg, group)
+        executeUntilSucceed(cur, query, 5, msg, group)
         #
         if not self.var_info:
             data = {x[0]:[] for x in cur.fetchall()}
@@ -718,10 +713,10 @@ class AssoTestsWorker(Process):
             dbID = self.sampleMap[ID]
             if dbID not in self.shelves:
                 try:
-                    shelf = ShelfDB(os.path.join(runOptions.temp_dir, 'geno_{}'.format(dbID)),
+                    shelf = ShelfDB(os.path.join(env.temp_dir, 'geno_{}'.format(dbID)),
                                     'r', lock=self.shelf_lock)
                 except Exception as e:
-                    self.logger.error('Process {} failed to connect to shelf {}: {}'.\
+                    env.logger.error('Process {} failed to connect to shelf {}: {}'.\
                                       format(self.index, dbID, e))
                     raise
                 self.shelves[dbID] = shelf
@@ -762,7 +757,7 @@ class AssoTestsWorker(Process):
         if sum(which) < 5:
             raise ValueError("Sample size too small ({0}) to be analyzed for {1}.".format(sum(which), repr(gname)))
         if len(which) - sum(which) > 0:
-            self.logger.debug('In {}, {} out of {} samples will be removed due to '
+            env.logger.debug('In {}, {} out of {} samples will be removed due to '
                               'having more than {}% missing genotypes'.\
                               format(repr(gname), len(which) - sum(which), len(which),
                                      self.missing_ind_ge * 100))
@@ -784,7 +779,7 @@ class AssoTestsWorker(Process):
             for k in var_info.keys():
                 var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
             #
-            self.logger.debug('In {}, {} out of {} loci will be removed due to '
+            env.logger.debug('In {}, {} out of {} loci will be removed due to '
                               'having no minor allele or having more than {}% missing genotypes'.\
                               format(repr(gname), len(keep_loci) - sum(keep_loci),
                                      len(keep_loci), self.missing_ind_ge * 100))
@@ -899,7 +894,7 @@ class AssoTestsWorker(Process):
                 grpname = "None"
             if grp is None:
                 break
-            # self.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
+            # env.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
             #
             #
             self.data = t.AssoData()
@@ -922,14 +917,14 @@ class AssoTestsWorker(Process):
                 # association tests
                 for test in self.tests:
                     test.setData(self.data, self.pydata)
-                    result = test.calculate(runOptions.association_timeout)
-                    # self.logger.debug('Finished association test on {}'.format(repr(grpname)))
+                    result = test.calculate(env.association_timeout)
+                    # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
             except KeyboardInterrupt as e:
                 # die silently if stopped by Ctrl-C
                 break
             except Exception as e:
-                self.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
+                env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
                                   format(self.index, repr(grpname), e))
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
@@ -950,10 +945,10 @@ def associate(args):
             except ValueError as e:
                 sys.exit(e)
             if len(asso.groups) == 0:
-                proj.logger.info('No data to analyze.')
+                env.logger.info('No data to analyze.')
                 sys.exit(0)
             # define results here but it might fail if args.to_db is not writable
-            results = ResultRecorder(asso, args.to_db, args.force, proj.logger)
+            results = ResultRecorder(asso, args.to_db, args.force)
             # determine if some results are already exist
             #
             # if write to a db and
@@ -966,7 +961,7 @@ def associate(args):
                     num_groups = len(asso.groups)
                     asso.groups = list(set(asso.groups).difference(set(existing_groups)))
                     if len(asso.groups) != num_groups:
-                        proj.logger.info('{} out of {} groups with existing results are ignored. '
+                        env.logger.info('{} out of {} groups with existing results are ignored. '
                                          'You can use option --force to re-analyze all groups.'.\
                                          format(num_groups - len(asso.groups), num_groups))
                         if len(asso.groups) == 0:
@@ -982,9 +977,9 @@ def associate(args):
             nJobs = max(min(args.jobs, len(asso.groups)), 1)
             # loading from disk cannot really benefit from more than 8 simultaneous read
             # due to disk access limits
-            # if runOptions.associate_num_of_readers is set we'll use it directly
-            nLoaders = runOptions.associate_num_of_readers
-            # if no runOptions.associate_num_of_readers is set we limit it to a max of 8.
+            # if env.associate_num_of_readers is set we'll use it directly
+            nLoaders = env.associate_num_of_readers
+            # if no env.associate_num_of_readers is set we limit it to a max of 8.
             if not nLoaders > 0:
                 nLoaders = min(8, nJobs)
             # step 1: getting all genotypes
@@ -1005,7 +1000,7 @@ def associate(args):
                 # None will kill the workers
                 sampleQueue.put(None)
             #
-            s = delayedAction(proj.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
+            s = delayedAction(env.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
             while True:
                 if all(ready_flags):
                     break
@@ -1021,7 +1016,7 @@ def associate(args):
                         # some samples were not properly loaded
                         # the program has to quit because data integrity is compromised
                         prog.done()
-                        proj.logger.error('An error occurred while loading genotype data. '
+                        env.logger.error('An error occurred while loading genotype data. '
                                           'Please make sure the genotype database is intact '
                                           'and is accessible before trying to start over.')
                         for loader in loaders:
@@ -1033,7 +1028,7 @@ def associate(args):
                     if done == len(asso.sample_IDs):
                         break
             except KeyboardInterrupt as e:
-                proj.logger.error('\nLoading genotype stopped by keyboard interruption.')
+                env.logger.error('\nLoading genotype stopped by keyboard interruption.')
                 proj.close()
                 sys.exit(1)
             prog.done()
@@ -1066,7 +1061,7 @@ def associate(args):
                 grpQueue.put(None)
             #
             count = 0
-            s = delayedAction(proj.logger.info, "Starting {} association test workers".format(nJobs))
+            s = delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs))
             while True:
                 if all(ready_flags):
                     break
@@ -1085,9 +1080,9 @@ def associate(args):
                     # update progress bar
                     count = results.completed()
                     prog.update(count, results.failed())
-                    # proj.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+                    # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
             except KeyboardInterrupt as e:
-                proj.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
+                env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
                                   format(count, len(asso.groups)))
                 results.done()
                 proj.close()
@@ -1096,7 +1091,7 @@ def associate(args):
             prog.done()
             results.done()
             # summary
-            proj.logger.info('Association tests on {} groups have completed. {} failed.'.\
+            env.logger.info('Association tests on {} groups have completed. {} failed.'.\
                              format(results.completed(), results.failed()))
             # use the result database in the project
             if args.to_db:
@@ -1104,7 +1099,7 @@ def associate(args):
             # tells the maintenance process to stop
             maintenance_flag.value = 0
             # wait for the maitenance process to stop
-            s = delayedAction(proj.logger.info,
+            s = delayedAction(env.logger.info,
                               "Maintaining database. This might take a few minutes.", delay=10)
             maintenance.join()
             del s

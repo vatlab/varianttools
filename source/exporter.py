@@ -38,7 +38,7 @@ else:
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
-    consolidateFieldName, DatabaseEngine
+    consolidateFieldName, DatabaseEngine, env
 
  
 class JoinFields:
@@ -397,7 +397,7 @@ def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, ge
     else:
         # using multiple process to handle more than 1500 samples
         if len(IDs) // MAX_COLUMN + 2 > jobs:
-            proj.logger.info('Using {} processes to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
+            env.logger.info('Using {} processes to handle {} samples'.format(len(IDs) // MAX_COLUMN + 2, len(IDs)))
         return MultiVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs, jobs)
 
@@ -522,13 +522,12 @@ class EmbeddedVariantReader(BaseVariantReader):
     def __init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs):
         self.proj = proj
-        self.logger = proj.logger
         self.var_fields = var_fields
         BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
 
     def records(self):
-        self.logger.debug('Running query {}'.format(self.getQuery()))
+        env.logger.debug('Running query {}'.format(self.getQuery()))
         cur = self.proj.db.cursor()
         try:
             cur.execute(self.getQuery())
@@ -546,7 +545,6 @@ class StandaloneVariantReader(BaseVariantReader):
         BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
-        self.logger = proj.logger
         ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
         if len(ID_needed_idx) > 0:
             prog = ProgressBar('Creating indexes', len(ID_needed_idx))
@@ -558,12 +556,12 @@ class StandaloneVariantReader(BaseVariantReader):
             prog.done()            
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
-        self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, None, proj.logger)
+        self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, None)
         self.worker.start()
 
     def start(self):
         # the first None, indicating ready to output
-        s = delayedAction(self.logger.info, 'Selecting genotypes...')
+        s = delayedAction(env.logger.info, 'Selecting genotypes...')
         self.reader.recv()
         del s
         
@@ -581,12 +579,11 @@ class MultiVariantReader(BaseVariantReader):
         BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
         self.proj = proj
-        self.logger = proj.logger
         self.var_fields = var_fields
         # the first job for variants
         r, w = Pipe(False)
         lock = Lock()
-        p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, lock, proj.logger)
+        p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, lock)
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
@@ -597,7 +594,7 @@ class MultiVariantReader(BaseVariantReader):
         self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (self.jobs-1) + 1
         #
-        s = delayedAction(self.logger.info, 'Checking indexes')
+        s = delayedAction(env.logger.info, 'Checking indexes')
         ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
         del s
         if len(ID_needed_idx) > 0:
@@ -611,7 +608,7 @@ class MultiVariantReader(BaseVariantReader):
         for i in range(self.jobs - 1):
             r, w = Pipe(False)
             subIDs = IDs[(block*i):(block *(i + 1))]
-            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock, proj.logger)
+            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock)
             self.workers.append(p)
             self.readers.append(r)
 
@@ -663,19 +660,18 @@ class MultiVariantReader(BaseVariantReader):
                 if all_done:
                     break
             except Exception as e:
-                self.logger.debug('Failed to get record: {}'.format(e))
+                env.logger.debug('Failed to get record: {}'.format(e))
         for p in self.workers:
             p.terminate()
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
-    def __init__(self, dbname, annoDB, query, output, lock, logger):
+    def __init__(self, dbname, annoDB, query, output, lock):
         self.dbname = dbname
         self.annoDB = annoDB
         self.query = query
         self.output = output
         self.lock = lock
-        self.logger = logger
         Process.__init__(self)
 
     def run(self):
@@ -704,7 +700,6 @@ class Exporter:
         self.proj = proj
         self.db = proj.db
         self.jobs = jobs
-        self.logger = proj.logger
         #
         # table
         if not self.proj.isVariantTable(table):
@@ -718,21 +713,21 @@ class Exporter:
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
         self.samples = []
         if samples:
-            self.logger.info('File and sample names of {} selected samples are outputted in project log file.'.format(len(self.IDs)))
+            env.logger.info('File and sample names of {} selected samples are outputted in project log file.'.format(len(self.IDs)))
             cur = self.db.cursor()
             for ID in self.IDs:
                 cur.execute('SELECT filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\
                     .format(self.db.PH), (ID,))
                 for rec in cur:
                     self.samples.append('{}'.format(rec[1]))
-                    self.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
+                    env.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
         # 
         # build
         if build is None:
             if self.proj.build is not None:
                 self.build = self.proj.build
                 if self.proj.alt_build is not None:
-                    self.logger.info('Using primary reference genome {} of the project.'.format(self.build))
+                    env.logger.info('Using primary reference genome {} of the project.'.format(self.build))
             else:
                 raise ValueError('This project does not have any data to export.')
             self.export_alt_build = False
@@ -755,7 +750,7 @@ class Exporter:
         try:
             self.format = fileFMT(format, fmt_args)
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         if not self.format.columns:
@@ -766,7 +761,7 @@ class Exporter:
             self.header = ''
         elif header == ['-']:
             # read from standard input
-            self.logger.info('Reading header from standard input')
+            env.logger.info('Reading header from standard input')
             self.header = sys.stdin.read()
         else:
             self.header = self.format.delimiter.join(header)
@@ -825,7 +820,7 @@ class Exporter:
         fname += '.tfam' if not fname.endswith('.tfam') else ''
         if os.path.exists(fname):
             os.remove(fname)
-        self.logger.info('Sample names are exported to {}'.format(fname))
+        env.logger.info('Sample names are exported to {}'.format(fname))
         # a tfam file is the first 6 columns of a ped file
         # FID, ID, paternal ID, maternal ID, sex, phenotype
         # Will output ID only; other fields will be populated with placeholders
@@ -998,7 +993,7 @@ class Exporter:
                 print >> output, sep.join(columns)
                 count += 1
             except Exception as e:
-                self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
             if idx - last_count > update_after:
                 last_count = idx
@@ -1047,12 +1042,12 @@ class Exporter:
                 print >> output, sep.join(columns)
                 count += 1
             except Exception as e:
-                self.logger.debug('Failed to process record {}: {}'.format(rec, e))
+                env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
         if self.filename is not None:
             output.close()
         prog.done()
-        self.logger.info('{} lines are exported from variant table {} {}'.format(count, self.table, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
+        env.logger.info('{} lines are exported from variant table {} {}'.format(count, self.table, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
 
 
 

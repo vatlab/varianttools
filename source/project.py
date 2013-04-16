@@ -45,7 +45,7 @@ from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, runOptions, createLogger, \
+    filesInURL, downloadFile, makeTableName, getMaxUcscBin, env, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
 
 
@@ -68,7 +68,7 @@ class AnnoDB:
     various sources.
     '''
     def __init__(self, proj, annoDB, linked_by=[], anno_type=None, linked_fields=None):
-        proj.logger.debug('Loading annotation database {}'.format(annoDB))
+        env.logger.debug('Loading annotation database {}'.format(annoDB))
         self.db = proj.db.newConnection()
         if self.db.hasDatabase(annoDB):
             self.db.connect(annoDB)
@@ -98,7 +98,7 @@ class AnnoDB:
             self.fields.append(Field(*rec))
             # FIXME: We should enforce comment for all fields.
             #if not self.fields[-1].comment:
-            #    proj.logger.warning('No comment for field {} in database {}'.format(self.fields[-1].name, annoDB))
+            #    env.logger.warning('No comment for field {} in database {}'.format(self.fields[-1].name, annoDB))
         if len(self.fields) == 0:
             raise ValueError('Annotation database {} does not provide any field.'.format(annoDB))
         #
@@ -135,7 +135,7 @@ class AnnoDB:
                     if key == '*':
                         self.build = self.refGenomes[key]
                     elif proj.build is None:
-                        proj.logger.warning('Project does not have a primary build. Using {} from the annotation database'.format(key))
+                        env.logger.warning('Project does not have a primary build. Using {} from the annotation database'.format(key))
                         proj.setRefGenome(key)
                         self.build = self.refGenomes[key]
                         break
@@ -151,17 +151,17 @@ class AnnoDB:
         if self.anno_type == 'range' and ((self.build is not None and len(self.build) != 3) or (self.alt_build is not None and len(self.alt_build) != 3)):
             raise ValueError('There should be three linking fields for range-based annotation databases.')
         if self.description == '':
-            proj.logger.warning('No description for annotation database {}'.format(annoDB))
+            env.logger.warning('No description for annotation database {}'.format(annoDB))
         if self.build is None and self.alt_build is None:
             raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
         if self.anno_type == 'field' and len(self.linked_by) != len(self.build):
             raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
         if self.linked_by:
-            s = delayedAction(proj.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
+            s = delayedAction(env.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
             self.indexLinkedField(proj, linked_by)
             del s
         if self.anno_type == 'range':
-            s = delayedAction(proj.logger.info, 'Binning ranges')
+            s = delayedAction(env.logger.info, 'Binning ranges')
             if self.build is not None:
                 self.binningRanges(proj, proj.build, self.build)
             elif self.alt_build is not None:
@@ -200,14 +200,14 @@ class AnnoDB:
                 try:
                     cur.execute('CREATE INDEX IF NOT EXISTS {0}_{1} ON {0} ({1} ASC);'.format(table, field))
                 except Exception as e:
-                    proj.logger.debug(e)
+                    env.logger.debug(e)
             else:
                 # from an annotation database
                 try:
                     # FIXME: this syntax is only valid for sqlite3, we will need to fix it for the mysql engine
                     cur.execute('CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(table, field))
                 except Exception as e:
-                    proj.logger.debug(e)
+                    env.logger.debug(e)
 
     def checkLinkedFields(self, proj):
         # 
@@ -229,15 +229,15 @@ class AnnoDB:
         val_proj = set(cur.fetchall())
         #
         val_common = val_annoDB & val_proj 
-        proj.logger.info('{} out of {} {} are annotated through annotation database {}'.format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
+        env.logger.info('{} out of {} {} are annotated through annotation database {}'.format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
         #
         # if not all values are used
         if len(val_common) < len(val_annoDB):
-            proj.logger.warning('{} out of {} values in annotation database {} are not linked to the project.'.format(len(val_annoDB) - len(val_common),
+            env.logger.warning('{} out of {} values in annotation database {} are not linked to the project.'.format(len(val_annoDB) - len(val_common),
                 len(val_annoDB), self.name))
             val_unused = list(val_annoDB - val_common)[:100]
             val_unused.sort()
-            proj.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
+            env.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
                 ', '.join([':'.join([str(y) for y in x]) for x in val_unused])))
         
 
@@ -311,7 +311,7 @@ class AnnoDB:
 
 
 class fileFMT:
-    def __init__(self, name, fmt_args=[], logger=None):
+    def __init__(self, name, fmt_args=[]):
         '''Input file format'''
         # locate a file format specification file
         self.description = None
@@ -324,7 +324,6 @@ class fileFMT:
         self.encoding = 'utf-8'
         self.preprocessor = None
         self.header = None
-        self.logger = logger
         # for export only
         self.export_by_fields = ''
         self.order_by_fields = ''
@@ -519,8 +518,7 @@ class fileFMT:
                 #
                 # This is a special case that allows users to use expressions as field....
                 #
-                if self.logger:
-                    self.logger.warning('Field {} is not defined in format {}, some or all variants might fail to import.'.format(self.fields[i], filename))
+                env.logger.warning('Field {} is not defined in format {}, some or all variants might fail to import.'.format(self.fields[i], filename))
                 self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
             else:
                 self.fields[i] = fld[0]
@@ -596,9 +594,8 @@ class AnnoDBWriter:
     '''
     A class to initiate and insert annotation database
     '''
-    def __init__(self, name, fields, anno_type, description, version, build, logger, use_existing_db=False,
+    def __init__(self, name, fields, anno_type, description, version, build, use_existing_db=False,
         overwrite_existing_fields=False):
-        self.logger = logger
         # remove extension .db
         self.name = name[:-3] if name.lower().endswith('.db') else name
         self.fields = fields
@@ -623,7 +620,7 @@ class AnnoDBWriter:
         cur = self.db.cursor()
         #
         # creating the field table
-        self.logger.debug('Creating {}_field table'.format(self.name))
+        env.logger.debug('Creating {}_field table'.format(self.name))
         self.createFieldsTable()
         #
         for field in self.fields:
@@ -632,7 +629,7 @@ class AnnoDBWriter:
         self.db.commit()
         #
         # creating the info table
-        self.logger.debug('Creating {}_info table'.format(self.name))
+        env.logger.debug('Creating {}_info table'.format(self.name))
         query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.db.PH)
         self.createInfoTable()
         cur.execute(query, ('name', self.name))
@@ -641,7 +638,7 @@ class AnnoDBWriter:
         cur.execute(query, ('version', self.version))
         cur.execute(query, ('build', str(self.build)))
         self.db.commit()
-        self.logger.debug('Creating table {}'.format(self.name))
+        env.logger.debug('Creating table {}'.format(self.name))
         self.createAnnotationTable()
     
     def updateAnnoDB(self, overwrite_existing_fields):
@@ -666,7 +663,7 @@ class AnnoDBWriter:
         for rec in cur:
             self.cur_fields.append(Field(*rec))
         # add new fields
-        s = delayedAction(self.logger.info, 'Adding fields to existing result database')
+        s = delayedAction(env.logger.info, 'Adding fields to existing result database')
         for field in self.fields:
             # name already exist
             if field.name in [x.name for x in self.cur_fields]:
@@ -674,7 +671,7 @@ class AnnoDBWriter:
                 if field.type != cf.type:
                     raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
                 if overwrite_existing_fields:
-                    self.logger.warning('Results in field {} will be overwritten.'.format(field.name))
+                    env.logger.warning('Results in field {} will be overwritten.'.format(field.name))
                 #else:
                 #    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
                 #        raise ValueError('Cannot modify database {} because field {} already exists. '
@@ -722,19 +719,19 @@ class AnnoDBWriter:
             items.append('{0} {1}'.format(field.name, field.type))
         query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
             ',\n'.join(items) + ');'
-        self.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
+        env.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
         cur = self.db.cursor()
         try:
             cur.execute(query)
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             raise ValueError('Failed to create table')
     
     def finalize(self):
         '''Create index and get statistics of the database'''
         cur = self.db.cursor()
         # creating indexes
-        s = delayedAction(self.logger.info, 'Creating indexes (this can take quite a while)')
+        s = delayedAction(env.logger.info, 'Creating indexes (this can take quite a while)')
         # creates index for each link method
         for key in self.build.keys():
             if key != '*':
@@ -746,7 +743,7 @@ class AnnoDBWriter:
                     cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
                         .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         del s
-        s = delayedAction(self.logger.info, 'Analyzing and tuning database ...')
+        s = delayedAction(env.logger.info, 'Analyzing and tuning database ...')
         # This is only useful for sqlite
         self.db.analyze()
         # calculating database statistics
@@ -756,7 +753,7 @@ class AnnoDBWriter:
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', self.db.numOfRows(self.name)))
         del s
         for field in self.fields:
-            s = delayedAction(self.logger.info, 'Calculating column statistics for field {}'.format(field.name))
+            s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
             cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
             missing = cur.fetchone()[0]
             cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
@@ -903,31 +900,31 @@ class Project:
         # create a temporary directory
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
-        runOptions.cache_dir = self.loadProperty('__option_cache_dir', None)
+        env.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
-        runOptions.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
+        env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
         #
-        runOptions.association_timeout = self.loadProperty('__option_association_timeout', None)
+        env.association_timeout = self.loadProperty('__option_association_timeout', None)
         #
-        runOptions.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
+        env.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
         if verbosity is None and not new:
             # try to get saved verbosity level
             verbosity = self.loadProperty('__option_verbosity', None)
         # set global verbosity level and temporary directory
-        runOptions.verbosity = verbosity
-        # runOptions.verbosity will affect the creation of logger
-        self.logger = createLogger(self.name + '.log', mode='w' if new else 'a')
-        self.logger.debug('')
-        self.logger.debug(runOptions.command_line)
+        env.verbosity = verbosity
+        # env.verbosity will affect the creation of logger
+        env.logger = '{}{}.log'.format('>' if new else '>>', self.name)
+        env.logger.debug('')
+        env.logger.debug(env.command_line)
         # if option temp_dir is set, the path will be used
         # if not, None will be passed, and a temporary directory will be used.
         try:
-            runOptions.temp_dir = self.loadProperty('__option_temp_dir', None)
+            env.temp_dir = self.loadProperty('__option_temp_dir', None)
         except Exception as e:
-            self.logger.warning('Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
+            env.logger.warning('Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
             # use a random directory
-            runOptions.temp_dir = None
-        self.logger.debug('Using temporary directory {}'.format(runOptions.temp_dir))
+            env.temp_dir = None
+        env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         if new:
             self.create(build=build, **kwargs)
         else:
@@ -936,10 +933,10 @@ class Project:
     def create(self, build, **kwargs):
         '''Create a new project'''
         # open the project file
-        self.logger.info(VTOOLS_COPYRIGHT)
-        self.logger.info(VTOOLS_CITATION)
-        self.logger.info(VTOOLS_CONTACT)
-        self.logger.info('Creating a new project {}'.format(self.name))
+        env.logger.info(VTOOLS_COPYRIGHT)
+        env.logger.info(VTOOLS_CITATION)
+        env.logger.info(VTOOLS_CONTACT)
+        env.logger.info('Creating a new project {}'.format(self.name))
         self.db = DatabaseEngine(engine='sqlite3', batch=kwargs.get('batch', 10000))
         self.db.connect(self.proj_file)
         #
@@ -954,9 +951,9 @@ class Project:
             # FIXME: I am saving passwd as clear text here...
             self.saveProperty('passwd', kwargs.get('passwd'))
             self.saveProperty('batch', kwargs.get('batch', 10000))
-            self.saveProperty('__option_verbosity', runOptions.verbosity)
+            self.saveProperty('__option_verbosity', env.verbosity)
             # turn to the real online engine
-            self.logger.debug('Connecting to mysql server')
+            env.logger.debug('Connecting to mysql server')
             self.db.commit()
             self.db = DatabaseEngine(**kwargs)
             if self.db.hasDatabase(self.name):
@@ -972,12 +969,12 @@ class Project:
         self.annoDB = []
         #
         # Initialize the core tables
-        self.logger.debug('Creating core tables')
+        env.logger.debug('Creating core tables')
         self.createProjectTable()
         self.saveProperty('engine', engine)
         self.saveProperty('version', self.version)
         self.saveProperty('batch', kwargs.get('batch', 10000))
-        self.saveProperty('__option_verbosity', runOptions.verbosity)
+        self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)
@@ -990,7 +987,7 @@ class Project:
     def open(self, verify=True):
         '''Open an existing project'''
         # open the project file
-        self.logger.debug('Opening project {}'.format(self.proj_file))
+        env.logger.debug('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
@@ -1009,13 +1006,13 @@ class Project:
         else: 
             # pragma, set to None if the key does not exist. In this case
             # the system default will be used.
-            runOptions.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
+            env.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
             # pass things like batch ... and re-connect
-            # runOptions['sqlite_pragma'] will be used 
+            # env['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
             self.db.connect(self.proj_file)
         # loading other options if they have been set
-        runOptions.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
+        env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         #
         # existing project
         cur = self.db.cursor()
@@ -1035,7 +1032,7 @@ class Project:
                 self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
                 self.db.attach(db)
             except Exception as e:
-                self.logger.warning('Cannot open annotation database {}: {}'.format(db, e))
+                env.logger.warning('Cannot open annotation database {}: {}'.format(db, e))
         #
         # get existing meta information
         # FIXME: these are not handled correctly for now
@@ -1056,7 +1053,7 @@ class Project:
         headers = self.db.getHeaders('variant')
         if self.alt_build is not None:
             if not ('alt_bin' in headers and 'alt_chr' in headers and 'alt_pos' in headers):
-                self.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
+                env.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
                     ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in headers])))
                 self.alt_build = None
                 self.saveProperty('alt_build', None)
@@ -1075,7 +1072,7 @@ class Project:
         cur = self.db.cursor()
         tables = self.db.tables()
         cur = self.db.cursor()
-        s = delayedAction(self.logger.info, 'Analyzing project')
+        s = delayedAction(env.logger.info, 'Analyzing project')
         for tbl in tables:
             analyzed = True
             if not force:
@@ -1094,8 +1091,8 @@ class Project:
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
         # DBs in different paths but with the same name are considered to be the same.
-        self.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
-        self.logger.info(db.description)
+        env.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
+        env.logger.info(db.description)
         if db.name not in [x.name for x in self.annoDB]:
             self.annoDB.append(db)
             self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
@@ -1116,10 +1113,10 @@ class Project:
             # __exit__() will also call close(), I do not know if I should remove
             # it from __exit__. Anyway, the second call to close() will try to 
             # remove temp_dir again...
-            if os.path.isdir(runOptions.temp_dir):
-                shutil.rmtree(runOptions.temp_dir)
+            if os.path.isdir(env.temp_dir):
+                shutil.rmtree(env.temp_dir)
         except Exception as e:
-            self.logger.warning('Failed to remove temporary directory {0}: {1}'.format(runOptions.temp_dir, e))
+            env.logger.warning('Failed to remove temporary directory {0}: {1}'.format(env.temp_dir, e))
         
     def loadProperty(self, key, default=None):
         '''Retrieve property from the project table'''
@@ -1128,8 +1125,8 @@ class Project:
             cur.execute('SELECT value FROM project WHERE name={0};'.format(self.db.PH), (key,))
             return cur.fetchone()[0]
         except Exception as e:
-            #self.logger.debug(e)
-            #self.logger.warning('Failed to retrieve value for project property {}'.format(key))
+            #env.logger.debug(e)
+            #env.logger.warning('Failed to retrieve value for project property {}'.format(key))
             self.saveProperty(key, default)
             return default
 
@@ -1158,21 +1155,21 @@ class Project:
         '''Remove the current project'''
         # step 1: remove database
         if self.db.engine == 'mysql':
-             self.logger.info('Removing database {}'.format(self.name))
+             env.logger.info('Removing database {}'.format(self.name))
              self.db.removeDatabase(self.name)
         # step 2: remove genotype
         if self.db.hasDatabase(self.name + '_genotype'):
-            self.logger.info('Removing database {}_genotype'.format(self.name))
+            env.logger.info('Removing database {}_genotype'.format(self.name))
             self.db.removeDatabase(self.name + '_genotype')
         # step 3: remove temp database
         if self.db.hasDatabase(self.name + '_temp'):
-            self.logger.info('Removing database {}_temp'.format(self.name))
+            env.logger.info('Removing database {}_temp'.format(self.name))
             self.db.removeDatabase(self.name + '_temp')
         # step 4: remove project file
-        self.logger.info('Removing project file {}'.format(self.proj_file))
+        env.logger.info('Removing project file {}'.format(self.proj_file))
         os.remove(self.proj_file)
         # step 5: remove log file
-        self.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
+        env.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
 
@@ -1193,7 +1190,7 @@ class Project:
     #
     def setRefGenome(self, build):
         if self.build is not None and self.build != build:
-            self.logger.error('Cannot change reference genome of an existing project.')
+            env.logger.error('Cannot change reference genome of an existing project.')
             sys.exit(1)
         self.build = build
         self.saveProperty('build', build)
@@ -1202,7 +1199,7 @@ class Project:
     # Functions to create core and optional tables.
     #
     def createProjectTable(self):
-        self.logger.debug('Creating table project')
+        env.logger.debug('Creating table project')
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE project (
@@ -1211,7 +1208,7 @@ class Project:
             )''')
 
     def createFilenameTable(self):
-        self.logger.debug('Creating table filename')
+        env.logger.debug('Creating table filename')
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE filename (
@@ -1227,7 +1224,7 @@ class Project:
 
     def createMasterVariantTable(self, fields=[]):
         '''Create a variant table with name. Fail if a table already exists.'''
-        self.logger.debug('Creating table variant')
+        env.logger.debug('Creating table variant')
         #
         # ref and alt are 'VARCHAR' to support indels. sqlite database ignores VARCHAR length
         # so it can support really long indels. MySQL will have trouble handling indels that
@@ -1248,7 +1245,7 @@ class Project:
         # create indexes
         #
         if not quiet:
-            s = delayedAction(self.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
+            s = delayedAction(env.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
         try:
             #
             # Index on the primary reference genome is UNIQUE when there is no alternative reference
@@ -1279,7 +1276,7 @@ class Project:
                 self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists, this does not really matter
-            self.logger.debug(e)
+            env.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         try:
             if self.alt_build:
@@ -1290,7 +1287,7 @@ class Project:
                 self.db.execute('''CREATE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists, this does not really matter
-            self.logger.debug(e)
+            env.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         if not quiet:
             del s
@@ -1300,20 +1297,20 @@ class Project:
         #
         # NOTE: for mysql, it might be better to use alt index disable/rebuild
         #
-        s = delayedAction(self.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
+        s = delayedAction(env.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
         try:
             # drop index has different syntax for mysql/sqlite3.
             self.db.dropIndex('variant_index', 'variant')
         except Exception as e:
             # the index might not exist
-            self.logger.debug(e)
+            env.logger.debug(e)
         #
         try:
             if self.alt_build:
                 self.db.dropIndex('variant_alt_index', 'variant')
         except Exception as e:
             # the index might not exist
-            self.logger.debug(e)
+            env.logger.debug(e)
         del s
 
     def createVariantTable(self, table, temporary=False):
@@ -1321,7 +1318,7 @@ class Project:
         '''
         if table == 'variant':
             raise ValueError('This function cannot be used to create a master variant table')
-        self.logger.debug('Creating table {}'.format(table))
+        env.logger.debug('Creating table {}'.format(table))
         self.db.execute('''CREATE {0} TABLE {1} (
                 variant_id INTEGER PRIMARY KEY
             );'''.format('TEMPORARY' if temporary else '', table))
@@ -1334,7 +1331,7 @@ class Project:
         if save_date:
             self.saveProperty('__date_of_{}'.format(table), time.strftime('%b%d', time.gmtime()))
         if save_cmd:
-            self.saveProperty('__cmd_of_{}'.format(table), runOptions.command_line)
+            self.saveProperty('__cmd_of_{}'.format(table), env.command_line)
 
     def descriptionOfTable(self, table):
         '''Get description of table'''
@@ -1345,7 +1342,7 @@ class Project:
     def createSampleTableIfNeeded(self, fields=[], table='sample'):
         if self.db.hasTable(table):
             return
-        self.logger.debug('Creating table {}'.format(table))
+        env.logger.debug('Creating table {}'.format(table))
         cur = self.db.cursor()
         query = '''\
             CREATE TABLE IF NOT EXISTS {0} (
@@ -1388,16 +1385,16 @@ class Project:
             #cur.execute('''CREATE INDEX {0}_index ON {0} (variant_id ASC, sample_id ASC);'''.format(table))
         #except Exception as e:
             # key might already exists
-            #self.logger.debug(e)
+            #env.logger.debug(e)
             #pass
 
     def createVariantMetaTableIfNeeded(self):
         if self.variant_meta is None:
-            self.logger.warning('Tried to create a variant meta table without valid meta fields')
+            env.logger.warning('Tried to create a variant meta table without valid meta fields')
             return
         if self.db.hasTable('variant_meta'):
             return
-        self.logger.debug('Creating table variant_meta')
+        env.logger.debug('Creating table variant_meta')
         cur = self.db.cursor()
         query = '''\
             CREATE TABLE IF NOT EXISTS variant_meta (
@@ -1416,11 +1413,11 @@ class Project:
 
     def createSampleMetaTableIfNeeded(self):
         if self.sample_meta is None:
-            self.logger.warning('Tried to create a sample meta table without valid meta fields')
+            env.logger.warning('Tried to create a sample meta table without valid meta fields')
             return
         if self.db.hasTable('sample_meta'):
             return
-        self.logger.debug('Creating table sample_meta')
+        env.logger.debug('Creating table sample_meta')
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS sample_meta (
@@ -1447,7 +1444,7 @@ class Project:
             raise ValueError('Master variant table cannot be removed.')
         if not self.isVariantTable(table):
             raise ValueError('{} is not found or is not a variant table.'.format(table))
-        self.logger.info('Removing table {}'.format(table))
+        env.logger.info('Removing table {}'.format(table))
         self.db.removeTable(table)
 
     def selectSampleByPhenotype(self, cond):
@@ -1455,14 +1452,14 @@ class Project:
         cur = self.db.cursor()
         try:
             query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {};'.format(' WHERE {}'.format(cond) if cond.strip() else '')
-            self.logger.debug('Select samples using query {}'.format(query))
+            env.logger.debug('Select samples using query {}'.format(query))
             cur.execute(query)
             IDs = [x[0] for x in cur.fetchall()]
             IDs.sort()
             # return a tuple to avoid future change of order
             return tuple(IDs)
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
     def removeSamples(self, IDs):
@@ -1478,10 +1475,10 @@ class Project:
                 (f,))
             rec = cur.fetchone()
             if rec[1] == len(samples[f]):
-                self.logger.info('Removing {1} and all its samples ({0})'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+                env.logger.info('Removing {1} and all its samples ({0})'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
                 cur.execute('DELETE FROM filename WHERE filename = {}'.format(self.db.PH), (f,))
             else:
-                self.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+                env.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
             self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
@@ -1498,7 +1495,7 @@ class Project:
             if t.lower() == table.lower():
                 continue
             cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
-            self.logger.info('{} variants are removed from table {}'.format(cur.rowcount, t))
+            env.logger.info('{} variants are removed from table {}'.format(cur.rowcount, t))
         # get sample_ids
         cur.execute('SELECT sample_id, sample_name FROM sample;')
         samples = cur.fetchall()
@@ -1507,9 +1504,9 @@ class Project:
                 cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.name, ID))
             cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.name, ID, table))
-            self.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
+            env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
         # remove the table itself
-        self.logger.info('Removing table {} itself'.format(table))
+        env.logger.info('Removing table {} itself'.format(table))
         self.db.removeTable(table)
 
     def removeGenotypes(self, cond):
@@ -1518,11 +1515,11 @@ class Project:
         cur = self.db.cursor()
         cur.execute('SELECT sample_id, sample_name FROM sample;')
         samples = cur.fetchall()
-        self.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
+        env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
         for ID, name in samples:
             cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
                 .format(self.name, ID, cond))
-            self.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
+            env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
 
     def renameSamples(self, cond, name):
         '''Rename selected samples to specified name, return the number of rows changed'''
@@ -1530,18 +1527,18 @@ class Project:
         try:
             query = 'UPDATE sample SET sample_name={} WHERE sample_id IN (SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {});'.format(self.db.PH, 
                 ' WHERE {}'.format(cond) if cond.strip() else '')
-            self.logger.debug('Update samples using query {}'.format(query))
+            env.logger.debug('Update samples using query {}'.format(query))
             cur.execute(query, (name, ))
             return cur.rowcount
         except Exception as e:
-            self.logger.debug(e)
+            env.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
 
     def mergeSamples(self):
         '''Merge samples with the same name to the same samples'''
         cur = self.db.cursor()
         query = 'SELECT sample_name, sample_id FROM sample ORDER BY sample_name'
-        self.logger.debug('Executing {}'.format(query))
+        env.logger.debug('Executing {}'.format(query))
         cur.execute(query)
         # a map of sample_name to multiple sample ids
         samples = {}
@@ -1559,10 +1556,10 @@ class Project:
                 count += len(ids)
         #
         if len(merged) == 0:
-            self.logger.info('No sample is merged because all samples have unique names')
+            env.logger.info('No sample is merged because all samples have unique names')
             return
         #
-        self.logger.info('{} samples that share identical names will be merged to {} samples'.format(count, len(merged)))
+        env.logger.info('{} samples that share identical names will be merged to {} samples'.format(count, len(merged)))
         # merge genotypes
         prog = ProgressBar('Merging samples', count)
         merged_count = 0
@@ -1604,7 +1601,7 @@ class Project:
                 new_fields.extend([fld for fld in fields if fld.split(None, 1)[0] not in [x.split(None, 1)[0] for x in new_fields]])
             #
             sql = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
-            self.logger.debug('Executing {}'.format(sql))
+            env.logger.debug('Executing {}'.format(sql))
             #
             # step 2: create temp table
             try:
@@ -1704,7 +1701,7 @@ class Project:
         numVariants = self.db.numOfRows(table)
         if numVariants == 0:
             return variantIndex
-        self.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        env.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
         where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         if alt_build:
             cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
@@ -1734,7 +1731,7 @@ class Project:
         #info += 'Database engine:             {}\n'.format(self.db.engine)
         #
         # list all runtime options as (name, val) pairs
-        opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in runOptions.persistent_options]
+        opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options]
         info += 'Runtime options:             {}\n'.format(
             ', '.join(['{}={}'.format(name, val) for name,val in opts if val is not None]))
         info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
@@ -1748,14 +1745,14 @@ class Project:
             filename = name
             mode = 'w' if name.endswith('.tar') else 'w:gz'
         elif name.replace('_', '').isalnum():
-            filename = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+            filename = os.path.join(env.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'w'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
         #
-        s = delayedAction(self.logger.info, 'Creating snapshot')
+        s = delayedAction(env.logger.info, 'Creating snapshot')
         with tarfile.open(filename, mode) as snapshot:
-            readme_file = os.path.join(runOptions.cache_dir, '.snapshot.info')
+            readme_file = os.path.join(env.cache_dir, '.snapshot.info')
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
                 readme.write('Name: {}\n'.format(name))
@@ -1763,26 +1760,26 @@ class Project:
                 readme.write('Info: {}\n'.format(message))
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
-            self.logger.debug('Adding .snapshot.info'.format(self.name))
-            s = delayedAction(self.logger.info, 'Copying project')
+            env.logger.debug('Adding .snapshot.info'.format(self.name))
+            s = delayedAction(env.logger.info, 'Copying project')
             snapshot.add('{}.proj'.format(self.name), arcname='snapshot.proj')
-            self.logger.debug('Adding {}.proj as snapshot.proj'.format(self.name))
+            env.logger.debug('Adding {}.proj as snapshot.proj'.format(self.name))
             del s
             if os.path.isfile('{}_genotype.DB'.format(self.name)):
-                s = delayedAction(self.logger.info, 'Copying genotypes')
+                s = delayedAction(env.logger.info, 'Copying genotypes')
                 snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-                self.logger.debug('Adding {}_genotype.DBj as snapshot_genotype.DB'.format(self.name))
+                env.logger.debug('Adding {}_genotype.DBj as snapshot_genotype.DB'.format(self.name))
                 del s
             os.remove(readme_file)
             if files is not None:
                 for f in files:
-                    self.logger.debug('Adding {}'.format(f))
-                    s = delayedAction(self.logger.info, 'Adding {}'.format(f))
+                    env.logger.debug('Adding {}'.format(f))
+                    s = delayedAction(env.logger.info, 'Adding {}'.format(f))
                     snapshot.add(f)
                     del s
         # add a warning message if the snapshot starts with 'vt_'
         if name.startswith('vt_'):
-            self.logger.warning('Snapshots with name starting with vt_ is reserved for public snapshots for documentation and training purposes.') 
+            env.logger.warning('Snapshots with name starting with vt_ is reserved for public snapshots for documentation and training purposes.') 
 
     def loadSnapshot(self, name):
         '''Load snapshot'''
@@ -1791,7 +1788,7 @@ class Project:
             snapshot_file = name
             mode = 'r' if name.endswith('.tar') else 'r:gz'
         elif name.replace('_', '').isalnum():
-            snapshot_file = os.path.join(runOptions.cache_dir, 'snapshot_{}.tar'.format(name))
+            snapshot_file = os.path.join(env.cache_dir, 'snapshot_{}.tar'.format(name))
             mode = 'r'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
@@ -1818,14 +1815,14 @@ class Project:
                 info_file = '.snapshot.info' if '.snapshot.info' in all_files else 'README'
                 all_files.remove(info_file)
                 # project
-                s = delayedAction(self.logger.info, 'Load project')
+                s = delayedAction(env.logger.info, 'Load project')
                 if 'snapshot.proj' in all_files:
-                    self.logger.debug('Extracting snapshot.proj as {}.proj'.format(self.name))
+                    env.logger.debug('Extracting snapshot.proj as {}.proj'.format(self.name))
                     snapshot.extract('snapshot.proj')
                     os.rename('snapshot.proj', '{}.proj'.format(self.name))
                     all_files.remove('snapshot.proj')
                 elif '{}.proj'.format(self.name) in all_files:
-                    self.logger.debug('Extracting {}.proj'.format(self.name))
+                    env.logger.debug('Extracting {}.proj'.format(self.name))
                     # an old version of snapshot saves $name.proj
                     snapshot.extract('{}.proj'.format(self.name))
                     all_files.remove('{}.proj'.format(self.name))
@@ -1833,14 +1830,14 @@ class Project:
                     raise ValueError('Invalid snapshot. Missing project database')
                 del s
                 # genotype
-                s = delayedAction(self.logger.info, 'Load genotypes')
+                s = delayedAction(env.logger.info, 'Load genotypes')
                 if 'snapshot_genotype.DB' in all_files:
-                    self.logger.debug('Extracting snapshot_genotype.DB as {}_genotype.DB'.format(self.name))
+                    env.logger.debug('Extracting snapshot_genotype.DB as {}_genotype.DB'.format(self.name))
                     snapshot.extract('snapshot_genotype.DB'.format(self.name))
                     os.rename('snapshot_genotype.DB', '{}_genotype.DB'.format(self.name))
                     all_files.remove('snapshot_genotype.DB')
                 elif '{}_genotype.DB'.format(self.name) in all_files:
-                    self.logger.debug('Extracting {}_genotype.DB'.format(self.name))
+                    env.logger.debug('Extracting {}_genotype.DB'.format(self.name))
                     # an old version of snapshot saves $name.proj
                     snapshot.extract('{}_genotype.DB'.format(self.name))
                     all_files.remove('{}_genotype.DB'.format(self.name))
@@ -1850,10 +1847,10 @@ class Project:
                 del s
                 # other files
                 for f in all_files:
-                    s = delayedAction(self.logger.info, 'Extracting {}'.format(f))
-                    self.logger.debug('Extracting {}'.format(f))
+                    s = delayedAction(env.logger.info, 'Extracting {}'.format(f))
+                    env.logger.debug('Extracting {}'.format(f))
                     if os.path.isfile(f):
-                        self.logger.warning('Ignore existing file {}.'.format(f))
+                        env.logger.warning('Ignore existing file {}.'.format(f))
                         continue
                     snapshot.extract(f)
                     del s
@@ -2110,7 +2107,6 @@ class MaintenanceProcess(Process):
     def __init__(self, proj, jobs, active_flag):
         Process.__init__(self)
         self.name = proj.name
-        self.logger = proj.logger
         if not jobs:  # if no job is specified
             self.jobs = {'genotype_index': []}
         else:
@@ -2136,7 +2132,7 @@ class MaintenanceProcess(Process):
             db.close()
             return
         #
-        self.logger.debug('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
+        env.logger.debug('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
         try:
             # we process IDs in sample_IDs first ...
             for idx in [x for x in missing_indexes if int(x[9:-6]) in sample_IDs] + \
@@ -2160,7 +2156,6 @@ class MaintenanceProcess(Process):
 class ProjCopier:
     def __init__(self, proj, dir, vtable, samples, genotypes):
         self.proj = proj
-        self.logger = proj.logger
         self.db = proj.db
         #
         files = glob.glob('{}/*.proj'.format(dir))
@@ -2193,10 +2188,10 @@ class ProjCopier:
             if self.db.hasTable(table):
                 self.db.removeTable(table)
             try:
-                #self.logger.debug(sql)
+                #env.logger.debug(sql)
                 cur.execute(sql)
             except Exception as e:
-                self.logger.debug(e)
+                env.logger.debug(e)
             # copying data over
             if self.proj.isVariantTable(table):
                 if self.vtable == 'variant':
@@ -2220,7 +2215,7 @@ class ProjCopier:
             for ID in removed:
                 cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH),
                     (ID,))
-            self.logger.debug('Removing {} unselected samples'.format(len(removed)))
+            env.logger.debug('Removing {} unselected samples'.format(len(removed)))
         self.proj.saveProperty('annoDB', '[]')
         return self.db.numOfRows('variant', False)
 
@@ -2241,10 +2236,10 @@ class ProjCopier:
             if db.hasTable(table):
                 db.removeTable(table)
             try:
-                # self.logger.debug(sql)
+                # env.logger.debug(sql)
                 cur.execute(sql)
             except Exception as e:
-                self.logger.debug(e)
+                env.logger.debug(e)
             # copying data over
             if self.vtable == 'variant':
                 if self.genotypes:
@@ -2300,9 +2295,9 @@ class ProjCopier:
                 copied_samples = self.copySamples()
             else:
                 copied_samples = 0
-            self.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
+            env.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
             # wait for the thread to close
-            s = delayedAction(self.logger.info, 'Create indexes')
+            s = delayedAction(env.logger.info, 'Create indexes')
             if thread.is_alive():
                 thread.join()
             del s
@@ -2499,9 +2494,8 @@ class VariantMapper(threading.Thread):
     
 class VariantProcessor(threading.Thread):
     '''The worker thread to merge a project to the master project'''
-    def __init__(self, queue, status, logger):
+    def __init__(self, queue, status):
         self.queue = queue
-        self.logger = logger
         self.status = status
         threading.Thread.__init__(self, name='cache variants')
 
@@ -2595,16 +2589,15 @@ class VariantProcessor(threading.Thread):
                                     ON v.variant_id = m.old_id;'''.format(
                     ' '.join([', {}'.format(x) for x in headers[1:]]), table)
             if query is not None:
-                self.logger.debug('Caching table {} of project {} ({})'.format(table, self.src_proj,
+                env.logger.debug('Caching table {} of project {} ({})'.format(table, self.src_proj,
                     query))
                 cur.execute(query)
         db.detach('__fromDB')
         db.close()
 
 class SampleProcessor(threading.Thread):
-    def __init__(self, queue, status, logger):
+    def __init__(self, queue, status):
         self.queue = queue
-        self.logger = logger
         self.status = status
         threading.Thread.__init__(self, name='cache samples')
     
@@ -2659,14 +2652,14 @@ class SampleProcessor(threading.Thread):
             try:
                 cur.execute(sql)
             except Exception as e:
-                self.logger.debug(e)
+                env.logger.debug(e)
             #
             # copy data over
             headers = db.getHeaders('genotype_{}'.format(_old_id))
             query = '''INSERT INTO genotype_{0} SELECT new_id {1} FROM __geno.genotype_{2} 
                 LEFT JOIN __proj.__id_map ON __id_map.old_id = __geno.genotype_{2}.variant_id;'''\
                 .format(_old_id, ''.join([', {}'.format(x) for x in headers[1:]]), _old_id)
-            self.logger.debug('Caching sample {} of project {}'.format(_old_id, self.src_proj))
+            env.logger.debug('Caching sample {} of project {}'.format(_old_id, self.src_proj))
             cur.execute(query)
             db.commit()
             self.status.set(self.src_proj, 'completed', 3 + idx)
@@ -2680,7 +2673,6 @@ class SampleProcessor(threading.Thread):
 class VariantCopier(threading.Thread):
     def __init__(self, proj, projects, status):
         self.proj = proj
-        self.logger = self.proj.logger
         #
         self.projects = projects
         self.status = status
@@ -2726,7 +2718,7 @@ class VariantCopier(threading.Thread):
                     query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __fromDB.{0};'''.format(table)
                 else:
                     query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __cacheDB.{0};'''.format(table)
-                self.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
+                env.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
                     all_the_same, keep_all))
                 cur.execute(query)
                 db.commit()
@@ -2748,7 +2740,6 @@ class VariantCopier(threading.Thread):
 class SampleCopier(threading.Thread):
     def __init__(self, proj, projects, status):
         self.proj = proj
-        self.logger = proj.logger
         #
         self.projects = projects
         self.status = status
@@ -2781,7 +2772,7 @@ class SampleCopier(threading.Thread):
                 cur.execute(sql)
                 query = 'INSERT INTO genotype_{} SELECT * FROM __geno.genotype_{};'\
                     .format(_new_id, _old_id)
-                self.logger.debug('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
+                env.logger.debug('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
                 cur.execute(query)
                 count += 1
                 self.status.set('__copySamples', 'completed', count)
@@ -2835,7 +2826,6 @@ class ProjectsMerger:
             and set self.projects and self.structure '''
         self.proj = proj
         self.db = proj.db
-        self.logger = proj.logger
         self.sort = sort
         self.jobs = jobs
         # valid projects
@@ -2850,7 +2840,7 @@ class ProjectsMerger:
                 raise ValueError('Directory {} does not contain a valid variant tools project'.format(dir))
             proj_file = files[0]
             if proj_file in [x[0] for x in self.projects]:
-                self.logger.warning('Remove duplicate merge {}'.format(proj_file))
+                env.logger.warning('Remove duplicate merge {}'.format(proj_file))
             #
             self.db.attach(files[0], '__fromDB')
             # 
@@ -2866,7 +2856,7 @@ class ProjectsMerger:
             alt_build = cur.fetchone()
             #
             if build is None or alt_build is None:
-                self.logger.warning('Ignoring invalid or empty project.'.format(proj_file))
+                env.logger.warning('Ignoring invalid or empty project.'.format(proj_file))
                 continue
             #
             # if merging from an empty project, use the primary and alterantive reference genome of the first one
@@ -2877,7 +2867,7 @@ class ProjectsMerger:
                 self.proj.saveProperty('alt_build', self.proj.alt_build)
                 #
                 if self.proj.alt_build is not None:
-                    s = delayedAction(self.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
+                    s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
                     cur = self.db.cursor()
                     headers = self.db.getHeaders('variant')
                     for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
@@ -3012,7 +3002,7 @@ class ProjectsMerger:
         #  new_ids: sample id in the new project
         duplicated_samples = self.mapSamples(status)
         if duplicated_samples > 0:
-            self.logger.warning('{} samples from the same source files have been copied, leading to potentially duplicated samples.'.format(duplicated_samples))
+            env.logger.warning('{} samples from the same source files have been copied, leading to potentially duplicated samples.'.format(duplicated_samples))
         # stop the database so that it can be opened in thread
         self.proj.db.close()
         #
@@ -3030,12 +3020,12 @@ class ProjectsMerger:
         # start all variant cachers
         self.vcQueue = Queue.Queue()
         for j in range(nJobs):
-            VariantProcessor(self.vcQueue, status, self.logger).start()
+            VariantProcessor(self.vcQueue, status).start()
         #
         # start all sample cachers
         self.scQueue = Queue.Queue()
         for j in range(nJobs):
-            SampleProcessor(self.scQueue, status, self.logger).start()
+            SampleProcessor(self.scQueue, status).start()
         #
         # create a thread to read variants
         if self.sort:
@@ -3048,11 +3038,11 @@ class ProjectsMerger:
         while True:
             for idx, proj in enumerate(self.projects):
                 if status.canProcessVariant(proj) and self.vcQueue.qsize() < nJobs:
-                    self.logger.debug('Process variant in {}'.format(proj))
+                    env.logger.debug('Process variant in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.vcQueue.put(proj)
                 if status.canProcessSample(proj) and self.vcQueue.qsize() + self.scQueue.qsize() < nJobs:
-                    self.logger.debug('Process variant in {}'.format(proj))
+                    env.logger.debug('Process variant in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.scQueue.put(proj)
             if status.canCopyVariants():
@@ -3247,7 +3237,7 @@ def remove(args):
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.items]))
                 if len(IDs) == 0:
-                    proj.logger.warning('No sample is selected by condition {}'.format(' AND '.join(['({})'.format(x) for x in args.items])))
+                    env.logger.warning('No sample is selected by condition {}'.format(' AND '.join(['({})'.format(x) for x in args.items])))
                 proj.removeSamples(IDs)
             elif args.type == 'fields':
                 if len(args.items) == 0:
@@ -3266,14 +3256,14 @@ def remove(args):
                         raise ValueError('Field {} does not exist in any of the variant tables.'.format(item))
                 # remove...
                 for table, items in from_table.items():
-                    proj.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
+                    env.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
                     proj.db.removeFields(table, items)
                     if 'alt_bin' in items or 'alt_chr' in items or 'alt_pos' in items:
-                        proj.logger.info('Removing alternative reference genome because of removal of related fields')
+                        env.logger.info('Removing alternative reference genome because of removal of related fields')
                         proj.alt_build = None
                         proj.saveProperty('alt_build', None)
                 # it is possible that new indexes are needed
-                s = delayedAction(proj.logger.info, 'Rebuilding indexes')
+                s = delayedAction(env.logger.info, 'Rebuilding indexes')
                 try:
                     proj.createIndexOnMasterVariantTable()
                 except:
@@ -3284,10 +3274,10 @@ def remove(args):
                     raise ValueError('Please specify name of genotype fields to be removed')
                 if 'variant_id' in [x.lower() for x in args.items]:
                     raise ValueError('Genotypes id variant_id cannot be removed')
-                    #proj.logger.warning('Genotype id variant_id cannot be removed')
+                    #env.logger.warning('Genotype id variant_id cannot be removed')
                 if 'gt' in [x.lower() for x in args.items]:
                     raise ValueError('Genotypes field GT cannot be removed')
-                    #proj.logger.warning('Genotype field GT cannot be removed')
+                    #env.logger.warning('Genotype field GT cannot be removed')
                 proj.db.attach(proj.name + '_genotype')
                 cur = proj.db.cursor()
                 cur.execute('SELECT sample_id FROM sample;')
@@ -3296,7 +3286,7 @@ def remove(args):
                     header = [x.lower() for x in proj.db.getHeaders(table)]
                     items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
                     if items:
-                        proj.logger.info('Removing fields {} from genotype table {}'.format(', '.join(items), table.split('_')[-1]))
+                        env.logger.info('Removing fields {} from genotype table {}'.format(', '.join(items), table.split('_')[-1]))
                         proj.db.removeFields(table, items)
             elif args.type == 'annotations':
                 if len(args.items) == 0:
@@ -3305,12 +3295,12 @@ def remove(args):
                     removed = False
                     for i in range(len(proj.annoDB)):
                         if proj.annoDB[i].name == item:
-                            proj.logger.info('Removing annotation database {} from the project'.format(item))
+                            env.logger.info('Removing annotation database {} from the project'.format(item))
                             proj.annoDB.pop(i)
                             removed = True
                             break
                     if not removed:
-                        proj.logger.warning('Cannot remove annotation database {} from the project'.format(item))
+                        env.logger.warning('Cannot remove annotation database {} from the project'.format(item))
                 proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in proj.annoDB]))
             elif args.type == 'variants':
                 if len(args.items) == 0:
@@ -3373,7 +3363,7 @@ def showArguments(parser):
 
 
 def show(args):
-    try:
+    #try:
         with Project(verbosity=args.verbosity) as proj:
             #
             limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
@@ -3422,7 +3412,7 @@ def show(args):
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
-                    proj.logger.warning('Project does not have a sample table.')
+                    env.logger.warning('Project does not have a sample table.')
                     return
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
@@ -3440,7 +3430,7 @@ def show(args):
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'fields':
                 if len(proj.annoDB) == 0:
-                    proj.logger.debug('No annotation database is attached.')
+                    env.logger.debug('No annotation database is attached.')
                 for table in proj.getVariantTables():
                     tfields = [field for field in proj.db.getHeaders(table) if field not in ('variant_id', 'bin', 'alt_bin')]
                     if tfields:
@@ -3459,7 +3449,7 @@ def show(args):
                     try:
                         annoDB = [x for x in proj.annoDB if x.name.lower() == item.lower()][0]
                     except Exception as e:
-                        proj.logger.debug(e)
+                        env.logger.debug(e)
                         raise IndexError('Database {} is not currently used in the project'.format(item))
                     annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
@@ -3471,7 +3461,7 @@ def show(args):
             elif args.type == 'formats':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'.format(', '.join(args.items)))
-                res = ResourceManager(proj.logger)
+                res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
                 for fmt, prop in res.manifest.iteritems():
@@ -3485,7 +3475,7 @@ def show(args):
                     try:
                         fmt = fileFMT(item)
                     except Exception as e:
-                        proj.logger.debug(e)
+                        env.logger.debug(e)
                         raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file "{}"'.format(e, item))
                     fmt.describe()
             elif args.type == 'genotypes':
@@ -3493,7 +3483,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show genotypes"'.format(', '.join(args.items)))
                 # get sample ids and attach the genotypes database
                 if not proj.db.hasTable('sample'):
-                    proj.logger.warning('Project does not have a sample table.')
+                    env.logger.warning('Project does not have a sample table.')
                     return
                 cur = proj.db.cursor()
                 try:
@@ -3501,7 +3491,7 @@ def show(args):
                 except Exception as e:
                     # either the database doesn't exist or it's already been attached (should we add a method proj.db.isAttached(...)? and embedding this in the attach() method?
                     if not proj.db.hasDatabase(proj.name + '_genotype'):
-                        proj.logger.debug('Trying to attach a database that doesn\'t exist' + e)
+                        env.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 print('sample_name\tfilename\tnum_genotypes\tsample_genotype_fields')
                 cur.execute('SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
@@ -3529,7 +3519,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
                 print('\n'.join(['{}{}{}'.format(test, ' '*(22-len(test)),
-                    '\n'.join(textwrap.wrap(obj.__doc__, initial_indent=' '*22, width=78,
+                    '\n'.join(textwrap.wrap('' if obj.__doc__ is None else obj.__doc__, initial_indent=' '*22, width=78,
                         subsequent_indent=' '*22))[22:]) for test, obj in getAllTests()]))
             elif args.type == 'test':
                 from .association import getAllTests
@@ -3546,11 +3536,11 @@ def show(args):
                 print('Description:   {}'.format('\n'.join(textwrap.wrap(test.__doc__, initial_indent='',
                         subsequent_indent=' '*15))))
                 # create an instance of the test and pass -h to it
-                test(1, None, ['-h']) 
+                test(1, ['-h']) 
             elif args.type == 'runtime_options':
-                for opt, (def_value, description) in sorted(runOptions.persistent_options.iteritems()):
+                for opt, (def_value, description) in sorted(env.persistent_options.iteritems()):
                     # get the raw value of option (not the attribute, which might not be a string)
-                    val = str(getattr(runOptions, '_' + opt))
+                    val = str(getattr(env, '_' + opt))
                     print('{}{}{} {}'.format(opt, ' '*(27-len(opt)), val,
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
                     print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
@@ -3558,13 +3548,13 @@ def show(args):
             elif args.type == 'runtime_option':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of a runtime option')
-                print(getattr(runOptions, '_' + args.items[0]))
+                print(getattr(env, '_' + args.items[0]))
             elif args.type == 'snapshot':
                 if not args.items:
                     raise ValueError('Please provide a list of snapshot name or filenames')
                 print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
                 for snapshot in args.items:
-                    name, date, desc = getSnapshotInfo(snapshot, proj.logger)
+                    name, date, desc = getSnapshotInfo(snapshot)
                     if name is not None:
                         print('{:<18} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
@@ -3572,20 +3562,20 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
                 print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
-                for snapshot_file in glob.glob(os.path.join(runOptions.cache_dir, 'snapshot_*.tar')):
-                    name, date, desc = getSnapshotInfo(snapshot_file, proj.logger)
+                for snapshot_file in glob.glob(os.path.join(env.cache_dir, 'snapshot_*.tar')):
+                    name, date, desc = getSnapshotInfo(snapshot_file)
                     if name is not None:
                         print('{:<18} {:<15} {}'.format(name, date, 
                             '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
                 #
-                res = ResourceManager(proj.logger)
+                res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
                     print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
                         initial_indent='', subsequent_indent=' '*35))[35:]))
-    except Exception as e:
-        sys.exit(e)
+    #except Exception as e:
+        #sys.exit(e)
 
 
 def executeArguments(parser):
@@ -3606,10 +3596,10 @@ def execute(args):
             cur = proj.db.cursor()
             query = ' '.join(args.query)
             if query.upper().startswith('SELECT'):
-                proj.logger.debug('Analyze statement: "{}"'.format(query))
+                env.logger.debug('Analyze statement: "{}"'.format(query))
                 cur.execute('EXPLAIN QUERY PLAN ' + query)
                 for rec in cur:
-                    proj.logger.debug('\t'.join([str(x) for x in rec]))
+                    env.logger.debug('\t'.join([str(x) for x in rec]))
             # really execute the query
             cur.execute(query)
             proj.db.commit()
@@ -3688,7 +3678,7 @@ def admin(args):
                 raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
                 changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
-                proj.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
+                env.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
             elif args.merge_samples:
                 # need to merge genotype tables
                 proj.db.attach(proj.name + '_genotype')
@@ -3705,7 +3695,7 @@ def admin(args):
                 if args.rename_table[0] == args.rename_table[1]:
                     raise ValueError('Cannot rename a table to itself.')
                 proj.db.renameTable(encodeTableName(args.rename_table[0]), encodeTableName(args.rename_table[1]))
-                proj.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
+                env.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
                 # change the meta information of the table
                 cur = proj.db.cursor()
                 for key in ('desc', 'date', 'cmd'):
@@ -3715,7 +3705,7 @@ def admin(args):
                 if not proj.db.hasTable(encodeTableName(args.describe_table[0])):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(encodeTableName(args.describe_table[0]), args.describe_table[1])
-                proj.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
+                env.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
             elif args.validate_build:
                 try:
                     refgenome = RefGenome(proj.build)
@@ -3731,24 +3721,24 @@ def admin(args):
                     count += 1
                     if not refgenome.verify(chr, pos, ref):
                         err_count += 1
-                        proj.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'.format(chr, pos, ref))
+                        env.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'.format(chr, pos, ref))
                     prog.update(count + 1, err_count)
                 prog.done()
-                proj.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count))
+                env.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
                         raise ValueError('Runtime option should be specified as opt=value')
                     opt, value = option.split('=', 1)
-                    if opt not in runOptions.persistent_options:
-                        raise ValueError('Only options {} are currently supported.'.format(', '.join(runOptions.persistent_options)))
+                    if opt not in env.persistent_options:
+                        raise ValueError('Only options {} are currently supported.'.format(', '.join(env.persistent_options)))
                     proj.saveProperty('__option_{}'.format(opt), value)
-                    proj.logger.info('Option {} is set to {}'.format(opt, value))
+                    env.logger.info('Option {} is set to {}'.format(opt, value))
             elif args.reset_runtime_option is not None:
-                if args.reset_runtime_option not in runOptions.persistent_options:
+                if args.reset_runtime_option not in env.persistent_options:
                     raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.'.format(args.reset_runtime_option))
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
-                proj.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
+                env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
                 if args.extra_files is not None:
                     cur_dir = os.path.realpath(os.getcwd())
@@ -3768,19 +3758,19 @@ def admin(args):
                         if f == proj.name + '_genotype.proj':
                             raise ValueError('Project genotype database is already included.')
                 proj.saveSnapshot(args.save_snapshot[0], args.save_snapshot[1], args.extra_files)
-                proj.logger.info('Snapshot {} has been saved'.format(args.save_snapshot[0]))
+                env.logger.info('Snapshot {} has been saved'.format(args.save_snapshot[0]))
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
-                proj.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
+                env.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
             elif args.update_resource:
-                res = ResourceManager(proj.logger)
+                res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type=args.update_resource)
                 res.excludeExistingLocalFiles()
-                proj.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
             else:
-                proj.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
+                env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
         sys.exit(e)
 

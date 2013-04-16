@@ -26,7 +26,7 @@
 
 import sys, os
 import itertools as it
-from .utils import ProgressBar, RefGenome
+from .utils import ProgressBar, RefGenome, env
 from .plinkfile import PlinkFile
 
 class PlinkBinaryToVariants:
@@ -62,14 +62,13 @@ class PlinkBinaryToVariants:
 
     self.determineMajorAllele() Attempts to resolve this issue
     """
-    def __init__(self, dataset, build, chrom_namemap = {}, logger = None):
+    def __init__(self, dataset, build, chrom_namemap = {}):
         # check file path
         for ext in ['.fam', '.bed', '.bim']:
             if not os.path.exists(dataset + ext):
                 raise RuntimeError('Cannot find file {0}'.format(dataset + ext))
         self.dataset = dataset
         self.build = build
-        self.logger = logger
         self.cur = PlinkFile(self.dataset)
         # a list of sample names (sample ID's in .fam file)'''
         self.samples =  [x.iid for x in self.cur.get_samples()]
@@ -106,28 +105,28 @@ class PlinkBinaryToVariants:
         try:
             ref = self.hgref.getBase(chrom, pos)
         except Exception as e:
-            self.logger.warning('Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
+            env.logger.warning('Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
                                 'Input variant is ignored'.format(chrom, pos, self.build))
             self.status = -1
             return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
             if self.status == -2:
-                self.logger.warning('Monomorphic site "{0}:{1}" ignored'.\
+                env.logger.warning('Monomorphic site "{0}:{1}" ignored'.\
                                     format(chrom, pos))
             else:
-                self.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
+                env.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
                                     format(chrom, pos, allele1, allele2, ref))
             return None
         elif self.status == 0:
             if strand:
-                self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+                env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
             return ','.join([chrom, str(pos), allele1, allele2]) + ',' + str(geno_cur)
         else:
             # have to flip the genotypes coding
             if strand:
-                self.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
-            # self.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
+                env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+            # env.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
             return ','.join([chrom, str(pos), allele2, allele1]) + ',' + \
                 ','.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
@@ -153,7 +152,7 @@ class PlinkBinaryToVariants:
             self.cur.close()
             return False, None
         except:
-            self.logger.error('Failed to retrieve locus {0}:{1} '
+            env.logger.error('Failed to retrieve locus {0}:{1} '
                                 '(plinkio error)'.format(locus.chromosome, locus.bp_position))
             return True, None
         if which_major == 1:
@@ -253,10 +252,9 @@ class Preprocessor:
         and write intermediate output files to $outdir/file.format'''
         pass
 
-    def convert(self, files, output_files, logger = None):
+    def convert(self, files, output_files):
         for item, ofile in zip(files, output_files):
-            if logger:
-                logger.info('Convert {} to {}'.format(item, ofile))
+            env.logger.info('Convert {} to {}'.format(item, ofile))
         
 
 class PlinkConverter(Preprocessor):
@@ -265,11 +263,11 @@ class PlinkConverter(Preprocessor):
         self.build = build
         self.cmap = chrom_namemap
 
-    def convert(self, files, output_files, logger):
+    def convert(self, files, output_files):
         for item, ofile in zip(files, output_files):
             if os.path.exists(item + ".bed"):
-                self.decode_plink(PlinkBinaryToVariants(item, self.build, self.cmap, logger),
-                                  ofile, logger=logger)
+                self.decode_plink(PlinkBinaryToVariants(item, self.build, self.cmap),
+                                  ofile)
             else:
                 import glob
                 files = '/'.join([x for x in glob.glob(item + '*')])
@@ -280,16 +278,16 @@ class PlinkConverter(Preprocessor):
                 else:
                     raise ValueError("Cannot find input files '{}'".format(item + '*'))
             
-    def decode_plink(self, p2vObject, ofile, n = 1000, logger = None):
+    def decode_plink(self, p2vObject, ofile, n = 1000):
         '''decode plink data from p2vObject and output to ofile'''
-        if logger: logger.info("Determining major/minor allele from data")
+        env.logger.info("Determining major/minor allele from data")
         # check major allele
         which_major = p2vObject.determineMajorAllele(n)
         # raise on bad match
         if which_major == -9:
             raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}.'.\
                                   format(p2vObject.dataset, p2vObject.build))
-        if logger: logger.debug("allele{} is major allele".format(which_major))
+        env.logger.debug("allele{} is major allele".format(which_major))
         # output
         nloci = p2vObject.getLociCounts()
         batch = int(nloci / 100)

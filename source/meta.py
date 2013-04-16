@@ -27,7 +27,7 @@ import sys, os, time
 from math import sqrt
 from variant_tools.utils import openFile
 from variant_tools.project import AnnoDBWriter, Field
-from variant_tools.utils import runOptions
+from variant_tools.utils import env
 if sys.version_info.major == 2:
     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_Pinv as qnorm
     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_P as pnorm
@@ -36,8 +36,7 @@ else:
     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_P as pnorm
 
 class MetaAnalysis:
-    def __init__(self, files, beta, pval, size, linker, logger=None):
-        self.logger = logger
+    def __init__(self, files, beta, pval, size, linker):
         self.data = [tuple(self.read(fn, beta, pval, size, linker)) for fn in files]
         self.header = list(set([tuple([d[0][i] for i in linker]) for d in self.data]))
         if len(self.header) > 1:
@@ -90,7 +89,7 @@ class MetaAnalysis:
         fields = [(x, 'FLOAT') if not x.startswith('sample_size') else (x, 'INTEGER') for x in fields]
         for item in linker + fields:
             self.fields.append(Field(name=item[0], index=None, type=item[1], adj=None, comment=''))
-        runOptions.sqlite_pragma = 'synchronous=OFF,journal_mode=MEMORY'
+        env.sqlite_pragma = 'synchronous=OFF,journal_mode=MEMORY'
         self.writer = AnnoDBWriter(
                 db_name, self.fields,
                 'field', # field annotation databases
@@ -98,7 +97,6 @@ class MetaAnalysis:
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
                 '1.0',# version 1.0
                 {'*': self.group_names},# link by group fields
-                self.logger,
                 True, # allow updating an existing database
                 True # allow updating an existing field
                 )
