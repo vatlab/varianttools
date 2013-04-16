@@ -1739,7 +1739,6 @@ class RTest(ExternTest):
         self.parseInput()
         # step 3: parse output, prepare output database field. field type have to be explicitly specified.
         self.parseOutput()
-        env.logger.debug("R Program in action:\n{0}".format('\n'.join(self.Rscript)))
         # step 4: self.calculate
         # 4.1  format python data into S4 object string that matches the input: self.loadData()
         # 4.2 finish script for the output part: self.formatOutput
@@ -1967,9 +1966,13 @@ class RTest(ExternTest):
         self.loadData()
         self.formatOutput()
         # write data and R script to log file for this group
-        if self.data_logger_counter < self.data_logger or self.data_logger < 0:
-            env.logger.debug('\n' + '\n'.join(self.Rdata))
-            self.data_logger_counter += 1
+        if self.data_cache_counter < self.data_cache or self.data_cache < 0:
+            try:
+                with open(os.path.join(env.cache_dir, '{0}.dat.R'.format(self.gname)), 'w') as f:
+                    f.write('\n'.join(self.Rscript + self.Rdata))
+                self.data_cache_counter += 1
+            except:
+                pass
         cmd = "R --slave --vanilla"
         try:
             out = run_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata)),
@@ -1987,19 +1990,19 @@ class RTest(ExternTest):
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
         parser.add_argument('script', type=str,
-            help='R program to be loaded, written in a format'
+            help='R program to be loaded. The R script format has to follow the convention '
             'documented at http://varianttools.sf.net/Association/RTest')
         parser.add_argument('--name', default='RTest',
             help='''Name of the test that will be appended to names of output fields.''')
-        parser.add_argument('--data_logger', metavar='N', type=int, default = 0,
-            help='''Name of R data sets to be written into log file, for debug purpose [use with caution].''')        
+        parser.add_argument('--data_cache', metavar='N', type=int, default = 0,
+            help='''Name of R data sets to be written into cache folder, for debug purpose.''')        
         # incorporate args to this class
         args, unknown = parser.parse_known_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         # handle unknown arguments
         self.params = self._determine_params(unknown, 'parse')
-        self.data_logger_counter = 0
+        self.data_cache_counter = 0
 
     def _determine_params(self, params, option = 'replace'):
         if option == 'parse':

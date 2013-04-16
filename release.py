@@ -210,8 +210,8 @@ if __name__ == '__main__':
     args, argv = parser.parse_known_args()
     #
     version = ModifyVersion(args.version)
-    SetUpEnvironment(version)
     if not args.pack_only:
+        SetUpEnvironment(version)
         GenerateSWIGWrappers()
         BuildVariantTools(argv)
     BuildSourcePackage()
