@@ -3367,7 +3367,7 @@ def showArguments(parser):
 
 
 def show(args):
-    #try:
+    try:
         with Project(verbosity=args.verbosity) as proj:
             #
             limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
@@ -3578,8 +3578,8 @@ def show(args):
                 for ss, prop in res.manifest.iteritems():
                     print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
                         initial_indent='', subsequent_indent=' '*35))[35:]))
-    #except Exception as e:
-        #sys.exit(e)
+    except Exception as e:
+        sys.exit(e)
 
 
 def executeArguments(parser):

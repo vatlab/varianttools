@@ -1728,6 +1728,7 @@ class GroupWrite(ExternTest):
 #
 
 class RTest(ExternTest):
+    '''A general framework for association analysis using R programs'''
     def __init__(self, ncovariates, *method_args):
         '''Properly parse command arguments to parts of R script'''
         ExternTest.__init__(self, *method_args)
@@ -1758,7 +1759,7 @@ class RTest(ExternTest):
                                  format(self.script, basename))
             # look for file
             found = False
-            for path in [None, '.', os.path.join(runOptions.local_resource, 'programs'), runOptions.cache_dir]:
+            for path in [None, '.', os.path.join(env.local_resource, 'programs'), env.cache_dir]:
                 if path is None:
                     script = os.path.expanduser(self.script)
                 else:
@@ -1849,7 +1850,8 @@ class RTest(ExternTest):
             output = output.group('a').strip().replace('\n', ' ')
             if not (output.startswith('list(') and output.endswith(')')):
                 raise ValueError("Improper return object '{0}'. "
-                                 "Please refer to documentation page http://.".format(output))
+                                 "For help, please read "
+                                 "http://varianttools.sf.net/Association/RTest".format(output))
             else:
                 output = output[5:-1]
             # FIXME: cannot find a good regular expression to work here
@@ -1964,7 +1966,10 @@ class RTest(ExternTest):
         #
         self.loadData()
         self.formatOutput()
-        # print ('\n'.join(self.Rscript + self.Rdata))
+        # write data and R script to log file for this group
+        if self.data_logger_counter < self.data_logger or self.data_logger < 0:
+            env.logger.debug('\n' + '\n'.join(self.Rdata))
+            self.data_logger_counter += 1
         cmd = "R --slave --vanilla"
         try:
             out = run_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata)),
@@ -1981,17 +1986,20 @@ class RTest(ExternTest):
         parser = argparse.ArgumentParser(description='''R test''',
             prog='vtools associate --method ' + self.__class__.__name__)
         # argument that is shared by all tests
-        parser.add_argument('--name', default='gwrite',
-            help='''Name of the test that will be appended to names of output fields.''')
         parser.add_argument('script', type=str,
             help='R program to be loaded, written in a format'
-            'documented at http://varianttools.sf.net/xx.')
+            'documented at http://varianttools.sf.net/Association/RTest')
+        parser.add_argument('--name', default='RTest',
+            help='''Name of the test that will be appended to names of output fields.''')
+        parser.add_argument('--data_logger', metavar='N', type=int, default = 0,
+            help='''Name of R data sets to be written into log file, for debug purpose [use with caution].''')        
         # incorporate args to this class
         args, unknown = parser.parse_known_args(method_args)
         # incorporate args to this class
         self.__dict__.update(vars(args))
         # handle unknown arguments
         self.params = self._determine_params(unknown, 'parse')
+        self.data_logger_counter = 0
 
     def _determine_params(self, params, option = 'replace'):
         if option == 'parse':
@@ -2032,15 +2040,15 @@ class RTest(ExternTest):
                             item.append('')
                     defaults.append(item[0])
                     if item[0] in self.params:
-                        s = self.params[item[0]]
+                        s = self.params[item[0]].strip()
                         # s should be a raw string, determined from the function,
                         # but was not inputted as raw
                         if re.match(r'(.*[^\s])\((.*)\)$', re.sub(r'\'|"', '', s).strip()):
                             # input is something like "c()", "rbind()" ...
-                            s = re.sub(r'\'|"', '', s)
-                        if ((item[1].startswith('"') and item[1].endswith('"')) \
-                          or (item[1].startswith("'") and item[1].endswith("'"))) \
-                          and (not re.match(r'\'|"', s)):
+                            # will remove quote marks around them
+                            s = re.sub(r'^\'|\'$|^"|"$', '', s)
+                        if re.match(r'^\'|\'$|^"|"$', item[1].strip()) \
+                          and (not re.match(r'^\'|\'$|^"|"$', s)):
                           item[1] = '"{0}"'.format(s)
                         else:
                           item[1] = '{0}'.format(s)
@@ -2053,6 +2061,8 @@ class RTest(ExternTest):
                                  "no variable name for data object is found in '{0}'".format(params))
             # check if all self.params belong to default parameters 
             for k in list(self.params.keys()):
+                if k is None:
+                    raise ValueError("Broken input argument {0}".format(self.params[k]))
                 if k not in defaults:
                     raise ValueError("[R script error] Input parameter '{0}' is not defined in R function '{1}'".\
                                      format(k, self.basename))
@@ -2064,7 +2074,7 @@ class RTest(ExternTest):
 
 
 class SKAT(RTest):
-    '''SKAT (Wu et al 2011) wrapper of its original R implementation'''
+    '''SKAT (Wu et al 2011) and SKAT-O (Lee et al 2012)'''
     def __init__(self, ncovariates, *method_args):
         RTest.__init__(self, ncovariates, *method_args)
         # Check for R/SKAT installation
@@ -2074,12 +2084,11 @@ class SKAT(RTest):
             raise ValueError("Cannot load R library SKAT: {0}".format(e))
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011).
-            This is a wrapper for the R package "SKAT" implemented & maintained by Dr. Seunggeun Lee, with a similar
-            interface and minimal descriptions based on the SKAT package documentation (May 11, 2012).
-            Please refer to http://http://cran.r-project.org/web/packages/SKAT/
-            for details of usage. To use this test you should have R installed with SKAT v0.75 or higher. 
-            The SKAT commands applied to the data will be recorded and saved in the project log file.''',
+        parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011; Lee at all 2012).
+            This test adapts the R package "SKAT" implemented & maintained by Dr. Seunggeun Lee, with a less
+            complete interface and collection of features. Please refer to the SKAT documentation in R 
+            http://cran.r-project.org/web/packages/SKAT/ 
+            for details of usage. Installation of SKAT R package v0.82 or higher is required to use this test.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
             help='''Phenotype is quantitative trait or disease trait (0/1 coding).
@@ -2096,8 +2105,8 @@ class SKAT(RTest):
         parser.add_argument('--beta_param', nargs=2, type=float, default = [1,25],
             help='''Parameters for beta weights. It is only used with weighted kernels. Default set to (1,25).
                 Please refer to SKAT documentation for details.''')
-        parser.add_argument('-m','--method', type=str, choices = ['davies','liu','liu.mod','optimal'], default='davies',
-            help='''A method to compute the p-value. Default set to "davies". Please refer to SKAT documentation for details.''')
+        parser.add_argument('-m','--method', type=str, choices = ['davies','liu','liu.mod','optimal', 'optimal.adj'], default='optimal',
+            help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "davies". Please refer to SKAT documentation for details.''')
         parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
             help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
         parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',

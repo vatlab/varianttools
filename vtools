@@ -213,5 +213,3 @@ if __name__ == '__main__':
         sys.exit('vtools: error: unrecognized arguments: ' + ' '.join(argv))
     # calling the associated functions
     args.func(args)
-
-

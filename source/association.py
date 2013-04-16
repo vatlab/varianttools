@@ -859,8 +859,10 @@ class AssoTestsWorker(Process):
         # D3: geno_info 
         self.pydata['geno_info'] = zip(*self.pydata['geno_info'])
         self.pydata['geno_info'] = [zip(*item) for item in self.pydata['geno_info']]
-        unique_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
-        self.pydata['sample_name'] = [str(x) for idx, x in enumerate(unique_names) if which[idx]]
+        if len(self.sample_names) != len(set(self.sample_names)):
+            env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names") 
+            self.sample_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
+        self.pydata['sample_name'] = [str(x) for idx, x in enumerate(self.sample_names) if which[idx]]
         self.pydata['phenotype_name'] = self.phenotype_names
         self.pydata['covariate_name'] = self.covariate_names
         self.pydata['phenotype'] = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
