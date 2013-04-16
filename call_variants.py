@@ -723,7 +723,7 @@ class BaseVariantCaller:
         wait_all()
         return sam_files        
 
-    def sam2bam(self, sam_files):
+    def SortSamWithSamtools(self, sam_files):
         '''Convert sam file to sorted bam files.'''
         bam_files = []
         for sam_file in sam_files:
@@ -751,6 +751,45 @@ class BaseVariantCaller:
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
         return sorted_bam_files
+
+   def SortSam(self, sam_files, output=None):
+        '''Convert sam file to sorted bam files using Picard.'''
+        # sort bam files
+        sorted_bam_files = []
+        for bam_file in bam_files:
+            sorted_bam_file = bam_file[:-4] + '_sorted.bam'
+            if existAndNewerThan(sorted_bam_file, bam_file):
+                env.logger.warning('Using existing sorted bam file {}'.format(sorted_bam_file))
+            else:
+                run_command('java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'.format(
+                    env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
+                    env.options['OPT_PICARD_SORTSAM'], bam_file, sorted_bam_file[:-4] + '_tmp.bam'),
+                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
+            sorted_bam_files.append(sorted_bam_file)
+        wait_all()
+        return sorted_bam_files
+
+
+    def markDuplicates(self, bam_files, working_dir):
+        '''Mark duplicate using picard'''
+        dedup_bam_files = []:
+        for bam_file in bam_files:
+            dedup_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
+            metrics_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
+            if existAndNewerThan(dedup_bam_file, bam_file):
+                env.logger.warning('Using existing bam files after marking duplicate {}'.format(dedup_bam_file))
+            else:
+                run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
+                    INPUT={3}
+                    OUTPUT={4}
+                    METRICS_FILE={5}
+                    VALIDATION_STRINGENCY=LENIENT
+                    '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                            env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
+                            metrics_file), 
+                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file))
+            dedup_bam_files.append(dedup_bam_file)
+        return dedup_bam_files
 
     def mergeBAMs(self, bam_files, output):
         '''merge sam files'''
@@ -824,23 +863,6 @@ class BaseVariantCaller:
         # 
         return cleaned_bam_file
 
-    def markDuplicates(self, bam_file, working_dir):
-        '''Mark duplicate using picard'''
-        dedup_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
-        metrics_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
-        if existAndNewerThan(dedup_bam_file, bam_file):
-            env.logger.warning('Using existing bam files after marking duplicate {}'.format(dedup_bam_file))
-        else:
-            run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
-                INPUT={3}
-                OUTPUT={4}
-                METRICS_FILE={5}
-                VALIDATION_STRINGENCY=LENIENT
-                '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                        env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
-                        metrics_file), 
-                upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file))
-        return dedup_bam_file
 
     def recalibrate(self, bam_file, recal_bam_file, working_dir):
         '''Create realigner target and realign indels'''
@@ -1037,13 +1059,16 @@ class hg19_gatk_23(BaseVariantCaller):
             sam_files = self.bwa_samse(fastq_files, working_dir)
         # 
         # step 4: convert sam to sorted bam files
-        bam_files = self.sam2bam(sam_files)
+        sorted_bam_files = self.SortSam(sam_files)
+        #
+        # step 5: remove duplicate
+        dedup_files = self.markDuplicates(sorted_bam_files)
         #
         # step 5: merge sorted bam files to output file
         if len(bam_files) > 1:
-            self.mergeBAMs(bam_files, output)
+            self.mergeBAMs(dedup_files, output)
         else:
-            shutil.copy(bam_files[0], output)
+            shutil.copy(dedup_files[0], output)
         #
         # step 6: index the output bam file
         self.indexBAM(output)
@@ -1060,12 +1085,8 @@ class hg19_gatk_23(BaseVariantCaller):
         cleaned_bam_file = self.realignIndels(input_file, working_dir)
         self.indexBAM(cleaned_bam_file)
         #
-        # step 2: Mark duplicate
-        dedup_bam_file = self.markDuplicates(cleaned_bam_file, working_dir)
-        self.indexBAM(dedup_bam_file)
-        #
         # step 3: recalibration
-        self.recalibrate(dedup_bam_file, output, working_dir)
+        self.recalibrate(cleaned_bam_file, output, working_dir)
         self.indexBAM(output)
 
     def callVariants(self, input_files, output):
@@ -1093,6 +1114,7 @@ if __name__ == '__main__':
         ('OPT_SAMTOOLS_SORT', ''),
         ('OPT_SAMTOOLS_INDEX', ''),
         ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
+        ('OPT_PICARD_SORTSAM', ''),
         ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
         ('OPT_GATK_INDELREALIGNER', ''),
         ('OPT_PICARD_MARKDUPLICATES', ''),
