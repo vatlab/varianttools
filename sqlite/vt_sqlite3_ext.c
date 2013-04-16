@@ -158,9 +158,13 @@ static void fisher_exact(
 }
 
 
-// add an init function to make python extension happy
-void init_vt_sqlite3_ext()
+// this is a fake function to make this .so file a loadable Python module
+// so that it can be imported and recogznied by pyinstaller. The library
+// is actually imported into sqlite using SELECT load_extension()
+#include <Python.h>
+PyMODINIT_FUNC init_vt_sqlite3_ext()
 {
+	Py_InitModule3("_vt_sqlite3_ext", NULL, "Fake sqlite3 extension module");
 }
 
 

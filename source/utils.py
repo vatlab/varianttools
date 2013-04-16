@@ -64,10 +64,14 @@ try:
     if sys.version_info.major == 2:
         import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
+        # fake import to make this sqlite module bundled by pyinstaller
+        import _vt_sqlite3_ext
         from cgatools_py2 import CrrFile, Location, Range
     else:
         import pickle
         import vt_sqlite3_py3 as sqlite3
+        # fake import to make this sqlite module bundled by pyinstaller
+        import _vt_sqlite3_ext
         from cgatools_py3 import CrrFile, Location, Range
 
 except ImportError as e:
@@ -1455,6 +1459,16 @@ class DatabaseEngine:
                         raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
                     break
                 ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
+                if ext:
+                    cur = self.database.cursor()
+                    try:
+                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
+                    except Exception as e:
+                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                    break
+                #
+                # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
+                ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext.*'))
                 if ext:
                     cur = self.database.cursor()
                     try:
