@@ -3224,10 +3224,14 @@ def remove(args):
                 removed = []
                 for table in args.items:
                     if '?' in table or '*' in table:
+                        matchd = False
                         for tbl in [decodeTableName(x) for x in allTables]:
                             if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
                                 proj.removeVariantTable(encodeTableName(tbl))
                                 removed.append(tbl)
+                                matched = True
+                        if not matched:
+                            env.logger.warning('Name {} does not match any existing variant table.'.format(table))
                     else:
                         proj.removeVariantTable(encodeTableName(table))
                         removed.append(table)

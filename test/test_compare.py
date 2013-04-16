@@ -102,6 +102,11 @@ class TestCompare(ProcessTestCase):
         runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare "d@p" ns_damaging --intersection "K&K@"')
         self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
+        #
+        # handling of wildcard names
+        self.assertSucc('vtools compare \'ns*\' --union u')
+        self.assertTrue('u' in outputOfCmd('vtools show tables'))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -25,11 +25,13 @@
 #
 
 import sys
+import re
 from .project import Project
 from .utils import ProgressBar, env, encodeTableName, decodeTableName
 
 def compareArguments(parser):
-    parser.add_argument('tables', nargs='+', help='''variant tables to compare.''')
+    parser.add_argument('tables', nargs='+', help='''variant tables to compare. Wildcard
+        characters * and ? can be used to specify multiple tables.''')
     parser.add_argument('--A_diff_B', metavar= 'TABLE',
         help='''deprecated, use --difference instead.''')
     parser.add_argument('--B_diff_A', metavar= 'TABLE',
@@ -189,10 +191,27 @@ def compareMultipleTables(proj, args):
 def compare(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            # table?
+            # expand wildcard characters in args.tables
+            tables = []
+            allTables = proj.getVariantTables()
             for table in args.tables:
+                if '?' in table or '*' in table:
+                    match = False
+                    for tbl in [decodeTableName(x) for x in allTables]:
+                        if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I):
+                            tables.append(tbl)
+                            match = True
+                    if not match:
+                        # * should match a table with '*' in its name.
+                        env.logger.warning('Name {} does not match any existing table.'.format(table))
+                else:
+                    tables.append(table)
+            # table?
+            for table in tables:
                 if not proj.isVariantTable(encodeTableName(table)):
                     raise ValueError('Variant table {} does not exist.'.format(table))
+            # set args.tables to its expanded version
+            args.tables = tables
             # this is the old behavior
             if args.intersection or args.union or args.difference:
                 if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
