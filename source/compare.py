@@ -90,6 +90,8 @@ def compareTwoTables(proj, args):
             continue
         if table == 'variant':
             raise ValueError('Cannot overwrite the master variant table')
+        if '*' in table or '?' in table:
+            env.logger.warning('Use of wildcard character * or ? in table names is not recommended because such names can be expanded to include other tables in some commands.')
         if proj.db.hasTable(encodeTableName(table)):
             new_table = proj.db.backupTable(encodeTableName(table))
             env.logger.warning('Existing table {} is renamed to {}.'.format(table, decodeTableName(new_table)))
@@ -169,6 +171,8 @@ def compareMultipleTables(proj, args):
         table = table_with_desc[0]
         if table == 'variant':
             raise ValueError('Cannot overwrite the master variant table')
+        if '*' in table or '?' in table:
+            env.logger.warning('Use of wildcard character * or ? in table names is not recommended because such names can be expanded to include other tables in some commands.')
         desc = table_with_desc[1] if len(table_with_desc) == 2 else ''
         if len(table_with_desc) > 2:
             raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
