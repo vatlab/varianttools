@@ -1573,7 +1573,8 @@ class Importer:
                     if not os.path.isfile(output):
                         raise ValueError("Preprocessed file {} does not exist.".format(output))
             except Exception as e:
-                raise ValueError("Failed to execute preprocessor '{}': {}".format(command, e))
+                raise ValueError("Failed to execute preprocessor '{}': {}".\
+                                 format(re.sub(r'\((.*)\)', '', command), e))
             #
             # we record file as cache files
             files = temp_files

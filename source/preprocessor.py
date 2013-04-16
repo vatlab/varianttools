@@ -73,6 +73,9 @@ class PlinkBinaryToVariants:
         self.cur = PlinkFile(self.dataset)
         # a list of sample names (sample ID's in .fam file)'''
         self.samples =  [x.iid for x in self.cur.get_samples()]
+        if None in self.samples:
+            raise ValueError("Cannot read sample ID from malformed '{0}.fam' file.".\
+                             format(self.dataset))
         # iterator for variants info: chr, pos, allele1, allele2
         self.variants = it.chain(self.cur.get_loci())
         # reference genome object and ATCG dictionary

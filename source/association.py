@@ -864,7 +864,8 @@ class AssoTestsWorker(Process):
         # D3: geno_info 
         self.pydata['geno_info'] = zip(*self.pydata['geno_info'])
         self.pydata['geno_info'] = [zip(*item) for item in self.pydata['geno_info']]
-        self.pydata['sample_name'] = map(str, self.sample_names)
+        unique_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
+        self.pydata['sample_name'] = [str(x) for idx, x in enumerate(unique_names) if which[idx]]
         self.pydata['phenotype_name'] = self.phenotype_names
         self.pydata['covariate_name'] = self.covariate_names
         self.pydata['phenotype'] = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]

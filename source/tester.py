@@ -175,7 +175,8 @@ class GroupStat(NullTest):
                 elif field.name == 'sample_size':
                     res.append(self.data.samplecounts())
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".\
+                              format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -415,7 +416,8 @@ class CaseCtrlBurdenTest(NullTest):
             if self.data.hasVar('NPERM'):
                 res.append(self.data.getIntVar("NPERM"))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".\
+                              format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -668,7 +670,8 @@ class GLMBurdenTest(NullTest):
             if self.data.hasVar('VT_MAF'):
                 res.append(self.data.getDoubleVar("VT_MAF"))
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".\
+                              format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
@@ -1644,14 +1647,13 @@ class ExternTest(NullTest):
             raise ValueError("Empty data set")
         self.nvar = len(self.pydata['genotype'][0])
         self.nsample = len(self.pydata['genotype'])
-       # type convert
+        # type convert
         self.pydata['genotype'] = [map(istr, x) for x in self.pydata['genotype']]
         self.pydata['phenotype'] = map(istr, self.pydata['phenotype'])
         if len(self.pydata['geno_info']) > 0:
                 self.pydata['geno_info'] = [[map(istr, j) for j in x] for x in self.pydata['geno_info']]
         if 'covariates' in self.pydata: 
                 self.pydata['covariates'] = [map(istr, x) for x in self.pydata['covariates']]
-        print(self.pydata)
         # write
         with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
             if len(self.pydata['geno_info']) == 0:
@@ -1707,13 +1709,18 @@ class GroupWrite(ExternTest):
         self.__dict__.update(vars(args))
 
     def calculate(self, timeout):
-        self.dump(tdir=self.directory)
-        res = []
-        for field in self.fields:
-            if field.name == 'num_variants':
-                res.append(self.nvar)
-            elif field.name == 'sample_size':
-                res.append(self.nsample)
+        try:
+            self.dump(tdir=self.directory)
+            res = []
+            for field in self.fields:
+                if field.name == 'num_variants':
+                    res.append(self.nvar)
+                elif field.name == 'sample_size':
+                    res.append(self.nsample)
+        except Exception as e:
+            self.logger.debug("Association test {} failed while processing '{}': {}".\
+                              format(self.name, self.gname, e))
+            res = [float('nan')]*len(self.fields)
         return res
 
 #
@@ -1745,39 +1752,55 @@ class RTest(ExternTest):
         basename = self._determine_algorithm()
         # No pre-defined R script available. Have to look for it
         if basename is None:
+            # check filename 
+            basename, ext = os.path.splitext(self.script)
+            if ext.upper() != '.R':
+                raise ValueError("Improper R program filename '{0}' (should be '{1}.R')".\
+                                 format(self.script, basename))
+            # look for file
+            found = False
             for path in [None, '.', os.path.join(runOptions.local_resource, 'programs'), runOptions.cache_dir]:
                 if path is None:
                     script = os.path.expanduser(self.script)
                 else:
                     script = os.path.join(path, self.script)
-                basename, ext = os.path.splitext(script)
-                if ext.upper() != '.R':
-                    raise ValueError("Improper R program filename '{0}' (should be '{1}.R')".\
-                                     format(script, self.foo))
                 if os.path.exists(script):
+                    found = True
+                    basename = os.path.splitext(script)[0]
                     self.logger.info("Loading R script '{0}'".format(script))
                     with open(script, 'r') as f:
                         self.Rscript = [i.strip() for i in f.readlines()]
                     break
-            if basename is None:
-                raise ValueError("Cannot find R program '{0}'".format(script))
+            if not found:
+                raise ValueError("Cannot find R program '{0}'".format(self.script))
         self.basename = os.path.split(basename)[-1]
 
     def parseInput(self):
         '''input argument passed to the Rscript'''
-        foo_exists = False
+        foostatement = '' 
+        start = None
+        end = None
         for idx, item in enumerate(self.Rscript):
             # locate the main function
-            foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(.*)'.\
-                            format(self.basename), item, re.DOTALL)
-            if foo:
-                foo_exists = True
-                if self.params is not None:
-                    updated_params = self._determine_params(foo.group('a'))
-                    self.Rscript[idx] = re.sub(r'function(\s*)\((.*?)\)', r'function ({0})'.\
-                                               format(updated_params), item)
+            if item.strip().startswith(self.basename):
+                foostatement = item
+                start = idx
+            elif foostatement:
+                foostatement += item
+            if '{' in item and foostatement:
+                end = idx
                 break
-        if not foo_exists:
+        foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(.*)'.\
+                        format(self.basename), foostatement, re.DOTALL)
+        if foo:
+            foo_exists = True
+            if self.params is not None:
+                updated_params = self._determine_params(foo.group('a'))
+                self.Rscript = [i for j, i in enumerate(self.Rscript) if j < start or j > end]
+                self.Rscript.insert(start, re.sub(r'function(\s*)\((.*?)\)', r'function ({0})'.\
+                                                  format(updated_params), foostatement)
+                    )
+        else:
             raise ValueError("Cannot find main function '{0}' in the R program {1}".\
                              format(self.basename, self.script))
         return
@@ -1820,7 +1843,7 @@ class RTest(ExternTest):
                     rtstatement = item
                 elif rtstatement is not None:
                     rtstatement += item
-                if '}' in item:
+                if '}' in item and rtstatement:
                     break
         output = re.match(r'return(\s*)\((\s*)(?P<a>.+?)(\s*)\)(\s*)(}|$)', rtstatement, re.DOTALL)
         if output:
@@ -1857,7 +1880,8 @@ class RTest(ExternTest):
         '''data to S4 object string'''
         if not self.pydata:
             raise ValueError("Empty data set")
-        self.Rscript.append('''setClass(Class="VATData",
+        self.Rdata = []
+        self.Rdata.append('''setClass(Class="VATData",
         representation=representation(
         name="character",
         X="data.frame",
@@ -1866,54 +1890,54 @@ class RTest(ExternTest):
         G="list"
         )
         )''')
-        self.Rscript.append('''{0} = new(Class="VATData")'''.format(self.datvar))
+        self.Rdata.append('''{0} = new(Class="VATData")'''.format(self.datvar))
         self.nvar = len(self.pydata['genotype'][0])
         self.nsample = len(self.pydata['genotype'])
         # Group name
-        self.Rscript.append('''{0}@name = "{1}"'''.format(self.datvar, self.pydata['name']))
+        self.Rdata.append('''{0}@name = "{1}"'''.format(self.datvar, self.pydata['name']))
         # X matrix
-        self.Rscript.append('''{0}@X = as.data.frame({1})'''.\
+        self.Rdata.append('''{0}@X = as.data.frame({1})'''.\
                             format(self.datvar, Str4R(self.pydata['genotype'], method = 'rbind')))
-        self.Rscript.append('''colnames({0}@X) = {1}'''.\
+        self.Rdata.append('''colnames({0}@X) = {1}'''.\
                             format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']])))
-        self.Rscript.append('''rownames({0}@X) = {1}'''.\
+        self.Rdata.append('''rownames({0}@X) = {1}'''.\
                             format(self.datvar, Str4R(self.pydata['sample_name'])))
         # Y matrix
-        self.Rscript.append('''{0}@Y = as.data.frame({1})'''.\
+        self.Rdata.append('''{0}@Y = as.data.frame({1})'''.\
                             format(self.datvar, Str4R(self.pydata['covariates'] + [self.pydata['phenotype']], method = 'cbind')))
-        self.Rscript.append('''colnames({0}@Y) = {1}'''.\
+        self.Rdata.append('''colnames({0}@Y) = {1}'''.\
                             format(self.datvar, Str4R(self.pydata['covariate_name'] + self.pydata['phenotype_name'])))
-        self.Rscript.append('''rownames({0}@Y) = {1}'''.\
+        self.Rdata.append('''rownames({0}@Y) = {1}'''.\
                             format(self.datvar, Str4R(self.pydata['sample_name'])))
 
         # Variant information matrix
         if len(self.pydata['var_info']):
-                self.Rscript.append('''{0}@V = as.data.frame({1})'''.\
+                self.Rdata.append('''{0}@V = as.data.frame({1})'''.\
                                     format(self.datvar, Str4R(zip(*self.pydata['var_info']), method = 'cbind')))            
-                self.Rscript.append('''rownames({0}@V) = {1}'''.\
+                self.Rdata.append('''rownames({0}@V) = {1}'''.\
                                     format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']])))                                    
-                self.Rscript.append('''colnames({0}@V) = {1}'''.\
+                self.Rdata.append('''colnames({0}@V) = {1}'''.\
                                     format(self.datvar, Str4R(self.pydata['var_info_header'])))
                                     
         # Genotype information matrix
         if len(self.pydata['geno_info']):
                 for idx, item in enumerate(self.pydata['geno_info_header']):
-                        self.Rscript.append('''{0}@G${2} = as.data.frame({1})'''.\
+                        self.Rdata.append('''{0}@G${2} = as.data.frame({1})'''.\
                         format(self.datvar, Str4R([[j[idx] for j in x] for x in self.pydata['geno_info']], method = 'rbind'), item))
-                        self.Rscript.append('''colnames({0}@G${2}) = {1}'''.\
+                        self.Rdata.append('''colnames({0}@G${2}) = {1}'''.\
                             format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']]), item))
-                        self.Rscript.append('''rownames({0}@G${2}) = {1}'''.\
+                        self.Rdata.append('''rownames({0}@G${2}) = {1}'''.\
                             format(self.datvar, Str4R(self.pydata['sample_name']), item))
         return
 
     def formatOutput(self):
         # run calculation
-        self.Rscript.append('''result = {0}({1})'''.format(self.basename, self.datvar))
+        self.Rdata.append('''result = {0}({1})'''.format(self.basename, self.datvar))
         # write output
-        self.Rscript.append('''write("BEGIN-VATOUTPUT", stdout())''')
-        self.Rscript.append('''write(c({0}), stdout())'''.\
+        self.Rdata.append('''write("BEGIN-VATOUTPUT", stdout())''')
+        self.Rdata.append('''write(c({0}), stdout())'''.\
                             format(', '.join(['result${0}[1]'.format(x[0]) for x in self.outvars])))
-        self.Rscript.append('''write("END-VATOUTPUT", stdout())''')
+        self.Rdata.append('''write("END-VATOUTPUT", stdout())''')
 
     def calculate(self, timeout):
         '''run command and return output results'''
@@ -1941,17 +1965,17 @@ class RTest(ExternTest):
         #
         self.loadData()
         self.formatOutput()
-        # print ('\n'.join(self.Rscript))
+        # print ('\n'.join(self.Rscript + self.Rdata))
         cmd = "R --slave --vanilla"
         try:
-            out = run_command(cmd, "{0}".format('\n'.join(self.Rscript)),
+            out = run_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata)),
                               self.logger, "R message for {0}".format(self.pydata['name'])).split()
             out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
             res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
         except Exception as e:
             self.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
-            res = [typemapper(x[1])(y) for x, y in zip(self.outvars, ['NA'] * len(self.fields))]
+            res = [float('nan')]*len(self.fields)
         return res
     
     def parseArgs(self, method_args):
@@ -2003,7 +2027,8 @@ class RTest(ExternTest):
                 elif idx != 0:
                     if len(item) == 1:
                         if item[0] not in self.params:
-                            raise ValueError("[R script error] Input value required for argument '{0}'".item[0])
+                            raise ValueError("[R script error] Input value required for argument '{0}'".\
+                                             format(item[0]))
                         else:
                             item.append('')
                     defaults.append(item[0])
@@ -2011,6 +2036,9 @@ class RTest(ExternTest):
                         s = self.params[item[0]]
                         # s should be a raw string, determined from the function,
                         # but was not inputted as raw
+                        if re.match(r'(.*[^\s])\((.*)\)$', re.sub(r'\'|"', '', s).strip()):
+                            # input is something like "c()", "rbind()" ...
+                            s = re.sub(r'\'|"', '', s)
                         if ((item[1].startswith('"') and item[1].endswith('"')) \
                           or (item[1].startswith("'") and item[1].endswith("'"))) \
                           and (not re.match(r'\'|"', s)):
@@ -2109,6 +2137,8 @@ class SKAT(RTest):
         # write header
         self.Rscript.append(basename + ' <- function(dat) {')
         self.Rscript.append('m <- ncol(dat@Y)')
+        self.Rscript.append('Z <- as.matrix(dat@X)')
+        # self.Rscript.append('Z[which(is.na(Z))] <- 9')
         # get parameters and residuals from the H0 model
         y_type = 'out_type="{0}", '.format('C' if self.trait_type == 'quantitative' else 'D')
         adjust_arg = 'Adjustment=TRUE'
@@ -2124,10 +2154,10 @@ class SKAT(RTest):
         self.Rscript.append(h_null)
         # get logistic weights
         if self.logistic_weights:
-            self.Rscript.append('weights <- Get_Logistic_Weights(as.matrix(dat@X), par1={0}, par2={1})'.\
+            self.Rscript.append('weights <- Get_Logistic_Weights(Z, par1={0}, par2={1})'.\
                      format(self.logistic_weights[0], self.logistic_weights[1]))
         # SKAT test
-        skat_test = '''re <- SKAT(as.matrix(dat@X), obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), {4}
+        skat_test = '''re <- SKAT(Z, obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), {4}
                 impute.method="{5}", r.corr={6}, is_check_genotype={7}, is_dosage={8}, missing_cutoff={9})'''.\
                         format(self.kernel, self.method, self.beta_param[0],
                                self.beta_param[1], 'weights=weights, ' if self.logistic_weights else '',
@@ -2341,7 +2371,8 @@ class ScoreSeq(ExternTest):
             self._process_output()
             res.extend([x for x in [self.stats[y] for y in self.colnames]])
         except Exception as e:
-            self.logger.debug("Association test {} failed while processing '{}': {}".format(self.name, self.gname, e))
+            self.logger.debug("Association test {} failed while processing '{}': {}".\
+                              format(self.name, self.gname, e))
             res = [float('nan')]*len(self.fields)
         return res
 
