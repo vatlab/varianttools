@@ -176,7 +176,7 @@ def select(args, reverse=False):
                     raise ValueError('Only a table name and an optional message is allowed for parameter to_table')
                 if args.to_table[0] == 'variant':
                     raise ValueError('Cannot overwrite the master variant table.')
-                if '*' in table or '?' in args.to_table[0]:
+                if '*' in args.to_table[0] or '?' in args.to_table[0]:
                     env.logger.warning('Use of wildcard character * or ? in table names is not recommended because such names can be expanded to include other tables in some commands.')
                 args.table_desc = args.to_table[1] if len(args.to_table) == 2 else ''
                 args.to_table = args.to_table[0]
