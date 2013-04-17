@@ -630,8 +630,8 @@ def samInfo(args):
                                 base_qual.append(str(call_qual))
                                 map_qual.append(str(pileupread.alignment.mapq))
                 if ref_info:
-                    ref = refGenome.getBase(chr, end)
-                    nref = call.count(ref)
+                    base = refGenome.getBase(chr, end)
+                    nref = call.count(base)
                     prop_ref = float(nref) / cnt
                 items.extend([{'coverage': str(cnt), 'calls': call, 'nref': str(nref), 'prop_ref': str(prop_ref),
                     'qual': ','.join(base_qual), 'mapq': ','.join(map_qual)}[x] for x in args.info])
