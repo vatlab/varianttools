@@ -29,11 +29,13 @@ import time
 import argparse
 from .utils import env, parenthetic_contents, runCommand
 from .project import Field
-from .tester import ExternTest
+from .tester import freq, ExternTest
 if sys.version_info.major == 2:
-    from ConfigParser import RawConfigParser as RCP
+    from ConfigParser import SafeConfigParser as RCP
 else:
-    from configparser import RawConfigParser as RCP
+    from configparser import SafeConfigParser as RCP
+from collections import OrderedDict
+
 import io
 
 from types import *
@@ -131,35 +133,90 @@ def Str4R(obj, method = 'c'):
             return str_func[tp](obj)
     return OtherStr(obj)
 
+from itertools import chain
+
+def flatten(listOfLists):
+    "Flatten one level of nesting"
+    return chain.from_iterable(listOfLists)
+
+def pairwise(x,y):
+    return flatten([[(i,j) for j in y] for i in x])
+
 class RConfig:
-    def __init__(self, rfile):
+    def __init__(self, rlist):
+        self.vars = OrderedDict()
         self.conf = RCP(allow_no_value=True)
-        self.conf.readfp(io.BytesIO(self.load(rfile)))
-        self.vars = {}
+        configstr = self.load(rlist)
+        if configstr is None:
+            return
+        self.conf.readfp(io.BytesIO(configstr))
         for section in self.conf.sections():
             try:
                 self.parse(section)
             except Exception as e:
-                raise ValueError("Invalid setting in configuration section [{0}]: {1}".\
+                raise ValueError("Invalid setting in configuration section [{0}]:\n\t{1}\n"
+                                 "For help, please read "
+                                 "http://varianttools.sf.net/Association/RTest".\
                                  format(section, e))
+    def getvars(self):
+        return self.vars
 
-    def load(self, fn):
+    def load(self, rlist):
         '''obtain raw configuration strings from R script'''
-        return ''' '''
+        res = None
+        ended = False
+        for item in rlist:
+            item = item.strip()
+            if not item.startswith("#"):
+                continue
+            item = item[1:].strip()
+            if item.upper().startswith("BEGINCONF"):
+                res = ''
+            elif item.upper().startswith("ENDCONF"):
+                ended = True
+                break
+            else:
+                if res is not None:
+                    res += item + '\n'
+        if not ended:
+            raise ValueError("Cannot find keyword '#ENDCONF'")
+        if res is None or res == '':
+            env.logger.warning("No output configuration specified in the R program. "
+                               "As a result nothing will be written to standard output or result database.")
+        return res
 
     def parse(self, section):
         '''self.vars[section] = {type: .., comment: .., name: .., [column_name:] ..}'''
+        def typemapper(i):
+            i = re.sub(r'"|\'', '', i)
+            try:
+                if i.lower() == 'integer':
+                    return "INT"
+                elif i.lower() == 'float':
+                    return "FLOAT"
+                elif i.lower() == 'string':
+                    return "VARCHAR(255)"
+                else:
+                    raise 
+            except:
+                raise ValueError("Unsupported type speficiation '{0}' in section '{1}'. "
+                                 "Should be one of 'integer', 'float' or 'string'".format(i, section))
+        #
+        if len(section.split()) > 1:
+            raise ValueError ("White space is not allowed in section name '{0}'".\
+                              format(section))
         self.vars[section] = {}
         options = self.conf.options(section)
         if "columns" in options and not "n" in options:
             raise ValueError("Please specify the length of output (n=?)".format(section))
         #
         if "n" in options:
-            self.vars[section]['comment'] = None
-            # 1. array length n
             n = int(self.conf.get(section, "n"))
+            self.vars[section]['n'] = n
+            #
             if "name" in options:
-                names = eval(self.conf.get(section, "name"))
+                # 1. array length n
+                names = [x.strip() for x in self.conf.get(section, "name").split(',')]
                 if len(names) != n:
                     raise ValueError("length of 'name' does not equal specified "
                                      "{0}".format(n))
@@ -167,19 +224,28 @@ class RConfig:
                     self.vars[section]['name'] = names
             else:
                 self.vars[section]['name'] = ["{}{}".format(section, i+1) for i in range(n)]
-            if not "columns" in options:
+            #
+            if not "columns" in options or int(self.conf.get(section, "columns")) == 1:
+                self.vars[section]['p'] = 1
                 if "type" in options:
-                    self.vars[section]['type'] = typemapper(self.conf.get(section, 'type'))
+                    self.vars[section]['type'] = [typemapper(self.conf.get(section, 'type')) for i in range(n)]
                 else:
-                    self.vars[section]['type'] = 'FLOAT'
+                    self.vars[section]['type'] = ['FLOAT' for i in range(n)]
                 if "column_name" in options:
                     raise ValueError ("Cannot set column_name without setting "
                                       "number of columns (columns=?)")
+                if "comment" in options:
+                    self.vars[section]['comment'] = \
+                      [self.conf.get(section, "comment").rstrip('.') + ', {0}'.format(x) \
+                       for x in self.vars[section]['name']]
+                else:
+                    self.vars[section]['comment'] = None
             else:
                 # 2. is a n by p data frame or matrix
                 p = int(self.conf.get(section, "columns"))
+                self.vars[section]['p'] = p
                 if "column_name" in options:
-                    cnames = eval(self.conf.get(section, "column_name"))
+                    cnames = [x.strip() for x in self.conf.get(section, "column_name").split(',')]
                     if len(cnames) != p:
                         raise ValueError("length of 'column_name' does not equal specified "
                                          "{0}".format(p))
@@ -188,14 +254,24 @@ class RConfig:
                 else:
                     self.vars[section]['column_name'] = [i+1 for i in range(p)]
                 if "type" in options:
-                    tp = eval(self.conf.get(section, "type"))
+                    tp = [x.strip() for x in self.conf.get(section, "type").split(',')]
                     if len(tp) != p:
                         raise ValueError("length of 'type' does not equal specified "
                                          "{0}".format(p))                        
                     else:
                         self.vars[section]['type'] = \
-                          [typermapper(x) for x in eval(self.conf.get(section, 'type'))] 
+                          flattern([[typermapper(x.strip()) for i in range(n)] for x in tp])
+                else:
+                    self.vars[section]['type'] = ['FLOAT' for i in range(n * p)]
+                if "comment" in options:
+                    self.vars[section]['comment'] = \
+                      [self.conf.get(section, "comment").rstrip('.') + ', {0}_{1}'.format(x, y) \
+                       for x, y in pairwise(self.vars[section]['name'], self.vars[section]['column_name'])]
+                else:
+                    self.vars[section]['comment'] = None
         else:
+            self.vars[section]['n'] = 1
+            self.vars[section]['p'] = 1
             # 3. is just a number
             if "type" in options:
                 self.vars[section]['type'] = typemapper(self.conf.get(section, 'type'))
@@ -205,10 +281,19 @@ class RConfig:
                 self.vars[section]['name'] = self.conf.get(section, "name")
             else:
                 self.vars[section]['name'] = section
+            if len(self.vars[section]['name'].split()) > 1:
+                raise ValueError ("White space is not allowed in name string '{0}' for section '{1}'".\
+                                  format(self.vars[section]['name'], section))
             if "comment" in options:
                 self.vars[section]['comment'] = self.conf.get(section, "comment")
             else:
                 self.vars[section]['comment'] = None
+        # finally merge name and column name
+        if "column_name" in self.vars[section]:
+            self.vars[section]['name'] = \
+               ['{}_{}'.format(i,j) for i,j \
+                in pairwise(self.vars[section]['name'], self.vars[section]['column_name'])]
+            del self.vars[section]['column_name']
         return
 
 #
@@ -278,15 +363,15 @@ class RTest(ExternTest):
             if '{' in item and foostatement:
                 end = idx
                 break
-        foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(.*)'.\
+        foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(\s*){{'.\
                         format(self.basename), foostatement, re.DOTALL)
         if foo:
             foo_exists = True
             if self.params is not None:
                 updated_params = self._determine_params(foo.group('a'))
                 self.Rscript = [i for j, i in enumerate(self.Rscript) if j < start or j > end]
-                self.Rscript.insert(start, re.sub(r'function(\s*)\((.*?)\)', r'function ({0})'.\
-                                                  format(updated_params), foostatement)
+                self.Rscript.insert(start, re.sub(r'function(\s*)\((.*?)\)(\s*){', r'function ({0}) {{'.\
+                                                  format(updated_params), foostatement, re.DOTALL)
                     )
         else:
             raise ValueError("Cannot find main function '{0}' in the R program {1}".\
@@ -294,75 +379,37 @@ class RTest(ExternTest):
         return
 
     def parseOutput(self):
-        '''analyze output and 1) prepare proper return format; 2) prepare database fields'''
-        # self.Rscript changed
-        # remember to replace dot by underscore
-        def typemapper(i):
-            i = re.sub(r'"|\'', '', i)
-            try:
-                if i.lower() == 'integer':
-                    return "INT"
-                elif i.lower() == 'float':
-                    return "FLOAT"
-                elif i.lower() == 'string':
-                    return "VARCHAR(255)"
+        '''analyze output and prepare database fields'''
+        # remember to replace dot by underscore in field names
+        self.outconf = RConfig(self.Rscript).getvars()
+        #
+        flds = []; tps = []; comments = []
+        for var in self.outconf:
+            for k, item in self.outconf[var].items():
+                if k == 'name':
+                    fld = item
+                elif k == 'type':
+                    tp = item
+                elif k == 'comment':
+                    comment = item
                 else:
-                    raise 
-            except:
-                raise ValueError("Unsupported type speficiation '{0}' in return statement of R function '{1}'. "
-                                 "Should be one of 'integer', 'float' or 'string'".format(i, self.basename))
-        # output R variable names
-        # find output pattern
-        # output = re.search(r'{0}(.*)function(.*){{(.*)return(\s*)\((\s*)(?P<a>.+?)(\s*)\)(\s*)}}'.\
-                            # format(self.basename), script, re.DOTALL)
-        # FIXME line-by-line parse, ugly
-        outvars = []
-        outvartypes = []
-        foo = None
-        output = None
-        rtstatement = None
-        for item in self.Rscript:
-            if foo is None:
-                # identify function start
-                foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(.*)'.\
-                            format(self.basename), item, re.DOTALL)
+                    continue
+            if isinstance(fld, list):
+                flds.extend(fld)
+                tps.extend(tp)
+                comments.extend(comment if comment else ['' for i in range(len(tps))])
             else:
-                if item.strip().startswith('return'):
-                    rtstatement = item
-                elif rtstatement is not None:
-                    rtstatement += item
-                if '}' in item and rtstatement:
-                    break
-        output = re.match(r'return(\s*)\((\s*)(?P<a>.+?)(\s*)\)(\s*)(}|$)', rtstatement, re.DOTALL)
-        if output:
-            output = output.group('a').strip().replace('\n', ' ')
-            if not (output.startswith('list(') and output.endswith(')')):
-                raise ValueError("Improper return object '{0}'. "
-                                 "For help, please read "
-                                 "http://varianttools.sf.net/Association/RTest".format(output))
-            else:
-                output = output[5:-1]
-            # FIXME: cannot find a good regular expression to work here
-            # pattern = re.compile('(\s*)(?P<a>.+?)(\s*)=(\s*)c\((\s*)(?P<b>.+?)(\s*)\)(\s*)(,(\s*)[^,](\s*)=|$)', re.DOTALL)
-            # using a rather ugly method to find field name and contents
-            flds = [re.split(r',|(\s)', x.strip())[-1] for x in output.split('=')[:-1]] 
-            contents = [x[1] for x in list(parenthetic_contents(output)) if x[0] == 0]
-            for fld, content in zip(flds, contents):
-                outvars.append(fld)
-                ga = fld.replace(".", "_")
-                gb = [y for y in [re.sub(r',$', '', x.strip()) for x in re.split(r'"|\'', content)] if y]
-                if len(gb) != 2 and len(gb) != 3:
-                    raise ValueError("Invalid return variable specification '{0}'. "
-                                     "Should be value, type, and optionally a comment string".format(content))
-                outvartypes.append(typemapper(gb[1]))
-                self.fields.append(Field(name='{0}'.format(ga),
-                                     index=None,
-                                     type='{0}'.format(typemapper(gb[1])),
-                                     adj=None,
-                                     comment='{0}'.format(gb[2] if len(gb) == 3 else '')))
-        else:
-            raise ValueError("Cannot find 'return' statement in R function '{0}'".format(self.basename))
-        self.outvars = [(x, y) for x, y in zip(outvars, outvartypes)]
+                flds.append(fld)
+                tps.append(tp)
+                comments.append(comment if comment else '')
+        #
+        for fld, tp, comment in zip(flds, tps, comments):
+            self.fields.append(Field(name='{0}'.format(fld.replace('.', '_')),
+                                 index=None,
+                                 type='{0}'.format(tp),
+                                 adj=None,
+                                 comment='{0}'.format(comment)))
+        self.outvars = [(x, y) for x, y in zip(flds, tps)]
         return
 
     def loadData(self):
@@ -417,16 +464,64 @@ class RTest(ExternTest):
                             format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']]), item))
                         self.Rdata.append('''rownames({0}@G${2}) = {1}'''.\
                             format(self.datvar, Str4R(self.pydata['sample_name']), item))
+        # run calculation
+        self.Rdata.append('''tryCatch({0}, error = function(err) q("no",1,FALSE))'''.format(self.basename))
+        self.Rdata.append('''tryCatch({{result = {0}({1})}}, error = function(err) {{
+        write(err$message, stderr()); q("no", 1, FALSE)}})'''.format(self.basename, self.datvar))
         return
 
     def formatOutput(self):
-        # run calculation
-        self.Rdata.append('''result = {0}({1})'''.format(self.basename, self.datvar))
+        '''some R code to convert the output to a plain string
+            that matches exactly with the self.outvars'''
+        # check if any return value needs to be collected
+        script = '\n'
+        if len(self.outvars) == 0:
+            return script 
+        output = list(self.outconf.keys())
+        for item in output:
+            n = self.outconf[item]['n'] 
+            p = self.outconf[item]['p'] 
+            script += '''
+            # check if exist
+            if (! "{0}" %in% names(result)) {{
+                write("[FATAL ERROR] Cannot find variable {0} in output", stderr())
+                q("no", 1, FALSE)
+            }}
+            '''.format(item)
+            if p == 1:
+                script += '''
+                # check if length matches for arrays
+                if (is.null(result[["{0}"]])) {{
+                    result[["{0}"]] = rep(NA, {1} )
+                }} else {{
+                    if (!is.null(dim(result[["{0}"]]))) result[["{0}"]] = as.vector(result[["{0}"]])
+                    if (length(result[["{0}"]]) != {1}) {{
+                        write("[WARNING] Length of output {0} does not match specified length {1}", stderr())
+                        if (length(result[["{0}"]]) < {1}) result[["{0}"]][{1}] = NA
+                        else result[["{0}"]] = result[["{0}"]][1:{1}]
+                    }}
+                }}
+                '''.format(item, n)
+            else:
+                script += '''
+                # check if dimension matches for data frames
+                if (is.null(result[["{0}"]])) {{
+                    result[["{0}"]] = rep(NA, {1} * {2})
+                }} else {{
+                    if (sum(dim(result[["{0}"]]) == c({1},{2})) != 2) {{
+                        write("[FATAL ERROR] Dimension of output {0} does not match specified ({1}, {2})",
+                         stderr())
+                        q("no", 1, FALSE)
+                    }}
+                    # convert data frames / matrices to arrays
+                    result[["{0}"]] = as.vector(as.matrix(result[["{0}"]]))
+                }}
+                '''.format(item, n, p)
         # write output
-        self.Rdata.append('''write("BEGIN-VATOUTPUT", stdout())''')
-        self.Rdata.append('''write(c({0}), stdout())'''.\
-                            format(', '.join(['result${0}[1]'.format(x[0]) for x in self.outvars])))
-        self.Rdata.append('''write("END-VATOUTPUT", stdout())''')
+        script += 'write("BEGIN-VATOUTPUT", stdout());' + \
+          'write(c({0}), stdout());'.format(', '.join(['result[["{0}"]]'.format(x) for x in output])) + \
+          'write("END-VATOUTPUT", stdout())\n'
+        return script
 
     def calculate(self, timeout):
         '''run command and return output results'''
@@ -453,7 +548,6 @@ class RTest(ExternTest):
                 return str
         #
         self.loadData()
-        self.formatOutput()
         # write data and R script to log file for this group
         if self.data_cache_counter < self.data_cache or self.data_cache < 0:
             try:
@@ -462,16 +556,20 @@ class RTest(ExternTest):
                 self.data_cache_counter += 1
             except:
                 pass
+        # print self.formatOutput()
         cmd = "R --slave --vanilla"
         try:
-            out = runCommand(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata)),
+            out = runCommand(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
                               "R message for {0}".format(self.pydata['name'])).split()
-            out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
-            res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
+            if len(self.outvars):
+                out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
+                res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
+            else:
+                res = []
         except Exception as e:
             env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
-            res = [float('nan')]*len(self.fields)
+            res = [float('nan')]*len(self.outvars)
         return res
     
     def parseArgs(self, method_args):
@@ -515,7 +613,7 @@ class RTest(ExternTest):
             # input parameter is a string, from the original R function
             # e.g., kernel = 'linear', df = 2
             # have to update information of input string and from self.params 
-            params_list = [[j.strip() for j in x.split('=')] for x in params.split(',')]
+            params_list = [[j.strip() for j in x.split('=')] for x in self._param_split(params)]
             for idx, item in enumerate(params_list):
                 if len(item) == 1 and idx == 0:
                     self.datvar = item[0]
@@ -563,7 +661,33 @@ class RTest(ExternTest):
 
     def _determine_algorithm(self):
         return None
-
+    
+    def _param_split(self, pm):
+        # quotes match
+        qmatch = True
+        # () match
+        pmatch = True
+        res = []
+        start = 0
+        pm = list(pm)
+        for idx, item in enumerate(pm):
+            # handle "" ''
+            if item in ['"', "'"]:
+                qmatch = not qmatch
+            # handle ()
+            if item == '(':
+                pmatch = False
+            if item == ')':
+                pmatch = True
+            # handle "()"
+            if not pmatch and not qmatch:
+                pmatch = True
+            if item == ',' and pmatch and qmatch:
+                res.append(''.join(pm[start:idx]))
+                start = idx + 1
+        # finally collect the last one
+        res.append(''.join(pm[start:]))
+        return res
 
 class SKAT(RTest):
     '''SKAT (Wu et al 2011) and SKAT-O (Lee et al 2012)'''
@@ -597,8 +721,8 @@ class SKAT(RTest):
         parser.add_argument('--beta_param', nargs=2, type=float, default = [1,25],
             help='''Parameters for beta weights. It is only used with weighted kernels. Default set to (1,25).
                 Please refer to SKAT documentation for details.''')
-        parser.add_argument('-m','--method', type=str, choices = ['davies','liu','liu.mod','optimal', 'optimal.adj'], default='optimal',
-            help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "davies". Please refer to SKAT documentation for details.''')
+        parser.add_argument('--p_method', type=str, choices = ['davies','liu','liu.mod','optimal','optimal.adj'], default='optimal',
+            help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "optimal". Please refer to SKAT documentation for details.''')
         parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
             help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
         parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',
@@ -618,6 +742,8 @@ class SKAT(RTest):
             help='''Number of resampling to estimate kurtosis, for small sample size adjustment.
             Set it to '0' if you do not wnat to apply the adjustment. The SKAT default setting is 10000. Please 
             refer to SKAT documentation for details.''')
+        parser.add_argument('--data_cache', metavar='N', type=int, default = 0,
+            help=argparse.SUPPRESS)
         # incorporate args to this class
         args = parser.parse_args(method_args)
         self.__dict__.update(vars(args))
@@ -628,10 +754,27 @@ class SKAT(RTest):
             env.logger.warning('Kurtosis adjustment is only effective with "--small_sample" option.')
             self.resampling_kurtosis = 0
         self.params = None
+        self.data_cache_counter = 0
 
     def _determine_algorithm(self):
         '''Generate SKAT R script'''
-        self.Rscript = ['library("SKAT")']
+        conf = '''
+        # BEGINCONF
+        #[sample.size]
+        #type=integer
+        #comment=Sample size of the test unit
+        #[Q.stats]
+        #comment=Q statistic for SKAT
+        #[pvalue]
+        #comment=p-value{0}
+        {1}
+        # ENDCONF
+
+        '''.format(' (from resampled outcome)' if self.resampling else '',
+                   '#[pvalue.noadj]\ncomment=The p-value of SKAT without the small sample adjustment, '
+                        'when small sample adjustment is applied' if self.small_sample else '')
+        self.Rscript = [x.strip() for x in conf.split('\n')]
+        self.Rscript.append('suppressMessages(library("SKAT"))')
         self.datvar = 'dat'
         basename = 'SKAT{0}'.format(time.strftime('%b%d%H%M%S', time.gmtime()))
         # write header
@@ -659,7 +802,7 @@ class SKAT(RTest):
         # SKAT test
         skat_test = '''re <- SKAT(Z, obj, kernel="{0}", method="{1}", weights.beta=c({2}, {3}), {4}
                 impute.method="{5}", r.corr={6}, is_check_genotype={7}, is_dosage={8}, missing_cutoff={9})'''.\
-                        format(self.kernel, self.method, self.beta_param[0],
+                        format(self.kernel, self.p_method, self.beta_param[0],
                                self.beta_param[1], 'weights=weights, ' if self.logistic_weights else '',
                                self.impute,
                                self.corr[0] if len(self.corr) == 1 else 'c('+','.join(map(str, self.corr))+')',
@@ -668,21 +811,17 @@ class SKAT(RTest):
                                self.missing_cutoff)
         self.Rscript.append(skat_test)
         # get results
-        self.Rscript.extend(['p <- re$p.value', 'stat <- re$Q[1,1]'])
+        self.Rscript.extend(['p <- re$p.value', 'stat <- ifelse (is.null(dim(re$Q)), NA, re$Q[1,1])'])
         if self.resampling:
             self.Rscript.append('pr <- Get_Resampling_Pvalue(re)$p.value')
         else:
             self.Rscript.append('pr <- -9')
         # return
-        self.Rscript.append('return(list(sample.size = c(nrow(dat@Y), "integer", "Sample size"), '
-                 'Q.stats = c(stat, "float", "Q statistic for SKAT"), '
+        self.Rscript.append('return(list(sample.size = nrow(dat@Y), '
+                 'Q.stats = stat, '
                  '{0} '
-                 'pvalue = c(max(p,pr), "float", "p-value{1}")))'.\
-                 format('pvalue.noadj = c(re$p.value.noadj, "float", '
-                        '"The p-value of SKAT without the small sample adjustment, '
-                        'when small sample adjustment is applied"),' if self.small_sample else '',
-                        ' (from resampled outcome)' if self.resampling else ''
-                        ))
+                 'pvalue = max(p,pr)))'.\
+                 format('pvalue.noadj = re$p.value.noadj,' if self.small_sample else ''))
         self.Rscript.append('}')
         # write
         self.script = os.path.join(env.cache_dir, basename + ".R")

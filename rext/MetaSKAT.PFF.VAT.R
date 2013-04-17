@@ -2,6 +2,16 @@
 # Copyright (c) 2013, Gao Wang <ewanggao@gmail.com>
 # GNU General Public License (http://www.gnu.org/licenses/gpl.html)
 # Meta SKAT Phenotype From File (MetaSKAT.PFF)
+# BEGINCONF
+# [pvalue]
+# comment=p-value from MetaSKAT_wZ method
+# [sample.size]
+# # Adjust this for your data !!
+# n = 2 
+# # Adjust this for your data !!
+# name = n.pop1, n.pop2 
+# comment=sample size per group
+# ENDCONF
 # Usage:
 # vtools associate variant sample_id \
 # -m 'RTest /path/to/this/script.R --name MetaSKAT --phenotype_files "c("file1.txt","file2.txt")" --phenotype_colname "QT_TRAIT" --out_type "C" ' \
@@ -48,7 +58,7 @@ MetaSKAT.PFF.VAT <- function (dat, out_type,
   y.list <- NULL; for (i in 1:n.g) {
     y.list[[i]] <- phenotype[[i]][valid_rows[[i]], phenotype_colname]
     if (is.null(y.list[[i]])) {
-      write(paste("No valid sample found for group", "i"), stderr())
+      write(paste("No valid sample found for group", i), stderr())
       q("no", 1, FALSE)
     }
     if (sum(is.na(y.list[[i]])) < length(y.list[[i]])) {
@@ -71,8 +81,8 @@ MetaSKAT.PFF.VAT <- function (dat, out_type,
   res <- MetaSKAT_wZ(Z, obj, r.corr = r.corr, method = pval.method,
                      combined.weight = combined.weight, is.separate = is.separate,
                      Group_Idx = Group_Idx)
-  return(list(sample.size = c(getGroupSampleSize(sample_size), 'string', 'sample size per group'),
-              pvalue = c(res$p.value, 'float', 'p-value from MetaSKAT_wZ method')))
+  return(list(sample.size = sample_size,
+              pvalue = res$p.value))
 }
 
 getGroupSampleSize <- function(sample_size) {

@@ -1,12 +1,24 @@
 #!/usr/bin/Rscript
 # Copyright (c) 2013, Gao Wang <ewanggao@gmail.com>
 # GNU General Public License (http://www.gnu.org/licenses/gpl.html)
+# BEGINCONF
+# [pvalue]
+# comment=p-value from MetaSKAT_wZ method
+# [sample.size]
+# # Adjust this for your data !!
+# n = 3 
+# # Adjust this for your data !!
+# name = n.pop1, n.pop2, n.pop3 
+# comment=sample size per group
+# ENDCONF
 suppressMessages(library(MetaSKAT))
 MetaSKAT.VAT <- function (dat, out_type, group_colname,
                           r.corr = 0,
                           pval.method = "optimal",
                           combined.weight = TRUE,
-                          is.separate = FALSE) {
+                          is.separate = FALSE,
+                          weights.beta = c(1,25),
+                          Group_Idx = NULL) {
   # see how many variants we have in the problem
   if (ncol(dat@X) == 1) {
     write("Only one variant found, not a rare variant analysis problem", stderr())
@@ -26,7 +38,7 @@ MetaSKAT.VAT <- function (dat, out_type, group_colname,
   # If you want to run MetaSKAT with assuming ancestry
   # group speciﬁc heterogeneity, you can set Group_Idx=c(1,1,2),
   # which indicates the ﬁrst two cohorts belong to the same group.
-  Group_Idx <- seq(1:n.g)
+  if (is.null(Group_Idx)) Group_Idx <- seq(1:n.g)
   # Drop the group label
   Y <- subset(dat@Y, select = -c(get(group_colname)))
   m <- ncol(Y)
@@ -47,16 +59,17 @@ MetaSKAT.VAT <- function (dat, out_type, group_colname,
   #
   obj <- Meta_Null_Model(y.list, x.list, n.cohort = n.g, out_type = out_type)
   res <- MetaSKAT_wZ(Z, obj, r.corr = r.corr, method = pval.method,
-                     combined.weight = combined.weight, is.separate = is.separate,
+                     combined.weight = combined.weight, weights.beta = weights.beta,
+                     is.separate = is.separate,
                      Group_Idx = Group_Idx)
-  return(list(sample.size = c(getGroupSampleSize(groups, ugroups), 'string', 'sample size per group'),
-              pvalue = c(res$p.value, 'float', 'p-value from MetaSKAT_wZ method')))
+  res.formatted <- list(sample.size = getGroupSampleSize(groups, ugroups), pvalue = res$pvalue)
+  return(res.formatted)
 }
 
 getGroupSampleSize <- function(groups, ugroups) {
   size <- vector()
   for (i in 1:length(ugroups)) {
-    size[i] <- paste('GP.', ugroups[i], '=', length(groups[which(groups == ugroups[i])]), sep = '')
+    size[i] <- length(groups[which(groups == ugroups[i])])
   }
-  return(paste(size, collapse=";"))
+  return(size)
 }
