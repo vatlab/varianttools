@@ -44,6 +44,7 @@ import gzip
 import copy
 import threading
 import re
+import shlex
 import stat
 import signal
 import random
@@ -528,7 +529,8 @@ def lineCount(filename, encoding='UTF-8'):
 def hasCommand(cmd):
     try:
         fnull = open(os.devnull, 'w')
-        result = subprocess.Popen(cmd, shell=True, stdout=fnull, stderr=fnull)
+        result = subprocess.Popen(cmd, shell=True, stdout=fnull, stderr=fnull,
+                                  env={'PATH':os.pathsep.join(['.', env.cache_dir, os.environ['PATH']])})
         result.terminate()
         fnull.close()
     except OSError:
@@ -538,6 +540,38 @@ def hasCommand(cmd):
         # other error is OK
         return True
     return True
+
+
+def runCommand(cmd, instream = None, msg = '', upon_succ=None):
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    try:
+        tc = subprocess.Popen(cmd, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+                              env={'PATH':os.pathsep.join(['.', env.cache_dir, os.environ['PATH']])})
+        if instream:
+            if sys.version_info.major == 3:
+                instream = instream.encode(sys.getdefaultencoding())
+            out, error = tc.communicate(instream)
+        else:
+            out, error = tc.communicate()
+        if sys.version_info.major == 3:
+            out = out.decode(sys.getdefaultencoding())
+            error = error.decode(sys.getdefaultencoding())
+        if tc.returncode < 0:
+            raise ValueError ("Command '{0}' was terminated by signal {1}".format(cmd, -tc.returncode))
+        elif tc.returncode > 0:
+            raise ValueError ("{0}".format(error))
+        else:
+            if error:
+                env.logger.debug("[WARNING] {0}: {1}".format(msg, error))
+    except OSError as e:
+        raise OSError ("Execution of command '{0}' failed: {1}".format(cmd, e))
+    # everything is OK
+    if upon_succ:
+        # call the function (upon_succ) using others as parameters.
+        upon_succ[0](*(upon_succ[1:]))
+    return out
+
 
 def openFile(filename):
     if filename.lower().endswith('.gz'):

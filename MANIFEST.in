@@ -37,8 +37,8 @@ include source/utils.py
 include source/variant.py
 include source/association.py
 include source/tester.py
+include source/rtester.py
 include source/compare.py
-include source/str4r.py
 include source/plinkfile.py
 include source/preprocessor.py
 include source/meta.py

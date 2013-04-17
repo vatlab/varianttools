@@ -42,6 +42,7 @@ from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAct
      env, executeUntilSucceed, ShelfDB
 from .phenotype import Sample
 from .tester import *
+from .rtester import RTest, SKAT
 
 if sys.version_info.major == 2:
     from vt_sqlite3_py2 import OperationalError
@@ -1108,3 +1109,10 @@ def associate(args):
             del s
     except Exception as e:
         sys.exit(e)
+
+def getAllTests():
+    '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
+    return sorted([(name, obj) for name, obj in globals().iteritems() \
+        if type(obj) == type(NullTest) and issubclass(obj, NullTest) \
+            and name not in ('NullTest', 'ExternTest', 'GLMBurdenTest',
+                             'CaseCtrlBurdenTest', 'ScoreSeq')], key=lambda x: x[0])
