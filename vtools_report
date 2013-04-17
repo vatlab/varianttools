@@ -524,13 +524,16 @@ def samInfoArguments(parser):
     parser.add_argument('table', help='''Name of a variant table for which information
         in specified SAM/BAM files will be obtained. ''')
     parser.add_argument('--info', nargs='+', default=['coverage'],
-        choices=['coverage', 'calls', 'qual', 'mapq' ],
+        choices=['coverage', 'calls', 'qual', 'mapq', 'nref', 'prop_ref'],
         help='''Type of information to be obtained from the SAM/BAM file. Allowed values
             include 'coverage' (number of reads that cover the variant), 'calls' (nucleotides
-            of aligned reads at the location), 'qual' (Phred base quality of reads at the
+            of aligned reads at the location), 'nref', 'prop_ref' (number and proportion
+            of reference alleles at the location), 'qual' (Phred base quality of reads at the
             location), and 'mapq' (Phred-scaled quality of alignment at the location). Note
             that location of variants refers to the starting position of the variants
-            although some variants (e.g. indels) can span several base pairs.''')
+            although some variants (e.g. indels) can span several base pairs. The primary
+            reference genome of the project will be used to get reference sequence at
+            these locations and output nref and prop_ref for each variant.''')
     parser.add_argument('--files', metavar='FILE', nargs='+',
         help='''A list of SAM/BAM files from which information about each variant will
             be obtained. Information retrieved from these files will be arranged by 
@@ -547,9 +550,24 @@ def samInfo(args):
     except ImportError as e:
         raise ImportError('''Failed to import module pysam. Please install pysam from
             https://code.google.com/p/pysam/ and try again.''')
+    # get reference genome
+    ref_info = 'nref' in args.info or 'prop_ref' in args.info
+    if ref_info:
+        build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
+        if not build:
+            raise RuntimeError('Failed to get build of reference from the current project.')
+        refGenome = RefGenome(build)
     #
     # from a list of SAM/BAM files
     #
+    for sam in args.files:
+        if not os.path.isfile(sam):
+            sys.exit('File not found: {}'.format(sam))
+        if not sam.lower().endswith('.sam') and not sam.lower().endswith('.bam'):
+            sys.exit('Not a sam or bam file: {}'.format(sam))
+    # define sams here because otherwise sams will not be defined in the 'finally clause when
+    # the samfile fails to open
+    sams = None
     try:
         sams = [pysam.Samfile(x, 'rb') for x in args.files]
         #
@@ -586,6 +604,8 @@ def samInfo(args):
                 call = ''
                 base_qual = []
                 map_qual = []
+                nref = 0
+                prop_ref = 0
                 try:
                     # name with leading chr
                     columns = sam.pileup('chr' + str(chr), begin, end)
@@ -609,14 +629,19 @@ def samInfo(args):
                                 call += pileupread.alignment.seq[pileupread.qpos]
                                 base_qual.append(str(call_qual))
                                 map_qual.append(str(pileupread.alignment.mapq))
-                items.extend([{'coverage': str(cnt), 'calls': call, 
+                if ref_info:
+                    ref = refGenome.getBase(chr, end)
+                    nref = call.count(ref)
+                    prop_ref = float(nref) / cnt
+                items.extend([{'coverage': str(cnt), 'calls': call, 'nref': str(nref), 'prop_ref': str(prop_ref),
                     'qual': ','.join(base_qual), 'mapq': ','.join(map_qual)}[x] for x in args.info])
             print('{}\t{}\t{}\t{}\t{}'.format(chr, pos, ref, alt, '\t'.join(items)))
     except IOError as e:
         raise ValueError('Failed to open all input files: {}'.format(e))
     finally:
-        for sam in sams:
-            sam.close()
+        if sams:
+            for sam in sams:
+                sam.close()
 
 #
 # command plot_fields
