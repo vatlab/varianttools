@@ -2075,3 +2075,11 @@ def longest_parenthetic_content(string):
             start = stack.pop()
             if len(stack) == 0:
                 return string[start + 1: i]
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc: # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise

@@ -27,7 +27,7 @@
 import sys, os, re 
 import time
 import argparse
-from .utils import env, parenthetic_contents, runCommand
+from .utils import env, downloadFile, runCommand, mkdir_p
 from .project import Field
 from .tester import freq, ExternTest
 if sys.version_info.major == 2:
@@ -514,7 +514,7 @@ class RTest(ExternTest):
                         q("no", 1, FALSE)
                     }}
                     # convert data frames / matrices to arrays
-                    result[["{0}"]] = as.vector(as.matrix(result[["{0}"]]))
+                    result[["{0}"]] = as.vector(t(result[["{0}"]]))
                 }}
                 '''.format(item, n, p)
         # write output
@@ -675,14 +675,13 @@ class RTest(ExternTest):
             if item in ['"', "'"]:
                 qmatch = not qmatch
             # handle ()
-            if item == '(':
-                pmatch = False
-            if item == ')':
-                pmatch = True
+            if item in ['(', ')']:
+                pmatch = not pmatch
             # handle "()"
             if not pmatch and not qmatch:
                 pmatch = True
             if item == ',' and pmatch and qmatch:
+                # collect contents before this comma
                 res.append(''.join(pm[start:idx]))
                 start = idx + 1
         # finally collect the last one
@@ -692,12 +691,8 @@ class RTest(ExternTest):
 class SKAT(RTest):
     '''SKAT (Wu et al 2011) and SKAT-O (Lee et al 2012)'''
     def __init__(self, ncovariates, *method_args):
+        self.skat_dir = self._check_skat()
         RTest.__init__(self, ncovariates, *method_args)
-        # Check for R/SKAT installation
-        try:
-            runCommand(["R", "-e", "library('SKAT')"])
-        except Exception as e:
-            raise ValueError("Cannot load R library SKAT: {0}".format(e))
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011; Lee at all 2012).
@@ -767,14 +762,15 @@ class SKAT(RTest):
         #comment=Q statistic for SKAT
         #[pvalue]
         #comment=p-value{0}
-        {1}
-        # ENDCONF
-
+        {1}# ENDCONF
         '''.format(' (from resampled outcome)' if self.resampling else '',
                    '#[pvalue.noadj]\ncomment=The p-value of SKAT without the small sample adjustment, '
-                        'when small sample adjustment is applied' if self.small_sample else '')
+                        'when small sample adjustment is applied\n' if self.small_sample else '')
         self.Rscript = [x.strip() for x in conf.split('\n')]
-        self.Rscript.append('suppressMessages(library("SKAT"))')
+        if self.skat_dir is None:
+            self.Rscript.append('suppressMessages(library("SKAT"))')
+        else:
+            self.Rscript.append("suppressMessages(library('SKAT', lib.loc='{0}'))".format(self.skat_dir))
         self.datvar = 'dat'
         basename = 'SKAT{0}'.format(time.strftime('%b%d%H%M%S', time.gmtime()))
         # write header
@@ -811,9 +807,9 @@ class SKAT(RTest):
                                self.missing_cutoff)
         self.Rscript.append(skat_test)
         # get results
-        self.Rscript.extend(['p <- re$p.value', 'stat <- ifelse (is.null(dim(re$Q)), NA, re$Q[1,1])'])
+        self.Rscript.extend(['p <- re[["p.value"]]', 'stat <- ifelse (is.null(dim(re$Q)), NA, re$Q[1,1])'])
         if self.resampling:
-            self.Rscript.append('pr <- Get_Resampling_Pvalue(re)$p.value')
+            self.Rscript.append('pr <- Get_Resampling_Pvalue(re)[["p.value"]]')
         else:
             self.Rscript.append('pr <- -9')
         # return
@@ -821,10 +817,36 @@ class SKAT(RTest):
                  'Q.stats = stat, '
                  '{0} '
                  'pvalue = max(p,pr)))'.\
-                 format('pvalue.noadj = re$p.value.noadj,' if self.small_sample else ''))
+                 format('pvalue.noadj = re[["p.value.noadj"]],' if self.small_sample else ''))
         self.Rscript.append('}')
         # write
         self.script = os.path.join(env.cache_dir, basename + ".R")
         with open(self.script, "w") as f:
                   f.write('\n'.join(self.Rscript))
         return os.path.splitext(self.script)[0]
+
+    def _install_skat(self, skat_dir):
+        try:
+            version = '0.82'
+            skat_url = 'http://www.houstonbioinformatics.org/vtools/programs/SKAT_{0}.tar.gz'.format(version)
+            env.logger.info('Downloading SKAT (V{0}) ...'.format(version))
+            skat_tar = downloadFile(skat_url, env.temp_dir)
+            mkdir_p(skat_dir)
+            env.logger.info('Installing SKAT (V{0}) to {1} ...'.format(version, skat_dir))
+            runCommand(['R', '-e', 'install.packages("{0}", repos = NULL, type = "source", lib="{1}")'.format(skat_tar, skat_dir)])
+            runCommand(["R", "-e", "library('SKAT', lib.loc='{0}')".format(skat_dir)])
+        except Exception as e:
+            raise ValueError("Cannot auto-install / load R library SKAT: {0}".format(e))
+
+    def _check_skat(self):
+        skat_dir = None
+        # Check for R/SKAT installation
+        try:
+            runCommand(["R", "-e", "library('SKAT')"])
+        except:
+            skat_dir = os.path.join(env.local_resource, 'Rlib')
+            try:
+                runCommand(["R", "-e", "library('SKAT', lib.loc='{0}')".format(skat_dir)])
+            except:
+                self._install_skat(skat_dir)
+        return skat_dir
