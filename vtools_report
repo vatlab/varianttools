@@ -632,7 +632,7 @@ def samInfo(args):
                 if ref_info:
                     base = refGenome.getBase(chr, end)
                     nref = call.count(base)
-                    prop_ref = float(nref) / cnt
+                    prop_ref = 0 if cnt == 0 else float(nref) / cnt
                 items.extend([{'coverage': str(cnt), 'calls': call, 'nref': str(nref), 'prop_ref': str(prop_ref),
                     'qual': ','.join(base_qual), 'mapq': ','.join(map_qual)}[x] for x in args.info])
             print('{}\t{}\t{}\t{}\t{}'.format(chr, pos, ref, alt, '\t'.join(items)))

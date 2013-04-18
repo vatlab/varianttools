@@ -722,7 +722,7 @@ class BaseVariantCaller:
         wait_all()
         return sam_files        
 
-    def sortSamWithSamtools(self, sam_files):
+    def SortSamWithSamtools(self, sam_files):
         '''Convert sam file to sorted bam files.'''
         bam_files = []
         for sam_file in sam_files:
@@ -751,7 +751,7 @@ class BaseVariantCaller:
         wait_all()
         return sorted_bam_files
 
-    def sortSam(self, sam_files, output=None):
+    def SortSam(self, sam_files, output=None):
         '''Convert sam file to sorted bam files using Picard.'''
         # sort bam files
         sorted_bam_files = []
@@ -782,6 +782,7 @@ class BaseVariantCaller:
                     INPUT={3}
                     OUTPUT={4}
                     METRICS_FILE={5}
+                    ASSUME_SORTED=true
                     VALIDATION_STRINGENCY=LENIENT
                     '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
                             env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
@@ -1058,7 +1059,7 @@ class hg19_gatk_23(BaseVariantCaller):
             sam_files = self.bwa_samse(fastq_files, working_dir)
         # 
         # step 4: convert sam to sorted bam files
-        sorted_bam_files = self.sortSam(sam_files)
+        sorted_bam_files = self.SortSam(sam_files)
         #
         # step 5: remove duplicate
         dedup_files = self.markDuplicates(sorted_bam_files, working_dir)
@@ -1098,6 +1099,173 @@ class hg19_gatk_23(BaseVariantCaller):
         env.logger.info('Setting working directory to {}'.format(working_dir))
         
 
+class b37_gatk_23(BaseVariantCaller):
+    '''A variant caller that uses gatk resource package 2.3 to call variants
+    from build b37 of the human genome of the GATK resource bundle'''
+    def __init__(self, resource_dir):
+        self.pipeline = 'b37_gatk_23'
+        BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
+
+    def checkResource(self):
+        '''Check if needed resource is available. This pipeline requires
+        GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
+        saved_dir = os.getcwd()
+        os.chdir(self.resource_dir)
+        files = ['ucsc.hg19.fasta.gz', 'bwaidx.amb', 'ucsc.hg19.fasta.fai']
+        if not all([os.path.isfile(x) for x in files]):
+            sys.exit('''GATK resource bundle does not exist in directory {}. Please run "call_variants.py prepare_resource" befor you execute this command.'''.format(self.resource_dir))
+        #
+        for cmd in ['wget',     # to download resource
+                    'bwa',      # alignment
+                    'samtools'  # merge sam files
+                    ]:
+            checkCmd(cmd)
+        #
+        checkPicard()
+        checkGATK()
+        # checkPySam()
+        #
+        os.chdir(saved_dir)
+
+    def prepareResourceIfNotExist(self):
+        '''This function downloads the UCSC resource boundle for specified build and
+        creates bwa and samtools indexed files from the whole genome sequence '''
+        saved_dir = os.getcwd()
+        os.chdir(self.resource_dir)
+        #
+        # these are pipeline specific
+        self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*', files=['human_g1k_v37.fasta.gz'])
+        self.buildBWARefIndex('human_g1k_v37.fasta')
+        self.buildSamToolsRefIndex('human_g1k_v37.fasta')
+        # 
+        os.chdir(saved_dir)
+
+#     def bam2fastq_obsolete(self, input_file, output_files):
+#         '''This function extracts raw reads from an input BAM file to one or 
+#         more fastq files. It uses a two step process recommended by
+#         Illumina to save RAM, but the first step is way too slow (21 + 9 hours,
+#         instead of a direct 9 hours according to Illumina documentation.'''
+#         BaseVariantCaller.bam2fastq(self, input_file, output_files)
+#         #
+#         # the working dir is a directory under output, the middle files are saved to this
+#         # directory to avoid name conflict
+#         working_dir = os.path.join(os.path.split(output_files[0])[0],
+#             os.path.basename(output_files[0]) + '_bam2fastq_cache')
+#         if not os.path.isdir(working_dir):
+#             os.makedirs(working_dir)
+#         #
+#         sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
+#         if os.path.isfile(sorted_bam):
+#             env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
+#         else:
+#             run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
+#                 upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
+#         if all([os.path.isfile(x) for x in output_files]):
+#             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
+#         else:
+#             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
+#                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
+#                 env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
+#                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+
+    def bam2fastq(self, input_file, output_files):
+        '''This function extracts raw reads from an input BAM file to one or 
+        more fastq files.'''
+        BaseVariantCaller.bam2fastq(self, input_file, output_files)
+        #
+        if all([os.path.isfile(x) for x in output_files]):
+            env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
+        else:
+            run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
+                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
+                env.options['PICARD_PATH'], input_file, output_files[0], output_files[1]),
+                upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+
+
+    def align(self, input_files, output):
+        '''Align reads to hg19 reference genome and return a sorted, indexed bam file.'''
+        BaseVariantCaller.align(self, input_files, output)
+        #
+        # the working dir is a directory under output, the middle files are saved to this
+        # directory to avoid name conflict
+        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        #
+        env.logger.info('Setting working directory to {}'.format(working_dir))
+        #
+        # step 1: decompress to get a list of fastq files
+        fastq_files = self.getFastqFiles(input_files, working_dir)
+        #
+        # step 2: call bwa aln to produce .sai files
+        self.bwa_aln(fastq_files, working_dir)
+        #
+        # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
+        paired = True
+        if len(fastq_files) // 2 * 2 != len(fastq_files):
+            env.logger.warning('Odd number of fastq files provided, not handled as paired end reads.')
+            paired = False
+        for idx in range(len(fastq_files)//2):
+            f1 = fastq_files[2*idx]
+            f2 = fastq_files[2*idx + 1]
+            if len(f1) != len(f2):
+                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
+                paired = False
+                break
+            diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
+            if diff != [1]:
+                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
+                paired = False
+                break
+        #
+        # sam files?
+        if paired:
+            sam_files = self.bwa_sampe(fastq_files, working_dir)
+        else:
+            sam_files = self.bwa_samse(fastq_files, working_dir)
+        # 
+        # step 4: convert sam to sorted bam files
+        sorted_bam_files = self.SortSam(sam_files)
+        #
+        # step 5: remove duplicate
+        dedup_files = self.markDuplicates(sorted_bam_files, working_dir)
+        #
+        # step 5: merge sorted bam files to output file
+        if len(bam_files) > 1:
+            self.mergeBAMs(dedup_files, output)
+        else:
+            shutil.copy(dedup_files[0], output)
+        #
+        # step 6: index the output bam file
+        self.indexBAM(output)
+
+    def calibrate(self, input_file, output):
+        BaseVariantCaller.calibrate(self, input_file, output)
+        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_calibrate_cache')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        #
+        env.logger.info('Setting working directory to {}'.format(working_dir))
+        #
+        # step 1: create indel realignment targets
+        cleaned_bam_file = self.realignIndels(input_file, working_dir)
+        self.indexBAM(cleaned_bam_file)
+        #
+        # step 3: recalibration
+        self.recalibrate(cleaned_bam_file, output, working_dir)
+        self.indexBAM(output)
+
+    def callVariants(self, input_files, output):
+        '''Call variants from a list of input files'''
+        BaseVariantCaller.callVariants(self, input_files, output)
+        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        #
+        env.logger.info('Setting working directory to {}'.format(working_dir))
+        
+
+
 if __name__ == '__main__':
     #
     options = [
@@ -1122,8 +1290,8 @@ if __name__ == '__main__':
         ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
-            parser.add_argument('--pipeline', nargs='?', default='hg19_gatk_23',
-                choices=['hg19_gatk_23'],
+            parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
+                choices=['hg19_gatk_23', 'b37_gatk_23'],
                 help='Name of the pipeline to be used to call variants.')
         if 'resource_dir' in args:
             parser.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
