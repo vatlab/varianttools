@@ -133,7 +133,6 @@ if __name__ == '__main__':
     env.logger = None  # no log file
     if args.generate_local_manifest is not None:
         manager = ResourceManager()
-        print args.generate_local_manifest
         # --generte_local_manifest without parameter will pass None, which will
         # use ~/.variant_tools.
         manager.scanDirectory(args.generate_local_manifest)

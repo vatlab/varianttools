@@ -1047,7 +1047,7 @@ class ResourceManager:
                 return ''
         elif filename.lower().endswith('ann'):      # annotation
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
-        elif filename.lower().endswith('.tar.gz'):  # snapshot
+        elif 'snapshot' in filename and filename.lower().endswith('.tar.gz'):  # snapshot
             (name, date, message) = getSnapshotInfo(filename)
             return '' if message is None else message
         else:      # other files, e.g. crr file
