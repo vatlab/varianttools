@@ -1,0 +1,155 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=To be used to export variants in a format that is acceptable by the polyphen2 server 
+	http://genetics.bwh.harvard.edu/pph2/bgi.shtml, and to import the FULL report returned
+	by this server.
+variant=chr,pos,ref,alt
+variant_info=prediction,pph2_class,pph2_prob
+export_by=chr,pos,ref,alt
+sort_output_by=chr,pos
+
+[col_1]
+field=chr,pos
+adj=JoinRecords(':'), lambda x: 'chr' + x
+comment=chr:pos
+
+[col_2]
+field=ref,alt
+adj=JoinRecords('/')
+comment=ref/alt
+
+# o_acc               	 o_pos	o_aa1	o_aa2	rsid      	acc       	   pos	aa1	aa2	nt1	nt2	        prediction	            based_on	    effect	        pph2_class	 pph2_prob	  pph2_FPR	  pph2_TPR	  pph2_FDR	    site	  region	    PHAT	dScore	Score1	Score2	MSAv	  Nobs	 Nstruct	 Nfilt	PDB_id	PDB_pos	PDB_ch	 ident	length	NormASA	SecStr	MapReg	  dVol	 dProp	B-fact	 H-bonds	 AveNHet	 MinDHet	 AveNInt	 MinDInt	 AveNSit	 MinDSit	Transv	CodPos	CpG	 MinDJxn	     PfamHit	  IdPmax	  IdPSNP	  IdQmin
+[chr]
+index=56
+type=VARCHAR(255)
+adj=ExtractField(1, '|'), ExtractField(1, ':'), RemoveLeading('# chr')
+comment=chromosome extracted from comment
+
+[pos]
+index=56
+type=INT
+adj=ExtractField(1, '|'), ExtractField(2, ':')
+comment=position extracted from comment
+
+[ref]
+index=56
+type=VARCHAR(255)
+adj=ExtractField(2, '|'), lambda x: x[0]
+comment=reference allele extracted from comment
+
+[alt]
+index=56
+type=VARCHAR(255)
+adj=ExtractField(2, '|'), lambda x: x[1]
+comment=alt allele extracted from comment
+
+[o_aa1]
+index=3
+type=VARCHAR(255)
+comment=amino acid 1
+
+[o_aa2]
+index=4
+type=VARCHAR(255)
+comment=amino acid 2
+
+[rsid]
+index=5
+type=VARCHAR(255)
+comment=rsID
+
+[prediction]
+index=12
+type=VARCHAR(255)
+comment=pp2 prediction
+
+[based_on]
+index=13
+type=VARCHAR(255)
+
+[pph2_class]
+index=15
+type=VARCHAR(255)
+
+[pph2_prob]
+index=16
+type=VARCHAR(255)
+
+[pph2_FPR]
+index=17
+type=VARCHAR(255)
+
+[pph2_TPR]
+index=18
+type=VARCHAR(255)
+
+[pph2_FDR]
+index=19
+type=VARCHAR(255)
+
+[site]
+index=20
+type=VARCHAR(255)
+
+[region]
+index=21
+type=VARCHAR(255)
+
+[dScore]
+index=23
+type=VARCHAR(255)
+
+[Score1]
+index=24
+type=VARCHAR(255)
+
+[Score2]
+index=25
+type=VARCHAR(255)
+
+[MSAv]
+index=26
+type=VARCHAR(255)
+
+[Nobs]
+index=27
+type=VARCHAR(255)
+
+[Transv]
+index=48
+type=VARCHAR(255)
+
+[CodPos]
+index=49
+type=VARCHAR(255)
+
+[CpG]
+index=50
+type=VARCHAR(255)
+
+[MinDJxn]
+index=51
+type=VARCHAR(255)
+
+[PfamHit]
+index=52
+type=VARCHAR(255)
+
+[IdPmax]
+index=53
+type=VARCHAR(255)
+
+[IdPSNP]
+index=54
+type=VARCHAR(255)
+
+[IdQmin]
+index=55
+type=VARCHAR(255)
+
+
