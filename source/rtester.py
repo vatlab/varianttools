@@ -164,6 +164,7 @@ class RConfig:
     def load(self, rlist):
         '''obtain raw configuration strings from R script'''
         res = None
+        started = False
         ended = False
         for item in rlist:
             item = item.strip()
@@ -171,6 +172,7 @@ class RConfig:
                 continue
             item = item[1:].strip()
             if item.upper().startswith("BEGINCONF"):
+                started = True
                 res = ''
             elif item.upper().startswith("ENDCONF"):
                 ended = True
@@ -178,7 +180,7 @@ class RConfig:
             else:
                 if res is not None:
                     res += item + '\n'
-        if not ended:
+        if started and not ended:
             raise ValueError("Cannot find keyword '#ENDCONF'")
         if res is None or res == '':
             env.logger.warning("No output configuration specified in the R program. "
@@ -199,14 +201,20 @@ class RConfig:
                 else:
                     raise 
             except:
-                raise ValueError("Unsupported type speficiation '{0}' in section '{1}'. "
-                                 "Should be one of 'integer', 'float' or 'string'".format(i, section))
+                raise ValueError("Unsupported type speficiation '{0}'. "
+                                 "Should be one of 'integer', 'float' or 'string'".format(i))
         #
         if len(section.split()) > 1:
             raise ValueError ("White space is not allowed in section name '{0}'".\
                               format(section))
         self.vars[section] = {}
         options = self.conf.options(section)
+        #
+        for option in options:
+            if option not in ['name','type','comment','n','columns','column_name']:
+                raise ValueError("Unknown configuration parameter '{0}'".\
+                                 format(option, section))
+        #
         if "columns" in options and not "n" in options:
             raise ValueError("Please specify the length of output (n=?)".format(section))
         #
@@ -382,6 +390,10 @@ class RTest(ExternTest):
         '''analyze output and prepare database fields'''
         # remember to replace dot by underscore in field names
         self.outconf = RConfig(self.Rscript).getvars()
+        if not self.outconf:
+            self.fields.append(Field(name='name', index=None, type="VARCHAR(255)", adj=None, comment=''))
+            self.outvars = []
+            return
         #
         flds = []; tps = []; comments = []
         for var in self.outconf:
@@ -565,7 +577,7 @@ class RTest(ExternTest):
                 out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
                 res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
             else:
-                res = []
+                res = [self.pydata['name']]
         except Exception as e:
             env.logger.debug("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
@@ -716,8 +728,8 @@ class SKAT(RTest):
         parser.add_argument('--beta_param', nargs=2, type=float, default = [1,25],
             help='''Parameters for beta weights. It is only used with weighted kernels. Default set to (1,25).
                 Please refer to SKAT documentation for details.''')
-        parser.add_argument('--p_method', type=str, choices = ['davies','liu','liu.mod','optimal','optimal.adj'], default='optimal',
-            help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "optimal". Please refer to SKAT documentation for details.''')
+        parser.add_argument('--p_method', type=str, choices = ['davies','liu','liu.mod','optimal','optimal.adj'], default='davies',
+            help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "davies". Please refer to SKAT documentation for details.''')
         parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
             help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
         parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',
@@ -726,13 +738,13 @@ class SKAT(RTest):
                 Please refer to SKAT documentation for details.''')
         parser.add_argument('-r','--corr', nargs='*', type=float, default=[0],
             help='''The pho parameter of SKAT test. Default is 0. Please refer to SKAT documentation for details.''')
-        parser.add_argument('--missing_cutoff', type=freq, default=0.15,
+        parser.add_argument('--missing_cutoff', metavar='C', type=freq, default=0.15,
             help='''a cutoff of the missing rates of SNPs. Any SNPs with missing
                 rates higher than cutoff will be excluded from the analysis. Default set to 0.15''')
         parser.add_argument('--resampling', metavar='N', type=int, default=0,
             help='''Number of resampling using bootstrap method. Set it to '0' if you do not want to apply resampling.''')
-        parser.add_argument('--small_sample', action='store_true',
-            help='''This option, if evoked, will apply small sample adjustment "SKAT_Null_Model_MomentAdjust" for small sample size and binary trait. Please refer to SKAT documentation for details.''')
+        parser.add_argument('--small_sample', metavar='N', type=int, default=0, 
+            help='''Apply small sample model "SKAT_Null_Model_MomentAdjust" for binary traits having sample size smaller than N. Please refer to SKAT documentation for details.''')
         parser.add_argument('--resampling_kurtosis', metavar='N', type=int, default=0,
             help='''Number of resampling to estimate kurtosis, for small sample size adjustment.
             Set it to '0' if you do not wnat to apply the adjustment. The SKAT default setting is 10000. Please 
@@ -753,6 +765,7 @@ class SKAT(RTest):
 
     def _determine_algorithm(self):
         '''Generate SKAT R script'''
+        self.small_sample = (self.small_sample > 0 and len(self.pydata['phenotype']) < self.small_sample)
         conf = '''
         # BEGINCONF
         #[sample.size]
@@ -764,8 +777,8 @@ class SKAT(RTest):
         #comment=p-value{0}
         {1}# ENDCONF
         '''.format(' (from resampled outcome)' if self.resampling else '',
-                   '#[pvalue.noadj]\ncomment=The p-value of SKAT without the small sample adjustment, '
-                        'when small sample adjustment is applied\n' if self.small_sample else '')
+                   '#[pvalue.noadj]\n#comment=The p-value of SKAT without small sample adjustment, '
+                        'when small sample null model (SKAT_Null_Model_MomentAdjust) is applied\n' if self.small_sample else '')
         self.Rscript = [x.strip() for x in conf.split('\n')]
         if self.skat_dir is None:
             self.Rscript.append('suppressMessages(library("SKAT"))')
@@ -809,14 +822,12 @@ class SKAT(RTest):
         # get results
         self.Rscript.extend(['p <- re[["p.value"]]', 'stat <- ifelse (is.null(dim(re$Q)), NA, re$Q[1,1])'])
         if self.resampling:
-            self.Rscript.append('pr <- Get_Resampling_Pvalue(re)[["p.value"]]')
-        else:
-            self.Rscript.append('pr <- -9')
+            self.Rscript.append('p <- Get_Resampling_Pvalue(re)[["p.value"]]')
         # return
         self.Rscript.append('return(list(sample.size = nrow(dat@Y), '
                  'Q.stats = stat, '
                  '{0} '
-                 'pvalue = max(p,pr)))'.\
+                 'pvalue = p))'.\
                  format('pvalue.noadj = re[["p.value.noadj"]],' if self.small_sample else ''))
         self.Rscript.append('}')
         # write

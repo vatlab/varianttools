@@ -1730,9 +1730,9 @@ class Importer:
                     else:
                         self.sample_in_file = [x for x in names]
                         return (self.recordFileAndSample(input_filename, names), 2)
-                except ValueError:
+                except ValueError as e:
                     # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
-                    env.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
+                    env.logger.warning('Cannot import genotype from the input file: {0}'.format(e))
                     self.sample_in_file = []
                     return ([], 0)
         else:

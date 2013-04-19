@@ -62,7 +62,7 @@ MetaSKAT.VAT <- function (dat, out_type, group_colname,
                      combined.weight = combined.weight, weights.beta = weights.beta,
                      is.separate = is.separate,
                      Group_Idx = Group_Idx)
-  res.formatted <- list(sample.size = getGroupSampleSize(groups, ugroups), pvalue = res$pvalue)
+  res.formatted <- list(sample.size = getGroupSampleSize(groups, ugroups), pvalue = res$p.value)
   return(res.formatted)
 }
 

@@ -285,8 +285,10 @@ class PlinkConverter(Preprocessor):
         which_major = p2vObject.determineMajorAllele(n)
         # raise on bad match
         if which_major == -9:
-            raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}.'.\
-                                  format(p2vObject.dataset, p2vObject.build))
+            raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}. '
+                              'Perhaps you specified the wrong build, or have too many unsupported allele '
+                              'types (not A/T/C/G, e.g, indels I/D) in BED file which you have to remove before '
+                              'import'.format(p2vObject.dataset, p2vObject.build))
         env.logger.debug("allele{} is major allele".format(which_major))
         # output
         nloci = p2vObject.getLociCounts()
