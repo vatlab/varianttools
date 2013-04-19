@@ -14,8 +14,7 @@ import bz2
 import zipfile
 import time
 import re
-from collections import defaultdict
-
+from collections import defaultdict, namedtuple
 #
 # Runtime environment
 #
@@ -32,7 +31,12 @@ class RuntimeEnvironment(object):
 
     def __init__(self):
         self._max_jobs = 1
+        #
+        # file and screen logging
         self._logger = None
+        #
+        # working directory
+        self._working_dir = None
         #
         # additional parameters for args
         self.options = defaultdict(str)
@@ -148,8 +152,19 @@ class RuntimeEnvironment(object):
             ch.setLevel(logging.DEBUG)
             ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
             self._logger.addHandler(ch)
-
+    #
     logger = property(lambda self: self._logger, _setLogger)
+
+    def _setWorkingDir(self, working_dir=None):
+        if working_dir is None:
+            raise RuntimeError('Invalid working directory.')
+        if not os.path.isdir(working_dir):
+            os.makedirs(working_dir)
+        self._working_dir = working_dir
+        if self._logger is not None:
+            self._logger.info('Setting working directory to {}'.format(self._working_dir))
+        
+    working_dir = property(lambda self: self._working_dir, _setWorkingDir)
 
 # create a runtime environment object
 env = RuntimeEnvironment()
@@ -164,28 +179,43 @@ def elapsed_time(start):
 #
 # A simple job management scheme 
 #
-def run_command(cmd, upon_succ=None, wait=True):
+# NOTE:
+#   subprocess.PIPE cannot be used for NGS commands because they tend to send
+#   a lot of progress output to stderr, which might block PIPE and cause the command
+#   itself to fail, or stall (which is even worse).
+#
+JOB = namedtuple('JOB', ['proc', 'cmd', 'upon_succ', 'start_time', 'stdout', 'stderr', 'name'])
+
+def run_command(cmd, name=None, upon_succ=None, wait=True):
     '''Call an external command, raise an error if it fails.
     If upon_succ is specified, the specified function and parameters will be
     evalulated after the job has been completed successfully.
+    If a name is given, stdout and stderr will be sent to env.working_dir, name.out and name.err.
+    Otherwise, stdout and stderr will be ignored.
     '''
     # merge mulit-line command into one line and remove extra white space and tabs
     cmd = ' '.join(cmd.split())
+    proc_out = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.out'.format(name.replace('/', '_'))), mode='w')
+    proc_err = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.err'.format(name.replace('/', '_'))), mode='w')
     if wait or env.jobs == 1:
         try:
             s = time.time()
             env.logger.info('Running {}'.format(cmd))
-            proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
-            (out_message, err_message) = proc.communicate()
-            retcode = proc.returncode
+            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+            retcode = proc.wait()
+            if name is not None:
+                proc_out.close()
+                proc_err.close()
+            proc_out.close()
             if retcode < 0:
                 env.logger.error("Command {} was terminated by signal {} after executing {}".format(cmd, -retcode, elapsed_time(s)))
                 sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
             elif retcode > 0:
-                [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
+                if name is not None:
+                    [env.logger.error(x) for x in open(proc_err).read().split('\n')[-20:]]
                 env.logger.error("Command {} returned {} after executing {}".format(cmd, retcode, elapsed_time(s)))
                 sys.exit("Command {} returned {}".format(cmd, retcode))
-            env.logger.error('Command {} completed successfully in {}'.format(cmd, elapsed_time(s)))
+            env.logger.info('Command {} completed successfully in {}'.format(cmd, elapsed_time(s)))
         except OSError as e:
             env.logger.error("Execution of command {} failed: {}".format(cmd, e))
             sys.exit("Execution of command {} failed: {}".format(cmd, e))
@@ -197,68 +227,62 @@ def run_command(cmd, upon_succ=None, wait=True):
         # if do not wait, look for running jobs
         while True:
             # if there are enough jobs running, wait
-            if running_jobs() >= env.jobs:
+            if poll_jobs() >= env.jobs:
                 time.sleep(5)
             else:
                 break
         # there is a slot, start running
+        proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+        env.running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ, start_time=time.time(),
+            stdout=proc_out, stderr=proc_err, name=name))
         env.logger.info('Running {}'.format(cmd))
-        proc = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
-        env.running_jobs.append([proc, cmd, upon_succ, time.time()])
 
-def running_jobs():
-    '''check the number of running jobs'''
+def poll_jobs():
+    '''check the number of running jobs.'''
     count = 0
     for idx, job in enumerate(env.running_jobs):
-        ret = job[0].poll()
+        if job is None:
+            continue
+        ret = job.proc.poll()
         if ret is None:  # still running
             count += 1
-        elif ret < 0:
-            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job[1], -ret, elapsed_time(job[3])))
-            sys.exit("Command {} was terminated by signal {}".format(job[1], -ret))
+            continue
+        #
+        # close redirected stdout and stderr
+        if job.stderr != subprocess.DEVNULL:
+            try:
+                job.stdout.close()
+                job.stderr.close()
+            except:
+                pass
+        #
+        if ret < 0:
+            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job.cmd, -ret, elapsed_time(job.start_time)))
+            sys.exit("Command {} was terminated by signal {}".format(job.cmd, -ret))
         elif ret > 0:
-            (out_message, err_message) = job[0].communicate()
-            # print error message
-            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
-            env.logger.error('Execution of command {} failed after {}.'.format(job[1], elapsed_time(job[3])))
-            sys.exit('Job {} failed.'.format(job[1]))
+            if job.name is not None:
+                with open(os.path.join(env.working_dir, job.name + '.err'), 'rb') as err:
+                    [env.logger.error(x) for x in err.read().decode().split('\n')[-50:]]
+            env.logger.error('Execution of command {} failed after {}.'.format(job.cmd, elapsed_time(job.start_time)))
+            sys.exit('Job {} failed.'.format(job.cmd))
         else:
-            (out_message, err_message) = job[0].communicate()
-            if err_message:
-                [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
+            if job.name is not None:
+                with open(os.path.join(env.working_dir, job.name + '.err'), 'rb') as err:
+                    [env.logger.info(x) for x in err.read().decode().split('\n')[-10:]]
             # finish up
-            if job[2]:
+            if job.upon_succ:
                 # call the upon_succ function
-                job[2][0](*(job[2][1:]))
+                job.upon_succ[0](*(job.upon_succ[1:]))
+            env.logger.info('Command {} completed successfully in {}'.format(job.cmd, elapsed_time(job.start_time)))
+            #
             env.running_jobs[idx] = None
-            env.logger.error('Command {} completed successfully in {}'.format(job[1], elapsed_time(job[3])))
-    # remove all completed jobs and exit
-    env.running_jobs = [x for x in env.running_jobs if x]
     return count
-
 
 def wait_all():
     '''Wait for all pending jobs to complete'''
-    if not env.running_jobs:
-        return
-    for job in env.running_jobs:
-        # wait and get error message
-        (out_message, err_message) = job[0].communicate()
-        retcode = job[0].returncode
-        if retcode < 0:
-            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job[1], -retcode, elapsed_time(job[3])))
-            sys.exit("Command {} was terminated by signal {}".format(job[1], -retcode))
-        elif retcode > 0:
-            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
-            env.logger.error('Execution of command {} failed after.'.format(job[1], elapsed_time(job[3])))
-            raise RuntimeError('Job {} failed.'.format(job[1]))
-        if err_message:
-            [env.logger.error(x) for x in err_message.decode().split('\n')[-20:]]
-        # run the upon_succ function
-        if job[2]:
-            job[2][0](*(job[2][1:]))
-        env.logger.error('Command {} completed successfully in {}'.format(job[1], elapsed_time(job[3])))
-    # all jobs are completed
+    while poll_jobs() > 0:
+        # sleep ten seconds before checking job status again.
+        time.sleep(10)
     env.running_jobs = []
 
 #
@@ -386,8 +410,13 @@ def existAndNewerThan(filenameA, filenameB):
         return False
     timestampA = min([os.path.getmtime(x) for x in filenameA]) if type(filenameA) == list else os.path.getmtime(filenameA)
     timestampB = max([os.path.getmtime(x) for x in filenameB]) if type(filenameB) == list else os.path.getmtime(filenameB)
-    # newer by at least 10 seconds.
-    return timestampA - timestampB > 10
+    if timestampA - timestampB < 10:
+        env.logger.warning('Existing output file {} is ignored because it is newer than input file.'.format(
+            ', '.join(filenameA) if type(filenameA) == list else filenameA))
+        return False
+    else:
+        # newer by at least 10 seconds.
+        return True
 
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
@@ -593,11 +622,11 @@ class BaseVariantCaller:
     #
     # align and create bam file
     #
-    def getFastqFiles(self, input_files, working_dir):
+    def getFastqFiles(self, input_files):
         '''Decompress input files to get a list of fastq files'''
         filenames = []
         for filename in input_files:
-            for fastq_file in decompress(filename, working_dir):
+            for fastq_file in decompress(filename, env.working_dir):
                 try:
                     with open(fastq_file) as fastq:
                         line = fastq.readline()
@@ -667,55 +696,58 @@ class BaseVariantCaller:
         env.logger.info('Setting read group tag to {}'.format(rg))
         return rg
 
-    def bwa_aln(self, fastq_files, working_dir):
+    def bwa_aln(self, fastq_files):
         '''Use bwa aln to process fastq files'''
         for input_file in fastq_files:
-            dest_file = '{}/{}.sai'.format(working_dir, os.path.basename(input_file))
+            dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
             if existAndNewerThan(dest_file, input_file):
                 env.logger.warning('Using existing alignment index file {}'.format(dest_file))
             else:
                 # input file should be in fastq format (-t 4 means 4 threads)
                 opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
                 if opt == ' -I ':
-                    env.logger.info('Using -I option for bwa aln command because the sequences seem to be in Illumina 1.3+ format.')
+                    env.logger.warning('Using -I option for bwa aln command because the sequences seem to be in Illumina 1.3+ format.')
                 run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
-                    input_file, dest_file), 
+                    input_file, dest_file),
+                    name=os.path.basename(dest_file),
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
         # wait for all bwa aln jobs to be completed
         wait_all()
 
-    def bwa_sampe(self, fastq_files, working_dir):
+    def bwa_sampe(self, fastq_files):
         '''Use bwa sampe to generate aligned sam files for paird end reads'''
         sam_files = []
         for idx in range(len(fastq_files)//2):
             f1 = fastq_files[2*idx]
             f2 = fastq_files[2*idx + 1]
-            rg = self.getReadGroup(f1, working_dir)
-            sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f1))
-            if existAndNewerThan(sam_file, [f1, f2]):
+            rg = self.getReadGroup(f1, env.working_dir)
+            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
+            if existAndNewerThan(sam_file, [f1 + '.sai', f2 + '.sai']):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command('bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
                     env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
-                    working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
+                    env.working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
+                    name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
         wait_all()
         return sam_files
 
-    def bwa_samse(self, fastq_files, working_dir):
+    def bwa_samse(self, fastq_files):
         '''Use bwa sampe to generate aligned sam files'''
         sam_files = []
         for f in fastq_file:
-            sam_file = '{}/{}_bwa.sam'.format(working_dir, os.path.basename(f))
-            rg = self.getReadGroup(f, working_dir)
+            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
+            rg = self.getReadGroup(f, env.working_dir)
             if existAndNewerThan(sam_file, f):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command('bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
                     env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
-                    working_dir, os.path.basename(f), f, sam_file),
+                    env.working_dir, os.path.basename(f), f, sam_file),
+                    name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
@@ -732,6 +764,7 @@ class BaseVariantCaller:
             else:
                 run_command('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, sam_file, bam_file),
+                    name=os.path.basename(bam_file),
                     upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
@@ -746,6 +779,7 @@ class BaseVariantCaller:
             else:
                 run_command('samtools sort {} {} {}_tmp'.format(
                     env.options['OPT_SAMTOOLS_SORT'], bam_file, sorted_bam_file[:-4]),
+                    name=os.path.basename(sorted_bam_file),
                     upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
@@ -763,18 +797,19 @@ class BaseVariantCaller:
                 run_command('java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'.format(
                     env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
                     env.options['OPT_PICARD_SORTSAM'], sam_file, sorted_bam_file[:-4] + '_tmp.bam'),
+                    name=os.path.basename(sorted_bam_file),
                     upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
         return sorted_bam_files
 
 
-    def markDuplicates(self, bam_files, working_dir):
+    def markDuplicates(self, bam_files):
         '''Mark duplicate using picard'''
         dedup_bam_files = []
         for bam_file in bam_files:
-            dedup_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
-            metrics_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
+            dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
+            metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
             if existAndNewerThan(dedup_bam_file, bam_file):
                 env.logger.warning('Using existing bam files after marking duplicate {}'.format(dedup_bam_file))
             else:
@@ -787,24 +822,27 @@ class BaseVariantCaller:
                     '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
                             env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
                             metrics_file), 
+                    name=os.path.basename(dedup_bam_file),
                     upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file))
             dedup_bam_files.append(dedup_bam_file)
         return dedup_bam_files
 
-    def mergeBAMs(self, bam_files, output):
+    def mergeBAMs(self, bam_files):
         '''merge sam files'''
         # use Picard merge, not samtools merge: 
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
         # inf from the first bam file
-        if existAndNewerThan(output, bam_files):
-            env.logger.warning('Using existing merged bam file {}'.format(output))
+        merged_bam_file = bam_files[0][:-4] + '_merged.bam'
+        if existAndNewerThan(merged_bam_file, bam_files):
+            env.logger.warning('Using existing merged bam file {}'.format(merged_bam_file))
         else:
             run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
     	        VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
     	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
                     env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), output[:-4] + '_tmp.bam'),
-                upon_succ=(os.rename, output[:-4] + '_tmp.bam', output))
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), merged_bam_file[:-4] + '_tmp.bam'),
+                upon_succ=(os.rename, merged_bam_file[:-4] + '_tmp.bam', merged_bam_file))
+        return merged_bam_file
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
@@ -820,13 +858,10 @@ class BaseVariantCaller:
         if not output.endswith('.bam'):
             env.logger.error('Plase specify a .bam file in the --output parameter')
             sys.exit(1)
-        if existAndNewerThan([output, output + '.bai'], input_files):
-            env.logger.warning('Using existing output file {}'.format(output))
-            sys.exit(0)
 
-    def realignIndels(self, bam_file, working_dir):
+    def realignIndels(self, bam_file):
         '''Create realigner target and realign indels'''
-        target = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
+        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
         if existAndNewerThan(target, bam_file):
             env.logger.warning('Using existing realigner target {}'.format(target))
         else:
@@ -843,7 +878,7 @@ class BaseVariantCaller:
                 target), upon_succ=(os.rename, target + '_tmp', target))
         # 
         # realign around known indels
-        cleaned_bam_file = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
+        cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
         if existAndNewerThan(cleaned_bam_file, target):
             env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
         else:
@@ -864,9 +899,9 @@ class BaseVariantCaller:
         return cleaned_bam_file
 
 
-    def recalibrate(self, bam_file, recal_bam_file, working_dir):
+    def recalibrate(self, bam_file, recal_bam_file):
         '''Create realigner target and realign indels'''
-        target = os.path.join(working_dir, os.path.basename(bam_file)[:-4] + '.grp')
+        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
         if existAndNewerThan(target, bam_file):
             env.logger.warning('Using existing base recalibrator target {}'.format(target))
         else:
@@ -901,21 +936,6 @@ class BaseVariantCaller:
         # 
         return recal_bam_file
 
-    def calibrate(self, input_file, output):
-        '''Calibrate BAM files.'''
-        if not output.endswith('.bam'):
-           env.logger.error('Please specify a .bam file in the --output parameter')
-           sys.exit(1)
-        if not os.path.isfile(input_file):
-            env.logger.error('Input file {} does not exist'.format(input_file))
-            sys.exit(1)
-        if not os.path.isfile(input_file + '.bai'):
-            env.logger.error('Input bam file {} is not indexed.'.format(input_file))
-            sys.exit(1)
-        if existAndNewerThan([output, output + '.bai'], [input_file, input_file + '.bai']):
-            env.logger.warning('Using existing output file {}'.format(output))
-            sys.exit(0)
-
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
         if not output.endswith('.vcf'):
@@ -932,186 +952,21 @@ class BaseVariantCaller:
                 env.logger.error('Input bam file {} is not indexed.'.format(bam_file))
                 sys.exit(1)
 
-
-class hg19_gatk_23(BaseVariantCaller):
-    '''A variant caller that uses gatk resource package 2.3 to call variants
-    from build hg19 of the human genome'''
-    def __init__(self, resource_dir):
-        self.pipeline = 'hg19_gatk_23'
-        BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
-
-    def checkResource(self):
-        '''Check if needed resource is available. This pipeline requires
-        GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
-        saved_dir = os.getcwd()
-        os.chdir(self.resource_dir)
-        files = ['ucsc.hg19.fasta.gz', 'bwaidx.amb', 'ucsc.hg19.fasta.fai']
-        if not all([os.path.isfile(x) for x in files]):
-            sys.exit('''GATK resource bundle does not exist in directory {}. Please run "call_variants.py prepare_resource" befor you execute this command.'''.format(self.resource_dir))
-        #
-        for cmd in ['wget',     # to download resource
-                    'bwa',      # alignment
-                    'samtools'  # merge sam files
-                    ]:
-            checkCmd(cmd)
-        #
-        checkPicard()
-        checkGATK()
-        # checkPySam()
-        #
-        os.chdir(saved_dir)
-
-    def prepareResourceIfNotExist(self):
-        '''This function downloads the UCSC resource boundle for specified build and
-        creates bwa and samtools indexed files from the whole genome sequence '''
-        saved_dir = os.getcwd()
-        os.chdir(self.resource_dir)
-        #
-        # these are pipeline specific
-        self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*', files=['ucsc.hg19.fasta.gz'])
-        self.buildBWARefIndex('ucsc.hg19.fasta')
-        self.buildSamToolsRefIndex('ucsc.hg19.fasta')
-        # 
-        os.chdir(saved_dir)
-
-#     def bam2fastq_obsolete(self, input_file, output_files):
-#         '''This function extracts raw reads from an input BAM file to one or 
-#         more fastq files. It uses a two step process recommended by
-#         Illumina to save RAM, but the first step is way too slow (21 + 9 hours,
-#         instead of a direct 9 hours according to Illumina documentation.'''
-#         BaseVariantCaller.bam2fastq(self, input_file, output_files)
-#         #
-#         # the working dir is a directory under output, the middle files are saved to this
-#         # directory to avoid name conflict
-#         working_dir = os.path.join(os.path.split(output_files[0])[0],
-#             os.path.basename(output_files[0]) + '_bam2fastq_cache')
-#         if not os.path.isdir(working_dir):
-#             os.makedirs(working_dir)
-#         #
-#         sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
-#         if os.path.isfile(sorted_bam):
-#             env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
-#         else:
-#             run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
-#                 upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
-#         if all([os.path.isfile(x) for x in output_files]):
-#             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
-#         else:
-#             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
-#                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-#                 env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
-#                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
-
-    def bam2fastq(self, input_file, output_files):
-        '''This function extracts raw reads from an input BAM file to one or 
-        more fastq files.'''
-        BaseVariantCaller.bam2fastq(self, input_file, output_files)
-        #
-        if all([os.path.isfile(x) for x in output_files]):
-            env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
-        else:
-            run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
-                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-                env.options['PICARD_PATH'], input_file, output_files[0], output_files[1]),
-                upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
-
-
-    def align(self, input_files, output):
-        '''Align reads to hg19 reference genome and return a sorted, indexed bam file.'''
-        BaseVariantCaller.align(self, input_files, output)
-        #
-        # the working dir is a directory under output, the middle files are saved to this
-        # directory to avoid name conflict
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
-        #
-        # step 1: decompress to get a list of fastq files
-        fastq_files = self.getFastqFiles(input_files, working_dir)
-        #
-        # step 2: call bwa aln to produce .sai files
-        self.bwa_aln(fastq_files, working_dir)
-        #
-        # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
-        paired = True
-        if len(fastq_files) // 2 * 2 != len(fastq_files):
-            env.logger.warning('Odd number of fastq files provided, not handled as paired end reads.')
-            paired = False
-        for idx in range(len(fastq_files)//2):
-            f1 = fastq_files[2*idx]
-            f2 = fastq_files[2*idx + 1]
-            if len(f1) != len(f2):
-                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
-                paired = False
-                break
-            diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
-            if diff != [1]:
-                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
-                paired = False
-                break
-        #
-        # sam files?
-        if paired:
-            sam_files = self.bwa_sampe(fastq_files, working_dir)
-        else:
-            sam_files = self.bwa_samse(fastq_files, working_dir)
-        # 
-        # step 4: convert sam to sorted bam files
-        sorted_bam_files = self.SortSam(sam_files)
-        #
-        # step 5: remove duplicate
-        dedup_files = self.markDuplicates(sorted_bam_files, working_dir)
-        #
-        # step 5: merge sorted bam files to output file
-        if len(bam_files) > 1:
-            self.mergeBAMs(dedup_files, output)
-        else:
-            shutil.copy(dedup_files[0], output)
-        #
-        # step 6: index the output bam file
-        self.indexBAM(output)
-
-    def calibrate(self, input_file, output):
-        BaseVariantCaller.calibrate(self, input_file, output)
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_calibrate_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
-        #
-        # step 1: create indel realignment targets
-        cleaned_bam_file = self.realignIndels(input_file, working_dir)
-        self.indexBAM(cleaned_bam_file)
-        #
-        # step 3: recalibration
-        self.recalibrate(cleaned_bam_file, output, working_dir)
-        self.indexBAM(output)
-
-    def callVariants(self, input_files, output):
-        '''Call variants from a list of input files'''
-        BaseVariantCaller.callVariants(self, input_files, output)
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
-        
-
 class b37_gatk_23(BaseVariantCaller):
     '''A variant caller that uses gatk resource package 2.3 to call variants
     from build b37 of the human genome of the GATK resource bundle'''
     def __init__(self, resource_dir):
         self.pipeline = 'b37_gatk_23'
         BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
+        self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*'
+        self.REF_fasta = 'human_g1k_v37.fasta'
 
     def checkResource(self):
         '''Check if needed resource is available. This pipeline requires
         GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
         saved_dir = os.getcwd()
         os.chdir(self.resource_dir)
-        files = ['ucsc.hg19.fasta.gz', 'bwaidx.amb', 'ucsc.hg19.fasta.fai']
+        files = [self.REF_fasta, 'bwaidx.amb', self.REF_fasta + '.fai']
         if not all([os.path.isfile(x) for x in files]):
             sys.exit('''GATK resource bundle does not exist in directory {}. Please run "call_variants.py prepare_resource" befor you execute this command.'''.format(self.resource_dir))
         #
@@ -1134,39 +989,11 @@ class b37_gatk_23(BaseVariantCaller):
         os.chdir(self.resource_dir)
         #
         # these are pipeline specific
-        self.downloadGATKResourceBundle('ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*', files=['human_g1k_v37.fasta.gz'])
-        self.buildBWARefIndex('human_g1k_v37.fasta')
-        self.buildSamToolsRefIndex('human_g1k_v37.fasta')
+        self.downloadGATKResourceBundle(self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
+        self.buildBWARefIndex(self.REF_fasta)
+        self.buildSamToolsRefIndex(self.REF_fasta)
         # 
         os.chdir(saved_dir)
-
-#     def bam2fastq_obsolete(self, input_file, output_files):
-#         '''This function extracts raw reads from an input BAM file to one or 
-#         more fastq files. It uses a two step process recommended by
-#         Illumina to save RAM, but the first step is way too slow (21 + 9 hours,
-#         instead of a direct 9 hours according to Illumina documentation.'''
-#         BaseVariantCaller.bam2fastq(self, input_file, output_files)
-#         #
-#         # the working dir is a directory under output, the middle files are saved to this
-#         # directory to avoid name conflict
-#         working_dir = os.path.join(os.path.split(output_files[0])[0],
-#             os.path.basename(output_files[0]) + '_bam2fastq_cache')
-#         if not os.path.isdir(working_dir):
-#             os.makedirs(working_dir)
-#         #
-#         sorted_bam = '{}/sorted_by_name.bam'.format(working_dir)
-#         if os.path.isfile(sorted_bam):
-#             env.logger.warning('Using existing sorted by name bam file'.format(sorted_bam))
-#         else:
-#             run_command('samtools sort -n -m 2000000000 {} {}'.format(input_file, sorted_bam[:-4] + '_tmp'),
-#                 upon_succ=(os.rename, sorted_bam[:-4] + '_tmp.bam', sorted_bam))
-#         if all([os.path.isfile(x) for x in output_files]):
-#             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
-#         else:
-#             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
-#                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-#                 env.options['PICARD_PATH'], sorted_bam, output_files[0], output_files[1]),
-#                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
 
     def bam2fastq(self, input_file, output_files):
         '''This function extracts raw reads from an input BAM file to one or 
@@ -1188,22 +1015,18 @@ class b37_gatk_23(BaseVariantCaller):
         #
         # the working dir is a directory under output, the middle files are saved to this
         # directory to avoid name conflict
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
+        env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
         #
         # step 1: decompress to get a list of fastq files
-        fastq_files = self.getFastqFiles(input_files, working_dir)
+        fastq_files = self.getFastqFiles(input_files)
         #
         # step 2: call bwa aln to produce .sai files
-        self.bwa_aln(fastq_files, working_dir)
+        self.bwa_aln(fastq_files)
         #
         # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
         paired = True
         if len(fastq_files) // 2 * 2 != len(fastq_files):
-            env.logger.warning('Odd number of fastq files provided, not handled as paired end reads.')
+            env.logger.warning('Odd number of fastq files found, not handled as paired end reads.')
             paired = False
         for idx in range(len(fastq_files)//2):
             f1 = fastq_files[2*idx]
@@ -1220,51 +1043,50 @@ class b37_gatk_23(BaseVariantCaller):
         #
         # sam files?
         if paired:
-            sam_files = self.bwa_sampe(fastq_files, working_dir)
+            sam_files = self.bwa_sampe(fastq_files)
         else:
-            sam_files = self.bwa_samse(fastq_files, working_dir)
+            sam_files = self.bwa_samse(fastq_files)
         # 
         # step 4: convert sam to sorted bam files
         sorted_bam_files = self.SortSam(sam_files)
         #
         # step 5: remove duplicate
-        dedup_files = self.markDuplicates(sorted_bam_files, working_dir)
+        dedup_files = self.markDuplicates(sorted_bam_files)
         #
         # step 5: merge sorted bam files to output file
         if len(bam_files) > 1:
-            self.mergeBAMs(dedup_files, output)
+            merged_bam_file = self.mergeBAMs(dedup_files)
         else:
-            shutil.copy(dedup_files[0], output)
+            merged_bam_file = dedup_files[0]
         #
         # step 6: index the output bam file
-        self.indexBAM(output)
-
-    def calibrate(self, input_file, output):
-        BaseVariantCaller.calibrate(self, input_file, output)
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_calibrate_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
+        self.indexBAM(merged_bam_file)
         #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
-        #
-        # step 1: create indel realignment targets
-        cleaned_bam_file = self.realignIndels(input_file, working_dir)
+        # step 7: create indel realignment targets
+        cleaned_bam_file = self.realignIndels(merged_bam_file)
         self.indexBAM(cleaned_bam_file)
         #
-        # step 3: recalibration
-        self.recalibrate(cleaned_bam_file, output, working_dir)
+        # step 8: recalibration
+        self.recalibrate(cleaned_bam_file, output)
         self.indexBAM(output)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
         BaseVariantCaller.callVariants(self, input_files, output)
-        working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        #
-        env.logger.info('Setting working directory to {}'.format(working_dir))
+        env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
         
 
+
+class hg19_gatk_23(b37_gatk_23):
+    '''A variant caller that uses gatk resource package 2.3 to call variants
+    from build hg19 of the human genome'''
+    def __init__(self, resource_dir):
+        self.pipeline = 'hg19_gatk_23'
+        b37_gatk_23.__init__(self, resource_dir, self.pipeline)
+        #
+        # this piple just uses different resource bundle
+        self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*'
+        self.REF_fasta = 'ucsc.hg19.fasta'
 
 if __name__ == '__main__':
     #
@@ -1379,15 +1201,13 @@ if __name__ == '__main__':
     #
     if hasattr(args, 'output'):
         if type(args.output) == list:
-            working_dir = os.path.split(args.output[0])[0]
+            env.working_dir = os.path.split(args.output[0])[0]
             logname = os.path.basename(args.output[0]) + '.log'
         else:
-            working_dir = os.path.split(args.output)[0]
+            env.working_dir = os.path.split(args.output)[0]
             logname = os.path.basename(args.output) + '.log'
-        if working_dir and not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
         # screen + log file logging
-        env.logger = os.path.join(working_dir, logname)
+        env.logger = os.path.join(env.working_dir, logname)
     else:
         # screen only logging
         env.logger = None
@@ -1425,12 +1245,6 @@ if __name__ == '__main__':
         checkPicard()
         pipeline.checkResource()
         pipeline.align(args.input_files, args.output)
-    elif args.action == 'calibrate':
-        env.jobs = args.jobs
-        checkPicard()
-        checkGATK()
-        pipeline.checkResource()
-        pipeline.calibrate(args.input_file, args.output)
     elif args.action == 'call':
         env.jobs = args.jobs
         checkPicard()
