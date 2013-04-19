@@ -103,6 +103,18 @@ if __name__ == '__main__':
         help='''List all remote and local resources under ~/.variant_tools and mark them
             as identical, missing, new, and modified. If any argument is given, only
             resources with filename containing specified words are displayed.''')
+    parser.add_argument('--update',  nargs='?', metavar='TYPE', 
+        const='current', 
+        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        help='''Download resources of specified type, which can be 'current' (latest version
+            of all resources excluding snapshots), 'all' (all resources including obsolete
+            databases), 'existing' (only update resources that exist locally), 
+            'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
+            'annotation' (all current annotation databases), 'format' (all formats), and
+            'snapshot' (all online snapshots). Identical resources that are available locally 
+            (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
+            option 'all' will download all versions of annotation databases which can be
+            slow and take a lot of disk spaces.''')
     parser.add_argument('--upload', metavar='FILE', nargs='+',
         help='''Upload specified files to the server. The file should 
             be under the local resource directory ~/.variant_tools.
@@ -148,6 +160,13 @@ if __name__ == '__main__':
         for f, p in sorted(local_manifest.items()):
             if f not in remote_manifest:
                 print('NEW       {}'.format(f))
+    elif args.update:
+        res = ResourceManager()
+        res.getRemoteManifest()
+        res.selectFiles(resource_type=args.update)
+        res.excludeExistingLocalFiles()
+        env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+        res.downloadResources()
     elif args.upload:
         username, password = getOrSaveAuthentication(args.username, args.password)
         manager = ResourceManager()
