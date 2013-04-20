@@ -206,7 +206,6 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
             if name is not None:
                 proc_out.close()
                 proc_err.close()
-            proc_out.close()
             if retcode < 0:
                 env.logger.error("Command {} was terminated by signal {} after executing {}".format(cmd, -retcode, elapsed_time(s)))
                 sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
@@ -953,7 +952,7 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T ReduceReads
                 -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_REDUCEREADS], input_file, self.resource_dir,
+                env.options['OPT_GATK_REDUCEREADS'], input_file, self.resource_dir,
                 self.REF_fasta, target[:-4] + '_tmp.bam'),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target[:-4] + '_tmp.bam', target))
