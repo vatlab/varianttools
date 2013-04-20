@@ -765,7 +765,6 @@ class SKAT(RTest):
 
     def _determine_algorithm(self):
         '''Generate SKAT R script'''
-        self.small_sample = (self.small_sample > 0 and len(self.pydata['phenotype']) < self.small_sample)
         conf = '''
         # BEGINCONF
         #[sample.size]
@@ -778,7 +777,8 @@ class SKAT(RTest):
         {1}# ENDCONF
         '''.format(' (from resampled outcome)' if self.resampling else '',
                    '#[pvalue.noadj]\n#comment=The p-value of SKAT without small sample adjustment, '
-                        'when small sample null model (SKAT_Null_Model_MomentAdjust) is applied\n' if self.small_sample else '')
+                        'when small sample null model (SKAT_Null_Model_MomentAdjust) is applied for '
+                        'association units having sample size smaller than {0}\n'.format(self.small_sample) if self.small_sample else '')
         self.Rscript = [x.strip() for x in conf.split('\n')]
         if self.skat_dir is None:
             self.Rscript.append('suppressMessages(library("SKAT"))')
@@ -794,16 +794,25 @@ class SKAT(RTest):
         # get parameters and residuals from the H0 model
         y_type = 'out_type="{0}", '.format('C' if self.trait_type == 'quantitative' else 'D')
         adjust_arg = 'Adjustment=TRUE'
-        if self.small_sample:
-          adjust_arg = 'is_kurtosis_adj={0}, n.Resampling.kurtosis={1}'.\
+        moment_adjust_arg = 'is_kurtosis_adj={0}, n.Resampling.kurtosis={1}'.\
             format('TRUE' if self.resampling_kurtosis else 'FALSE', self.resampling_kurtosis)
-        h_null = '''obj <- SKAT_Null_Model{0}(dat@Y[, m]~{1}, {2}n.Resampling={3},
-                 type.Resampling="bootstrap", {4})'''.\
-                   format('_MomentAdjust' if self.small_sample else '',
-                          1 if not self.ncovariates else 'as.matrix(dat@Y[, -m])',
-                          y_type if not self.small_sample else '',
-                          self.resampling, adjust_arg)
-        self.Rscript.append(h_null)
+        # small sample null model
+        self.Rscript.append('small.sample <- F')
+        h_null = 'obj <- SKAT_Null_Model(dat@Y[, m]~{0}, {1}n.Resampling={2}, type.Resampling="bootstrap",{3})'.\
+                format(1 if not self.ncovariates else 'as.matrix(dat@Y[, -m])',
+                       y_type, self.resampling, adjust_arg)
+        if self.small_sample:
+            h_null = '''
+            if (nrow(dat@Y) < {0}) {{
+            small.sample <- T
+            obj <- SKAT_Null_Model_MomentAdjust(dat@Y[, m]~{1}, n.Resampling={2},
+                 type.Resampling="bootstrap", {3})
+            }} else {{
+            {4}
+            }}
+            '''.format(self.small_sample, 1 if not self.ncovariates else 'as.matrix(dat@Y[, -m])',
+                       self.resampling, moment_adjust_arg, h_null)
+        self.Rscript.extend([x.strip() for x in h_null.split('\n')])
         # get logistic weights
         if self.logistic_weights:
             self.Rscript.append('weights <- Get_Logistic_Weights(Z, par1={0}, par2={1})'.\
@@ -828,7 +837,7 @@ class SKAT(RTest):
                  'Q.stats = stat, '
                  '{0} '
                  'pvalue = p))'.\
-                 format('pvalue.noadj = re[["p.value.noadj"]],' if self.small_sample else ''))
+                 format('pvalue.noadj = ifelse(small.sample,re[["p.value.noadj"]],NA),'))
         self.Rscript.append('}')
         # write
         self.script = os.path.join(env.cache_dir, basename + ".R")

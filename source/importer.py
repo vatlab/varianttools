@@ -1726,7 +1726,7 @@ class Importer:
                             self.sample_in_file = []
                             return ([], 0)
                         else:
-                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file. See "vtools import_variants -h" for details.'.format(numSample))
+                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file that matches the columns of samples. See "vtools import -h" for details.'.format(numSample))
                     else:
                         self.sample_in_file = [x for x in names]
                         return (self.recordFileAndSample(input_filename, names), 2)
@@ -1996,11 +1996,11 @@ class Importer:
         for count, input_filename in enumerate(self.files):
             env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
             self.importVariant(input_filename)
-            env.logger.info('{:,} new variants ({}) from {:,} lines are imported.'\
-                .format(self.count[2],
+            env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
+                .format(self.count[2], "(" if self.count[2] else '', 
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
-                    self.count[0]))
+                        ")" if self.count[2] else '', self.count[0]))
             # genotypes?
             if self.genotype_field:
                 self.prober.reset()

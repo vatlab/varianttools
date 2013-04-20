@@ -112,10 +112,11 @@ class PlinkBinaryToVariants:
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
             if self.status == -2:
-                env.logger.warning('Monomorphic site "{0}:{1}" ignored'.\
+                env.logger.warning('All genotypes for variant "{0}:{1}" are missing'.\
                                     format(chrom, pos))
             else:
-                env.logger.warning('Variant "{0}:{1} {2} {3}" failed to match reference genome {4}/(A,T,C,G)'.\
+                env.logger.warning('Variant "{0}:{1} {2} {3}" failed '
+                                   'to match reference genome {4}/(A,T,C,G)'.\
                                     format(chrom, pos, allele1, allele2, ref))
             return None
         elif self.status == 0:
@@ -179,19 +180,31 @@ class PlinkBinaryToVariants:
         variants = it.chain(cur.get_loci())
         # counters
         m_ones = zeros = ones = 0
-        for i in range(n):
+        i = 0
+        while i < n:
             self.status = 0
             # self.status will be updated
-            self.getLine(viter = variants, giter = cur)
+            flag, line = self.getLine(viter = variants, giter = cur)
+            if not flag:
+                # end of line
+                n = i
+                break
             if self.status == 0:
                 # not flipped
                 zeros += 1
             elif self.status == 1:
                 # flipped
                 ones += 1
-            else:
+            elif self.status == -1:
                 # bad match
                 m_ones += 1
+            else:
+                # status = -2, monomorphic site
+                # ignore this test
+                if self.status == -2:
+                    continue
+                else:
+                    i += 1
         # check if so many are negative values
         if m_ones > float(n) / 2.0:
             return -9
@@ -216,12 +229,15 @@ class PlinkBinaryToVariants:
         In *.bim file allele1 or allele2 (major/minor) can be 0 when only one allele is found
         in data. Such loci is not considered a variant site and will be ignored
         '''
-        if major not in ['A','T','C','G'] or minor not in ['A','T','C','G']:
-            # invalid coding
-            if major == '0' or minor == '0':
-                return -2, 0, major, minor 
-            else:
-                return -1, 0, major, minor
+        # monomorphic, missing, or invalid coding
+        if major not in ['A','T','C','G','0'] or minor not in ['A','T','C','G','0']:
+            return -1, 0, major, minor
+        if major == '0' and minor == '0':
+            return -2, 0, major, minor
+        if major == '0' and minor != '0':
+            major = minor
+        if major != '0' and minor == '0':
+            minor = major
         status = strand = 0
         if ref in [major, minor]:
             # allele found, determine flip status

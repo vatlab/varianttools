@@ -37,15 +37,27 @@ import shutil
 import argparse
 import zipfile
 import platform
+from variant_tools.utils import runCommand
 
 def ModifyVersion(version):
     # modify source/__init__.py to write version string
     if version is not None:
+        content = []
+        rev = runCommand('svnversion').strip()
         with open('source/__init__.py', 'r') as init_file:
-            content = init_file.readlines()
-            new_content = ''.join(["VTOOLS_VERSION='{}'\n".format(version) if x.startswith('VTOOLS_VERSION') else x for x in content])
+            for x in init_file.readlines():
+                if x.startswith('VTOOLS_VERSION'):
+                    content.append("VTOOLS_VERSION='{}'\n".format(version))
+                elif x.startswith('# $Rev:'):
+                    content.append("# $Rev: {} $\n".\
+                                   format(rev))
+                elif x.startswith("VTOOLS_REVISION='$Rev:"):
+                    content.append("VTOOLS_REVISION='$Rev: {} $'\n".\
+                                   format(rev))
+                else:
+                    content.append(x)
         with open('source/__init__.py', 'w') as init_file:
-            init_file.write(new_content)
+            init_file.write(''.join(content))
     # read version string
     from source import VTOOLS_VERSION
     return VTOOLS_VERSION
