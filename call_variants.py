@@ -762,9 +762,9 @@ class BaseVariantCaller:
             if existAndNewerThan(bam_file, sam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
-                run_command('samtools view {} -bt {}/ucsc.hg19.fasta.fai {} > {}_tmp'.format(
-                    env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, sam_file, bam_file),
-                    name=os.path.basename(bam_file),
+                run_command('samtools view {} -bt {}/{}.fai {} > {}_tmp'.format(
+                    env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, self.REF_fasta, 
+                    sam_file, bam_file), name=os.path.basename(bam_file),
                     upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
@@ -823,8 +823,9 @@ class BaseVariantCaller:
                             env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
                             metrics_file), 
                     name=os.path.basename(dedup_bam_file),
-                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file))
+                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file), wait=False)
             dedup_bam_files.append(dedup_bam_file)
+        wait_all()
         return dedup_bam_files
 
     def mergeBAMs(self, bam_files):
@@ -841,6 +842,7 @@ class BaseVariantCaller:
     	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
                     env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
                     ' '.join(['INPUT={}'.format(x) for x in bam_files]), merged_bam_file[:-4] + '_tmp.bam'),
+                name=os.path.basename(merged_bam_file),
                 upon_succ=(os.rename, merged_bam_file[:-4] + '_tmp.bam', merged_bam_file))
         return merged_bam_file
 
@@ -866,16 +868,18 @@ class BaseVariantCaller:
             env.logger.warning('Using existing realigner target {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/ucsc.hg19.fasta
+                -R {4}/{5}
                 -T RealignerTargetCreator
                 --mismatchFraction 0.0
                 -known {4}/dbsnp_137.hg19.vcf
                 -known {4}/hapmap_3.3.hg19.vcf
                 -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
                 -known {4}/1000G_phase1.indels.hg19.vcf
-                -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -o {6}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                target), upon_succ=(os.rename, target + '_tmp', target))
+                self.REF_fasta, target),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target + '_tmp', target))
         # 
         # realign around known indels
         cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
@@ -883,17 +887,18 @@ class BaseVariantCaller:
             env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/ucsc.hg19.fasta
+                -R {4}/{5}
                 -T IndelRealigner 
-                --targetIntervals {5}
+                --targetIntervals {6}
                 -known {4}/dbsnp_137.hg19.vcf
                 -known {4}/hapmap_3.3.hg19.vcf
                 -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
                 -known {4}/1000G_phase1.indels.hg19.vcf
                 --consensusDeterminationModel USE_READS
-                -compress 0 -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -compress 0 -o {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                target, cleaned_bam_file[:-4] + '_tmp.bam'),
+                self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam'),
+                name=os.path.basename(cleaned_bam_file),
                 upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file))
         # 
         return cleaned_bam_file
@@ -907,7 +912,7 @@ class BaseVariantCaller:
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -T BaseRecalibrator
-                -R {4}/ucsc.hg19.fasta
+                -R {4}/{5}
                 -cov ReadGroupCovariate
                 -cov QualityScoreCovariate
                 -cov CycleCovariate
@@ -917,33 +922,49 @@ class BaseVariantCaller:
                 -knownSites {4}/1000G_omni2.5.hg19.vcf
                 -knownSites {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
                 -knownSites {4}/1000G_phase1.indels.hg19.vcf
-                -o {5}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -o {6}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_BASERECALIBRATOR'], bam_file, self.resource_dir,
-                target), upon_succ=(os.rename, target + '_tmp', target))
+                self.REF_fasta, target),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target + '_tmp', target))
         #
         # recalibrate
         if existAndNewerThan(recal_bam_file, target):
             env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/ucsc.hg19.fasta
+                -R {4}/{5}
                 -T PrintReads
-                -BQSR {5}
-                -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -BQSR {6}
+                -o {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_PRINTREADS'], bam_file, self.resource_dir,
-                target, recal_bam_file[:-4] + '_tmp.bam'),
+                self.REF_fasta, target, recal_bam_file[:-4] + '_tmp.bam'),
+                name=os.path.basename(recal_bam_file),
                 upon_succ=(os.rename, recal_bam_file[:-4] + '_tmp.bam', recal_bam_file))
         # 
         return recal_bam_file
+
+    def reduceReads(self, input_file):
+        target = input_file[:-4] + '_reduced.bam'
+        if existAndNewerThan(input_file, target):
+            env.logger.warning('Using existing reduced bam file {}'.format(input_file))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T ReduceReads
+                -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                env.options['OPT_GATK_REDUCEREADS], input_file, self.resource_dir,
+                self.REF_fasta, target[:-4] + '_tmp.bam'),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target[:-4] + '_tmp.bam', target))
+        # 
+        return target
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
         if not output.endswith('.vcf'):
            env.logger.error('Please specify a .vcf file in the --output parameter')
            sys.exit(1)
-        if existAndNewerThan(output, input_files):
-            env.logger.warning('Using existing output file {}'.format(output))
-            sys.exit(0)
         for bam_file in input_files:
             if not os.path.isfile(bam_file):
                 env.logger.error('Input file {} does not exist'.format(bam_file))
@@ -1050,25 +1071,32 @@ class b37_gatk_23(BaseVariantCaller):
         # step 4: convert sam to sorted bam files
         sorted_bam_files = self.SortSam(sam_files)
         #
+        # According to GATK best practice, dedup should be run at the
+        # lane level (the documentation is confusing here though)
+        #
         # step 5: remove duplicate
-        dedup_files = self.markDuplicates(sorted_bam_files)
+        dedup_bam_files = self.markDuplicates(sorted_bam_files)
         #
-        # step 5: merge sorted bam files to output file
-        if len(bam_files) > 1:
-            merged_bam_file = self.mergeBAMs(dedup_files)
+        # step 6: merge sorted bam files to output file
+        if len(dedup_bam_files) > 1:
+            merged_bam_file = self.mergeBAMs(dedup_bam_files)
         else:
-            merged_bam_file = dedup_files[0]
+            merged_bam_file = dedup_bam_files[0]
         #
-        # step 6: index the output bam file
+        # step 7: index the output bam file
         self.indexBAM(merged_bam_file)
         #
-        # step 7: create indel realignment targets
+        # step 7: create indel realignment targets and recall
         cleaned_bam_file = self.realignIndels(merged_bam_file)
         self.indexBAM(cleaned_bam_file)
         #
         # step 8: recalibration
         self.recalibrate(cleaned_bam_file, output)
         self.indexBAM(output)
+        #
+        # step 9: reduce reads
+        reduced = self.reduceReads(output)
+        self.indexBAM(reduced)
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
@@ -1109,6 +1137,7 @@ if __name__ == '__main__':
         ('OPT_PICARD_MARKDUPLICATES', ''),
         ('OPT_GATK_BASERECALIBRATOR', ''),
         ('OPT_GATK_PRINTREADS', ''),
+        ('OPT_GATK_REDUCEREADS', ''),
         ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
