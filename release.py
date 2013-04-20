@@ -216,16 +216,16 @@ if __name__ == '__main__':
         help='If specified, tag this release')
     parser.add_argument('--pyinstaller_dir', default = '.',
         help='path to the directory where pyinstaller git clone is located.')
-    parser.add_argument('--pack_only', action='store_true',
-        help='If specified, will skip the compilation and only pack the source and build the binary')
+    parser.add_argument('--rebuild', action='store_true',
+        help='If specified, purge the existing "build" folder to compile afresh.')
     # allow recognied parameters to be set to the build process
     args, argv = parser.parse_known_args()
     #
     version = ModifyVersion(args.version)
-    if not args.pack_only:
+    if args.rebuild:
         SetUpEnvironment(version)
         GenerateSWIGWrappers()
-        BuildVariantTools(argv)
+    BuildVariantTools(argv)
     BuildSourcePackage()
     git_dir = ObtainPyInstaller(args.pyinstaller_dir)
     BuildExecutables(version, git_dir)
