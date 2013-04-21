@@ -19,14 +19,13 @@ from collections import defaultdict, namedtuple
 # Runtime environment
 #
 class RuntimeEnvironment(object):
-    '''Define the runtime environment of the pipeline, which presently provides
-    maximum number of concurrent jobs, and a logger
-    '''
-    # the following make RuntimeEnvironment a singleton class
+    '''Define the runtime environment of the pipeline'''
+    # the following makes RuntimeEnvironment a singleton class
     _instance = None
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(RuntimeEnvironment, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(RuntimeEnvironment, cls).__new__(cls, *args, 
+                **kwargs)
         return cls._instance
 
     def __init__(self):
@@ -41,8 +40,8 @@ class RuntimeEnvironment(object):
         # additional parameters for args
         self.options = defaultdict(str)
         #
-        # running_jobs implements a simple multi-processing queue system. Basically,
-        # this variable holds the (popen, cmd, upon_succ) object for running jobs.
+        # running_jobs implements a simple multi-processing queue system. 
+        # This variable holds a JOB tuple of the running jobs.
         #
         # Functions:
         #   BaseVariantCaller.call(cmd, upon_succ, wait=False)
@@ -65,9 +64,6 @@ class RuntimeEnvironment(object):
 
     jobs = property(lambda self:self._max_jobs, _setMaxJobs)
 
-    #
-    # a global logger
-    #
     class ColoredFormatter(logging.Formatter):
         ''' A logging format with colored output, which is copied from
         http://stackoverflow.com/questions/384076/how-can-i-make-the-python-logging-output-to-be-colored
@@ -124,7 +120,8 @@ class RuntimeEnvironment(object):
             }
 
         def colorstr(self, astr, color):
-            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr, self.COLOR_CODE['ENDC'])
+            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr, 
+                self.COLOR_CODE['ENDC'])
 
         def format(self, record):
             record = copy.copy(record)
@@ -162,7 +159,8 @@ class RuntimeEnvironment(object):
             os.makedirs(working_dir)
         self._working_dir = working_dir
         if self._logger is not None:
-            self._logger.info('Setting working directory to {}'.format(self._working_dir))
+            self._logger.info('Setting working directory to {}'
+                .format(self._working_dir))
         
     working_dir = property(lambda self: self._working_dir, _setWorkingDir)
 
@@ -170,35 +168,39 @@ class RuntimeEnvironment(object):
 env = RuntimeEnvironment()
 
 
-def elapsed_time(start):
-    '''Return the elapsed time in human readable format since start time'''
-    second_elapsed = int(time.time() - start)
-    return ('' if second_elapsed < 86400 else '{} days '.format(second_elapsed // 86400)) + \
-        time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
- 
 #
 # A simple job management scheme 
 #
 # NOTE:
 #   subprocess.PIPE cannot be used for NGS commands because they tend to send
-#   a lot of progress output to stderr, which might block PIPE and cause the command
-#   itself to fail, or stall (which is even worse).
+#   a lot of progress output to stderr, which might block PIPE and cause the
+#   command itself to fail, or stall (which is even worse).
 #
-JOB = namedtuple('JOB', ['proc', 'cmd', 'upon_succ', 'start_time', 'stdout', 'stderr', 'name'])
+JOB = namedtuple('JOB', 'proc cmd upon_succ start_time stdout stderr name')
 
+def elapsed_time(start):
+    '''Return the elapsed time in human readable format since start time'''
+    second_elapsed = int(time.time() - start)
+    days_elapsed = second_elapsed // 86400
+    return ('{} days ' if days_elapsed else '') + 
+        time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
+ 
 def run_command(cmd, name=None, upon_succ=None, wait=True):
     '''Call an external command, raise an error if it fails.
     If upon_succ is specified, the specified function and parameters will be
     evalulated after the job has been completed successfully.
-    If a name is given, stdout and stderr will be sent to env.working_dir, name.out and name.err.
-    Otherwise, stdout and stderr will be ignored.
+    If a name is given, stdout and stderr will be sent to env.working_dir, 
+    name.out and name.err. Otherwise, stdout and stderr will be ignored.
     '''
-    # merge mulit-line command into one line and remove extra white space and tabs
+    # merge mulit-line command into one line and remove extra white spaces
     cmd = ' '.join(cmd.split())
-    if name is not None:
+    if name is None:
+        proc_out = DEVNULL
+        proc_err = DEVNULL
+    else:
         name = name.replace('/', '_')
-    proc_out = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.out'.format(name)), mode='w')
-    proc_err = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.err'.format(name)), mode='w')
+        proc_out = open(os.path.join(env.working_dir, name + '.out'), 'w')
+        proc_err = open(os.path.join(env.working_dir, name + '.err'), 'w')
     if wait or env.jobs == 1:
         try:
             s = time.time()
@@ -209,15 +211,20 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
                 proc_out.close()
                 proc_err.close()
             if retcode < 0:
-                env.logger.error("Command {} was terminated by signal {} after executing {}".format(cmd, -retcode, elapsed_time(s)))
-                sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
+                env.logger.error('Command {} was terminated by signal {} after executing {}'
+                    .format(cmd, -retcode, elapsed_time(s)))
+                sys.exit('Command {} was terminated by signal {}'
+                    .format(cmd, -retcode))
             elif retcode > 0:
                 if name is not None:
-                    with open(os.path.join(env.working_dir, '{}.err'.format(name))) as err:
-                        [env.logger.error(x) for x in err.read().split('\n')[-20:]]
-                env.logger.error("Command {} returned {} after executing {}".format(cmd, retcode, elapsed_time(s)))
+                    with open(os.path.join(env.working_dir, name + '.err')) as err:
+                        for line in err.read().split('\n')[-20:]:
+                            env.logger.error(line)
+                env.logger.error("Command {} returned {} after executing {}"
+                    .format(cmd, retcode, elapsed_time(s)))
                 sys.exit("Command {} returned {}".format(cmd, retcode))
-            env.logger.info('Command {} completed successfully in {}'.format(cmd, elapsed_time(s)))
+            env.logger.info('Command {} completed successfully in {}'
+                .format(cmd, elapsed_time(s)))
         except OSError as e:
             env.logger.error("Execution of command {} failed: {}".format(cmd, e))
             sys.exit("Execution of command {} failed: {}".format(cmd, e))
@@ -226,17 +233,16 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
             # call the function (upon_succ) using others as parameters.
             upon_succ[0](*(upon_succ[1:]))
     else:
-        # if do not wait, look for running jobs
+        # wait for empty slot to run the job
         while True:
-            # if there are enough jobs running, wait
             if poll_jobs() >= env.jobs:
                 time.sleep(5)
             else:
                 break
         # there is a slot, start running
         proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-        env.running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ, start_time=time.time(),
-            stdout=proc_out, stderr=proc_err, name=name))
+        env.running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ,
+            start_time=time.time(), stdout=proc_out, stderr=proc_err, name=name))
         env.logger.info('Running {}'.format(cmd))
 
 def poll_jobs():
@@ -250,7 +256,7 @@ def poll_jobs():
             count += 1
             continue
         #
-        # close redirected stdout and stderr
+        # job completed, close redirected stdout and stderr
         if job.stderr != subprocess.DEVNULL:
             try:
                 job.stdout.close()
@@ -259,23 +265,28 @@ def poll_jobs():
                 pass
         #
         if ret < 0:
-            env.logger.error("Command {} was terminated by signal {} after executing {}".format(job.cmd, -ret, elapsed_time(job.start_time)))
+            env.logger.error("Command {} was terminated by signal {} after executing {}"
+                .format(job.cmd, -ret, elapsed_time(job.start_time)))
             sys.exit("Command {} was terminated by signal {}".format(job.cmd, -ret))
         elif ret > 0:
             if job.name is not None:
                 with open(os.path.join(env.working_dir, job.name + '.err')) as err:
-                    [env.logger.error(x) for x in err.read().split('\n')[-50:]]
-            env.logger.error('Execution of command {} failed after {}.'.format(job.cmd, elapsed_time(job.start_time)))
+                    for line in err.read().split('\n')[-50:]:
+                        env.logger.error(line)
+            env.logger.error('Execution of command {} failed after {}.'
+                .format(job.cmd, elapsed_time(job.start_time)))
             sys.exit('Job {} failed.'.format(job.cmd))
         else:
             if job.name is not None:
                 with open(os.path.join(env.working_dir, job.name + '.err')) as err:
-                    [env.logger.info(x) for x in err.read().split('\n')[-10:]]
+                    for line in err.read().split('\n')[-10:]:
+                        env.logger.info(x)
             # finish up
             if job.upon_succ:
                 # call the upon_succ function
                 job.upon_succ[0](*(job.upon_succ[1:]))
-            env.logger.info('Command {} completed successfully in {}'.format(job.cmd, elapsed_time(job.start_time)))
+            env.logger.info('Command {} completed successfully in {}'
+                .format(job.cmd, elapsed_time(job.start_time)))
             #
             env.running_jobs[idx] = None
     return count
@@ -296,18 +307,22 @@ def checkCmd(cmd):
         env.logger.error('Please use Python 3.3 or higher for the use of shutil.which function')
         sys.exit(1)
     if shutil.which(cmd) is None:
-        env.logger.error('Command {} does not exist. Please install it and try again.'.format(cmd))
+        env.logger.error('Command {} does not exist. Please install it and try again.'
+            .format(cmd))
         sys.exit(1)
 
 def checkPicard():
     '''Check if picard is available, set PICARD_PATH if the path is specified in CLASSPATH'''
     if env.options['PICARD_PATH']:
         if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
-            env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'.format(env.options['PICARD_PATH']))
+            env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'
+                .format(env.options['PICARD_PATH']))
             sys.exit(1)
     elif 'CLASSPATH' in os.environ:
-        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) for x in os.environ['CLASSPATH'].split(':')]):
-            env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'.format(os.environ['CLASSPATH']))
+        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) 
+                for x in os.environ['CLASSPATH'].split(':')]):
+            env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'
+                .format(os.environ['CLASSPATH']))
             sys.exit(1)
         for x in os.environ['CLASSPATH'].split(':'):
             if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
@@ -315,18 +330,24 @@ def checkPicard():
                 env.options['PICARD_PATH'] = os.path.expanduser(x)
                 break
     else:
-        env.logger.error('Please either specify path to picard using option PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
+        env.logger.error('Please either specify path to picard using option '
+            'PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
         sys.exit(1)
 
 def checkGATK():
-    '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path is specified in CLASSPATH'''
+    '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path
+        is specified in CLASSPATH'''
     if env.options['GATK_PATH']:
-        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']), 'GenomeAnalysisTK.jar')):
-            env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'.format(env.options['GATK_PATH']))
+        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']),
+                'GenomeAnalysisTK.jar')):
+            env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'
+                .format(env.options['GATK_PATH']))
             sys.exit(1)
     elif 'CLASSPATH' in os.environ:
-        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')) for x in os.environ['CLASSPATH'].split(':')]):
-            env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'.format(os.environ['CLASSPATH']))
+        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar'))
+                for x in os.environ['CLASSPATH'].split(':')]):
+            env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'
+                .format(os.environ['CLASSPATH']))
             sys.exit(1)
         else:
             for x in os.environ['CLASSPATH'].split(':'):
@@ -335,7 +356,8 @@ def checkGATK():
                     env.options['GATK_PATH'] = os.path.expanduser(x)
                     break
     else:
-        env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environment variable $CLASSPATH.')
+        env.logger.error('Please either specify path to GATK using option '
+            'GATK_PATH=path, or set it in environment variable $CLASSPATH.')
         sys.exit(1) 
 
 # 
@@ -356,7 +378,8 @@ def downloadFile(URL, dest, quiet=False):
     if os.path.isfile(dest):
         env.logger.warning('Using existing downloaded file {}.'.format(dest))
         return dest
-    p = subprocess.Popen('wget {} -O {}_tmp {}'.format('-q' if quiet else '', dest, URL), shell=True)
+    p = subprocess.Popen('wget {} -O {}_tmp {}'
+        .format('-q' if quiet else '', dest, URL), shell=True)
     ret = p.wait()
     if ret == 0 and os.path.isfile(dest + '_tmp'):
         os.rename(dest + '_tmp', dest)
@@ -387,21 +410,25 @@ def fastqVersion(fastq_file):
             try:
                 line = fastq.readline()
             except Exception as e:
-                env.logger.error('Failed to read fastq file {}: {}'.format(fastq_file, e))
+                env.logger.error('Failed to read fastq file {}: {}'
+                    .format(fastq_file, e))
                 sys.exit(1)
             if not line.startswith('@'):
                 raise ValueError('Wrong FASTA file {}'.format(fastq_file))
             line = fastq.readline()
             line = fastq.readline()
             if not line.startswith('+'):
-                env.logger.warning('Suspiciout FASTA file {}: third line does not start with "+".'.foramt(fastq_file))
+                env.logger.warning(
+                    'Suspiciout FASTA file {}: third line does not start with "+".'
+                    .foramt(fastq_file))
                 return 'Unknown'
             line = fastq.readline()
             qual_scores += line.strip()
     #
     min_qual = min([ord(x) for x in qual_scores])
     max_qual = max([ord(x) for x in qual_scores])
-    env.logger.debug('FASTA file with quality score ranging {} to {}'.format(min_qual, max_qual))
+    env.logger.debug('FASTA file with quality score ranging {} to {}'
+        .format(min_qual, max_qual))
     # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
     # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
     if min_qual >= 64 or max_qual > 90:
@@ -439,16 +466,17 @@ def decompress(filename, dest_dir=None):
     elif filename.lower().endswith('.tar'):
         mode = 'r'
     elif filename.lower().endswith('.gz'):
-        dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-3])
+        dest_file = os.path.join('.' if dest_dir is None else dest_dir,
+            os.path.basename(filename)[:-3])
         if existAndNewerThan(dest_file, filename):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with gzip.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
-                buffer = input.read(10000000)
-                while buffer:
-                    output.write(buffer)
-                    buffer = input.read(10000000)
+            with gzip.open(filename, 'rb') as gzinput, open(dest_file + '_tmp', 'wb') as output:
+                content = gzinput.read(10000000)
+                while content:
+                    output.write(content)
+                    content = gzinput.read(10000000)
             # only rename the temporary file to the right one after finishing everything
             # this avoids corrupted files
             os.rename(dest_file + '_tmp', dest_file)
@@ -459,11 +487,11 @@ def decompress(filename, dest_dir=None):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with bz2.open(filename, 'rb') as input, open(dest_file + '_tmp', 'wb') as output:
-                buffer = input.read(10000000)
-                while buffer:
-                    output.write(buffer)
-                    buffer = input.read(10000000)
+            with bz2.open(filename, 'rb') as bzinput, open(dest_file + '_tmp', 'wb') as output:
+                content = bzinput.read(10000000)
+                while content:
+                    output.write(content)
+                    content = bzinput.read(10000000)
             # only rename the temporary file to the right one after finishing everything
             # this avoids corrupted files
             os.rename(dest_file + '_tmp', dest_file)
@@ -477,13 +505,15 @@ def decompress(filename, dest_dir=None):
     #
     # if it is a tar file
     if mode is not None:
-        env.logger.info('Extracting fastq sequences from tar file {}'.format(filename))
+        env.logger.info('Extracting fastq sequences from tar file {}'
+            .format(filename))
         #
         # MOTE: open a compressed tar file can take a long time because it needs to scan
         # the whole file to determine its content. I am therefore creating a manifest
         # file for the tar file in the dest_dir, and avoid re-opening when the tar file
         # is processed again.
-        manifest = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(filename) + '.manifest')
+        manifest = os.path.join( '.' if dest_dir is None else dest_dir,
+            os.path.basename(filename) + '.manifest')
         all_extracted = False
         dest_files = []
         if existAndNewerThan(manifest, filename):
@@ -524,9 +554,9 @@ def decompress(filename, dest_dir=None):
                     tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
                     # move to the top directory with the right name only after the file has been properly extracted
                     shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
-            # set dest_files to the same modification time. This is used to mark the right time when the 
-            # files are created and avoid the use of archieved but should-not-be-used files that might 
-            # be generated later
+            # set dest_files to the same modification time. This is used to
+            # mark the right time when the files are created and avoid the use
+            # of archieved but should-not-be-used files that might be generated later
             [os.utime(x) for x in dest_files]
         return dest_files
     # return source file if 
@@ -587,9 +617,11 @@ class BaseVariantCaller:
                     shutil.move(os.path.join(root, name), name)
         #
         # decompress all .gz files
-        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and not x.endswith('tar.gz')]:
+        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
+            not x.endswith('tar.gz')]:
             if existAndNewerThan(gzipped_file[:-3], gzipped_file):
-                env.logger.warning('Using existing decompressed file {}'.format(gzipped_file[:-3]))
+                env.logger.warning('Using existing decompressed file {}'
+                    .format(gzipped_file[:-3]))
             else:
                 decompress(gzipped_file, '.')
 
@@ -600,15 +632,18 @@ class BaseVariantCaller:
             env.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
         else:
             checkCmd('bwa')
-            run_command('bwa index {} -p bwaidx -a bwtsw {}'.format(env.options['OPT_BWA_INDEX'], ref_file))
+            run_command('bwa index {} -p bwaidx -a bwtsw {}'
+                .format(env.options['OPT_BWA_INDEX'], ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
         '''Create index for reference genome used by samtools'''
         if os.path.isfile('{}.fai'.format(ref_file)):
-            env.logger.warning('Using existing samtools sequence index {}.fai'.format(ref_file))
+            env.logger.warning('Using existing samtools sequence index {}.fai'
+                .format(ref_file))
         else:
             checkCmd('samtools')
-            run_command('samtools faidx {} {}'.format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
+            run_command('samtools faidx {} {}'
+                .format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
 
     # interface
     def checkResource(self):
@@ -637,7 +672,8 @@ class BaseVariantCaller:
                             raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
                     filenames.append(fastq_file)
                 except Exception as e:
-                    env.logger.error('Ignoring non-fastq file {}: {}'.format(fastq_file, e))
+                    env.logger.error('Ignoring non-fastq file {}: {}'
+                        .format(fastq_file, e))
         filenames.sort()
         return filenames
 
@@ -650,24 +686,31 @@ class BaseVariantCaller:
         # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
         # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
         #
-        # This function return a read group string like ‘@RG\tID:foo\tSM:bar’
+        # This function return a read group string like '@RG\tID:foo\tSM:bar'
         #
-        # ID* Read group identifier. Each @RG line must have a unique ID. The value of ID is used in the RG
-        #     tags of alignment records. Must be unique among all read groups in header section. Read group
+        # ID* Read group identifier. Each @RG line must have a unique ID. The
+        # value of ID is used in the RG
+        #     tags of alignment records. Must be unique among all read groups
+        #     in header section. Read group
         #     IDs may be modifid when merging SAM fies in order to handle collisions.
         # CN Name of sequencing center producing the read.
         # DS Description.
         # DT Date the run was produced (ISO8601 date or date/time).
-        # FO Flow order. The array of nucleotide bases that correspond to the nucleotides used for each
-        #     flow of each read. Multi-base flows are encoded in IUPAC format, and non-nucleotide flows by
+        # FO Flow order. The array of nucleotide bases that correspond to the
+        #     nucleotides used for each
+        #     flow of each read. Multi-base flows are encoded in IUPAC format, 
+        #     and non-nucleotide flows by
         #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
-        # KS The array of nucleotide bases that correspond to the key sequence of each read.
+        # KS The array of nucleotide bases that correspond to the key sequence
+        #     of each read.
         # LB Library.
         # PG Programs used for processing the read group.
         # PI Predicted median insert size.
-        # PL Platform/technology used to produce the reads. Valid values: CAPILLARY, LS454, ILLUMINA,
+        # PL Platform/technology used to produce the reads. Valid values: 
+        #     CAPILLARY, LS454, ILLUMINA,
         #     SOLID, HELICOS, IONTORRENT and PACBIO.
-        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for SOLiD). Unique identifier.
+        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
+        #     SOLiD). Unique identifier.
         # SM Sample. Use pool name where a pool is being sequenced.
         #
         filename = os.path.basename(fastq_filename)
@@ -678,14 +721,16 @@ class BaseVariantCaller:
         PL = 'ILLUMINA'  
         PG = 'BWA'
         #
-        # PU is for flowcell and lane information, ID should be unique for each readgroup
+        # PU is for flowcell and lane information, ID should be unique for each
+        #     readgroup
         # ID is temporarily obtained from input filename without exteion
         ID = filename.split('.')[0]
         # try to get lan information from s_x_1/2 pattern
         try:
             PU = re.search('s_([^_]+)_', filename).group(1)
         except AttributeError as e:
-            env.logger.error('Cannot find lane information from filename {}: {}'.format(filename, e))
+            env.logger.error('Cannot find lane information from filename {}: {}'
+                .format(filename, e))
             PU = 'NA'
         # try to get some better ID
         try:
@@ -693,7 +738,8 @@ class BaseVariantCaller:
             m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
             ID = '{}.{}'.format(m.group(1), m.group(4))
         except AttributeError as e:
-            env.logger.warning('Input fasta filename {} does not match a known pattern. ID is directly obtained from filename.'.format(filename))
+            env.logger.warning('Input fasta filename {} does not match a known'
+                ' pattern. ID is directly obtained from filename.'.format(filename))
         #
         rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
         env.logger.info('Setting read group tag to {}'.format(rg))
@@ -704,16 +750,20 @@ class BaseVariantCaller:
         for input_file in fastq_files:
             dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
             if existAndNewerThan(dest_file, input_file):
-                env.logger.warning('Using existing alignment index file {}'.format(dest_file))
+                env.logger.warning('Using existing alignment index file {}'
+                    .format(dest_file))
             else:
                 # input file should be in fastq format (-t 4 means 4 threads)
                 opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
                 if opt == ' -I ':
-                    env.logger.warning('Using -I option for bwa aln command because the sequences seem to be in Illumina 1.3+ format.')
-                run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'.format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
-                    input_file, dest_file),
+                    env.logger.warning('Using -I option for bwa aln command '
+                        'because the sequences seem to be in Illumina 1.3+ format.')
+                run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'
+                    .format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
+                        input_file, dest_file),
                     name=os.path.basename(dest_file),
-                    upon_succ=(os.rename, dest_file + '_tmp', dest_file), wait=False)
+                    upon_succ=(os.rename, dest_file + '_tmp', dest_file),
+                    wait=False)
         # wait for all bwa aln jobs to be completed
         wait_all()
 
@@ -728,11 +778,15 @@ class BaseVariantCaller:
             if existAndNewerThan(sam_file, [f1 + '.sai', f2 + '.sai']):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'.format(
-                    env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
-                    env.working_dir, os.path.basename(f1), os.path.basename(f2), f1, f2, sam_file),
+                run_command(
+                    'bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'
+                    .format(
+                        env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
+                        env.working_dir, os.path.basename(f1),
+                        os.path.basename(f2), f1, f2, sam_file),
                     name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
         wait_all()
@@ -741,17 +795,20 @@ class BaseVariantCaller:
     def bwa_samse(self, fastq_files):
         '''Use bwa sampe to generate aligned sam files'''
         sam_files = []
-        for f in fastq_file:
+        for f in fastq_files:
             sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
             rg = self.getReadGroup(f, env.working_dir)
             if existAndNewerThan(sam_file, f):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
-                run_command('bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'.format(
-                    env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
-                    env.working_dir, os.path.basename(f), f, sam_file),
+                run_command(
+                    'bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'
+                    .format(
+                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
+                        env.working_dir, os.path.basename(f), f, sam_file),
                     name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file), wait=False)
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
         wait_all()
@@ -765,10 +822,13 @@ class BaseVariantCaller:
             if existAndNewerThan(bam_file, sam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
-                run_command('samtools view {} -bt {}/{}.fai {} > {}_tmp'.format(
-                    env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir, self.REF_fasta, 
-                    sam_file, bam_file), name=os.path.basename(bam_file),
-                    upon_succ=(os.rename, bam_file + '_tmp', bam_file), wait=False)
+                run_command('samtools view {} -bt {}/{}.fai {} > {}_tmp'
+                    .format(
+                        env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir,
+                        self.REF_fasta, sam_file, bam_file),
+                    name=os.path.basename(bam_file),
+                    upon_succ=(os.rename, bam_file + '_tmp', bam_file),
+                    wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
         wait_all()
@@ -778,12 +838,16 @@ class BaseVariantCaller:
         for bam_file in bam_files:
             sorted_bam_file = bam_file[:-4] + '_sorted.bam'
             if existAndNewerThan(sorted_bam_file, bam_file):
-                env.logger.warning('Using existing sorted bam file {}'.format(sorted_bam_file))
+                env.logger.warning('Using existing sorted bam file {}'
+                    .format(sorted_bam_file))
             else:
-                run_command('samtools sort {} {} {}_tmp'.format(
-                    env.options['OPT_SAMTOOLS_SORT'], bam_file, sorted_bam_file[:-4]),
+                run_command('samtools sort {} {} {}_tmp'
+                    .format(
+                        env.options['OPT_SAMTOOLS_SORT'], bam_file,
+                        sorted_bam_file[:-4]),
                     name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
+                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file),
+                    wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
         return sorted_bam_files
@@ -795,13 +859,18 @@ class BaseVariantCaller:
         for sam_file in sam_files:
             sorted_bam_file = sam_file[:-4] + '_sorted.bam'
             if existAndNewerThan(sorted_bam_file, sam_file):
-                env.logger.warning('Using existing sorted bam file {}'.format(sorted_bam_file))
+                env.logger.warning('Using existing sorted bam file {}'
+                    .format(sorted_bam_file))
             else:
-                run_command('java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'.format(
-                    env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
-                    env.options['OPT_PICARD_SORTSAM'], sam_file, sorted_bam_file[:-4] + '_tmp.bam'),
+                run_command(
+                    'java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'
+                    .format(
+                        env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
+                        env.options['OPT_PICARD_SORTSAM'], sam_file,
+                        sorted_bam_file[:-4] + '_tmp.bam'),
                     name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file), wait=False)
+                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file),
+                    wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
         return sorted_bam_files
@@ -814,7 +883,9 @@ class BaseVariantCaller:
             dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
             metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
             if existAndNewerThan(dedup_bam_file, bam_file):
-                env.logger.warning('Using existing bam files after marking duplicate {}'.format(dedup_bam_file))
+                env.logger.warning(
+                    'Using existing bam files after marking duplicate {}'
+                    .format(dedup_bam_file))
             else:
                 run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
                     INPUT={3}
@@ -822,11 +893,14 @@ class BaseVariantCaller:
                     METRICS_FILE={5}
                     ASSUME_SORTED=true
                     VALIDATION_STRINGENCY=LENIENT
-                    '''.format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                            env.options['OPT_PICARD_MARKDUPLICATES'], bam_file, dedup_bam_file[:-4] + '_tmp.bam',
-                            metrics_file), 
+                    '''.format(
+                        env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                        env.options['OPT_PICARD_MARKDUPLICATES'], bam_file,
+                        dedup_bam_file[:-4] + '_tmp.bam',
+                        metrics_file), 
                     name=os.path.basename(dedup_bam_file),
-                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file), wait=False)
+                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file),
+                    wait=False)
             dedup_bam_files.append(dedup_bam_file)
         wait_all()
         return dedup_bam_files
@@ -838,13 +912,17 @@ class BaseVariantCaller:
         # inf from the first bam file
         merged_bam_file = bam_files[0][:-4] + '_merged.bam'
         if existAndNewerThan(merged_bam_file, bam_files):
-            env.logger.warning('Using existing merged bam file {}'.format(merged_bam_file))
+            env.logger.warning('Using existing merged bam file {}'
+                .format(merged_bam_file))
         else:
-            run_command('''java {} -jar {}/MergeSamFiles.jar {} {} USE_THREADING=true
-    	        VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-    	        OUTPUT={}'''.format(env.options['OPT_JAVA'],
-                    env.options['PICARD_PATH'], env.options['OPT_PICARD_MERGESAMFILES'],
-                    ' '.join(['INPUT={}'.format(x) for x in bam_files]), merged_bam_file[:-4] + '_tmp.bam'),
+            run_command('''java {} -jar {}/MergeSamFiles.jar {} {}
+                USE_THREADING=true
+                VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
+                OUTPUT={}'''.format(
+                    env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                    env.options['OPT_PICARD_MERGESAMFILES'],
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]),
+                    merged_bam_file[:-4] + '_tmp.bam'),
                 name=os.path.basename(merged_bam_file),
                 upon_succ=(os.rename, merged_bam_file[:-4] + '_tmp.bam', merged_bam_file))
         return merged_bam_file
@@ -874,10 +952,12 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T RealignerTargetCreator
                 --mismatchFraction 0.0
-                -o {6}_tmp {7} '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target,
-                ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
+                -o {6}_tmp {7} '''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
+                    bam_file, self.resource_dir,
+                    self.REF_fasta, target,
+                    ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         # 
@@ -891,10 +971,12 @@ class BaseVariantCaller:
                 -T IndelRealigner 
                 --targetIntervals {6}
                 --consensusDeterminationModel USE_READS
-                -compress 0 -o {7} {8}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam',
-                ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
+                -compress 0 -o {7} {8}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
+                    bam_file, self.resource_dir,
+                    self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam',
+                    ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(cleaned_bam_file),
                 upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file))
         # 
@@ -914,10 +996,11 @@ class BaseVariantCaller:
                 -cov QualityScoreCovariate
                 -cov CycleCovariate
                 -cov ContextCovariate
-                -o {6}_tmp {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_BASERECALIBRATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target,
-                ' '.join(['-knownSites {}/{}'.format(self.resource_dir, x) for x in knownSites])),
+                -o {6}_tmp {7}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_BASERECALIBRATOR'], bam_file,
+                    self.resource_dir, self.REF_fasta, target,
+                    ' '.join(['-knownSites {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         #
@@ -929,9 +1012,11 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T PrintReads
                 -BQSR {6}
-                -o {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_PRINTREADS'], bam_file, self.resource_dir,
-                self.REF_fasta, target, recal_bam_file[:-4] + '_tmp.bam'),
+                -o {7}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_PRINTREADS'], bam_file,
+                    self.resource_dir, self.REF_fasta, target, 
+                    recal_bam_file[:-4] + '_tmp.bam'),
                 name=os.path.basename(recal_bam_file),
                 upon_succ=(os.rename, recal_bam_file[:-4] + '_tmp.bam', recal_bam_file))
         # 
@@ -945,9 +1030,11 @@ class BaseVariantCaller:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
                 -T ReduceReads
-                -o {6}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                env.options['OPT_GATK_REDUCEREADS'], input_file, self.resource_dir,
-                self.REF_fasta, target[:-4] + '_tmp.bam'),
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REDUCEREADS'], input_file,
+                    self.resource_dir, self.REF_fasta,
+                    target[:-4] + '_tmp.bam'),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target[:-4] + '_tmp.bam', target))
         # 
@@ -990,7 +1077,9 @@ class b37_gatk_23(BaseVariantCaller):
         os.chdir(self.resource_dir)
         files = [self.REF_fasta, 'bwaidx.amb', self.REF_fasta + '.fai']
         if not all([os.path.isfile(x) for x in files]):
-            sys.exit('''GATK resource bundle does not exist in directory {}. Please run "call_variants.py prepare_resource" befor you execute this command.'''.format(self.resource_dir))
+            sys.exit('GATK resource bundle does not exist in directory {}. '
+                'Please run "call_variants.py prepare_resource" befor you '
+                'execute this command.'.format(self.resource_dir))
         #
         for cmd in ['wget',     # to download resource
                     'bwa',      # alignment
@@ -1022,13 +1111,17 @@ class b37_gatk_23(BaseVariantCaller):
         more fastq files.'''
         #
         # check if the bam file is paired or not (FIXME)
-        output_files = [os.path.join(env.working_dir, '{}_{}.fastq'.format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
+        output_files = [os.path.join(env.working_dir, '{}_{}.fastq'
+            .format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
         if all([os.path.isfile(x) for x in output_files]):
-            env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
+            env.logger.warning('Using existing sequence files {}'
+                .format(' and '.join(output_files)))
         else:
             run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
-                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
-                env.options['PICARD_PATH'], input_file, output_files[0], output_files[1]),
+                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''
+                .format(env.options['OPT_JAVA'],
+                    env.options['PICARD_PATH'], input_file,
+                    output_files[0], output_files[1]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
         return output_files
 
@@ -1056,12 +1149,16 @@ class b37_gatk_23(BaseVariantCaller):
             f1 = fastq_files[2*idx]
             f2 = fastq_files[2*idx + 1]
             if len(f1) != len(f2):
-                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
+                env.logger.warning(
+                    'Filenames {}, {} are not paired, not handled as paired end reads.'
+                    .format(f1, f2))
                 paired = False
                 break
             diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
             if diff != [1]:
-                env.logger.warning('Filenames {}, {} are not paired, not handled as paired end reads.'.format(f1, f2))
+                env.logger.warning(
+                    'Filenames {}, {} are not paired, not handled as paired end reads.'
+                    .format(f1, f2))
                 paired = False
                 break
         #
@@ -1105,7 +1202,6 @@ class b37_gatk_23(BaseVariantCaller):
         '''Call variants from a list of input files'''
         BaseVariantCaller.callVariants(self, input_files, output)
         env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
-        
 
 
 class hg19_gatk_23(b37_gatk_23):
@@ -1269,4 +1365,4 @@ if __name__ == '__main__':
         pipeline.callVariants(args.input_files, args.output)
 
         
-	
+    
