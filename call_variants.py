@@ -195,8 +195,10 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
     '''
     # merge mulit-line command into one line and remove extra white space and tabs
     cmd = ' '.join(cmd.split())
-    proc_out = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.out'.format(name.replace('/', '_'))), mode='w')
-    proc_err = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.err'.format(name.replace('/', '_'))), mode='w')
+    if name is not None:
+        name = name.replace('/', '_')
+    proc_out = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.out'.format(name)), mode='w')
+    proc_err = subprocess.DEVNULL if name is None else open(os.path.join(env.working_dir, '{}.err'.format(name)), mode='w')
     if wait or env.jobs == 1:
         try:
             s = time.time()
@@ -211,7 +213,8 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
                 sys.exit("Command {} was terminated by signal {}".format(cmd, -retcode))
             elif retcode > 0:
                 if name is not None:
-                    [env.logger.error(x) for x in open(proc_err).read().split('\n')[-20:]]
+                    with open(os.path.join(env.working_dir, '{}.err'.format(name))) as err:
+                        [env.logger.error(x) for x in err.read().split('\n')[-20:]]
                 env.logger.error("Command {} returned {} after executing {}".format(cmd, retcode, elapsed_time(s)))
                 sys.exit("Command {} returned {}".format(cmd, retcode))
             env.logger.info('Command {} completed successfully in {}'.format(cmd, elapsed_time(s)))
@@ -260,14 +263,14 @@ def poll_jobs():
             sys.exit("Command {} was terminated by signal {}".format(job.cmd, -ret))
         elif ret > 0:
             if job.name is not None:
-                with open(os.path.join(env.working_dir, job.name + '.err'), 'rb') as err:
-                    [env.logger.error(x) for x in err.read().decode().split('\n')[-50:]]
+                with open(os.path.join(env.working_dir, job.name + '.err')) as err:
+                    [env.logger.error(x) for x in err.read().split('\n')[-50:]]
             env.logger.error('Execution of command {} failed after {}.'.format(job.cmd, elapsed_time(job.start_time)))
             sys.exit('Job {} failed.'.format(job.cmd))
         else:
             if job.name is not None:
-                with open(os.path.join(env.working_dir, job.name + '.err'), 'rb') as err:
-                    [env.logger.info(x) for x in err.read().decode().split('\n')[-10:]]
+                with open(os.path.join(env.working_dir, job.name + '.err')) as err:
+                    [env.logger.info(x) for x in err.read().split('\n')[-10:]]
             # finish up
             if job.upon_succ:
                 # call the upon_succ function
@@ -335,6 +338,7 @@ def checkGATK():
         env.logger.error('Please either specify path to GATK using option GATK_PATH=path, or set it in environment variable $CLASSPATH.')
         sys.exit(1) 
 
+# 
 # def checkPySam():
 #     '''Check if PySam (a python wrapper to samtools) is installed.'''
 #     try:
@@ -363,6 +367,12 @@ def downloadFile(URL, dest, quiet=False):
         except OSError:
             pass
         raise RuntimeError('Failed to download {} using wget'.format(URL))
+
+
+def isBamPairedEnd(bamfile):
+    # FIXME: check if a bam file has paired end reads
+    # we need pysam for this but pysam does not yet work for Python 3.3.
+    return True
 
 def fastqVersion(fastq_file):
     '''Detect the version of input fastq file. This can be very inaccurate'''
@@ -610,21 +620,15 @@ class BaseVariantCaller:
         pass
 
     #
-    # bam2fastq
-    #
-    def bam2fastq(self, input_file, output_files):
-        '''Convert an illumina BAM file to fastq files'''
-        diff = [(x,y) for x,y in zip(output_files[0], output_files[1]) if x!=y]
-        if diff != [('1', '2')]:
-            sys.exit('Name of output fastq files should differ by 1/2.: {}'.format(diff))
-
-    #
     # align and create bam file
     #
     def getFastqFiles(self, input_files):
-        '''Decompress input files to get a list of fastq files'''
+        '''Decompress or extract input files to get a list of fastq files'''
         filenames = []
         for filename in input_files:
+            if filename.lower().endswith('.bam') or filename.lower().endswith('.sam'):
+                filenames.extend(self.bam2fastq(filename))
+                continue
             for fastq_file in decompress(filename, env.working_dir):
                 try:
                     with open(fastq_file) as fastq:
@@ -860,7 +864,7 @@ class BaseVariantCaller:
             env.logger.error('Plase specify a .bam file in the --output parameter')
             sys.exit(1)
 
-    def realignIndels(self, bam_file):
+    def realignIndels(self, bam_file, knownSites):
         '''Create realigner target and realign indels'''
         target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
         if existAndNewerThan(target, bam_file):
@@ -870,13 +874,10 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T RealignerTargetCreator
                 --mismatchFraction 0.0
-                -known {4}/dbsnp_137.hg19.vcf
-                -known {4}/hapmap_3.3.hg19.vcf
-                -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-                -known {4}/1000G_phase1.indels.hg19.vcf
-                -o {6}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -o {6}_tmp {7} '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target),
+                self.REF_fasta, target,
+                ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         # 
@@ -889,21 +890,18 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T IndelRealigner 
                 --targetIntervals {6}
-                -known {4}/dbsnp_137.hg19.vcf
-                -known {4}/hapmap_3.3.hg19.vcf
-                -known {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-                -known {4}/1000G_phase1.indels.hg19.vcf
                 --consensusDeterminationModel USE_READS
-                -compress 0 -o {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -compress 0 -o {7} {8}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_REALIGNERTARGETCREATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam'),
+                self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam',
+                ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(cleaned_bam_file),
                 upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file))
         # 
         return cleaned_bam_file
 
 
-    def recalibrate(self, bam_file, recal_bam_file):
+    def recalibrate(self, bam_file, recal_bam_file, knownSites):
         '''Create realigner target and realign indels'''
         target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
         if existAndNewerThan(target, bam_file):
@@ -916,14 +914,10 @@ class BaseVariantCaller:
                 -cov QualityScoreCovariate
                 -cov CycleCovariate
                 -cov ContextCovariate
-                -knownSites {4}/dbsnp_137.hg19.vcf
-                -knownSites {4}/hapmap_3.3.hg19.vcf
-                -knownSites {4}/1000G_omni2.5.hg19.vcf
-                -knownSites {4}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-                -knownSites {4}/1000G_phase1.indels.hg19.vcf
-                -o {6}_tmp '''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                -o {6}_tmp {7}'''.format(env.options['OPT_JAVA'], env.options['GATK_PATH'],
                 env.options['OPT_GATK_BASERECALIBRATOR'], bam_file, self.resource_dir,
-                self.REF_fasta, target),
+                self.REF_fasta, target,
+                ' '.join(['-knownSites {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         #
@@ -980,6 +974,14 @@ class b37_gatk_23(BaseVariantCaller):
         BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
         self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*'
         self.REF_fasta = 'human_g1k_v37.fasta'
+        self.knownSites = [
+            'dbsnp_137.b37.vcf',
+            'hapmap_3.3.b37.vcf',
+            '1000G_omni2.5.b37.vcf',
+            'Mills_and_1000G_gold_standard.indels.b37.vcf',
+            '1000G_phase1.indels.b37.vcf',
+        ]
+
 
     def checkResource(self):
         '''Check if needed resource is available. This pipeline requires
@@ -1015,11 +1017,12 @@ class b37_gatk_23(BaseVariantCaller):
         # 
         os.chdir(saved_dir)
 
-    def bam2fastq(self, input_file, output_files):
+    def bam2fastq(self, input_file):
         '''This function extracts raw reads from an input BAM file to one or 
         more fastq files.'''
-        BaseVariantCaller.bam2fastq(self, input_file, output_files)
         #
+        # check if the bam file is paired or not (FIXME)
+        output_files = [os.path.join(env.working_dir, '{}_{}.fastq'.format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
         if all([os.path.isfile(x) for x in output_files]):
             env.logger.warning('Using existing sequence files {}'.format(' and '.join(output_files)))
         else:
@@ -1027,6 +1030,7 @@ class b37_gatk_23(BaseVariantCaller):
                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''.format(env.options['OPT_JAVA'],
                 env.options['PICARD_PATH'], input_file, output_files[0], output_files[1]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+        return output_files
 
 
     def align(self, input_files, output):
@@ -1086,11 +1090,11 @@ class b37_gatk_23(BaseVariantCaller):
         self.indexBAM(merged_bam_file)
         #
         # step 7: create indel realignment targets and recall
-        cleaned_bam_file = self.realignIndels(merged_bam_file)
+        cleaned_bam_file = self.realignIndels(merged_bam_file, knownSites=self.knownSites)
         self.indexBAM(cleaned_bam_file)
         #
         # step 8: recalibration
-        self.recalibrate(cleaned_bam_file, output)
+        self.recalibrate(cleaned_bam_file, output, knownSites=self.knownSites)
         self.indexBAM(output)
         #
         # step 9: reduce reads
@@ -1114,6 +1118,14 @@ class hg19_gatk_23(b37_gatk_23):
         # this piple just uses different resource bundle
         self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*'
         self.REF_fasta = 'ucsc.hg19.fasta'
+        self.knownSites = [
+            'dbsnp_137.hg19.vcf',
+            'hapmap_3.3.hg19.vcf',
+            '1000G_omni2.5.hg19.vcf',
+            'Mills_and_1000G_gold_standard.indels.hg19.vcf',
+            '1000G_phase1.indels.hg19.vcf',
+        ]
+        
 
 if __name__ == '__main__':
     #
@@ -1163,11 +1175,11 @@ if __name__ == '__main__':
             parser.add_argument('-j', '--jobs', default=2, type=int,
                 help='''Maximum number of concurrent jobs.''')
     #
-    master_parser = argparse.ArgumentParser(description='''A pipeline to call variants
+    master_parser = argparse.ArgumentParser(description='''Pipelines to call variants
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling.''')
+        calling, and Picard for various other options..''')
 
     subparsers = master_parser.add_subparsers(title='Available operations', dest='action')
     #
@@ -1179,17 +1191,6 @@ if __name__ == '__main__':
             indexed reference genomes to be used by other tools.''')
     addCommonArguments(resource, ['pipeline', 'resource_dir'])
     #
-    # action bam2fastq
-    #
-    bam2fastq = subparsers.add_parser('bam2fastq',
-        help='''Convert a illumina BAM file to fastq files.''')
-    bam2fastq.add_argument('input_file',
-        help='''A single BAM file that will be converted to fastq files.''')
-    bam2fastq.add_argument('-o', '--output', nargs='+', required=True,
-        help='''One or two files (for paired end reads) that will be used
-            to store raw reads extracted from the input BAM file.''')
-    addCommonArguments(bam2fastq, ['pipeline', 'resource_dir', 'set', 'jobs'])
-    #
     # action align
     #
     align = subparsers.add_parser('align',
@@ -1199,21 +1200,13 @@ if __name__ == '__main__':
             versions. Filenames ending with _1 _2 will be considered as paired end reads.''')
     align.add_argument('input_files', nargs='+',
         help='''One or more .txt, .fa, .fastq, .tar, .tar.gz, .tar.bz2, .tbz2, .tgz files
-            that contain raw reads of a single sample.''')
+            that contain raw reads of a single sample. Files in sam/bam format are also
+            acceptable, in which case raw reads will be extracted and aligned again to 
+            generate a new bam file. ''')
     align.add_argument('-o', '--output', required=True,
-        help='''Output aligned reads to a sorted BAM file $output.bam. ''')
+        help='''Output aligned reads to a sorted, indexed, dedupped, and recalibrated
+            BAM file $output.bam.''')
     addCommonArguments(align, ['pipeline', 'resource_dir', 'set', 'jobs'])
-    #
-    # action calibrate
-    calibrate = subparsers.add_parser('calibrate',
-        help='''Calibrate raw BAM files to mark duplicate, realign reads, and
-            recalibrate base quality. This action converts a single BAM file
-            to a calibrated one.''')
-    calibrate.add_argument('input_file', 
-        help='''A single BAM file that will be calibrated.''')
-    calibrate.add_argument('-o', '--output', required=True,
-        help='''Name of a calibrated BAM filee.''')
-    addCommonArguments(calibrate, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     # action call
     #
@@ -1263,11 +1256,6 @@ if __name__ == '__main__':
     pipeline = eval(args.pipeline)(args.resource_dir)
     if args.action == 'prepare_resource':
         pipeline.prepareResourceIfNotExist()
-    elif args.action == 'bam2fastq':
-        env.jobs = args.jobs
-        checkPicard()
-        pipeline.checkResource()
-        pipeline.bam2fastq(args.input_file, args.output)
     elif args.action == 'align':
         env.jobs = args.jobs
         checkPicard()
