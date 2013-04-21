@@ -182,7 +182,7 @@ def elapsed_time(start):
     '''Return the elapsed time in human readable format since start time'''
     second_elapsed = int(time.time() - start)
     days_elapsed = second_elapsed // 86400
-    return ('{} days ' if days_elapsed else '') + 
+    return ('{} days ' if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
 def run_command(cmd, name=None, upon_succ=None, wait=True):
