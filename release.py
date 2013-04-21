@@ -213,16 +213,16 @@ if __name__ == '__main__':
     parser.add_argument('--version',
         help='Modify source/__init__.py to the specified version string and make the release.')
     parser.add_argument('--tag', action='store_true',
-        help='If specified, tag this release')
+        help='If specified, tag this release.')
     parser.add_argument('--pyinstaller_dir', default = '.',
         help='path to the directory where pyinstaller git clone is located.')
-    parser.add_argument('--rebuild', action='store_true',
-        help='If specified, purge the existing "build" folder to compile afresh.')
+    parser.add_argument('--skip_rebuild', action='store_true',
+        help=argparse.SUPPRESS)
     # allow recognied parameters to be set to the build process
     args, argv = parser.parse_known_args()
     #
     version = ModifyVersion(args.version)
-    if args.rebuild:
+    if not args.skip_rebuild:
         SetUpEnvironment(version)
         GenerateSWIGWrappers()
     BuildVariantTools(argv)
