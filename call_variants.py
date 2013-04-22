@@ -195,8 +195,8 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
     # merge mulit-line command into one line and remove extra white spaces
     cmd = ' '.join(cmd.split())
     if name is None:
-        proc_out = DEVNULL
-        proc_err = DEVNULL
+        proc_out = subprocess.DEVNULL
+        proc_err = subprocess.DEVNULL
     else:
         name = name.replace('/', '_')
         proc_out = open(os.path.join(env.working_dir, name + '.out'), 'w')
@@ -1024,7 +1024,7 @@ class BaseVariantCaller:
 
     def reduceReads(self, input_file):
         target = input_file[:-4] + '_reduced.bam'
-        if existAndNewerThan(input_file, target):
+        if existAndNewerThan(target, input_file):
             env.logger.warning('Using existing reduced bam file {}'.format(input_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
