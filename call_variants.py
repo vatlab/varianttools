@@ -280,7 +280,7 @@ def poll_jobs():
             if job.name is not None:
                 with open(os.path.join(env.working_dir, job.name + '.err')) as err:
                     for line in err.read().split('\n')[-10:]:
-                        env.logger.info(x)
+                        env.logger.info(line)
             # finish up
             if job.upon_succ:
                 # call the upon_succ function
