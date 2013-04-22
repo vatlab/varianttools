@@ -203,8 +203,7 @@ class PlinkBinaryToVariants:
                 # ignore this test
                 if self.status == -2:
                     continue
-                else:
-                    i += 1
+            i += 1
         # check if so many are negative values
         if m_ones > float(n) / 2.0:
             return -9
