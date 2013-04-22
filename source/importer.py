@@ -580,7 +580,7 @@ def SeqAtLoc(filename):
     # return the same object for multiple instances of SeqAtLoc because
     # we do not want to read the fasta file multiple times
     if filename not in g_SeqExtractor:
-        g_SeqExtractor[filename] = SequenceExtractor(filename)
+        g_SeqExtractor[filename] = SequentialExtractor(filename)
     return g_SeqExtractor[filename]
     
 class SequentialExtractor:

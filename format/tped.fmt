@@ -7,7 +7,7 @@
 [format description]
 description=Output to TPED format with the first four columns chr name gen_pos pos, and the 
     rest for genotypes. Variant tools cannot import from this format because it does not contain
-    information about reference genome.
+    information about reference genome. 
 variant=chr,pos,ref,alt
 # COMMENT:
 # export_by=chr,pos,ref will ignore all multi-allele genotypes
@@ -43,17 +43,27 @@ index=4
 type=INTEGER NOT NULL
 comment=1-based position
 
-#[ref]
-#index=1,4
-#adj=SeqAtLoc("%{seq_file}s")
-#type=VARCHAR(255)
-#comment=Reference allele, '-' for insertion.
+[ref]
+index=5
+type=VARCHAR(255)
+comment=Reference allele, the 5th column of the PLINK bim file. I for insertion D for deletion.
 
-#
-#[alt]
-#index=
-#type=VARCHAR(255)
-#comment=Alternative allele obtained from another database
+[alt]
+index=6
+type=VARCHAR(255)
+comment=Reference allele, the 5th column of the PLINK bim file. I for insertion D for deletion.
+
+
+# [ref]
+# index=1,4
+# adj=SeqAtLoc("%{seq_file}s")
+# type=VARCHAR(255)
+# comment=Reference allele, '-' for insertion.
+
+# [alt]
+# index=
+# type=VARCHAR(255)
+# comment=Alternative allele obtained from another database
 
 #
 #[GT]

@@ -569,7 +569,7 @@ class RTest(ExternTest):
             except:
                 pass
         # print self.formatOutput()
-        cmd = "R --slave --vanilla"
+        cmd = "R --slave --no-save --no-restore"
         try:
             out = runCommand(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
                               "R message for {0}".format(self.pydata['name'])).split()
