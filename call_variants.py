@@ -438,17 +438,31 @@ def fastqVersion(fastq_file):
         # no option is needed for bwa
         return 'Sanger'
 
-def existAndNewerThan(filenameA, filenameB):
-    '''Check if filenameA is newer than filenameB. The oldest timestamp of filenameA
-    and newest timestam of filenameB will be used if filenameA or filenameB is a list.'''
-    exist = all([os.path.isfile(x) for x in filenameA]) if type(filenameA) == list else os.path.isfile(filenameA)
-    if not exist:
-        return False
-    timestampA = min([os.path.getmtime(x) for x in filenameA]) if type(filenameA) == list else os.path.getmtime(filenameA)
-    timestampB = max([os.path.getmtime(x) for x in filenameB]) if type(filenameB) == list else os.path.getmtime(filenameB)
-    if timestampA - timestampB < 10:
-        env.logger.warning('Existing output file {} is ignored because it is newer than input file.'.format(
-            ', '.join(filenameA) if type(filenameA) == list else filenameA))
+def existAndNewerThan(ofiles=ofiles, ifiles=ifiles):
+    '''Check if ofiles is newer than ifiles. The oldest timestamp
+    of ofiles and newest timestam of ifiles will be used if 
+    ofiles or ifiles is a list.'''
+    if type(ofiles) == list:
+        if not all([os.path.isfile(x) for x in ofiles]):
+            return False
+    else:
+        if not os.path.isfile(ofiles):
+            return False
+    #
+    if type(ofiles) == list:
+        output_timestamp = min([os.path.getmtime(x) for x in ofiles])
+    else:
+        output_timestamp = os.path.getmtime(ofiles)
+    #
+    if type(ifiles) == list:
+        input_timestamp = max([os.path.getmtime(x) for x in ifiles])
+    else
+        input_timestamp = os.path.getmtime(ifiles)
+    #
+    if output_timestamp - input_timestamp < 10:
+        env.logger.warning(
+            'Existing output file {} is ignored because it is newer than input file.'
+            .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
         return False
     else:
         # newer by at least 10 seconds.
@@ -468,7 +482,7 @@ def decompress(filename, dest_dir=None):
     elif filename.lower().endswith('.gz'):
         dest_file = os.path.join('.' if dest_dir is None else dest_dir,
             os.path.basename(filename)[:-3])
-        if existAndNewerThan(dest_file, filename):
+        if existAndNewerThan(ofiles=dest_file, ifiles=filename):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
@@ -483,7 +497,7 @@ def decompress(filename, dest_dir=None):
         return [dest_file]
     elif filename.lower().endswith('.bz2'):
         dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
-        if existAndNewerThan(dest_file, filename):
+        if existAndNewerThan(ofiles=dest_file, ifiles=filename):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
@@ -516,11 +530,11 @@ def decompress(filename, dest_dir=None):
             os.path.basename(filename) + '.manifest')
         all_extracted = False
         dest_files = []
-        if existAndNewerThan(manifest, filename):
+        if existAndNewerThan(ofiles=manifest, ifiles=filename):
             all_extracted = True
             for f in [x.strip() for x in open(manifest).readlines()]:
                 dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
-                if existAndNewerThan(dest_file, filename):
+                if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                     dest_files.append(dest_file)
                     env.logger.warning('Using existing extracted file {}'.format(dest_file))
                 else:
@@ -547,7 +561,7 @@ def decompress(filename, dest_dir=None):
                 # if there is directory structure within tar file, decompress all to the current directory
                 dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
                 dest_files.append(dest_file)
-                if existAndNewerThan(dest_file, filename):
+                if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                     env.logger.warning('Using existing extracted file {}'.format(dest_file))
                 else:
                     env.logger.info('Extracting {} to {}'.format(f, dest_file))
@@ -619,7 +633,7 @@ class BaseVariantCaller:
         # decompress all .gz files
         for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
             not x.endswith('tar.gz')]:
-            if existAndNewerThan(gzipped_file[:-3], gzipped_file):
+            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
                 env.logger.warning('Using existing decompressed file {}'
                     .format(gzipped_file[:-3]))
             else:
@@ -749,7 +763,7 @@ class BaseVariantCaller:
         '''Use bwa aln to process fastq files'''
         for input_file in fastq_files:
             dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
-            if existAndNewerThan(dest_file, input_file):
+            if existAndNewerThan(ofiles=dest_file, ifiles=input_file):
                 env.logger.warning('Using existing alignment index file {}'
                     .format(dest_file))
             else:
@@ -775,7 +789,7 @@ class BaseVariantCaller:
             f2 = fastq_files[2*idx + 1]
             rg = self.getReadGroup(f1, env.working_dir)
             sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
-            if existAndNewerThan(sam_file, [f1 + '.sai', f2 + '.sai']):
+            if existAndNewerThan(ofiles=sam_file, ifiles=[f1 + '.sai', f2 + '.sai']):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
@@ -798,7 +812,7 @@ class BaseVariantCaller:
         for f in fastq_files:
             sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
             rg = self.getReadGroup(f, env.working_dir)
-            if existAndNewerThan(sam_file, f):
+            if existAndNewerThan(ofiles=sam_file, ifiles=f):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
@@ -819,7 +833,7 @@ class BaseVariantCaller:
         bam_files = []
         for sam_file in sam_files:
             bam_file = sam_file[:-4] + '.bam'
-            if existAndNewerThan(bam_file, sam_file):
+            if existAndNewerThan(ofiles=bam_file, ifiles=sam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
                 run_command('samtools view {} -bt {}/{}.fai {} > {}_tmp'
@@ -837,7 +851,7 @@ class BaseVariantCaller:
         sorted_bam_files = []
         for bam_file in bam_files:
             sorted_bam_file = bam_file[:-4] + '_sorted.bam'
-            if existAndNewerThan(sorted_bam_file, bam_file):
+            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=bam_file):
                 env.logger.warning('Using existing sorted bam file {}'
                     .format(sorted_bam_file))
             else:
@@ -858,7 +872,7 @@ class BaseVariantCaller:
         sorted_bam_files = []
         for sam_file in sam_files:
             sorted_bam_file = sam_file[:-4] + '_sorted.bam'
-            if existAndNewerThan(sorted_bam_file, sam_file):
+            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=sam_file):
                 env.logger.warning('Using existing sorted bam file {}'
                     .format(sorted_bam_file))
             else:
@@ -882,7 +896,7 @@ class BaseVariantCaller:
         for bam_file in bam_files:
             dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
             metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
-            if existAndNewerThan(dedup_bam_file, bam_file):
+            if existAndNewerThan(ofiles=dedup_bam_file, ifiles=bam_file):
                 env.logger.warning(
                     'Using existing bam files after marking duplicate {}'
                     .format(dedup_bam_file))
@@ -911,7 +925,7 @@ class BaseVariantCaller:
         # Picard keeps RG information from all Bam files, whereas samtools uses only 
         # inf from the first bam file
         merged_bam_file = bam_files[0][:-4] + '_merged.bam'
-        if existAndNewerThan(merged_bam_file, bam_files):
+        if existAndNewerThan(ofiles=merged_bam_file, ifiles=bam_files):
             env.logger.warning('Using existing merged bam file {}'
                 .format(merged_bam_file))
         else:
@@ -929,7 +943,7 @@ class BaseVariantCaller:
 
     def indexBAM(self, bam_file):
         '''Index the input bam file'''
-        if existAndNewerThan('{}.bai'.format(bam_file), bam_file):
+        if existAndNewerThan(ofiles='{}.bai'.format(bam_file), ifiles=bam_file):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
             run_command('samtools index {0} {1} {1}_tmp.bai'.format(
@@ -945,7 +959,7 @@ class BaseVariantCaller:
     def realignIndels(self, bam_file, knownSites):
         '''Create realigner target and realign indels'''
         target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
-        if existAndNewerThan(target, bam_file):
+        if existAndNewerThan(ofiles=target, ifiles=bam_file):
             env.logger.warning('Using existing realigner target {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -963,7 +977,7 @@ class BaseVariantCaller:
         # 
         # realign around known indels
         cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
-        if existAndNewerThan(cleaned_bam_file, target):
+        if existAndNewerThan(ofiles=cleaned_bam_file, ifiles=target):
             env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -986,7 +1000,7 @@ class BaseVariantCaller:
     def recalibrate(self, bam_file, recal_bam_file, knownSites):
         '''Create realigner target and realign indels'''
         target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
-        if existAndNewerThan(target, bam_file):
+        if existAndNewerThan(ofiles=target, ifiles=bam_file):
             env.logger.warning('Using existing base recalibrator target {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -1005,7 +1019,7 @@ class BaseVariantCaller:
                 upon_succ=(os.rename, target + '_tmp', target))
         #
         # recalibrate
-        if existAndNewerThan(recal_bam_file, target):
+        if existAndNewerThan(ofiles=recal_bam_file, ifiles=target):
             env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
@@ -1024,8 +1038,8 @@ class BaseVariantCaller:
 
     def reduceReads(self, input_file):
         target = input_file[:-4] + '_reduced.bam'
-        if existAndNewerThan(target, input_file):
-            env.logger.warning('Using existing reduced bam file {}'.format(input_file))
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing reduced bam file {}'.format(targe))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
@@ -1039,6 +1053,75 @@ class BaseVariantCaller:
                 upon_succ=(os.rename, target[:-4] + '_tmp.bam', target))
         # 
         return target
+
+    def haplotypeCall(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing called variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T HaplotypeCaller
+                -minPruning 3
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    self.resource_dir, self.REF_fasta,
+                    target[:-4] + '_tmp.vcf'),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+        # 
+        return target
+
+    def variantRecalibration(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '_recal.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T VariantRecalibrator
+                –resource:	{see	next	slide}	
+                -resource:hapmap,known=false,training=true,truth=true,prior=15.0	
+                    hapmap_3.3.b37.sites.vcf		
+                -resource:omni,known=false,training=true,truth=false,prior=12.0	
+                    1000G_omni2.5.b37.sites.vcf		
+                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0	
+                    dbsnp_137.b37.v	
+                –an	QD	–an	MQ	–an	HaplotypeScore	{…}
+                –mode	SNP
+                –recalFile raw.SNPs.recal
+                –tranchesFile raw.SNPs.tranches
+                –rscriptFile recal.plots.R
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    self.resource_dir, self.REF_fasta,
+                    target[:-4] + '_tmp.vcf'),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+        # 
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T ApplyRecalibraBon
+                -mode SNP 
+                –recalFile raw.SNPs.recal	
+                –tranchesFile raw.SNPs.tranches
+                –ts_ﬁlter_level	99.0
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    self.resource_dir, self.REF_fasta,
+                    target[:-4] + '_tmp.vcf'),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+        return target
+
 
     def callVariants(self, input_files, output):
         '''Call variants from a list of input files'''
@@ -1202,6 +1285,10 @@ class b37_gatk_23(BaseVariantCaller):
         '''Call variants from a list of input files'''
         BaseVariantCaller.callVariants(self, input_files, output)
         env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
+        #
+        # step 1: haplotype call
+        for input_file in input_files:
+            vcf_file = self.haplotypeCall(input_file)
 
 
 class hg19_gatk_23(b37_gatk_23):
@@ -1245,6 +1332,7 @@ if __name__ == '__main__':
         ('OPT_GATK_BASERECALIBRATOR', ''),
         ('OPT_GATK_PRINTREADS', ''),
         ('OPT_GATK_REDUCEREADS', ''),
+        ('OPT_GATK_HAPLOTYPECALLER', ''),
         ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
