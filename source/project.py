@@ -2908,14 +2908,22 @@ class ProjectsMerger:
             else:
                 tables = [x for x in self.db.tables('__fromDB') if not x.startswith('__')]
                 tables.sort()
-                if tables != sorted(list(structure.keys())):
-                    raise ValueError("Project {} does not have the same set of variant tables ({}) as other projects ({})"\
-                        .format(proj_file,
-                        ', '.join([x for x in tables if x not in ['sample', 'filename', 'project']]),
-                        ', '.join([x for x in structure.keys() if x not in ['sample', 'filename', 'project']])))
                 for table in tables:
-                    if structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
-                        raise ValueError('Columns of table {} ({}) in project {} does not match those are in others ({}).'\
+                    # new table?
+                    if table not in structure:
+                        tbl = table.split('.')[-1]
+                        if tbl.startswith('__'):
+                            continue
+                        structure[tbl] = self.db.fieldsOfTable('__fromDB.{}'.format(tbl))
+                        if tbl in ['project', 'filename']:
+                            continue
+                        cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
+                                (tbl, ))
+                        sql = cur.fetchone()
+                        cur.execute(sql[0])
+                    elif structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
+                        env.logger.warning('Columns of table {} ({}) in project {} does not match those are in {}. '
+                            'Extra columns will be ignored. '
                             .format(table, ', '.join(self.db.getHeaders('__fromDB.{}'.format(table))),
                             proj_file, ', '.join([x[0] for x in structure[table]])))
             # we put the largest project the first to improve efficiency, because the

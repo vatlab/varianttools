@@ -438,7 +438,7 @@ def fastqVersion(fastq_file):
         # no option is needed for bwa
         return 'Sanger'
 
-def existAndNewerThan(ofiles=ofiles, ifiles=ifiles):
+def existAndNewerThan(ofiles, ifiles):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 
     ofiles or ifiles is a list.'''
@@ -456,7 +456,7 @@ def existAndNewerThan(ofiles=ofiles, ifiles=ifiles):
     #
     if type(ifiles) == list:
         input_timestamp = max([os.path.getmtime(x) for x in ifiles])
-    else
+    else:
         input_timestamp = os.path.getmtime(ifiles)
     #
     if output_timestamp - input_timestamp < 10:
