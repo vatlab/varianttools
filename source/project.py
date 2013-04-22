@@ -43,9 +43,10 @@ import tarfile
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
-from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CITATION, VTOOLS_CONTACT
-from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, RefGenome, \
-    filesInURL, downloadFile, makeTableName, getMaxUcscBin, env, \
+from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
+    VTOOLS_CITATION, VTOOLS_CONTACT
+from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
+    RefGenome, filesInURL, downloadFile, makeTableName, getMaxUcscBin, env, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
 
 
@@ -144,18 +145,28 @@ class AnnoDB:
                     elif key == proj.alt_build:
                         self.alt_build = self.refGenomes[key]
         #
-        if self.anno_type == 'variant' and ((self.build is not None and len(self.build) != 4) or (self.alt_build is not None and len(self.alt_build) != 4)):
+        if self.anno_type == 'variant' and ((self.build is not None and
+            len(self.build) != 4) or (self.alt_build is not None and
+            len(self.alt_build) != 4)):
             raise ValueError('There should be four linking fields for variant annotation databases.')
-        if self.anno_type == 'position' and ((self.build is not None and len(self.build) != 2) or (self.alt_build is not None and len(self.alt_build) != 2)):
+        if self.anno_type == 'position' and ((self.build is not None and
+            len(self.build) != 2) or (self.alt_build is not None and
+            len(self.alt_build) != 2)):
             raise ValueError('There should be two linking fields for positional annotation databases.')
-        if self.anno_type == 'range' and ((self.build is not None and len(self.build) != 3) or (self.alt_build is not None and len(self.alt_build) != 3)):
+        if self.anno_type == 'range' and ((self.build is not None and
+            len(self.build) != 3) or (self.alt_build is not None and
+            len(self.alt_build) != 3)):
             raise ValueError('There should be three linking fields for range-based annotation databases.')
         if self.description == '':
-            env.logger.warning('No description for annotation database {}'.format(annoDB))
+            env.logger.warning('No description for annotation database {}'
+                .format(annoDB))
         if self.build is None and self.alt_build is None:
-            raise ValueError('No reference genome information for annotation database {}'.format(annoDB))
+            raise ValueError('No reference genome information for annotation database {}'
+                .format(annoDB))
         if self.anno_type == 'field' and len(self.linked_by) != len(self.build):
-            raise RuntimeError('Please specify link fields for attributes {} using parameter --linked_by'.format(','.join(self.build)))
+            raise RuntimeError(
+                'Please specify link fields for attributes {} using parameter --linked_by'
+                .format(','.join(self.build)))
         if self.linked_by:
             s = delayedAction(env.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
             self.indexLinkedField(proj, linked_by)
@@ -229,12 +240,14 @@ class AnnoDB:
         val_proj = set(cur.fetchall())
         #
         val_common = val_annoDB & val_proj 
-        env.logger.info('{} out of {} {} are annotated through annotation database {}'.format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
+        env.logger.info('{} out of {} {} are annotated through annotation database {}'
+            .format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
         #
         # if not all values are used
         if len(val_common) < len(val_annoDB):
-            env.logger.warning('{} out of {} values in annotation database {} are not linked to the project.'.format(len(val_annoDB) - len(val_common),
-                len(val_annoDB), self.name))
+            env.logger.warning(
+                '{} out of {} values in annotation database {} are not linked to the project.'
+                .format(len(val_annoDB) - len(val_common), len(val_annoDB), self.name))
             val_unused = list(val_annoDB - val_common)[:100]
             val_unused.sort()
             env.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
@@ -243,7 +256,8 @@ class AnnoDB:
 
     def describe(self, verbose=False):
         '''Describe this annotation database'''
-        print('Annotation database {} {}'.format(self.name, '(version {})'.format(self.version) if self.version else ''))
+        print('Annotation database {} {}'.format(self.name, '(version {})'
+            .format(self.version) if self.version else ''))
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*4))))
@@ -2701,6 +2715,10 @@ class VariantCopier(threading.Thread):
             for table in db.tables():
                 if table in ['sample', 'filename', 'project', '__id_map']:
                     continue
+                if not db.hasTable('__fromDB.{}'.format(table)):
+                    continue
+                # get fields of table because source and destination might have different fields
+                fields = [x[0] for x in db.fieldsOfTable('__fromDB.{}'.format(table))]
                 # 
                 # if ALL_THE_SAME:
                 # table variant:
@@ -2715,9 +2733,9 @@ class VariantCopier(threading.Thread):
                 #     copy from cache
                 #
                 if all_the_same and (table != 'variant' or keep_all):
-                    query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __fromDB.{0};'''.format(table)
+                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, ', '.join(fields))
                 else:
-                    query = '''INSERT OR IGNORE INTO {0} SELECT * FROM __cacheDB.{0};'''.format(table)
+                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __cacheDB.{0};'''.format(table, ', '.join(fields))
                 env.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
                     all_the_same, keep_all))
                 cur.execute(query)
@@ -2769,6 +2787,7 @@ class SampleCopier(threading.Thread):
                 cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={};'.format(db.PH),
                     ('genotype_{}'.format(_old_id),))
                 sql = cur.fetchone()[0].replace('genotype_{}'.format(_old_id), 'genotype_{}'.format(_new_id))
+                env.logger.debug('Running {}'.format(sql))
                 cur.execute(sql)
                 query = 'INSERT INTO genotype_{} SELECT * FROM __geno.genotype_{};'\
                     .format(_new_id, _old_id)
@@ -2899,12 +2918,6 @@ class ProjectsMerger:
                     if table.startswith('__'):
                         continue
                     structure[table] = self.db.fieldsOfTable('__fromDB.{}'.format(table))
-                    if table in ['project', 'filename']:
-                        continue
-                    cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
-                            (table, ))
-                    sql = cur.fetchone()
-                    cur.execute(sql[0])
             else:
                 tables = [x for x in self.db.tables('__fromDB') if not x.startswith('__')]
                 tables.sort()
@@ -2915,17 +2928,12 @@ class ProjectsMerger:
                         if tbl.startswith('__'):
                             continue
                         structure[tbl] = self.db.fieldsOfTable('__fromDB.{}'.format(tbl))
-                        if tbl in ['project', 'filename']:
-                            continue
-                        cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={0};'.format(self.db.PH),
-                                (tbl, ))
-                        sql = cur.fetchone()
-                        cur.execute(sql[0])
-                    elif structure[table] != self.db.fieldsOfTable('__fromDB.{}'.format(table)):
-                        env.logger.warning('Columns of table {} ({}) in project {} does not match those are in {}. '
-                            'Extra columns will be ignored. '
-                            .format(table, ', '.join(self.db.getHeaders('__fromDB.{}'.format(table))),
-                            proj_file, ', '.join([x[0] for x in structure[table]])))
+                    else:
+                        flds = self.db.fieldsOfTable('__fromDB.{}'.format(table))
+                        for fld in flds:
+                            if fld[0] not in [x[0] for x in structure[table]]:
+                                env.logger.warning('Field {} in table {} does not exist in all projects.'.format(fld[0], table))
+                                structure[table].append(fld)
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
             if self.db.numOfRows('__fromDB.variant', False) * self.db.numOfRows('__fromDB.sample') > proj_size:
@@ -2936,6 +2944,13 @@ class ProjectsMerger:
                 self.projects.append(proj_file)
             #
             self.db.detach('__fromDB')
+        # create all variant tables
+        for table in structure:
+            if table in ['project', 'filename']:
+                continue
+            env.logger.debug('Creating table {} with columns {}'
+                .format(table, ', '.join([x[0] for x in structure[table]])))
+            cur.execute('CREATE TABLE {} ({});'.format(table, ', '.join([' '.join(x) for x in structure[table]])))
        
     def mapSamples(self, status):
         '''Population filename and sample table, return id maps
@@ -2984,6 +2999,8 @@ class ProjectsMerger:
                 #
                 old_sample_id.extend(old_sid)
                 new_sample_id.extend(new_sid)
+            env.logger.debug('Mapping sample_ids of project {} from {} to {}'
+                .format(proj, old_sample_id, new_sample_id))
             status.set(proj, 'old_ids', old_sample_id)
             status.set(proj, 'new_ids', new_sample_id)
             self.db.detach('__proj')

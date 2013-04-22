@@ -313,7 +313,9 @@ class RuntimeEnvironments(object):
     #
     # attribute logger
     def _set_logger(self, logfile=None):
-        # create a logger
+        # create a logger, but shutdown the previous one
+        if self._logger is not None:
+            self._logger.handlers = []
         self._logger = logging.getLogger()
         self._logger.setLevel(logging.DEBUG)
         # output to standard output
