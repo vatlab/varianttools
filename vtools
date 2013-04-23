@@ -205,8 +205,8 @@ if __name__ == '__main__':
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
     args, argv = master_parser.parse_known_args()
-    # only command associate and sample_stat accept arbitrary parameter
-    if (args.func in [association.associate, project.init, importer.importVariants, update.update, exporter.export]):
+    # commands that accepts format and other subparsers can pass arbitrary parameter to subparsers
+    if (args.func in [association.associate, importer.importVariants, update.update, exporter.export]):
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

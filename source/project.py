@@ -2321,96 +2321,6 @@ class ProjCopier:
             self.proj.db.connect(self.proj.proj_file)
 
 
-class SortedVariantMapper(threading.Thread):
-    '''The worker thread read variants from all projects, sort them, and
-       figure out the distinct variants. It uses less RAM than another mapper
-       but requires the Unix sort command. A huge disadvantage of this mapper
-       if that the read and process threads cannot be run in parallel.'''
-    def __init__(self, projects, alt_build, status):
-        self.projects = projects
-        self.alt_build = alt_build
-        self.status = status
-        threading.Thread.__init__(self, name='Read, sort and map variants')
-
-    def run(self):
-        if self.alt_build:
-            psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,8'], stdin=PIPE, stdout=PIPE)
-        else:
-            psort = Popen(['sort', '-k3,3', '-k4,4n', '-k5,6'], stdin=PIPE, stdout=PIPE)
-        for idx, proj in enumerate(self.projects):
-            db = DatabaseEngine()
-            db.connect(proj)
-            cur = db.cursor()
-            prog = ProgressBar('Loading {} ({}/{})'.format(proj[:-5], idx+1, len(self.projects)), db.numOfRows('variant',  False))
-            if self.alt_build:
-                cur.execute('SELECT variant_id, chr, pos, ref, alt, alt_chr, alt_pos FROM variant;')
-                for count, (id, chr, pos, ref, alt, alt_chr, alt_pos) in enumerate(cur):
-                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.\
-                        format(idx, id, chr, pos, alt_chr, alt_pos, ref, alt).encode())
-                    if count % 10000 == 0:
-                        prog.update(count)
-            else:
-                cur.execute('SELECT variant_id, chr, pos, ref, alt FROM variant;')
-                for count, (id, chr, pos, ref, alt) in enumerate(cur):
-                    psort.stdin.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(idx, id, chr, pos, ref, alt).encode())
-                    if count % 10000 == 0:
-                        prog.update(count)
-            prog.done()
-            db.close()
-        psort.stdin.close()
-        #
-        prog = ProgressBar('Sorting variants')
-        idMaps = {x:{} for x in range(len(self.projects))}
-        last_rec = None
-        new_id = 1
-        for count, line in enumerate(psort.stdout):
-            rec = line.decode().rstrip().split('\t', 2)
-            # rec[0] is source, rec[1] is source_id
-            if last_rec is None or last_rec != rec[2]:
-                # a new record
-                idMaps[int(rec[0])][int(rec[1])] = (new_id, 0)
-                last_rec = rec[2]
-                new_id += 1
-            else:
-                # last_rec[2] == rec[2]
-                # we use 1 to mark a duplicated entry
-                idMaps[int(rec[0])][int(rec[1])] = (new_id, 1)
-            if count % 10000 == 0:
-                prog.update(count)
-        prog.done()
-        #
-        prog = ProgressBar('Create mapping tables')
-        for idx, proj in enumerate(self.projects):
-            db = DatabaseEngine()
-            db.connect(proj)
-            cur = db.cursor()
-            prog.reset('create mapping table {}'.format(idx + 1))
-            cur.execute('DROP TABLE IF EXISTS __id_map;')
-            cur.execute('CREATE TABLE __id_map (old_id INT, new_id INT, is_dup INT);')
-            insert_query = 'INSERT INTO __id_map VALUES ({0}, {0}, {0});'.format(db.PH);
-            the_same = True
-            keep_all = True
-            for old_id, (new_id, is_duplicate) in idMaps[idx].iteritems():
-                if the_same and old_id != new_id:
-                    the_same = False
-                if keep_all and is_duplicate:
-                    keep_all = False
-                if not the_same and not keep_all:
-                    break
-            self.status.set(proj, 'the_same', the_same)
-            self.status.set(proj, 'keep_all', keep_all)
-            cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps[idx].iteritems()))
-            prog.update(count)
-            db.commit()
-            db.close()
-        prog.done()
-        # free some RAM
-        idMaps.clear()
-        # tells the dispatcher that we have created all maps
-        for proj in self.projects:
-            self.status.set(proj, 'stage', 1)
-            self.status.set(proj, 'completed', 1)
-
 class VariantMapper(threading.Thread):
     '''The worker thread read variants from all projects and create 
     id maps along the way. This mapper does not sort variants, uses 
@@ -2466,13 +2376,16 @@ class VariantMapper(threading.Thread):
                     vv = existing.get((chr, ref, alt))
                     if vv is not None:
                         if pos in vv:
+                            # there exists a duplicate
                             idMaps[id] = (vv[pos], 1)
                             keep_all = False
                         else:
+                            # a new variant is found
                             vv[pos] = new_id
                             idMaps[id] = (new_id, 0)
                             new_id += 1
                     else:
+                        # a new variant is found 
                         existing[(chr, ref, alt)] = {pos: new_id}
                         idMaps[id] = (new_id, 0)
                         new_id += 1
@@ -2484,13 +2397,16 @@ class VariantMapper(threading.Thread):
             cur.execute('DROP TABLE IF EXISTS __id_map;')
             cur.execute('CREATE TABLE __id_map (old_id INT, new_id INT, is_dup INT);')
             insert_query = 'INSERT INTO __id_map values ({0}, {0}, {0});'.format(db.PH);
-            the_same = True
+            identical_ids = True
             for _old_id, (_new_id, _is_duplicate) in idMaps.iteritems():
                 if _old_id != _new_id:
-                    the_same = False
+                    identical_ids = False
                     break
-            #
-            self.status.set(proj, 'the_same', the_same)
+            # identical_ids means new_id and old_id are the same, no need to map
+            self.status.set(proj, 'identical_ids', identical_ids)
+            # keep_all means keeping all variants because there is no overlap (e.g. merge SNPs and INDELs)
+            # it is set to False when there is at least one variant that overlap with a previous
+            # project
             self.status.set(proj, 'keep_all', keep_all)
             # insert into database
             cur.executemany(insert_query, ([x, y[0], y[1]] for x, y in idMaps.iteritems()))
@@ -2521,9 +2437,9 @@ class VariantProcessor(threading.Thread):
                 break
             # get parameters
             self.src_proj = item
-            self.all_the_same = self.status.get(self.src_proj, 'the_same')
+            self.identical_ids = self.status.get(self.src_proj, 'identical_ids')
             self.keep_all = self.status.get(self.src_proj, 'keep_all')
-            if not (self.all_the_same and self.keep_all):
+            if not (self.identical_ids and self.keep_all):
                 d, p = os.path.split(self.src_proj)
                 if not os.path.isdir(os.path.join(d, 'cache')):
                     os.mkdir(os.path.join(d, 'cache'))
@@ -2541,7 +2457,7 @@ class VariantProcessor(threading.Thread):
             self.queue.task_done()
 
     def cacheVariants(self):
-        if self.all_the_same and self.keep_all:
+        if self.identical_ids and self.keep_all:
             return
         db = DatabaseEngine()
         db.connect(self.cache_proj)
@@ -2565,14 +2481,14 @@ class VariantProcessor(threading.Thread):
                 continue
             query = None
             headers = db.getHeaders(table)
-            if self.all_the_same:
+            # if identical_ids, no need to map ids,
+            if self.identical_ids:
                 # table variant:
-                #     if keep_all: do not copy anything
+                #     if keep_all: do not copy anything ...
                 #     otherwise:   copy some of them (is_dup == 0)
                 # 
                 # Other variant tables:
-                #     if keep_all: do not copy anything
-                #     otherwise:   do not copy anything because it should keep all.
+                #     we should always copy all variants
                 # 
                 if table == 'variant' and not self.keep_all:
                     query = '''INSERT INTO {0}  
@@ -2589,7 +2505,7 @@ class VariantProcessor(threading.Thread):
                 #     if keep_all: copy with id_map
                 #     otherwise:   copy with id_map 
                 #
-                if table != 'variant' or not self.keep_all:
+                if table == 'variant' and not self.keep_all:
                     query = '''INSERT INTO {1} (variant_id {0}) 
                                 SELECT m.new_id {0} 
                                 FROM __fromDB.{1} v LEFT OUTER JOIN __fromDB.__id_map m
@@ -2623,10 +2539,10 @@ class SampleProcessor(threading.Thread):
                 break
             # get parameters
             self.src_proj = item
-            self.all_the_same = self.status.get(self.src_proj, 'the_same')
+            self.identical_ids = self.status.get(self.src_proj, 'identical_ids')
             self.samples = self.status.get(self.src_proj, 'old_ids')
             #
-            if self.all_the_same:
+            if self.identical_ids:
                 self.status.set(self.src_proj, 'completed', 3)
             else:
                 self.status.set(self.src_proj, 'total_count', 2 + len(self.samples))
@@ -2696,11 +2612,11 @@ class VariantCopier(threading.Thread):
         db = DatabaseEngine()
         db.connect(self.proj.proj_file)
         for idx, proj in enumerate(self.projects):
-            all_the_same = self.status.get(proj, 'the_same')
+            identical_ids = self.status.get(proj, 'identical_ids')
             keep_all = self.status.get(proj, 'keep_all')
             # get cache_proj
             db.attach(proj, '__fromDB')
-            if not (all_the_same and keep_all):
+            if not (identical_ids and keep_all):
                 d, p = os.path.split(proj)
                 if not os.path.isdir(os.path.join(d, 'cache')):
                     raise RuntimeError('Cannot locate cache directory of project {}'.format(proj))
@@ -2732,17 +2648,17 @@ class VariantCopier(threading.Thread):
                 # NOT ALL_THE_SAME:
                 #     copy from cache
                 #
-                if all_the_same and (table != 'variant' or keep_all):
+                if identical_ids and (table != 'variant' or keep_all):
                     query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, ', '.join(fields))
                 else:
                     query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __cacheDB.{0};'''.format(table, ', '.join(fields))
                 env.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
-                    all_the_same, keep_all))
+                    identical_ids, keep_all))
                 cur.execute(query)
                 db.commit()
             #
             db.detach('__fromDB')
-            if not (all_the_same and keep_all):
+            if not (identical_ids and keep_all):
                 db.detach('__cacheDB')
             self.status.set('__copyVariants', 'completed', idx + 1)
         # create index
@@ -2770,8 +2686,8 @@ class SampleCopier(threading.Thread):
         db.connect(self.proj.proj_file.replace('.proj', '_genotype.DB'))
         count = 0
         for proj in self.projects:
-            all_the_same = self.status.get(proj, 'the_same')
-            if all_the_same:
+            identical_ids = self.status.get(proj, 'identical_ids')
+            if identical_ids:
                 src_geno = proj.replace('.proj', '_genotype.DB')
                 db.attach(src_geno, '__geno')
             else:
@@ -2840,12 +2756,11 @@ class MergeStatus:
         #print self.tasks
 
 class ProjectsMerger:
-    def __init__(self, proj, dirs, sort, jobs):
+    def __init__(self, proj, dirs, jobs):
         '''Check if merge is possible, set primary and reference genome
             and set self.projects and self.structure '''
         self.proj = proj
         self.db = proj.db
-        self.sort = sort
         self.jobs = jobs
         # valid projects
         self.projects = []
@@ -3053,21 +2968,18 @@ class ProjectsMerger:
             SampleProcessor(self.scQueue, status).start()
         #
         # create a thread to read variants
-        if self.sort:
-            SortedVariantMapper(self.projects, self.proj.alt_build, status).start()
-        else:
-            VariantMapper(self.projects, self.proj.alt_build, status).start()
+        VariantMapper(self.projects, self.proj.alt_build, status).start()
         #
         prog = None
         count = 0
         while True:
             for idx, proj in enumerate(self.projects):
                 if status.canProcessVariant(proj) and self.vcQueue.qsize() < nJobs:
-                    env.logger.debug('Process variant in {}'.format(proj))
+                    env.logger.debug('Mapping variants in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.vcQueue.put(proj)
                 if status.canProcessSample(proj) and self.vcQueue.qsize() + self.scQueue.qsize() < nJobs:
-                    env.logger.debug('Process variant in {}'.format(proj))
+                    env.logger.debug('Mapping sample variants in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.scQueue.put(proj)
             if status.canCopyVariants():
@@ -3192,15 +3104,9 @@ def init(args):
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
             elif args.children:
-                # args.sort is temporarily removed to keep interface clean
-                # because the only advantage (save RAM) does not really justify
-                # its inclusion.
-                #
                 # A default value 4 is given for args.jobs because more threads usually
                 # do not improve effiency
-                if args.unknown_args:
-                    raise ValueError('Unknown args for option --children: {}'.format(' '.join(args.unknown_args)))
-                merger = ProjectsMerger(proj, args.children, False, 4)
+                merger = ProjectsMerger(proj, args.children, 4)
                 merger.merge()
     except Exception as e:
         sys.exit(e)
