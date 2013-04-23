@@ -153,8 +153,13 @@ class TestInit(ProcessTestCase):
            pass
         runCmd('vtools init ceu -f')
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('vtools select variant \'ref="A"\' -t refA')
+        runCmd('vtools select variant \'ref="G"\' -t refG')
+        runCmd('vtools update --set "ref1=ref"')
         self.assertEqual(numOfVariant('variant'), 288)
-        self.assertEqual(numOfSample(),60 )
+        self.assertEqual(numOfVariant('refA'), 43)
+        self.assertEqual(numOfVariant('refG'), 96)
+        self.assertEqual(numOfSample(), 60 )
         shutil.move('ceu.proj', 'ceu/ceu.proj')
         shutil.move('ceu_genotype.DB', 'ceu/ceu_genotype.DB')
         try:
@@ -163,13 +168,21 @@ class TestInit(ProcessTestCase):
            pass
         runCmd('vtools init sam1 -f')
         runCmd('vtools import vcf/SAMP1.vcf --build hg18')
+        runCmd('vtools select variant \'ref="A"\' -t refA')
+        runCmd('vtools select variant \'ref="C"\' -t refC')
         self.assertEqual(numOfVariant(), 289)
+        self.assertEqual(numOfVariant('refA'), 58)
+        self.assertEqual(numOfVariant('refC'), 85)
         self.assertEqual(numOfSample(), 1)
         shutil.move('sam1.proj', 'sam1/sam1.proj')
         shutil.move('sam1_genotype.DB', 'sam1/sam1_genotype.DB')
         self.assertSucc('vtools init test --children ceu sam1') 
-        self.assertEqual(numOfSample(),61)
+        self.assertEqual(numOfSample(), 61)
         self.assertEqual(numOfVariant(), 577)
+        self.assertEqual(numOfVariant('refA'), 101)
+        self.assertEqual(numOfVariant('refC'), 85)
+        self.assertEqual(numOfVariant('refG'), 96)
+        #
         shutil.rmtree('ceu')
         shutil.rmtree('sam1')
 
