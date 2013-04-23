@@ -3310,7 +3310,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'.format(', '.join(args.items)))
                 width = max([len(decodeTableName(x)) for x in proj.getVariantTables()])
                 print(('{:<' + str(width+2) + '} {:>10} {:>8}  {}').format('table', '#variants', 'date', 'message'))
-                for table in proj.getVariantTables():
+                for table in sorted(proj.getVariantTables(), key=lambda x: decodeTableName(x)):
                     desc, date, cmd = proj.descriptionOfTable(table) 
                     print(('{:<' + str(width+2) + '} {: >10,} {:>8}  {}').format(decodeTableName(table), proj.db.numOfRows(table), date, 
                         '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
@@ -3496,19 +3496,24 @@ def show(args):
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
-                print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
+                snapshots = []
                 for snapshot_file in glob.glob(os.path.join(env.cache_dir, 'snapshot_*.tar')):
                     name, date, desc = getSnapshotInfo(snapshot_file)
                     if name is not None:
-                        print('{:<18} {:<15} {}'.format(name, date, 
-                            '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
+                        snapshots.append((name, date, desc))
+                #
+                width = max(18, max([len(x[0]) for x in snapshots]))
+                print(('{:<' + str(width) + '} {:<15} {}').format('snapshot', 'date', 'description'))
+                for name, date, desc in sorted(snapshots):
+                    print(('{:<' + str(width) + '} {:<15} {}').format(name, date, 
+                        '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
                 #
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
-                    print('{:<18} {:15} {}'.format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
-                        initial_indent='', subsequent_indent=' '*35))[35:]))
+                    print(('{:<' + str(width) + '} {:15} {}').format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
+                        initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
     except Exception as e:
         sys.exit(e)
 
