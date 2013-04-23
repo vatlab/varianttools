@@ -61,7 +61,7 @@ MetaSKAT.PFF.VAT <- function (dat, out_type,
       write(paste("No valid sample found for group", i), stderr())
       q("no", 1, FALSE)
     }
-    if (sum(is.na(y.list[[i]])) < length(y.list[[i]])) {
+    if (sum(!is.na(y.list[[i]])) < length(y.list[[i]])) {
       write("Missing data in phenotype is not allowed", stderr())
       q("no", 1, FALSE)
     }

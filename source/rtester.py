@@ -133,6 +133,30 @@ def Str4R(obj, method = 'c'):
             return str_func[tp](obj)
     return OtherStr(obj)
 
+import signal 
+class TimeoutException(Exception): 
+    pass 
+
+def timectrl(timeout_time, default):
+    def timeout_function(f):
+        def f2(*args):
+            def timeout_handler(signum, frame):
+                raise TimeoutException()
+ 
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
+            signal.alarm(timeout_time) # triger alarm in timeout_time seconds
+            try: 
+                retval = f(*args)
+            except TimeoutException:
+                return default
+            finally:
+                signal.signal(signal.SIGALRM, old_handler) 
+            signal.alarm(0)
+            return retval
+        return f2
+    return timeout_function
+
+
 from itertools import chain
 
 def flatten(listOfLists):
@@ -535,7 +559,7 @@ class RTest(ExternTest):
           'write("END-VATOUTPUT", stdout())\n'
         return script
 
-    def calculate(self, timeout):
+    def calculate(self, tmout):
         '''run command and return output results'''
         def forcefloat(i):
             try:
@@ -559,6 +583,10 @@ class RTest(ExternTest):
             else:
                 return str
         #
+        @timectrl(tmout, 'time expired')
+        def timed_command(cmd, instream = None, msg = '', upon_succ=None):
+            return runCommand(cmd, instream, msg, upon_succ)
+        # 
         self.loadData()
         # write data and R script to log file for this group
         if self.data_cache_counter < self.data_cache or self.data_cache < 0:
@@ -570,18 +598,26 @@ class RTest(ExternTest):
                 pass
         # print self.formatOutput()
         cmd = "R --slave --no-save --no-restore"
+        cmd_logger = env.logger.debug
+        na_value = float('nan')
         try:
-            out = runCommand(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
-                              "R message for {0}".format(self.pydata['name'])).split()
+            out = timed_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
+                              "R message for {0}".format(self.pydata['name']))
+            if out == 'time expired':
+                cmd_logger = env.logger.warning
+                na_value = -9
+                raise ValueError("running time {}s has expired".format(tmout))
+            else:
+                out = out.split()
             if len(self.outvars):
                 out = out[out.index("BEGIN-VATOUTPUT") + 1:out.index("END-VATOUTPUT")]
                 res = [typemapper(x[1])(y) for x, y in zip(self.outvars, out)]
             else:
                 res = [self.pydata['name']]
         except Exception as e:
-            env.logger.debug("Association test {} failed while processing '{}': {}".\
+            cmd_logger("Association test {} failed while processing '{}': {}".\
                               format(self.name, self.gname, e))
-            res = [float('nan')]*len(self.outvars)
+            res = [na_value]*len(self.outvars)
         return res
     
     def parseArgs(self, method_args):
