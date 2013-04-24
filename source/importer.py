@@ -1160,51 +1160,60 @@ def probeSampleName(filename, prober, encoding):
     header_line = None
     count = 0
     with openFile(filename) as input:
-        for line in input:
-            line = line.decode(encoding)
-            # the last # line
-            if line.startswith('#'):
-                header_line = line
-            else:
-                try:
-                    for bins, rec in prober.process(line):
-                        if header_line is None:
-                            return len(rec), []
-                        elif len(rec) == 0:
-                            return 0, []
-                        else:
-                            cols = [x[0] for x in prober.fields]
-                            if type(cols[0]) is tuple:
-                                fixed = False
-                                # mutiple ones, need to figure out the moving one
-                                for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
-                                    if ':' in idx:
-                                        cols = [x[i] for x in cols]
-                                        fixed = True
-                                        break
-                                if not fixed:
-                                    cols = [x[-1] for x in cols]
-                            header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
-                            if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
-                                return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+        try:
+            for line in input:
+                line = line.decode(encoding)
+                # the last # line
+                if line.startswith('#'):
+                    header_line = line
+                else:
+                    try:
+                        for bins, rec in prober.process(line):
+                            if header_line is None:
+                                return len(rec), []
+                            elif len(rec) == 0:
+                                return 0, []
                             else:
-                                header = [x.strip() for x in header_line.split(prober.delimiter)]
+                                cols = [x[0] for x in prober.fields]
+                                if type(cols[0]) is tuple:
+                                    fixed = False
+                                    # mutiple ones, need to figure out the moving one
+                                    for i,idx in enumerate(prober.raw_fields[0].index.split(',')):
+                                        if ':' in idx:
+                                            cols = [x[i] for x in cols]
+                                            fixed = True
+                                            break
+                                    if not fixed:
+                                        cols = [x[-1] for x in cols]
+                                header = [x.strip() for x in header_line.split()] # #prober.delimiter)]
                                 if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
                                     return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
                                 else:
-                                    return len(rec), []
-                except IgnoredRecord:
-                    continue
-                except Exception as e:
-                    # perhaps not start with #, if we have no header, use it anyway
-                    if header_line is None:
-                        header_line = line
-                    count += 1
-                    if count == 100:
-                        raise ValueError('No genotype column could be determined after 1000 lines.')
-                    env.logger.debug(e)
-
-
+                                    header = [x.strip() for x in header_line.split(prober.delimiter)]
+                                    if max(cols) - min(cols)  < len(header) and len(header) > max(cols):
+                                        return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
+                                    else:
+                                        return len(rec), []
+                    except IgnoredRecord:
+                        continue
+                    except Exception as e:
+                        # perhaps not start with #, if we have no header, use it anyway
+                        if header_line is None:
+                            header_line = line
+                        count += 1
+                        if count == 100:
+                            raise ValueError('No genotype column could be determined after 1000 lines.')
+                        env.logger.debug(e)
+        except TypeError as e:
+            # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
+            # certain types of gzip file (http://bugs.python.org/issue17666).
+            if filename.lower().endswith('.gz'):
+                raise RuntimeError('Failed to open gzipped file {} due to a bug '
+                    'in Python 2.7.4 and 3.3.1. Please use a different version '
+                    'of Python or decompress this file manually.'.format(filename))
+            else:
+                raise e
+       
 
 #
 #  A status object to control the import process. I cannot use a simple
@@ -1415,7 +1424,11 @@ class GenotypeCopier(Process):
         self.db.connect(self.main_genotype_file)
         file_count = 0
         while True:
-            item = self.status.itemToCopy()
+            try:
+                item = self.status.itemToCopy()
+            except Exception as e:
+                env.logger.error('GenotypeCopier failed: {}'.format(e))
+                sys.exit(1)
             if item is None:
                 if self.status.all_done.value == 1:
                     self.db.close()
@@ -2169,4 +2182,5 @@ def importVariants(args):
             importer.finalize()
         proj.close()
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)

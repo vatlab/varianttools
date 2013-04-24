@@ -488,7 +488,14 @@ def lineCount(filename, encoding='UTF-8'):
     if totalSize < 500000:
         # small file, read the number of lines directly
         if filename.endswith('.gz'):
-            return len(gzip.open(filename, 'rb').readlines())
+            try:
+                return len(gzip.open(filename, 'rb').readlines())
+            # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
+            # certain types of gzip file (http://bugs.python.org/issue17666).
+            except TypeError as e:
+                raise RuntimeError('Failed to open gzipped file {} due to a bug '
+                    'in Python 2.7.4 and 3.3.1. Please use a different version '
+                    'of Python or decompress this file manually.'.format(filename))
         elif filename.endswith('.bz2'):
             if not bz2_support:
                 raise ValueError('Direct reading of bz2 files is not supported. Please update your python installation or uncompress the file before processing')
@@ -496,12 +503,19 @@ def lineCount(filename, encoding='UTF-8'):
         else:
             return len(open(filename, 'rb').readlines())
     elif filename.endswith('.gz'):
-        input = gzip.open(filename, 'rb')
-        input.seek(50000, 0)
-        content = input.read(500000).decode(encoding)
-        input.close()
-        lineCount = len(content.split('\n'))
-        input.close()
+        try:
+            input = gzip.open(filename, 'rb')
+            input.seek(50000, 0)
+            content = input.read(500000).decode(encoding)
+            input.close()
+            lineCount = len(content.split('\n'))
+            input.close()
+        # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
+        # certain types of gzip file (http://bugs.python.org/issue17666).
+        except TypeError as e:
+            raise RuntimeError('Failed to open gzipped file {} due to a bug '
+                'in Python 2.7.4 and 3.3.1. Please use a different version '
+                'of Python or decompress this file manually.'.format(filename))
         # assuming an arbitrary compression ratio of 5. :-)
         return int(lineCount * (5 * totalSize / 500000.))
     elif filename.endswith('.bz2'):
@@ -1185,11 +1199,19 @@ def decompressIfNeeded(filename, inplace=True):
         new_filename = filename[:-3]
         if os.path.isfile(new_filename):
             return new_filename
-        with gzip.open(filename, 'rb') as input, open(new_filename, 'wb') as output:
-            buffer = input.read(100000)
-            while buffer:
-                output.write(buffer)
+        #
+        try:
+            with gzip.open(filename, 'rb') as input, open(new_filename, 'wb') as output:
                 buffer = input.read(100000)
+                while buffer:
+                    output.write(buffer)
+                    buffer = input.read(100000)
+        # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
+        # certain types of gzip file (http://bugs.python.org/issue17666).
+        except TypeError as e:
+            raise RuntimeError('Failed to open gzipped file {} due to a bug '
+                'in Python 2.7.4 and 3.3.1. Please use a different '
+                'version of Python or decompress this file manually.'.format(filename))
         #
         if inplace:
             try:
