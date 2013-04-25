@@ -3502,11 +3502,12 @@ def show(args):
                     if name is not None:
                         snapshots.append((name, date, desc))
                 #
-                width = max(18, max([len(x[0]) for x in snapshots]))
-                print(('{:<' + str(width) + '} {:<15} {}').format('snapshot', 'date', 'description'))
-                for name, date, desc in sorted(snapshots):
-                    print(('{:<' + str(width) + '} {:<15} {}').format(name, date, 
-                        '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
+                if snapshots:
+                    width = max(18, max([len(x[0]) for x in snapshots]))
+                    print(('{:<' + str(width) + '} {:<15} {}').format('snapshot', 'date', 'description'))
+                    for name, date, desc in sorted(snapshots):
+                        print(('{:<' + str(width) + '} {:<15} {}').format(name, date, 
+                            '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
                 #
                 res = ResourceManager()
                 res.getRemoteManifest()

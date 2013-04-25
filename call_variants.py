@@ -641,12 +641,12 @@ class BaseVariantCaller:
 
     def buildBWARefIndex(self, ref_file):
         '''Create BWA index for reference genome file'''
-        # bwa index -p hg19bwaidx -a bwtsw wg.fa
-        if os.path.isfile('bwaidx.amb'):
-            env.logger.warning('Using existing bwa indexed sequence bwaidx.amb')
+        # bwa index  -a bwtsw wg.fa
+        if os.path.isfile(self.REF_fasta + '.amb'):
+            env.logger.warning('Using existing bwa indexed sequence {}.amb'.format(self.REF_fasta))
         else:
             checkCmd('bwa')
-            run_command('bwa index {} -p bwaidx -a bwtsw {}'
+            run_command('bwa index {}  -a bwtsw {}'
                 .format(env.options['OPT_BWA_INDEX'], ref_file))
 
     def buildSamToolsRefIndex(self, ref_file):
@@ -772,9 +772,9 @@ class BaseVariantCaller:
                 if opt == ' -I ':
                     env.logger.warning('Using -I option for bwa aln command '
                         'because the sequences seem to be in Illumina 1.3+ format.')
-                run_command('bwa aln {} {} -t 4 {}/bwaidx {} > {}_tmp'
+                run_command('bwa aln {} {} -t 4 {}/{} {} > {}_tmp'
                     .format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
-                        input_file, dest_file),
+                        self.REF_fasta, input_file, dest_file),
                     name=os.path.basename(dest_file),
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file),
                     wait=False)
@@ -793,9 +793,9 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa sampe {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {3}/{5}.sai {6} {7} > {8}_tmp'
+                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4}/{5}.sai {4}/{6}.sai {7} {8} > {9}_tmp'
                     .format(
-                        env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, 
+                        env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, self.REF_fasta,
                         env.working_dir, os.path.basename(f1),
                         os.path.basename(f2), f1, f2, sam_file),
                     name=os.path.basename(sam_file),
@@ -816,9 +816,9 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa samse {0} -r \'{1}\' {2}/bwaidx {3}/{4}.sai {5} > {6}_tmp'
+                    'bwa samse {0} -r \'{1}\' {2}/{3} {4}/{5}.sai {6} > {7}_tmp'
                     .format(
-                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
+                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir, self.REF_fasta,
                         env.working_dir, os.path.basename(f), f, sam_file),
                     name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file),
@@ -1054,6 +1054,30 @@ class BaseVariantCaller:
         # 
         return target
 
+    def unifiedGenotyper(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing called variants {}'.format(target))
+        else:
+            dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T UnifiedGenotyper
+                --dbsnp {4}/{7}
+                -stand_call_conf 50.0 
+                -stand_emit_conf 10.0 
+                -dcov 200
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_UNIFIEDGENOTYPER'], input_file,
+                    self.resource_dir, self.REF_fasta,
+                    target[:-4] + '_tmp.vcf', dbSNP_vcf),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+        # 
+        return target
+
     def haplotypeCall(self, input_file):
         target = os.path.join(env.working_dir,
             os.path.basename(input_file)[:-4] + '.vcf')
@@ -1074,6 +1098,7 @@ class BaseVariantCaller:
         # 
         return target
 
+
     def variantRecalibration(self, input_file):
         target = os.path.join(env.working_dir,
             os.path.basename(input_file)[:-4] + '_recal.vcf')
@@ -1083,18 +1108,14 @@ class BaseVariantCaller:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
                 -T VariantRecalibrator
-                –resource:	{see	next	slide}	
-                -resource:hapmap,known=false,training=true,truth=true,prior=15.0	
-                    hapmap_3.3.b37.sites.vcf		
-                -resource:omni,known=false,training=true,truth=false,prior=12.0	
-                    1000G_omni2.5.b37.sites.vcf		
-                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0	
-                    dbsnp_137.b37.v	
-                –an	QD	–an	MQ	–an	HaplotypeScore	{…}
-                –mode	SNP
-                –recalFile raw.SNPs.recal
-                –tranchesFile raw.SNPs.tranches
-                –rscriptFile recal.plots.R
+                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf		
+                -resource:omni,known=false,training=true,truth=false,prior=12.0	1000G_omni2.5.b37.sites.vcf		
+                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0	dbsnp_137.b37.v	
+                -an	QD	-an	MQ	-an	HaplotypeScore {}
+                -mode SNP 
+                -recalFile raw.SNPs.recal
+                -tranchesFile raw.SNPs.tranches
+                -rscriptFile recal.plots.R
                 -o {6}'''.format(
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
@@ -1110,9 +1131,8 @@ class BaseVariantCaller:
                 -R {4}/{5}
                 -T ApplyRecalibraBon
                 -mode SNP 
-                –recalFile raw.SNPs.recal	
-                –tranchesFile raw.SNPs.tranches
-                –ts_ﬁlter_level	99.0
+                -recalFile raw.SNPs.recal
+                -tranchesFile raw.SNPs.trances
                 -o {6}'''.format(
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
@@ -1123,7 +1143,7 @@ class BaseVariantCaller:
         return target
 
 
-    def callVariants(self, input_files, output):
+    def callVariants(self, input_files, ped_file, output):
         '''Call variants from a list of input files'''
         if not output.endswith('.vcf'):
            env.logger.error('Please specify a .vcf file in the --output parameter')
@@ -1158,7 +1178,7 @@ class b37_gatk_23(BaseVariantCaller):
         GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
         saved_dir = os.getcwd()
         os.chdir(self.resource_dir)
-        files = [self.REF_fasta, 'bwaidx.amb', self.REF_fasta + '.fai']
+        files = [self.REF_fasta, self.REF_fasta + '.amb', self.REF_fasta + '.fai']
         if not all([os.path.isfile(x) for x in files]):
             sys.exit('GATK resource bundle does not exist in directory {}. '
                 'Please run "call_variants.py prepare_resource" befor you '
@@ -1281,14 +1301,15 @@ class b37_gatk_23(BaseVariantCaller):
         reduced = self.reduceReads(output)
         self.indexBAM(reduced)
 
-    def callVariants(self, input_files, output):
+    def callVariants(self, input_files, pedfile, output):
         '''Call variants from a list of input files'''
-        BaseVariantCaller.callVariants(self, input_files, output)
+        BaseVariantCaller.callVariants(self, input_files, pedfile, output)
         env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
         #
         # step 1: haplotype call
         for input_file in input_files:
-            vcf_file = self.haplotypeCall(input_file)
+            #vcf_file = self.haplotypeCall(input_file)
+            vcf_file = self.unifiedGenotyper(input_file)
 
 
 class hg19_gatk_23(b37_gatk_23):
@@ -1400,6 +1421,9 @@ if __name__ == '__main__':
         help='''One or more BAM files.''')
     call.add_argument('-o', '--output', required=True,
         help='''Output called variants to the specified VCF file''')
+    call.add_argument('--pedfile',
+        help='''A pedigree file that specifies the relationship between input
+            samples, used for multi-sample calling.''')
     addCommonArguments(call, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     args = master_parser.parse_args()
@@ -1450,7 +1474,5 @@ if __name__ == '__main__':
         checkPicard()
         checkGATK()
         pipeline.checkResource()
-        pipeline.callVariants(args.input_files, args.output)
+        pipeline.callVariants(args.input_files, args.pedfile, args.output)
 
-        
-    
