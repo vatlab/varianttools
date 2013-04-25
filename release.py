@@ -39,6 +39,10 @@ import zipfile
 import platform
 from variant_tools.utils import runCommand
 
+if sys.version.startswith('2.7.4') or sys.version.startswith('3.3.1'):
+    sys.exit('Python 2.7.4 and 3.3.1 cannot be used to release variant '
+        'tools due to a regression bug in the gzip module.')
+
 def ModifyVersion(version):
     # modify source/__init__.py to write version string
     if version is not None:
