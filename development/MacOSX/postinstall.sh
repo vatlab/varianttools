@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $File: install.sh $
+# $File: postinstall.sh $
 # $LastChangedDate: 2013-04-16 13:32:03 -0500 (Tue, 16 Apr 2013) $
 # $Rev: 1825 $
 #
@@ -30,12 +30,13 @@ if [ -f /usr/local/bin/vtools ]
 then
     /bin/rm -f /usr/local/bin/vtools
 fi
-/bin/ln -s $3/Applications/variant_tools/vtools.app/Contents/MacOS/vtools /usr/local/bin
 
 if [ -f /usr/local/bin/vtools_report ]
 then
     /bin/rm -f /usr/local/bin/vtools_report
 fi
-/bin/ln -s $3/Applications/variant_tools/vtools_report.app/Contents/MacOS/vtools_report /usr/local/bin
+
+/bin/ln -s /Applications/variant_tools/variant_tools.app/Contents/MacOS/vtools /usr/local/bin
+/bin/ln -s /Applications/variant_tools/variant_tools.app/Contents/MacOS/vtools_report /usr/local/bin
 
 exit 0

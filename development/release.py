@@ -210,7 +210,27 @@ def createZipPackage(version):
         dist_file.write(os.path.join('dist', vtools_report_cmd), vtools_report_cmd)
 
 def createMacPackage(version):
-    # create a dmg file for the package
+    #
+    # package source, required by PackageMaker
+    src = os.path.join('dist', 'variant_tools')
+    if os.path.isdir(src):
+        shutil.rmtree(src)
+    os.makedirs(src)
+    # move files into src
+    shutil.copy('README', src)
+    shutil.copytree(os.path.join('dist', 'vtools.app'), os.path.join(src, 'variant_tools.app'))
+    # merge vtools_report.app to variant_tools.app
+    for root, dirs, files in os.walk(os.path.join('dist', 'vtools_report.app')):
+        # root is dist/vtools_report.app/OTHERS
+        # the destination should be dist/variant_tools/variant_tools.app/OTHERS
+        new_root = root.replace('dist/vtools_report.app', os.path.join(src, 'variant_tools.app'))
+        for f in files:
+            if not os.path.isfile(os.path.join(new_root, f)):
+                print('Copying {} to {}'.format(
+                    os.path.join(root, f), os.path.join(new_root, f)))
+                shutil.copy(os.path.join(root, f), os.path.join(new_root, f))
+    #
+    # package destination, within a dmg directory
     dest = os.path.join('dist', 'variant_tools-{}'.format(version))
     if os.path.isdir(dest):
         shutil.rmtree(dest)
@@ -321,6 +341,8 @@ if __name__ == '__main__':
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
         buildExecutables(git_dir, '--windowed')
+        # one-file executables are also included
+        buildExecutables(git_dir, '--onefile')
         createMacPackage(version)
     else:
         # linux build self installation bundle
