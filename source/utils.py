@@ -582,7 +582,11 @@ def runCommand(cmd, instream = None, msg = '', upon_succ=None):
             raise ValueError ("{0}".format(error))
         else:
             if error:
-                env.logger.debug("[WARNING] {0}: {1}".format(msg, error))
+                msg = "[WARNING] {0}: {1}".format(msg, error)
+                if env.logger is not None:
+                    env.logger.debug(msg)
+                else:
+                    sys.stderr.write(msg + '\n')
     except OSError as e:
         raise OSError ("Execution of command '{0}' failed: {1}".format(cmd, e))
     # everything is OK

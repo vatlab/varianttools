@@ -252,6 +252,24 @@ def createMacPackage(version):
                 sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg'.format(version))
     except Exception as e:
         sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg: {}'.format(version, e))
+
+def createLinuxPackage(version):
+    bundle = 'variant_tools-{}-{}-{}'.format(version, platform.system(), platform.machine())
+    dest = os.path.join('dist', bundle)
+    # merge the installations
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
+    os.makedirs(dest)
+    for folder in ['dist/vtools', 'dist/vtools_report']:
+        os.system('rsync -auc {0}/* {1}'.format(folder, dest))
+        shutil.rmtree(folder)
+    with open('development/Linux/extractor-template.sh', 'r') as f:
+        content = ["BUNDLE={0}\n".format(bundle) if x.startswith("BUNDLE=") else x for x in f.readlines()]
+    with open(dest + '.sh', 'w') as f:
+        f.write(''.join(content))
+    shutil.copy('development/Linux/INSTALL', dest)
+    #
+    os.system('cd dist; tar czf - {0} >> {0}.sh; cd -'.format(bundle))
     
 def tagRelease(version):
     try:
@@ -281,6 +299,8 @@ if __name__ == '__main__':
             make the release.''')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release.')
+    parser.add_argument('--portable', action='store_true',
+        help='If specified, create additional portable binaries.')
     parser.add_argument('--pyinstaller_dir', default = '.',
         help='path to the directory where pyinstaller git clone is located.')
     parser.add_argument('--skip_rebuild', action='store_true',
@@ -301,10 +321,12 @@ if __name__ == '__main__':
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
         buildExecutables(git_dir, '--windowed')
-        buildExecutables(git_dir, '--onefile')
         createMacPackage(version)
     else:
-        # linux, right now build a single executable
+        # linux build self installation bundle
+        buildExecutables(git_dir, '--onedir')
+        createLinuxPackage(version)
+    if args.portable:
         buildExecutables(git_dir, '--onefile')
         createZipPackage(version)
     # if everything is OK, tag the release
