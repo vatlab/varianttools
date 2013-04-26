@@ -287,7 +287,7 @@ def createLinuxPackage(version):
         content = ["BUNDLE={0}\n".format(bundle) if x.startswith("BUNDLE=") else x for x in f.readlines()]
     with open(dest + '.sh', 'w') as f:
         f.write(''.join(content))
-    shutil.copy('development/Linux/INSTALL', dest)
+    shutil.copy('development/Linux/install.sh', dest)
     #
     os.system('cd dist; tar czf - {0} >> {0}.sh; cd -'.format(bundle))
     
@@ -319,11 +319,11 @@ if __name__ == '__main__':
             make the release.''')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release.')
-    parser.add_argument('--portable', action='store_true',
-        help='If specified, create additional portable binaries.')
     parser.add_argument('--pyinstaller_dir', default = '.',
         help='path to the directory where pyinstaller git clone is located.')
     parser.add_argument('--skip_rebuild', action='store_true',
+        help=argparse.SUPPRESS)
+    parser.add_argument('--skip_onefile', action='store_true',
         help=argparse.SUPPRESS)
     #
     # go to the root source directory
@@ -341,14 +341,12 @@ if __name__ == '__main__':
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
         buildExecutables(git_dir, '--windowed')
-        # one-file executables are also included
-        buildExecutables(git_dir, '--onefile')
         createMacPackage(version)
     else:
         # linux build self installation bundle
         buildExecutables(git_dir, '--onedir')
         createLinuxPackage(version)
-    if args.portable:
+    if not args.skip_onefile:
         buildExecutables(git_dir, '--onefile')
         createZipPackage(version)
     # if everything is OK, tag the release

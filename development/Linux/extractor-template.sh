@@ -90,7 +90,7 @@ extract() {
 }
 
 bootstrap() {
-   bash $1/INSTALL $1
+   bash $1/install.sh $1
    ret=$?
    if [ $ret != 0 ]; then
       exit $ret

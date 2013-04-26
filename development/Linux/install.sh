@@ -9,12 +9,12 @@ is_relative() {
 }
 install () {
     mkdir -p $2/bin
-    rm -rf $2/lib/varianttools &> /dev/null
-    mkdir -p $2/lib/varianttools
-    cp -a $1/* $2/lib/varianttools
+    rm -rf $2/lib/variant_tools &> /dev/null
+    mkdir -p $2/lib/variant_tools
+    cp -a $1/* $2/lib/variant_tools
     for cmd in vtools vtools_report; do
 	rm -rf $2/bin/$cmd &> /dev/null
-	ln -s $2/lib/varianttools/$cmd $2/bin/$cmd
+	ln -s $2/lib/variant_tools/$cmd $2/bin/$cmd
     done
     echo -e "Libraries are installed to $2/lib\nBinary files are installed to $2/bin\n"
 }
