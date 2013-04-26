@@ -90,8 +90,7 @@ extract() {
 }
 
 bootstrap() {
-   local source=$1/INSTALL
-   bash $source $1
+   bash $1/INSTALL $1
    ret=$?
    if [ $ret != 0 ]; then
       exit $ret

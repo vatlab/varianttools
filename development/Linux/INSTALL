@@ -26,6 +26,7 @@ main () {
     if [ -z $fullpath ]; then
 	install $1 "/usr/local"
     else
+	eval fullpath=$fullpath
 	if is_relative $fullpath; then
 	    fullpath=$PWD/$fullpath
 	fi
