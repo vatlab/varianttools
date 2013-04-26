@@ -285,11 +285,11 @@ def createLinuxPackage(version):
         shutil.rmtree(folder)
     with open('development/Linux/extractor-template.sh', 'r') as f:
         content = ["BUNDLE={0}\n".format(bundle) if x.startswith("BUNDLE=") else x for x in f.readlines()]
-    with open(dest + '.sh', 'w') as f:
+    with open(dest + '.bundle', 'w') as f:
         f.write(''.join(content))
     shutil.copy('development/Linux/install.sh', dest)
     #
-    os.system('cd dist; tar czf - {0} >> {0}.sh; cd -'.format(bundle))
+    os.system('cd dist; tar czf - {0} >> {0}.bundle; cd -'.format(bundle))
     
 def tagRelease(version):
     try:
