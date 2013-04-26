@@ -179,8 +179,14 @@ def buildExecutables(git_dir, option):
     for exe in ['vtools', 'vtools_report']:
         try:
             # remove existing files or directories
-            for dest in [os.path.join('dist', x) for x in [exe, exe + '.app']]:
-                if os.path.isfile(dest) or os.path.isdir(dest):
+            dest = os.path.join('dist', exe)
+            if os.path.isfile(dest):
+                os.remove(dest)
+            elif os.path.isdir(dest):
+                shutil.rmtree(dest)
+            if option == '--windowed':
+                dest = os.path.join('dist', exe + '.app')
+                if os.path.isdir(dest):
                     shutil.rmtree(dest)
             print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
@@ -230,6 +236,9 @@ def createMacPackage(version):
     #
     # copy things into dmg
     shutil.copy('README', dest)
+    shutil.copy('development/MacOSX/INSTALL', dest)
+    for exe in [os.path.join('dist', x) for x in ['vtools', 'vtools_report']]:
+        shutil.copy(exe, dest)
     dmg = os.path.join('dist', 'variant_tools-{}.dmg'.format(version))
     if os.path.isfile(dmg):
         os.remove(dmg)
@@ -292,6 +301,7 @@ if __name__ == '__main__':
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
         buildExecutables(git_dir, '--windowed')
+        buildExecutables(git_dir, '--onefile')
         createMacPackage(version)
     else:
         # linux, right now build a single executable
