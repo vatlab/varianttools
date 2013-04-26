@@ -43,7 +43,7 @@ if sys.version.startswith('2.7.4') or sys.version.startswith('3.3.1'):
     sys.exit('Python 2.7.4 and 3.3.1 cannot be used to release variant '
         'tools due to a regression bug in the gzip module.')
 
-def ModifyVersion(version):
+def modifyVersion(version):
     # modify source/__init__.py to write version string
     if version is not None:
         content = []
@@ -66,7 +66,7 @@ def ModifyVersion(version):
     from source import VTOOLS_VERSION
     return VTOOLS_VERSION
 
-def SetUpEnvironment(version):
+def setupEnvironment(version):
     #
     if version.endswith('svn'):
         print('WARNING: You are releasing a subversion version of variant tools.')
@@ -80,10 +80,11 @@ def SetUpEnvironment(version):
         print('Removing directory variant_tools-{}'.format(version))
         shutil.rmtree('variant_tools-{}'.format(version))
 
-def GenerateSWIGWrappers():
+def generateSWIGWrappers():
     # 
     # generate wrapper files to make sure they are up to date
-    SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509', '-outdir', 'source']
+    SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
+        '-w-509', '-outdir', 'source']
     WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
     WRAPPER_PY_FILE = 'source/assoTests_{}.py'
     CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
@@ -115,7 +116,7 @@ def GenerateSWIGWrappers():
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(ver))
              
 
-def BuildVariantTools(extra_args):
+def buildVariantTools(extra_args):
     # build variant tools
     try:
         print('Building and installing variant tools ...')
@@ -127,7 +128,7 @@ def BuildVariantTools(extra_args):
         sys.exit('Failed to build and install variant tools: {}'.format(e))
 
 
-def BuildSourcePackage():
+def buildSourcePackage():
     # build source package
     try:
         print('Building source package of variant tools {} ...'.format(version))
@@ -139,7 +140,7 @@ def BuildSourcePackage():
         sys.exit('Failed to build source pacakge of variant tools: {}'.format(e))
 
 
-def ObtainPyInstaller(pyinstaller_dir):
+def obtainPyInstaller(pyinstaller_dir):
     # check if pyinstaller is available
     #   if not, use git clone to get it
     #   if yes, try to update to the newest version
@@ -173,19 +174,28 @@ def ObtainPyInstaller(pyinstaller_dir):
     os.chdir(curdir)
     return git_dir
 
-def BuildExecutables(version, git_dir):
+def buildExecutables(git_dir, option):
     # use py installer to create executable
     for exe in ['vtools', 'vtools_report']:
         try:
+            # remove existing files or directories
+            for dest in [os.path.join('dist', x) for x in [exe, exe + '.app']]:
+                if os.path.isfile(dest) or os.path.isdir(dest):
+                    shutil.rmtree(dest)
             print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
-                ret = subprocess.call('python {} -F --log-level=ERROR {} '.format(os.path.join(git_dir, 'pyinstaller.py'), exe), shell=True, stdout=fnull)
+                ret = subprocess.call('python {} {} --log-level=ERROR {} '
+                    .format(os.path.join(git_dir, 'pyinstaller.py'), option, exe),
+                    shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to create executable for command {}'.format(exe))
         except Exception as e:
             sys.exit('Failed to create executable for command {}: {}'.format(exe, e))
+
+def createZipPackage(version):
     # after the creation of commands, create a zip file with OS and version information
-    zipfilename = os.path.join('dist', 'variant_tools-{}.{}.{}.zip'.format(version, platform.system(), platform.machine()))
+    zipfilename = os.path.join('dist', 'variant_tools-{}.{}.{}.zip'
+        .format(version, platform.system(), platform.machine()))
     print('Adding executables to file {}'.format(zipfilename))
     with zipfile.ZipFile(zipfilename, 'w') as dist_file:
         vtools_cmd = 'vtools.exe' if os.name == 'win32' else 'vtools'
@@ -193,11 +203,53 @@ def BuildExecutables(version, git_dir):
         vtools_report_cmd = 'vtools_report.exe' if os.name == 'win32' else 'vtools_report'
         dist_file.write(os.path.join('dist', vtools_report_cmd), vtools_report_cmd)
 
-def TagRelease(version):
+def createMacPackage(version):
+    # create a dmg file for the package
+    dest = os.path.join('dist', 'variant_tools-{}'.format(version))
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
+    os.makedirs(dest)
+    # create a directory variant_tools and put everything inside it
+    pkg = os.path.join(dest, 'variant_tools-{}.pkg'.format(version))
+    # running packagemaker
+    try:
+        print('Building MacOSX package variant_tools-{}.pkg ...'.format(version))
+        with open(os.devnull, 'w') as fnull:
+            ret = subprocess.call(
+                '/Applications/PackageMaker.app/Contents/MacOS/PackageMaker '
+                '--verbose '
+                '--doc development/MacOSX/variant_tools.pmdoc '
+                '--out {}'.format(pkg),
+                shell=True, stdout=fnull)
+            if ret != 0:
+                sys.exit('Failed to create MacOSX package variant_tools-{}.pkg'
+                    .format(version))
+    except Exception as e:
+        sys.exit('Failed to create MacOSX package variant_tools-{}.pkg: {}'
+            .format(version, e))
+    #
+    # copy things into dmg
+    shutil.copy('README', dest)
+    dmg = os.path.join('dist', 'variant_tools-{}.dmg'.format(version))
+    if os.path.isfile(dmg):
+        os.remove(dmg)
+    try:
+        print('Building disk image variant_tools-{}.dmg ...'.format(version))
+        with open(os.devnull, 'w') as fnull:
+            ret = subprocess.call(
+                'hdiutil create {} -volname variant_tools-{} -fs HFS+ -srcfolder {}'
+                .format(dmg, version, dest), shell=True, stdout=fnull)
+            if ret != 0:
+                sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg'.format(version))
+    except Exception as e:
+        sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg: {}'.format(version, e))
+    
+def tagRelease(version):
     try:
         ret = subprocess.check_output(['svn', 'diff'], shell=True)
         if ret:
-            sys.exit('Cannot tag release because there is uncommitted changes. Please commit the changes and try again.')
+            sys.exit('Cannot tag release because there is uncommitted changes. '
+                'Please commit the changes and try again.')
         with open(os.devnull, 'w') as fnull:
             print('Tagging release {}...'.format(version))
             ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
@@ -211,30 +263,43 @@ def TagRelease(version):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='''Create source distribution and executables for
-        a variant tools release. In addition to optional parameters version and tag, extra parameters
-        would be specified and will be passed directly to the 'python setup.py install' process. ''')
+    parser = argparse.ArgumentParser(description='''Create source distribution 
+        and executables for a variant tools release. In addition to optional
+        parameters version and tag, extra parameters would be specified and 
+        will be passed directly to the 'python setup.py install' process. ''')
     parser.add_argument('--version',
-        help='Modify source/__init__.py to the specified version string and make the release.')
+        help='''Modify source/__init__.py to the specified version string and
+            make the release.''')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release.')
     parser.add_argument('--pyinstaller_dir', default = '.',
         help='path to the directory where pyinstaller git clone is located.')
     parser.add_argument('--skip_rebuild', action='store_true',
         help=argparse.SUPPRESS)
+    #
+    # go to the root source directory
+    os.chdir('..')
     # allow recognied parameters to be set to the build process
     args, argv = parser.parse_known_args()
     #
-    version = ModifyVersion(args.version)
+    version = modifyVersion(args.version)
     if not args.skip_rebuild:
-        SetUpEnvironment(version)
-        GenerateSWIGWrappers()
-    BuildVariantTools(argv)
-    BuildSourcePackage()
-    git_dir = ObtainPyInstaller(args.pyinstaller_dir)
-    BuildExecutables(version, git_dir)
+        setupEnvironment(version)
+        generateSWIGWrappers()
+    buildVariantTools(argv)
+    buildSourcePackage()
+    git_dir = obtainPyInstaller(args.pyinstaller_dir)
+    if platform.platform().startswith('Darwin'):
+        # build mac mpkg package
+        buildExecutables(git_dir, '--windowed')
+        createMacPackage(version)
+    else:
+        # linux, right now build a single executable
+        buildExecutables(git_dir, '--onefile')
+        createZipPackage(version)
     # if everything is OK, tag the release
     if args.tag:
-        TagRelease(version)
+        tagRelease(version)
     # if everything is done
-    print('source packages and executables are successfully generated and saved to directory dist')
+    print('source packages and executables are successfully generated and '
+        'saved to directory dist.')
