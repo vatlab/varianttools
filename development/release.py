@@ -198,6 +198,24 @@ def buildExecutables(git_dir, option):
         except Exception as e:
             sys.exit('Failed to create executable for command {}: {}'.format(exe, e))
 
+def mergeDirsTo(dir1, dir2, dir3):
+    # merge vtools and vtools_report directory to a single directory
+    # to avoid distributing duplicate library files.
+    if os.path.isdir(dir3):
+        shutil.rmtree(dir3)
+    shutil.copytree(dir1, dir3)
+    #
+    # merge dir2 to dir3
+    for root, dirs, files in os.walk(dir2):
+        # root is dist/vtools_report.app/OTHERS
+        # the destination should be dist/variant_tools/variant_tools.app/OTHERS
+        new_root = root.replace(dir2, dir3)
+        for f in files:
+            if not os.path.isfile(os.path.join(new_root, f)):
+                print('Copying {} to {}'.format(
+                    os.path.join(root, f), os.path.join(new_root, f)))
+                shutil.copy(os.path.join(root, f), os.path.join(new_root, f))
+
 def createZipPackage(version):
     # after the creation of commands, create a zip file with OS and version information
     zipfilename = os.path.join('dist', 'variant_tools-{}.{}.{}.zip'
@@ -215,20 +233,11 @@ def createMacPackage(version):
     src = os.path.join('dist', 'variant_tools')
     if os.path.isdir(src):
         shutil.rmtree(src)
-    os.makedirs(src)
+    mergeDirsTo(os.path.join('dist', 'vtools.app'),
+        os.path.join('dist', 'vtools.app'), 
+        os.path.join(src, 'variant_tools.app'))
     # move files into src
     shutil.copy('README', src)
-    shutil.copytree(os.path.join('dist', 'vtools.app'), os.path.join(src, 'variant_tools.app'))
-    # merge vtools_report.app to variant_tools.app
-    for root, dirs, files in os.walk(os.path.join('dist', 'vtools_report.app')):
-        # root is dist/vtools_report.app/OTHERS
-        # the destination should be dist/variant_tools/variant_tools.app/OTHERS
-        new_root = root.replace('dist/vtools_report.app', os.path.join(src, 'variant_tools.app'))
-        for f in files:
-            if not os.path.isfile(os.path.join(new_root, f)):
-                print('Copying {} to {}'.format(
-                    os.path.join(root, f), os.path.join(new_root, f)))
-                shutil.copy(os.path.join(root, f), os.path.join(new_root, f))
     #
     # package destination, within a dmg directory
     dest = os.path.join('dist', 'variant_tools-{}'.format(version))
@@ -341,6 +350,8 @@ if __name__ == '__main__':
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
         buildExecutables(git_dir, '--windowed')
+        # also include one file binaries with the dmg
+        buildExecutables(git_dir, '--onefile')
         createMacPackage(version)
     else:
         # linux build self installation bundle
