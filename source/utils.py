@@ -412,7 +412,7 @@ env = RuntimeEnvironments()
 # create a default logger without logging to file, this makes sure a logger
 # will be usable even when a project is failed to create
 env.logger = None
-OS_ENV = {x:os.pathsep.join(['.', env.cache_dir, os.environ[x]]) for x in ['PATH', 'LD_LIBRARY_PATH', 'PYTHONPATH', 'R_LIBS'] if x in os.environ}
+OS_ENV = {x:os.pathsep.join(['.', env.cache_dir, os.environ[x]]) for x in ['PATH', 'LD_LIBRARY_PATH', 'PYTHONPATH', 'PYTHONHOME', 'R_LIBS'] if x in os.environ}
 
 SQL_KEYWORDS = set([
     'ADD', 'ALL', 'ALTER', 'ANALYZE', 'AND', 'AS', 'ASC', 'ASENSITIVE', 'BEFORE',
