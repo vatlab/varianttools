@@ -412,6 +412,7 @@ env = RuntimeEnvironments()
 # create a default logger without logging to file, this makes sure a logger
 # will be usable even when a project is failed to create
 env.logger = None
+OS_ENV = {x:os.pathsep.join(['.', env.cache_dir, os.environ[x]]) for x in ['PATH', 'LD_LIBRARY_PATH', 'PYTHONPATH', 'R_LIBS'] if x in os.environ}
 
 SQL_KEYWORDS = set([
     'ADD', 'ALL', 'ALTER', 'ANALYZE', 'AND', 'AS', 'ASC', 'ASENSITIVE', 'BEFORE',
@@ -548,8 +549,7 @@ def lineCount(filename, encoding='UTF-8'):
 def hasCommand(cmd):
     try:
         fnull = open(os.devnull, 'w')
-        result = subprocess.Popen(cmd, shell=True, stdout=fnull, stderr=fnull,
-                                  env={'PATH':os.pathsep.join(['.', env.cache_dir, os.environ['PATH']])})
+        result = subprocess.Popen(cmd, shell=True, stdout=fnull, stderr=fnull, env=OS_ENV)
         result.terminate()
         fnull.close()
     except OSError:
@@ -566,7 +566,7 @@ def runCommand(cmd, instream = None, msg = '', upon_succ=None):
         cmd = shlex.split(cmd)
     try:
         tc = subprocess.Popen(cmd, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
-                              env={'PATH':os.pathsep.join(['.', env.cache_dir, os.environ['PATH']])})
+                              env=OS_ENV)
         if instream:
             if sys.version_info.major == 3:
                 instream = instream.encode(sys.getdefaultencoding())

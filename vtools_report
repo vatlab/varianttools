@@ -28,8 +28,7 @@ import sys, os
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome
-
+from variant_tools.utils import RefGenome, OS_ENV
 #
 # These functions are utility functions used by all reports
 #
@@ -76,7 +75,7 @@ def getoutput(cmd):
     logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
-    return subprocess.check_output(cmd, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])}).strip().decode()
+    return subprocess.check_output(cmd, env=OS_ENV).strip().decode()
 
 def outputToFile(cmd, filename):
     # execute a command and send its output to a file
@@ -87,7 +86,7 @@ def outputToFile(cmd, filename):
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     with open(filename, 'w') as output:
-        subprocess.call(cmd, stdout=output, env={'PATH': os.pathsep.join(['.', os.environ['PATH']])})
+        subprocess.call(cmd, stdout=output, env=OS_ENV)
 
 def RdeviceFromFilename(filename):
     # guess the device used to plot R plot from filename

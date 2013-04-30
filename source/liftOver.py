@@ -31,7 +31,7 @@ import stat
 import subprocess
     
 from .project import Project
-from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction, env
+from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction, env, OS_ENV
 
 #
 class LiftOverTool:
@@ -45,7 +45,7 @@ class LiftOverTool:
         '''Obtain the liftOver tool, download from UCSC website if needed.'''
         try:
             subprocess.Popen(['liftOver'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH':os.pathsep.join(['.', os.environ['PATH']])})
+                env=OS_ENV)
         except:
             # otherwise download the tool
             env.logger.debug('Failed to execute liftOver -h')
@@ -122,7 +122,7 @@ class LiftOverTool:
         env.logger.info('Running UCSC liftOver tool')
         proc = subprocess.Popen(['liftOver', input, chain, output, unmapped],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={'PATH':os.pathsep.join([env.cache_dir, os.environ['PATH']])})
+                env=OS_ENV)
         proc.wait()
         err = proc.stderr.read().decode().strip()
         if err:
