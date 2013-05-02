@@ -145,7 +145,6 @@ class TestExport(ProcessTestCase):
 
     def testExportVcfSnv_mul(self):
         'Test command export with multiple sub-options'
-
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
         runCmd('vtools use dbSNP')
@@ -170,6 +169,23 @@ class TestExport(ProcessTestCase):
         #output in alternative reference genome
         runCmd('vtools liftover hg18')
         self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func --samples 1 --format_string GT:DP')
+
+    def testHeader(self):
+        'Test option header of vtools export'
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
+        self.assertOutput('vtools export variant --format vcf --header something', 'something', 1)
+        self.assertOutput('vtools export variant --format vcf --header a1 a2', 'a1\ta2', 1)
+        self.assertOutput('vtools export variant --format vcf --samples 1 --header a1 a2 "%(sample_names)s"', 
+            'a1\ta2\tNA06985\tNA06986\tNA06994\tNA07000\tNA07037\tNA07051\tNA07346\tNA07347\t'
+            'NA07357\tNA10847\tNA10851\tNA11829\tNA11830\tNA11831\tNA11832\tNA11840\tNA11881\t'
+            'NA11894\tNA11918\tNA11919\tNA11920\tNA11931\tNA11992\tNA11993\tNA11994\tNA11995\t'
+            'NA12003\tNA12004\tNA12005\tNA12006\tNA12043\tNA12044\tNA12045\tNA12144\tNA12154\t'
+            'NA12155\tNA12156\tNA12234\tNA12249\tNA12287\tNA12414\tNA12489\tNA12716\tNA12717\t'
+            'NA12749\tNA12750\tNA12751\tNA12760\tNA12761\tNA12762\tNA12763\tNA12776\tNA12812\t'
+            'NA12813\tNA12814\tNA12815\tNA12828\tNA12872\tNA12873\tNA12874', 1)
+        self.assertOutput('vtools export variant --format vcf --samples \'sample_name like "NA11%"\' --header "chr pos %(sample_names)s"', 
+            'chr pos NA11829\tNA11830\tNA11831\tNA11832\tNA11840\tNA11881\tNA11894'
+            '\tNA11918\tNA11919\tNA11920\tNA11931\tNA11992\tNA11993\tNA11994\tNA11995', 1)
 
     def testExportVcfSnv_ind(self):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')

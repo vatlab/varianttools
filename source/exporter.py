@@ -922,7 +922,17 @@ class Exporter:
         output = open(self.filename, 'w') if self.filename else sys.stdout
         # write header
         if self.header:
-            print >> output, self.header.rstrip()
+            # we can support more variables later
+            header_keywords = ['sample_names']
+            # interpolate %(VAR)s with values
+            for m in re.finditer('%\((\w+)\)s', self.header):
+                if m.group(1) not in header_keywords:
+                    env.logger.warning('variable {} is not supported in --header.'.format(m.group(1)))
+            #
+            # sample_names
+            header = self.header.replace('%(sample_names)s',
+                        self.format.delimiter.join(self.samples))
+            print >> output, header.rstrip()
         global rec_ref, rec_alt
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False
@@ -1079,10 +1089,13 @@ def exportArguments(parser):
             can only be one of the primary (default) of alternative (if exists) reference
             genome of the project.'''),
     parser.add_argument('--header', nargs='*', 
-        help='''A complete header or a list of names that will be joined by a delimiter
-            specified by the file format to form a header. If a special name - is specified,
-            the header will be read from the standard input, which is the preferred way
-            to specify large multi-line headers (e.g. cat myheader | vtools export --header -).''')
+        help='''A complete header or a list of names that will be joined by a
+            delimiter specified by the file format to form a header. If a special
+            name - is specified, the header will be read from the standard input,
+            which is the preferred way to specify large multi-line headers (e.g.
+            cat myheader | vtools export --header -). Strings in the form of
+            %(VAR)s will be interpolated to values of variable VAR, which can be
+            "sample_names" for list of sample names.''')
     parser.add_argument('-j', '--jobs', type=int, default=1,
         help='''Number of processes to export data. Multiple threads will be automatically
             used if there are a large number of samples.''')
