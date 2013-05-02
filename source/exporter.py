@@ -1094,7 +1094,7 @@ def exportArguments(parser):
             name - is specified, the header will be read from the standard input,
             which is the preferred way to specify large multi-line headers (e.g.
             cat myheader | vtools export --header -). Strings in the form of
-            %(VAR)s will be interpolated to values of variable VAR, which can be
+            %%(VAR)s will be interpolated to values of variable VAR, which can be
             "sample_names" for list of sample names.''')
     parser.add_argument('-j', '--jobs', type=int, default=1,
         help='''Number of processes to export data. Multiple threads will be automatically

@@ -366,7 +366,7 @@ class AssociationTestManager:
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields]
         # name the fields
-        field_names = [x.replace('.', '_') for x in group_by]
+        field_names = ['.'.join([x.rsplit('.', 1)[-1], y.rsplit('.', 1)[-1]]).replace('.', '_').lower() for x, y in zip(table_of_fields, group_by)]
         # type of the fields
         field_types = [self.db.typeOfColumn(y, x.rsplit('.', 1)[-1]) for x,y in zip(group_by, table_of_fields)]
         cur = self.db.cursor()
