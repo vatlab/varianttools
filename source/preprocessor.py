@@ -29,6 +29,30 @@ import itertools as it
 from .utils import ProgressBar, RefGenome, env
 from .plinkfile import PlinkFile
 
+
+class BatchWriter:
+    '''write text to file in batches (#lines)'''
+    def __init__(self, fn, batch = 1000):
+        self.batch = batch
+        if os.path.exists(fn):
+            os.remove(fn)
+        self.fs = open(fn, 'a')
+        self.counter = 0
+        self.swap = ''
+
+    def write(self, line):
+        if line is None:
+            self.fs.write(self.swap)
+            self.fs.close()
+        else:
+            self.swap += line
+            self.counter += 1
+            if self.counter == self.batch:
+                # time to write
+                self.fs.write(self.swap)
+                self.counter = 0
+                self.swap = ''
+
 class PlinkBinaryToVariants:
     """
     Class to write a PLINK BED format genotype dataset (.bed, .fam and .bim files)
@@ -87,6 +111,13 @@ class PlinkBinaryToVariants:
         self.status = 0
         # chromosome naming convention map
         self.cmap = chrom_namemap
+        # variant writer
+        self.variant_writer = None
+        self.data_writer = None
+
+    def initWriter(self, ofile):
+        self.variant_writer = BatchWriter(self.dataset + ".{0}adjusted".format(self.build), batch = 1000)
+        self.data_writer = BatchWriter(ofile, batch = 5)
 
     def getValidatedLocusGenotype(self, chrom, pos, allele1, allele2, geno_cur):
         '''Use cgatools to obtain validated genotype for given locus.
@@ -108,6 +139,8 @@ class PlinkBinaryToVariants:
             env.logger.warning('Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
                                 'Input variant is ignored'.format(chrom, pos, self.build))
             self.status = -1
+            if self.variant_writer:
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, 0, 0))
             return None
         self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
         if self.status < 0:
@@ -118,10 +151,14 @@ class PlinkBinaryToVariants:
                 env.logger.warning('Variant "{0}:{1} {2} {3}" failed '
                                    'to match reference genome {4}/(A,T,C,G)'.\
                                     format(chrom, pos, allele1, allele2, ref))
+            if self.variant_writer:
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, 0, 0))
             return None
         elif self.status == 0:
             if strand:
                 env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+            if self.variant_writer:
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, allele1, allele2))
             return ','.join([chrom, str(pos), allele1, allele2]) + ',' + str(geno_cur)
         else:
             # have to flip the genotypes coding
@@ -129,6 +166,8 @@ class PlinkBinaryToVariants:
                 env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
             # env.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
+            if self.variant_writer:
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, allele2, allele1))
             return ','.join([chrom, str(pos), allele2, allele1]) + ',' + \
                 ','.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
             
@@ -166,7 +205,6 @@ class PlinkBinaryToVariants:
             return True, self.getValidatedLocusGenotype(str(locus.chromosome), int(locus.bp_position),
                                                         locus.allele2.upper(), locus.allele1.upper(),
                                                         genotypes)
-
 
     def determineMajorAllele(self, n=1000):
         '''The logic here is that for the first n loci we
@@ -293,35 +331,35 @@ class PlinkConverter(Preprocessor):
                 else:
                     raise ValueError("Cannot find input files '{}'".format(item + '*'))
             
-    def decode_plink(self, p2vObject, ofile, n = 1000):
-        '''decode plink data from p2vObject and output to ofile'''
+    def decode_plink(self, p2v, ofile, n = 1000):
+        '''decode plink data from p2v object and output to ofile'''
         env.logger.info("Determining major/minor allele from data")
         # check major allele
-        which_major = p2vObject.determineMajorAllele(n)
+        which_major = p2v.determineMajorAllele(n)
         # raise on bad match
         if which_major == -9:
             raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}. '
                               'Perhaps you specified the wrong build, or have too many unsupported allele '
                               'types (not A/T/C/G, e.g, indels I/D) in BED file which you have to remove before '
-                              'import'.format(p2vObject.dataset, p2vObject.build))
+                              'import'.format(p2v.dataset, p2v.build))
         env.logger.debug("allele{} is major allele".format(which_major))
         # output
-        nloci = p2vObject.getLociCounts()
+        nloci = p2v.getLociCounts()
         batch = int(nloci / 100)
-        prog = ProgressBar('Decoding {0}'.format(p2vObject.dataset), nloci)
-        if os.path.exists(ofile):
-            os.remove(ofile)
-        with open(ofile, 'a') as f:
-            f.write(p2vObject.getHeader() + '\n')
-            count = 0
-            while True:
-                flag, line = p2vObject.getLine(which_major = which_major)
-                count += 1
-                if not flag:
-                    prog.done()
-                    break
-                else:
-                    if line is not None:
-                        f.write(line + '\n')
-                    if count % batch == 0 and count > batch:
-                        prog.update(count)
+        prog = ProgressBar('Decoding {0}'.format(p2v.dataset), nloci)
+        p2v.initWriter(ofile)
+        p2v.data_writer.write(p2v.getHeader() + '\n')
+        count = 0
+        while True:
+            flag, line = p2v.getLine(which_major = which_major)
+            count += 1
+            if not flag:
+                prog.done()
+                p2v.data_writer.write(None)
+                p2v.variant_writer.write(None)
+                break
+            else:
+                if line is not None:
+                    p2v.data_writer.write(line + '\n')
+                if count % batch == 0 and count > batch:
+                    prog.update(count)
