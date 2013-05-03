@@ -158,47 +158,65 @@ class Sample:
             return
         # num sample, num new field, num update field
         count = [0, 0, 0]
+        delimiter = '\t'
         with open(filename) as input:
-            headers = input.readline().rstrip().split('\t')
+            line = input.readline().rstrip()
+            raw_headers = line.split(delimiter)
+            # if there is no tab
+            if len(raw_headers) == 1:
+                env.logger.warning('Header line is not tab delimitered, using space instead.')
+                raw_headers = line.split()
+                delimiter = None
+            #
+            # header name cannot have space etc
+            headers = []
+            skipped_idx = []
+            for idx,h in enumerate(raw_headers):
+                if allowed_fields and idx > 0 and h not in allowed_fields:
+                    env.logger.warning('Field {} is ignored because it is not in allowed list.'.format(h))
+                    skipped_idx.append(idx)
+                    continue
+                if not h:  # empty 
+                    raise ValueError('Empty header in input phenotype file')
+                if not h.replace('_', '').isalnum():
+                    new_h = ''.join([x if x.isalnum() else '_' for x in h])
+                    if new_h[0].isdigit():
+                        new_h = '_' + new_h
+                    env.logger.warning('Phenotype "{}" is renamed to "{}".'.format(h, new_h))
+                    headers.append(new_h)
+                elif h[0].isdigit():
+                    env.logger.warning('Phenotype "{0}" is renamed to "_{0}".'.format(h))
+                    headers.append('_' + h)                    
+                else:
+                    headers.append(h)
             if len(headers) == 0:
                 raise ValueError('Empty header line. No phenotype will be imported.')
-            if headers[0] == 'sample_name':
-                by_sample = True
-                if len(headers) == 1:
-                    raise ValueError('No phenotype to be imported')
-            elif len(headers) >= 2 and headers[0] == 'filename' and headers[1] == 'sample_name':
-                by_sample = False
-                if len(headers) == 2:
-                    raise ValueError('No phenotype to be imported')
-            else:
-                raise ValueError('The phenotype file must be tab delimited, and starts with a header line '
-                    'with the first column sample_name, or first two columns being filename and sample_name.')
+            if headers[0] != 'sample_name':
+                env.logger.warning('The first column is not named sample_name.')
+            if len(headers) == 1:
+                raise ValueError('No phenotype to be imported')
             #
             records = {}
             nCol = len(headers)
             for idx, line in enumerate(input.readlines()):
                 if line.startswith('#') or line.strip() == '':
                     continue
-                fields = [x.strip() for x in line.split('\t')]
-                if len(fields) != nCol or ('' in fields):
-                    raise ValueError('Invalid phenotype file: number of fields mismatch at line {}. Please use \'None\' for missing values.'.format(idx+2))
+                fields = [x.strip() for i,x in enumerate(line.split(delimiter)) if i not in skipped_idx]
+                if len(fields) != nCol:
+                    raise ValueError('Invalid phenotype file: number of fields '
+                        'mismatch at line {}. Please use \'None\' for missing '
+                        'values.'.format(idx+2))
                 #
-                if by_sample:
-                    key = (None if fields[0] == 'None' else fields[0],)
-                    if key in records:
-                        raise ValueError('Duplicate sample name ({}).'.format(key))
-                    records[key] = fields[1:]
-                else:
-                    key = (fields[0], None if fields[1] == 'None' else fields[1])
-                    if key in records:
-                        raise ValueError('Duplicate filename and sample name ({},{}).'.format(key[0], key[1]))
-                    records[key] = fields[2:]
+                key = (None if fields[0] in ['None', ''] else fields[0],)
+                if key in records:
+                    raise ValueError('Duplicate sample name ({}).'.format(key))
+                records[key] = fields[1:]
             #
-            new_fields = headers[(1 if by_sample else 2):]
-            if allowed_fields:
-                for f in allowed_fields:
-                    if f.lower() not in [x.lower() for x in new_fields]:
-                        raise ValueError('Field {} is not in specified input file {}'.format(f, filename))
+            excluded_fields = ['sample_id', 'sample_name', 'filename']
+            for f in excluded_fields:
+                if f in [x.lower() for x in headers[1:]]:
+                    env.logger.warning('Field {} is ignored because it is reserved for variant tools.'.format(f))
+            new_fields = [x for x in headers[1:] if x.lower() not in excluded_fields]
         #
         # get allowed samples
         cur = self.db.cursor()
@@ -209,48 +227,33 @@ class Sample:
         # get existing fields
         cur_fields = self.db.getHeaders('sample')[3:]
         # handle each field one by one
+        invalid_sample_names = set()
         for idx, field in enumerate(new_fields):
-            if field.lower() == 'sample_name':
-                raise ValueError('Command vtools phenotype cannot be used to update sample names. Please use command "vtools admin" for this purpose.')
-            if by_sample and field.lower() == 'filename':
-                env.logger.debug('Ignoring field {}'.format(field))
-                continue
-            if allowed_fields and field.lower() not in [x.lower() for x in allowed_fields]:
-                env.logger.debug('Ignoring field {}'.format(field))
-                continue
             # if adding a new field
             if field.lower() not in [x.lower() for x in cur_fields]:
                 self.proj.checkFieldName(field, exclude='sample')
                 fldtype = typeOfValues([x[idx] for x in records.values()])
                 env.logger.info('Adding field {}'.format(field))
+                env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 count[1] += 1  # new
             else:
                 count[2] += 1  # updated
             for key, rec in records.iteritems():
                 # get matching sample
-                if by_sample:
-                    cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
-                    ids = [x[0] for x in cur.fetchall()]
-                    if len(ids) == 0:
-                        env.logger.warning('Sample name {} does not match any sample'.format(key[0]))
-                        continue
-                    for id in [x for x in ids if x in allowed_samples]:
-                        count[0] += 1
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
-                else:
-                    cur.execute('SELECT sample.sample_id FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id WHERE filename.filename = {0} AND sample.sample_name = {0}'.format(self.db.PH), key)
-                    ids = [x[0] for x in cur.fetchall()]
-                    if len(ids) == 0:
-                        env.logger.warning('Filename {} and sample name {} does not match any sample'.format(key[0], key[1]))
-                        continue
-                    if len(ids) != 1:
-                        raise ValueError('Filename and sample should uniquely determine a sample')
-                    for id in [x for x in ids if x in allowed_samples]:
-                        count[0] += 1
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
+                cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
+                ids = [x[0] for x in cur.fetchall()]
+                if len(ids) == 0:
+                    invalid_sample_names.add(key[0])
+                    continue
+                for id in [x for x in ids if x in allowed_samples]:
+                    count[0] += 1
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
         env.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
             count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
+        if invalid_sample_names:
+            env.logger.warning('Samples {} in input file does not match any sample.'
+                .format(', '.join(sorted(invalid_sample_names))))
         self.db.commit()
 
     def setPhenotype(self, field, expression, samples):
@@ -407,13 +410,16 @@ def generalOutputArguments(parser):
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
-        help='''Import phenotype from a tab delimited file. The file should have
-            a header, with either 'sample_name' as the first column, or 'filename'
-            and 'sample_name' as the first two columns. In the former case, samples
-            with the same 'sample_name' will share the imported phenotypes. If 
-            a list of phenotypes (columns of the file) is specified after filename,
-            only the specified phenotypes will be imported. Parameter --samples
-            could be used to limit the samples for which phenotypes are imported.'''),
+        help='''Import phenotype from a tab or space delimited file. The first
+            column of this file is assumed to be sample name, and the rest being
+            phenotype fields to be added or updated. The file should have a header
+            that specify names of the phenotype fields. Non-alphanumeric characters
+            in field names will be replaced by '_'. If multiple samples share
+            the same sample_name, they will shared the imported phenotypes.
+            Optionally, a list of phenotypes (columns of the file) can be specified
+            after filename, only the specified phenotypes will be imported.
+            Parameter --samples could be used to limit the samples for which
+            phenotypes are imported.'''),
     parser.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
             using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio

@@ -48,13 +48,14 @@ class TestPhenotype(ProcessTestCase):
         #the output format was changed, so we reorganize the output and compare
         ori_file = open('phenotype/phenotype.txt', 'r')
         new_file = open('new_file','w')
+        new_file.write(ori_file.readline().replace('sample_name', 'sample_name\tfilename'))
         for line in ori_file:
-            c1,c2,c3,c4,c5 = line.split('\t')
-            line = '\t'.join([c2,c1,c3,c4,c5])
+            c1,c2,c3,c4 = line.split('\t')
+            line = '\t'.join([c1,'vcf/CEU.vcf.gz', c2,c3,c4])
             new_file.write(line)
         ori_file.close()
         new_file.close()
-        self.assertOutput('vtools show samples -l -1','', 0, 'new_file')
+        self.assertOutput('vtools show samples -l -1','', 10, 'new_file')
         os.remove('new_file')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
@@ -68,15 +69,17 @@ class TestPhenotype(ProcessTestCase):
         #the output format was changed, so we reorganize the output and compare
         ori_file2 = open('phenotype/phenotype.txt', 'r')
         new_file2 = open('new_file2','w')
+        new_file2.write('sample_name\tfilename\taff\n')
+        ori_file2.readline()
         for line in ori_file2:
-            c1,c2,c3,c4,c5 = line.split('\t')
-            line = '\t'.join([c2,c1,c3,c4,c5])
-            new_file2.write(line)
+            c1,c2,c3,c4 = line.split('\t')
+            line = '\t'.join([c1,'vcf/CEU.vcf.gz',c2])
+            new_file2.write(line + '\n')
         ori_file2.close()
         new_file2.close()
         with open('new_file2') as inputfile:
-            out4 = ['\t'.join((x.split('\t')[:3])) for x in inputfile] 
-        self.assertEqual(out3, out4)
+            out4 = ['\t'.join((x.strip().split('\t')[:3])) for x in inputfile] 
+        self.assertEqual(out3[:20], out4[:20])
         os.remove('new_file2')
         
     def testSetPhenotype(self):
