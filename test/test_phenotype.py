@@ -82,6 +82,46 @@ class TestPhenotype(ProcessTestCase):
         self.assertEqual(out3[:20], out4[:20])
         os.remove('new_file2')
         
+    def testImportPhenotypeWithFilename(self):
+        'Test command phenotype --from_file'
+        # too few arguments
+        # opening project project_name. Importing phenotypes into table sample.
+        self.assertSucc('vtools phenotype --from_file phenotype/pheno_filename.txt')
+        out1 = output2list('vtools show samples -l -1')
+        #the output format was changed, so we reorganize the output and compare
+        ori_file = open('phenotype/pheno_filename.txt', 'r')
+        new_file = open('new_file','w')
+        for line in ori_file:
+            c1,c2,c3,c4,c5 = line.split('\t')
+            line = '\t'.join([c2,c1,c3,c4,c5])
+            new_file.write(line)
+        ori_file.close()
+        new_file.close()
+        self.assertOutput('vtools show samples -l -1','', 0, 'new_file')
+        os.remove('new_file')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
+        self.assertFail('vtools phenotype --from_file phenotype/badphenotype3.txt')
+        
+    def testImportFieldsWithFilename(self):
+        'Test command phenotype --from_file FIELD'
+        # importing only a few fields, not all fields
+        runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
+        out3 = output2list('vtools show samples -l -1')
+        #the output format was changed, so we reorganize the output and compare
+        ori_file2 = open('phenotype/pheno_filename.txt', 'r')
+        new_file2 = open('new_file2','w')
+        for line in ori_file2:
+            c1,c2,c3,c4,c5 = line.split('\t')
+            line = '\t'.join([c2,c1,c3,c4,c5])
+            new_file2.write(line)
+        ori_file2.close()
+        new_file2.close()
+        with open('new_file2') as inputfile:
+            out4 = ['\t'.join((x.split('\t')[:3])) for x in inputfile] 
+        self.assertEqual(out3, out4)
+        os.remove('new_file2')
+        
     def testSetPhenotype(self):
         'Test command phenotype --set'
         self.assertFail('vtools phenotype --set')
