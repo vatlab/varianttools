@@ -47,7 +47,7 @@ from .importer import *
 #
 class Updater:
     '''Import variants from one or more tab or comma separated files.'''
-    def __init__(self, proj, table, files, build, format, jobs, fmt_args=[]):
+    def __init__(self, proj, table, files, build, format, jobs, sample_name, fmt_args=[]):
         # if update is None, recreate index
         self.proj = proj
         self.db = proj.db
@@ -67,6 +67,7 @@ class Updater:
         if len(self.files) == 0:
             raise ValueError('No file to import')
         #
+        self.sample_name = sample_name
         if build is None:
             if self.proj.build is not None:
                 self.build = self.proj.build
@@ -131,7 +132,7 @@ class Updater:
         else:  # position or range type
             self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges)
         # probe number of sample
-        if self.genotype_field and self.genotype_info:
+        if self.genotype_field or self.genotype_info:
             self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None)
         # there are variant_info
         if self.variant_info:
@@ -180,47 +181,90 @@ class Updater:
             self.count[8] += cur.rowcount
         return None
 
-    def getSampleIDs(self, filename):
-        if not self.genotype_field:
-            # no genotype_field, good, do not have to worry about genotype
-            return []
-        # has the file been imported before?
-        cur = self.db.cursor()
-        cur.execute('SELECT filename from filename;')
-        existing_files = [x[0] for x in cur.fetchall()]
-        if filename not in existing_files:
-            return []
-        #
-        # what are the samples related to this file?
-        cur.execute('SELECT sample_id, sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE filename.filename = {}'\
-            .format(self.db.PH), (filename,))
-        sample_ids = []
-        sample_names = []
-        for rec in cur:
-            sample_ids.append(rec[0])
-            sample_names.append(rec[1])
-        # what is the sample names get from this file?
-        nSample, names = probeSampleName(filename, self.prober, self.encoding)
-        if nSample != len(sample_ids):
-            env.logger.warning('Number of samples mismatch. Cannot update genotype')
-            return []
-        if nSample == 1:
-            # if only one sample, update it regardless of sample name.
-            return sample_ids
-        if sample_names == names:
-            # if sample name matches, get sample_ids
-            return sample_ids
+    def getSampleIDs(self, input_filename):
+        '''Return a list of sample ids, and a status field indicating
+        0:  no sample. sample id has to be empty
+        1:  no genotype but with sample (a list of variant ids, no genotype), there can be only one sample id.
+        2:  genotype with samples.
+        '''
+        if not self.sample_name:
+            try:
+                numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
+                self.sample_name = names
+                if not names:
+                    if numSample == 1:
+                        env.logger.debug('Missing sample name (name None is used)')
+                        self.sample_name = ['None']
+                    elif numSample == 0:
+                        return ([], 0)
+                    else:
+                        env.logger.warning('Failed to names for {} samples from input file'
+                            .format(numSample))
+            except ValueError as e:
+                # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
+                env.logger.warning('Failed to get sample names from input file: {}'
+                    .format(e))
+                return ([], 0)
         else:
-            env.logger.warning('Sample names mismatch. Cannot update genotype.')
-            return []
-        
+            # if sample names are provided, we try to check
+            #
+            # 1. if sample name is provided from input file, they should match
+            # 2. if there is an sample that can be uniqly identified by 
+            #     sample_name and filename.
+            try:
+                numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
+            except ValueError as e:
+                env.logger.debug(e)
+                numSample = 0
+                #
+            if numSample == 0:
+                env.logger.warning('No genotype column could be found from the input file. Assuming no genotype.')
+                # remove genotype field from processor
+                self.processor.reset(import_var_info=True, import_sample_range=[0,0])
+                if len(self.sample_name) > 1:
+                    raise ValueError("When there is no sample genotype, only one sample name is allowed.")
+            elif len(self.sample_name) != numSample:
+                raise ValueError('{} sample detected but only {} sample names are specified'
+                    .format(numSample, len(self.sample_name)))                        
+            elif self.sample_name.sorted() != names.sorted():
+                raise ValueError('Specified ({}) and detected sample names ({}) mismatch.'
+                    .format(', '.join(self.sample_name), ', '.join(names))) 
+        #
+        # now get sample ids:
+        cur = self.db.cursor()
+        sample_ids = []
+        for name in self.sample_name:
+            # get filename and sample_id
+            cur.execute('SELECT sample_id, filename FROM sample '
+                'LEFT OUTER JOIN filename ON sample.file_id = filename.file_id '
+                'WHERE sample.sample_name = {}'\
+                .format(self.db.PH), (name,))
+            res = cur.fetchall()
+            if len(res) == 0:
+                raise ValueError('Name {} does not match any existing sample'
+                    .format(name))
+            elif len(res) == 1:
+                sample_ids.append(res[0][0])
+            else:
+                # if we can find one matching using filename
+                res = [x for x in res if x[1] == input_filename]
+                if len(res) == 1:
+                    sample_ids.append(res[0][0])
+                else:
+                    raise ValueError('Cannot identify an unique sample using '
+                        'sample name ({}) and filename ({})'
+                        .format(name, input_filename))
+        return sample_ids
+
+
     def updateFromFile(self, input_filename):
         self.processor.reset()
-        if self.genotype_field and self.genotype_info:
+        if self.genotype_field or self.genotype_info:
             self.prober.reset()
         #
         # do we handle genotype info as well?
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
+        print sample_ids
         # one process is for the main program, the
         # other thread will handle input
         reader = TextReader(self.processor, input_filename,
@@ -814,6 +858,14 @@ def updateArguments(parser):
             dedicated reader processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
+    files.add_argument('--sample_name', nargs='*', default=[],
+        help='''Name of the samples to be updated by the input files. If unspecified,
+            headers of the genotype columns of the last comment line (line starts
+            with #) of the input files will be used (and thus allow different sample
+            names for input files). Sample names will be used to identify samples to
+            be updated. Filename will be used to uniquely identify a sample if mutliple
+            samples with the same name exist in the project. No genotype info will
+            be updated if samples cannot be unquely determined.''')
     field = parser.add_argument_group('Set value from existing fields')
     field.add_argument('--set', metavar='EXPR', nargs='*', default=[],
         help='''Add a new field or updating an existing field using a constant
@@ -855,11 +907,13 @@ def update(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             if not args.from_file and not args.from_stat and not args.set:
-                env.logger.warning('Please specify one of --from_file, --set and --from_stat for command vtools upate')
+                env.logger.warning('Please specify one of --from_file, --set '
+                    'and --from_stat for command vtools upate')
             if args.from_file:
                 proj.db.attach(proj.name + '_genotype')
                 updater = Updater(proj=proj, table=args.table, files=args.from_file,
-                    build=args.build, format=args.format, jobs=args.jobs, fmt_args=args.unknown_args)
+                    build=args.build, format=args.format, jobs=args.jobs, 
+                    sample_name=args.sample_name, fmt_args=args.unknown_args)
                 updater.update()
             if args.set:
                 for item in args.set:
