@@ -241,8 +241,9 @@ class Updater:
                 .format(self.db.PH), (name,))
             res = cur.fetchall()
             if len(res) == 0:
-                raise ValueError('Name {} does not match any existing sample'
+                env.logger.warning('Name {} does not match any existing sample'
                     .format(name))
+                sample_ids.append(-1)
             elif len(res) == 1:
                 sample_ids.append(res[0][0])
             else:
@@ -254,6 +255,8 @@ class Updater:
                     raise ValueError('Cannot identify an unique sample using '
                         'sample name ({}) and filename ({})'
                         .format(name, input_filename))
+        if all([x == -1 for x in sample_ids]):
+            sample_ids = []
         return sample_ids
 
 
@@ -264,7 +267,6 @@ class Updater:
         #
         # do we handle genotype info as well?
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
-        print sample_ids
         # one process is for the main program, the
         # other thread will handle input
         reader = TextReader(self.processor, input_filename,
@@ -278,6 +280,8 @@ class Updater:
             s = delayedAction(env.logger.info, 'Preparing genotype tables (adding needed fields and indexes)...')
             cur = self.db.cursor()
             for id in sample_ids:
+                if id == -1:
+                    continue
                 headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 if 'GT' not in headers:  # for genotype
                     env.logger.debug('Adding column GT to table genotype_{}'.format(id))
@@ -288,6 +292,8 @@ class Updater:
                         cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
             # if we are updating by variant_id, we will need to create an index for it
             for id in sample_ids:
+                if id == -1:
+                    continue
                 if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
                     cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
             del s
@@ -295,7 +301,7 @@ class Updater:
                 .format(self.proj.name, id,
                 ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
                 self.db.PH)
-                for id in sample_ids}
+                for id in sample_ids if id != -1}
         else:
             # do not import genotype even if the input file has them
             self.genotype_field = []
@@ -321,7 +327,7 @@ class Updater:
                         env.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
                             col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
                 for idx, id in enumerate(sample_ids):
-                    if rec[self.ranges[2] + idx] is not None:
+                    if id != -1 and rec[self.ranges[2] + idx] is not None:
                         cur.execute(genotype_update_query[id], [rec[c] for c in fld_cols[idx]] + [variant_id])
                         self.count[1] += 1
             if self.count[0] - last_count > update_after:
