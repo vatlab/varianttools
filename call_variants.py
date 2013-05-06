@@ -182,7 +182,7 @@ def elapsed_time(start):
     '''Return the elapsed time in human readable format since start time'''
     second_elapsed = int(time.time() - start)
     days_elapsed = second_elapsed // 86400
-    return ('{} days ' if days_elapsed else '') + \
+    return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
 def run_command(cmd, name=None, upon_succ=None, wait=True):
@@ -467,6 +467,11 @@ def existAndNewerThan(ofiles, ifiles):
     else:
         # newer by at least 10 seconds.
         return True
+
+def TEMP(filename):
+    '''Temporary output of filename'''
+    # turn path/filename.ext to path/filename_tmp.ext
+    return '_tmp.'.join(filename.rsplit('.', 1))
 
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
@@ -836,12 +841,12 @@ class BaseVariantCaller:
             if existAndNewerThan(ofiles=bam_file, ifiles=sam_file):
                 env.logger.warning('Using existing bam file {}'.format(bam_file))
             else:
-                run_command('samtools view {} -bt {}/{}.fai {} > {}_tmp'
+                run_command('samtools view {} -bt {}/{}.fai {} > {}'
                     .format(
                         env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir,
-                        self.REF_fasta, sam_file, bam_file),
+                        self.REF_fasta, sam_file, TEMP(bam_file)),
                     name=os.path.basename(bam_file),
-                    upon_succ=(os.rename, bam_file + '_tmp', bam_file),
+                    upon_succ=(os.rename, TEMP(bam_file), bam_file),
                     wait=False)
             bam_files.append(bam_file)
         # wait for all sam->bam jobs to be completed
@@ -855,12 +860,12 @@ class BaseVariantCaller:
                 env.logger.warning('Using existing sorted bam file {}'
                     .format(sorted_bam_file))
             else:
-                run_command('samtools sort {} {} {}_tmp'
+                run_command('samtools sort {} {} {}'
                     .format(
                         env.options['OPT_SAMTOOLS_SORT'], bam_file,
-                        sorted_bam_file[:-4]),
+                        TEMP(sorted_bam_file)),
                     name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file),
+                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
                     wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
@@ -881,9 +886,9 @@ class BaseVariantCaller:
                     .format(
                         env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
                         env.options['OPT_PICARD_SORTSAM'], sam_file,
-                        sorted_bam_file[:-4] + '_tmp.bam'),
+                        TEMP(sorted_bam_file)),
                     name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, sorted_bam_file[:-4] + '_tmp.bam', sorted_bam_file),
+                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
                     wait=False)
             sorted_bam_files.append(sorted_bam_file)
         wait_all()
@@ -910,10 +915,10 @@ class BaseVariantCaller:
                     '''.format(
                         env.options['OPT_JAVA'], env.options['PICARD_PATH'],
                         env.options['OPT_PICARD_MARKDUPLICATES'], bam_file,
-                        dedup_bam_file[:-4] + '_tmp.bam',
+                        TEMP(dedup_bam_file),
                         metrics_file), 
                     name=os.path.basename(dedup_bam_file),
-                    upon_succ=(os.rename, dedup_bam_file[:-4] + '_tmp.bam', dedup_bam_file),
+                    upon_succ=(os.rename, TEMP(dedup_bam_file), dedup_bam_file),
                     wait=False)
             dedup_bam_files.append(dedup_bam_file)
         wait_all()
@@ -936,9 +941,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['PICARD_PATH'],
                     env.options['OPT_PICARD_MERGESAMFILES'],
                     ' '.join(['INPUT={}'.format(x) for x in bam_files]),
-                    merged_bam_file[:-4] + '_tmp.bam'),
+                    TEMP(merged_bam_file)),
                 name=os.path.basename(merged_bam_file),
-                upon_succ=(os.rename, merged_bam_file[:-4] + '_tmp.bam', merged_bam_file))
+                upon_succ=(os.rename, TEMP(merged_bam_file), merged_bam_file))
         return merged_bam_file
 
     def indexBAM(self, bam_file):
@@ -989,10 +994,10 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
                     bam_file, self.resource_dir,
-                    self.REF_fasta, target, cleaned_bam_file[:-4] + '_tmp.bam',
+                    self.REF_fasta, target, TEMP(cleaned_bam_file),
                     ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
                 name=os.path.basename(cleaned_bam_file),
-                upon_succ=(os.rename, cleaned_bam_file[:-4] + '_tmp.bam', cleaned_bam_file))
+                upon_succ=(os.rename, TEMP(cleaned_bam_file), cleaned_bam_file))
         # 
         return cleaned_bam_file
 
@@ -1030,9 +1035,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_PRINTREADS'], bam_file,
                     self.resource_dir, self.REF_fasta, target, 
-                    recal_bam_file[:-4] + '_tmp.bam'),
+                    TEMP(recal_bam_file)),
                 name=os.path.basename(recal_bam_file),
-                upon_succ=(os.rename, recal_bam_file[:-4] + '_tmp.bam', recal_bam_file))
+                upon_succ=(os.rename, TEMP(recal_bam_file), recal_bam_file))
         # 
         return recal_bam_file
 
@@ -1048,9 +1053,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_REDUCEREADS'], input_file,
                     self.resource_dir, self.REF_fasta,
-                    target[:-4] + '_tmp.bam'),
+                    TEMP(target)),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target[:-4] + '_tmp.bam', target))
+                upon_succ=(os.rename, TEMP(target), target))
         # 
         return target
 
@@ -1072,9 +1077,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_UNIFIEDGENOTYPER'], input_file,
                     self.resource_dir, self.REF_fasta,
-                    target[:-4] + '_tmp.vcf', dbSNP_vcf),
+                    TEMP(target), dbSNP_vcf),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+                upon_succ=(os.rename, TEMP(target), target))
         # 
         return target
 
@@ -1092,9 +1097,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
                     self.resource_dir, self.REF_fasta,
-                    target[:-4] + '_tmp.vcf'),
+                    TEMP(target)),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+                upon_succ=(os.rename, TEMP(target), target))
         # 
         return target
 
@@ -1120,9 +1125,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
                     self.resource_dir, self.REF_fasta,
-                    target[:-4] + '_tmp.vcf'),
+                    TEMP(target)),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+                upon_succ=(os.rename, TEMP(target), target))
         # 
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
@@ -1137,9 +1142,9 @@ class BaseVariantCaller:
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
                     self.resource_dir, self.REF_fasta,
-                    target[:-4] + '_tmp.vcf'),
+                    TEMP(target)),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target[:-4] + '_tmp.vcf', target))
+                upon_succ=(os.rename, TEMP(target), target))
         return target
 
 
@@ -1225,6 +1230,7 @@ class b37_gatk_23(BaseVariantCaller):
                 .format(env.options['OPT_JAVA'],
                     env.options['PICARD_PATH'], input_file,
                     output_files[0], output_files[1]),
+                name=os.path.basename(output_files[0]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
         return output_files
 
