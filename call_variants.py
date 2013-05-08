@@ -213,8 +213,7 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
             if retcode < 0:
                 env.logger.error('Command {} was terminated by signal {} after executing {}'
                     .format(cmd, -retcode, elapsed_time(s)))
-                sys.exit('Command {} was terminated by signal {}'
-                    .format(cmd, -retcode))
+                sys.exit(1)
             elif retcode > 0:
                 if name is not None:
                     with open(os.path.join(env.working_dir, name + '.err')) as err:
@@ -222,12 +221,12 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
                             env.logger.error(line)
                 env.logger.error("Command {} returned {} after executing {}"
                     .format(cmd, retcode, elapsed_time(s)))
-                sys.exit("Command {} returned {}".format(cmd, retcode))
+                sys.exit(1)
             env.logger.info('Command {} completed successfully in {}'
                 .format(cmd, elapsed_time(s)))
         except OSError as e:
             env.logger.error("Execution of command {} failed: {}".format(cmd, e))
-            sys.exit("Execution of command {} failed: {}".format(cmd, e))
+            sys.exit(1)
         # everything is OK
         if upon_succ:
             # call the function (upon_succ) using others as parameters.
@@ -267,15 +266,15 @@ def poll_jobs():
         if ret < 0:
             env.logger.error("Command {} was terminated by signal {} after executing {}"
                 .format(job.cmd, -ret, elapsed_time(job.start_time)))
-            sys.exit("Command {} was terminated by signal {}".format(job.cmd, -ret))
+            sys.exit(1)
         elif ret > 0:
             if job.name is not None:
                 with open(os.path.join(env.working_dir, job.name + '.err')) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            env.logger.error('Execution of command {} failed after {}.'
-                .format(job.cmd, elapsed_time(job.start_time)))
-            sys.exit('Job {} failed.'.format(job.cmd))
+            env.logger.error('Execution of command {} failed after {} (return code {}).'
+                .format(job.cmd, elapsed_time(job.start_time), ret))
+            sys.exit(1)
         else:
             if job.name is not None:
                 with open(os.path.join(env.working_dir, job.name + '.err')) as err:
@@ -747,9 +746,9 @@ class BaseVariantCaller:
         # try to get lan information from s_x_1/2 pattern
         try:
             PU = re.search('s_([^_]+)_', filename).group(1)
-        except AttributeError as e:
-            env.logger.error('Cannot find lane information from filename {}: {}'
-                .format(filename, e))
+        except AttributeError:
+            env.logger.warning('Failed to guess lane information from filename {}'
+                .format(filename))
             PU = 'NA'
         # try to get some better ID
         try:
@@ -793,16 +792,17 @@ class BaseVariantCaller:
             f1 = fastq_files[2*idx]
             f2 = fastq_files[2*idx + 1]
             rg = self.getReadGroup(f1, env.working_dir)
+            sai1 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f1))
+            sai2 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f2))
             sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
-            if existAndNewerThan(ofiles=sam_file, ifiles=[f1 + '.sai', f2 + '.sai']):
+            if existAndNewerThan(ofiles=sam_file, ifiles=[f1, f2, sai1, sai2]):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4}/{5}.sai {4}/{6}.sai {7} {8} > {9}_tmp'
+                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}_tmp'
                     .format(
                         env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, self.REF_fasta,
-                        env.working_dir, os.path.basename(f1),
-                        os.path.basename(f2), f1, f2, sam_file),
+                        sai1, sai2, f1, f2, sam_file),
                     name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file),
                     wait=False)
@@ -817,14 +817,15 @@ class BaseVariantCaller:
         for f in fastq_files:
             sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
             rg = self.getReadGroup(f, env.working_dir)
-            if existAndNewerThan(ofiles=sam_file, ifiles=f):
+            sai = '{}/{}.sai'.format(env.working_dir, os.path.basename(f))
+            if existAndNewerThan(ofiles=sam_file, ifiles=[f, sai]):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa samse {0} -r \'{1}\' {2}/{3} {4}/{5}.sai {6} > {7}_tmp'
+                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}_tmp'
                     .format(
-                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir, self.REF_fasta,
-                        env.working_dir, os.path.basename(f), f, sam_file),
+                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
+                        self.REF_fasta, sai, f, sam_file),
                     name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file),
                     wait=False)
@@ -832,6 +833,34 @@ class BaseVariantCaller:
         # wait for all jobs to be completed
         wait_all()
         return sam_files        
+
+    def countUnmappedReads(self, sam_files):
+        # count total reads and unmapped reads
+        targets = ['{}.counts'.format(x) for x in sam_files]
+        if not existAndNewerThan(ofiles=targets, ifiles=sam_files):
+            for sam_file in sam_files:
+                # I need to pass output of grep to cat to because
+                # grep will exit with status 1 if there is no match
+                run_command(
+                    'grep -c "XT:A:N" {0} | cat > {0}.counts_tmp'
+                    .format(sam_file), wait=False)
+            wait_all()
+            for sam_file in sam_files:
+                run_command(
+                    'wc -l {0} | cut -f1 >> {0}.counts_tmp'
+                    .format(sam_file), wait=False,
+                    upon_succ=(os.rename, sam_file + '.counts_tmp',
+                        sam_file + '.counts'))
+            wait_all()
+        #
+        counts = []
+        for count_file in targets:
+            with open(count_file) as cnt:
+                unmapped = int(cnt.readline())
+                total = int(cnt.readline().strip().split()[0])
+                counts.append((unmapped, total))
+        return counts
+
 
     def SortSamWithSamtools(self, sam_files):
         '''Convert sam file to sorted bam files.'''
@@ -1276,6 +1305,17 @@ class b37_gatk_23(BaseVariantCaller):
             sam_files = self.bwa_sampe(fastq_files)
         else:
             sam_files = self.bwa_samse(fastq_files)
+        #
+        counts = self.countUnmappedReads(sam_files)
+        for f,c in zip(sam_files, counts):
+            # more than 40% unmapped
+            if c[0]/c[1] > 0.4:
+                env.logger.error('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
+                    .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
+                sys.exit(1)
+            else:
+                env.logger.info('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
+                    .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
         # 
         # step 4: convert sam to sorted bam files
         sorted_bam_files = self.SortSam(sam_files)
