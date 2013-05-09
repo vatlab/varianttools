@@ -1039,6 +1039,7 @@ class BaseVariantCaller:
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -T BaseRecalibrator
+                -rf BadCigar
                 -R {4}/{5}
                 -cov ReadGroupCovariate
                 -cov QualityScoreCovariate
@@ -1073,7 +1074,7 @@ class BaseVariantCaller:
     def reduceReads(self, input_file):
         target = input_file[:-4] + '_reduced.bam'
         if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing reduced bam file {}'.format(targe))
+            env.logger.warning('Using existing reduced bam file {}'.format(target))
         else:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
@@ -1098,6 +1099,7 @@ class BaseVariantCaller:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
                 -T UnifiedGenotyper
+                -rf BadCigar
                 --dbsnp {4}/{7}
                 -stand_call_conf 50.0 
                 -stand_emit_conf 10.0 
@@ -1400,6 +1402,7 @@ if __name__ == '__main__':
         ('OPT_GATK_PRINTREADS', ''),
         ('OPT_GATK_REDUCEREADS', ''),
         ('OPT_GATK_HAPLOTYPECALLER', ''),
+        ('OPT_GATK_UNIFIEDGENOTYPER', ''),
         ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
@@ -1423,7 +1426,7 @@ if __name__ == '__main__':
                     The following options are acceptable: {}'''.format(', '.join(
                     [x[0] for x in options])))
         if 'jobs' in args:
-            parser.add_argument('-j', '--jobs', default=2, type=int,
+            parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
     #
     master_parser = argparse.ArgumentParser(description='''Pipelines to call variants
