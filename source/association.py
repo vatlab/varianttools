@@ -28,7 +28,6 @@ from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
 import random
 import math
-from collections import OrderedDict
 from copy import copy, deepcopy
 try:
     # python 2 has pickle and cPickle
@@ -75,10 +74,10 @@ def associateArguments(parser):
     tests.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
             method should be specified together as a quoted long argument (e.g.
-            --method "m --alternative 2" "m1 --permute 1000"), although
+            --methods "m --alternative 2" "m1 --permute 1000"), although
             the common method parameters can be specified separately, as long as
-            they do not conflict with command arguments. (e.g. --method m1 m2 -p 1000
-            is equivalent to --method "m1 -p 1000" "m2 -p 1000".). You can use
+            they do not conflict with command arguments. (e.g. --methods m1 m2 -p 1000
+            is equivalent to --methods "m1 -p 1000" "m2 -p 1000".). You can use
             command 'vtools show tests' for a list of association tests, and
             'vtools show test TST' for details about a test. Customized association
             tests can be specified as mod_name.test_name where mod_name should
@@ -214,7 +213,8 @@ class AssociationTestManager:
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
     def getMissingFilters(self, discard_samples, discard_variants):
-        missing_ind_ge = missing_var_ge = 1.0
+        missing_ind_ge = 1.0
+        missing_var_ge = 1.0
         # sample level missingness filter
         for expr in discard_samples:
             try:

@@ -29,7 +29,6 @@ import itertools as it
 from .utils import ProgressBar, RefGenome, env
 from .plinkfile import PlinkFile
 
-
 class BatchWriter:
     '''write text to file in batches (#lines)'''
     def __init__(self, fn, batch = 1000):
@@ -349,6 +348,7 @@ class PlinkConverter(Preprocessor):
         prog = ProgressBar('Decoding {0}'.format(p2v.dataset), nloci)
         p2v.initWriter(ofile)
         p2v.data_writer.write(p2v.getHeader() + '\n')
+        p2v.variant_writer.write("#chr\tpos\tref\talt\n")
         count = 0
         while True:
             flag, line = p2v.getLine(which_major = which_major)
