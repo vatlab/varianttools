@@ -835,29 +835,29 @@ class BaseVariantCaller:
         return sam_files        
 
     def countUnmappedReads(self, sam_files):
+        #
         # count total reads and unmapped reads
+        #
+        # The previous implementation uses grep and wc -l, but
+        # I cannot understand why these commands are so slow...
+        #
         targets = ['{}.counts'.format(x) for x in sam_files]
         if not existAndNewerThan(ofiles=targets, ifiles=sam_files):
-            for sam_file in sam_files:
-                # I need to pass output of grep to cat to because
-                # grep will exit with status 1 if there is no match
-                run_command(
-                    'grep -c "XT:A:N" {0} | cat > {0}.counts_tmp'
-                    .format(sam_file), wait=False)
-            wait_all()
-            for sam_file in sam_files:
-                run_command(
-                    'wc -l {0} | cut -f1 >> {0}.counts_tmp'
-                    .format(sam_file), wait=False,
-                    upon_succ=(os.rename, sam_file + '.counts_tmp',
-                        sam_file + '.counts'))
-            wait_all()
+            for sam_file, target_file in zip(sam_files, targets):
+                env.logger.info('Counting unmapped reads in {}'.format(sam_file))
+                unmapped_count = 0
+                with open(sam_file) as sam:
+                   for idx,line in enumerate(sam):
+                       if 'XT:A:N' in line:
+                           unmapped_count += 1
+                with open(target_file, 'w') as target:
+                    target.write('{}\n{}\n'.format(unmapped_count, idx+1))
         #
         counts = []
         for count_file in targets:
             with open(count_file) as cnt:
                 unmapped = int(cnt.readline())
-                total = int(cnt.readline().strip().split()[0])
+                total = int(cnt.readline())
                 counts.append((unmapped, total))
         return counts
 
@@ -1037,9 +1037,9 @@ class BaseVariantCaller:
         if existAndNewerThan(ofiles=target, ifiles=bam_file):
             env.logger.warning('Using existing base recalibrator target {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} 
                 -T BaseRecalibrator
-                -rf BadCigar
+                -I {3} 
                 -R {4}/{5}
                 -cov ReadGroupCovariate
                 -cov QualityScoreCovariate
@@ -1057,9 +1057,10 @@ class BaseVariantCaller:
         if existAndNewerThan(ofiles=recal_bam_file, ifiles=target):
             env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
                 -T PrintReads
+                -I {3} 
+                -R {4}/{5}
                 -BQSR {6}
                 -o {7}'''.format(
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
@@ -1076,9 +1077,10 @@ class BaseVariantCaller:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing reduced bam file {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
                 -T ReduceReads
+                -I {3} 
+                -R {4}/{5}
                 -o {6}'''.format(
                     env.options['OPT_JAVA'], env.options['GATK_PATH'],
                     env.options['OPT_GATK_REDUCEREADS'], input_file,
@@ -1099,7 +1101,6 @@ class BaseVariantCaller:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
                 -T UnifiedGenotyper
-                -rf BadCigar
                 --dbsnp {4}/{7}
                 -stand_call_conf 50.0 
                 -stand_emit_conf 10.0 
@@ -1358,6 +1359,7 @@ class b37_gatk_23(BaseVariantCaller):
         for input_file in input_files:
             #vcf_file = self.haplotypeCall(input_file)
             vcf_file = self.unifiedGenotyper(input_file)
+        #
 
 
 class hg19_gatk_23(b37_gatk_23):
@@ -1394,15 +1396,21 @@ if __name__ == '__main__':
         ('OPT_SAMTOOLS_SORT', ''),
         ('OPT_SAMTOOLS_INDEX', ''),
         ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
-        ('OPT_PICARD_SORTSAM', ''),
+        # validation_stringency=leniant is used to correct an error
+        # caused by some versions of BWA, see
+        #
+        #   http://seqanswers.com/forums/showthread.php?t=4246
+        #
+        # for details
+        ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
         ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
         ('OPT_GATK_INDELREALIGNER', ''),
         ('OPT_PICARD_MARKDUPLICATES', ''),
-        ('OPT_GATK_BASERECALIBRATOR', ''),
+        ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
         ('OPT_GATK_PRINTREADS', ''),
         ('OPT_GATK_REDUCEREADS', ''),
         ('OPT_GATK_HAPLOTYPECALLER', ''),
-        ('OPT_GATK_UNIFIEDGENOTYPER', ''),
+        ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
         ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
@@ -1424,7 +1432,7 @@ if __name__ == '__main__':
                     to value "-Xmx4g"), and options to individual subcommands such as
                     OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
                     The following options are acceptable: {}'''.format(', '.join(
-                    [x[0] for x in options])))
+                    [x[0] + (' (default: {})'.format(x[1]) if x[1] else '') for x in options])))
         if 'jobs' in args:
             parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
