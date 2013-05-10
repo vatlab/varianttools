@@ -3618,7 +3618,11 @@ def admin(args):
                 raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
                 changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
-                env.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
+                if changed > 0:
+                    env.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
+                else:
+                    env.logger.warning('No sample matching condition {} is found.'
+                        .format(args.rename_samples[0]))
             elif args.merge_samples:
                 # need to merge genotype tables
                 proj.db.attach(proj.name + '_genotype')
