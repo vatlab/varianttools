@@ -982,18 +982,18 @@ class ResourceManager:
         specified resource directory. It is used by program manage_resource
         to forcefully generate a manifest file.'''
         if resource_dir is None:
-            resource_dir = os.path.expanduser('~/.variant_tools')
+            resource_dir = os.path.expanduser(env.local_resource)
         else:
             resource_dir = os.path.expanduser(resource_dir)
         if not os.path.isdir(resource_dir):
-            env.logger.error('Resource directory {} does not exist'.format(resource_dir))
+            os.makedirs(resource_dir)
         #
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
             filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files \
                 if not filters or all([y in os.path.relpath(os.path.join(root,x), resource_dir) for y in filters])])
-        prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[1] for x in filenames]))
+        prog = ProgressBar('Scanning {} files under {}'.format(len(filenames), resource_dir), sum([x[1] for x in filenames]))
         total_size = 0
         for filename, filesize in filenames:
             info = self.addResource(filename, resource_dir)
@@ -1010,7 +1010,7 @@ class ResourceManager:
         
     def addResource(self, filename, resource_dir=None):
         if resource_dir is None:
-            resource_dir = os.path.expanduser('~/.variant_tools')
+            resource_dir = os.path.expanduser(env.local_resource)
         #
         # if resource_dir is specified, filename 
         #
@@ -1150,7 +1150,7 @@ class ResourceManager:
                 rel_name = os.path.relpath(os.path.join(root, f), resource_dir)
                 if rel_name in self.manifest:
                     filenames.append((os.path.join(root, f), rel_name, os.path.getsize(os.path.join(root, f))))
-        prog = ProgressBar('Scanning {} local files'.format(len(filenames)), sum([x[2] for x in filenames]))
+        prog = ProgressBar('Scanning {} files under {}'.format(len(filenames), resource_dir), sum([x[2] for x in filenames]))
         total_size = 0
         for filename, rel_name, filesize in filenames:
             # if file size are different, will be copied

@@ -1027,6 +1027,7 @@ class Project:
             self.db.connect(self.proj_file)
         # loading other options if they have been set
         env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
+        env.local_resource = self.loadProperty('__option_local_resource', None)
         #
         # existing project
         cur = self.db.cursor()
