@@ -40,6 +40,9 @@ class RuntimeEnvironment(object):
         # additional parameters for args
         self.options = defaultdict(str)
         #
+        # email notification
+        self._notification_email = None
+        #
         # running_jobs implements a simple multi-processing queue system. 
         # This variable holds a JOB tuple of the running jobs.
         #
@@ -151,7 +154,7 @@ class RuntimeEnvironment(object):
             self._logger.addHandler(ch)
     #
     logger = property(lambda self: self._logger, _setLogger)
-
+    #
     def _setWorkingDir(self, working_dir=None):
         if working_dir is None:
             raise RuntimeError('Invalid working directory.')
@@ -161,8 +164,19 @@ class RuntimeEnvironment(object):
         if self._logger is not None:
             self._logger.info('Setting working directory to {}'
                 .format(self._working_dir))
-        
+    #
     working_dir = property(lambda self: self._working_dir, _setWorkingDir)
+    #
+    def _setNotificationEmail(self, address):
+        if not address:
+            self._notification_email = None
+        elif '@' not in address:
+            raise ValueError('Please provide a valid email address.')
+        else:
+            self._notification_email = address
+    #
+    notification_email = property(lambda self: self._notification_email, 
+        _setNotificationEmail)
 
 # create a runtime environment object
 env = RuntimeEnvironment()
@@ -309,6 +323,21 @@ def checkCmd(cmd):
         env.logger.error('Command {} does not exist. Please install it and try again.'
             .format(cmd))
         sys.exit(1)
+
+def sendMail(header, message=''):
+    '''Send an email to report status.'''
+    if not env.notification_email:
+        return
+    sendmail_location = '/usr/sbin/sendmail' # sendmail location
+    p = os.popen('{} -t'.format(sendmail_location), 'w')
+    p.write('From: call_variants.py\n')
+    p.write('To: {}\n'.format(env.notification_email))
+    p.write('Subject: {}\n'.format(header))
+    p.write('\n') # blank line separating headers from body
+    p.write(message)
+    status = p.close()
+    if status != 0:
+       env.logger.warning('Send mail failed.')
 
 def checkPicard():
     '''Check if picard is available, set PICARD_PATH if the path is specified in CLASSPATH'''
@@ -1382,8 +1411,8 @@ class hg19_gatk_23(b37_gatk_23):
         
 
 if __name__ == '__main__':
-    #
     options = [
+        # option, default value
         ('PICARD_PATH', ''),
         ('GATK_PATH', ''),
         ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit'),
@@ -1411,7 +1440,7 @@ if __name__ == '__main__':
         ('OPT_GATK_REDUCEREADS', ''),
         ('OPT_GATK_HAPLOTYPECALLER', ''),
         ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
-        ]
+    ]
     def addCommonArguments(parser, args):
         if 'pipeline' in args:
             parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
@@ -1436,13 +1465,17 @@ if __name__ == '__main__':
         if 'jobs' in args:
             parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
+        # notification is currently not used
+        if 'notification' in args:
+            parser.add_argument('--notification',
+                help='''If an email address is provided, an email will be sent
+                    to after the completion of each major step.''')
     #
     master_parser = argparse.ArgumentParser(description='''Pipelines to call variants
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
         calling, and Picard for various other options..''')
-
     subparsers = master_parser.add_subparsers(title='Available operations', dest='action')
     #
     # action prepare_resource
@@ -1484,6 +1517,9 @@ if __name__ == '__main__':
     addCommonArguments(call, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     args = master_parser.parse_args()
+    if args.action is None:
+        master_parser.print_help()
+        sys.exit(0)
     #
     if hasattr(args, 'output'):
         if type(args.output) == list:
@@ -1498,6 +1534,8 @@ if __name__ == '__main__':
         # screen only logging
         env.logger = None
     #
+    if hasattr(args, 'notification'):
+        env.notification_email = args.notification
     # handling additional parameters
     # set default value
     for opt in options:
