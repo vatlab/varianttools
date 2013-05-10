@@ -36,29 +36,36 @@ else:
     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_P as pnorm
 
 class MetaAnalysis:
-    def __init__(self, files, beta, pval, size, linker):
-        self.data = [tuple(self.read(fn, beta, pval, size, linker)) for fn in files]
+    def __init__(self, files, beta, pval, se, size, linker, method):
+        self.bcol = beta
+        self.pcol = pval
+        self.scol = size
+        self.secol = se
+        self.linker = linker
+        self.method = method
+        #
+        self.data = [tuple(self.read(fn)) for fn in files]
         self.header = list(set([tuple([d[0][i] for i in linker]) for d in self.data]))
         if len(self.header) > 1:
             raise ValueError("Linker field mismatch in input data: {}".\
                                  format(' != '.join([','.join(x) for x in self.header])))
         self.link_by = list(self.header[0])
         self.header = list(self.header[0])
-        self.header.extend(['p_meta', 'sample_size_meta'])
+        self.header.extend(['beta_meta', 'p_meta', 'sample_size_meta'])
         for idx, d in enumerate(self.data):
-            self.header.extend([d[0][i] + '_{}'.format(idx+1) for i in [beta, pval, size]])
+            self.header.extend([d[0][i] + '_{}'.format(idx+1) for i in [self.bcol, self.pcol, self.scol]])
         # find overlapping groups
         self.groups = list(set.intersection(*list(map(set, [d[1].keys() for d in self.data]))))
         self.sample_size = {}
 
-    def read(self, filename, beta, pval, size, linker):
+    def read(self, filename):
         try:
             f = openFile(filename)
             head = f.readline().decode("utf-8").strip().split('\t')
             dat = {}
             for line in f.readlines():
                 line = line.decode("utf-8").strip().split('\t')
-                dat[tuple([str(line[i]) for i in linker])] = [float(line[beta]), float(line[pval]), int(line[size])]
+                dat[tuple([str(line[i]) for i in self.linker])] = [float(line[self.bcol]), float(line[self.pcol]), int(line[self.scol]), float(line[self.secol]) if self.secol else None]
             f.close()
         except Exception as e:
             raise ValueError ('ERROR while loading data: {}'.format(e))
@@ -66,17 +73,30 @@ class MetaAnalysis:
 
 
     def calculate(self, grp):
-        '''x=[beta_a, pval_a, size_a]; y=[beta_b, pval_b, size_b], etc'''
-        bpn = [d[1][grp] for d in self.data]
+        '''x=[beta_a, pval_a, size_a, se_a]; y=[beta_b, pval_b, size_b, se_b], etc'''
+        beta = float('nan')
+        z = 0
+        bpne = [d[1][grp] for d in self.data]
         self.sample_size[grp] = sum([d[1][grp][2] for d in self.data])
         # skip nan p-value
-        bpn = [x for x in bpn if x[1] == x[1]]
-        if len(bpn) <= 1:
+        bpne = [x for x in bpne if x[1] == x[1]]
+        if len(bpne) <= 1:
             # nothing to do; will not meta-analyze anything
-            return -9
-        z = [(abs(qnorm(x[1] / 2.0)) * (abs(x[0]) / x[0]) if x[0] else 1, x[2]) for x in bpn]
-        z = sum([x[0] * sqrt(x[1]) for x in z]) / sqrt(sum([x[1] for x in z]))
-        return min(pnorm(z), 1 - pnorm(z)) * 2.0
+            return beta, -9
+        if self.method == "ssb":
+            # sample size based method
+            z = [(abs(qnorm(x[1] / 2.0)) * (abs(x[0]) / x[0]) if x[0] else 1, x[2]) for x in bpne]
+            z = sum([x[0] * sqrt(x[1]) for x in z]) / sqrt(sum([x[1] for x in z]))
+        else:
+            # inverse variance based method
+            # calculate std err from beta and p if se is not available
+            # 
+            var = [x[3]**2 if x[3] is not None else (x[0]/qnorm(x[1]/2.0))**2 for x in bpne]
+            w = [1/x for x in var]
+            sumw = sum(w)
+            beta = sum([x[0]*y for x, y in zip(bpne, w)]) / sumw
+            z = beta / sqrt(1/sumw)
+        return beta, min(pnorm(z), 1 - pnorm(z)) * 2.0
 
     def createDB(self, db_name):
         linker = [x for x in self.header if x in self.link_by]

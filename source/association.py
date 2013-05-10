@@ -355,13 +355,8 @@ class AssociationTestManager:
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
         # do not write chr, pos to __asso_tmp by default
-        chr_pos = []
-        # have to include chr, pos for ExternTest based methods
-        if self.num_extern_tests:
-            chr_pos = ['chr', 'pos']
         if not group_by:
-            group_by = ['chr', 'pos']
-            chr_pos = []
+            group_by = ['variant.chr', 'variant.pos']
         # find the source of fields in group_by
         table_of_fields = [self.proj.linkFieldToTable(field, self.table)[-1].table for field in group_by]
         table_of_fields = [x if x else self.table for x in table_of_fields]
@@ -384,17 +379,22 @@ class AssociationTestManager:
         #  variant_id
         #  groups (e.g. chr, pos)
         #  variant_info
-        cur.execute('''\
+        add_chrpos = True if (self.num_extern_tests > 0 and sorted(group_by) != ['variant.chr', 'variant.pos']) else False 
+        create_query = '''
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL, _ignored INT, 
               {} {} {});
               '''.format(
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
               ''.join([', {} FLOAT'.format(x.replace('.', '_')) for x in self.var_info]),
-              ', chr VARCHAR(20) NULL, pos INTEGER NULL' if chr_pos else ''))
+              ', variant_chr VARCHAR(20) NULL, variant_pos INTEGER NULL' if add_chrpos else '')
+        cur.execute(create_query)
+        # ['variant.chr', 'variant.pos'] must be in the var_info table if there is any ExternTest
+        if add_chrpos:
+            self.var_info += ['variant.chr', 'variant.pos']
         #
         # select variant_id and groups for association testing
-        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by + self.var_info + chr_pos))
+        group_fields, fields = consolidateFieldName(self.proj, self.table, ','.join(group_by + self.var_info))
         from_clause = [self.table]
         where_clause = []
         fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
@@ -662,9 +662,6 @@ class AssoTestsWorker(Process):
         self.result_fields = result_fields
         self.shelf_lock = shelf_lock
         #
-        # ['chr', 'pos'] must be in the var_info table if there is any ExternTest
-        if param.num_extern_tests:
-            self.var_info += ['chr', 'pos']
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
         self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)

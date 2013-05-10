@@ -122,7 +122,7 @@ def executeRScript(script):
     logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
     logger.debug(script)
     # start R
-    process = subprocess.Popen(['R', '--slave', '--vanilla'], 
+    process = subprocess.Popen(['R', '--slave', '--no-save', '--no-restore'], 
         stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     # send script and get standard output and error
     out, err = process.communicate(script)
@@ -790,6 +790,11 @@ def metaAnalysisArguments(parser):
             type = int,
             default = 0,
             help='''column number of p-value''')
+    parser.add_argument('--se',
+            metavar = 'col',
+            type = int,
+            default = 0,
+            help='''column number of standard error''')
     parser.add_argument('-n', '--size',
             metavar = 'col',
             type = int,
@@ -801,6 +806,12 @@ def metaAnalysisArguments(parser):
             nargs = '+',
             default = [0],
             help='''columns that links entries of two datasets''')
+    parser.add_argument('-m',
+                        '--method',
+                        metavar = "method",
+                        default = "ssb",
+                        choices = ['ssb','ivb'],
+                        help='''Method (choose from "ssb" for sample based method and "ivb" for inverse variance based method), default set to "ssb"''')
     parser.add_argument('--to_db',
             metavar = 'database',
             type = str,
@@ -819,22 +830,23 @@ def metaAnalysis(args):
         if x < 0:
             raise ValueError('Invalid column specification for "--beta/--pval/-n/--link": '
                                  'should be positive integers')
-    ma = MetaAnalysis(fs, beta, pval, size, linker) 
+    se = None if args.se is 0 else args.se
+    ma = MetaAnalysis(fs, beta, pval, se, size, linker, args.method) 
     # calculate p_meta and print results
     print('\t'.join(ma.header))
     if args.to_db:
         ma.createDB(args.to_db)
     res = []
     for grp in ma.groups:
-        p = ma.calculate(grp)
+        b, p = ma.calculate(grp)
         s = ma.sample_size[grp] 
         if p > 0:
-            print(('\t'.join(list(grp) + ['{:.3E}'.format(p).replace('E+00', ''), str(s)] + ['\t'.join(list(map(str,d[1][grp]))) for d in ma.data])))
+            print(('\t'.join(list(grp) + [str(b), '{:.3E}'.format(p).replace('E+00', ''), str(s)] + ['\t'.join([str(x) for x in d[1][grp] if x is not None]) for d in ma.data])))
         if args.to_db:
             res.append(list(grp))
-            res[-1].extend([p, s])
+            res[-1].extend([b, p, s])
             for d in ma.data:
-                res[-1].extend(d[1][grp])
+                res[-1].extend([x for x in d[1][grp] if x is not None])
     if args.to_db:
         try:
             ma.writeDB(res)

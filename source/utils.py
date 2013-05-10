@@ -2079,9 +2079,10 @@ def executeUntilSucceed(cur, query, attempts, operation_msg, data = None):
             if attempt != 0:
                 env.logger.debug('Operation "' + operation_msg + '" succeeded after {} attempts'.format(attempt + 1))
             break
-        except:
+        except Exception as e:
             if attempt == attempts - 1:
-                env.logger.error('Operation "' + operation_msg + '" failed after {} attempts'.format(attempt + 1))
+                env.logger.error('Operation "' + operation_msg + '" failed after {} attempts: {}'.\
+                                 format(attempt + 1, e))
                 raise
             else:
                 time.sleep(1 + attempt + random.random() * 10)
