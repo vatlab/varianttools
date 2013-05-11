@@ -1286,10 +1286,10 @@ class b37_gatk_23(BaseVariantCaller):
             env.logger.warning('Using existing sequence files {}'
                 .format(' and '.join(output_files)))
         else:
-            run_command('''java {} -jar {}/SamToFastq.jar INPUT={}
+            run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''
-                .format(env.options['OPT_JAVA'],
-                    env.options['PICARD_PATH'], input_file,
+                .format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                    env.options['OPT_PICARD_SAMTOFASTQ'], input_file,
                     output_files[0], output_files[1]),
                 name=os.path.basename(output_files[0]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
@@ -1415,16 +1415,19 @@ if __name__ == '__main__':
         # option, default value
         ('PICARD_PATH', ''),
         ('GATK_PATH', ''),
+        #
         ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit'),
+        #
         ('OPT_BWA_INDEX', ''),
-        ('OPT_SAMTOOLS_FAIDX', ''),
         ('OPT_BWA_ALN', ''),
         ('OPT_BWA_SAMPE', ''),
         ('OPT_BWA_SAMSE', ''),
+        #
+        ('OPT_SAMTOOLS_FAIDX', ''),
         ('OPT_SAMTOOLS_VIEW', ''),
         ('OPT_SAMTOOLS_SORT', ''),
         ('OPT_SAMTOOLS_INDEX', ''),
-        ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
+        #
         # validation_stringency=leniant is used to correct an error
         # caused by some versions of BWA, see
         #
@@ -1432,9 +1435,12 @@ if __name__ == '__main__':
         #
         # for details
         ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
+        ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
+        ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT'),
+        ('OPT_PICARD_MARKDUPLICATES', ''),
+        #
         ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
         ('OPT_GATK_INDELREALIGNER', ''),
-        ('OPT_PICARD_MARKDUPLICATES', ''),
         ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
         ('OPT_GATK_PRINTREADS', ''),
         ('OPT_GATK_REDUCEREADS', ''),
