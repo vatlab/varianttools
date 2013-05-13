@@ -188,7 +188,7 @@ class PlinkBinaryToVariants:
             locus = next(viter)
             genotypes = giter.next()
         except StopIteration:
-            self.cur.close()
+            giter.close()
             return False, None
         except Exception as e:
             env.logger.error('Failed to retrieve locus {0}:{1} '
@@ -344,7 +344,7 @@ class PlinkConverter(Preprocessor):
         env.logger.debug("allele{} is major allele".format(which_major))
         # output
         nloci = p2v.getLociCounts()
-        batch = int(nloci / 100)
+        batch = int(nloci / 100) + 1
         prog = ProgressBar('Decoding {0}'.format(p2v.dataset), nloci)
         p2v.initWriter(ofile)
         p2v.data_writer.write(p2v.getHeader() + '\n')
