@@ -14,13 +14,14 @@
 # ENDCONF
 # Usage:
 # vtools associate variant sample_id \
-# -m 'RTest /path/to/this/script.R --name MetaSKAT --phenotype_files "c("file1.txt","file2.txt")" --phenotype_colname "QT_TRAIT" --out_type "C" ' \
+# -m 'RTest /path/to/this/script.R --name MetaSKAT --phenotype_files "c("file1.txt","file2.txt")" --phenotype_colname "QT_TRAIT" --out_type "C" --skip "c("covar1", "covar2")"' \
 # --group_by name2 -j8 --to_db MetaSKAT > result.txt 
 suppressMessages(library(MetaSKAT))
 MetaSKAT.PFF.VAT <- function (dat, out_type,
                           phenotype_colname,
                           phenotype_files,
                           sample_colname = "sample_name",
+                          skip = NULL,
                           r.corr = 0,
                           pval.method = "optimal",
                           combined.weight = TRUE,
@@ -68,7 +69,7 @@ MetaSKAT.PFF.VAT <- function (dat, out_type,
   }
   x.list <- NULL; for (i in 1:n.g) {
     x.list[[i]] <- as.matrix(
-      phenotype[[i]][valid_rows[[i]], -which(names(phenotype[[i]]) %in% c(phenotype_colname, sample_colname))]
+      phenotype[[i]][valid_rows[[i]], -which(names(phenotype[[i]]) %in% c(phenotype_colname, sample_colname, skip))]
       )
   }
   Z <- NULL; for (i in 1:n.g) {

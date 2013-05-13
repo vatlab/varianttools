@@ -831,14 +831,14 @@ class AssoTestsWorker(Process):
             self.pydata['genotype'] = [x for idx, x in enumerate(geno) if which[idx]]
         #
         try:
-            self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['chr'], var_info['pos'])]
+            self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['variant.chr'], var_info['variant.pos'])]
         except:
             self.pydata['coordinate'] = []
         # var_info
         self.pydata['var_info'] = []
         self.pydata['var_info_header'] = []
         for k, item in var_info.items():
-             if k != 'chr' and k != 'pos':
+             if k != 'variant.chr' and k != 'variant.pos':
                  self.pydata['var_info_header'].append(k)
                  self.pydata['var_info'].append(map(fstr, item))
         self.pydata['var_info'] = zip(*self.pydata['var_info'])

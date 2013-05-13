@@ -830,7 +830,7 @@ def metaAnalysis(args):
         if x < 0:
             raise ValueError('Invalid column specification for "--beta/--pval/-n/--link": '
                                  'should be positive integers')
-    se = None if args.se is 0 else args.se
+    se = None if args.se is 0 else args.se - 1
     ma = MetaAnalysis(fs, beta, pval, se, size, linker, args.method) 
     # calculate p_meta and print results
     print('\t'.join(ma.header))
