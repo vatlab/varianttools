@@ -190,9 +190,9 @@ class PlinkBinaryToVariants:
         except StopIteration:
             self.cur.close()
             return False, None
-        except:
+        except Exception as e:
             env.logger.error('Failed to retrieve locus {0}:{1} '
-                                '(plinkio error)'.format(locus.chromosome, locus.bp_position))
+                                '(plinkio error "{2}")'.format(locus.chromosome, locus.bp_position, e))
             return True, None
         if which_major == 1:
             # allele 1 is the major allele
