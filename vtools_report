@@ -288,8 +288,9 @@ def variantStat(args):
         num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
             ['vtools', 'select', args.table, "alt='-'",
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
+        num_samples = getoutput(['vtools', 'execute', 'SELECT COUNT(sample_id) FROM sample'])
         #
-        print('\t'.join([str(len(sample_ids)), num_snps, num_insertions, num_deletions,
+        print('\t'.join([num_samples, num_snps, num_insertions, num_deletions,
             num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
             min_deletion_size, avg_deletion_size, max_deletion_size]))
     else:
