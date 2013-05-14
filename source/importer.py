@@ -1194,8 +1194,6 @@ def probeSampleName(filename, prober, encoding):
                                         return len(rec), [header[len(header) - prober.nColumns + x] for x in cols]
                                     else:
                                         return len(rec), []
-                        # if there is no data line, we cannot use cols to determine sample name
-                        return 0, []
                     except IgnoredRecord:
                         continue
                     except Exception as e:
@@ -1215,6 +1213,8 @@ def probeSampleName(filename, prober, encoding):
                     'of Python or decompress this file manually.'.format(filename))
             else:
                 raise e
+        # if there is no data line, we cannot use cols to determine sample name
+        return 0, []
        
 
 #
