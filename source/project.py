@@ -1494,7 +1494,7 @@ class Project:
                 env.logger.info('Removing {1} and all its samples ({0})'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
                 cur.execute('DELETE FROM filename WHERE filename = {}'.format(self.db.PH), (f,))
             else:
-                env.logger.info('Removing {} from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+                env.logger.info('Removing {} imported from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
             self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
