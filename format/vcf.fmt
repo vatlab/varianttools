@@ -261,6 +261,37 @@ adj=ExtractValue('DP=', ';')
 type=INTEGER
 comment=DP fields in INFO. Total depth of samples in a vcf file.
 
+[TI]
+index=8
+adj=ExtractValue('TI=', ';')
+type=VARCHAR(255)
+comment=Transcript ID, recorded in Illumina produced VCF file
+
+[GI]
+index=8
+adj=ExtractValue('GI=', ';')
+type=VARCHAR(255)
+comment=Gene ID, recorded in Illumina produced VCF file
+
+[EXON]
+index=8
+adj=ExtractFlag('EXON', ';')
+type=INTEGER
+comment=Exon region, recorded in Illumina produced VCF file
+
+[FC]
+index=8
+adj=ExtractValue('FC=', ';')
+type=VARCHAR(255)
+comment=Functional Consequence, recorded in Illumina produced VCF file
+
+[BKPT]
+index=8
+adj=ExtractFlag('BKPT', ';')
+type=INTEGER
+comment=Breakpoint, recorded in Illumina produced Indels.vcf file
+
+
 [H2]
 index=8
 adj=ExtractValue('H2=', ';')
