@@ -3257,12 +3257,14 @@ def remove(args):
                 toBeRemoved = []
                 for item in args.items:
                     if item.lower() in ['filename', 'sample_name']:
-                        raise ValueError('Cannot remove filename or sample_name from the sample table')
+                        env.logger.warning('Cannot remove filename or sample_name from the sample table')
+                        continue
                     if item.lower() not in phenos:
-                        raise ValueError('No phenotype {} exists in the sample table.'.format(item))
+                        env.logger.warning('No phenotype {} exists in the sample table.'.format(item))
+                        continue
                     toBeRemoved.append(item)
                 if len(toBeRemoved) == 0:
-                    raise ValueError('No valid phenotype to be removed.')
+                    env.logger.warning('No valid phenotype to be removed.')
                 # remove
                 proj.db.removeFields('sample', toBeRemoved)
     except Exception as e:

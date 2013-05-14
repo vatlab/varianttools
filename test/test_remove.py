@@ -99,7 +99,7 @@ class TestRemove(ProcessTestCase):
         runCmd('vtools remove fields CEU_cases_num gene_name DP') 
         self.assertOutput('vtools show table variant -l 1', '''variant_id, bin, chr, pos, ref, alt\n1, 585, 1, 533, G, C''', numOfLines=2)
 
-    def testRemovePheno(self):
+    def testRemovePhenotype(self):
         #remove genotype 
         self.assertFail('vtools remove phenotype')
         self.assertFail('vtools remove phenotypes')
@@ -107,6 +107,8 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools remove phenotypes filename')
         self.assertFail('vtools remove phenotypes "sex = "F""')
         self.assertSucc('vtools remove phenotypes sex')
+        # removing non-existing phenotype should yield just a warning
+        self.assertSucc('vtools remove phenotypes non_existing')
         self.assertOutput('vtools show samples','sample_name	filename	aff	BMI',1) 
     
     def testRemoveGenofield(self):

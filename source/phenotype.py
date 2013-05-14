@@ -153,18 +153,17 @@ class Sample:
 
     def encodeFieldName(self, name):
         '''Convert name to a valid field name. E.g. a(b) to a_b_'''
-        if not name.replace('_', '').isalnum():
+        new_name = name
+        if not new_name.replace('_', '').isalnum():
             new_name = ''.join([x if x.isalnum() else '_' for x in name])
-            if new_name[0].isdigit():
-                new_name = '_' + new_name
+        if new_name[0].isdigit():
+            new_name = '_' + new_name
+        if new_name in ['filename', 'sample_name', 'sample_id', 'file_id']:
+            new_name = '_' + new_name
+        if new_name != name:
             env.logger.warning('Phenotype "{}" is renamed to "{}".'
                 .format(name, new_name))
-            return new_name
-        elif name[0].isdigit():
-            env.logger.warning('Phenotype "{0}" is renamed to "_{0}".'.format(name))
-            return '_' + name
-        else:
-            return name
+        return new_name
 
     def load(self, filename, allowed_fields, samples):
         '''Load phenotype information from a file'''
@@ -202,8 +201,7 @@ class Sample:
             #
             # determine phenotype fields 
             phenotype_idx = [idx for idx, fld in enumerate(headers)
-                if idx not in sample_idx and 
-                    fld not in ['filename', 'sample_name', 'sample_id', 'file_id'] and
+                if idx not in sample_idx and
                     (not allowed_fields or fld in allowed_fields)]
             #
             if not phenotype_idx:
