@@ -154,6 +154,10 @@ class TestImport(ProcessTestCase):
                                            '1', '2', '1', '1', '1', '1', '1', '2', '1', '1', '2', '1', '1', '1', \
                                            '1', '1', '1', '1'])
     
+    def testImportEmpty(self):
+        'Test import file without variant'
+        self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
+
     def testImportVCF(self):
         'Test command vtools import *.vcf'
         # no build information. Fail
