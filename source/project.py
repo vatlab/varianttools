@@ -1315,13 +1315,14 @@ class Project:
         s = delayedAction(env.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
         try:
             # drop index has different syntax for mysql/sqlite3.
-            self.db.dropIndex('variant_index', 'variant')
+            if self.db.hasIndex('variant_index'):
+                self.db.dropIndex('variant_index', 'variant')
         except Exception as e:
             # the index might not exist
             env.logger.debug(e)
         #
         try:
-            if self.alt_build:
+            if self.alt_build and self.db.hasIndex('variant_alt_index'):
                 self.db.dropIndex('variant_alt_index', 'variant')
         except Exception as e:
             # the index might not exist
