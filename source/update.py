@@ -636,10 +636,11 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     validGenotypeIndices = []
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in genotypeFieldTypes.keys()]:
-            env.logger.warning("Field {} is not an existing genotype field within your samples: {}".format(field, str(genotypeFieldTypes.keys())))
+            env.logger.warning("Field {} does not exist in any of the samples.".format(field))
         else:
             if len(fieldInTable[field.lower()]) < len(IDs):
-                env.logger.warning('Field {} exists in {} of {} selected samples'.format(field, len(fieldInTable[field.lower()]), len(IDs))) 
+                env.logger.warning('Field {} exists in {} of {} selected samples'
+                    .format(field, len(fieldInTable[field.lower()]), len(IDs))) 
             validGenotypeIndices.append(index)
             validGenotypeFields.append(field)
     # check GT field
@@ -648,7 +649,8 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             env.logger.warning('Genotype field does not exist in any of the selected samples')
         else:
             if len(fieldInTable['gt']) < len(IDs):
-                env.logger.warning('Genotype field GT exists in {} of {} selected samples'.format(len(fieldInTable[field.lower()]), len(IDs))) 
+                env.logger.warning('Genotype field GT exists in {} of {} selected samples'
+                    .format(len(fieldInTable[field.lower()]), len(IDs))) 
 
     if all([x is None for x in coreDestinations]) and len(validGenotypeFields) == 0:
         env.logger.warning("No valid sample statistics operation has been specified.")
