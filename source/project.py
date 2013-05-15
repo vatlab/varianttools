@@ -1750,8 +1750,11 @@ class Project:
         opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options]
         info += 'Runtime options:             {}\n'.format(
             ', '.join(['{}={}'.format(name, val) for name,val in opts if val is not None]))
-        info += 'Variant tables:              {}\n'.format('\n'.join([' '*29 + x for x in self.getVariantTables()]).lstrip())
-        info += 'Annotation databases:        {}\n'.format('\n'.join([' '*29 + os.path.join(x.dir, x.name) \
+        tables = [decodeTableName(x) for x in self.getVariantTables()]
+        info += 'Variant tables:              {}\n'.format(
+            '\n'.join(sorted([' '*29 + x for x in tables])).lstrip())
+        info += 'Annotation databases:        {}\n'.format(
+            '\n'.join([' '*29 + os.path.join(x.dir, x.name)
             + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
         return info
 
