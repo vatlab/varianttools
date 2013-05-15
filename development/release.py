@@ -76,6 +76,10 @@ def setupEnvironment(version):
         print('Removing directory build')
         shutil.rmtree('build')
     #
+    if os.path.isdir('dist'):
+        print('Removing directory dist')
+        shutil.rmtree('dist')
+    #
     if os.path.isdir('variant_tools-{}'.format(version)):
         print('Removing directory variant_tools-{}'.format(version))
         shutil.rmtree('variant_tools-{}'.format(version))
