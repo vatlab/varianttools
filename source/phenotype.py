@@ -70,10 +70,8 @@ class GenotypeStatCalculator(threading.Thread):
                 self.stat.append(('count(*)', 'GT=0'))
             elif item == '#(mutGT)':
                 self.stat.append(('count(*)', 'GT!=0'))
-            elif item == '#(missing)':
-                self.stat.append(('count(*)', 'GT is NULL'))
             elif item.startswith('#'):
-                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(missing), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
+                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
             else:
                 self.stat.append((item, None))
         self.queue = idQueue
@@ -458,8 +456,8 @@ def phenotypeArguments(parser):
             DP is one of the genotype fields) of the sample. Multiple fields (e.g.
             '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
             standard SQL aggregation functions, variant tools supports special functions
-            #(GT), #(missing), #(wtGT), #(mutGT), #(alt), #(hom), #(het) and #(other), which
-            counts the number of genotypes (the same as count(*)), missing genotypes, wildtype genotypes,
+            #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het) and #(other), which
+            counts the number of genotypes (the same as count(*)), wildtype genotypes,
             mutant genotypes alternative alleles, homozygotes, heterozygotes, and
             genotypes with two different alternative alleles. Parameters --genotypes
             and --samples could be used to limit the genotypes to be considered and

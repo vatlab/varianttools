@@ -863,9 +863,9 @@ class AssoTestsWorker(Process):
             unique_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
         self.pydata['sample_name'] = [str(x) for idx, x in enumerate(unique_names) if which[idx]]
         self.pydata['phenotype_name'] = self.phenotype_names
-        self.pydata['covariate_name'] = self.covariate_names
         self.pydata['phenotype'] = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
         if self.covariates:
+            self.pydata['covariate_name'] = self.covariate_names
             # skip the first covariate, a vector of '1''s
             self.pydata['covariates'] = [[x for idx, x in enumerate(y) if which[idx]] for y in self.covariates[1:]]
         #
