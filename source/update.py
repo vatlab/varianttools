@@ -816,7 +816,6 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if count % proj.db.batch == 0:
             proj.db.commit()
             prog.update(count)
-    prog.done()
     #
     # missing should be handled differently because variants only stores variants that
     # show up in at least one samples. If a variant does not exist in any of them, the 
@@ -826,16 +825,16 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         cur.execute('SELECT variant_id FROM {};'.format(variant_table))
         missing_variants = [x[0] for x in cur.fetchall() if x[0] not in variants]
         if missing_variants:
-            prog = ProgressBar('Updating missing variants in {}'.format(variant_table), len(missing_variants))
             update_query = 'UPDATE {0} SET {2}={3} WHERE variant_id={1};'.format('variant', proj.db.PH, missing, numSample)
-            for count,id in enumerate(missing_variants):
+            for id in missing_variants:
                 cur.execute(update_query, [id])
+                count += 1
                 if count % proj.db.batch == 0:
                     prog.update(count)
-            prog.done()
+    prog.done()
     # done
     proj.db.commit()
-    env.logger.info('{} records are updated'.format(count))
+    env.logger.info('{} records are updated'.format(count + 1))
 
 
 def updateArguments(parser):
