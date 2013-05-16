@@ -58,7 +58,7 @@ def modifyVersion(version):
                                    format(rev))
                 elif x.startswith("VTOOLS_REVISION='$Rev"):
                     content.append("VTOOLS_REVISION='$Rev: {} $'\n".\
-                                   format(rev.rstrip('M')))
+                                   format(rev.rstrip('M').split(':')[0]))
                 else:
                     content.append(x)
         with open('source/__init__.py', 'w') as init_file:
@@ -370,5 +370,5 @@ if __name__ == '__main__':
     if args.tag:
         tagRelease(version)
     # if everything is done
-    print('source packages and executables are successfully generated and '
+    print('Source packages and executables are successfully generated and '
         'saved to directory dist.')
