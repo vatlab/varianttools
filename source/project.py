@@ -2589,7 +2589,9 @@ class SampleProcessor(threading.Thread):
                 ('genotype_{}'.format(_old_id), ))
             sql = cur.fetchone()
             if sql is None:
-                raise ValueError('Cannot recreate genotype table {} from {}, please check the integrity of the database.'.format(_old_id, self.src_geno))
+                raise ValueError('Cannot recreate genotype table {} from {}, '
+                    'please check the integrity of the database.'
+                    .format(_old_id, self.src_geno))
             sql = sql[0]
             try:
                 cur.execute(sql)
@@ -2793,12 +2795,12 @@ class ProjectsMerger:
             # get primary and alternative reference genome
             cur = self.db.cursor()
             # primary reference genome
-            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
-                ('build',))
+            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'
+                .format(self.db.PH), ('build',))
             build = cur.fetchone()
             # alternative reference genome
-            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'.format(self.db.PH),
-                ('alt_build',))
+            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'  
+                .format(self.db.PH), ('alt_build',))
             alt_build = cur.fetchone()
             #
             if build is None or alt_build is None:
@@ -2813,19 +2815,24 @@ class ProjectsMerger:
                 self.proj.saveProperty('alt_build', self.proj.alt_build)
                 #
                 if self.proj.alt_build is not None:
-                    s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
+                    s = delayedAction(env.logger.info, 
+                        'Adding alternative reference genome {} to the project.'
+                        .format(self.proj.alt_build))
                     cur = self.db.cursor()
                     headers = self.db.getHeaders('variant')
                     for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
                         if fldName in headers:
                             continue
-                        self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
+                        self.db.execute('ALTER TABLE variant ADD {} {} NULL;'
+                            .format(fldName, fldType))
                     del s
             elif build[0] != self.proj.build:
-                raise ValueError('Primary reference genome of project ({} of {}) does not match that of the current project ({}).'\
+                raise ValueError('Primary reference genome of project ({} of {}) '
+                    'does not match that of the current project ({}).'
                     .format(build[0], proj_file, self.proj.build))
             elif alt_build[0] != self.proj.alt_build:
-                raise ValueError('Alternative reference genome of project ({} of {}) does not match that of the current project ({})'\
+                raise ValueError('Alternative reference genome of project '
+                    '({} of {}) does not match that of the current project ({})'
                     .format(alt_build[0], proj_file, self.proj.alt_build))
             #
             # copy table message and runtime options
@@ -2859,7 +2866,8 @@ class ProjectsMerger:
                         flds = self.db.fieldsOfTable('__fromDB.{}'.format(table))
                         for fld in flds:
                             if fld[0] not in [x[0] for x in structure[table]]:
-                                env.logger.warning('Field {} in table {} does not exist in all projects.'.format(fld[0], table))
+                                env.logger.warning('Field {} in table {} does not exist in all projects.'
+                                    .format(fld[0], table))
                                 structure[table].append(fld)
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
@@ -2897,24 +2905,24 @@ class ProjectsMerger:
             new_sample_id = []
             for old_file_id, filename in filename_records:
                 if filename in filenames:
-                    cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
-                        (old_file_id, ))
+                    cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id={};'
+                        .format(self.db.PH), (old_file_id, ))
                     cnt = cur.fetchone()[0]
                     duplicated_samples += int(cnt)
-                    cur.execute('SELECT file_id FROM filename WHERE filename = {0};'.format(self.db.PH),
-                        (filename,))
+                    cur.execute('SELECT file_id FROM filename WHERE filename = {0};'
+                        .format(self.db.PH), (filename,))
                     new_file_id = cur.fetchone()[0]
                     duplicate = True
                 else:
                     filenames.append(filename)
                     #
-                    cur.execute('INSERT INTO filename (filename) VALUES ({0});'.format(self.db.PH),
-                        (filename, ))
+                    cur.execute('INSERT INTO filename (filename) VALUES ({0});'
+                        .format(self.db.PH), (filename, ))
                     new_file_id = cur.lastrowid
                     duplicate = False
                 # get samples
-                cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id={};'.format(self.db.PH),
-                    (old_file_id, ))
+                cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id={};'
+                    .format(self.db.PH), (old_file_id, ))
                 old_sid = [x[0] for x in cur.fetchall()]
                 new_sid = []
                 headers = self.db.getHeaders('sample')
@@ -2954,7 +2962,9 @@ class ProjectsMerger:
         #  new_ids: sample id in the new project
         duplicated_samples = self.mapSamples(status)
         if duplicated_samples > 0:
-            env.logger.warning('{} samples from the same source files have been copied, leading to potentially duplicated samples.'.format(duplicated_samples))
+            env.logger.warning('{} samples from the same source files have been '
+                'copied, leading to potentially duplicated samples.'
+                .format(duplicated_samples))
         # stop the database so that it can be opened in thread
         self.proj.db.close()
         #
@@ -3137,7 +3147,8 @@ def merge(args):
         sys.exit(e)
 
 def removeArguments(parser):
-    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields', 'geno_fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
+    parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields',
+        'geno_fields', 'annotations', 'variants', 'genotypes', 'phenotypes'],
         help='''Type of items to be removed.''')
     parser.add_argument('items', nargs='*',
         help='''Items to be removed, which should be, for 'project' the name of project to be
@@ -3184,7 +3195,8 @@ def remove(args):
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.items]))
                 if len(IDs) == 0:
-                    env.logger.warning('No sample is selected by condition {}'.format(' AND '.join(['({})'.format(x) for x in args.items])))
+                    env.logger.warning('No sample is selected by condition {}'
+                        .format(' AND '.join(['({})'.format(x) for x in args.items])))
                 proj.removeSamples(IDs)
             elif args.type == 'fields':
                 if len(args.items) == 0:
@@ -3203,10 +3215,12 @@ def remove(args):
                         raise ValueError('Field {} does not exist in any of the variant tables.'.format(item))
                 # remove...
                 for table, items in from_table.items():
-                    env.logger.info('Removing field {} from variant table {}'.format(', '.join(items), table))
+                    env.logger.info('Removing field {} from variant table {}'
+                        .format(', '.join(items), table))
                     proj.db.removeFields(table, items)
                     if 'alt_bin' in items or 'alt_chr' in items or 'alt_pos' in items:
-                        env.logger.info('Removing alternative reference genome because of removal of related fields')
+                        env.logger.info('Removing alternative reference genome '
+                            'because of removal of related fields')
                         proj.alt_build = None
                         proj.saveProperty('alt_build', None)
                 # it is possible that new indexes are needed
@@ -3233,7 +3247,8 @@ def remove(args):
                     header = [x.lower() for x in proj.db.getHeaders(table)]
                     items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
                     if items:
-                        env.logger.info('Removing fields {} from genotype table {}'.format(', '.join(items), table.split('_')[-1]))
+                        env.logger.info('Removing fields {} from genotype table {}'
+                            .format(', '.join(items), table.split('_')[-1]))
                         proj.db.removeFields(table, items)
             elif args.type == 'annotations':
                 if len(args.items) == 0:
@@ -3262,7 +3277,8 @@ def remove(args):
                 proj.removeGenotypes(' AND '.join(['({})'.format(x) for x in args.items]))
             elif args.type == 'phenotypes':
                 if len(args.items) == 0:
-                    raise ValueError('Please specify one or more phenotypes (columns in the output of "vtools show samples") to be removed')
+                    raise ValueError('Please specify one or more phenotypes '
+                        '(columns in the output of "vtools show samples") to be removed')
                 phenos = [x.lower() for x in proj.db.getHeaders('sample')]
                 toBeRemoved = []
                 for item in args.items:
@@ -3321,12 +3337,14 @@ def show(args):
                 print(proj.summarize())
             elif args.type == 'tables':
                 if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show tables"'.format(', '.join(args.items)))
+                    raise ValueError('Invalid parameter "{}" for command "vtools show tables"'
+                        .format(', '.join(args.items)))
                 width = max([len(decodeTableName(x)) for x in proj.getVariantTables()])
                 print(('{:<' + str(width+2) + '} {:>10} {:>8}  {}').format('table', '#variants', 'date', 'message'))
                 for table in sorted(proj.getVariantTables(), key=lambda x: decodeTableName(x)):
                     desc, date, cmd = proj.descriptionOfTable(table) 
-                    print(('{:<' + str(width+2) + '} {: >10,} {:>8}  {}').format(decodeTableName(table), proj.db.numOfRows(table), date, 
+                    print(('{:<' + str(width+2) + '} {: >10,} {:>8}  {}')
+                        .format(decodeTableName(table), proj.db.numOfRows(table), date, 
                         '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
@@ -3337,7 +3355,8 @@ def show(args):
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
                 elif not proj.db.hasTable(encodeTableName(table)):
-                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'.format(proj.name, encodeTableName(table))):
+                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'
+                        .format(proj.name, encodeTableName(table))):
                         table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
                     else:
                         raise ValueError('Table {} does not exist'.format(table))
@@ -3367,7 +3386,8 @@ def show(args):
                 fields = proj.db.getHeaders('sample')
                 # headers are ID, file, sample, FIELDS
                 print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
-                cur.execute('SELECT sample_name, filename {} FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'\
+                cur.execute('SELECT sample_name, filename {} FROM sample, filename '
+                    'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields[3:]]), limit_clause))
                 for rec in cur:
                     if args.verbosity != '2' and len(rec[1]) > 25:
@@ -3389,7 +3409,8 @@ def show(args):
                         print('\n'.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
                     else:
                         print('\n'.join(['{}.{} {}'.format(db.name, x.name,
-                            '\n'.join(textwrap.wrap(x.comment, initial_indent=' '*(27-len(db.name)-len(x.name)),
+                            '\n'.join(textwrap.wrap(x.comment,
+                                initial_indent=' '*(27-len(db.name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
             elif args.type == 'annotation':
                 if len(args.items) == 0:
@@ -3403,13 +3424,15 @@ def show(args):
                     annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
                 if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show annotations"'.format(', '.join(args.items)))
+                    raise ValueError('Invalid parameter "{}" for command "vtools show annotations"'
+                        .format(', '.join(args.items)))
                 DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
                 for db in DBs:
                     print(db)
             elif args.type == 'formats':
                 if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show formats"'.format(', '.join(args.items)))
+                    raise ValueError('Invalid parameter "{}" for command "vtools show formats"'
+                        .format(', '.join(args.items)))
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
@@ -3651,31 +3674,39 @@ def admin(args):
                 if args.rename_table[1] == 'variant':
                     raise ValueError('Cannot rename a table to the master variant table')
                 if encodeTableName(args.rename_table[0]) not in proj.getVariantTables():
-                    raise ValueError('Table {} does no exist or is not a variant table.'.format(args.rename_table[0]))
+                    raise ValueError('Table {} does no exist or is not a variant table.'
+                        .format(args.rename_table[0]))
                 if encodeTableName(args.rename_table[1]) in proj.db.tables():
-                    raise ValueError('Table {} already exists in the project'.format(args.rename_table[1]))
+                    raise ValueError('Table {} already exists in the project'
+                        .format(args.rename_table[1]))
                 if args.rename_table[0] == args.rename_table[1]:
                     raise ValueError('Cannot rename a table to itself.')
-                proj.db.renameTable(encodeTableName(args.rename_table[0]), encodeTableName(args.rename_table[1]))
-                env.logger.info('Table {} is renamed to {}'.format(args.rename_table[0], args.rename_table[1]))
+                proj.db.renameTable(encodeTableName(args.rename_table[0]),
+                    encodeTableName(args.rename_table[1]))
+                env.logger.info('Table {} is renamed to {}'.format(args.rename_table[0],
+                    args.rename_table[1]))
                 # change the meta information of the table
                 cur = proj.db.cursor()
                 for key in ('desc', 'date', 'cmd'):
-                    cur.execute('UPDATE project SET name="__{}_of_{}" WHERE name="__{}_of_{}"'.format(
-                        key, encodeTableName(args.rename_table[1]), key, encodeTableName(args.rename_table[0])))
+                    cur.execute('UPDATE project SET name="__{}_of_{}" WHERE name="__{}_of_{}"'
+                        .format(key, encodeTableName(args.rename_table[1]),
+                            key, encodeTableName(args.rename_table[0])))
             elif args.describe_table:
                 if not proj.db.hasTable(encodeTableName(args.describe_table[0])):
                     raise ValueError('Table {} does not exist'.format(args.describe_table[0]))
                 proj.describeTable(encodeTableName(args.describe_table[0]), args.describe_table[1])
-                env.logger.info('Description of table {} is updated'.format(args.describe_table[0]))
+                env.logger.info('Description of table {} is updated'
+                    .format(args.describe_table[0]))
             elif args.validate_build:
                 try:
                     refgenome = RefGenome(proj.build)
                 except Exception as e:
-                    raise RuntimeError('Failed to obtain reference genome for build {}: {}'.format(proj.build, e))
+                    raise RuntimeError('Failed to obtain reference genome for build {}: {}'
+                        .format(proj.build, e))
                 #
                 cur = proj.db.cursor()
-                prog = ProgressBar('Validate reference alleles', proj.db.numOfRows('variant', exact=False))
+                prog = ProgressBar('Validate reference alleles',
+                    proj.db.numOfRows('variant', exact=False))
                 cur.execute('SELECT chr, pos, ref FROM variant WHERE ref != "-";')
                 count = 0
                 err_count = 0
@@ -3683,22 +3714,27 @@ def admin(args):
                     count += 1
                     if not refgenome.verify(chr, pos, ref):
                         err_count += 1
-                        env.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'.format(chr, pos, ref))
+                        env.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'
+                            .format(chr, pos, ref))
                     prog.update(count + 1, err_count)
                 prog.done()
-                env.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'.format(count, err_count))
+                env.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'
+                    .format(count, err_count))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
                         raise ValueError('Runtime option should be specified as opt=value')
                     opt, value = option.split('=', 1)
                     if opt not in env.persistent_options:
-                        raise ValueError('Only options {} are currently supported.'.format(', '.join(env.persistent_options)))
+                        raise ValueError('Only options {} are currently supported.'
+                            .format(', '.join(env.persistent_options)))
                     proj.saveProperty('__option_{}'.format(opt), value)
                     env.logger.info('Option {} is set to {}'.format(opt, value))
             elif args.reset_runtime_option is not None:
                 if args.reset_runtime_option not in env.persistent_options:
-                    raise ValueError('Option {} is not a valid runtime option. Use "vtools show runtime_options" to list currently supported runtime options.'.format(args.reset_runtime_option))
+                    raise ValueError('Option {} is not a valid runtime option. '
+                        'Use "vtools show runtime_options" to list currently '
+                        'supported runtime options.'.format(args.reset_runtime_option))
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
@@ -3706,9 +3742,14 @@ def admin(args):
                     cur_dir = os.path.realpath(os.getcwd())
                     for f in args.extra_files:
                         if f == '.snapshot.info':
-                            raise ValueError('Cannot include ".snapshot.info" in snapshot due to filename conflicts. Please rename the file.')
+                            raise ValueError('Cannot include ".snapshot.info" '
+                                'in snapshot due to filename conflicts. '
+                                'Please rename the file.')
                         if os.path.isdir(f):
-                            raise ValueError('Cannot add directory "{0}" into snapshot. You should use wildcard names (e.g., "{0}/*") if you want to save all files under this directory.'.format(f))
+                            raise ValueError('Cannot add directory "{0}" into '
+                                'snapshot. You should use wildcard names (e.g., '
+                                '{0}/*") if you want to save all files under '
+                                'this directory.'.format(f))
                         if not os.path.isfile(f):
                             raise ValueError('Cannot include {} in snapshot. File does not exist.'.format(f))
                         # if the file is not under the current directory
