@@ -1541,11 +1541,18 @@ class Project:
         '''Rename selected samples to specified name, return the number of rows changed'''
         cur = self.db.cursor()
         try:
-            query = 'UPDATE sample SET sample_name={} WHERE sample_id IN (SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {});'.format(self.db.PH, 
-                ' WHERE {}'.format(cond) if cond.strip() else '')
-            env.logger.debug('Update samples using query {}'.format(query))
-            cur.execute(query, (name, ))
-            return cur.rowcount
+            where_clause = ' WHERE {}'.format(cond) if cond.strip() else ''
+            cur.execute('SELECT sample_name FROM sample WHERE sample_id IN '
+                '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
+                '  sample.file_id = filename.file_id {});'
+                .format(where_clause))
+            names = cur.fetchall()
+            if names:
+                cur.execute('UPDATE sample SET sample_name={} WHERE sample_id IN '
+                    '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
+                    'sample.file_id = filename.file_id {});'
+                    .format(self.db.PH, where_clause), (name, ))
+            return [x[0] for x in names]
         except Exception as e:
             env.logger.debug(e)
             raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
@@ -3624,9 +3631,13 @@ def admin(args):
             if args.merge_samples and args.rename_samples:
                 raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
-                changed = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
-                if changed > 0:
-                    env.logger.info('Name of {} samples are changed to {}'.format(changed, args.rename_samples[1]))
+                names = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
+                if len(names) > 1:
+                    env.logger.info('Samples {} are renamed to {}'
+                        .format(', '.join(names), args.rename_samples[1]))
+                elif len(names) == 1:
+                    env.logger.info('Sample {} is renamed to {}'
+                        .format(names[0], args.rename_samples[1]))
                 else:
                     env.logger.warning('No sample matching condition {} is found.'
                         .format(args.rename_samples[0]))
