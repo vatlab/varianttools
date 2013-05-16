@@ -2925,7 +2925,9 @@ class ProjectsMerger:
                     .format(self.db.PH), (old_file_id, ))
                 old_sid = [x[0] for x in cur.fetchall()]
                 new_sid = []
-                headers = self.db.getHeaders('sample')
+                # use __proj.sample because the project sample might have more
+                # fields (phenotypes)
+                headers = self.db.getHeaders('__proj.sample')
                 for sid in old_sid:
                     cur.execute('''INSERT INTO sample ('file_id', {0}) SELECT {1}, {0} 
                         FROM __proj.sample WHERE __proj.sample.sample_id = {1};'''\

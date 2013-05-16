@@ -170,6 +170,7 @@ class TestInit(ProcessTestCase):
         runCmd('vtools import vcf/SAMP1.vcf --build hg18')
         runCmd('vtools select variant \'ref="A"\' -t refA')
         runCmd('vtools select variant \'ref="C"\' -t refC')
+        runCmd('vtools phenotype --set "column_A=sample_name"')
         self.assertEqual(numOfVariant(), 289)
         self.assertEqual(numOfVariant('refA'), 58)
         self.assertEqual(numOfVariant('refC'), 85)
