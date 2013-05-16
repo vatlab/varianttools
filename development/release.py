@@ -315,7 +315,7 @@ def tagRelease(version):
         with open(os.devnull, 'w') as fnull:
             print('Tagging release {}...'.format(version))
             ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
-                'svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/tag/v{} '
+                'svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/tags/v{} '
                 ' -m "Version {} released at {}"'.format(version, version, time.asctime()),
                 shell=True, stdout=fnull)
             if ret != 0:
