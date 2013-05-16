@@ -38,7 +38,7 @@ else:
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
-    consolidateFieldName, DatabaseEngine, env
+    consolidateFieldName, DatabaseEngine, env, encodeTableName
 
  
 class JoinFields:
@@ -702,9 +702,9 @@ class Exporter:
         self.jobs = jobs
         #
         # table
-        if not self.proj.isVariantTable(table):
-            raise ValueError('{} is not a valid variant table'.format(table))
-        self.table = table
+        self.table = encodeTableName(table)
+        if not self.proj.isVariantTable(self.table):
+            raise ValueError('{} is not a valid variant table'.format(decodeTableName(self.table)))
         #
         # filename
         self.filename = filename

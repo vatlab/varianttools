@@ -206,6 +206,10 @@ class TestExport(ProcessTestCase):
         #the output format of 'ANNOVAR' is with one options: --comment_string
         self.assertSucc('vtools export variant --format ANNOVAR') 
         self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.func')
+        #
+        # export table with non-ascii name
+        runCmd('vtools select variant -t "8#?"')
+        self.assertSucc('vtools export "8#?" --format ANNOVAR') 
 
     #def testExportANNOVAR_output(self):
         'Test command export in annovar input format'
