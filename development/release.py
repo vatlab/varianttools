@@ -133,7 +133,7 @@ def buildVariantTools(extra_args):
         sys.exit('Failed to build and install variant tools: {}'.format(e))
 
 
-def buildSourcePackage():
+def buildSourcePackage(version):
     # build source package
     try:
         print('Building source package of variant tools {} ...'.format(version))
@@ -141,6 +141,8 @@ def buildSourcePackage():
             ret = subprocess.call('python setup.py sdist', shell=True, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to build source package of variant tools.')
+        os.rename('dist/variant_tools-{}.tar.gz'.format(version),
+            'dist/variant_tools-{}-src.tar.gz'.format(version))
     except Exception as e:
         sys.exit('Failed to build source pacakge of variant tools: {}'.format(e))
 
@@ -273,19 +275,19 @@ def createMacPackage(version):
     shutil.copy('development/MacOSX/INSTALL', dest)
     for exe in [os.path.join('dist', x) for x in ['vtools', 'vtools_report']]:
         shutil.copy(exe, dest)
-    dmg = os.path.join('dist', 'variant_tools-{}.dmg'.format(version))
+    dmg = os.path.join('dist', 'variant_tools-macosx-{}.dmg'.format(version))
     if os.path.isfile(dmg):
         os.remove(dmg)
     try:
-        print('Building disk image variant_tools-{}.dmg ...'.format(version))
+        print('Building disk image variant_tools-macosx-{}.dmg ...'.format(version))
         with open(os.devnull, 'w') as fnull:
             ret = subprocess.call(
-                'hdiutil create {} -volname variant_tools-{} -fs HFS+ -srcfolder {}'
+                'hdiutil create {} -volname variant_tools-macosx-{} -fs HFS+ -srcfolder {}'
                 .format(dmg, version, dest), shell=True, stdout=fnull)
             if ret != 0:
-                sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg'.format(version))
+                sys.exit('Failed to create MacOSX disk image variant_tools-macosx-{}.dmg'.format(version))
     except Exception as e:
-        sys.exit('Failed to create MacOSX disk image variant_tools-{}.dmg: {}'.format(version, e))
+        sys.exit('Failed to create MacOSX disk image variant_tools-macosx-{}.dmg: {}'.format(version, e))
 
 def createLinuxPackage(version):
     bundle = 'variant_tools-{}-{}-{}'.format(version, platform.system(), platform.machine())
@@ -351,7 +353,7 @@ if __name__ == '__main__':
         setupEnvironment(version)
         generateSWIGWrappers()
     buildVariantTools(argv)
-    buildSourcePackage()
+    buildSourcePackage(version)
     git_dir = obtainPyInstaller(args.pyinstaller_dir)
     if platform.platform().startswith('Darwin'):
         # build mac mpkg package
