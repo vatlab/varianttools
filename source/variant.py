@@ -62,11 +62,12 @@ def generalOutputArguments(parser):
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
 
-def outputVariants(proj, table, output_fields, args, query=None, reverse=False):
+def outputVariants(proj, table_name, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
     # table
-    if not proj.isVariantTable(encodeTableName(table)):
-        raise ValueError('Variant table {} does not exist.'.format(table))
+    table = encodeTableName(table_name)
+    if not proj.isVariantTable(table):
+        raise ValueError('Variant table {} does not exist.'.format(table_name))
     #
     # fields
     select_clause, fields = consolidateFieldName(proj, table, ','.join(output_fields),
@@ -347,7 +348,7 @@ def select(args, reverse=False):
                 count = proj.db.numOfRows(encodeTableName(args.to_table))
                 env.logger.info('{} variants selected.'.format(count))
                 if args.output:
-                    outputVariants(proj, encodeTableName(args.to_table), args.output, args)
+                    outputVariants(proj, args.to_table, args.output, args)
                 if args.count:
                     print(count)
             # case 3: output, but do not write to table, and not count

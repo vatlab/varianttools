@@ -473,7 +473,8 @@ def decodeTableName(name):
         return name
 
 def encodeTableName(name):
-    '''Get a normalized name for variant table'''
+    '''Get a normalized name for variant table. The returned name is a valid
+    table name so calling encodeTableName on an encoded name is safe.'''
     # if the table name is not ALPHA + ALPHANUM, use an internal name
     if name.upper() in SQL_KEYWORDS or not name[0].isalpha() or not name.replace('_', '').isalnum():
         return '_' + binascii.hexlify(name)

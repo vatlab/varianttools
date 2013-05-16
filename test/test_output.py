@@ -52,6 +52,10 @@ class TestOutput(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.assertSucc('vtools output CEU chr pos ref alt -l -1')
         self.assertFail('vtools output CEU and variant -l 10')
+        # test output of table with non-ascii name
+        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t "08#x"')
+        self.assertSucc('vtools output "08#x" chr pos ref alt -l -1')
+
         
     def testOutputExpression(self):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
