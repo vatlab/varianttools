@@ -55,9 +55,9 @@ def modifyVersion(version):
                 elif x.startswith('# $Rev:'):
                     content.append("# $Rev: {} $\n".\
                                    format(rev))
-                elif x.startswith("VTOOLS_REVISION='$Rev:"):
+                elif x.startswith("VTOOLS_REVISION='$Rev"):
                     content.append("VTOOLS_REVISION='$Rev: {} $'\n".\
-                                   format(rev))
+                                   format(rev.rstrip('M')))
                 else:
                     content.append(x)
         with open('source/__init__.py', 'w') as init_file:
@@ -306,10 +306,11 @@ def createLinuxPackage(version):
     
 def tagRelease(version):
     try:
-        ret = subprocess.check_output(['svn', 'diff'], shell=True)
+        ret = subprocess.check_output('svn diff', shell=True)
         if ret:
-            sys.exit('Cannot tag release because there is uncommitted changes. '
-                'Please commit the changes and try again.')
+            print('Commit all changes for the release of {}'.format(version))
+            subprocess.call('svn ci -m "Commit all change for the release of {}"'
+                .format(version), shell=True)
         with open(os.devnull, 'w') as fnull:
             print('Tagging release {}...'.format(version))
             ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
@@ -319,7 +320,7 @@ def tagRelease(version):
             if ret != 0:
                 sys.exit('Failed to tag release {}.'.format(version))
     except Exception as e:
-        sys.exit('Failed to tag release {}: {}'.format(version, e))
+        sys.exit('Failed to commit and tag release {}: {}'.format(version, e))
 
 
 if __name__ == '__main__':
