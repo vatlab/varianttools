@@ -1554,7 +1554,8 @@ class Importer:
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
             else:
-                raise ValueError('Cannot guess input file type from filename')
+                raise ValueError('Cannot guess input file format from filename "{}"'
+                    .format(files[0]))
         try:
             fmt = fileFMT(format, fmt_args)
         except Exception as e:
