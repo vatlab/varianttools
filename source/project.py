@@ -532,7 +532,7 @@ class fileFMT:
                 #
                 # This is a special case that allows users to use expressions as field....
                 #
-                env.logger.warning('Field {} is not defined in format {}, some or all variants might fail to import.'.format(self.fields[i], filename))
+                env.logger.warning('Undefined field {} in format {}.'.format(self.fields[i], filename))
                 self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
             else:
                 self.fields[i] = fld[0]

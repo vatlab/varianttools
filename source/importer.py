@@ -1560,6 +1560,11 @@ class Importer:
         except Exception as e:
             env.logger.debug(e)
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
+        # if there are any invalid field, quite with an error message
+        # (field idx+1 can be used for output, but not for input)
+        for fld in fmt.fields:
+            if fld.index is None:
+                raise ValueError('Cannot import field {} from input file.'.format(fld.name))
         #
         if fmt.preprocessor is not None:
             env.logger.info('Preprocessing data [{}] to generate intermediate input files for import'.format(', '.join(files)))
