@@ -2865,7 +2865,7 @@ class ProjectsMerger:
                     else:
                         flds = self.db.fieldsOfTable('__fromDB.{}'.format(table))
                         for fld in flds:
-                            if fld[0] not in [x[0] for x in structure[table]]:
+                            if fld[0].lower() not in [x[0].lower() for x in structure[table]]:
                                 env.logger.warning('Field {} in table {} does not exist in all projects.'
                                     .format(fld[0], table))
                                 structure[table].append(fld)
