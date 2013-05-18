@@ -3133,20 +3133,9 @@ def init(args):
                 merger = ProjectsMerger(proj, args.children, 4)
                 merger.merge()
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
-
-def mergeArguments(parser):
-    parser.add_argument('projects', nargs='+', metavar='DIR',
-        help='''Directories to a list of projects that will be merged''')
-
-def merge(args):
-    try:
-        # create a new project
-        with Project(verbosity=args.verbosity) as proj:
-            proj.merge(args.projects)
-    except Exception as e:
-        sys.exit(e)
 
 def removeArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'samples', 'fields',
@@ -3207,24 +3196,17 @@ def remove(args):
                 for item in args.items:
                     if item.lower() in ['variant_id', 'chr', 'pos', 'alt']:
                         raise ValueError('Fields variant_id, chr, pos and alt cannot be removed')
-                    found = False
-                    for table in proj.getVariantTables():
-                        if item.lower() in [x.lower() for x in proj.db.getHeaders(table)]:
-                            from_table[table].append(item)
-                            found = True
-                            break
-                    if not found:
-                        raise ValueError('Field {} does not exist in any of the variant tables.'.format(item))
+                    all_fields = [x.lower() for x in proj.db.getHeaders('variant')]
+                    if item.lower() not in all_fields:
+                        raise ValueError('{} is not a valid variant info field.'.format(item))
                 # remove...
-                for table, items in from_table.items():
-                    env.logger.info('Removing field {} from variant table {}'
-                        .format(', '.join(items), table))
-                    proj.db.removeFields(table, items)
-                    if 'alt_bin' in items or 'alt_chr' in items or 'alt_pos' in items:
-                        env.logger.info('Removing alternative reference genome '
-                            'because of removal of related fields')
-                        proj.alt_build = None
-                        proj.saveProperty('alt_build', None)
+                env.logger.info('Removing variant info field {}'.format(', '.join(args.items)))
+                proj.db.removeFields('variant', args.items)
+                if 'alt_bin' in args.items or 'alt_chr' in args.items or 'alt_pos' in args.items:
+                    env.logger.info('Removing alternative reference genome '
+                        'because of removal of related fields')
+                    proj.alt_build = None
+                    proj.saveProperty('alt_build', None)
                 # it is possible that new indexes are needed
                 s = delayedAction(env.logger.info, 'Rebuilding indexes')
                 try:
@@ -3237,21 +3219,25 @@ def remove(args):
                     raise ValueError('Please specify name of genotype fields to be removed')
                 if 'variant_id' in [x.lower() for x in args.items]:
                     raise ValueError('Genotypes id variant_id cannot be removed')
-                    #env.logger.warning('Genotype id variant_id cannot be removed')
                 if 'gt' in [x.lower() for x in args.items]:
                     raise ValueError('Genotypes field GT cannot be removed')
-                    #env.logger.warning('Genotype field GT cannot be removed')
                 proj.db.attach(proj.name + '_genotype')
                 cur = proj.db.cursor()
                 cur.execute('SELECT sample_id FROM sample;')
                 IDs = [x[0] for x in cur.fetchall()]
+                cnt = 0
                 for table in ['{}_genotype.genotype_{}'.format(proj.name, id) for id in IDs]:
                     header = [x.lower() for x in proj.db.getHeaders(table)]
                     items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
                     if items:
+                        cnt += 1
                         env.logger.info('Removing fields {} from genotype table {}'
                             .format(', '.join(items), table.split('_')[-1]))
                         proj.db.removeFields(table, items)
+                if cnt:
+                    env.logger.info('Genotype info fields {} are removed from {} samples.'.format(', '.join(items), cnt))
+                else:
+                    env.logger.warning('Genotype info fields {} not found in any of the samples.'.format(', '.join(items)))
             elif args.type == 'annotations':
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select annotation table to be removed')
@@ -3296,8 +3282,8 @@ def remove(args):
                 # remove
                 proj.db.removeFields('sample', toBeRemoved)
     except Exception as e:
-        sys.exit(e)
-
+        env.logger.error(e)
+        sys.exit(1)
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
@@ -3554,7 +3540,8 @@ def show(args):
                     print(('{:<' + str(width) + '} {:15} {}').format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
                         initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
 
 def executeArguments(parser):
@@ -3586,7 +3573,8 @@ def execute(args):
             for rec in cur:
                 print(sep.join(['{}'.format(x) for x in rec]))
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
 
 def adminArguments(parser):
@@ -3777,7 +3765,8 @@ def admin(args):
             else:
                 env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools

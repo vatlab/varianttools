@@ -229,5 +229,6 @@ def compare(args):
                 env.logger.warning('No action parameter is specified. Nothing to do.')
                 return
     except Exception as e:
-        sys.exit(e) 
+        env.logger.error(e)
+        sys.exit(1) 
 

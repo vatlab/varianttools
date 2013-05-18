@@ -145,7 +145,8 @@ def output(args):
         with Project(verbosity=args.verbosity) as proj:
             outputVariants(proj, args.table, args.fields, args)
     except Exception as e:
-        sys.exit(e) 
+        env.logger.error(e)
+        sys.exit(1) 
 
 def selectArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
@@ -361,7 +362,8 @@ def select(args, reverse=False):
             if args.samples and proj.db.hasTable('__variants_from_samples'): 
                 cur.execute('DROP TABLE __variants_from_samples')
     except Exception as e:
-        sys.exit(e) 
+        env.logger.error(e)
+        sys.exit(1) 
 
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')

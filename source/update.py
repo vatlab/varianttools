@@ -946,5 +946,6 @@ def update(args):
                 calcSampleStat(proj, args.from_stat, IDs, variant_table, args.genotypes)
         proj.close()
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 

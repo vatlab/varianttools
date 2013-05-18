@@ -1111,4 +1111,5 @@ def export(args):
             exporter.exportData()
         proj.close()
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)

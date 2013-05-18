@@ -1105,7 +1105,8 @@ def associate(args):
             maintenance.join()
             del s
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
