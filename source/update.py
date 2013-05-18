@@ -747,7 +747,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     
     for index in validGenotypeIndices:
         field = genotypeFields[index]
-        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
+        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
         
         if genotypeFieldType == 'VARCHAR':
             raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
