@@ -400,7 +400,7 @@ def setFieldValue(proj, table, items, build):
                     env.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
                     fldType = str
                 proj.checkFieldName(field, exclude=table)
-                env.logger.info('Adding field {}'.format(field))
+                env.logger.info('Adding variant info field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
                     {int: 'INT',
                      float: 'FLOAT',
@@ -452,7 +452,7 @@ def setFieldValue(proj, table, items, build):
                     env.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
                     fldType = str
                 proj.checkFieldName(field, exclude=table)
-                env.logger.info('Adding field {}'.format(field))
+                env.logger.info('Adding variant info field {}'.format(field))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
                     {int: 'INT',
                      float: 'FLOAT',
@@ -768,7 +768,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             env.logger.info('Resetting values at existing field {}'.format(field))
             proj.db.execute('Update {} SET {} = {};'.format('variant', field, proj.db.PH), (defaultValue, ))
         else:
-            env.logger.info('Adding field {}'.format(field))
+            env.logger.info('Adding variant info field {}'.format(field))
             proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format('variant', field, fldtype))
             if defaultValue == 0:
                 proj.db.execute ('UPDATE {} SET {} = 0'.format('variant', field))              

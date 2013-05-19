@@ -239,7 +239,7 @@ class Sample:
             if field.lower() not in [x.lower() for x in cur_fields]:
                 self.proj.checkFieldName(field, exclude='sample')
                 fldtype = typeOfValues([x[idx] for x in records.values()])
-                env.logger.info('Adding field {}'.format(field))
+                env.logger.info('Adding phenotype {}'.format(field))
                 env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 count[1] += 1  # new
@@ -305,7 +305,7 @@ class Sample:
         if field.lower() not in [x.lower() for x in cur_fields]:
             if field.upper in SQL_KEYWORDS:
                 raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
-            env.logger.info('Adding field {}'.format(field))
+            env.logger.info('Adding phenotype {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                 {int: 'INT',
                  float: 'FLOAT',
@@ -377,7 +377,7 @@ class Sample:
             res = status.get(ID)
             for idx, (field, expr) in enumerate(stat):
                 if new_field[field]:
-                    env.logger.debug('Adding field {}'.format(field))
+                    env.logger.debug('Adding phenotype {}'.format(field))
                     # determine the type of value
                     self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                         typeOfValues([str(status.get(x)[idx]) for x in IDs])))
