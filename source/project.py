@@ -1285,16 +1285,17 @@ class Project:
             #
             # in both projects.
             #
-            if self.alt_build is not None:
-                self.db.execute('''CREATE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
-            else:
-                self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+            if not self.db.hasIndex('variant_index'):
+                if self.alt_build is not None:
+                    self.db.execute('''CREATE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+                else:
+                    self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
         except Exception as e:
             # the index might already exists, this does not really matter
             env.logger.debug(e)
         # the message will not be displayed if index is created within 5 seconds
         try:
-            if self.alt_build:
+            if self.alt_build and not self.db.hasIndex('variant_alt_index'):
                 #
                 # Index on alternative reference genome is not unique because several variants might
                 # be mapped to the same coordinates in the alternative reference genome. 
@@ -1507,8 +1508,16 @@ class Project:
         if not self.isVariantTable(table):
             raise ValueError('{} is not found or is not a variant table.'.format(table))
         cur = self.db.cursor()
+        # first remove from the master variant table
+        cur.execute('DELETE FROM variant WHERE variant_id IN (SELECT variant_id FROM {});'.format(table))
+        if not cur.rowcount:
+            env.logger.warning('Table {} is empty. No variant has been removed from the project.'.format(table))
+            return
+        else:
+            env.logger.info('{} variants are removed from the master variant table.'.format(cur.rowcount))
+        # remove from other variant tables
         for t in self.getVariantTables():
-            if t.lower() == table.lower():
+            if t.lower() in ['variant', table.lower()]:
                 continue
             cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
             env.logger.info('{} variants are removed from table {}'.format(cur.rowcount, t))

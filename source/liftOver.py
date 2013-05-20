@@ -123,10 +123,10 @@ class LiftOverTool:
         proc = subprocess.Popen(['liftOver', input, chain, output, unmapped],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env=OS_ENV)
-        proc.wait()
-        err = proc.stderr.read().decode().strip()
-        if err:
-            env.logger.info(err)
+        ret = proc.wait()
+        if ret != 0:
+            err = proc.stderr.read().decode().strip()
+            raise RuntimeError('Failed to execute command liftover: {}'.format(err))
 
     def updateAltCoordinates(self, flip=False):
         '''Download and use the UCSC LiftOver tool to translate coordinates from primary
