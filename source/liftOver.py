@@ -159,15 +159,17 @@ class LiftOverTool:
             os.path.join(env.temp_dir, 'var_out.bed'), os.path.join(env.temp_dir, 'unmapped.bed'))           
         #
         err_count = 0
-        with open(os.path.join(env.temp_dir, 'unmapped.bed')) as var_err:
-            for line in var_err:
-                if line.startswith('#'):
-                    continue
-                if err_count == 0:
-                    env.logger.debug('First 100 unmapped variants:')
-                if err_count < 100:
-                    env.logger.debug(line.rstrip())
-                err_count += 1
+        unmapped_file = os.path.join(env.temp_dir, 'unmapped.bed')
+        if os.path.isfile(unmapped_file):
+            with open(unmapped_file) as var_err:
+                for line in var_err:
+                    if line.startswith('#'):
+                        continue
+                    if err_count == 0:
+                        env.logger.debug('First 100 unmapped variants:')
+                    if err_count < 100:
+                        env.logger.debug(line.rstrip())
+                    err_count += 1
         if err_count != 0:
             env.logger.info('{0} records failed to map.'.format(err_count))
         #
