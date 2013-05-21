@@ -171,7 +171,7 @@ class Sample:
         # num sample, num new field, num update field
         count = [0, 0, 0]
         delimiter = '\t'
-        with open(filename) as input:
+        with open(filename, 'rU') as input:
             line = input.readline().rstrip()
             headers = line.split(delimiter)
             # if there is no tab
@@ -215,8 +215,9 @@ class Sample:
                     continue
                 fields = [x.strip() for x in line.split(delimiter)]
                 if len(fields) != nCol:
-                    raise ValueError('Invalid phenotype file: number of fields '
-                        'mismatch at line {}.'.format(idx+2))
+                    env.logger.warning('Number of fields mismatch (expecting {}). Ignoring line "{}"'
+                        .format(nCol, line.strip()))
+                    continue
                 #
                 key = tuple([fields[x] for x in sample_idx])
                 if key in records:
