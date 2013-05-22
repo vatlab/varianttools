@@ -1,5 +1,29 @@
 #!/usr/bin/env python3
 #
+# $File: call_variants $
+# $LastChangedDate: 2013-04-23 11:58:41 -0500 (Tue, 23 Apr 2013) $
+# $Rev: 1855 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://varianttools.sourceforge.net for details.
+#
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 import os
 import sys
 import subprocess
@@ -15,6 +39,7 @@ import zipfile
 import time
 import re
 from collections import defaultdict, namedtuple
+
 #
 # Runtime environment
 #
@@ -54,10 +79,12 @@ class RuntimeEnvironment(object):
         #   BaseVariantCaller.wait()
         #      wait till all jobs are completed
         self.running_jobs = []
+        #
+        # resource directory
+        self._resource_dir = None
     
     #
     # max number of jobs
-    #
     #
     def _setMaxJobs(self, x):
         try:
@@ -177,6 +204,14 @@ class RuntimeEnvironment(object):
     #
     notification_email = property(lambda self: self._notification_email, 
         _setNotificationEmail)
+
+    def _setResourceDir(self, resource_dir):
+        if not os.path.isdir(resource_dir):
+            env.logger.info('Creating resource directory {}'.format(resource_dir))
+            os.makedirs(resource_dir)
+        self._resource_dir = resource_dir
+
+    resource_dir = property(lambda self: self._resource_dir, _setResourceDir)
 
 # create a runtime environment object
 env = RuntimeEnvironment()
@@ -312,17 +347,523 @@ def wait_all():
     env.running_jobs = []
 
 #
+# Wrappers for commands used
+#
+class BWA:
+    def __init__(self, ref_fasta, version=None):
+        '''A BWA wrapper, if version is not None, a specific version is
+        required.'''
+        checkCmd('bwa')
+        self.REF_fasta = ref_fasta
+        
+    def buildIndex(self):
+        '''Create BWA index for reference genome file'''
+        # bwa index  -a bwtsw wg.fa
+        saved_dir = os.getcwd()
+        os.chdir(env.resource_dir)
+        if os.path.isfile(self.REF_fasta + '.amb'):
+            env.logger.warning('Using existing bwa indexed sequence {}.amb'.format(self.REF_fasta))
+        else:
+            run_command('bwa index {}  -a bwtsw {}'
+                .format(env.options['OPT_BWA_INDEX'], self.REF_fasta))
+        os.chdir(saved_dir)
+
+    def aln(self, fastq_files):
+        '''Use bwa aln to process fastq files'''
+        for input_file in fastq_files:
+            dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
+            if existAndNewerThan(ofiles=dest_file, ifiles=input_file):
+                env.logger.warning('Using existing alignment index file {}'
+                    .format(dest_file))
+            else:
+                # input file should be in fastq format (-t 4 means 4 threads)
+                opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
+                if opt == ' -I ':
+                    env.logger.warning('Using -I option for bwa aln command '
+                        'because the sequences seem to be in Illumina 1.3+ format.')
+                run_command('bwa aln {} {} -t 4 {}/{} {} > {}_tmp'
+                    .format(opt, env.options['OPT_BWA_ALN'], env.resource_dir, 
+                        self.REF_fasta, input_file, dest_file),
+                    name=os.path.basename(dest_file),
+                    upon_succ=(os.rename, dest_file + '_tmp', dest_file),
+                    wait=False)
+        # wait for all bwa aln jobs to be completed
+        wait_all()
+
+    def sampe(self, fastq_files):
+        '''Use bwa sampe to generate aligned sam files for paird end reads'''
+        sam_files = []
+        for idx in range(len(fastq_files)//2):
+            f1 = fastq_files[2*idx]
+            f2 = fastq_files[2*idx + 1]
+            rg = getReadGroup(f1, env.working_dir)
+            sai1 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f1))
+            sai2 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f2))
+            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
+            if existAndNewerThan(ofiles=sam_file, ifiles=[f1, f2, sai1, sai2]):
+                env.logger.warning('Using existing sam file {}'.format(sam_file))
+            else:
+                run_command(
+                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}_tmp'
+                    .format(
+                        env.options['OPT_BWA_SAMPE'], rg, env.resource_dir, self.REF_fasta,
+                        sai1, sai2, f1, f2, sam_file),
+                    name=os.path.basename(sam_file),
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    wait=False)
+            sam_files.append(sam_file)
+        # wait for all jobs to be completed
+        wait_all()
+        return sam_files
+
+    def samse(self, fastq_files):
+        '''Use bwa sampe to generate aligned sam files'''
+        sam_files = []
+        for f in fastq_files:
+            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
+            rg = getReadGroup(f, env.working_dir)
+            sai = '{}/{}.sai'.format(env.working_dir, os.path.basename(f))
+            if existAndNewerThan(ofiles=sam_file, ifiles=[f, sai]):
+                env.logger.warning('Using existing sam file {}'.format(sam_file))
+            else:
+                run_command(
+                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}_tmp'
+                    .format(
+                        env.options['OPT_BWA_SAMSE'], rg, env.resource_dir,
+                        self.REF_fasta, sai, f, sam_file),
+                    name=os.path.basename(sam_file),
+                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    wait=False)
+            sam_files.append(sam_file)
+        # wait for all jobs to be completed
+        wait_all()
+        return sam_files        
+
+
+class SAMTOOLS:
+    def __init__(self, ref_fasta):
+        checkCmd('samtools')
+        self.REF_fasta = ref_fasta
+
+    def buildIndex(self):
+        '''Create index for reference genome used by samtools'''
+        saved_dir = os.getcwd()
+        os.chdir(env.resource_dir)
+        if os.path.isfile('{}.fai'.format(self.REF_fasta)):
+            env.logger.warning('Using existing samtools sequence index {}.fai'
+                .format(self.REF_fasta))
+        else:
+            run_command('samtools faidx {} {}'
+                .format(env.options['OPT_SAMTOOLS_FAIDX'], self.REF_fasta))
+        os.chdir(saved_dir)
+
+    def sortSam(self, sam_files):
+        '''Convert sam file to sorted bam files.'''
+        bam_files = []
+        for sam_file in sam_files:
+            bam_file = sam_file[:-4] + '.bam'
+            if existAndNewerThan(ofiles=bam_file, ifiles=sam_file):
+                env.logger.warning('Using existing bam file {}'.format(bam_file))
+            else:
+                run_command('samtools view {} -bt {}/{}.fai {} > {}'
+                    .format(
+                        env.options['OPT_SAMTOOLS_VIEW'], env.resource_dir,
+                        self.REF_fasta, sam_file, TEMP(bam_file)),
+                    name=os.path.basename(bam_file),
+                    upon_succ=(os.rename, TEMP(bam_file), bam_file),
+                    wait=False)
+            bam_files.append(bam_file)
+        # wait for all sam->bam jobs to be completed
+        wait_all()
+        #
+        # sort bam files
+        sorted_bam_files = []
+        for bam_file in bam_files:
+            sorted_bam_file = bam_file[:-4] + '_sorted.bam'
+            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=bam_file):
+                env.logger.warning('Using existing sorted bam file {}'
+                    .format(sorted_bam_file))
+            else:
+                run_command('samtools sort {} {} {}'
+                    .format(
+                        env.options['OPT_SAMTOOLS_SORT'], bam_file,
+                        TEMP(sorted_bam_file)),
+                    name=os.path.basename(sorted_bam_file),
+                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
+                    wait=False)
+            sorted_bam_files.append(sorted_bam_file)
+        wait_all()
+        return sorted_bam_files
+
+    def indexBAM(self, bam_file):
+        '''Index the input bam file'''
+        if existAndNewerThan(ofiles='{}.bai'.format(bam_file), ifiles=bam_file):
+            env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
+        else:
+            run_command('samtools index {0} {1} {1}_tmp.bai'.format(
+                env.options['OPT_SAMTOOLS_INDEX'], bam_file),
+                upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
+
+class PICARD:
+    def __init__(self):
+        if env.options['PICARD_PATH']:
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
+                env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'
+                    .format(env.options['PICARD_PATH']))
+                sys.exit(1)
+        elif 'CLASSPATH' in os.environ:
+            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) 
+                    for x in os.environ['CLASSPATH'].split(':')]):
+                env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'
+                    .format(os.environ['CLASSPATH']))
+                sys.exit(1)
+            for x in os.environ['CLASSPATH'].split(':'):
+                if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
+                    env.logger.info('Using picard under {}'.format(x))
+                    env.options['PICARD_PATH'] = os.path.expanduser(x)
+                    break
+        else:
+            env.logger.error('Please either specify path to picard using option '
+                'PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
+            sys.exit(1)
+
+    def sortSam(self, sam_files, output=None):
+        '''Convert sam file to sorted bam files using Picard.'''
+        # sort bam files
+        sorted_bam_files = []
+        for sam_file in sam_files:
+            sorted_bam_file = sam_file[:-4] + '_sorted.bam'
+            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=sam_file):
+                env.logger.warning('Using existing sorted bam file {}'
+                    .format(sorted_bam_file))
+            else:
+                run_command(
+                    'java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'
+                    .format(
+                        env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
+                        env.options['OPT_PICARD_SORTSAM'], sam_file,
+                        TEMP(sorted_bam_file)),
+                    name=os.path.basename(sorted_bam_file),
+                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
+                    wait=False)
+            sorted_bam_files.append(sorted_bam_file)
+        wait_all()
+        return sorted_bam_files
+
+    def mergeBAMs(self, bam_files):
+        '''merge sam files'''
+        # use Picard merge, not samtools merge: 
+        # Picard keeps RG information from all Bam files, whereas samtools uses only 
+        # inf from the first bam file
+        merged_bam_file = bam_files[0][:-4] + '_merged.bam'
+        if existAndNewerThan(ofiles=merged_bam_file, ifiles=bam_files):
+            env.logger.warning('Using existing merged bam file {}'
+                .format(merged_bam_file))
+        else:
+            run_command('''java {} -jar {}/MergeSamFiles.jar {} {}
+                USE_THREADING=true
+                VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
+                OUTPUT={}'''.format(
+                    env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                    env.options['OPT_PICARD_MERGESAMFILES'],
+                    ' '.join(['INPUT={}'.format(x) for x in bam_files]),
+                    TEMP(merged_bam_file)),
+                name=os.path.basename(merged_bam_file),
+                upon_succ=(os.rename, TEMP(merged_bam_file), merged_bam_file))
+        return merged_bam_file
+
+
+    def markDuplicates(self, bam_files):
+        '''Mark duplicate using picard'''
+        dedup_bam_files = []
+        for bam_file in bam_files:
+            dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
+            metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
+            if existAndNewerThan(ofiles=dedup_bam_file, ifiles=bam_file):
+                env.logger.warning(
+                    'Using existing bam files after marking duplicate {}'
+                    .format(dedup_bam_file))
+            else:
+                run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
+                    INPUT={3}
+                    OUTPUT={4}
+                    METRICS_FILE={5}
+                    ASSUME_SORTED=true
+                    VALIDATION_STRINGENCY=LENIENT
+                    '''.format(
+                        env.options['OPT_JAVA'], env.options['PICARD_PATH'],
+                        env.options['OPT_PICARD_MARKDUPLICATES'], bam_file,
+                        TEMP(dedup_bam_file),
+                        metrics_file), 
+                    name=os.path.basename(dedup_bam_file),
+                    upon_succ=(os.rename, TEMP(dedup_bam_file), dedup_bam_file),
+                    wait=False)
+            dedup_bam_files.append(dedup_bam_file)
+        wait_all()
+        return dedup_bam_files
+
+class GATK:
+    def __init__(self, ref_fasta, knownSites):
+        '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path
+            is specified in CLASSPATH'''
+        if env.options['GATK_PATH']:
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']),
+                    'GenomeAnalysisTK.jar')):
+                env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'
+                    .format(env.options['GATK_PATH']))
+                sys.exit(1)
+        elif 'CLASSPATH' in os.environ:
+            if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar'))
+                    for x in os.environ['CLASSPATH'].split(':')]):
+                env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'
+                    .format(os.environ['CLASSPATH']))
+                sys.exit(1)
+            else:
+                for x in os.environ['CLASSPATH'].split(':'):
+                    if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
+                        env.logger.info('Using GATK under {}'.format(x))
+                        env.options['GATK_PATH'] = os.path.expanduser(x)
+                        break
+        else:
+            env.logger.error('Please either specify path to GATK using option '
+                'GATK_PATH=path, or set it in environment variable $CLASSPATH.')
+            sys.exit(1) 
+        #
+        self.REF_fasta = ref_fasta
+        self.knownSites = knownSites
+
+    def downloadResourceBundle(self, URL, files):
+        '''Utility function to download GATK resource bundle. If files specified by
+        files already exist, use the existing downloaded files.'''
+        #
+        saved_dir = os.getcwd()
+        os.chdir(env.resource_dir)
+        if all([os.path.isfile(x) for x in files]):
+            env.logger.warning('Using existing GATK resource')
+        else:
+            run_command('wget -r {}'.format(URL))
+            # walk into the directory and get everything to the top directory
+            # this is because wget -r saves files under URL/file
+            for root, dirs, files in os.walk('.'):
+                for name in files:
+                    shutil.move(os.path.join(root, name), name)
+        #
+        # decompress all .gz files
+        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
+            not x.endswith('tar.gz')]:
+            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
+                env.logger.warning('Using existing decompressed file {}'
+                    .format(gzipped_file[:-3]))
+            else:
+                decompress(gzipped_file, '.')
+        os.chdir(saved_dir)
+
+
+    def realignIndels(self, bam_file):
+        '''Create realigner target and realign indels'''
+        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
+        if existAndNewerThan(ofiles=target, ifiles=bam_file):
+            env.logger.warning('Using existing realigner target {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T RealignerTargetCreator
+                --mismatchFraction 0.0
+                -o {6}_tmp {7} '''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
+                    bam_file, env.resource_dir,
+                    self.REF_fasta, target,
+                    ' '.join(['-known {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target + '_tmp', target))
+        # 
+        # realign around known indels
+        cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
+        if existAndNewerThan(ofiles=cleaned_bam_file, ifiles=target):
+            env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T IndelRealigner 
+                --targetIntervals {6}
+                --consensusDeterminationModel USE_READS
+                -compress 0 -o {7} {8}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
+                    bam_file, env.resource_dir,
+                    self.REF_fasta, target, TEMP(cleaned_bam_file),
+                    ' '.join(['-known {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                name=os.path.basename(cleaned_bam_file),
+                upon_succ=(os.rename, TEMP(cleaned_bam_file), cleaned_bam_file))
+        # 
+        return cleaned_bam_file
+
+
+    def recalibrate(self, bam_file, recal_bam_file):
+        '''Create realigner target and realign indels'''
+        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
+        if existAndNewerThan(ofiles=target, ifiles=bam_file):
+            env.logger.warning('Using existing base recalibrator target {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} 
+                -T BaseRecalibrator
+                -I {3} 
+                -R {4}/{5}
+                -cov ReadGroupCovariate
+                -cov QualityScoreCovariate
+                -cov CycleCovariate
+                -cov ContextCovariate
+                -o {6}_tmp {7}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_BASERECALIBRATOR'], bam_file,
+                    env.resource_dir, self.REF_fasta, target,
+                    ' '.join(['-knownSites {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, target + '_tmp', target))
+        #
+        # recalibrate
+        if existAndNewerThan(ofiles=recal_bam_file, ifiles=target):
+            env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
+                -T PrintReads
+                -I {3} 
+                -R {4}/{5}
+                -BQSR {6}
+                -o {7}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_PRINTREADS'], bam_file,
+                    env.resource_dir, self.REF_fasta, target, 
+                    TEMP(recal_bam_file)),
+                name=os.path.basename(recal_bam_file),
+                upon_succ=(os.rename, TEMP(recal_bam_file), recal_bam_file))
+        # 
+        return recal_bam_file
+
+    def reduceReads(self, input_file):
+        target = input_file[:-4] + '_reduced.bam'
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing reduced bam file {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
+                -T ReduceReads
+                -I {3} 
+                -R {4}/{5}
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_REDUCEREADS'], input_file,
+                    env.resource_dir, self.REF_fasta,
+                    TEMP(target)),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, TEMP(target), target))
+        # 
+        return target
+
+    def unifiedGenotyper(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing called variants {}'.format(target))
+        else:
+            dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T UnifiedGenotyper
+                --dbsnp {4}/{7}
+                -stand_call_conf 50.0 
+                -stand_emit_conf 10.0 
+                -dcov 200
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_UNIFIEDGENOTYPER'], input_file,
+                    env.resource_dir, self.REF_fasta,
+                    TEMP(target), dbSNP_vcf),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, TEMP(target), target))
+        # 
+        return target
+
+    def haplotypeCall(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing called variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T HaplotypeCaller
+                -minPruning 3
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    env.resource_dir, self.REF_fasta,
+                    TEMP(target)),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, TEMP(target), target))
+        # 
+        return target
+
+
+    def variantRecalibration(self, input_file):
+        target = os.path.join(env.working_dir,
+            os.path.basename(input_file)[:-4] + '_recal.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T VariantRecalibrator
+                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf		
+                -resource:omni,known=false,training=true,truth=false,prior=12.0	1000G_omni2.5.b37.sites.vcf		
+                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0	dbsnp_137.b37.v	
+                -an	QD	-an	MQ	-an	HaplotypeScore {}
+                -mode SNP 
+                -recalFile raw.SNPs.recal
+                -tranchesFile raw.SNPs.tranches
+                -rscriptFile recal.plots.R
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    env.resource_dir, self.REF_fasta,
+                    TEMP(target)),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, TEMP(target), target))
+        # 
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T ApplyRecalibraBon
+                -mode SNP 
+                -recalFile raw.SNPs.recal
+                -tranchesFile raw.SNPs.trances
+                -o {6}'''.format(
+                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
+                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
+                    env.resource_dir, self.REF_fasta,
+                    TEMP(target)),
+                name=os.path.basename(target),
+                upon_succ=(os.rename, TEMP(target), target))
+        return target
+
+    
+#
+#
 # Check the existence of commands
 #
 def checkCmd(cmd):
     '''Check if a cmd exist'''
     if not hasattr(shutil, 'which'):
-        env.logger.error('Please use Python 3.3 or higher for the use of shutil.which function')
-        sys.exit(1)
+        env.logger.warning('Failed to check the availability of command {}. '
+            'Please use Python 3.3 or higher to execute this script.'.format(cmd))
+        return True
     if shutil.which(cmd) is None:
         env.logger.error('Command {} does not exist. Please install it and try again.'
             .format(cmd))
         sys.exit(1)
+
 
 def sendMail(header, message=''):
     '''Send an email to report status.'''
@@ -339,65 +880,7 @@ def sendMail(header, message=''):
     if status != 0:
        env.logger.warning('Send mail failed.')
 
-def checkPicard():
-    '''Check if picard is available, set PICARD_PATH if the path is specified in CLASSPATH'''
-    if env.options['PICARD_PATH']:
-        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
-            env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'
-                .format(env.options['PICARD_PATH']))
-            sys.exit(1)
-    elif 'CLASSPATH' in os.environ:
-        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) 
-                for x in os.environ['CLASSPATH'].split(':')]):
-            env.logger.error('$CLASSPATH ({}) does not contain a path that contain picard jar files.'
-                .format(os.environ['CLASSPATH']))
-            sys.exit(1)
-        for x in os.environ['CLASSPATH'].split(':'):
-            if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
-                env.logger.info('Using picard under {}'.format(x))
-                env.options['PICARD_PATH'] = os.path.expanduser(x)
-                break
-    else:
-        env.logger.error('Please either specify path to picard using option '
-            'PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
-        sys.exit(1)
 
-def checkGATK():
-    '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path
-        is specified in CLASSPATH'''
-    if env.options['GATK_PATH']:
-        if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']),
-                'GenomeAnalysisTK.jar')):
-            env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'
-                .format(env.options['GATK_PATH']))
-            sys.exit(1)
-    elif 'CLASSPATH' in os.environ:
-        if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar'))
-                for x in os.environ['CLASSPATH'].split(':')]):
-            env.logger.error('$CLASSPATH ({}) does not contain a path that contain GATK jar files.'
-                .format(os.environ['CLASSPATH']))
-            sys.exit(1)
-        else:
-            for x in os.environ['CLASSPATH'].split(':'):
-                if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
-                    env.logger.info('Using GATK under {}'.format(x))
-                    env.options['GATK_PATH'] = os.path.expanduser(x)
-                    break
-    else:
-        env.logger.error('Please either specify path to GATK using option '
-            'GATK_PATH=path, or set it in environment variable $CLASSPATH.')
-        sys.exit(1) 
-
-# 
-# def checkPySam():
-#     '''Check if PySam (a python wrapper to samtools) is installed.'''
-#     try:
-#         import pysam
-#     except ImportError:
-#         env.logger.error('Please install pysam for python3.3 and try again.')
-# 
-#
-# Utility functions
 # 
 def downloadFile(URL, dest, quiet=False):
     '''Download a file from URL and save to dest'''
@@ -487,7 +970,7 @@ def existAndNewerThan(ofiles, ifiles):
     else:
         input_timestamp = os.path.getmtime(ifiles)
     #
-    if output_timestamp - input_timestamp < 10:
+    if output_timestamp - input_timestamp < 2:
         env.logger.warning(
             'Existing output file {} is ignored because it is newer than input file.'
             .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
@@ -504,7 +987,8 @@ def TEMP(filename):
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress it to
     dest_dir (current directory if unspecified), and return a list of files. Uncompressed
-    files will be returned untouched.'''
+    files will be returned untouched. If the destination files exist and newer, this
+    function will return immediately.'''
     mode = None
     if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
         mode = 'r:gz'
@@ -609,6 +1093,76 @@ def decompress(filename, dest_dir=None):
     # return source file if 
     return [filename]
    
+   
+def getReadGroup(fastq_filename, output_bam):
+    '''Get read group information from names of fastq files.'''
+    # Extract read group information from filename such as
+    # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
+    # according to the lane that produced them and whether they
+    # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
+    # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
+    # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
+    #
+    # This function return a read group string like '@RG\tID:foo\tSM:bar'
+    #
+    # ID* Read group identifier. Each @RG line must have a unique ID. The
+    # value of ID is used in the RG
+    #     tags of alignment records. Must be unique among all read groups
+    #     in header section. Read group
+    #     IDs may be modifid when merging SAM fies in order to handle collisions.
+    # CN Name of sequencing center producing the read.
+    # DS Description.
+    # DT Date the run was produced (ISO8601 date or date/time).
+    # FO Flow order. The array of nucleotide bases that correspond to the
+    #     nucleotides used for each
+    #     flow of each read. Multi-base flows are encoded in IUPAC format, 
+    #     and non-nucleotide flows by
+    #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
+    # KS The array of nucleotide bases that correspond to the key sequence
+    #     of each read.
+    # LB Library.
+    # PG Programs used for processing the read group.
+    # PI Predicted median insert size.
+    # PL Platform/technology used to produce the reads. Valid values: 
+    #     CAPILLARY, LS454, ILLUMINA,
+    #     SOLID, HELICOS, IONTORRENT and PACBIO.
+    # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
+    #     SOLiD). Unique identifier.
+    # SM Sample. Use pool name where a pool is being sequenced.
+    #
+    filename = os.path.basename(fastq_filename)
+    output = os.path.basename(output_bam)
+    # sample name is obtained from output filename without file extension
+    SM = output.split('.', 1)[0]
+    # always assume ILLUMINA for this script and BWA for processing
+    PL = 'ILLUMINA'  
+    PG = 'BWA'
+    #
+    # PU is for flowcell and lane information, ID should be unique for each
+    #     readgroup
+    # ID is temporarily obtained from input filename without exteion
+    ID = filename.split('.')[0]
+    # try to get lan information from s_x_1/2 pattern
+    try:
+        PU = re.search('s_([^_]+)_', filename).group(1)
+    except AttributeError:
+        env.logger.warning('Failed to guess lane information from filename {}'
+            .format(filename))
+        PU = 'NA'
+    # try to get some better ID
+    try:
+        # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
+        m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
+        ID = '{}.{}'.format(m.group(1), m.group(4))
+    except AttributeError as e:
+        env.logger.warning('Input fasta filename {} does not match a known'
+            ' pattern. ID is directly obtained from filename.'.format(filename))
+    #
+    rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
+    env.logger.info('Setting read group tag to {}'.format(rg))
+    return rg
+
+
 # def hasReadGroup(bamfile):
 #     '''Check if a bamfile has read group information, if not we will have to add 
 #     @RG tag to the bam file. Note that technically speaking, read group contains
@@ -641,65 +1195,25 @@ class BaseVariantCaller:
     and common operations that are not specific to any pipeline.
     '''
     def __init__(self, resource_dir, pipeline):
-        self.resource_dir = os.path.join(os.path.expanduser(resource_dir), pipeline)
-        if not os.path.isdir(self.resource_dir):
-            env.logger.info('Creating resource directory {}'.format(self.resource_dir))
-            os.makedirs(self.resource_dir)
+        env.resource_dir = os.path.join(os.path.expanduser(resource_dir), pipeline)
 
     #
     # PREPARE RESOURCE
     #
-    def downloadGATKResourceBundle(self, URL, files):
-        '''Utility function to download GATK resource bundle. If files specified by
-        files already exist, use the existing downloaded files.'''
-        #
-        if all([os.path.isfile(x) for x in files]):
-            env.logger.warning('Using existing GATK resource')
-        else:
-            run_command('wget -r {}'.format(URL))
-            # walk into the directory and get everything to the top directory
-            # this is because wget -r saves files under URL/file
-            for root, dirs, files in os.walk('.'):
-                for name in files:
-                    shutil.move(os.path.join(root, name), name)
-        #
-        # decompress all .gz files
-        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
-            not x.endswith('tar.gz')]:
-            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
-                env.logger.warning('Using existing decompressed file {}'
-                    .format(gzipped_file[:-3]))
-            else:
-                decompress(gzipped_file, '.')
-
-    def buildBWARefIndex(self, ref_file):
-        '''Create BWA index for reference genome file'''
-        # bwa index  -a bwtsw wg.fa
-        if os.path.isfile(self.REF_fasta + '.amb'):
-            env.logger.warning('Using existing bwa indexed sequence {}.amb'.format(self.REF_fasta))
-        else:
-            checkCmd('bwa')
-            run_command('bwa index {}  -a bwtsw {}'
-                .format(env.options['OPT_BWA_INDEX'], ref_file))
-
-    def buildSamToolsRefIndex(self, ref_file):
-        '''Create index for reference genome used by samtools'''
-        if os.path.isfile('{}.fai'.format(ref_file)):
-            env.logger.warning('Using existing samtools sequence index {}.fai'
-                .format(ref_file))
-        else:
-            checkCmd('samtools')
-            run_command('samtools faidx {} {}'
-                .format(env.options['OPT_SAMTOOLS_FAIDX'], ref_file))
-
     # interface
-    def checkResource(self):
-        '''Check if needed resource is available.'''
-        pass
-
     def prepareResourceIfNotExist(self):
         '''Prepare all resources for the pipeline. This is pipeline dependent.'''
-        pass
+        # download test data
+        saved_dir = os.getcwd()
+        os.chdir(env.resource_dir)
+        downloadFile('http://vtools.houstonbioinformatics.org/test_data/illumina_test_seq.tar.gz',
+            dest='illumina_test_seq.tar.gz')
+        if existAndNewerThan(ofiles=['illumina_test_seq_1.fastq', 'illumina_test_seq_2.fastq'],
+                ifiles='illumina_test_seq.tar.gz'):
+            env.logger.warning('Using existing test sequence files illumina_test_seq_1/2.fastq')
+        else:
+            decompress('illumina_test_seq.tar.gz', '.')
+        os.chdir(saved_dir)
 
     #
     # align and create bam file
@@ -723,145 +1237,6 @@ class BaseVariantCaller:
                         .format(fastq_file, e))
         filenames.sort()
         return filenames
-
-    def getReadGroup(self, fastq_filename, output_bam):
-        '''Get read group information from names of fastq files.'''
-        # Extract read group information from filename such as
-        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
-        # according to the lane that produced them and whether they
-        # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
-        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
-        # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
-        #
-        # This function return a read group string like '@RG\tID:foo\tSM:bar'
-        #
-        # ID* Read group identifier. Each @RG line must have a unique ID. The
-        # value of ID is used in the RG
-        #     tags of alignment records. Must be unique among all read groups
-        #     in header section. Read group
-        #     IDs may be modifid when merging SAM fies in order to handle collisions.
-        # CN Name of sequencing center producing the read.
-        # DS Description.
-        # DT Date the run was produced (ISO8601 date or date/time).
-        # FO Flow order. The array of nucleotide bases that correspond to the
-        #     nucleotides used for each
-        #     flow of each read. Multi-base flows are encoded in IUPAC format, 
-        #     and non-nucleotide flows by
-        #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
-        # KS The array of nucleotide bases that correspond to the key sequence
-        #     of each read.
-        # LB Library.
-        # PG Programs used for processing the read group.
-        # PI Predicted median insert size.
-        # PL Platform/technology used to produce the reads. Valid values: 
-        #     CAPILLARY, LS454, ILLUMINA,
-        #     SOLID, HELICOS, IONTORRENT and PACBIO.
-        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
-        #     SOLiD). Unique identifier.
-        # SM Sample. Use pool name where a pool is being sequenced.
-        #
-        filename = os.path.basename(fastq_filename)
-        output = os.path.basename(output_bam)
-        # sample name is obtained from output filename without file extension
-        SM = output.split('.', 1)[0]
-        # always assume ILLUMINA for this script and BWA for processing
-        PL = 'ILLUMINA'  
-        PG = 'BWA'
-        #
-        # PU is for flowcell and lane information, ID should be unique for each
-        #     readgroup
-        # ID is temporarily obtained from input filename without exteion
-        ID = filename.split('.')[0]
-        # try to get lan information from s_x_1/2 pattern
-        try:
-            PU = re.search('s_([^_]+)_', filename).group(1)
-        except AttributeError:
-            env.logger.warning('Failed to guess lane information from filename {}'
-                .format(filename))
-            PU = 'NA'
-        # try to get some better ID
-        try:
-            # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
-            m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
-            ID = '{}.{}'.format(m.group(1), m.group(4))
-        except AttributeError as e:
-            env.logger.warning('Input fasta filename {} does not match a known'
-                ' pattern. ID is directly obtained from filename.'.format(filename))
-        #
-        rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
-        env.logger.info('Setting read group tag to {}'.format(rg))
-        return rg
-
-    def bwa_aln(self, fastq_files):
-        '''Use bwa aln to process fastq files'''
-        for input_file in fastq_files:
-            dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
-            if existAndNewerThan(ofiles=dest_file, ifiles=input_file):
-                env.logger.warning('Using existing alignment index file {}'
-                    .format(dest_file))
-            else:
-                # input file should be in fastq format (-t 4 means 4 threads)
-                opt = ' -I ' if fastqVersion(input_file) == 'Illumina 1.3+' else ''
-                if opt == ' -I ':
-                    env.logger.warning('Using -I option for bwa aln command '
-                        'because the sequences seem to be in Illumina 1.3+ format.')
-                run_command('bwa aln {} {} -t 4 {}/{} {} > {}_tmp'
-                    .format(opt, env.options['OPT_BWA_ALN'], self.resource_dir, 
-                        self.REF_fasta, input_file, dest_file),
-                    name=os.path.basename(dest_file),
-                    upon_succ=(os.rename, dest_file + '_tmp', dest_file),
-                    wait=False)
-        # wait for all bwa aln jobs to be completed
-        wait_all()
-
-    def bwa_sampe(self, fastq_files):
-        '''Use bwa sampe to generate aligned sam files for paird end reads'''
-        sam_files = []
-        for idx in range(len(fastq_files)//2):
-            f1 = fastq_files[2*idx]
-            f2 = fastq_files[2*idx + 1]
-            rg = self.getReadGroup(f1, env.working_dir)
-            sai1 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f1))
-            sai2 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f2))
-            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
-            if existAndNewerThan(ofiles=sam_file, ifiles=[f1, f2, sai1, sai2]):
-                env.logger.warning('Using existing sam file {}'.format(sam_file))
-            else:
-                run_command(
-                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}_tmp'
-                    .format(
-                        env.options['OPT_BWA_SAMPE'], rg, self.resource_dir, self.REF_fasta,
-                        sai1, sai2, f1, f2, sam_file),
-                    name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
-                    wait=False)
-            sam_files.append(sam_file)
-        # wait for all jobs to be completed
-        wait_all()
-        return sam_files
-
-    def bwa_samse(self, fastq_files):
-        '''Use bwa sampe to generate aligned sam files'''
-        sam_files = []
-        for f in fastq_files:
-            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
-            rg = self.getReadGroup(f, env.working_dir)
-            sai = '{}/{}.sai'.format(env.working_dir, os.path.basename(f))
-            if existAndNewerThan(ofiles=sam_file, ifiles=[f, sai]):
-                env.logger.warning('Using existing sam file {}'.format(sam_file))
-            else:
-                run_command(
-                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}_tmp'
-                    .format(
-                        env.options['OPT_BWA_SAMSE'], rg, self.resource_dir,
-                        self.REF_fasta, sai, f, sam_file),
-                    name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
-                    wait=False)
-            sam_files.append(sam_file)
-        # wait for all jobs to be completed
-        wait_all()
-        return sam_files        
 
     def countUnmappedReads(self, sam_files):
         #
@@ -891,322 +1266,11 @@ class BaseVariantCaller:
         return counts
 
 
-    def SortSamWithSamtools(self, sam_files):
-        '''Convert sam file to sorted bam files.'''
-        bam_files = []
-        for sam_file in sam_files:
-            bam_file = sam_file[:-4] + '.bam'
-            if existAndNewerThan(ofiles=bam_file, ifiles=sam_file):
-                env.logger.warning('Using existing bam file {}'.format(bam_file))
-            else:
-                run_command('samtools view {} -bt {}/{}.fai {} > {}'
-                    .format(
-                        env.options['OPT_SAMTOOLS_VIEW'], self.resource_dir,
-                        self.REF_fasta, sam_file, TEMP(bam_file)),
-                    name=os.path.basename(bam_file),
-                    upon_succ=(os.rename, TEMP(bam_file), bam_file),
-                    wait=False)
-            bam_files.append(bam_file)
-        # wait for all sam->bam jobs to be completed
-        wait_all()
-        #
-        # sort bam files
-        sorted_bam_files = []
-        for bam_file in bam_files:
-            sorted_bam_file = bam_file[:-4] + '_sorted.bam'
-            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=bam_file):
-                env.logger.warning('Using existing sorted bam file {}'
-                    .format(sorted_bam_file))
-            else:
-                run_command('samtools sort {} {} {}'
-                    .format(
-                        env.options['OPT_SAMTOOLS_SORT'], bam_file,
-                        TEMP(sorted_bam_file)),
-                    name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
-                    wait=False)
-            sorted_bam_files.append(sorted_bam_file)
-        wait_all()
-        return sorted_bam_files
-
-    def SortSam(self, sam_files, output=None):
-        '''Convert sam file to sorted bam files using Picard.'''
-        # sort bam files
-        sorted_bam_files = []
-        for sam_file in sam_files:
-            sorted_bam_file = sam_file[:-4] + '_sorted.bam'
-            if existAndNewerThan(ofiles=sorted_bam_file, ifiles=sam_file):
-                env.logger.warning('Using existing sorted bam file {}'
-                    .format(sorted_bam_file))
-            else:
-                run_command(
-                    'java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'
-                    .format(
-                        env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
-                        env.options['OPT_PICARD_SORTSAM'], sam_file,
-                        TEMP(sorted_bam_file)),
-                    name=os.path.basename(sorted_bam_file),
-                    upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
-                    wait=False)
-            sorted_bam_files.append(sorted_bam_file)
-        wait_all()
-        return sorted_bam_files
-
-
-    def markDuplicates(self, bam_files):
-        '''Mark duplicate using picard'''
-        dedup_bam_files = []
-        for bam_file in bam_files:
-            dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
-            metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
-            if existAndNewerThan(ofiles=dedup_bam_file, ifiles=bam_file):
-                env.logger.warning(
-                    'Using existing bam files after marking duplicate {}'
-                    .format(dedup_bam_file))
-            else:
-                run_command('''java {0} -jar {1}/MarkDuplicates.jar {2}
-                    INPUT={3}
-                    OUTPUT={4}
-                    METRICS_FILE={5}
-                    ASSUME_SORTED=true
-                    VALIDATION_STRINGENCY=LENIENT
-                    '''.format(
-                        env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                        env.options['OPT_PICARD_MARKDUPLICATES'], bam_file,
-                        TEMP(dedup_bam_file),
-                        metrics_file), 
-                    name=os.path.basename(dedup_bam_file),
-                    upon_succ=(os.rename, TEMP(dedup_bam_file), dedup_bam_file),
-                    wait=False)
-            dedup_bam_files.append(dedup_bam_file)
-        wait_all()
-        return dedup_bam_files
-
-    def mergeBAMs(self, bam_files):
-        '''merge sam files'''
-        # use Picard merge, not samtools merge: 
-        # Picard keeps RG information from all Bam files, whereas samtools uses only 
-        # inf from the first bam file
-        merged_bam_file = bam_files[0][:-4] + '_merged.bam'
-        if existAndNewerThan(ofiles=merged_bam_file, ifiles=bam_files):
-            env.logger.warning('Using existing merged bam file {}'
-                .format(merged_bam_file))
-        else:
-            run_command('''java {} -jar {}/MergeSamFiles.jar {} {}
-                USE_THREADING=true
-                VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
-                OUTPUT={}'''.format(
-                    env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                    env.options['OPT_PICARD_MERGESAMFILES'],
-                    ' '.join(['INPUT={}'.format(x) for x in bam_files]),
-                    TEMP(merged_bam_file)),
-                name=os.path.basename(merged_bam_file),
-                upon_succ=(os.rename, TEMP(merged_bam_file), merged_bam_file))
-        return merged_bam_file
-
-    def indexBAM(self, bam_file):
-        '''Index the input bam file'''
-        if existAndNewerThan(ofiles='{}.bai'.format(bam_file), ifiles=bam_file):
-            env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
-        else:
-            run_command('samtools index {0} {1} {1}_tmp.bai'.format(
-                env.options['OPT_SAMTOOLS_INDEX'], bam_file),
-                upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
-
     def align(self, input_files, output):
         '''Align to the reference genome'''
         if not output.endswith('.bam'):
             env.logger.error('Plase specify a .bam file in the --output parameter')
             sys.exit(1)
-
-    def realignIndels(self, bam_file, knownSites):
-        '''Create realigner target and realign indels'''
-        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
-        if existAndNewerThan(ofiles=target, ifiles=bam_file):
-            env.logger.warning('Using existing realigner target {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T RealignerTargetCreator
-                --mismatchFraction 0.0
-                -o {6}_tmp {7} '''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
-                    bam_file, self.resource_dir,
-                    self.REF_fasta, target,
-                    ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, target + '_tmp', target))
-        # 
-        # realign around known indels
-        cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
-        if existAndNewerThan(ofiles=cleaned_bam_file, ifiles=target):
-            env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T IndelRealigner 
-                --targetIntervals {6}
-                --consensusDeterminationModel USE_READS
-                -compress 0 -o {7} {8}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
-                    bam_file, self.resource_dir,
-                    self.REF_fasta, target, TEMP(cleaned_bam_file),
-                    ' '.join(['-known {}/{}'.format(self.resource_dir, x) for x in knownSites])),
-                name=os.path.basename(cleaned_bam_file),
-                upon_succ=(os.rename, TEMP(cleaned_bam_file), cleaned_bam_file))
-        # 
-        return cleaned_bam_file
-
-
-    def recalibrate(self, bam_file, recal_bam_file, knownSites):
-        '''Create realigner target and realign indels'''
-        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
-        if existAndNewerThan(ofiles=target, ifiles=bam_file):
-            env.logger.warning('Using existing base recalibrator target {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} 
-                -T BaseRecalibrator
-                -I {3} 
-                -R {4}/{5}
-                -cov ReadGroupCovariate
-                -cov QualityScoreCovariate
-                -cov CycleCovariate
-                -cov ContextCovariate
-                -o {6}_tmp {7}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_BASERECALIBRATOR'], bam_file,
-                    self.resource_dir, self.REF_fasta, target,
-                    ' '.join(['-knownSites {}/{}'.format(self.resource_dir, x) for x in knownSites])),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, target + '_tmp', target))
-        #
-        # recalibrate
-        if existAndNewerThan(ofiles=recal_bam_file, ifiles=target):
-            env.logger.warning('Using existing recalibrated bam file {}'.format(recal_bam_file))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
-                -T PrintReads
-                -I {3} 
-                -R {4}/{5}
-                -BQSR {6}
-                -o {7}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_PRINTREADS'], bam_file,
-                    self.resource_dir, self.REF_fasta, target, 
-                    TEMP(recal_bam_file)),
-                name=os.path.basename(recal_bam_file),
-                upon_succ=(os.rename, TEMP(recal_bam_file), recal_bam_file))
-        # 
-        return recal_bam_file
-
-    def reduceReads(self, input_file):
-        target = input_file[:-4] + '_reduced.bam'
-        if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing reduced bam file {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
-                -T ReduceReads
-                -I {3} 
-                -R {4}/{5}
-                -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REDUCEREADS'], input_file,
-                    self.resource_dir, self.REF_fasta,
-                    TEMP(target)),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, TEMP(target), target))
-        # 
-        return target
-
-    def unifiedGenotyper(self, input_file):
-        target = os.path.join(env.working_dir,
-            os.path.basename(input_file)[:-4] + '.vcf')
-        if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing called variants {}'.format(target))
-        else:
-            dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T UnifiedGenotyper
-                --dbsnp {4}/{7}
-                -stand_call_conf 50.0 
-                -stand_emit_conf 10.0 
-                -dcov 200
-                -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_UNIFIEDGENOTYPER'], input_file,
-                    self.resource_dir, self.REF_fasta,
-                    TEMP(target), dbSNP_vcf),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, TEMP(target), target))
-        # 
-        return target
-
-    def haplotypeCall(self, input_file):
-        target = os.path.join(env.working_dir,
-            os.path.basename(input_file)[:-4] + '.vcf')
-        if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing called variants {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T HaplotypeCaller
-                -minPruning 3
-                -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    self.resource_dir, self.REF_fasta,
-                    TEMP(target)),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, TEMP(target), target))
-        # 
-        return target
-
-
-    def variantRecalibration(self, input_file):
-        target = os.path.join(env.working_dir,
-            os.path.basename(input_file)[:-4] + '_recal.vcf')
-        if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing recalibrated variants {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T VariantRecalibrator
-                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf		
-                -resource:omni,known=false,training=true,truth=false,prior=12.0	1000G_omni2.5.b37.sites.vcf		
-                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0	dbsnp_137.b37.v	
-                -an	QD	-an	MQ	-an	HaplotypeScore {}
-                -mode SNP 
-                -recalFile raw.SNPs.recal
-                -tranchesFile raw.SNPs.tranches
-                -rscriptFile recal.plots.R
-                -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    self.resource_dir, self.REF_fasta,
-                    TEMP(target)),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, TEMP(target), target))
-        # 
-        if existAndNewerThan(ofiles=target, ifiles=input_file):
-            env.logger.warning('Using existing recalibrated variants {}'.format(target))
-        else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
-                -T ApplyRecalibraBon
-                -mode SNP 
-                -recalFile raw.SNPs.recal
-                -tranchesFile raw.SNPs.trances
-                -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    self.resource_dir, self.REF_fasta,
-                    TEMP(target)),
-                name=os.path.basename(target),
-                upon_succ=(os.rename, TEMP(target), target))
-        return target
 
 
     def callVariants(self, input_files, ped_file, output):
@@ -1237,43 +1301,34 @@ class b37_gatk_23(BaseVariantCaller):
             'Mills_and_1000G_gold_standard.indels.b37.vcf',
             '1000G_phase1.indels.b37.vcf',
         ]
-
+        #
+        self.checkResource()
+        # prepare the commands to be used
+        self.bwa = BWA(self.REF_fasta)
+        self.picard = PICARD()
+        self.samtools = SAMTOOLS(self.REF_fasta)
+        self.gatk = GATK(self.REF_fasta, self.knownSites)
 
     def checkResource(self):
         '''Check if needed resource is available. This pipeline requires
         GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
         saved_dir = os.getcwd()
-        os.chdir(self.resource_dir)
+        os.chdir(env.resource_dir)
         files = [self.REF_fasta, self.REF_fasta + '.amb', self.REF_fasta + '.fai']
         if not all([os.path.isfile(x) for x in files]):
             sys.exit('GATK resource bundle does not exist in directory {}. '
                 'Please run "call_variants.py prepare_resource" befor you '
-                'execute this command.'.format(self.resource_dir))
-        #
-        for cmd in ['wget',     # to download resource
-                    'bwa',      # alignment
-                    'samtools'  # merge sam files
-                    ]:
-            checkCmd(cmd)
-        #
-        checkPicard()
-        checkGATK()
-        # checkPySam()
-        #
+                'execute this command.'.format(env.resource_dir))
         os.chdir(saved_dir)
 
     def prepareResourceIfNotExist(self):
         '''This function downloads the UCSC resource boundle for specified build and
         creates bwa and samtools indexed files from the whole genome sequence '''
-        saved_dir = os.getcwd()
-        os.chdir(self.resource_dir)
-        #
         # these are pipeline specific
-        self.downloadGATKResourceBundle(self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
-        self.buildBWARefIndex(self.REF_fasta)
-        self.buildSamToolsRefIndex(self.REF_fasta)
-        # 
-        os.chdir(saved_dir)
+        BaseVariantCaller.prepareResourceIfNotExist(self)
+        GATK().downloadResourceBundle(self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
+        BWA(self.REF_fasta).buildIndex()
+        SAMTOOLS(self.REF_fasta).buildIndex()
 
     def bam2fastq(self, input_file):
         '''This function extracts raw reads from an input BAM file to one or 
@@ -1308,7 +1363,7 @@ class b37_gatk_23(BaseVariantCaller):
         fastq_files = self.getFastqFiles(input_files)
         #
         # step 2: call bwa aln to produce .sai files
-        self.bwa_aln(fastq_files)
+        self.bwa.aln(fastq_files)
         #
         # step 3: generate .sam files for each pair of pairend reads, or reach file of unpaired reads
         paired = True
@@ -1334,9 +1389,9 @@ class b37_gatk_23(BaseVariantCaller):
         #
         # sam files?
         if paired:
-            sam_files = self.bwa_sampe(fastq_files)
+            sam_files = self.bwa.sampe(fastq_files)
         else:
-            sam_files = self.bwa_samse(fastq_files)
+            sam_files = self.bwa.samse(fastq_files)
         #
         counts = self.countUnmappedReads(sam_files)
         for f,c in zip(sam_files, counts):
@@ -1350,34 +1405,34 @@ class b37_gatk_23(BaseVariantCaller):
                     .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
         # 
         # step 4: convert sam to sorted bam files
-        sorted_bam_files = self.SortSam(sam_files)
+        sorted_bam_files = self.picard.sortSam(sam_files)
         #
         # According to GATK best practice, dedup should be run at the
         # lane level (the documentation is confusing here though)
         #
         # step 5: remove duplicate
-        dedup_bam_files = self.markDuplicates(sorted_bam_files)
+        dedup_bam_files = self.picard.markDuplicates(sorted_bam_files)
         #
         # step 6: merge sorted bam files to output file
         if len(dedup_bam_files) > 1:
-            merged_bam_file = self.mergeBAMs(dedup_bam_files)
+            merged_bam_file = self.picard.mergeBAMs(dedup_bam_files)
         else:
             merged_bam_file = dedup_bam_files[0]
         #
         # step 7: index the output bam file
-        self.indexBAM(merged_bam_file)
+        self.samtools.indexBAM(merged_bam_file)
         #
         # step 7: create indel realignment targets and recall
-        cleaned_bam_file = self.realignIndels(merged_bam_file, knownSites=self.knownSites)
-        self.indexBAM(cleaned_bam_file)
+        cleaned_bam_file = self.gatk.realignIndels(merged_bam_file)
+        self.samtools.indexBAM(cleaned_bam_file)
         #
         # step 8: recalibration
-        self.recalibrate(cleaned_bam_file, output, knownSites=self.knownSites)
-        self.indexBAM(output)
+        self.gatk.recalibrate(cleaned_bam_file, output)
+        self.samtools.indexBAM(output)
         #
         # step 9: reduce reads
-        reduced = self.reduceReads(output)
-        self.indexBAM(reduced)
+        reduced = self.gatk.reduceReads(output)
+        self.samtools.indexBAM(reduced)
 
     def callVariants(self, input_files, pedfile, output):
         '''Call variants from a list of input files'''
@@ -1387,7 +1442,7 @@ class b37_gatk_23(BaseVariantCaller):
         # step 1: haplotype call
         for input_file in input_files:
             #vcf_file = self.haplotypeCall(input_file)
-            vcf_file = self.unifiedGenotyper(input_file)
+            vcf_file = self.gatk.unifiedGenotyper(input_file)
         #
 
 
@@ -1408,6 +1463,12 @@ class hg19_gatk_23(b37_gatk_23):
             'Mills_and_1000G_gold_standard.indels.hg19.vcf',
             '1000G_phase1.indels.hg19.vcf',
         ]
+        self.checkResource()
+        # prepare the commands to be used
+        self.bwa = BWA(self.REF_fasta)
+        self.picard = PICARD()
+        self.samtools = SAMTOOLS(self.REF_fasta)
+        self.gatk = GATK(self.REF_fasta, self.knownSites)
         
 
 if __name__ == '__main__':
@@ -1440,7 +1501,8 @@ if __name__ == '__main__':
         ('OPT_PICARD_MARKDUPLICATES', ''),
         #
         ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
-        ('OPT_GATK_INDELREALIGNER', ''),
+        # http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
+        ('OPT_GATK_INDELREALIGNER', '--filter_mismatching_base_and_quals'),
         ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
         ('OPT_GATK_PRINTREADS', ''),
         ('OPT_GATK_REDUCEREADS', ''),
@@ -1457,17 +1519,19 @@ if __name__ == '__main__':
                 help='''A directory for resources used by variant caller. Default to
                     ~/.variant_tools/var_caller.''')
         if 'set' in args:
-            parser.add_argument('--set', nargs='*',
-                help='''Set runtime variables in the format of NAME=value. NAME can be
-                    PICARD_PATH (path to picard, should have a number of .jar files 
-                    under it), GATK_PATH (path to gatk, should have GenomeAnalysisTK.jar
-                    under it) for path to JAR files (can be ignored if the paths are
-                    specified in environment variable $CLASSPATH), additional options
-                    to command java (OPT_JAVA, parameter to the java command, default
-                    to value "-Xmx4g"), and options to individual subcommands such as
+            parser.add_argument('--set', nargs='*', metavar='NAME+=VALUE',
+                help='''Set runtime variables in the format of NAME=VALUE (set
+                    VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
+                    NAME). NAME can be PICARD_PATH (path to picard, should have
+                    a number of .jar files under it), GATK_PATH (path to gatk,
+                    should have GenomeAnalysisTK.jar under it) for path to JAR
+                    files (can be ignored if the paths are specified in environment
+                    variable $CLASSPATH), additional options to command java
+                    (OPT_JAVA, parameter to the java command, default to value
+                    "-Xmx4g"), and options to individual subcommands such as
                     OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
-                    The following options are acceptable: {}'''.format(', '.join(
-                    [x[0] + (' (default: {})'.format(x[1]) if x[1] else '') for x in options])))
+                    The following options are acceptable: {}.'''.format(
+                    ', '.join([x[0] + (' ({})'.format(x[1]) if x[1] else '') for x in options])))
         if 'jobs' in args:
             parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
@@ -1499,27 +1563,34 @@ if __name__ == '__main__':
             The input files should be reads for the same sample, which could be individual
             fastq files, a tar file with all fastq files, or their gziped or bzipped
             versions. Filenames ending with _1 _2 will be considered as paired end reads.''')
-    align.add_argument('input_files', nargs='+',
+    align.add_argument('input_files', nargs='*',
         help='''One or more .txt, .fa, .fastq, .tar, .tar.gz, .tar.bz2, .tbz2, .tgz files
             that contain raw reads of a single sample. Files in sam/bam format are also
             acceptable, in which case raw reads will be extracted and aligned again to 
             generate a new bam file. ''')
-    align.add_argument('-o', '--output', required=True,
+    align.add_argument('-o', '--output',
         help='''Output aligned reads to a sorted, indexed, dedupped, and recalibrated
             BAM file $output.bam.''')
+    align.add_argument('--test_run', action='store_true',
+        help='''If specified, run the pipeline using test data that is prepared
+            by the prepare_resource command. The test data contains 1 million
+            pair-end reads.''')
     addCommonArguments(align, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     # action call
     #
     call = subparsers.add_parser('call',
         help='''Call variants from a list of calibrated BAM files.''')
-    call.add_argument('input_files', nargs='+',
+    call.add_argument('input_files', nargs='*',
         help='''One or more BAM files.''')
-    call.add_argument('-o', '--output', required=True,
+    call.add_argument('-o', '--output',
         help='''Output called variants to the specified VCF file''')
     call.add_argument('--pedfile',
         help='''A pedigree file that specifies the relationship between input
             samples, used for multi-sample calling.''')
+    call.add_argument('--test_run', action='store_true',
+        help='''If specified, run the pipeline using test data from illumina. The test
+            data should be produced by the 'align --test' command.''')
     addCommonArguments(call, ['pipeline', 'resource_dir', 'set', 'jobs'])
     #
     args = master_parser.parse_args()
@@ -1531,9 +1602,12 @@ if __name__ == '__main__':
         if type(args.output) == list:
             env.working_dir = os.path.split(args.output[0])[0]
             logname = os.path.basename(args.output[0]) + '.log'
-        else:
+        elif args.output:
             env.working_dir = os.path.split(args.output)[0]
             logname = os.path.basename(args.output) + '.log'
+        else:
+            env.working_dir = '.'
+            logname = 'illumina_test.log'
         # screen + log file logging
         env.logger = os.path.join(env.working_dir, logname)
     else:
@@ -1553,11 +1627,19 @@ if __name__ == '__main__':
             if '=' not in arg:
                 sys.exit('Additional parameter should have form NAME=value')
             name, value = arg.split('=', 1)
+            append = False
+            if name.endswith('+'):  # NAME+=VALUE
+                name = name[:-1]
+                append = True
             if name not in [x[0] for x in options]:
                 env.logger.error('Unrecognized environment variable {}: {} are allowed.'.format(
                     name, ', '.join([x[0] for x in options])))
                 sys.exit(1)
-            env.options[name] = value
+            # replace $ITEM in value with their values
+            if append:
+                env.options[name] = env.options[name] + ' ' + value
+            else:
+                env.options[name] = value
             env.logger.info('Environment variable {} is set to {}'.format(name, value))
     #
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
@@ -1567,13 +1649,18 @@ if __name__ == '__main__':
         pipeline.prepareResourceIfNotExist()
     elif args.action == 'align':
         env.jobs = args.jobs
-        checkPicard()
-        pipeline.checkResource()
-        pipeline.align(args.input_files, args.output)
+        if args.test_run:
+            ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
+            ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.bam')
+            pipeline.align(ifiles, ofiles)
+        else:
+            pipeline.align(args.input_files, args.output)
     elif args.action == 'call':
         env.jobs = args.jobs
-        checkPicard()
-        checkGATK()
-        pipeline.checkResource()
-        pipeline.callVariants(args.input_files, args.pedfile, args.output)
+        if args.test_run:
+            ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq.bam')]
+            ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.vcf')
+            pipeline.callVariants(ifiles, None, ofiles)
+        else:
+            pipeline.callVariants(args.input_files, args.pedfile, args.output)
 
