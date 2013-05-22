@@ -1326,7 +1326,7 @@ class b37_gatk_23(BaseVariantCaller):
         creates bwa and samtools indexed files from the whole genome sequence '''
         # these are pipeline specific
         BaseVariantCaller.prepareResourceIfNotExist(self)
-        GATK().downloadResourceBundle(self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
+        GATK(self.REF_fasta, self.knownSites).downloadResourceBundle(self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
         BWA(self.REF_fasta).buildIndex()
         SAMTOOLS(self.REF_fasta).buildIndex()
 
