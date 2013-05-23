@@ -524,7 +524,7 @@ class PICARD:
                     break
         else:
             env.logger.error('Please either specify path to picard using option '
-                'PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
+                '--set PICARD_PATH=path, or set it in environment variable $CLASSPATH.')
             sys.exit(1)
 
     def sortSam(self, sam_files, output=None):
@@ -626,7 +626,7 @@ class GATK:
                         break
         else:
             env.logger.error('Please either specify path to GATK using option '
-                'GATK_PATH=path, or set it in environment variable $CLASSPATH.')
+                '--set GATK_PATH=path, or set it in environment variable $CLASSPATH.')
             sys.exit(1) 
         #
         self.REF_fasta = ref_fasta
@@ -1302,11 +1302,10 @@ class b37_gatk_23(BaseVariantCaller):
             '1000G_phase1.indels.b37.vcf',
         ]
         #
-        self.checkResource()
         # prepare the commands to be used
         self.bwa = BWA(self.REF_fasta)
-        self.picard = PICARD()
         self.samtools = SAMTOOLS(self.REF_fasta)
+        self.picard = PICARD()
         self.gatk = GATK(self.REF_fasta, self.knownSites)
 
     def checkResource(self):
@@ -1509,31 +1508,27 @@ if __name__ == '__main__':
         ('OPT_GATK_HAPLOTYPECALLER', ''),
         ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
     ]
-    def addCommonArguments(parser, args):
-        if 'pipeline' in args:
-            parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
-                choices=['hg19_gatk_23', 'b37_gatk_23'],
-                help='Name of the pipeline to be used to call variants.')
-        if 'resource_dir' in args:
-            parser.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
-                help='''A directory for resources used by variant caller. Default to
-                    ~/.variant_tools/var_caller.''')
-        if 'set' in args:
-            parser.add_argument('--set', nargs='*', metavar='NAME+=VALUE',
-                help='''Set runtime variables in the format of NAME=VALUE (set
-                    VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
-                    NAME). NAME can be PICARD_PATH (path to picard, should have
-                    a number of .jar files under it), GATK_PATH (path to gatk,
-                    should have GenomeAnalysisTK.jar under it) for path to JAR
-                    files (can be ignored if the paths are specified in environment
-                    variable $CLASSPATH), additional options to command java
-                    (OPT_JAVA, parameter to the java command, default to value
-                    "-Xmx4g"), and options to individual subcommands such as
-                    OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
-                    The following options are acceptable: {}.'''.format(
-                    ', '.join([x[0] + (' ({})'.format(x[1]) if x[1] else '') for x in options])))
-        if 'jobs' in args:
-            parser.add_argument('-j', '--jobs', default=1, type=int,
+    def addCommonArguments(parser, args=[]):
+        parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
+            choices=['hg19_gatk_23', 'b37_gatk_23'],
+            help='Name of the pipeline to be used to call variants.')
+        parser.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
+            help='''A directory for resources used by variant caller. Default to
+                ~/.variant_tools/var_caller.''')
+        parser.add_argument('--set', nargs='*', metavar='NAME+=VALUE',
+            help='''Set runtime variables in the format of NAME=VALUE (set
+                VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
+                NAME). NAME can be PICARD_PATH (path to picard, should have
+                a number of .jar files under it), GATK_PATH (path to gatk,
+                should have GenomeAnalysisTK.jar under it) for path to JAR
+                files (can be ignored if the paths are specified in environment
+                variable $CLASSPATH), additional options to command java
+                (OPT_JAVA, parameter to the java command, default to value
+                "-Xmx4g"), and options to individual subcommands such as
+                OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
+                The following options are acceptable: {}.'''.format(
+                ', '.join([x[0] + (' ({})'.format(x[1]) if x[1] else '') for x in options])))
+        parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
         # notification is currently not used
         if 'notification' in args:
@@ -1554,7 +1549,7 @@ if __name__ == '__main__':
         help='Prepare resources for subsequent variant calling operations.',
         description='''This operation downloads GATK resource bundle and creates
             indexed reference genomes to be used by other tools.''')
-    addCommonArguments(resource, ['pipeline', 'resource_dir'])
+    addCommonArguments(resource)
     #
     # action align
     #
@@ -1575,7 +1570,7 @@ if __name__ == '__main__':
         help='''If specified, run the pipeline using test data that is prepared
             by the prepare_resource command. The test data contains 1 million
             pair-end reads.''')
-    addCommonArguments(align, ['pipeline', 'resource_dir', 'set', 'jobs'])
+    addCommonArguments(align)
     #
     # action call
     #
@@ -1591,7 +1586,7 @@ if __name__ == '__main__':
     call.add_argument('--test_run', action='store_true',
         help='''If specified, run the pipeline using test data from illumina. The test
             data should be produced by the 'align --test' command.''')
-    addCommonArguments(call, ['pipeline', 'resource_dir', 'set', 'jobs'])
+    addCommonArguments(call)
     #
     args = master_parser.parse_args()
     if args.action is None:
@@ -1649,6 +1644,7 @@ if __name__ == '__main__':
         pipeline.prepareResourceIfNotExist()
     elif args.action == 'align':
         env.jobs = args.jobs
+        pipeline.checkResource()
         if args.test_run:
             ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
             ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.bam')
@@ -1657,6 +1653,7 @@ if __name__ == '__main__':
             pipeline.align(args.input_files, args.output)
     elif args.action == 'call':
         env.jobs = args.jobs
+        pipeline.checkResource()
         if args.test_run:
             ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq.bam')]
             ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.vcf')
