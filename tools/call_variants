@@ -59,9 +59,6 @@ class RuntimeEnvironment(object):
         # file and screen logging
         self._logger = None
         #
-        # working directory
-        self._working_dir = None
-        #
         # additional parameters for args
         self.options = defaultdict(str)
         #
@@ -168,6 +165,8 @@ class RuntimeEnvironment(object):
         '''Create a logger with colored console output, and a log file if a
         filename is provided.'''
         # create a logger
+        if self._logger is not None:
+            self._logger.handlers = []
         self._logger = logging.getLogger()
         self._logger.setLevel(logging.DEBUG)
         # output to standard output
@@ -183,18 +182,6 @@ class RuntimeEnvironment(object):
             self._logger.addHandler(ch)
     #
     logger = property(lambda self: self._logger, _setLogger)
-    #
-    def _setWorkingDir(self, working_dir=None):
-        if working_dir is None:
-            raise RuntimeError('Invalid working directory.')
-        if not os.path.isdir(working_dir):
-            os.makedirs(working_dir)
-        self._working_dir = working_dir
-        if self._logger is not None:
-            self._logger.info('Setting working directory to {}'
-                .format(self._working_dir))
-    #
-    working_dir = property(lambda self: self._working_dir, _setWorkingDir)
     #
     def _setNotificationEmail(self, address):
         if not address:
@@ -233,18 +220,23 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
     '''Call an external command, raise an error if it fails.
     If upon_succ is specified, the specified function and parameters will be
     evalulated after the job has been completed successfully.
-    If a name is given, stdout and stderr will be sent to env.working_dir, 
+    If a name is given, stdout and stderr will be sent to env.WORKING_DIR, 
     name.out and name.err. Otherwise, stdout and stderr will be ignored.
     '''
     # merge mulit-line command into one line and remove extra white spaces
     cmd = ' '.join(cmd.split())
     if name is None:
-        proc_out = subprocess.DEVNULL
-        proc_err = subprocess.DEVNULL
+        try:
+            proc_out = subprocess.DEVNULL
+            proc_err = subprocess.DEVNULL
+        except:
+            # subprocess.DEVNULL was introduced in Python 3.3
+            proc_out = open(os.devnull, 'w')
+            proc_err = open(os.devnull, 'w')
     else:
         name = name.replace('/', '_')
-        proc_out = open(os.path.join(env.working_dir, name + '.out'), 'w')
-        proc_err = open(os.path.join(env.working_dir, name + '.err'), 'w')
+        proc_out = open(os.path.join(env.WORKING_DIR, name + '.out'), 'w')
+        proc_err = open(os.path.join(env.WORKING_DIR, name + '.err'), 'w')
     if wait or env.jobs == 1:
         try:
             s = time.time()
@@ -260,7 +252,7 @@ def run_command(cmd, name=None, upon_succ=None, wait=True):
                 sys.exit(1)
             elif retcode > 0:
                 if name is not None:
-                    with open(os.path.join(env.working_dir, name + '.err')) as err:
+                    with open(os.path.join(env.WORKING_DIR, name + '.err')) as err:
                         for line in err.read().split('\n')[-20:]:
                             env.logger.error(line)
                 env.logger.error("Command {} returned {} after executing {}"
@@ -300,12 +292,13 @@ def poll_jobs():
             continue
         #
         # job completed, close redirected stdout and stderr
-        if job.stderr != subprocess.DEVNULL:
-            try:
-                job.stdout.close()
-                job.stderr.close()
-            except:
-                pass
+        # for python 3.3. where job.stdout is DEVNULL, this will 
+        # fail so try/except is needed.
+        try:
+            job.stdout.close()
+            job.stderr.close()
+        except:
+            pass
         #
         if ret < 0:
             env.logger.error("Command {} was terminated by signal {} after executing {}"
@@ -313,7 +306,7 @@ def poll_jobs():
             sys.exit(1)
         elif ret > 0:
             if job.name is not None:
-                with open(os.path.join(env.working_dir, job.name + '.err')) as err:
+                with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
             env.logger.error('Execution of command {} failed after {} (return code {}).'
@@ -321,7 +314,7 @@ def poll_jobs():
             sys.exit(1)
         else:
             if job.name is not None:
-                with open(os.path.join(env.working_dir, job.name + '.err')) as err:
+                with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
                     for line in err.read().split('\n')[-10:]:
                         env.logger.info(line)
             # finish up
@@ -366,7 +359,7 @@ class BWA:
     def aln(self, fastq_files):
         '''Use bwa aln to process fastq files'''
         for input_file in fastq_files:
-            dest_file = '{}/{}.sai'.format(env.working_dir, os.path.basename(input_file))
+            dest_file = '{}/{}.sai'.format(env.WORKING_DIR, os.path.basename(input_file))
             if existAndNewerThan(ofiles=dest_file, ifiles=input_file):
                 env.logger.warning('Using existing alignment index file {}'
                     .format(dest_file))
@@ -385,16 +378,16 @@ class BWA:
         # wait for all bwa aln jobs to be completed
         wait_all()
 
-    def sampe(self, fastq_files):
+    def sampe(self, fastq_files, sample_name=None):
         '''Use bwa sampe to generate aligned sam files for paird end reads'''
         sam_files = []
         for idx in range(len(fastq_files)//2):
             f1 = fastq_files[2*idx]
             f2 = fastq_files[2*idx + 1]
-            rg = getReadGroup(f1, env.working_dir)
-            sai1 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f1))
-            sai2 = '{}/{}.sai'.format(env.working_dir, os.path.basename(f2))
-            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f1))
+            rg = getReadGroup(f1, sample_name)
+            sai1 = '{}/{}.sai'.format(env.WORKING_DIR, os.path.basename(f1))
+            sai2 = '{}/{}.sai'.format(env.WORKING_DIR, os.path.basename(f2))
+            sam_file = '{}/{}_bwa.sam'.format(env.WORKING_DIR, os.path.basename(f1))
             if existAndNewerThan(ofiles=sam_file, ifiles=[f1, f2, sai1, sai2]):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
@@ -411,13 +404,13 @@ class BWA:
         wait_all()
         return sam_files
 
-    def samse(self, fastq_files):
+    def samse(self, fastq_files, sample_name=None):
         '''Use bwa sampe to generate aligned sam files'''
         sam_files = []
         for f in fastq_files:
-            sam_file = '{}/{}_bwa.sam'.format(env.working_dir, os.path.basename(f))
-            rg = getReadGroup(f, env.working_dir)
-            sai = '{}/{}.sai'.format(env.working_dir, os.path.basename(f))
+            sam_file = '{}/{}_bwa.sam'.format(env.WORKING_DIR, os.path.basename(f))
+            rg = getReadGroup(f, sample_name)
+            sai = '{}/{}.sai'.format(env.WORKING_DIR, os.path.basename(f))
             if existAndNewerThan(ofiles=sam_file, ifiles=[f, sai]):
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
@@ -572,8 +565,8 @@ class PICARD:
         '''Mark duplicate using picard'''
         dedup_bam_files = []
         for bam_file in bam_files:
-            dedup_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.dedup.bam')
-            metrics_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.metrics')
+            dedup_bam_file = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.dedup.bam')
+            metrics_file = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.metrics')
             if existAndNewerThan(ofiles=dedup_bam_file, ifiles=bam_file):
                 env.logger.warning(
                     'Using existing bam files after marking duplicate {}'
@@ -636,7 +629,7 @@ class GATK:
         if all([os.path.isfile(x) for x in files]):
             env.logger.warning('Using existing GATK resource')
         else:
-            run_command('wget -r {}'.format(URL))
+            run_command('wget -nc -r {}'.format(URL))
             # walk into the directory and get everything to the top directory
             # this is because wget -r saves files under URL/file
             for root, dirs, files in os.walk('.'):
@@ -656,7 +649,7 @@ class GATK:
 
     def realignIndels(self, bam_file):
         '''Create realigner target and realign indels'''
-        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
+        target = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.IndelRealignerTarget.intervals')
         if existAndNewerThan(ofiles=target, ifiles=bam_file):
             env.logger.warning('Using existing realigner target {}'.format(target))
         else:
@@ -674,7 +667,7 @@ class GATK:
                 upon_succ=(os.rename, target + '_tmp', target))
         # 
         # realign around known indels
-        cleaned_bam_file = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.clean.bam')
+        cleaned_bam_file = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.clean.bam')
         if existAndNewerThan(ofiles=cleaned_bam_file, ifiles=target):
             env.logger.warning('Using existing realigner bam file {}'.format(cleaned_bam_file))
         else:
@@ -697,7 +690,7 @@ class GATK:
 
     def recalibrate(self, bam_file, recal_bam_file):
         '''Create realigner target and realign indels'''
-        target = os.path.join(env.working_dir, os.path.basename(bam_file)[:-4] + '.grp')
+        target = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.grp')
         if existAndNewerThan(ofiles=target, ifiles=bam_file):
             env.logger.warning('Using existing base recalibrator target {}'.format(target))
         else:
@@ -756,7 +749,7 @@ class GATK:
         return target
 
     def unifiedGenotyper(self, input_file):
-        target = os.path.join(env.working_dir,
+        target = os.path.join(env.WORKING_DIR,
             os.path.basename(input_file)[:-4] + '.vcf')
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing called variants {}'.format(target))
@@ -780,7 +773,7 @@ class GATK:
         return target
 
     def haplotypeCall(self, input_file):
-        target = os.path.join(env.working_dir,
+        target = os.path.join(env.WORKING_DIR,
             os.path.basename(input_file)[:-4] + '.vcf')
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing called variants {}'.format(target))
@@ -801,7 +794,7 @@ class GATK:
 
 
     def variantRecalibration(self, input_file):
-        target = os.path.join(env.working_dir,
+        target = os.path.join(env.WORKING_DIR,
             os.path.basename(input_file)[:-4] + '_recal.vcf')
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
@@ -967,7 +960,7 @@ def existAndNewerThan(ofiles, ifiles):
     #
     if output_timestamp - input_timestamp < 2:
         env.logger.warning(
-            'Existing output file {} is ignored because it is newer than input file.'
+            'Existing output file {} is ignored because it is older than input file.'
             .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
         return False
     else:
@@ -1083,7 +1076,7 @@ def decompress(filename, dest_dir=None):
             # set dest_files to the same modification time. This is used to
             # mark the right time when the files are created and avoid the use
             # of archieved but should-not-be-used files that might be generated later
-            [os.utime(x) for x in dest_files]
+            [os.utime(x, None) for x in dest_files]
         return dest_files
     # return source file if 
     return [filename]
@@ -1125,6 +1118,7 @@ def getReadGroup(fastq_filename, output_bam):
     #     SOLiD). Unique identifier.
     # SM Sample. Use pool name where a pool is being sequenced.
     #
+    env.logger.error(output_bam)
     filename = os.path.basename(fastq_filename)
     output = os.path.basename(output_bam)
     # sample name is obtained from output filename without file extension
@@ -1223,7 +1217,7 @@ class BaseVariantCaller:
             if filename.lower().endswith('.bam') or filename.lower().endswith('.sam'):
                 filenames.extend(self.bam2fastq(filename))
                 continue
-            for fastq_file in decompress(filename, env.working_dir):
+            for fastq_file in decompress(filename, env.WORKING_DIR):
                 try:
                     with open(fastq_file) as fastq:
                         line = fastq.readline()
@@ -1332,7 +1326,7 @@ class b37_gatk_23(BaseVariantCaller):
         more fastq files.'''
         #
         # check if the bam file is paired or not (FIXME)
-        output_files = [os.path.join(env.working_dir, '{}_{}.fastq'
+        output_files = [os.path.join(env.WORKING_DIR, '{}_{}.fastq'
             .format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
         if all([os.path.isfile(x) for x in output_files]):
             env.logger.warning('Using existing sequence files {}'
@@ -1354,7 +1348,10 @@ class b37_gatk_23(BaseVariantCaller):
         #
         # the working dir is a directory under output, the middle files are saved to this
         # directory to avoid name conflict
-        env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
+        if not env.SPECIFIED_WORKING_DIR:
+            env.options['WORKING_DIR'] = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
+        if not os.path.isdir(env.WORKING_DIR):
+            os.makedirs(env.WORKING_DIR)
         #
         # step 1: decompress to get a list of fastq files
         fastq_files = self.getFastqFiles(input_files)
@@ -1386,9 +1383,9 @@ class b37_gatk_23(BaseVariantCaller):
         #
         # sam files?
         if paired:
-            sam_files = self.bwa.sampe(fastq_files)
+            sam_files = self.bwa.sampe(fastq_files, output)
         else:
-            sam_files = self.bwa.samse(fastq_files)
+            sam_files = self.bwa.samse(fastq_files, output)
         #
         counts = self.countUnmappedReads(sam_files)
         for f,c in zip(sam_files, counts):
@@ -1434,7 +1431,11 @@ class b37_gatk_23(BaseVariantCaller):
     def callVariants(self, input_files, pedfile, output):
         '''Call variants from a list of input files'''
         BaseVariantCaller.callVariants(self, input_files, pedfile, output)
-        env.working_dir = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_call_cache')
+        if not env.SPECIFIED_WORKING_DIR:
+            env.options['WORKING_DIR'] = os.path.join(os.path.split(output)[0],
+                os.path.basename(output) + '_call_cache')
+        if not os.path.isdir(env.WORKING_DIR):
+            os.makedirs(env.WORKING_DIR)
         #
         # step 1: haplotype call
         for input_file in input_files:
@@ -1475,6 +1476,7 @@ class hg19_gatk_23(b37_gatk_23):
 if __name__ == '__main__':
     options = [
         ('RESOURCE_DIR', '~/.variant_tools/var_caller'),
+        ('WORKING_DIR', ''),
         # option, default value
         ('PICARD_PATH', ''),
         ('GATK_PATH', ''),
@@ -1511,7 +1513,7 @@ if __name__ == '__main__':
         ('OPT_GATK_HAPLOTYPECALLER', ''),
         ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
     ]
-    def addCommonArguments(parser, args=[]):
+    def addCommonArguments(parser):
         parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
             choices=['hg19_gatk_23', 'b37_gatk_23'],
             help='Name of the pipeline to be used to call variants.')
@@ -1519,8 +1521,9 @@ if __name__ == '__main__':
             help='''Set runtime variables in the format of NAME=VALUE (set
                 VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
                 NAME). NAME can be RESOURCE_DIR (directory for resources such as
-                reference genome. Default to ~/.variant_tools/var_caller), 
-                PICARD_PATH (path to picard, should have
+                reference genome. Default to ~/.variant_tools/var_caller),
+                WORKING_DIR (directory to hold all intermedate files, default to
+                $output_$action_cache) PICARD_PATH (path to picard, should have
                 a number of .jar files under it), GATK_PATH (path to gatk,
                 should have GenomeAnalysisTK.jar under it) for path to JAR
                 files (can be ignored if the paths are specified in environment
@@ -1533,10 +1536,9 @@ if __name__ == '__main__':
         parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
         # notification is currently not used
-        if 'notification' in args:
-            parser.add_argument('--notification',
-                help='''If an email address is provided, an email will be sent
-                    to after the completion of each major step.''')
+        #    parser.add_argument('--notification',
+        #        help='''If an email address is provided, an email will be sent
+        #            to after the completion of each major step.''')
     #
     master_parser = argparse.ArgumentParser(description='''Pipelines to call variants
         from raw sequence files, or single-sample bam files. It works (tested) only
@@ -1596,21 +1598,8 @@ if __name__ == '__main__':
         master_parser.print_help()
         sys.exit(0)
     #
-    if hasattr(args, 'output'):
-        if type(args.output) == list:
-            env.working_dir = os.path.split(args.output[0])[0]
-            logname = os.path.basename(args.output[0]) + '.log'
-        elif args.output:
-            env.working_dir = os.path.split(args.output)[0]
-            logname = os.path.basename(args.output) + '.log'
-        else:
-            env.working_dir = '.'
-            logname = 'illumina_test.log'
-        # screen + log file logging
-        env.logger = os.path.join(env.working_dir, logname)
-    else:
-        # screen only logging
-        env.logger = None
+    # temporary screen only logging
+    env.logger = None
     #
     if hasattr(args, 'notification'):
         env.notification_email = args.notification
@@ -1639,6 +1628,28 @@ if __name__ == '__main__':
             else:
                 env.options[name] = value
             env.logger.info('Environment variable {} is set to {}'.format(name, value))
+    # special handling of 'WORKING_DIR'
+    # if USER_WORKING_DIR is not specified, WORKING_DIR will be
+    # output dependent.
+    env.options['SPECIFIED_WORKING_DIR'] = env.options['WORKING_DIR']
+    #
+    if hasattr(args, 'output'):
+        if type(args.output) == list:
+            if not env.SPECIFIED_WORKING_DIR:
+                env.options['WORKING_DIR'] = os.path.split(args.output[0])[0]
+            logname = os.path.basename(args.output[0]) + '.log'
+        elif args.output:
+            if not env.SPECIFIED_WORKING_DIR:
+                env.options['WORKING_DIR'] = os.path.split(args.output)[0]
+            logname = os.path.basename(args.output) + '.log'
+        else:
+            if not env.SPECIFIED_WORKING_DIR:
+                env.options['WORKING_DIR'] = '.'
+            logname = 'illumina_test.log'
+        if not os.path.isdir(env.WORKING_DIR):
+            os.makedirs(env.WORKING_DIR)
+        # screen + log file logging
+        env.logger = os.path.join(env.WORKING_DIR, logname)
     #
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
@@ -1651,7 +1662,12 @@ if __name__ == '__main__':
         if args.test_run:
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
+            if not env.SPECIFIED_WORKING_DIR:
+                env.options['SPECIFIED_WORKING_DIR'] = 'illumina_test_seq_align_cache'
+                env.options['WORKING_DIR'] = env.SPECIFIED_WORKING_DIR
             pipeline.align(ifiles, ofiles)
+            env.logger.info('Please remove working directory {} if you would like '
+                'to rerun the test.'.format(env.WORKING_DIR))
         else:
             pipeline.align(args.input_files, args.output)
     elif args.action == 'call':
@@ -1660,7 +1676,12 @@ if __name__ == '__main__':
         if args.test_run:
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
+            if not env.SPECIFIED_WORKING_DIR:
+                env.options['SPECIFIED_WORKING_DIR'] = 'illumina_test_seq_call_cache'
+                env.options['WORKING_DIR'] = env.SPECIFIED_WORKING_DIR
             pipeline.callVariants(ifiles, None, ofiles)
+            env.logger.info('Please remove working directory {} if you would like '
+                'to rerun the test.'.format(env.WORKING_DIR))
         else:
             pipeline.callVariants(args.input_files, args.pedfile, args.output)
 
