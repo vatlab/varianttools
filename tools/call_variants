@@ -79,10 +79,12 @@ class RuntimeEnvironment(object):
         #   BaseVariantCaller.wait()
         #      wait till all jobs are completed
         self.running_jobs = []
-        #
-        # resource directory
-        self._resource_dir = None
     
+    def __getattr__(self, attr):
+        if attr in self.options:
+            return self.options[attr]
+        else:
+            return ''
     #
     # max number of jobs
     #
@@ -205,13 +207,6 @@ class RuntimeEnvironment(object):
     notification_email = property(lambda self: self._notification_email, 
         _setNotificationEmail)
 
-    def _setResourceDir(self, resource_dir):
-        if not os.path.isdir(resource_dir):
-            env.logger.info('Creating resource directory {}'.format(resource_dir))
-            os.makedirs(resource_dir)
-        self._resource_dir = resource_dir
-
-    resource_dir = property(lambda self: self._resource_dir, _setResourceDir)
 
 # create a runtime environment object
 env = RuntimeEnvironment()
@@ -360,12 +355,12 @@ class BWA:
         '''Create BWA index for reference genome file'''
         # bwa index  -a bwtsw wg.fa
         saved_dir = os.getcwd()
-        os.chdir(env.resource_dir)
+        os.chdir(env.RESOURCE_DIR)
         if os.path.isfile(self.REF_fasta + '.amb'):
             env.logger.warning('Using existing bwa indexed sequence {}.amb'.format(self.REF_fasta))
         else:
             run_command('bwa index {}  -a bwtsw {}'
-                .format(env.options['OPT_BWA_INDEX'], self.REF_fasta))
+                .format(env.OPT_BWA_INDEX, self.REF_fasta))
         os.chdir(saved_dir)
 
     def aln(self, fastq_files):
@@ -382,7 +377,7 @@ class BWA:
                     env.logger.warning('Using -I option for bwa aln command '
                         'because the sequences seem to be in Illumina 1.3+ format.')
                 run_command('bwa aln {} {} -t 4 {}/{} {} > {}_tmp'
-                    .format(opt, env.options['OPT_BWA_ALN'], env.resource_dir, 
+                    .format(opt, env.OPT_BWA_ALN, env.RESOURCE_DIR, 
                         self.REF_fasta, input_file, dest_file),
                     name=os.path.basename(dest_file),
                     upon_succ=(os.rename, dest_file + '_tmp', dest_file),
@@ -406,7 +401,7 @@ class BWA:
                 run_command(
                     'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}_tmp'
                     .format(
-                        env.options['OPT_BWA_SAMPE'], rg, env.resource_dir, self.REF_fasta,
+                        env.OPT_BWA_SAMPE, rg, env.RESOURCE_DIR, self.REF_fasta,
                         sai1, sai2, f1, f2, sam_file),
                     name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file),
@@ -429,7 +424,7 @@ class BWA:
                 run_command(
                     'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}_tmp'
                     .format(
-                        env.options['OPT_BWA_SAMSE'], rg, env.resource_dir,
+                        env.OPT_BWA_SAMSE, rg, env.RESOURCE_DIR,
                         self.REF_fasta, sai, f, sam_file),
                     name=os.path.basename(sam_file),
                     upon_succ=(os.rename, sam_file + '_tmp', sam_file),
@@ -448,13 +443,13 @@ class SAMTOOLS:
     def buildIndex(self):
         '''Create index for reference genome used by samtools'''
         saved_dir = os.getcwd()
-        os.chdir(env.resource_dir)
+        os.chdir(env.RESOURCE_DIR)
         if os.path.isfile('{}.fai'.format(self.REF_fasta)):
             env.logger.warning('Using existing samtools sequence index {}.fai'
                 .format(self.REF_fasta))
         else:
             run_command('samtools faidx {} {}'
-                .format(env.options['OPT_SAMTOOLS_FAIDX'], self.REF_fasta))
+                .format(env.OPT_SAMTOOLS_FAIDX, self.REF_fasta))
         os.chdir(saved_dir)
 
     def sortSam(self, sam_files):
@@ -467,7 +462,7 @@ class SAMTOOLS:
             else:
                 run_command('samtools view {} -bt {}/{}.fai {} > {}'
                     .format(
-                        env.options['OPT_SAMTOOLS_VIEW'], env.resource_dir,
+                        env.OPT_SAMTOOLS_VIEW, env.RESOURCE_DIR,
                         self.REF_fasta, sam_file, TEMP(bam_file)),
                     name=os.path.basename(bam_file),
                     upon_succ=(os.rename, TEMP(bam_file), bam_file),
@@ -486,7 +481,7 @@ class SAMTOOLS:
             else:
                 run_command('samtools sort {} {} {}'
                     .format(
-                        env.options['OPT_SAMTOOLS_SORT'], bam_file,
+                        env.OPT_SAMTOOLS_SORT, bam_file,
                         TEMP(sorted_bam_file)),
                     name=os.path.basename(sorted_bam_file),
                     upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
@@ -501,15 +496,15 @@ class SAMTOOLS:
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
             run_command('samtools index {0} {1} {1}_tmp.bai'.format(
-                env.options['OPT_SAMTOOLS_INDEX'], bam_file),
+                env.OPT_SAMTOOLS_INDEX, bam_file),
                 upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
 
 class PICARD:
     def __init__(self):
-        if env.options['PICARD_PATH']:
-            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['PICARD_PATH']), 'SortSam.jar')):
+        if env.PICARD_PATH:
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.PICARD_PATH), 'SortSam.jar')):
                 env.logger.error('Specified PICARD_PATH {} does not contain picard jar files.'
-                    .format(env.options['PICARD_PATH']))
+                    .format(env.PICARD_PATH))
                 sys.exit(1)
         elif 'CLASSPATH' in os.environ:
             if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')) 
@@ -540,8 +535,8 @@ class PICARD:
                 run_command(
                     'java {0} -jar {1}/SortSam.jar {2} I={3} O={4} SO=coordinate'
                     .format(
-                        env.options['OPT_JAVA'], env.options['PICARD_PATH'], 
-                        env.options['OPT_PICARD_SORTSAM'], sam_file,
+                        env.OPT_JAVA, env.PICARD_PATH, 
+                        env.OPT_PICARD_SORTSAM, sam_file,
                         TEMP(sorted_bam_file)),
                     name=os.path.basename(sorted_bam_file),
                     upon_succ=(os.rename, TEMP(sorted_bam_file), sorted_bam_file),
@@ -564,8 +559,8 @@ class PICARD:
                 USE_THREADING=true
                 VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true
                 OUTPUT={}'''.format(
-                    env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                    env.options['OPT_PICARD_MERGESAMFILES'],
+                    env.OPT_JAVA, env.PICARD_PATH,
+                    env.OPT_PICARD_MERGESAMFILES,
                     ' '.join(['INPUT={}'.format(x) for x in bam_files]),
                     TEMP(merged_bam_file)),
                 name=os.path.basename(merged_bam_file),
@@ -591,8 +586,8 @@ class PICARD:
                     ASSUME_SORTED=true
                     VALIDATION_STRINGENCY=LENIENT
                     '''.format(
-                        env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                        env.options['OPT_PICARD_MARKDUPLICATES'], bam_file,
+                        env.OPT_JAVA, env.PICARD_PATH,
+                        env.OPT_PICARD_MARKDUPLICATES, bam_file,
                         TEMP(dedup_bam_file),
                         metrics_file), 
                     name=os.path.basename(dedup_bam_file),
@@ -606,11 +601,11 @@ class GATK:
     def __init__(self, ref_fasta, knownSites):
         '''Check if GATK is available, set GATK_PATH from CLASSPATH if the path
             is specified in CLASSPATH'''
-        if env.options['GATK_PATH']:
-            if not os.path.isfile(os.path.join(os.path.expanduser(env.options['GATK_PATH']),
+        if env.GATK_PATH:
+            if not os.path.isfile(os.path.join(os.path.expanduser(env.GATK_PATH),
                     'GenomeAnalysisTK.jar')):
                 env.logger.error('Specified GATK_PATH {} does not contain GATK jar files.'
-                    .format(env.options['GATK_PATH']))
+                    .format(env.GATK_PATH))
                 sys.exit(1)
         elif 'CLASSPATH' in os.environ:
             if not any([os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar'))
@@ -637,7 +632,7 @@ class GATK:
         files already exist, use the existing downloaded files.'''
         #
         saved_dir = os.getcwd()
-        os.chdir(env.resource_dir)
+        os.chdir(env.RESOURCE_DIR)
         if all([os.path.isfile(x) for x in files]):
             env.logger.warning('Using existing GATK resource')
         else:
@@ -670,11 +665,11 @@ class GATK:
                 -T RealignerTargetCreator
                 --mismatchFraction 0.0
                 -o {6}_tmp {7} '''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
-                    bam_file, env.resource_dir,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_REALIGNERTARGETCREATOR,
+                    bam_file, env.RESOURCE_DIR,
                     self.REF_fasta, target,
-                    ' '.join(['-known {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                    ' '.join(['-known {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         # 
@@ -689,11 +684,11 @@ class GATK:
                 --targetIntervals {6}
                 --consensusDeterminationModel USE_READS
                 -compress 0 -o {7} {8}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REALIGNERTARGETCREATOR'],
-                    bam_file, env.resource_dir,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_REALIGNERTARGETCREATOR,
+                    bam_file, env.RESOURCE_DIR,
                     self.REF_fasta, target, TEMP(cleaned_bam_file),
-                    ' '.join(['-known {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                    ' '.join(['-known {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
                 name=os.path.basename(cleaned_bam_file),
                 upon_succ=(os.rename, TEMP(cleaned_bam_file), cleaned_bam_file))
         # 
@@ -715,10 +710,10 @@ class GATK:
                 -cov CycleCovariate
                 -cov ContextCovariate
                 -o {6}_tmp {7}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_BASERECALIBRATOR'], bam_file,
-                    env.resource_dir, self.REF_fasta, target,
-                    ' '.join(['-knownSites {}/{}'.format(env.resource_dir, x) for x in self.knownSites])),
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_BASERECALIBRATOR, bam_file,
+                    env.RESOURCE_DIR, self.REF_fasta, target,
+                    ' '.join(['-knownSites {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, target + '_tmp', target))
         #
@@ -732,9 +727,9 @@ class GATK:
                 -R {4}/{5}
                 -BQSR {6}
                 -o {7}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_PRINTREADS'], bam_file,
-                    env.resource_dir, self.REF_fasta, target, 
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_PRINTREADS, bam_file,
+                    env.RESOURCE_DIR, self.REF_fasta, target, 
                     TEMP(recal_bam_file)),
                 name=os.path.basename(recal_bam_file),
                 upon_succ=(os.rename, TEMP(recal_bam_file), recal_bam_file))
@@ -751,9 +746,9 @@ class GATK:
                 -I {3} 
                 -R {4}/{5}
                 -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_REDUCEREADS'], input_file,
-                    env.resource_dir, self.REF_fasta,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_REDUCEREADS, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
                     TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -775,9 +770,9 @@ class GATK:
                 -stand_emit_conf 10.0 
                 -dcov 200
                 -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_UNIFIEDGENOTYPER'], input_file,
-                    env.resource_dir, self.REF_fasta,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_UNIFIEDGENOTYPER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
                     TEMP(target), dbSNP_vcf),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -795,9 +790,9 @@ class GATK:
                 -T HaplotypeCaller
                 -minPruning 3
                 -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    env.resource_dir, self.REF_fasta,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
                     TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -823,9 +818,9 @@ class GATK:
                 -tranchesFile raw.SNPs.tranches
                 -rscriptFile recal.plots.R
                 -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    env.resource_dir, self.REF_fasta,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
                     TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -840,9 +835,9 @@ class GATK:
                 -recalFile raw.SNPs.recal
                 -tranchesFile raw.SNPs.trances
                 -o {6}'''.format(
-                    env.options['OPT_JAVA'], env.options['GATK_PATH'],
-                    env.options['OPT_GATK_HAPLOTYPECALLER'], input_file,
-                    env.resource_dir, self.REF_fasta,
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
                     TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -1194,8 +1189,11 @@ class BaseVariantCaller:
     '''A vase variant caller that is supposed to provide most of the utility functions
     and common operations that are not specific to any pipeline.
     '''
-    def __init__(self, resource_dir, pipeline):
-        env.resource_dir = os.path.join(os.path.expanduser(resource_dir), pipeline)
+    def __init__(self, pipeline):
+        env.RESOURCE_DIR = os.path.join(os.path.expanduser(env.RESOURCE_DIR), pipeline)
+        if not os.path.isdir(env.RESOURCE_DIR):
+            env.logger.info('Creating resource directory {}'.format(env.RESOURCE_DIR))
+            os.makedirs(env.RESOURCE_DIR)
 
     #
     # PREPARE RESOURCE
@@ -1205,7 +1203,7 @@ class BaseVariantCaller:
         '''Prepare all resources for the pipeline. This is pipeline dependent.'''
         # download test data
         saved_dir = os.getcwd()
-        os.chdir(env.resource_dir)
+        os.chdir(env.RESOURCE_DIR)
         downloadFile('http://vtools.houstonbioinformatics.org/test_data/illumina_test_seq.tar.gz',
             dest='illumina_test_seq.tar.gz')
         if existAndNewerThan(ofiles=['illumina_test_seq_1.fastq', 'illumina_test_seq_2.fastq'],
@@ -1289,9 +1287,9 @@ class BaseVariantCaller:
 class b37_gatk_23(BaseVariantCaller):
     '''A variant caller that uses gatk resource package 2.3 to call variants
     from build b37 of the human genome of the GATK resource bundle'''
-    def __init__(self, resource_dir):
+    def __init__(self):
         self.pipeline = 'b37_gatk_23'
-        BaseVariantCaller.__init__(self, resource_dir, self.pipeline)
+        BaseVariantCaller.__init__(self, self.pipeline)
         self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*'
         self.REF_fasta = 'human_g1k_v37.fasta'
         self.knownSites = [
@@ -1312,12 +1310,12 @@ class b37_gatk_23(BaseVariantCaller):
         '''Check if needed resource is available. This pipeline requires
         GATK resource bundle, commands wget, bwa, samtools, picard, and GATK. '''
         saved_dir = os.getcwd()
-        os.chdir(env.resource_dir)
+        os.chdir(env.RESOURCE_DIR)
         files = [self.REF_fasta, self.REF_fasta + '.amb', self.REF_fasta + '.fai']
         if not all([os.path.isfile(x) for x in files]):
             sys.exit('GATK resource bundle does not exist in directory {}. '
                 'Please run "call_variants.py prepare_resource" befor you '
-                'execute this command.'.format(env.resource_dir))
+                'execute this command.'.format(env.RESOURCE_DIR))
         os.chdir(saved_dir)
 
     def prepareResourceIfNotExist(self):
@@ -1342,8 +1340,8 @@ class b37_gatk_23(BaseVariantCaller):
         else:
             run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
                 FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''
-                .format(env.options['OPT_JAVA'], env.options['PICARD_PATH'],
-                    env.options['OPT_PICARD_SAMTOFASTQ'], input_file,
+                .format(env.OPT_JAVA, env.PICARD_PATH,
+                    env.OPT_PICARD_SAMTOFASTQ, input_file,
                     output_files[0], output_files[1]),
                 name=os.path.basename(output_files[0]),
                 upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
@@ -1472,6 +1470,7 @@ class hg19_gatk_23(b37_gatk_23):
 
 if __name__ == '__main__':
     options = [
+        ('RESOURCE_DIR', '~/.variant_tools/var_caller'),
         # option, default value
         ('PICARD_PATH', ''),
         ('GATK_PATH', ''),
@@ -1512,13 +1511,12 @@ if __name__ == '__main__':
         parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
             choices=['hg19_gatk_23', 'b37_gatk_23'],
             help='Name of the pipeline to be used to call variants.')
-        parser.add_argument('--resource_dir', default='~/.variant_tools/var_caller', 
-            help='''A directory for resources used by variant caller. Default to
-                ~/.variant_tools/var_caller.''')
         parser.add_argument('--set', nargs='*', metavar='NAME+=VALUE',
             help='''Set runtime variables in the format of NAME=VALUE (set
                 VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
-                NAME). NAME can be PICARD_PATH (path to picard, should have
+                NAME). NAME can be RESOURCE_DIR (directory for resources such as
+                reference genome. Default to ~/.variant_tools/var_caller), 
+                PICARD_PATH (path to picard, should have
                 a number of .jar files under it), GATK_PATH (path to gatk,
                 should have GenomeAnalysisTK.jar under it) for path to JAR
                 files (can be ignored if the paths are specified in environment
@@ -1540,7 +1538,8 @@ if __name__ == '__main__':
         from raw sequence files, or single-sample bam files. It works (tested) only
         for Illumina sequence data, and for human genome with build hg19 of the
         reference genome. This pipeline uses BWA for alignment and GATK for variant
-        calling, and Picard for various other options..''')
+        calling, and Picard for various other options..''', )
+    master_parser.add_argument('--version', action='version', version='%(prog)s 1.2 (5/22/2013)')
     subparsers = master_parser.add_subparsers(title='Available operations', dest='action')
     #
     # action prepare_resource
@@ -1639,15 +1638,15 @@ if __name__ == '__main__':
     #
     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
     # class (subclass of VariantCaller) that implements the pipeline
-    pipeline = eval(args.pipeline)(args.resource_dir)
+    pipeline = eval(args.pipeline)()
     if args.action == 'prepare_resource':
         pipeline.prepareResourceIfNotExist()
     elif args.action == 'align':
         env.jobs = args.jobs
         pipeline.checkResource()
         if args.test_run:
-            ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
-            ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.bam')
+            ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
+            ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
             pipeline.align(ifiles, ofiles)
         else:
             pipeline.align(args.input_files, args.output)
@@ -1655,8 +1654,8 @@ if __name__ == '__main__':
         env.jobs = args.jobs
         pipeline.checkResource()
         if args.test_run:
-            ifiles = [os.path.join(env.resource_dir, 'illumina_test_seq.bam')]
-            ofiles = os.path.join(env.resource_dir, 'illumina_test_seq.vcf')
+            ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
+            ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
             pipeline.callVariants(ifiles, None, ofiles)
         else:
             pipeline.callVariants(args.input_files, args.pedfile, args.output)
