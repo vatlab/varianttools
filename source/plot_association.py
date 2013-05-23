@@ -159,7 +159,7 @@ class PlotAssociationOpt:
                 ''')
 
     def commonArguments(self, parser):
-        parser.add_argument("--method", default=sys.argv[2], help=argparse.SUPPRESS)
+        parser.add_argument("--method", default = sys.argv[2] if len(sys.argv) > 2 else '', help=argparse.SUPPRESS)
         settings = parser.add_argument_group('graph properties')
         settings.add_argument('-t', '--title',
                             type=str,

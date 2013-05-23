@@ -954,7 +954,7 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('plot_association',
         help = '''Generate QQ / Manhattan plots of p-values from association analysis.
 		Input data should be in the format of the output from 'vtools associate' command
-        and be piped to the program as stdardard input stream (stdin) | Authors: Zongxiao He & Gao Wang''')
+        and be piped to the program as stdardard input stream (stdin)''')
     parser = PlotAssociationOpt(parser).get()
     addVerbosityArg(parser)
     parser.set_defaults(func=plotAssociation)
