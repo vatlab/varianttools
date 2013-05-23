@@ -216,7 +216,6 @@ class RuntimeEnvironments(object):
             self._cache_dir = path
         try:
             if not os.path.isdir(self._cache_dir):
-                sys.stderr.write('Creating cache directory {}\n'.format(self._cache_dir))
                 os.makedirs(self._cache_dir)
         except:
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
