@@ -24,7 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # Copyright Gao Wang 2012
-import sys, os, re 
+import sys, os, re
 import time
 import argparse
 from .utils import env, downloadFile, runCommand, mkdir_p

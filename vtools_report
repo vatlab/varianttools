@@ -28,7 +28,8 @@ import sys, os
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome, OS_ENV
+from variant_tools.utils import RefGenome, env, OS_ENV
+from variant_tools.plot_association import PlotAssociationOpt, plotAssociation
 #
 # These functions are utility functions used by all reports
 #
@@ -42,30 +43,6 @@ def addVerbosityArg(parser):
 # is executed. 
 verbosity = '1'
 logger = None
-
-def getLogger():
-    # create a logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    # output to standard output
-    cout = logging.StreamHandler()
-    levels = {
-        None: logging.INFO,
-        '0': logging.ERROR,
-        '1': logging.INFO,
-        '2': logging.DEBUG
-        }
-    #
-    cout.setLevel(levels[verbosity])
-    cout.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-    logger.addHandler(cout)
-    # output to a log file vtools_report.log
-    ch = logging.FileHandler('vtools_report.log', mode='a')
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-    logger.addHandler(ch)
-    return logger
-
 
 def getoutput(cmd):
     # add -v option if unspecified
@@ -973,6 +950,14 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=plotGenoFields)
     #
+    # command plot_association
+    parser = subparsers.add_parser('plot_association',
+        help = '''Generate QQ / Manhattan plots of p-values from association analysis.
+		Input data should be in the format of the output from 'vtools associate' command
+        and be piped to the program as stdardard input stream (stdin) | Authors: Zongxiao He & Gao Wang''')
+    parser = PlotAssociationOpt(parser).get()
+    addVerbosityArg(parser)
+    parser.set_defaults(func=plotAssociation)
     # command meta_analysis
     parser = subparsers.add_parser('meta_analysis',
         help = '''Meta analysis on multiple sets of association testing results.''')
@@ -984,6 +969,6 @@ if __name__ == '__main__':
     args = master_parser.parse_args()
     # setting global logger
     verbosity = args.verbosity
-    logger = getLogger()
+    logger = env.logger
     # calling the associated functions
     args.func(args)

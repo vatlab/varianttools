@@ -426,9 +426,10 @@ VTOOLS_FILES = ['source.__init__',
         'source.liftOver',
         'source.association',
         'source.tester',
-        'source.rtester'
+        'source.rtester',
+        'source.meta',
+        'source.plot_association'
 ]
-
 
 #
 # Generate wrapper files (only in development mode)
@@ -524,11 +525,11 @@ setup(name = "variant_tools",
     author_email = 'bpeng@mdanderson.org',
     maintainer = 'Bo Peng',
     maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    py_modules = VTOOLS_FILES + [
-        SQLITE_PY_FILE.format(PYVERSION)[:-3],
-        WRAPPER_PY_FILE.format(PYVERSION)[:-3],          # assotests_pyX.py file without extension
-        CGATOOLS_WRAPPER_PY_FILE.format(PYVERSION)[:-3]  # cgatools_pyX.py
-    ],
+    # py_modules = VTOOLS_FILES + [
+    #     SQLITE_PY_FILE.format(PYVERSION)[:-3],
+    #     WRAPPER_PY_FILE.format(PYVERSION)[:-3],          # assotests_pyX.py file without extension
+    #     CGATOOLS_WRAPPER_PY_FILE.format(PYVERSION)[:-3]  # cgatools_pyX.py
+    # ],
     packages = ['variant_tools'],
     scripts = [
         'vtools',
@@ -562,4 +563,3 @@ setup(name = "variant_tools",
         ),
       ] + ASSOCIATION_MODULE   # association module is not available under windows
 )
-

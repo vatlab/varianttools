@@ -105,7 +105,7 @@ class MetaAnalysis:
         if os.path.exists(db_name + '.DB'): os.remove(db_name + '.DB')
         self.fields = []
         self.group_names = [x for x in linker]
-        linker = [(x, 'INTEGER') if x == 'pos' else (x, 'VARCHAR(20)') for x in linker]
+        linker = [(x, 'INTEGER') if x.endswith('pos') else (x, 'VARCHAR(20)') for x in linker]
         fields = [(x, 'FLOAT') if not x.startswith('sample_size') else (x, 'INTEGER') for x in fields]
         for item in linker + fields:
             self.fields.append(Field(name=item[0], index=None, type=item[1], adj=None, comment=''))
