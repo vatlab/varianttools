@@ -1441,6 +1441,10 @@ class b37_gatk_23(BaseVariantCaller):
             #vcf_file = self.haplotypeCall(input_file)
             vcf_file = self.gatk.unifiedGenotyper(input_file)
         #
+        #
+        #
+        # copy results to output
+        shutil.copy(vcf_file, output)
 
 
 class hg19_gatk_23(b37_gatk_23):
