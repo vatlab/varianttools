@@ -61,6 +61,9 @@ def generalOutputArguments(parser):
             where summary statistics are grouped by one or more fields.''')
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
+    grp.add_argument('--dedup', default=False, action='store_true',
+        help='''Remove adjacent duplicated records resulting from multiple
+            entries of variants in annotation databases.''')
 
 def outputVariants(proj, table_name, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
@@ -124,20 +127,15 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
                 env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
             sys.stdout.write(args.delimiter.join(args.header) + '\n')
     # output with a warning to potentially duplicated lines
-    has_duplicate = False
     last_line = None
     for count, rec in enumerate(cur):
         line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-        if not has_duplicate:
+        if args.dedup:
             if line == last_line:
-                has_duplicate = True
+                continue
             else:
                 last_line = line
         sys.stdout.write(line)
-    if has_duplicate:
-        env.logger.warning('Duplicate records are outputted. This may due to '
-            'multiple entries of variants in the annotation database. Piping standard output '
-            'to a uniq command ("vtools output ... | uniq") will remove these entries.')
 
 
 def output(args):

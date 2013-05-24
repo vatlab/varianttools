@@ -56,6 +56,19 @@ class TestOutput(ProcessTestCase):
         runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t "08#x"')
         self.assertSucc('vtools output "08#x" chr pos ref alt -l -1')
 
+
+    def testOutputDedup(self):
+        'Test option --dedup of command output'
+        # we need to find a case that produce uplicate records
+        # this is usally caused by multiple records for variants in annotation
+        # databases, for testing purpose, I am applying here for output chr only
+        # which is not a good test case
+        out1 = outputOfCmd('vtools output variant chr ref').split('\n')
+        out2 = outputOfCmd('vtools output variant chr ref --dedup').split('\n')
+        self.assertEqual(len(set(out1)), 6)
+        self.assertEqual(len(set(out2)), 6)
+        self.assertEqual(len(out1), 339)
+        self.assertEqual(len(out2), 235)
         
     def testOutputExpression(self):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
