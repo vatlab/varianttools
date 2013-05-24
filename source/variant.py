@@ -61,7 +61,7 @@ def generalOutputArguments(parser):
             where summary statistics are grouped by one or more fields.''')
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
-    grp.add_argument('--dedup', default=False, action='store_true',
+    grp.add_argument('-u', '--uniq', default=False, action='store_true',
         help='''Remove adjacent duplicated records resulting from multiple
             entries of variants in annotation databases.''')
 
@@ -130,7 +130,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     last_line = None
     for count, rec in enumerate(cur):
         line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-        if args.dedup:
+        if args.uniq:
             if line == last_line:
                 continue
             else:
