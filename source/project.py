@@ -44,7 +44,7 @@ from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
-    VTOOLS_CITATION, VTOOLS_CONTACT
+    VTOOLS_CITATION, VTOOLS_REVISION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, makeTableName, getMaxUcscBin, env, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
@@ -910,6 +910,7 @@ class Project:
         # version of vtools, useful when opening a project created by a previous
         # version of vtools.
         self.version = VTOOLS_VERSION
+        self.revision = VTOOLS_REVISION
         #
         # create a temporary directory
         self.db = DatabaseEngine()
@@ -959,6 +960,7 @@ class Project:
             # project information table
             self.createProjectTable()
             self.saveProperty('version', self.version)
+            self.saveProperty('revision', self.revision)
             self.saveProperty('engine', engine)
             self.saveProperty('host', kwargs.get('host'))
             self.saveProperty('user', kwargs.get('user'))
@@ -987,6 +989,7 @@ class Project:
         self.createProjectTable()
         self.saveProperty('engine', engine)
         self.saveProperty('version', self.version)
+        self.saveProperty('revision', self.revision)
         self.saveProperty('batch', kwargs.get('batch', 10000))
         self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
@@ -1032,6 +1035,7 @@ class Project:
         # existing project
         cur = self.db.cursor()
         self.version = self.loadProperty('version', '1.0')
+        self.revision = self.loadProperty('revision', '0')
         self.build = self.loadProperty('build')
         self.alt_build = self.loadProperty('alt_build')
         self.annoDB = []
@@ -1054,16 +1058,16 @@ class Project:
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
         #
-        if self.version != VTOOLS_VERSION:
-            proj_ver = [int(x) for x in self.version.rstrip('svn').split('.')]
-            vtools_ver = [int(x) for x in VTOOLS_VERSION.rstrip('svn').split('.')]
-            if proj_ver > vtools_ver:
+        if self.revision != VTOOLS_REVISION:
+            proj_rev = int(self.revision)
+            vtools_rev = int(VTOOLS_REVISION)
+            if proj_rev > vtools_rev:
                 env.logger.warning('Opening a project that is created by an '
-                    'newer version of vtools ({}) is dangerous.'
-                    .format(self.version))
-            elif proj_ver < vtools_ver:
+                    'newer version of vtools ({}, rev {}) is dangerous.'
+                    .format(self.version, self.revision))
+            elif proj_rev < vtools_rev:
                 # upgrade project
-                self.upgrade(from_version=proj_ver)
+                self.upgrade(proj_rev)
         if verify:
             self.checkIntegrity()
         # 
@@ -1112,15 +1116,15 @@ class Project:
         self.db.commit()
         del s
         
-    def upgrade(self, from_version):
-        for ver, proc in project_format_history:
+    def upgrade(self, proj_revision):
+        for ver, rev, proc in project_format_history:
             # for example, if the project version if 1.0.6
             # it will call the upgrade version for 1.0.7 and higher
-            if from_version < ver:
+            if proj_revision < rev:
                 proc(self)
         # mark the version of the project
         self.saveProperty('version', VTOOLS_VERSION)
-    
+        self.saveProperty('revision', VTOOLS_REVISION)
 
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
@@ -3099,7 +3103,8 @@ def remove_duplicate_genotype(proj):
                 's' if len(tables) > 1 else ''))
 
 project_format_history = [
-    [(1, 0, 7), remove_duplicate_genotype],
+    # version (for documentation purpose only), revision, upgrade function
+    ['1.0.7', 1915, remove_duplicate_genotype],
 ]
 
 #
