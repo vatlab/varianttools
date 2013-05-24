@@ -1054,6 +1054,16 @@ class Project:
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
         #
+        if self.version != VTOOLS_VERSION:
+            proj_ver = [int(x) for x in self.version.rstrip('svn').split('.')]
+            vtools_ver = [int(x) for x in VTOOLS_VERSION.rstrip('svn').split('.')]
+            if proj_ver > vtools_ver:
+                env.logger.warning('Opening a project that is created by an '
+                    'newer version of vtools ({}) is dangerous.'
+                    .format(self.version))
+            elif proj_ver < vtools_ver:
+                # upgrade project
+                self.upgrade(from_version=proj_ver)
         if verify:
             self.checkIntegrity()
         # 
@@ -1102,6 +1112,15 @@ class Project:
         self.db.commit()
         del s
         
+    def upgrade(self, from_version):
+        for ver, proc in project_format_history:
+            # for example, if the project version if 1.0.6
+            # it will call the upgrade version for 1.0.7 and higher
+            if from_version < ver:
+                proc(self)
+        # mark the version of the project
+        self.saveProperty('version', VTOOLS_VERSION)
+    
 
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
@@ -3045,7 +3064,44 @@ class ProjectsMerger:
         self.proj.db = DatabaseEngine()
         self.proj.db.connect(self.proj.proj_file)
 
-        
+#
+# PROJECT UPGRADE TREE
+#
+def remove_duplicate_genotype(proj):
+    #
+    # remove all uplicate genotypes from sample tables
+    # version 1.0.7 handles this automatically but projects created
+    # by older version of variant tools might still have such genotypes
+    db = DatabaseEngine()
+    db.connect('{}_genotype'.format(proj.name))
+    tables = [x for x in db.tables() if x.startswith('genotype_')]
+    prog = ProgressBar('Upgrading to 1.0.7', len(tables))
+    duplicated_genotype = 0
+    cur = db.cursor()
+    for idx, table in enumerate(tables):
+        cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {}'.format(table))
+        nRec, nVar = cur.fetchone()
+        if nRec != nVar:
+            cur.execute('DELETE from {0} WHERE rowid NOT IN '
+                '(SELECT MAX(rowid) FROM {0} GROUP BY variant_id)'
+                .format(table))
+            if cur.rowcount != nRec - nVar:
+                raise SystemError('Failed to remove duplicated variants from '
+                    'genotype table {}'.format(table))
+        duplicated_genotype += nRec - nVar
+        prog.update(idx + 1)
+    db.commit()
+    db.close()
+    prog.done()
+    if duplicated_genotype:
+        env.logger.warning('{} duplicated genotypes are removed from {} sample{}.'
+            .format(duplicated_genotype, len(tables),
+                's' if len(tables) > 1 else ''))
+
+project_format_history = [
+    [(1, 0, 7), remove_duplicate_genotype],
+]
+
 #
 #
 # Functions provided by this script
