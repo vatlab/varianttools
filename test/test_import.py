@@ -66,7 +66,7 @@ class TestImport(ProcessTestCase):
         self.assertFail('vtools import --build hg18 --format ../format/non_existing_fmt txt/input.tsv')
     
     def testGenotypes(self):
-        'Testing the import of genotypes'
+        'Test the import of genotypes'
         # use an empty var_info option. The program should not import any var_info for now
         # the following 2 commands are commented out due to running time: very slow to remove the existing sample tables
         #self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --var_info --build hg18')
@@ -94,6 +94,13 @@ class TestImport(ProcessTestCase):
         self.assertEqual(input_variants, variants)
         # test importing genotypes
         self.assertEqual(input_genotypes, genotypes)
+
+    def testDupGenotype(self):
+        'Test importing duplicated genotypes'
+        self.assertSucc('vtools import vcf/V1.vcf --sample_name V1 --build hg18')
+        self.assertSucc('vtools import vcf/dup_geno.vcf --sample_name DUP --build hg18')
+        out = outputOfCmd('vtools show genotypes').split('\n')[1:]
+        self.assertEqual(out[0].split()[2], out[1].split()[2])
 
     def testANNOVAR(self):
         'Testing the annovar input format'
