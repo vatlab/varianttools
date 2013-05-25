@@ -38,7 +38,8 @@ import bz2
 import zipfile
 import time
 import re
-from collections import defaultdict, namedtuple
+import platform
+from collections import namedtuple
 
 ###############################################################################
 #
@@ -53,6 +54,90 @@ from collections import defaultdict, namedtuple
 #    can be accessed as attributed (e.g. env.OPT_JAVA).
 #
 ###############################################################################
+#
+# All options, their default values, and a validator function
+# if needed.
+#
+def physicalMemory():
+    '''Get the amount of physical memory in the system'''
+    # MacOSX?
+    if platform.platform().startswith('Darwin'):
+        # FIXME
+        return None
+    elif platform.platform().startswith('Linux'):
+        try:
+            res = subprocess.check_output('free').decode().split('\n')
+            return int(res[1].split()[1])
+        except Exception as e:
+            return None
+
+def javaXmxCheck(val):
+    '''Check if the Xmx option is valid for OPT_JAVA'''
+    ram = physicalMemory()
+    # cannot check physical memory
+    if ram is None:
+        return
+    # find option matching '-Xmx???'
+    m = re.search('-Xmx(\d+)([^\s]*)(?:\s+|$)', val)
+    if m is None:  # no -Xmx specified
+        return
+    try:
+        size = int(m.group(1)) * {
+            't': 10**9,
+            'T': 10**9,
+            'g': 10**6,
+            'G': 10**6,
+            'm': 10**3,
+            'M': 10**3,
+            '': 1
+        }[m.group(2)]
+    except:
+        sys.exit('Invalid java option {}'.format(val))
+    #
+    if ram < size:
+        sys.exit('Specified -Xms size {} is larger than available physical memory {}'
+            .format(size, ram))
+
+options = [
+    ('RESOURCE_DIR', '~/.variant_tools/var_caller'),
+    ('WORKING_DIR', ''),
+    # option, default value
+    ('PICARD_PATH', ''),
+    ('GATK_PATH', ''),
+    #
+    ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit', javaXmxCheck),
+    #
+    ('OPT_BWA_INDEX', ''),
+    ('OPT_BWA_ALN', ''),
+    ('OPT_BWA_SAMPE', ''),
+    ('OPT_BWA_SAMSE', ''),
+    #
+    ('OPT_SAMTOOLS_FAIDX', ''),
+    ('OPT_SAMTOOLS_VIEW', ''),
+    ('OPT_SAMTOOLS_SORT', ''),
+    ('OPT_SAMTOOLS_INDEX', ''),
+    #
+    # validation_stringency=leniant is used to correct an error
+    # caused by some versions of BWA, see
+    #
+    #   http://seqanswers.com/forums/showthread.php?t=4246
+    #
+    # for details
+    ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
+    ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
+    ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT'),
+    ('OPT_PICARD_MARKDUPLICATES', ''),
+    #
+    ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
+    # http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
+    ('OPT_GATK_INDELREALIGNER', '--filter_mismatching_base_and_quals'),
+    ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
+    ('OPT_GATK_PRINTREADS', ''),
+    ('OPT_GATK_REDUCEREADS', ''),
+    ('OPT_GATK_HAPLOTYPECALLER', ''),
+    ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
+]
+
 class RuntimeEnvironment(object):
     '''Define the runtime environment of the pipeline'''
     # the following makes RuntimeEnvironment a singleton class
@@ -69,7 +154,11 @@ class RuntimeEnvironment(object):
         self._logger = None
         #
         # additional parameters for args
-        self.options = defaultdict(str)
+        self._validators = {}
+        for x in options:
+            if len(x) == 3:
+                self._validators[x[0]] = x[2]
+            self.__setattr__(x[0], x[1])
         #
         # running_jobs implements a simple multi-processing queue system. 
         # This variable holds a JOB tuple of the running jobs.
@@ -83,13 +172,13 @@ class RuntimeEnvironment(object):
         #      wait till all jobs are completed
         self._max_jobs = 1
         self.running_jobs = []
-    
-    def __getattr__(self, attr):
-        '''Allow access options as attributes'''
-        if attr in self.options:
-            return self.options[attr]
-        else:
-            return ''
+
+    def __setattr__(self, name, value):
+        '''Set options '''
+        if hasattr(self, '_validators') and name in self._validators:
+            self._validators[name](value)
+        object.__setattr__(self, name, value)
+
     #
     # max number of jobs
     #
@@ -190,6 +279,8 @@ class RuntimeEnvironment(object):
             self._logger.addHandler(ch)
     #
     logger = property(lambda self: self._logger, _setLogger)
+
+    
 
 # create a runtime environment object
 env = RuntimeEnvironment()
@@ -355,7 +446,6 @@ def checkCmd(cmd):
         env.logger.error('Command {} does not exist. Please install it and try again.'
             .format(cmd))
         sys.exit(1)
-
 
 ## def sendMail(header, message=''):
 ##     '''Send an email to report status.'''
@@ -908,7 +998,7 @@ class PICARD:
             for x in os.environ['CLASSPATH'].split(':'):
                 if os.path.isfile(os.path.join(os.path.expanduser(x), 'SortSam.jar')):
                     env.logger.info('Using picard under {}'.format(x))
-                    env.options['PICARD_PATH'] = os.path.expanduser(x)
+                    env.PICARD_PATH = os.path.expanduser(x)
                     break
         else:
             env.logger.error('Please either specify path to picard using option '
@@ -1032,7 +1122,7 @@ class GATK:
                 for x in os.environ['CLASSPATH'].split(':'):
                     if os.path.isfile(os.path.join(os.path.expanduser(x), 'GenomeAnalysisTK.jar')):
                         env.logger.info('Using GATK under {}'.format(x))
-                        env.options['GATK_PATH'] = os.path.expanduser(x)
+                        env.GATK_PATH = os.path.expanduser(x)
                         break
         else:
             env.logger.error('Please either specify path to GATK using option '
@@ -1399,7 +1489,7 @@ class b37_gatk_23(BasePipeline):
         # the working dir is a directory under output, the internediate files are saved to this
         # directory to avoid name conflict
         if not env.SPECIFIED_WORKING_DIR:
-            env.options['WORKING_DIR'] = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
+            env.WORKING_DIR = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
         if not os.path.isdir(env.WORKING_DIR):
             os.makedirs(env.WORKING_DIR)
         #
@@ -1484,7 +1574,7 @@ class b37_gatk_23(BasePipeline):
         BasePipeline.callVariants(self, input_files, pedfile, output)
         #
         if not env.SPECIFIED_WORKING_DIR:
-            env.options['WORKING_DIR'] = os.path.join(os.path.split(output)[0],
+            env.WORKING_DIR = os.path.join(os.path.split(output)[0],
                 os.path.basename(output) + '_call_cache')
         if not os.path.isdir(env.WORKING_DIR):
             os.makedirs(env.WORKING_DIR)
@@ -1525,48 +1615,6 @@ class hg19_gatk_23(b37_gatk_23):
         
 
 if __name__ == '__main__':
-    #
-    # All options and their default values
-    #
-    options = [
-        ('RESOURCE_DIR', '~/.variant_tools/var_caller'),
-        ('WORKING_DIR', ''),
-        # option, default value
-        ('PICARD_PATH', ''),
-        ('GATK_PATH', ''),
-        #
-        ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit'),
-        #
-        ('OPT_BWA_INDEX', ''),
-        ('OPT_BWA_ALN', ''),
-        ('OPT_BWA_SAMPE', ''),
-        ('OPT_BWA_SAMSE', ''),
-        #
-        ('OPT_SAMTOOLS_FAIDX', ''),
-        ('OPT_SAMTOOLS_VIEW', ''),
-        ('OPT_SAMTOOLS_SORT', ''),
-        ('OPT_SAMTOOLS_INDEX', ''),
-        #
-        # validation_stringency=leniant is used to correct an error
-        # caused by some versions of BWA, see
-        #
-        #   http://seqanswers.com/forums/showthread.php?t=4246
-        #
-        # for details
-        ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
-        ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
-        ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT'),
-        ('OPT_PICARD_MARKDUPLICATES', ''),
-        #
-        ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
-        # http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
-        ('OPT_GATK_INDELREALIGNER', '--filter_mismatching_base_and_quals'),
-        ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
-        ('OPT_GATK_PRINTREADS', ''),
-        ('OPT_GATK_REDUCEREADS', ''),
-        ('OPT_GATK_HAPLOTYPECALLER', ''),
-        ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
-    ]
     #
     # common options to all actions
     #
@@ -1657,7 +1705,7 @@ if __name__ == '__main__':
     # handling additional parameters, set default value
     for opt in options:
         if opt[1]:
-            env.options[opt[0]] = opt[1]
+            env.__setattr__(opt[0], opt[1])
     # override using command line values --set
     if hasattr(args, 'set') and args.set is not None:
         for arg in args.set:
@@ -1674,27 +1722,27 @@ if __name__ == '__main__':
                 sys.exit(1)
             #
             if append:
-                env.options[name] = env.options[name] + ' ' + value
+                env.__setattr__(name, env.__getattr__(name) + ' ' + value)
             else:
-                env.options[name] = value
+                env.__setattr__(name, value)
             env.logger.info('Environment variable {} is set to {}'.format(name, value))
     #
     # special handling of 'WORKING_DIR'
     # if WORKING_DIR is not specified, WORKING_DIR will be output dependent.
-    env.options['SPECIFIED_WORKING_DIR'] = env.options['WORKING_DIR']
+    env.SPECIFIED_WORKING_DIR = env.WORKING_DIR
     #
     if hasattr(args, 'output'):
         if type(args.output) == list:
             if not env.SPECIFIED_WORKING_DIR:
-                env.options['WORKING_DIR'] = os.path.split(args.output[0])[0]
+                env.WORKING_DIR = os.path.split(args.output[0])[0]
             logname = os.path.basename(args.output[0]) + '.log'
         elif args.output:
             if not env.SPECIFIED_WORKING_DIR:
-                env.options['WORKING_DIR'] = os.path.split(args.output)[0]
+                env.WORKING_DIR = os.path.split(args.output)[0]
             logname = os.path.basename(args.output) + '.log'
         else:
             if not env.SPECIFIED_WORKING_DIR:
-                env.options['WORKING_DIR'] = '.'
+                env.WORKING_DIR = '.'
             logname = 'illumina_test.log'
         if not os.path.isdir(env.WORKING_DIR):
             os.makedirs(env.WORKING_DIR)
@@ -1713,8 +1761,8 @@ if __name__ == '__main__':
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
             if not env.SPECIFIED_WORKING_DIR:
-                env.options['SPECIFIED_WORKING_DIR'] = 'illumina_test_seq_align_cache'
-                env.options['WORKING_DIR'] = env.SPECIFIED_WORKING_DIR
+                env.SPECIFIED_WORKING_DIR = 'illumina_test_seq_align_cache'
+                env.WORKING_DIR = env.SPECIFIED_WORKING_DIR
             pipeline.align(ifiles, ofiles)
             env.logger.info('Please remove working directory {} if you would like '
                 'to rerun the test.'.format(env.WORKING_DIR))
@@ -1727,8 +1775,8 @@ if __name__ == '__main__':
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
             if not env.SPECIFIED_WORKING_DIR:
-                env.options['SPECIFIED_WORKING_DIR'] = 'illumina_test_seq_call_cache'
-                env.options['WORKING_DIR'] = env.SPECIFIED_WORKING_DIR
+                env.SPECIFIED_WORKING_DIR = 'illumina_test_seq_call_cache'
+                env.WORKING_DIR = env.SPECIFIED_WORKING_DIR
             pipeline.callVariants(ifiles, None, ofiles)
             env.logger.info('Please remove working directory {} if you would like '
                 'to rerun the test.'.format(env.WORKING_DIR))
