@@ -1100,7 +1100,7 @@ class GATK:
                 --consensusDeterminationModel USE_READS
                 -compress 0 -o {7} {8}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
-                    env.OPT_GATK_REALIGNERTARGETCREATOR,
+                    env.OPT_GATK_INDELREALIGNER,
                     bam_file, env.RESOURCE_DIR,
                     self.REF_fasta, target, TEMP(cleaned_bam_file),
                     ' '.join(['-known {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
