@@ -142,6 +142,9 @@ options = [
     ('OPT_GATK_REDUCEREADS', ''),
     ('OPT_GATK_HAPLOTYPECALLER', ''),
     ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
+    # for private use
+    ('_WORKING_DIR', ''),
+    ('_LOGFILE', ''),
 ]
 
 class RuntimeEnvironment(object):
@@ -158,7 +161,7 @@ class RuntimeEnvironment(object):
         #
         # file and screen logging
         self._logger = None
-        self.__LOGFILE = None
+        self._LOGFILE = None
         #
         # additional parameters for args
         self._validators = {}
@@ -284,7 +287,7 @@ class RuntimeEnvironment(object):
             ch.setLevel(logging.DEBUG)
             ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
             self._logger.addHandler(ch)
-            self.__LOGFILE = logfile
+            self._LOGFILE = logfile
     #
     logger = property(lambda self: self._logger, _setLogger)
 
@@ -466,9 +469,9 @@ def sendmail(subject):
     if not env.NOTIFICATION_EMAIL:
         return
     try:
-        if env.__LOGFILE is not None:
+        if env._LOGFILE is not None:
             # email the last few lines of the log message
-            with open(env.__LOGFILE) as err:
+            with open(env._LOGFILE) as err:
                 text = '\n'.join(err.read().split('\n')[-50:])
         else:
             text = 'JOB FAILED.'
@@ -744,7 +747,6 @@ def getReadGroup(fastq_filename, output_bam):
     #     SOLiD). Unique identifier.
     # SM Sample. Use pool name where a pool is being sequenced.
     #
-    env.logger.error(output_bam)
     filename = os.path.basename(fastq_filename)
     output = os.path.basename(output_bam)
     # sample name is obtained from output filename without file extension
@@ -1526,7 +1528,7 @@ class b37_gatk_23(BasePipeline):
         #
         # the working dir is a directory under output, the internediate files are saved to this
         # directory to avoid name conflict
-        if not env.__WORKING_DIR:
+        if not env._WORKING_DIR:
             env.WORKING_DIR = os.path.join(os.path.split(output)[0], os.path.basename(output) + '_align_cache')
         if not os.path.isdir(env.WORKING_DIR):
             os.makedirs(env.WORKING_DIR)
@@ -1611,7 +1613,7 @@ class b37_gatk_23(BasePipeline):
         '''Call variants from a list of input files'''
         BasePipeline.callVariants(self, input_files, pedfile, output)
         #
-        if not env.__WORKING_DIR:
+        if not env._WORKING_DIR:
             env.WORKING_DIR = os.path.join(os.path.split(output)[0],
                 os.path.basename(output) + '_call_cache')
         if not os.path.isdir(env.WORKING_DIR):
@@ -1740,10 +1742,6 @@ if __name__ == '__main__':
     # temporary screen only logging
     env.logger = None
     #
-    # handling additional parameters, set default value
-    for opt in options:
-        if opt[1]:
-            env.__setattr__(opt[0], opt[1])
     # override using command line values --set
     if hasattr(args, 'set') and args.set is not None:
         for arg in args.set:
@@ -1767,19 +1765,19 @@ if __name__ == '__main__':
     #
     # special handling of 'WORKING_DIR'
     # if WORKING_DIR is not specified, WORKING_DIR will be output dependent.
-    env.__WORKING_DIR = env.WORKING_DIR
+    env._WORKING_DIR = env.WORKING_DIR
     #
     if hasattr(args, 'output'):
         if type(args.output) == list:
-            if not env.__WORKING_DIR:
+            if not env._WORKING_DIR:
                 env.WORKING_DIR = os.path.split(args.output[0])[0]
             logname = os.path.basename(args.output[0]) + '.log'
         elif args.output:
-            if not env.__WORKING_DIR:
+            if not env._WORKING_DIR:
                 env.WORKING_DIR = os.path.split(args.output)[0]
             logname = os.path.basename(args.output) + '.log'
         else:
-            if not env.__WORKING_DIR:
+            if not env._WORKING_DIR:
                 env.WORKING_DIR = '.'
             logname = 'illumina_test.log'
         if not os.path.isdir(env.WORKING_DIR):
@@ -1798,9 +1796,9 @@ if __name__ == '__main__':
         if args.test_run:
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
-            if not env.__WORKING_DIR:
-                env.__WORKING_DIR = 'illumina_test_seq_align_cache'
-                env.WORKING_DIR = env.__WORKING_DIR
+            if not env._WORKING_DIR:
+                env._WORKING_DIR = 'illumina_test_seq_align_cache'
+                env.WORKING_DIR = env._WORKING_DIR
             pipeline.align(ifiles, ofiles)
             env.logger.info('Please remove working directory {} if you would like '
                 'to rerun the test.'.format(env.WORKING_DIR))
@@ -1812,9 +1810,9 @@ if __name__ == '__main__':
         if args.test_run:
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
-            if not env.__WORKING_DIR:
-                env.__WORKING_DIR = 'illumina_test_seq_call_cache'
-                env.WORKING_DIR = env.__WORKING_DIR
+            if not env._WORKING_DIR:
+                env._WORKING_DIR = 'illumina_test_seq_call_cache'
+                env.WORKING_DIR = env._WORKING_DIR
             pipeline.callVariants(ifiles, None, ofiles)
             env.logger.info('Please remove working directory {} if you would like '
                 'to rerun the test.'.format(env.WORKING_DIR))
