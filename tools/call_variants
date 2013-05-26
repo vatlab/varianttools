@@ -511,15 +511,15 @@ def downloadFile(URL, dest, quiet=False):
     if os.path.isfile(dest):
         env.logger.warning('Using existing downloaded file {}.'.format(dest))
         return dest
-    p = subprocess.Popen('wget {} -O {}_tmp {}'
-        .format('-q' if quiet else '', dest, URL), shell=True)
+    p = subprocess.Popen('wget {} -O {} {}'
+        .format('-q' if quiet else '', TEMP(dest), URL), shell=True)
     ret = p.wait()
-    if ret == 0 and os.path.isfile(dest + '_tmp'):
-        os.rename(dest + '_tmp', dest)
+    if ret == 0 and os.path.isfile(TEMP(dest)):
+        os.rename(TEMP(dest), dest)
         return dest
     else:
         try:
-            os.remove(dest + '_tmp')
+            os.remove(TEMP(dest))
         except OSError:
             pass
         raise RuntimeError('Failed to download {} using wget'.format(URL))
@@ -598,8 +598,12 @@ def existAndNewerThan(ofiles, ifiles):
 
 def TEMP(filename):
     '''Temporary output of filename'''
-    # turn path/filename.ext to path/filename_tmp.ext
-    return '_tmp.'.join(filename.rsplit('.', 1))
+    # turn path/filename.ext to path/filename_tmp???.ext, where ??? is
+    # the process ID to avoid two processes writing to the same temp
+    # files. That is to say, if two processes are working on the same step
+    # they will produce different temp files, and the final results should 
+    # still be valid.
+    return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
 
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
@@ -620,14 +624,14 @@ def decompress(filename, dest_dir=None):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with gzip.open(filename, 'rb') as gzinput, open(dest_file + '_tmp', 'wb') as output:
+            with gzip.open(filename, 'rb') as gzinput, open(TEMP(dest_file), 'wb') as output:
                 content = gzinput.read(10000000)
                 while content:
                     output.write(content)
                     content = gzinput.read(10000000)
             # only rename the temporary file to the right one after finishing everything
             # this avoids corrupted files
-            os.rename(dest_file + '_tmp', dest_file)
+            os.rename(TEMP(dest_file), dest_file)
         return [dest_file]
     elif filename.lower().endswith('.bz2'):
         dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
@@ -635,14 +639,14 @@ def decompress(filename, dest_dir=None):
             env.logger.warning('Using existing decompressed file {}'.format(dest_file))
         else:
             env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with bz2.open(filename, 'rb') as bzinput, open(dest_file + '_tmp', 'wb') as output:
+            with bz2.open(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
                 content = bzinput.read(10000000)
                 while content:
                     output.write(content)
                     content = bzinput.read(10000000)
             # only rename the temporary file to the right one after finishing everything
             # this avoids corrupted files
-            os.rename(dest_file + '_tmp', dest_file)
+            os.rename(TEMP(dest_file), dest_file)
         return [dest_file]
     elif filename.lower().endswith('.zip'):
         bundle = zipfile.ZipFile(filename)
@@ -792,12 +796,14 @@ def countUnmappedReads(sam_files):
         for sam_file, target_file in zip(sam_files, targets):
             env.logger.info('Counting unmapped reads in {}'.format(sam_file))
             unmapped_count = 0
+            total_count = 0
             with open(sam_file) as sam:
-               for idx,line in enumerate(sam):
+               for line in sam:
+                   total_count += 1
                    if 'XT:A:N' in line:
                        unmapped_count += 1
             with open(target_file, 'w') as target:
-                target.write('{}\n{}\n'.format(unmapped_count, idx+1))
+                target.write('{}\n{}\n'.format(unmapped_count, total_count))
     #
     counts = []
     for count_file in targets:
@@ -897,11 +903,11 @@ class BWA:
                 if opt == ' -I ':
                     env.logger.warning('Using -I option for bwa aln command '
                         'because the sequences seem to be in Illumina 1.3+ format.')
-                run_command('bwa aln {} {} -t 4 {}/{} {} > {}_tmp'
+                run_command('bwa aln {} {} -t 4 {}/{} {} > {}'
                     .format(opt, env.OPT_BWA_ALN, env.RESOURCE_DIR, 
-                        self.REF_fasta, input_file, dest_file),
+                        self.REF_fasta, input_file, TEMP(dest_file)),
                     name=os.path.basename(dest_file),
-                    upon_succ=(os.rename, dest_file + '_tmp', dest_file),
+                    upon_succ=(os.rename, TEMP(dest_file), dest_file),
                     wait=False)
         # wait for all bwa aln jobs to be completed
         wait_all()
@@ -920,12 +926,12 @@ class BWA:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}_tmp'
+                    'bwa sampe {0} -r \'{1}\' {2}/{3} {4} {5} {6} {7} > {8}'
                     .format(
                         env.OPT_BWA_SAMPE, rg, env.RESOURCE_DIR, self.REF_fasta,
-                        sai1, sai2, f1, f2, sam_file),
+                        sai1, sai2, f1, f2, TEMP(sam_file)),
                     name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    upon_succ=(os.rename, TEMP(sam_file), sam_file),
                     wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
@@ -943,12 +949,12 @@ class BWA:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}_tmp'
+                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}'
                     .format(
                         env.OPT_BWA_SAMSE, rg, env.RESOURCE_DIR,
-                        self.REF_fasta, sai, f, sam_file),
+                        self.REF_fasta, sai, f, TEMP(sam_file)),
                     name=os.path.basename(sam_file),
-                    upon_succ=(os.rename, sam_file + '_tmp', sam_file),
+                    upon_succ=(os.rename, TEMP(sam_file), sam_file),
                     wait=False)
             sam_files.append(sam_file)
         # wait for all jobs to be completed
@@ -1016,9 +1022,9 @@ class SAMTOOLS:
         if existAndNewerThan(ofiles='{}.bai'.format(bam_file), ifiles=bam_file):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
-            run_command('samtools index {0} {1} {1}_tmp.bai'.format(
-                env.OPT_SAMTOOLS_INDEX, bam_file),
-                upon_succ=(os.rename, bam_file + '_tmp.bai', bam_file + '.bai'))
+            run_command('samtools index {0} {1} {1}'.format(
+                env.OPT_SAMTOOLS_INDEX, TEMP(bam_file + '.bai')),
+                upon_succ=(os.rename, TEMP(bam_file + '.bai'), bam_file + '.bai'))
 
 
 class PICARD:
@@ -1103,12 +1109,12 @@ class PICARD:
                 .format(' and '.join(output_files)))
         else:
             run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
-                FASTQ={}_tmp SECOND_END_FASTQ={} NON_PF=true'''
+                FASTQ={} SECOND_END_FASTQ={} NON_PF=true'''
                 .format(env.OPT_JAVA, env.PICARD_PATH,
                     env.OPT_PICARD_SAMTOFASTQ, input_file,
-                    output_files[0], output_files[1]),
+                    TEMP(output_files[0]), output_files[1]),
                 name=os.path.basename(output_files[0]),
-                upon_succ=(os.rename, output_files[0] + '_tmp', output_files[0]))
+                upon_succ=(os.rename, TEMP(output_files[0]), output_files[0]))
         return output_files
 
     def markDuplicates(self, bam_files):
@@ -1209,14 +1215,14 @@ class GATK:
                 -R {4}/{5}
                 -T RealignerTargetCreator
                 --mismatchFraction 0.0
-                -o {6}_tmp {7} '''.format(
+                -o {6} {7} '''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_REALIGNERTARGETCREATOR,
                     bam_file, env.RESOURCE_DIR,
-                    self.REF_fasta, target,
+                    self.REF_fasta, TEMP(target),
                     ' '.join(['-known {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target + '_tmp', target))
+                upon_succ=(os.rename, TEMP(target), target))
         # 
         # realign around known indels
         cleaned_bam_file = os.path.join(env.WORKING_DIR, os.path.basename(bam_file)[:-4] + '.clean.bam')
@@ -1254,13 +1260,13 @@ class GATK:
                 -cov QualityScoreCovariate
                 -cov CycleCovariate
                 -cov ContextCovariate
-                -o {6}_tmp {7}'''.format(
+                -o {6} {7}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_BASERECALIBRATOR, bam_file,
-                    env.RESOURCE_DIR, self.REF_fasta, target,
+                    env.RESOURCE_DIR, self.REF_fasta, TEMP(target),
                     ' '.join(['-knownSites {}/{}'.format(env.RESOURCE_DIR, x) for x in self.knownSites])),
                 name=os.path.basename(target),
-                upon_succ=(os.rename, target + '_tmp', target))
+                upon_succ=(os.rename, TEMP(target), target))
         #
         # recalibrate
         if existAndNewerThan(ofiles=recal_bam_file, ifiles=target):
@@ -1571,9 +1577,9 @@ class b37_gatk_23(BasePipeline):
         counts = countUnmappedReads(sam_files)
         for f,c in zip(sam_files, counts):
             # more than 40% unmapped
-            if c[0]/c[1] > 0.4:
+            if c[1] == 0 or c[0]/c[1] > 0.4:
                 env.logger.error('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
-                    .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
+                    .format(f, c[0], c[1], 0 if c[1] == 0 else (100*(1 - c[0]/c[1]))))
                 sys.exit(1)
             else:
                 env.logger.info('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
@@ -1794,9 +1800,10 @@ if __name__ == '__main__':
         env.jobs = args.jobs
         pipeline.checkResource()
         if args.test_run:
-            ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq_{}.fastq'.format(x)) for x in [1,2]]
+            ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.tar.gz')]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
-            if not env._WORKING_DIR:
+            if not env.WORKING_DIR:
+                env.logger.info('Using local cache directory illumina_test_seq_align_cache')
                 env._WORKING_DIR = 'illumina_test_seq_align_cache'
                 env.WORKING_DIR = env._WORKING_DIR
             pipeline.align(ifiles, ofiles)
@@ -1810,7 +1817,8 @@ if __name__ == '__main__':
         if args.test_run:
             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
-            if not env._WORKING_DIR:
+            if not env.WORKING_DIR:
+                env.logger.info('Using local cache directory illumina_test_seq_call_cache')
                 env._WORKING_DIR = 'illumina_test_seq_call_cache'
                 env.WORKING_DIR = env._WORKING_DIR
             pipeline.callVariants(ifiles, None, ofiles)
