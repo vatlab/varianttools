@@ -39,6 +39,8 @@ import zipfile
 import time
 import re
 import platform
+import smtplib
+from email.mime.text import MIMEText
 from collections import namedtuple
 
 ###############################################################################
@@ -105,6 +107,7 @@ options = [
     ('NOTIFICATION_EMAIL', ''),
     ('SMTP_HOST', 'smtp.gmail.com'),  # for gmail
     ('SMTP_PORT', '465'),             # for gmail
+    ('SMTP_SSL', 'True'),             # use SSL or not, default to True
     ('SMTP_USER', ''),                # email address
     ('SMTP_PASSWORD', ''),            # email password
     # option, default value
@@ -479,12 +482,17 @@ def sendmail(subject):
         msg['Subject'] = subject
         msg['From'] = env.SMTP_USER
         msg['To'] = env.NOTIFICATION_EMAIL
-        s = smtplib.SMTP_SSL(host=env.SMTP_HOST, port=env.SMTP_PORT)
+        if env.SMTP_SSL.lower() in ['true', '1', 'yes', 'y']:
+            s = smtplib.SMTP_SSL(host=env.SMTP_HOST, port=env.SMTP_PORT)
+        else:
+            s = smtplib.SMTP(host=env.SMTP_HOST, port=env.SMTP_PORT)
         s.login(user=env.SMTP_USER, password=env.SMTP_PASSWORD)
         s.sendmail(env.SMTP_USER, [env.NOTIFICATION_EMAIL], msg.as_string())
         s.quit()
+        env.logger.info('Email with subject "{}" is sent to {}'
+            .format(subject[:40], env.NOTIFICATION_EMAIL))
     except Exception as e:
-        print('Failed to send mail with subject {}: {}'
+        env.logger.warning('Failed to send mail with subject {}: {}'
             .format(subject, e))
 
 
