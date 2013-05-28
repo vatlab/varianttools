@@ -145,6 +145,10 @@ options = [
     ('OPT_GATK_REDUCEREADS', ''),
     ('OPT_GATK_HAPLOTYPECALLER', ''),
     ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
+    ('OPT_GATK_VARIANTRECALIBRATOR', ''),
+    ('OPT_GATK_VARIANTRECALIBRATOR_SNP', ' -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP'),
+    ('OPT_GATK_VARIANTRECALIBRATOR_INDEL', '--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum'),
+    ('OPT_GATK_APPLYRECALIBRATION', ''),
     # for private use
     ('_WORKING_DIR', ''),
     ('_LOGFILE', ''),
@@ -456,7 +460,8 @@ def checkCmd(cmd):
     if not hasattr(shutil, 'which'):
         # if shutil.which does not exist, use subprocess...
         try:
-            subprocess.call(cmd)
+            subprocess.call(cmd, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
+            return
         except:
             env.logger.error('Command {} does not exist. Please install it and try again.'
                 .format(cmd))
@@ -1371,23 +1376,33 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing error model {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
+            dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
+            hapmap_vcf = [x for x in self.knownSites if 'hapmap' in x][0]
+            kg_vcf = [x for x in self.knownSites if '1000G_omni' in x][0]
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2}
+                -input {4}
                 -T VariantRecalibrator
-                -percentBad 0.01 -minNumBad 1000
-                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf		
-                -resource:omni,known=false,training=true,truth=true,prior=12.0	1000G_omni2.5.b37.sites.vcf		
-                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	dbsnp_137.b37.v	
-                -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+                -R {5}/{6}
+                {3}
+                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 {5}/{7}
+                -resource:omni,known=false,training=true,truth=true,prior=12.0	{5}/{8}
+                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	{5}/{9}
                 -mode SNP 
-                -recalFile {6}.recal
-                -tranchesFile {6}.tranches
-                -rscriptFile {6}.R
-                -log {7}'''.format(
+                -recalFile {10}.recal
+                -tranchesFile {10}.tranches
+                -rscriptFile {10}.R
+                -log {11}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
-                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
-                    env.RESOURCE_DIR, self.REF_fasta,
-                    target, TEMP(target)),
+                    env.OPT_GATK_VARIANTRECALIBRATOR,
+                    env.OPT_GATK_VARIANTRECALIBRATOR_SNP,
+                    input_file,
+                    env.RESOURCE_DIR,
+                    self.REF_fasta,
+                    hapmap_vcf,
+                    kg_vcf,
+                    dbSNP_vcf,
+                    target,
+                    TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
         #
@@ -1400,21 +1415,27 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing error model {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
+            dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
+            indels_vcf = [x for x in self.knownSites if 'gold_standard.indels' in x][0]
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} 
+                -input {4} 
                 -T VariantRecalibrator
-                --maxGaussians 4 -percentBad 0.01 -minNumBad 1000
-                -resource:mills,known=false,training=true,truth=true,prior=12.0 Mills_and_1000G_gold_standard.indels.b37.sites.vcf
-                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 dbsnp_137.b37.vcf 
-                -an DP -an FS -an ReadPosRankSum -an MQRankSum
+                -R {5}/{6}
+                {3}
+                -resource:mills,known=false,training=true,truth=true,prior=12.0 {5}/{7}
+                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 {5}/{8}
                 -mode INDEL 
-                -recalFile {6}.recal
-                -tranchesFile {6}.tranches
-                -rscriptFile {6}.R
-                -log {7}'''.format(
+                -recalFile {9}.recal
+                -tranchesFile {9}.tranches
+                -rscriptFile {9}.R
+                -log {10}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
-                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.OPT_GATK_VARIANTRECALIBRATOR, 
+                    env.OPT_GATK_VARIANTRECALIBRATOR_INDEL,
+                    input_file,
                     env.RESOURCE_DIR, self.REF_fasta,
+                    indels_vcf,
+                    dbSNP_vcf,
                     target, TEMP(target)),
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
@@ -1463,11 +1484,8 @@ class BasePipeline:
     '''A vase variant caller that is supposed to provide most of the utility functions
     and common operations that are not specific to any pipeline.
     '''
-    def __init__(self, pipeline):
-        env.RESOURCE_DIR = os.path.join(os.path.expanduser(env.RESOURCE_DIR), pipeline)
-        if not os.path.isdir(env.RESOURCE_DIR):
-            env.logger.info('Creating resource directory {}'.format(env.RESOURCE_DIR))
-            os.makedirs(env.RESOURCE_DIR)
+    def __init__(self):
+        pass
 
     #
     # PREPARE RESOURCE
@@ -1513,8 +1531,8 @@ class b37_gatk_23(BasePipeline):
     '''A variant caller that uses gatk resource package 2.3 to call variants
     from build b37 of the human genome of the GATK resource bundle'''
     def __init__(self):
+        BasePipeline.__init__(self)
         self.pipeline = 'b37_gatk_23'
-        BasePipeline.__init__(self, self.pipeline)
         self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*'
         self.REF_fasta = 'human_g1k_v37.fasta'
         self.knownSites = [
@@ -1530,6 +1548,11 @@ class b37_gatk_23(BasePipeline):
         self.samtools = SAMTOOLS(self.REF_fasta)
         self.picard = PICARD()
         self.gatk = GATK(self.REF_fasta, self.knownSites)
+        #
+        env.RESOURCE_DIR = os.path.join(os.path.expanduser(env.RESOURCE_DIR), self.pipeline)
+        if not os.path.isdir(env.RESOURCE_DIR):
+            env.logger.info('Creating resource directory {}'.format(env.RESOURCE_DIR))
+            os.makedirs(env.RESOURCE_DIR)
 
     def checkResource(self):
         '''Check if needed resource is available. This pipeline requires
@@ -1674,11 +1697,12 @@ class b37_gatk_23(BasePipeline):
         if not os.path.isdir(env.WORKING_DIR):
             os.makedirs(env.WORKING_DIR)
         #
-        # step 1: haplotype call
         for input_file in input_files:
             #vcf_file = self.haplotypeCall(input_file)
             vcf_file = self.gatk.unifiedGenotyper(input_file)
-        #
+            #   
+            # variant calibrate
+            recal_vcf_file = self.gatk.variantRecalibration(vcf_file)
         #
         # copy results to output
         shutil.copy(vcf_file, output)
@@ -1687,10 +1711,10 @@ class b37_gatk_23(BasePipeline):
 class hg19_gatk_23(b37_gatk_23):
     '''A variant caller that uses gatk resource package 2.3 to call variants
     from build hg19 of the human genome'''
-    def __init__(self, resource_dir):
+    def __init__(self):
+        # do not call 
+        BasePipeline.__init__(self)
         self.pipeline = 'hg19_gatk_23'
-        b37_gatk_23.__init__(self, resource_dir, self.pipeline)
-        #
         # this piple just uses different resource bundle
         self.GATK_resource_url = 'ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*'
         self.REF_fasta = 'ucsc.hg19.fasta'
@@ -1701,12 +1725,16 @@ class hg19_gatk_23(b37_gatk_23):
             'Mills_and_1000G_gold_standard.indels.hg19.vcf',
             '1000G_phase1.indels.hg19.vcf',
         ]
-        self.checkResource()
         # prepare the commands to be used
         self.bwa = BWA(self.REF_fasta)
         self.picard = PICARD()
         self.samtools = SAMTOOLS(self.REF_fasta)
         self.gatk = GATK(self.REF_fasta, self.knownSites)
+        #
+        env.RESOURCE_DIR = os.path.join(os.path.expanduser(env.RESOURCE_DIR), self.pipeline)
+        if not os.path.isdir(env.RESOURCE_DIR):
+            env.logger.info('Creating resource directory {}'.format(env.RESOURCE_DIR))
+            os.makedirs(env.RESOURCE_DIR)
         
 
 if __name__ == '__main__':
