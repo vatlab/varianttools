@@ -38,7 +38,7 @@ except:
 
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
-     env, executeUntilSucceed, ShelfDB
+     env, executeUntilSucceed, ShelfDB, safeMapFloat
 from .phenotype import Sample
 from .tester import *
 from .rtester import RTest, SKAT
@@ -336,8 +336,8 @@ class AssociationTestManager:
             # add intercept
             covariates.insert(0, [1]*len(sample_IDs))
             try:
-                phenotypes = [list(map(float, x)) for x in phenotypes]
-                covariates = [list(map(float, x)) for x in covariates]
+                phenotypes = [safeMapFloat(x, nan=False) for x in phenotypes]
+                covariates = [safeMapFloat(x, nan=False) for x in covariates]
             except:
                 raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values: '
                                  'missing values should be removed from analysis or '

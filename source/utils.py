@@ -625,6 +625,16 @@ def typeOfValues(vals):
         except:
             return 'VARCHAR({})'.format(max([len(x) for x in vals]))
 
+def safeMapFloat(x, nan = True):
+    for i, item in enumerate(x):
+        try:
+            x[i] = float(item)
+        except:
+            raise
+        if not nan and x[i] != x[i]:
+            raise
+    return x
+        
 class delayedAction:
     '''Call the passed function with param after a few seconds. It is most often 
     used to display certain message only if an action takes a long time.

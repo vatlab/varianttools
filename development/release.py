@@ -64,7 +64,7 @@ def modifyVersion(version):
         with open('source/__init__.py', 'w') as init_file:
             init_file.write(''.join(content))
     # read version string
-    from source import VTOOLS_VERSION
+    from variant_tools import VTOOLS_VERSION
     return VTOOLS_VERSION
 
 def setupEnvironment(version):
