@@ -335,7 +335,7 @@ def discordanceRate(args):
                 var_i[var] = gt
             for j, (id_j, name_j) in enumerate(zip(sample_ids, sample_names)):
                 if i > j:
-                    output_items.append('{:.5f}'.format(float(rates[j][i][0]) / rates[j][i][1]))
+                    output_items.append('{:.5f}'.format(float(rates[j][i][0]) / (rates[j][i][0] + rates[j][i][1])))
                 elif i == j:
                     output_items.append('0/{0}'.format(len(var_i)))
                 else:
@@ -971,4 +971,8 @@ if __name__ == '__main__':
     verbosity = args.verbosity
     logger = env.logger
     # calling the associated functions
-    args.func(args)
+    try:
+        args.func(args)
+    except Exception as e:
+        env.logger.error('{}'.format(e))
+        sys.exit(1)
