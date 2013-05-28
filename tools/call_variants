@@ -1322,7 +1322,7 @@ class GATK:
 
     def unifiedGenotyper(self, input_file):
         target = os.path.join(env.WORKING_DIR,
-            os.path.basename(input_file)[:-4] + '.vcf')
+            os.path.basename(input_file)[:-4] + '_raw.vcf')
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing called variants {}'.format(target))
         else:
@@ -1333,6 +1333,7 @@ class GATK:
                 --dbsnp {4}/{7}
                 -stand_call_conf 50.0 
                 -stand_emit_conf 10.0 
+                --genotype_likelihoods_model BOTH
                 -dcov 200
                 -o {6}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
