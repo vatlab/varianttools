@@ -1335,6 +1335,8 @@ class GATK:
                 -stand_emit_conf 10.0 
                 --genotype_likelihoods_model BOTH
                 -dcov 200
+            	-A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest 
+                -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage 
                 -o {6}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_UNIFIEDGENOTYPER, input_file,
@@ -1371,10 +1373,10 @@ class GATK:
         # SNPs error model
         #
         # target is log file
-        recal_files = []
+        recal_files = {} 
         target = os.path.join(env.WORKING_DIR,
             os.path.basename(input_file)[:-4] + '.SNPs')
-        recal_files.append(target)
+        recal_files['SNP'] = target
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing error model {}'.format(target))
         else:
@@ -1413,7 +1415,7 @@ class GATK:
         # target is log file
         target = os.path.join(env.WORKING_DIR,
             os.path.basename(input_file)[:-4] + '.INDELs')
-        recal_files.append(target)
+        recal_files['INDEL'] = target
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing error model {}'.format(target))
         else:
@@ -1442,31 +1444,53 @@ class GATK:
                 name=os.path.basename(target),
                 upon_succ=(os.rename, TEMP(target), target))
         #
-        # apply recalibration
+        # SNP recalibration
         #
         target = os.path.join(env.WORKING_DIR,
-                              os.path.basename(input_file)[:-4] + '.recal.vcf'.format(model))
+                              os.path.basename(input_file)[:-4] + '.recal.SNPs.vcf')
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
         else:
-            for model, model_data in zip(['SNPs', 'INDELs'], recal_files):
-                run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                    -R {4}/{5}
-                    -T ApplyRecalibration
-                    -mode {6} 
-                    --ts_filter_level 99.9 
-                    -recalFile {7}.recal
-                    -tranchesFile {7}.tranches
-                    -o {8}'''.format(
-                        env.OPT_JAVA, env.GATK_PATH,
-                        env.OPT_GATK_HAPLOTYPECALLER, input_file,
-                        env.RESOURCE_DIR, self.REF_fasta,
-                        model, model_data, TEMP(target)),
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T ApplyRecalibration
+                -mode {6} 
+                --ts_filter_level 99.9 
+                -recalFile {7}.recal
+                -tranchesFile {7}.tranches
+                -o {8}'''.format(
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
+                    "SNP", recal_files["SNP"], TEMP(target)),
+            name=os.path.basename(target),
+            upon_succ=(os.rename, TEMP(target), target))
+        #
+        # INDEL recalibration
+        # input file should be the output from the last step
+        #
+        input_file = target
+        target = os.path.join(env.WORKING_DIR,
+                              os.path.basename(input_file)[:-4] + '.INDELs.vcf')
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+                -R {4}/{5}
+                -T ApplyRecalibration
+                -mode {6} 
+                --ts_filter_level 99.9 
+                -recalFile {7}.recal
+                -tranchesFile {7}.tranches
+                -o {8}'''.format(
+                    env.OPT_JAVA, env.GATK_PATH,
+                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.RESOURCE_DIR, self.REF_fasta,
+                    "INDEL", recal_files["INDEL"], TEMP(target)),
             name=os.path.basename(target),
             upon_succ=(os.rename, TEMP(target), target))
         return target 
 
-    
 
 ###############################################################################
 #
