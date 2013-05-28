@@ -1035,8 +1035,9 @@ class SAMTOOLS:
         if existAndNewerThan(ofiles='{}.bai'.format(bam_file), ifiles=bam_file):
             env.logger.warning('Using existing bam index {}.bai'.format(bam_file))
         else:
-            run_command('samtools index {0} {1} {1}'.format(
-                env.OPT_SAMTOOLS_INDEX, TEMP(bam_file + '.bai')),
+            # samtools index input.bam [output.bam.bai]
+            run_command('samtools index {} {} {}'.format(
+                env.OPT_SAMTOOLS_INDEX, bam_file, TEMP(bam_file + '.bai')),
                 upon_succ=(os.rename, TEMP(bam_file + '.bai'), bam_file + '.bai'))
 
 
