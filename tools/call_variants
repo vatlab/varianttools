@@ -1421,15 +1421,12 @@ class GATK:
         #
         # apply recalibration
         #
-        # targets are two output vcf file names
-        targets = []
-        for model, model_data in zip(['SNPs', 'INDELs'], recal_files):
-            target = os.path.join(env.WORKING_DIR,
-                                  os.path.basename(input_file)[:-4] + '.recal.{}.vcf'.format(model))
-            targets.append(target)
-            if existAndNewerThan(ofiles=target, ifiles=input_file):
-                env.logger.warning('Using existing recalibrated variants {}'.format(target))
-            else:
+        target = os.path.join(env.WORKING_DIR,
+                              os.path.basename(input_file)[:-4] + '.recal.vcf'.format(model))
+        if existAndNewerThan(ofiles=target, ifiles=input_file):
+            env.logger.warning('Using existing recalibrated variants {}'.format(target))
+        else:
+            for model, model_data in zip(['SNPs', 'INDELs'], recal_files):
                 run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                     -R {4}/{5}
                     -T ApplyRecalibration
@@ -1442,9 +1439,9 @@ class GATK:
                         env.OPT_GATK_HAPLOTYPECALLER, input_file,
                         env.RESOURCE_DIR, self.REF_fasta,
                         model, model_data, TEMP(target)),
-                    name=os.path.basename(target),
-                    upon_succ=(os.rename, TEMP(target), target))
-        return ','.join(target)
+            name=os.path.basename(target),
+            upon_succ=(os.rename, TEMP(target), target))
+        return target 
 
     
 
