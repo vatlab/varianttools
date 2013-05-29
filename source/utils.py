@@ -65,14 +65,10 @@ try:
     if sys.version_info.major == 2:
         import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
-        # fake import to make this sqlite module bundled by pyinstaller
-        import _vt_sqlite3_ext
         from cgatools_py2 import CrrFile, Location, Range
     else:
         import pickle
         import vt_sqlite3_py3 as sqlite3
-        # fake import to make this sqlite module bundled by pyinstaller
-        import _vt_sqlite3_ext
         from cgatools_py3 import CrrFile, Location, Range
 
 except ImportError as e:
@@ -81,6 +77,11 @@ except ImportError as e:
         '"python setup.py install") and you are NOT running command vtools from within '
         'the source directory.'.format(e))
 
+try:
+    # fake import to make this sqlite module bundled by pyinstaller
+    import _vt_sqlite3_ext
+except ImportError as e:
+    pass
 
 class RuntimeEnvironments(object):
     # the following make RuntimeEnvironments a singleton class
