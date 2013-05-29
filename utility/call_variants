@@ -1683,26 +1683,27 @@ class b37_gatk_23(BasePipeline):
                 env.logger.info('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
                     .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
         # 
+        # step 4: merge per-lane bam files to a single sample bam file
+        if len(sam_files) > 1:
+            merged_bam_file = self.picard.mergeBAMs(sam_files)
+        else:
+            merged_bam_file = sam_files[0]
+
         # step 4: convert sam to sorted bam files
-        sorted_bam_files = self.picard.sortSam(sam_files)
+        sorted_bam_file = self.picard.sortSam([merged_bam_file])[0]
         #
         # According to GATK best practice, dedup should be run at the
         # lane level (the documentation is confusing here though)
         #
         # step 5: remove duplicate
-        dedup_bam_files = self.picard.markDuplicates(sorted_bam_files)
+        dedup_bam_file = self.picard.markDuplicates([sorted_bam_file])[0]
         #
-        # step 6: merge sorted bam files to output file
-        if len(dedup_bam_files) > 1:
-            merged_bam_file = self.picard.mergeBAMs(dedup_bam_files)
-        else:
-            merged_bam_file = dedup_bam_files[0]
         #
         # step 7: index the output bam file
-        self.samtools.indexBAM(merged_bam_file)
+        self.samtools.indexBAM(dedup_bam_file)
         #
         # step 8: create indel realignment targets and recall
-        cleaned_bam_file = self.gatk.realignIndels(merged_bam_file)
+        cleaned_bam_file = self.gatk.realignIndels(dedup_bam_file)
         self.samtools.indexBAM(cleaned_bam_file)
         #
         # step 9: recalibration
