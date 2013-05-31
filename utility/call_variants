@@ -1451,7 +1451,7 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} --input {3} 
                 -R {4}/{5}
                 -T ApplyRecalibration
                 -mode {6} 
@@ -1475,7 +1475,7 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} --input {3} 
                 -R {4}/{5}
                 -T ApplyRecalibration
                 -mode {6} 
