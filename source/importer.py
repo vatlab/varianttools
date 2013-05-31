@@ -539,8 +539,16 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
             raise ValueError('Incorrect database (missing table {})'.format(name))
         if not name + '_field':
             raise ValueError('Incorrect database (missing field table)')
+        #
+        # The following is very important for the performance of this functor
+        # but we cannot yet do it because vtools import/update can be executed in
+        # parallel, open multiple databases in rw mode is not possible. I mean,
+        # if we are using only 1 process, we can do readonly=False in db.connect
+        # and index the fields as follows.
+        #
         #for fld in cond_fields.split(','):
         #    if not db.hasIndex('{}_idx'.format(fld)):
+        #        env.logger.info('Creating index for field {} in database {}'.format(fld, name))
         #        cur.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
         __databases[dbfile] = (cur, name)
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
