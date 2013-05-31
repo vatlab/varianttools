@@ -468,7 +468,8 @@ def use(args):
                 #FIXME if line 470 fails due to "No reference genome information" then the error prompt below is misleading(wanggao) 
                 raise ValueError('Cannot find annotation database {}'.format(annoDB))
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)
 
 
 
