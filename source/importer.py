@@ -523,9 +523,14 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     global __databases
     if dbfile not in __databases:
         db = DatabaseEngine()
-        if not os.path.isfile(dbfile):
-            raise ValueError('Database file {} does not exist'.format(dbfile))
-        db.connect(dbfile, readonly=True)
+        if not os.path.isfile(os.path.expanduser(dbfile)):
+            if os.path.isfile(os.path.join(env.local_resource, 'annoDB', dbfile)):
+                db.connect(os.path.join(env.local_resource, 'annoDB', dbfile), readonly=True)
+            else:
+                raise ValueError('Database file {} does not exist locally or '
+                    'under resource directory'.format(dbfile))
+        else:
+            db.connect(os.path.expanduser(dbfile), readonly=True)
         cur = db.cursor()
         tables = db.tables()
         if not tables:
