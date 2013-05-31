@@ -358,4 +358,18 @@ comment=DP fields in FORMAT. Depth for each sample genotype in a vcf file.
 index=9, 10:
 adj=FieldFromFormat('GQ', ':')
 type=INTEGER
-comment=Genotype quality. The value of Q(max_gt) from Illumina platform
+comment=Genotype quality. The value of Q(max_gt) from Illumina platform.
+
+[AD_geno]
+index=9, 10:
+adj=FieldFromFormat('AD', ':')
+type=INTEGER
+comment=Allelic depths for the ref and alt alleles in the order listed, produced by GATK.
+
+[PL_geno]
+index=9, 10:
+adj=FieldFromFormat('PL', ':')
+type=INTEGER
+comment=Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification
+
+
