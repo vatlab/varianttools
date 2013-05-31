@@ -226,7 +226,7 @@ class Updater:
             elif len(self.sample_name) != numSample:
                 raise ValueError('{} sample detected but only {} sample names are specified'
                     .format(numSample, len(self.sample_name)))                        
-            elif self.sample_name.sorted() != names.sorted():
+            elif sorted(self.sample_name) != sorted(names):
                 raise ValueError('Specified ({}) and detected sample names ({}) mismatch.'
                     .format(', '.join(self.sample_name), ', '.join(names))) 
         #
