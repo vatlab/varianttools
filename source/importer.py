@@ -1667,6 +1667,8 @@ class Importer:
         #
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
         self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
+        if 'GT' in self.genotype_info:
+            raise ValueError('GT (genotype) field should not be explicitly specified.')
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
