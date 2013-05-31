@@ -54,7 +54,7 @@ comment=1-based position
 
 [ref]
 index=1,%(pos_idx)s
-adj=DatabaseQuerier("%(db_file)s", "%(ref_field)s", "%(chr_field)s,%(pos_field)s")
+adj=FieldFromDB("%(db_file)s", "%(ref_field)s", "%(chr_field)s,%(pos_field)s")
 type=VARCHAR(255)
 comment=Reference allele, '-' for insertion.
 
@@ -62,7 +62,7 @@ comment=Reference allele, '-' for insertion.
 [alt]
 index=1,%(pos_idx)s
 type=VARCHAR(255)
-adj=DatabaseQuerier("%(db_file)s", "%(alt_field)s", "%(chr_field)s,%(pos_field)s")
+adj=FieldFromDB("%(db_file)s", "%(alt_field)s", "%(chr_field)s,%(pos_field)s")
 comment=Alternative allele obtained from another database
 
 
