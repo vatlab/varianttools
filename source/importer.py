@@ -492,6 +492,9 @@ class DiscardRecord:
         return item
     
 __databases = {}
+#
+# lock the database until it is sure that indexes are created
+__db_lock = Lock()
 
 class _DatabaseQuerier:
     '''This query a field from an annotation database'''
@@ -521,16 +524,19 @@ class _DatabaseQuerier:
 
 def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     global __databases
+    global __db_lock
+    __db_lock.acquire()
     if dbfile not in __databases:
         db = DatabaseEngine()
         if not os.path.isfile(os.path.expanduser(dbfile)):
             if os.path.isfile(os.path.join(env.local_resource, 'annoDB', dbfile)):
-                db.connect(os.path.join(env.local_resource, 'annoDB', dbfile), readonly=True)
+                database_file = os.path.join(env.local_resource, 'annoDB', dbfile)
             else:
                 raise ValueError('Database file {} does not exist locally or '
                     'under resource directory'.format(dbfile))
         else:
-            db.connect(os.path.expanduser(dbfile), readonly=True)
+            database_file = os.path.expanduser(dbfile)
+        db.connect(database_file, readonly=True)
         cur = db.cursor()
         tables = db.tables()
         if not tables:
@@ -545,17 +551,21 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
         if not name + '_field':
             raise ValueError('Incorrect database (missing field table)')
         #
-        # The following is very important for the performance of this functor
-        # but we cannot yet do it because vtools import/update can be executed in
-        # parallel, open multiple databases in rw mode is not possible. I mean,
-        # if we are using only 1 process, we can do readonly=False in db.connect
-        # and index the fields as follows.
+        # we need to create indexes for the databases but we have to re-open the
+        # database to make it writable. Because multiple processes might be used
+        # we have to use a global lock.
         #
-        #for fld in cond_fields.split(','):
-        #    if not db.hasIndex('{}_idx'.format(fld)):
-        #        env.logger.info('Creating index for field {} in database {}'.format(fld, name))
-        #        cur.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
+        for fld in cond_fields.split(','):
+            if not db.hasIndex('{}_idx'.format(fld)):
+                db.close()
+                db.connect(database_file, readonly=False)
+                env.logger.info('Creating index for field "{}" in database {}'.format(fld, name))
+                db.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
+                db.commit()
+                db.close()
+                db.connect(database_file, readonly=True)
         __databases[dbfile] = (cur, name)
+    __db_lock.release()
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
         res_field, cond_fields.split(','), default)
 
