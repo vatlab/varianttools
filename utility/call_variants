@@ -143,12 +143,17 @@ options = [
     ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
     ('OPT_GATK_PRINTREADS', ''),
     ('OPT_GATK_REDUCEREADS', ''),
-    ('OPT_GATK_HAPLOTYPECALLER', ''),
-    ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar'),
+    ('OPT_GATK_HAPLOTYPECALLER', '-minPruning 3'),
+    ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar  -stand_call_conf 50.0 '
+        '-stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth '
+        '-A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest '
+        '-A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage'),
     ('OPT_GATK_VARIANTRECALIBRATOR', ''),
-    ('OPT_GATK_VARIANTRECALIBRATOR_SNP', ' -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP'),
+    ('OPT_GATK_VARIANTRECALIBRATOR_SNV', ' -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP'),
     ('OPT_GATK_VARIANTRECALIBRATOR_INDEL', '--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum'),
-    ('OPT_GATK_APPLYRECALIBRATION', ''),
+    ('OPT_GATK_APPLYRECALIBRATION', '--ts_filter_level 99.9'),
+    ('OPT_GATK_APPLYRECALIBRATION_SNV', ''),
+    ('OPT_GATK_APPLYRECALIBRATION_INDEL', ''),
     # for private use
     ('_WORKING_DIR', ''),
     ('_LOGFILE', ''),
@@ -1327,16 +1332,13 @@ class GATK:
             env.logger.warning('Using existing called variants {}'.format(target))
         else:
             dbSNP_vcf = [x for x in self.knownSites if 'dbsnp' in x][0]
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-                -R {4}/{5}
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar
                 -T UnifiedGenotyper
+                {2}
+                -I {3} 
+                -R {4}/{5}
                 --dbsnp {4}/{7}
-                -stand_call_conf 50.0 
-                -stand_emit_conf 10.0 
                 --genotype_likelihoods_model BOTH
-                -dcov 200
-            	-A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest 
-                -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage 
                 -o {6}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_UNIFIEDGENOTYPER, input_file,
@@ -1356,7 +1358,6 @@ class GATK:
             run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
                 -R {4}/{5}
                 -T HaplotypeCaller
-                -minPruning 3
                 -o {6}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_HAPLOTYPECALLER, input_file,
@@ -1398,7 +1399,7 @@ class GATK:
                 -log {11}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
                     env.OPT_GATK_VARIANTRECALIBRATOR,
-                    env.OPT_GATK_VARIANTRECALIBRATOR_SNP,
+                    env.OPT_GATK_VARIANTRECALIBRATOR_SNV,
                     input_file,
                     env.RESOURCE_DIR,
                     self.REF_fasta,
@@ -1451,16 +1452,18 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} --input {3} 
-                -R {4}/{5}
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} {3}
+                --input {4} 
+                -R {5}/{6}
                 -T ApplyRecalibration
-                -mode {6} 
-                --ts_filter_level 99.9 
-                -recalFile {7}.recal
-                -tranchesFile {7}.tranches
-                -o {8}'''.format(
+                -mode {7} 
+                -recalFile {8}.recal
+                -tranchesFile {8}.tranches
+                -o {9}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
-                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.OPT_GATK_APPLYRECALIBRATION,
+                    env.OPT_GATK_APPLYRECALIBRATION_SNV,
+                    input_file,
                     env.RESOURCE_DIR, self.REF_fasta,
                     "SNP", recal_files["SNP"], TEMP(target)),
             name=os.path.basename(target),
@@ -1475,16 +1478,18 @@ class GATK:
         if existAndNewerThan(ofiles=target, ifiles=input_file):
             env.logger.warning('Using existing recalibrated variants {}'.format(target))
         else:
-            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} --input {3} 
-                -R {4}/{5}
+            run_command('''java {0} -jar {1}/GenomeAnalysisTK.jar {2} {3}
+                --input {4} 
+                -R {5}/{6}
                 -T ApplyRecalibration
-                -mode {6} 
-                --ts_filter_level 99.9 
-                -recalFile {7}.recal
-                -tranchesFile {7}.tranches
-                -o {8}'''.format(
+                -mode {7} 
+                -recalFile {8}.recal
+                -tranchesFile {8}.tranches
+                -o {9}'''.format(
                     env.OPT_JAVA, env.GATK_PATH,
-                    env.OPT_GATK_HAPLOTYPECALLER, input_file,
+                    env.OPT_GATK_APPLYRECALIBRATION,
+                    env.OPT_GATK_APPLYRECALIBRATION_INDEL,
+                    input_file,
                     env.RESOURCE_DIR, self.REF_fasta,
                     "INDEL", recal_files["INDEL"], TEMP(target)),
             name=os.path.basename(target),
