@@ -1,0 +1,291 @@
+#!/usr/bin/env python
+#
+# $File: submit_jobs $
+# $LastChangedDate: 2013-04-23 11:58:41 -0500 (Tue, 23 Apr 2013) $
+# $Rev: 1855 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://varianttools.sourceforge.net for details.
+#
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# $LastChangedDate: 2006-01-02 20:59:22 -0600 (Mon, 02 Jan 2006) $
+# $Rev: 110 $
+# 
+
+import os
+import sys
+import re
+import time
+import argparse
+import subprocess
+import smtplib
+from email.mime.text import MIMEText
+
+class Mailer:
+    def __init__(self, notify_email, smtp_host, smtp_port, smtp_ssl,
+        smtp_user, smtp_password):
+        self.notify_email = notify_email
+        self.smtp_user = smtp_user
+        self.smtp_password = smtp_password
+        self.smtp_host = smtp_host
+        self.smtp_port = smtp_port
+        self.smtp_ssl = smtp_ssl
+
+    def sendmail(header):
+        '''Send an email to report status.'''
+        if not self.notify_email:
+            return
+        try:
+            msg = MIMEText(' ')
+            msg['Subject'] = header
+            msg['From'] = 'submit_jobs@HPC'
+            msg['To'] = self.notify_email
+            if self.smtp_ssl:
+                s = smtplib.SMTP_SSL(host=self.smtp_host, port=self.smtp_port)
+            else:
+                s = smtplib.SMTP(host=self.smtp_host, port=self.smtp_port)
+            s.login(user=self.smtp_user, password=self.smtp_password)
+            s.sendmail('submit_jobs@HPC', [self.notify_email], msg.as_string())
+            s.quit()
+        except Exception as e:
+            print('Failed to send mail with header {}: {}'
+                .format(header, e))
+
+
+class Job:
+    def __init__(self, name, script, status, output):
+        self.name = name
+        self.script = script
+        self.status = status
+        self.output = output
+
+class Jobs:
+    def __init__(self, script, joblist, sep, max_jobs, patterns, qsub_cmd, qstat_cmd,
+        mailer):
+        '''Create a list of jobs using script and joblist
+        script
+            The bash script template
+        joblist
+            A list of jobs with fields
+        sep
+            Delimiter to separate fields for each job
+        max_jobs
+            Maximum number of running and pending jobs
+        pattern
+            Patterns to select jobs according to their names
+        qsub_cmd and qstat_cmd
+            Commands to submit jobs and check job status
+        mailer:
+            Options to send emails for major events
+        '''
+        self.patterns = patterns
+        self.max_jobs = max_jobs
+        self.qsub_cmd = qsub_cmd
+        self.qstat_cmd = qstat_cmd
+        self.mailer = mailer
+        #
+        self.jobs = {}
+
+        for job in joblist.split('\n'):
+            # remove empty lines
+            name = job.split(sep, 1)[0].strip()
+            if not name:
+                continue
+            if name == 'all':
+                sys.exit('Using all as job name is not allowed.')
+            # get keys 0, 1, 2, ...
+            keys = {}
+            for i, key in enumerate(job.split(sep)):
+                keys[str(i)] = key.strip()
+                keys['name'] = keys['0']
+                keys['output'] = keys[str(i)]
+            # replace $1, etc in script with values of keys
+            s = script
+            for k,v in keys.items():
+                # first protect double $ sign.
+                s = re.sub(r'\$\$', r'%%%', s)
+                # subsitute in script
+                if True in [x in str(v) for x in [' ', '*', ',', '[', ']']]:
+                    if '"' in str(v):
+                        quote = '"'
+                    else:
+                        quote = "'"
+                    s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s%s%s\1" % (quote, str(v), quote), s)
+                    s = re.sub(r'\$\{%s\}' % k, "%s%s%s" % (quote, str(v), quote), s)
+                else:
+                    s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s\1" % str(v), s)
+                    s = re.sub(r'\$\{%s\}' % k, str(v), s)
+                # $$ is replaced with single $
+                s = re.sub(r'%%%', r'$', s)
+            self.jobs[name] = Job(name=name, script=s, status='new', output=keys['output'])
+
+    def write_pbs_files(self):
+        '''write $name.pbs files'''
+        print('Writing PBS files for {} jobs'.format(len(self.jobs)))
+        for job in self.jobs:
+            with open('{}.pbs'.format(job), 'w') as cmd:
+                cmd.write(self.jobs[job].script)
+
+    def match(self, name):
+        # if 'all' in patterns all jobs will be selected
+        if 'all' in self.patterns:
+            return True
+        for pat in self.patterns:
+            if re.match(pat.replace('?', '.{1}').replace('*', '.*'), name, re.I):
+                return True
+        return False
+
+    def submit(self):
+        '''Submit jobs...'''
+        # 
+        # get a list of running jobs
+        qstat_output = subprocess.check_output(self.qstat_cmd, shell=True)
+        running_jobs = [x for x in qstat_output.decode().split() if x in self.jobs]
+        #
+        nIgnored = 0
+        nRunning = 0
+        nCompleted = 0
+        for name,job in self.jobs.items():
+            if not self.match(name):
+                job.status = 'ignored'
+                nIgnored += 1
+            elif name in running_jobs:
+                job.status = 'running'
+                nRunning += 1
+            elif os.path.isfile(job.output):
+                job.status = 'completed'
+                nCompleted += 1
+            elif job.status != 'unsubmitted':
+                job.status = 'failed'
+            else:
+                job.status = 'unsubmitted'
+        #
+        # submit jobs
+        submitted = 0
+        for name in [x for x,y in self.jobs.items() if y.status in ['unsubmitted', 'failed']]:
+            if submitted + len(running_jobs) > self.max_jobs:
+                break
+            if self.jobs[name] == 'failed':
+                self.mailer.sendmail('Failed job {} has been resumitted.'.format(name))
+                print('Resubmitting failed job {}'.format(name))
+            else:
+                print('Submitting new job {}'.format(name))
+            self.jobs[name].status = 'running'
+            subprocess.call(self.qsub_cmd.replace('$name', name), shell=True)
+            submitted += 1
+        print('{} jobs processed: {} submitted, {} running/pending, {} completed, {} remaining.'
+            .format(len(self.jobs) - nIgnored, submitted, nRunning, nCompleted,
+                len(self.jobs) - submitted - nRunning - nCompleted))
+        return nRunning, submitted, len(self.jobs) - nIgnored - submitted - nRunning - nCompleted
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='''
+This script reads information about jobs to be executed from a configuration
+file, submit, and resubmit them if needed, until all jobs are completed
+successfully. The configuration file should define the following variables
+using a Python syntax:
+
+script: a script that has field $0, $1, $2, ...., separated by ':'. $0 can
+    also be referred to as $name, and ${n-1} (the last element) can also be
+    referred to as $output. If you have to use $ in the script, use $$ instead.
+
+joblist: a multi-line string of the form
+      name1: v1: v2:
+      name2: v2: v2:
+   The values will be used to substitute $0, $1, ..., and $name (first 
+   element) and $output (last element). The job will be saved as $name.pbs
+   and this script will check the existence of $output to determine if a 
+   job has completed successfully.
+
+separator (optional): separator to separate joblist, default to ':'
+
+qsub_cmd (optional): command to submit jobs, with $name representing job name.
+    Default: 'qsub < $name.pbs'.
+
+qstat_cmd (optional): command to get a list of running and pending jobs.
+    Default: 'qstat -f | grep Job_Name | cut -d= -f2'
+
+notification_email (optional): an email address to which major events such as
+    resubmit of a failed job will be sent. To use this function, you will
+    have to specify also
+      - smtp_user (your email account)
+      - smtp_password (your email password)
+      - smtp_host (smtp server)
+      - smtp_port (smtp port)
+      - smtp_ssl (whether or not use ssl)
+    If you are using gmail, you will need to turn on SMTP support for your
+    gmail account.
+''', formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('jobs', metavar='JOBS', nargs='*',
+        help='''A list of jobs to be executed, or "all" for all jobs. Wildcard
+            characters are allowed so "'*'" is equivalent to "all".).''')
+    parser.add_argument('-c', '--conf', default='jobs.lst',
+        help='''A configuration file that defines at least script and joblist.
+            defula to jobs.lst.''')
+    parser.add_argument('-m', '--max_jobs', type=int, default=100,
+        help='Maximum number of running and waiting jobs. Default to 100.')
+    parser.add_argument('--wait', action='store_true',
+        help='''If specified, this script will check if all jobs have completed
+            before it exits. It will also check the existence of $output
+            (the last element of each element in joblist) and resubmit the job
+            if a job is terminated without $output.''')
+    args = parser.parse_args()
+    #
+    cvars = {}
+    if not os.path.isfile(args.conf):
+        sys.exit('Configuration file does not exist.')
+    exec(open(args.conf).read(), cvars, cvars)
+    if 'script' not in cvars:
+        sys.exit('Variable script not defined in configuration file {}'
+            .format(args.conf))
+    if 'joblist' not in cvars:
+        sys.exit('Variable joblist not defined in configuration file {}'
+            .format(args.conf))
+    #
+    # add variables defined in configuration file to args
+    qsub_cmd = cvars['qsub_cmd'] if 'qsub_cmd' in cvars else 'qsub < $name.pbs'
+    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else 'qstat -f | grep Job_Name | cut -d= -f2'
+    mailer = Mailer(
+        cvars['notification_email'] if 'notification_email' in cvars else '',
+        cvars['smtp_host'] if 'smtp_host' in cvars else 'localhost',
+        cvars['smtp_port'] if 'smtp_port' in cvars else '25',
+        cvars['smtp_ssl'].lower() in ['1', 'true', 't', 'yes', 'y'] if 'smtp_ssl' in cvars else False,
+        cvars['smtp_user'] if 'smtp_user' in cvars else '',
+        cvars['smtp_password'] if 'smtp_password' in cvars else '')
+    #
+    jobs = Jobs(cvars['script'], cvars['joblist'],
+        cvars['separator'] if 'separator' in cvars else ':',
+        args.max_jobs, args.jobs, qsub_cmd, qstat_cmd, mailer)
+    # 
+    jobs.write_pbs_files()
+    #
+    while True:
+        running, submitted, pending = jobs.submit()
+        if not args.wait:
+            if pending == 0:
+                print('All jobs have been submitted successfully')
+                break
+        elif running + submitted + pending == 0:
+            mailer.sendmail('All jobs have been completed')
+            print('All jobs have been completed successfully')
+            break
+        else:
+            # sleep 5 minutes before resubmitting jobs
+            time.sleep(300)
+
