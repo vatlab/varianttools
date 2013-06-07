@@ -187,7 +187,10 @@ class RuntimeEnvironment(object):
         for x in options:
             if len(x) == 3:
                 self._validators[x[0]] = x[2]
-            self.__setattr__(x[0], x[1])
+            if ('CALL_VARIANTS_' + x[0]) in os.environ:
+                self.__setattr__(x[0], os.environ['CALL_VARIANTS_' + x[0]])
+            else:
+                self.__setattr__(x[0], x[1])
         #
         # running_jobs implements a simple multi-processing queue system. 
         # This variable holds a JOB tuple of the running jobs.
@@ -1822,7 +1825,9 @@ if __name__ == '__main__':
                 (OPT_JAVA, parameter to the java command, default to value
                 "-Xmx4g"), and options to individual subcommands such as
                 OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
-                The following options are acceptable: {}.'''.format(
+                The following options are acceptable: {}. Note that the default
+                values can be overridden by environment variables with name
+                prefixed by CALL_VARIANTS_ (e.g. CALL_VARIANTS_RESOURCE_DIR).'''.format(
                 ', '.join([x[0] + (' ({})'.format(x[1]) if x[1] else '') for x in options])))
         parser.add_argument('-j', '--jobs', default=1, type=int,
                 help='''Maximum number of concurrent jobs.''')
