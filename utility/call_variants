@@ -43,6 +43,12 @@ import smtplib
 from email.mime.text import MIMEText
 from collections import namedtuple
 
+try:
+    import pysam
+    hasPySam = True
+except ImportError as e:
+    hasPySam = False
+
 ###############################################################################
 #
 # Runtime environment
@@ -134,7 +140,7 @@ options = [
     # for details
     ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
     ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
-    ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT'),
+    ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT NON_PF=true'),
     ('OPT_PICARD_MARKDUPLICATES', ''),
     #
     ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
@@ -154,6 +160,7 @@ options = [
     ('OPT_GATK_APPLYRECALIBRATION', '--ts_filter_level 99.9'),
     ('OPT_GATK_APPLYRECALIBRATION_SNV', ''),
     ('OPT_GATK_APPLYRECALIBRATION_INDEL', ''),
+    #
     # for private use
     ('_WORKING_DIR', ''),
     ('_LOGFILE', ''),
@@ -831,10 +838,19 @@ def countUnmappedReads(sam_files):
             counts.append((unmapped, total))
     return counts
 
-# def isBamPairedEnd(bamfile):
-#    # FIXME: check if a bam file has paired end reads
-#    # we need pysam for this but pysam does not yet work for Python 3.3.
-#    return True
+def isBamPairedEnd(input_file):
+    # we need pysam for this but pysam does not yet work for Python 3.3.
+    if not hasPySam:
+        env.logger.error('Cannot detect if input bam file has paired reads (missing pysam). Assuming paired.')
+        return True
+    bamfile = pysam.Samfile(input_file, 'rb')
+    for read in bamfile.fetch():
+        if read.is_paired:
+            env.logger.info('{} is detected to have paired reads.'.format(input_file))
+        else:
+            env.logger.info('{} is detected to have single (non-paired) reads.'.format(input_file))
+        return read.is_paired
+
 #
 # def hasReadGroup(bamfile):
 #     '''Check if a bamfile has read group information, if not we will have to add 
@@ -967,7 +983,7 @@ class BWA:
                 env.logger.warning('Using existing sam file {}'.format(sam_file))
             else:
                 run_command(
-                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {6} > {7}'
+                    'bwa samse {0} -r \'{1}\' {2}/{3} {4} {5} > {6}'
                     .format(
                         env.OPT_BWA_SAMSE, rg, env.RESOURCE_DIR,
                         self.REF_fasta, sai, f, TEMP(sam_file)),
@@ -1120,21 +1136,36 @@ class PICARD:
         '''This function extracts raw reads from an input BAM file to one or 
         more fastq files.'''
         #
-        # check if the bam file is paired or not (FIXME)
-        output_files = [os.path.join(env.WORKING_DIR, '{}_{}.fastq'
-            .format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
-        if all([os.path.isfile(x) for x in output_files]):
-            env.logger.warning('Using existing sequence files {}'
-                .format(' and '.join(output_files)))
+        if isBamPairedEnd(input_file):
+            output_files = [os.path.join(env.WORKING_DIR, '{}_{}.fastq'
+                .format(os.path.basename(input_file)[:-4], x)) for x in [1,2]]
+            if existAndNewerThan(ofiles=ouput_files, ifiles=input_file):
+                env.logger.warning('Using existing sequence files {}'
+                    .format(' and '.join(output_files)))
+            else:
+                run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
+                    FASTQ={} SECOND_END_FASTQ={}'''
+                    .format(env.OPT_JAVA, env.PICARD_PATH,
+                        env.OPT_PICARD_SAMTOFASTQ, input_file,
+                        TEMP(output_files[0]), output_files[1]),
+                    name=os.path.basename(output_files[0]),
+                    upon_succ=(os.rename, TEMP(output_files[0]), output_files[0]))
+            return output_files
         else:
-            run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
-                FASTQ={} SECOND_END_FASTQ={} NON_PF=true'''
-                .format(env.OPT_JAVA, env.PICARD_PATH,
-                    env.OPT_PICARD_SAMTOFASTQ, input_file,
-                    TEMP(output_files[0]), output_files[1]),
-                name=os.path.basename(output_files[0]),
-                upon_succ=(os.rename, TEMP(output_files[0]), output_files[0]))
-        return output_files
+            output_file = os.path.join(env.WORKING_DIR, '{}.fastq'
+                .format(os.path.basename(input_file)[:-4]))
+            if existAndNewerThan(ofiles=output_file, ifiles=input_file):
+                env.logger.warning('Using existing sequence files {}'
+                    .format(output_file))
+            else:
+                run_command('''java {} -jar {}/SamToFastq.jar {} INPUT={}
+                    FASTQ={}'''
+                    .format(env.OPT_JAVA, env.PICARD_PATH,
+                        env.OPT_PICARD_SAMTOFASTQ, input_file,
+                        TEMP(output_file)),
+                    name=os.path.basename(output_file),
+                    upon_succ=(os.rename, TEMP(output_file), output_file))
+            return [output_file]
 
     def markDuplicates(self, bam_files):
         '''Mark duplicate using picard'''
