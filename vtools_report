@@ -511,7 +511,7 @@ def samInfoArguments(parser):
             although some variants (e.g. indels) can span several base pairs. The primary
             reference genome of the project will be used to get reference sequence at
             these locations and output nref and prop_ref for each variant.''')
-    parser.add_argument('--files', metavar='FILE', nargs='+',
+    parser.add_argument('--files', metavar='FILE', nargs='+', required=True,
         help='''A list of SAM/BAM files from which information about each variant will
             be obtained. Information retrieved from these files will be arranged by 
             files.''')
