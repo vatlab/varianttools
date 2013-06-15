@@ -1079,8 +1079,10 @@ class ResourceManager:
                 return self.getCommentFromConfigFile(filename[:-6] + '.ann', 'data sources', 'description')
             else:
                 return ''
-        elif filename.lower().endswith('ann'):      # annotation
+        elif filename.lower().endswith('.ann'):      # annotation
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
+        elif filename.lower().endswith('.pipeline'):      # annotation
+            return self.getCommentFromConfigFile(filename, 'pipeline description', 'description')
         elif 'snapshot' in filename and filename.lower().endswith('.tar.gz'):  # snapshot
             (name, date, message) = getSnapshotInfo(filename)
             return '' if message is None else message
@@ -1124,6 +1126,8 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('snapshot/')}
         elif resource_type == 'annotation':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
+        elif resource_type == 'pipeline':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/')}
         elif resource_type == 'hg18':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':

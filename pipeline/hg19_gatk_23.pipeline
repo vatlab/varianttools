@@ -1,0 +1,70 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=Import variants (chr, pos, ref, alt) that are queried from dbSNP database using provided rsnames
+resources=
+
+
+[DEFAULT]
+PICARD_PATH=
+GATK_PATH=
+JAVA=-Xmx4g -XX:-UseGCOverheadLimit
+#
+BWA_INDEX=
+BWA_ALN=
+BWA_SAMPE=
+BWA_SAMSE=
+#
+SAMTOOLS_FAIDX=
+SAMTOOLS_VIEW=
+SAMTOOLS_SORT=
+SAMTOOLS_INDEX=
+#
+# validation_stringency=leniant is used to correct an error
+# caused by some versions of BWA, see
+#
+#   http://seqanswers.com/forums/showthread.php?t=4246
+#
+# for details
+PICARD_SORTSAM=VALIDATION_STRINGENCY=LENIENT
+PICARD_MERGESAMFILES=MAX_RECORDS_IN_RAM=5000000
+PICARD_SAMTOFASTQ=VALIDATION_STRINGENCY=LENIENT NON_PF=true
+PICARD_MARKDUPLICATES=
+#
+GATK_REALIGNERTARGETCREATOR=
+# http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
+GATK_INDELREALIGNER=--filter_mismatching_base_and_quals
+GATK_BASERECALIBRATOR=-rf BadCigar
+GATK_PRINTREADS=
+GATK_REDUCEREADS=
+GATK_HAPLOTYPECALLER=-minPruning 3
+GATK_UNIFIEDGENOTYPER=-rf BadCigar  -stand_call_conf 50.0 -stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage
+GATK_VARIANTRECALIBRATOR=
+GATK_VARIANTRECALIBRATOR_SNV= -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+GATK_VARIANTRECALIBRATOR_INDEL=--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
+GATK_APPLYRECALIBRATION=--ts_filter_level 99.9
+GATK_APPLYRECALIBRATION_SNV=
+GATK_APPLYRECALIBRATION_INDEL=
+
+[prerequisite_1]
+input=
+output=
+command=
+post_command=
+
+[align_1]
+input=
+output=
+command=
+post_command=
+
+
+[align_2]
+index=%(rsname_col)s
+type=VARCHAR(20)
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='chr', cond_fields='name')
+comment=Obtain chromosome from dbSNP by rsname

@@ -49,6 +49,272 @@ try:
 except ImportError as e:
     hasPySam = False
 
+class Pipeline:
+    def __init__(self, name, fmt_args=[]):
+        '''Input file format'''
+        # locate a file format specification file
+        self.description = None
+        #
+        if os.path.isfile(name + '.fmt'):
+            self.name = os.path.split(name)[-1]
+            args = self.parseArgs(name + '.fmt', fmt_args)
+            self.parseFMT(name + '.fmt', defaults=args) 
+        elif name.endswith('.fmt') and os.path.isfile(name):
+            self.name = os.path.split(name)[-1][:-4]
+            args = self.parseArgs(name, fmt_args)
+            self.parseFMT(name, defaults=args) 
+        else:
+            url = 'format/{}.fmt'.format(name)
+            try:
+                fmt = downloadFile(url, quiet=True)
+            except Exception as e:
+                raise ValueError('Failed to download format specification file {}.fmt: {}'.format(name, e))
+            self.name = name
+            args = self.parseArgs(fmt, fmt_args)
+            self.parseFMT(fmt, defaults=args)
+
+    def parseArgs(self, filename, fmt_args):
+        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser.read(filename)
+        parameters = fmt_parser.items('DEFAULT')
+        parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
+            existing format.''')
+        self.parameters = []
+        for par in parameters:
+            # $NAME_comment is used for documentation only
+            if par[0].endswith('_comment'):
+                continue
+            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
+            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
+            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
+                nargs='*', default=par[1])
+        args = vars(parser.parse_args(fmt_args))
+        for key in args:
+            if type(args[key]) == list:
+                args[key] = ','.join(args[key])
+        return args
+
+    def parsePipeline(self, filename, defaults):
+        parser = ConfigParser.SafeConfigParser()
+        # this allows python3 to read .fmt file with non-ascii characters, but there is no
+        # simple way to make it python2 compatible.
+        #with open(filename, 'r', encoding='UTF-8') as inputfile:
+        #    parser.readfp(inputfile)
+        parser.read(filename)
+        # sections?
+        sections = parser.sections()
+        if 'format description' not in sections:
+            raise ValueError("Missing section 'format description'")
+        #
+        fields = []
+        columns = []
+        self.formatter = {}
+        for section in sections:
+            if section.lower() == 'format description':
+                continue
+            if section.lower() == 'field formatter':
+                for item in parser.items(section, vars=defaults):
+                    if item[0].startswith('fmt_'):
+                        self.formatter[item[0][4:]] = item[1]
+                continue
+            if section.startswith('col_'):
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    for item in items:
+                        if item.endswith('_comment'):
+                            continue
+                        if item not in ['field', 'adj', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only field, adj and comment are allowed.'.format(item, section))
+                    columns.append(
+                        Column(index=int(section.split('_', 1)[1]),
+                            field=parser.get(section, 'field', vars=defaults) if 'field' in items else '',
+                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                        )
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
+            else:
+                if not section.replace('_', '').isalnum():
+                  raise ValueError('Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))
+                if section.upper() in SQL_KEYWORDS:
+                  raise ValueError('Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    for item in items:
+                        if item.endswith('_comment'):
+                            continue
+                        if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
+                    fields.append(
+                        Field(name=section,
+                            index=parser.get(section, 'index', vars=defaults),
+                            type=parser.get(section, 'type', vars=defaults),
+                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                        )
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
+        #
+        if len(fields) == 0:
+            raise ValueError('No valid field is defined in format specification file {}'.format(self.name))
+        #
+        self.delimiter = '\t'
+        #
+        for item in parser.items('format description', vars=defaults):
+            if item[0] == 'description':
+                self.description = item[1]
+            elif item[0] == 'delimiter':
+                try:
+                    # for None, '\t' etc
+                    self.delimiter = eval(item[1])
+                except:
+                    # if failed, take things literally.
+                    self.delimiter = item[1]
+            elif item[0] == 'encoding':
+                self.encoding = item[1]
+            elif item[0] == 'preprocessor':
+                self.preprocessor = item[1]
+            elif item[0] == 'merge_by':
+                self.merge_by_cols = [x-1 for x in eval(item[1])]
+            elif item[0] == 'export_by':
+                self.export_by_fields = item[1]
+            elif item[0] == 'additional_exports':
+                # additional files to export from the variant/sample tables
+                self.additional_exports = item[1]
+            elif item[0] == 'sort_output_by':
+                self.order_by_fields = item[1]
+            elif item[0] == 'header':
+                if item[1] in ('none', 'None'):
+                    self.header = None
+                else:
+                    try:
+                        self.header = int(item[1])
+                    except:
+                        # in this case header is a pattern
+                        self.header = re.compile(item[1])
+            elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
+                setattr(self, item[0] if item[0].endswith('_info') else item[0]+'_fields', [x.strip() for x in item[1].split(',') if x.strip()])
+        #
+        # Post process all fields
+        if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
+            raise ValueError('Please specify one and only one of "variant=?", "position=?" or "range=?"')
+        #
+        if self.variant_fields:
+            self.input_type = 'variant'
+            self.ranges = [0, 4]
+            self.fields = self.variant_fields
+            if len(self.fields) != 4:
+                raise ValueError('"variant" fields should have four fields for chr, pos, ref, and alt alleles')
+        elif self.position_fields:
+            self.input_type = 'position'
+            self.ranges = [0, 2]
+            self.fields = self.position_fields
+            if len(self.fields) != 2:
+                raise ValueError('"position" fields should have two fields for chr and pos')
+        elif self.range_fields:
+            self.input_type = 'range'
+            self.ranges = [0, 3]
+            self.fields = self.range_fields
+            if len(self.fields) != 3:
+                raise ValueError('"range" fields should have three fields for chr and starting and ending position')
+        #
+        if self.input_type != 'variant' and not self.variant_info:
+            raise ValueError('Input file with type position or range must specify variant_info')
+        if self.input_type != 'variant' and self.genotype_info:
+            raise ValueError('Input file with type position or range can not have any genotype information.')
+        if self.genotype_fields and len(self.genotype_fields) != 1:
+            raise ValueError('Only one genotype field is allowed to input genotype for one or more samples.')
+        #
+        if self.variant_info:
+            self.fields.extend(self.variant_info)
+        self.ranges.append(self.ranges[-1] + (len(self.variant_info) if self.variant_info else 0))
+        if self.genotype_fields:
+            self.fields.extend(self.genotype_fields)
+        self.ranges.append(self.ranges[-1] + (len(self.genotype_fields) if self.genotype_fields else 0))
+        if self.genotype_info:
+            self.fields.extend(self.genotype_info)
+        self.ranges.append(self.ranges[-1] + (len(self.genotype_info) if self.genotype_info else 0))
+        #
+        # now, change to real fields
+        for i in range(len(self.fields)):
+            fld = [x for x in fields if x.name == self.fields[i]]
+            if len(fld) != 1:
+                #
+                # This is a special case that allows users to use expressions as field....
+                #
+                env.logger.warning('Undefined field {} in format {}.'.format(self.fields[i], filename))
+                self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
+            else:
+                self.fields[i] = fld[0]
+        # other fields?
+        self.other_fields = [x for x in fields if x not in self.fields]
+        #
+        # columns definition
+        self.columns = []
+        for idx in range(len(columns)):
+            # find column
+            try:
+                col = [x for x in columns if x.index == idx + 1][0]
+            except Exception as e:
+                raise ValueError('Cannot find column {} from format specification: {}'.format(idx + 1, e))
+            self.columns.append(col)
+
+    def describe(self):
+        print('Format:      {}'.format(self.name))
+        if self.description is not None:
+            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
+                initial_indent='', subsequent_indent=' '*2))))
+        #
+        if self.preprocessor is not None:
+            print('Preprocessor: {}'.format(self.preprocessor))
+        #
+        print('\nColumns:')
+        if self.columns:
+            for col in self.columns:
+                print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
+                    subsequent_indent=' '*15))))
+            if self.formatter:
+                print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
+        else:
+            print('  None defined, cannot export to this format')
+        #
+        if self.input_type == 'variant':
+            print('\n{0}:'.format(self.input_type))
+        for fld in self.fields[self.ranges[0]:self.ranges[1]]:
+            print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                subsequent_indent=' '*15))))
+        if self.ranges[1] != self.ranges[2]:
+            print('\nVariant info:')
+            for fld in self.fields[self.ranges[1]:self.ranges[2]]:
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
+        if self.ranges[2] != self.ranges[3]:
+            print('\nGenotype:')
+            for fld in self.fields[self.ranges[2]:self.ranges[3]]:
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
+        if self.ranges[3] != self.ranges[4]:
+            print('\nGenotype info:')
+            for fld in self.fields[self.ranges[3]:self.ranges[4]]:
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
+        if self.other_fields:
+            print('\nOther fields (usable through parameters):')
+            for fld in self.other_fields:
+                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
+                    subsequent_indent=' '*15))))
+        if self.parameters:
+            print('\nFormat parameters:')
+            for item in self.parameters:
+                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
+                    '{} (default: {})'.format(item[2], item[1]),
+                    subsequent_indent=' '*15))))
+        else:
+            print('\nNo configurable parameter is defined for this format.\n')
+
+
+
+
 ###############################################################################
 #
 # Runtime environment
@@ -120,46 +386,6 @@ options = [
     ('PICARD_PATH', ''),
     ('GATK_PATH', ''),
     #
-    ('OPT_JAVA', '-Xmx4g -XX:-UseGCOverheadLimit', javaXmxCheck),
-    #
-    ('OPT_BWA_INDEX', ''),
-    ('OPT_BWA_ALN', ''),
-    ('OPT_BWA_SAMPE', ''),
-    ('OPT_BWA_SAMSE', ''),
-    #
-    ('OPT_SAMTOOLS_FAIDX', ''),
-    ('OPT_SAMTOOLS_VIEW', ''),
-    ('OPT_SAMTOOLS_SORT', ''),
-    ('OPT_SAMTOOLS_INDEX', ''),
-    #
-    # validation_stringency=leniant is used to correct an error
-    # caused by some versions of BWA, see
-    #
-    #   http://seqanswers.com/forums/showthread.php?t=4246
-    #
-    # for details
-    ('OPT_PICARD_SORTSAM', 'VALIDATION_STRINGENCY=LENIENT'),
-    ('OPT_PICARD_MERGESAMFILES', 'MAX_RECORDS_IN_RAM=5000000'),
-    ('OPT_PICARD_SAMTOFASTQ', 'VALIDATION_STRINGENCY=LENIENT NON_PF=true'),
-    ('OPT_PICARD_MARKDUPLICATES', ''),
-    #
-    ('OPT_GATK_REALIGNERTARGETCREATOR', ''),
-    # http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
-    ('OPT_GATK_INDELREALIGNER', '--filter_mismatching_base_and_quals'),
-    ('OPT_GATK_BASERECALIBRATOR', '-rf BadCigar'),
-    ('OPT_GATK_PRINTREADS', ''),
-    ('OPT_GATK_REDUCEREADS', ''),
-    ('OPT_GATK_HAPLOTYPECALLER', '-minPruning 3'),
-    ('OPT_GATK_UNIFIEDGENOTYPER', '-rf BadCigar  -stand_call_conf 50.0 '
-        '-stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth '
-        '-A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest '
-        '-A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage'),
-    ('OPT_GATK_VARIANTRECALIBRATOR', ''),
-    ('OPT_GATK_VARIANTRECALIBRATOR_SNV', ' -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP'),
-    ('OPT_GATK_VARIANTRECALIBRATOR_INDEL', '--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum'),
-    ('OPT_GATK_APPLYRECALIBRATION', '--ts_filter_level 99.9'),
-    ('OPT_GATK_APPLYRECALIBRATION_SNV', ''),
-    ('OPT_GATK_APPLYRECALIBRATION_INDEL', ''),
     #
     # for private use
     ('_WORKING_DIR', ''),

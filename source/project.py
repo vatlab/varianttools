@@ -3357,8 +3357,9 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test', 'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
+        'samples', 'genotypes', 'fields', 'annotations', 'annotation',
+        'formats', 'format', 'tests', 'test', 'runtime_options', 'runtime_option',
+        'snapshot', 'snapshots', 'pipeline', 'pipelines'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3371,11 +3372,13 @@ def showArguments(parser):
             details of format FMT, 'tests' for a list of all association tests, and
             'test TST' for details of an association test TST, 'runtime_options'
             for a list of runtime options and their descriptions, 'runtime_option
-            OPT' for value of specified runtime option OPT. 'snapshot' for a
+            OPT' for value of specified runtime option OPT, 'snapshot' for a
             particular snapshot by name or filename, 'snapshots' for a list of
             publicly available snapshots, and snapshots of the current project
-            saved by command 'vtools admin --save_snapshots'. The default
-            parameter of this command is 'project'.''')
+            saved by command 'vtools admin --save_snapshots', 'pipeline PIPELINE'
+            for details of a particular align and variant calling pipeline, and
+            'pipelines' for a list of available pipelines. The default parameter
+            of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, names of tables for
             type 'table', name of an annotation database for type 'annotation',
@@ -3609,6 +3612,29 @@ def show(args):
                 for ss, prop in res.manifest.iteritems():
                     print(('{:<' + str(width) + '} {:15} {}').format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
                         initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
+            elif args.type == 'pipelines':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
+                        .pipeline(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='pipeline')
+                for pipeline, prop in res.manifest.iteritems():
+                    print('{}\n{}\n'.format(pipeline[9:-9],
+                        '\n'.join(textwrap.wrap(prop[3], initial_indent=' '*10,
+                            subsequent_indent=' '*10))))
+            elif args.type == 'pipeline':
+                if not args.items:
+                    raise ValueError('Please specify a pipeline to display')
+                for item in args.items:
+                    try:
+                        pipeline = Pipeline(item)
+                    except Exception as e:
+                        env.logger.debug(e)
+                        raise IndexError('Unrecognized pipeline: {}\nPlease '
+                            'check your input parameters or configuration file "{}"'
+                            .format(e, item))
+                    pipeline.describe()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
@@ -3651,7 +3677,8 @@ def adminArguments(parser):
     resource = parser.add_argument_group('Download or update resources')
     resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
         const='current', 
-        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 
+            'format', 'snapshot', 'pipeline'],
         help='''Download resources of specified type, which can be 'current' (latest version
             of all resources excluding snapshots), 'all' (all resources including obsolete
             databases), 'existing' (only update resources that exist locally), 
