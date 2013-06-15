@@ -42,6 +42,8 @@ import variant_tools.annotation as annotation
 import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
+import variant_tools.pipeline as pipeline
+
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
     import variant_tools.association as association
@@ -74,6 +76,31 @@ if __name__ == '__main__':
     addCommonArgs(parser)
     parser.set_defaults(func=project.init)
     #
+    # command align
+    parser = subparsers.add_parser('align',
+        help='''Align raw reads in the format of fastq or bam/sam formats to
+            a reference genome and produce variant-call ready .bam file.''',
+        description='''Align raw reads to reference genome and return a
+            compressed BAM file. The input files should be reads for the same 
+            sample, which could be individual fastq files, a tar file with 
+            all fastq files, or their gziped or bzipped versions. Filenames
+            ending with _1 _2 will be considered as paired end reads. The 
+            process utilizes external tools such as BWA, samtools, and PICARD
+            and is controlled by pipelines defined in external configuration
+            files.''')
+    pipeline.alignReadsArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=pipeline.alignReads)
+    # 
+    # command call
+    parser = subparsers.add_parser('call',
+        help='''Call variants from a list of calibrated BAM files and produce
+            a VCF file that can be imported into variant tools.''',
+        description=''' ''')
+    pipeline.callVariantsArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=pipeline.callVariants)
+    #
     # command import
     parser = subparsers.add_parser('import',
         help='Import variants and related sample genotype from files in specified formats',
@@ -101,8 +128,8 @@ if __name__ == '__main__':
     # command liftover
     if sys.platform != 'win32':
         parser = subparsers.add_parser('liftover',
-            help='''Set alternative reference genome and update alternative coordinates
-                of all variant tables''',
+            help='''Set alternative reference genome and update alternative
+                coordinates of all variant tables''',
             description='''Convert coordinates of existing variants to alternative 
                 coordinates in an alternative reference genome. The UCSC liftover
                 tool will be automatically downloaded if it is not available.''')
@@ -119,10 +146,13 @@ if __name__ == '__main__':
     #
     # command update
     parser = subparsers.add_parser('update',
-        help='Add or update fields of existing variants and genotype using information from specified existing fields, sample genotype, or external files',
-        description='''Add or update fields of existing variants and genotype from other fields,
-            statistics of genotypes and genotype info, or files that annotate variants or their
-            locations (e.g. Read annotation from ANNOVAR output files, import additional variant
+        help='''Add or update fields of existing variants and genotype using
+            information from specified existing fields, sample genotype, 
+            or external files''',
+        description='''Add or update fields of existing variants and genotype
+            from other fields, statistics of genotypes and genotype info, or
+            files that annotate variants or their locations (e.g. Read 
+            annotation from ANNOVAR output files, import additional variant
             or genotype fields from .vcf files).''')
     update.updateArguments(parser)
     addCommonArgs(parser)
@@ -213,7 +243,7 @@ if __name__ == '__main__':
         sys.exit(0)
     # commands that accepts format and other subparsers can pass arbitrary parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export]:
+        update.update, exporter.export, pipeline.alignReads, pipeline.callVariants]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)
