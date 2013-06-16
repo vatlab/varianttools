@@ -53,6 +53,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
+Command = namedtuple('Command', ['name', 'command', 'input_group', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -601,6 +602,138 @@ class fileFMT:
                     subsequent_indent=' '*15))))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
+
+
+
+class Pipeline:
+    def __init__(self, name, extra_args=[]):
+        '''Pipeline configuration file'''
+        self.description = None
+        self.resource = []
+        self.init_steps = []
+        self.align_steps = []
+        self.call_steps = []
+        #
+        if os.path.isfile(name + '.pipeline'):
+            self.name = os.path.split(name)[-1]
+            args = self.parseArgs(name + '.pipeline', extra_args)
+            self.parsePipeline(name + '.pipeline', defaults=args) 
+        elif name.endswith('.pipeline') and os.path.isfile(name):
+            self.name = os.path.split(name)[-1][:-9]
+            args = self.parseArgs(name, extra_args)
+            self.parsePipeline(name, defaults=args) 
+        else:
+            url = 'pipeline/{}.pipeline'.format(name)
+            try:
+                pipeline = downloadFile(url, quiet=True)
+            except Exception as e:
+                raise ValueError('Failed to download pipeline specification '
+                    'file {}.pipeline: {}'.format(name, e))
+            self.name = name
+            args = self.parseArgs(pipeline, extra_args)
+            self.parsePipeline(name, defaults=args)
+
+    def parseArgs(self, filename, fmt_args):
+        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser.read(filename)
+        parameters = fmt_parser.items('DEFAULT')
+        parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
+            .format(os.path.split(filename)[-1]),
+            description='Parameters to override parameters of existing steps.')
+        self.parameters = []
+        for par in parameters:
+            # $NAME_comment is used for documentation only
+            if par[0].endswith('_comment'):
+                continue
+            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
+            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
+            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
+                nargs='*', default=par[1])
+        args = vars(parser.parse_args(fmt_args))
+        for key in args:
+            if type(args[key]) == list:
+                args[key] = ','.join(args[key])
+        return args
+
+    def parsePipeline(self, filename, defaults):
+        parser = ConfigParser.SafeConfigParser()
+        # this allows python3 to read .pipeline file with non-ascii characters,
+        # but there is no simple way to make it python2 compatible.
+        #with open(filename, 'r', encoding='UTF-8') as inputfile:
+        #    parser.readfp(inputfile)
+        parser.read(filename)
+        # sections?
+        sections = parser.sections()
+        if 'pipeline description' not in sections:
+            raise ValueError("Missing section 'pipeline description'")
+        #
+        for section in sections:
+            if section.lower() == 'pipeline description':
+                for item in parser.items(section, vars=defaults):
+                    if item[0] == 'description':
+                        self.description = item[1]
+                    elif item[0] == 'resource':
+                        self.resource = [x.strip() for x in item[1].split('\n')]
+            else:
+                if section.split('_')[0] not in ('init', 'align', 'call'):
+                    raise ValueEror('Only sections init_#, align_# and call_# are allowed.')
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    for item in items:
+                        if item.endswith('_comment'):
+                            continue
+                        if item not in ['name', 'command', 'input_group', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. '
+                                'Only name, command, input_group, and comment are allowed.'
+                                .format(item, section))
+                    command = Command(name=parser.get(section, 'name', vars=defaults) if 'name' in items else '',
+                            command=parser.get(section, 'command', vars=defaults) if 'command' in items else '',
+                            input_group=parser.get(section, 'input_group', vars=defaults) if 'input_group' in items else '',
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                    # for example, cmd_idx = 5
+                    cmd_idx = int(section.split('_', 1)[1]) - 1
+                    # len(align_steps) = 4 (0, 1, 2, 3),
+                    # need to add two elements with index 4, and 5
+                    if section.startswith('init_'):
+                        if len(self.call_steps) < cmd_idx + 1:
+                            self.call_steps.extend([None] * (cmd_idx + 1 - len(self.call_steps)))
+                        self.call_steps[cmd_idx] = command
+                    elif section.startswith('align_'):
+                        if len(self.align_steps) < cmd_idx + 1:
+                            self.align_steps.extend([None] * (cmd_idx + 1 - len(self.align_steps)))
+                        self.align_steps[cmd_idx] = command
+                    elif section.startswith('call_'):
+                        if len(self.call_steps) < cmd_idx + 1:
+                            self.call_steps.extend([None] * (cmd_idx + 1 - len(self.call_steps)))
+                        self.call_steps[cmd_idx] = command
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
+           
+    def describe(self):
+        print('Pipeline:      {}'.format(self.name))
+        if self.description is not None:
+            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
+                initial_indent='', subsequent_indent=' '*2))))
+        #
+        for name, commands in [('Initialization', self.init_steps), 
+            ('Align', self.align_steps), ('Variant calling', self.call_steps)]:
+            if not commands:
+                continue
+            print('\n{} steps:'.format(name))
+            for idx, step in enumerate(commands):
+                print('  {:12} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
+                    subsequent_indent=' '*15))))
+        #
+        if self.parameters:
+            print('\nPipeline parameters:')
+            for item in self.parameters:
+                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
+                    '{} (default: {})'.format(item[2], item[1]),
+                    subsequent_indent=' '*15))))
+        else:
+            print('\nNo configurable parameter is defined for this format.\n')
+
+
 
 
 
