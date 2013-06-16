@@ -605,7 +605,7 @@ class fileFMT:
 
 
 
-class Pipeline:
+class PipelineDescription:
     def __init__(self, name, extra_args=[]):
         '''Pipeline configuration file'''
         self.description = None
@@ -631,7 +631,7 @@ class Pipeline:
                     'file {}.pipeline: {}'.format(name, e))
             self.name = name
             args = self.parseArgs(pipeline, extra_args)
-            self.parsePipeline(name, defaults=args)
+            self.parsePipeline(pipeline, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
         fmt_parser = ConfigParser.SafeConfigParser()
@@ -665,7 +665,8 @@ class Pipeline:
         # sections?
         sections = parser.sections()
         if 'pipeline description' not in sections:
-            raise ValueError("Missing section 'pipeline description'")
+            raise ValueError("Missing section 'pipeline description' in "
+                "configuration file {}".format(filename))
         #
         for section in sections:
             if section.lower() == 'pipeline description':
@@ -3761,7 +3762,7 @@ def show(args):
                     raise ValueError('Please specify a pipeline to display')
                 for item in args.items:
                     try:
-                        pipeline = Pipeline(item)
+                        pipeline = PipelineDescription(item)
                     except Exception as e:
                         env.logger.debug(e)
                         raise IndexError('Unrecognized pipeline: {}\nPlease '

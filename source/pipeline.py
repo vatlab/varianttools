@@ -39,9 +39,12 @@ import zipfile
 import time
 import re
 import platform
-import smtplib
-from email.mime.text import MIMEText
 from collections import namedtuple
+
+from .utils import env, ProgressBar, downloadFile, downloadURL, existAndNewerThan,
+    elapsed_time, run_command, wait_all
+    
+from .project import PipelineDescription, Project
 
 try:
     import pysam
@@ -49,285 +52,59 @@ try:
 except ImportError as e:
     hasPySam = False
 
+
 class Pipeline:
-    def __init__(self, name, fmt_args=[]):
-        '''Input file format'''
-        # locate a file format specification file
-        self.description = None
+    def __init__(self, name):
+        self.pipeline = PipelineDescription(name)
         #
-        if os.path.isfile(name + '.fmt'):
-            self.name = os.path.split(name)[-1]
-            args = self.parseArgs(name + '.fmt', fmt_args)
-            self.parseFMT(name + '.fmt', defaults=args) 
-        elif name.endswith('.fmt') and os.path.isfile(name):
-            self.name = os.path.split(name)[-1][:-4]
-            args = self.parseArgs(name, fmt_args)
-            self.parseFMT(name, defaults=args) 
-        else:
-            url = 'format/{}.fmt'.format(name)
+        # resource directory
+        #
+        self.pipeline_resource = os.path.join(os.path.expanduser(
+            env.local_resource), 'var_caller', self.pipeline.name)
+        try:
+            if not os.path.isdir(self.pipeline_resource):
+                sys.stderr.write('Creating pipeline resource directory {}\n'
+                    .format(self.pipeline_resource))
+                os.makedirs(self.pipeline_resource)
+        except:
+            raise RuntimeError('Failed to create pipeline resource directory '
+                .format(self.pipeline_resource))
+
+    def downloadResource(self):
+        '''Download resource'''
+        for cnt, URL in enumerate(sorted(self.pipeline.resource)):
+            filename = URL.rsplit('/', 1)[-1]
+            dest_file = os.path.join(self.pipeline_resource, filename)
             try:
-                fmt = downloadFile(url, quiet=True)
-            except Exception as e:
-                raise ValueError('Failed to download format specification file {}.fmt: {}'.format(name, e))
-            self.name = name
-            args = self.parseArgs(fmt, fmt_args)
-            self.parseFMT(fmt, defaults=args)
-
-    def parseArgs(self, filename, fmt_args):
-        fmt_parser = ConfigParser.SafeConfigParser()
-        fmt_parser.read(filename)
-        parameters = fmt_parser.items('DEFAULT')
-        parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
-            existing format.''')
-        self.parameters = []
-        for par in parameters:
-            # $NAME_comment is used for documentation only
-            if par[0].endswith('_comment'):
-                continue
-            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
-            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
-            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
-                nargs='*', default=par[1])
-        args = vars(parser.parse_args(fmt_args))
-        for key in args:
-            if type(args[key]) == list:
-                args[key] = ','.join(args[key])
-        return args
-
-    def parsePipeline(self, filename, defaults):
-        parser = ConfigParser.SafeConfigParser()
-        # this allows python3 to read .fmt file with non-ascii characters, but there is no
-        # simple way to make it python2 compatible.
-        #with open(filename, 'r', encoding='UTF-8') as inputfile:
-        #    parser.readfp(inputfile)
-        parser.read(filename)
-        # sections?
-        sections = parser.sections()
-        if 'format description' not in sections:
-            raise ValueError("Missing section 'format description'")
-        #
-        fields = []
-        columns = []
-        self.formatter = {}
-        for section in sections:
-            if section.lower() == 'format description':
-                continue
-            if section.lower() == 'field formatter':
-                for item in parser.items(section, vars=defaults):
-                    if item[0].startswith('fmt_'):
-                        self.formatter[item[0][4:]] = item[1]
-                continue
-            if section.startswith('col_'):
-                try:
-                    items = [x[0] for x in parser.items(section, raw=True)]
-                    for item in items:
-                        if item.endswith('_comment'):
-                            continue
-                        if item not in ['field', 'adj', 'comment'] + defaults.keys():
-                            raise ValueError('Incorrect key {} in section {}. Only field, adj and comment are allowed.'.format(item, section))
-                    columns.append(
-                        Column(index=int(section.split('_', 1)[1]),
-                            field=parser.get(section, 'field', vars=defaults) if 'field' in items else '',
-                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
-                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                        )
-                except Exception as e:
-                    raise ValueError('Invalid section {}: {}'.format(section, e))
-            else:
-                if not section.replace('_', '').isalnum():
-                  raise ValueError('Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))
-                if section.upper() in SQL_KEYWORDS:
-                  raise ValueError('Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
-                try:
-                    items = [x[0] for x in parser.items(section, raw=True)]
-                    for item in items:
-                        if item.endswith('_comment'):
-                            continue
-                        if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
-                            raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
-                    fields.append(
-                        Field(name=section,
-                            index=parser.get(section, 'index', vars=defaults),
-                            type=parser.get(section, 'type', vars=defaults),
-                            adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
-                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                        )
-                except Exception as e:
-                    raise ValueError('Invalid section {}: {}'.format(section, e))
-        #
-        if len(fields) == 0:
-            raise ValueError('No valid field is defined in format specification file {}'.format(self.name))
-        #
-        self.delimiter = '\t'
-        #
-        for item in parser.items('format description', vars=defaults):
-            if item[0] == 'description':
-                self.description = item[1]
-            elif item[0] == 'delimiter':
-                try:
-                    # for None, '\t' etc
-                    self.delimiter = eval(item[1])
-                except:
-                    # if failed, take things literally.
-                    self.delimiter = item[1]
-            elif item[0] == 'encoding':
-                self.encoding = item[1]
-            elif item[0] == 'preprocessor':
-                self.preprocessor = item[1]
-            elif item[0] == 'merge_by':
-                self.merge_by_cols = [x-1 for x in eval(item[1])]
-            elif item[0] == 'export_by':
-                self.export_by_fields = item[1]
-            elif item[0] == 'additional_exports':
-                # additional files to export from the variant/sample tables
-                self.additional_exports = item[1]
-            elif item[0] == 'sort_output_by':
-                self.order_by_fields = item[1]
-            elif item[0] == 'header':
-                if item[1] in ('none', 'None'):
-                    self.header = None
+                if os.path.isfile(dest_file):
+                    env.logger.info('Using existing resource file {}'.format(filename))
                 else:
-                    try:
-                        self.header = int(item[1])
-                    except:
-                        # in this case header is a pattern
-                        self.header = re.compile(item[1])
-            elif item[0] in ['variant', 'position', 'range', 'genotype', 'variant_info', 'genotype_info']:
-                setattr(self, item[0] if item[0].endswith('_info') else item[0]+'_fields', [x.strip() for x in item[1].split(',') if x.strip()])
-        #
-        # Post process all fields
-        if (not not self.variant_fields) + (not not self.position_fields) + (not not self.range_fields) != 1:
-            raise ValueError('Please specify one and only one of "variant=?", "position=?" or "range=?"')
-        #
-        if self.variant_fields:
-            self.input_type = 'variant'
-            self.ranges = [0, 4]
-            self.fields = self.variant_fields
-            if len(self.fields) != 4:
-                raise ValueError('"variant" fields should have four fields for chr, pos, ref, and alt alleles')
-        elif self.position_fields:
-            self.input_type = 'position'
-            self.ranges = [0, 2]
-            self.fields = self.position_fields
-            if len(self.fields) != 2:
-                raise ValueError('"position" fields should have two fields for chr and pos')
-        elif self.range_fields:
-            self.input_type = 'range'
-            self.ranges = [0, 3]
-            self.fields = self.range_fields
-            if len(self.fields) != 3:
-                raise ValueError('"range" fields should have three fields for chr and starting and ending position')
-        #
-        if self.input_type != 'variant' and not self.variant_info:
-            raise ValueError('Input file with type position or range must specify variant_info')
-        if self.input_type != 'variant' and self.genotype_info:
-            raise ValueError('Input file with type position or range can not have any genotype information.')
-        if self.genotype_fields and len(self.genotype_fields) != 1:
-            raise ValueError('Only one genotype field is allowed to input genotype for one or more samples.')
-        #
-        if self.variant_info:
-            self.fields.extend(self.variant_info)
-        self.ranges.append(self.ranges[-1] + (len(self.variant_info) if self.variant_info else 0))
-        if self.genotype_fields:
-            self.fields.extend(self.genotype_fields)
-        self.ranges.append(self.ranges[-1] + (len(self.genotype_fields) if self.genotype_fields else 0))
-        if self.genotype_info:
-            self.fields.extend(self.genotype_info)
-        self.ranges.append(self.ranges[-1] + (len(self.genotype_info) if self.genotype_info else 0))
-        #
-        # now, change to real fields
-        for i in range(len(self.fields)):
-            fld = [x for x in fields if x.name == self.fields[i]]
-            if len(fld) != 1:
-                #
-                # This is a special case that allows users to use expressions as field....
-                #
-                env.logger.warning('Undefined field {} in format {}.'.format(self.fields[i], filename))
-                self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
-            else:
-                self.fields[i] = fld[0]
-        # other fields?
-        self.other_fields = [x for x in fields if x not in self.fields]
-        #
-        # columns definition
-        self.columns = []
-        for idx in range(len(columns)):
-            # find column
-            try:
-                col = [x for x in columns if x.index == idx + 1][0]
+                    downloadURL(URL, dest_file, False,
+                        message='{}/{} {}'.format(cnt+1, len(self.pipeline.resource), filename))
+            except KeyboardInterrupt as e:
+                raise e
             except Exception as e:
-                raise ValueError('Cannot find column {} from format specification: {}'.format(idx + 1, e))
-            self.columns.append(col)
-
-    def describe(self):
-        print('Format:      {}'.format(self.name))
-        if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*2))))
+                env.logger.error('Failed to download {}: {} {}'
+                    .format(filename, type(e).__name__, e))
         #
-        if self.preprocessor is not None:
-            print('Preprocessor: {}'.format(self.preprocessor))
-        #
-        print('\nColumns:')
-        if self.columns:
-            for col in self.columns:
-                print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
-                    subsequent_indent=' '*15))))
-            if self.formatter:
-                print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
-        else:
-            print('  None defined, cannot export to this format')
-        #
-        if self.input_type == 'variant':
-            print('\n{0}:'.format(self.input_type))
-        for fld in self.fields[self.ranges[0]:self.ranges[1]]:
-            print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*15))))
-        if self.ranges[1] != self.ranges[2]:
-            print('\nVariant info:')
-            for fld in self.fields[self.ranges[1]:self.ranges[2]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
-        if self.ranges[2] != self.ranges[3]:
-            print('\nGenotype:')
-            for fld in self.fields[self.ranges[2]:self.ranges[3]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
-        if self.ranges[3] != self.ranges[4]:
-            print('\nGenotype info:')
-            for fld in self.fields[self.ranges[3]:self.ranges[4]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
-        if self.other_fields:
-            print('\nOther fields (usable through parameters):')
-            for fld in self.other_fields:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
-        if self.parameters:
-            print('\nFormat parameters:')
-            for item in self.parameters:
-                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
-                    '{} (default: {})'.format(item[2], item[1]),
-                    subsequent_indent=' '*15))))
-        else:
-            print('\nNo configurable parameter is defined for this format.\n')
+        # decompress all .gz files
+        saved_dir = os.getcwd()
+        os.chdir(self.pipeline_resource)
+        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
+            not x.endswith('tar.gz')]:
+            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
+                env.logger.warning('Using existing decompressed file {}'
+                    .format(gzipped_file[:-3]))
+            else:
+                decompress(gzipped_file, '.')
+        os.chdir(saved_dir)
+    
+    def executeStep(self):
+        pass
 
+    def execute(self):
+        pass
 
-
-
-###############################################################################
-#
-# Runtime environment
-#
-# This class is used to create an singleton global object env that contains
-# various runtime information, including
-#
-# 1. A logger object that writes information to standard output and a log file
-# 2. A running_jobs list that keeps instances of running jobs
-# 3. A options dictionary that hold all user-provided options. The options
-#    can be accessed as attributed (e.g. env.OPT_JAVA).
-#
-###############################################################################
 #
 # All options, their default values, and a validator function
 # if needed.
@@ -377,11 +154,6 @@ options = [
     ('WORKING_DIR', ''),
     # notification emails
     ('NOTIFICATION_EMAIL', ''),
-    ('SMTP_HOST', 'smtp.gmail.com'),  # for gmail
-    ('SMTP_PORT', '465'),             # for gmail
-    ('SMTP_SSL', 'True'),             # use SSL or not, default to True
-    ('SMTP_USER', ''),                # email address
-    ('SMTP_PASSWORD', ''),            # email password
     # option, default value
     ('PICARD_PATH', ''),
     ('GATK_PATH', ''),
@@ -392,303 +164,9 @@ options = [
     ('_LOGFILE', ''),
 ]
 
-class RuntimeEnvironment(object):
-    '''Define the runtime environment of the pipeline'''
-    # the following makes RuntimeEnvironment a singleton class
-    _instance = None
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(RuntimeEnvironment, cls).__new__(cls, *args, 
-                **kwargs)
-        return cls._instance
-
-    def __init__(self):
-        #
-        # file and screen logging
-        self._logger = None
-        self._LOGFILE = None
-        #
-        # additional parameters for args
-        self._validators = {}
-        for x in options:
-            if len(x) == 3:
-                self._validators[x[0]] = x[2]
-            if ('CALL_VARIANTS_' + x[0]) in os.environ:
-                self.__setattr__(x[0], os.environ['CALL_VARIANTS_' + x[0]])
-            else:
-                self.__setattr__(x[0], x[1])
-        #
-        # running_jobs implements a simple multi-processing queue system. 
-        # This variable holds a JOB tuple of the running jobs.
-        #
-        # Functions:
-        #   call(cmd, upon_succ, wait=False)
-        #      add an entry until there is less than self._max_jobs running jobs
-        #   poll()
-        #      check the number of running jobs
-        #   wait()
-        #      wait till all jobs are completed
-        self._max_jobs = 1
-        self.running_jobs = []
-
-    def __setattr__(self, name, value):
-        '''Set options '''
-        if hasattr(self, '_validators') and name in self._validators:
-            self._validators[name](value)
-        object.__setattr__(self, name, value)
-
-    #
-    # max number of jobs
-    #
-    def _setMaxJobs(self, x):
-        try:
-            self._max_jobs = int(x)
-        except Exception as e:
-            sys.exit('Failed to set max jobs: {}'.format(e))
-
-    jobs = property(lambda self:self._max_jobs, _setMaxJobs)
-
-    class ColoredFormatter(logging.Formatter):
-        ''' A logging format with colored output, which is copied from
-        http://stackoverflow.com/questions/384076/how-can-i-make-the-python-logging-output-to-be-colored
-        '''
-        def __init__(self, msg):
-            logging.Formatter.__init__(self, msg)
-            self.LEVEL_COLOR = {
-                'DEBUG': 'BLUE',
-                'WARNING': 'PURPLE',
-                'ERROR': 'RED',
-                'CRITICAL': 'RED_BG',
-                }
-            self.COLOR_CODE={
-                'ENDC':0,  # RESET COLOR
-                'BOLD':1,
-                'UNDERLINE':4,
-                'BLINK':5,
-                'INVERT':7,
-                'CONCEALD':8,
-                'STRIKE':9,
-                'GREY30':90,
-                'GREY40':2,
-                'GREY65':37,
-                'GREY70':97,
-                'GREY20_BG':40,
-                'GREY33_BG':100,
-                'GREY80_BG':47,
-                'GREY93_BG':107,
-                'DARK_RED':31,
-                'RED':91,
-                'RED_BG':41,
-                'LIGHT_RED_BG':101,
-                'DARK_YELLOW':33,
-                'YELLOW':93,
-                'YELLOW_BG':43,
-                'LIGHT_YELLOW_BG':103,
-                'DARK_BLUE':34,
-                'BLUE':94,
-                'BLUE_BG':44,
-                'LIGHT_BLUE_BG':104,
-                'DARK_MAGENTA':35,
-                'PURPLE':95,
-                'MAGENTA_BG':45,
-                'LIGHT_PURPLE_BG':105,
-                'DARK_CYAN':36,
-                'AUQA':96,
-                'CYAN_BG':46,
-                'LIGHT_AUQA_BG':106,
-                'DARK_GREEN':32,
-                'GREEN':92,
-                'GREEN_BG':42,
-                'LIGHT_GREEN_BG':102,
-                'BLACK':30,
-            }
-
-        def colorstr(self, astr, color):
-            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr, 
-                self.COLOR_CODE['ENDC'])
-
-        def format(self, record):
-            record = copy.copy(record)
-            levelname = record.levelname
-            if levelname in self.LEVEL_COLOR:
-                record.levelname = self.colorstr(levelname, self.LEVEL_COLOR[levelname])
-                record.name = self.colorstr(record.name, 'BOLD')
-                record.msg = self.colorstr(record.msg, self.LEVEL_COLOR[levelname])
-            return logging.Formatter.format(self, record)
-
-    def _setLogger(self, logfile=None):
-        '''Create a logger with colored console output, and a log file if a
-        filename is provided.'''
-        # create a logger
-        if self._logger is not None:
-            self._logger.handlers = []
-        self._logger = logging.getLogger()
-        self._logger.setLevel(logging.DEBUG)
-        # output to standard output
-        cout = logging.StreamHandler()
-        cout.setLevel(logging.INFO)
-        cout.setFormatter(RuntimeEnvironment.ColoredFormatter('%(levelname)s: %(message)s'))
-        self._logger.addHandler(cout)
-        if logfile is not None:
-            # output to a log file
-            ch = logging.FileHandler(logfile, 'a')
-            ch.setLevel(logging.DEBUG)
-            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-            self._logger.addHandler(ch)
-            self._LOGFILE = logfile
-    #
-    logger = property(lambda self: self._logger, _setLogger)
-
-    
-
-# create a runtime environment object
-env = RuntimeEnvironment()
-
-
 ###############################################################################
 #
-# A simple job management scheme 
-#
-# NOTE:
-#   subprocess.PIPE cannot be used for NGS commands because they tend to send
-#   a lot of progress output to stderr, which might block PIPE and cause the
-#   command itself to fail, or stall (which is even worse).
-#
-###############################################################################
-JOB = namedtuple('JOB', 'proc cmd upon_succ start_time stdout stderr name')
-
-def elapsed_time(start):
-    '''Return the elapsed time in human readable format since start time'''
-    second_elapsed = int(time.time() - start)
-    days_elapsed = second_elapsed // 86400
-    return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
-        time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
- 
-def run_command(cmd, name=None, upon_succ=None, wait=True):
-    '''Call an external command, raise an error if it fails.
-    If upon_succ is specified, the specified function and parameters will be
-    evalulated after the job has been completed successfully.
-    If a name is given, stdout and stderr will be sent to name.out and 
-    name.err under env.WORKING_DIR. Otherwise, stdout and stderr will be
-    ignored (send to /dev/null).
-    '''
-    # merge mulit-line command into one line and remove extra white spaces
-    cmd = ' '.join(cmd.split())
-    if name is None:
-        try:
-            proc_out = subprocess.DEVNULL
-            proc_err = subprocess.DEVNULL
-        except:
-            # subprocess.DEVNULL was introduced in Python 3.3
-            proc_out = open(os.devnull, 'w')
-            proc_err = open(os.devnull, 'w')
-    else:
-        name = name.replace('/', '_')
-        proc_out = open(os.path.join(env.WORKING_DIR, name + '.out'), 'w')
-        proc_err = open(os.path.join(env.WORKING_DIR, name + '.err'), 'w')
-    if wait or env.jobs == 1:
-        try:
-            s = time.time()
-            env.logger.info('Running {}'.format(cmd))
-            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-            retcode = proc.wait()
-            if name is not None:
-                proc_out.close()
-                proc_err.close()
-            if retcode < 0:
-                env.logger.error('Command {} was terminated by signal {} after executing {}'
-                    .format(cmd, -retcode, elapsed_time(s)))
-                sendmail('Command {} terminated.'.format(cmd[:40]))
-                sys.exit(1)
-            elif retcode > 0:
-                if name is not None:
-                    with open(os.path.join(env.WORKING_DIR, name + '.err')) as err:
-                        for line in err.read().split('\n')[-20:]:
-                            env.logger.error(line)
-                env.logger.error("Command {} returned {} after executing {}"
-                    .format(cmd, retcode, elapsed_time(s)))
-                sendmail('Command {} failed.'.format(cmd[:40]))
-                sys.exit(1)
-            env.logger.info('Command {} completed successfully in {}'
-                .format(cmd, elapsed_time(s)))
-        except OSError as e:
-            env.logger.error("Execution of command {} failed: {}".format(cmd, e))
-            sendmail('Cannot execute command {}.'.format(cmd[:40]))
-            sys.exit(1)
-        # everything is OK
-        if upon_succ:
-            # call the function (upon_succ) using others as parameters.
-            upon_succ[0](*(upon_succ[1:]))
-    else:
-        # wait for empty slot to run the job
-        while True:
-            if poll_jobs() >= env.jobs:
-                time.sleep(5)
-            else:
-                break
-        # there is a slot, start running
-        proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-        env.running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ,
-            start_time=time.time(), stdout=proc_out, stderr=proc_err, name=name))
-        env.logger.info('Running {}'.format(cmd))
-
-def poll_jobs():
-    '''check the number of running jobs.'''
-    count = 0
-    for idx, job in enumerate(env.running_jobs):
-        if job is None:
-            continue
-        ret = job.proc.poll()
-        if ret is None:  # still running
-            count += 1
-            continue
-        #
-        # job completed, close redirected stdout and stderr
-        # for python 3.3. where job.stdout is DEVNULL, this will 
-        # fail so try/except is needed.
-        try:
-            job.stdout.close()
-            job.stderr.close()
-        except:
-            pass
-        #
-        if ret < 0:
-            env.logger.error("Command {} was terminated by signal {} after executing {}"
-                .format(job.cmd, -ret, elapsed_time(job.start_time)))
-            sendmail('Command {} terminated.'.format(job.cmd[:40]))
-            sys.exit(1)
-        elif ret > 0:
-            if job.name is not None:
-                with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
-                    for line in err.read().split('\n')[-50:]:
-                        env.logger.error(line)
-            env.logger.error('Execution of command {} failed after {} (return code {}).'
-                .format(job.cmd, elapsed_time(job.start_time), ret))
-            sendmail('Command {} failed.'.format(job.cmd[:40]))
-            sys.exit(1)
-        else:
-            if job.name is not None:
-                with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
-                    for line in err.read().split('\n')[-10:]:
-                        env.logger.info(line)
-            # finish up
-            if job.upon_succ:
-                # call the upon_succ function
-                job.upon_succ[0](*(job.upon_succ[1:]))
-            env.logger.info('Command {} completed successfully in {}'
-                .format(job.cmd, elapsed_time(job.start_time)))
-            #
-            env.running_jobs[idx] = None
-    return count
-
-def wait_all():
-    '''Wait for all pending jobs to complete'''
-    while poll_jobs() > 0:
-        # sleep ten seconds before checking job status again.
-        time.sleep(10)
-    env.running_jobs = []
-
-
+# 
 
 ###############################################################################
 #
@@ -696,67 +174,7 @@ def wait_all():
 #
 ###############################################################################
 
-def checkCmd(cmd):
-    '''Check if a cmd exist'''
-    if not hasattr(shutil, 'which'):
-        # if shutil.which does not exist, use subprocess...
-        try:
-            subprocess.call(cmd, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
-            return
-        except:
-            env.logger.error('Command {} does not exist. Please install it and try again.'
-                .format(cmd))
-            sys.exit(1)
-    if shutil.which(cmd) is None:
-        env.logger.error('Command {} does not exist. Please install it and try again.'
-            .format(cmd))
-        sys.exit(1)
 
-
-def sendmail(subject):
-    '''Send an email to report status.'''
-    if not env.NOTIFICATION_EMAIL:
-        return
-    try:
-        if env._LOGFILE is not None:
-            # email the last few lines of the log message
-            with open(env._LOGFILE) as err:
-                text = '\n'.join(err.read().split('\n')[-50:])
-        else:
-            text = 'JOB FAILED.'
-        msg = MIMEText(text)
-        msg['Subject'] = subject
-        msg['From'] = env.SMTP_USER
-        msg['To'] = env.NOTIFICATION_EMAIL
-        if env.SMTP_SSL.lower() in ['true', '1', 'yes', 'y']:
-            s = smtplib.SMTP_SSL(host=env.SMTP_HOST, port=env.SMTP_PORT)
-        else:
-            s = smtplib.SMTP(host=env.SMTP_HOST, port=env.SMTP_PORT)
-        s.login(user=env.SMTP_USER, password=env.SMTP_PASSWORD)
-        s.sendmail(env.SMTP_USER, [env.NOTIFICATION_EMAIL], msg.as_string())
-        s.quit()
-        env.logger.info('Email with subject "{}" is sent to {}'
-            .format(subject[:40], env.NOTIFICATION_EMAIL))
-    except Exception as e:
-        env.logger.warning('Failed to send mail with subject {}: {}'
-            .format(subject, e))
-
-
-## def sendMail(header, message=''):
-##     '''Send an email to report status.'''
-##     if not env.NOTIFICATION_EMAIL:
-##         return
-##     sendmail_location = '/usr/sbin/sendmail' # sendmail location
-##     p = os.popen('{} -t'.format(sendmail_location), 'w')
-##     p.write('From: call_variants.py\n')
-##     p.write('To: {}\n'.format(env.NOTIFICATION_EMAIL))
-##     p.write('Subject: {}\n'.format(header))
-##     p.write('\n') # blank line separating headers from body
-##     p.write(message)
-##     status = p.close()
-##     if status != 0:
-##        env.logger.warning('Send mail failed.')
-## 
 
 def downloadFile(URL, dest, quiet=False):
     '''Download a file from URL and save to dest'''
@@ -820,35 +238,6 @@ def fastqVersion(fastq_file):
         # no option is needed for bwa
         return 'Sanger'
 
-def existAndNewerThan(ofiles, ifiles):
-    '''Check if ofiles is newer than ifiles. The oldest timestamp
-    of ofiles and newest timestam of ifiles will be used if 
-    ofiles or ifiles is a list.'''
-    if type(ofiles) == list:
-        if not all([os.path.isfile(x) for x in ofiles]):
-            return False
-    else:
-        if not os.path.isfile(ofiles):
-            return False
-    #
-    if type(ofiles) == list:
-        output_timestamp = min([os.path.getmtime(x) for x in ofiles])
-    else:
-        output_timestamp = os.path.getmtime(ofiles)
-    #
-    if type(ifiles) == list:
-        input_timestamp = max([os.path.getmtime(x) for x in ifiles])
-    else:
-        input_timestamp = os.path.getmtime(ifiles)
-    #
-    if output_timestamp - input_timestamp < 2:
-        env.logger.warning(
-            'Existing output file {} is ignored because it is older than input file.'
-            .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
-        return False
-    else:
-        # newer by at least 10 seconds.
-        return True
 
 def TEMP(filename):
     '''Temporary output of filename'''
@@ -1079,31 +468,6 @@ def isBamPairedEnd(input_file):
         else:
             env.logger.info('{} is detected to have single (non-paired) reads.'.format(input_file))
         return read.is_paired
-
-#
-# def hasReadGroup(bamfile):
-#     '''Check if a bamfile has read group information, if not we will have to add 
-#     @RG tag to the bam file. Note that technically speaking, read group contains
-#     flowcell and lane information and should be lane-specific. That is to say a
-#     bam file for the same sample might have several @RG with the same SM (sample
-#     name) value. However, because GATK only uses SM to identify samples (treats 
-#     different RG with the same SM as the same sample), it is OK to add a single 
-#     RG tag to a SAM/BAM file is it contains reads for the same sample.'''
-#     # the following code consulted a addReadGroups2BAMs.py file available online
-#     sam_handle = pysam.Samfile(bamfile, 'r')
-#     sam_line = sam_handle.next()
-#     read_info = sam_line.qname
-#     sam_handle.close()
-#     instrument, run_id, flowcell_id, lane = read_info.split(":")[:4]
-#     info = {#'sample_name': sample_name,
-#             #'locality': locality,
-#             #'inline_tag': inline_tag,
-#             #'third_read_tag': third_read_tag,
-#             'instrument':instrument,  
-#             'run_id': run_id,
-#             'flowcell_id': flowcell_id,
-#             'lane': lane}
-#     return info
 
 
 ###############################################################################
@@ -1456,32 +820,6 @@ class GATK:
         #
         self.REF_fasta = ref_fasta
         self.knownSites = knownSites
-
-    def downloadResourceBundle(self, URL, files):
-        '''Utility function to download GATK resource bundle. If files specified by
-        files already exist, use the existing downloaded files.'''
-        #
-        saved_dir = os.getcwd()
-        os.chdir(env.RESOURCE_DIR)
-        if all([os.path.isfile(x) for x in files]):
-            env.logger.warning('Using existing GATK resource')
-        else:
-            run_command('wget -nc -r {}'.format(URL))
-            # walk into the directory and get everything to the top directory
-            # this is because wget -r saves files under URL/file
-            for root, dirs, files in os.walk('.'):
-                for name in files:
-                    shutil.move(os.path.join(root, name), name)
-        #
-        # decompress all .gz files
-        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
-            not x.endswith('tar.gz')]:
-            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
-                env.logger.warning('Using existing decompressed file {}'
-                    .format(gzipped_file[:-3]))
-            else:
-                decompress(gzipped_file, '.')
-        os.chdir(saved_dir)
 
 
     def realignIndels(self, bam_file):
@@ -2029,31 +1367,6 @@ class hg19_gatk_23(b37_gatk_23):
             os.makedirs(env.RESOURCE_DIR)
         
 
-def addCommonPipelineArguments(parser):
-    parser.add_argument('--pipeline', nargs='?', default='b37_gatk_23',
-        choices=['hg19_gatk_23', 'b37_gatk_23'],
-        help='Name of the pipeline to be used to call variants.')
-    parser.add_argument('--set', nargs='*', metavar='NAME+=VALUE',
-        help='''Set runtime variables in the format of NAME=VALUE (set
-            VALUE to NAME) or NAME+=VALUE (add VALUE to default value of
-            NAME). NAME can be RESOURCE_DIR (directory for resources such as
-            reference genome. Default to ~/.variant_tools/var_caller),
-            WORKING_DIR (directory to hold all intermedate files, default to
-            $output_$action_cache) PICARD_PATH (path to picard, should have
-            a number of .jar files under it), GATK_PATH (path to gatk,
-            should have GenomeAnalysisTK.jar under it) for path to JAR
-            files (can be ignored if the paths are specified in environment
-            variable $CLASSPATH), additional options to command java
-            (OPT_JAVA, parameter to the java command, default to value
-            "-Xmx4g"), and options to individual subcommands such as
-            OPT_BWA_INDEX (additional option to bwa index) and OPT_SAMTOOLS_FAIDX.
-            The following options are acceptable: {}. Note that the default
-            values can be overridden by environment variables with name
-            prefixed by CALL_VARIANTS_ (e.g. CALL_VARIANTS_RESOURCE_DIR).'''.format(
-            ', '.join([x[0] + (' ({})'.format(x[1]) if x[1] else '') for x in options])))
-    parser.add_argument('-j', '--jobs', default=1, type=int,
-            help='''Maximum number of concurrent jobs.''')
- 
 
 def alignReadsArguments(parser):
     parser.add_argument('input_files', nargs='*',
@@ -2064,10 +1377,22 @@ def alignReadsArguments(parser):
     parser.add_argument('-o', '--output',
         help='''Output aligned reads to a sorted, indexed, dedupped, and recalibrated
             BAM file $output.bam.''')
-    addCommonPipelineArguments(parser)
+    parser.add_argument('--pipeline', required=True,
+        help='Name of the pipeline to be used to call variants.')
+    parser.add_argument('-j', '--jobs', default=1, type=int,
+        help='''Maximum number of concurrent jobs.''')
 
 def alignReads(args):
-    pass
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            pipeline = Pipeline(args.pipeline)
+            # 
+            # initialize
+            pipeline.downloadResource()
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
 
 def callVariantsArguments(parser):
     parser.add_argument('input_files', nargs='*',
@@ -2077,95 +1402,20 @@ def callVariantsArguments(parser):
     parser.add_argument('--pedfile',
         help='''A pedigree file that specifies the relationship between input
             samples, used for multi-sample parsering.''')
-    addCommonPipelineArguments(parser)
+    parser.add_argument('--pipeline', required=True,
+        help='Name of the pipeline to be used to call variants.')
+    parser.add_argument('-j', '--jobs', default=1, type=int,
+            help='''Maximum number of concurrent jobs.''')
 
 def callVariants(args):
-    pass
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            pass
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
-#     args = master_parser.parse_args()
-#     if args.action is None:
-#         master_parser.print_help()
-#         sys.exit(0)
-#     #
-#     # temporary screen only logging
-#     env.logger = None
-#     #
-#     # override using command line values --set
-#     if hasattr(args, 'set') and args.set is not None:
-#         for arg in args.set:
-#             if '=' not in arg:
-#                 sys.exit('Additional parameter should have form NAME=value')
-#             name, value = arg.split('=', 1)
-#             append = False
-#             if name.endswith('+'):  # NAME+=VALUE
-#                 name = name[:-1]
-#                 append = True
-#             if name not in [x[0] for x in options]:
-#                 env.logger.error('Unrecognized environment variable {}: {} are allowed.'.format(
-#                     name, ', '.join([x[0] for x in options])))
-#                 sys.exit(1)
-#             #
-#             if append:
-#                 env.__setattr__(name, env.__getattr__(name) + ' ' + value)
-#             else:
-#                 env.__setattr__(name, value)
-#             env.logger.info('Environment variable {} is set to {}'.format(name, value))
-#     #
-#     # special handling of 'WORKING_DIR'
-#     # if WORKING_DIR is not specified, WORKING_DIR will be output dependent.
-#     env._WORKING_DIR = env.WORKING_DIR
-#     #
-#     if hasattr(args, 'output'):
-#         if type(args.output) == list:
-#             if not env._WORKING_DIR:
-#                 env.WORKING_DIR = os.path.split(args.output[0])[0]
-#             logname = os.path.basename(args.output[0]) + '.log'
-#         elif args.output:
-#             if not env._WORKING_DIR:
-#                 env.WORKING_DIR = os.path.split(args.output)[0]
-#             logname = os.path.basename(args.output) + '.log'
-#         else:
-#             if not env._WORKING_DIR:
-#                 env.WORKING_DIR = '.'
-#             logname = 'illumina_test.log'
-#         if not os.path.isdir(env.WORKING_DIR):
-#             os.makedirs(env.WORKING_DIR)
-#         # screen + log file logging
-#         env.logger = os.path.join(env.WORKING_DIR, logname)
-#     #
-#     # get a pipeline: args.pipeline is the name of the pipeline, also the name of the
-#     # class (subclass of VariantCaller) that implements the pipeline
-#     pipeline = eval(args.pipeline)()
-#     if args.action == 'prepare_resource':
-#         pipeline.prepareResourceIfNotExist()
-#     elif args.action == 'align':
-#         env.jobs = args.jobs
-#         pipeline.checkResource()
-#         if args.test_run:
-#             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.tar.gz')]
-#             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')
-#             if not env.WORKING_DIR:
-#                 env.logger.info('Using local cache directory illumina_test_seq_align_cache')
-#                 env._WORKING_DIR = 'illumina_test_seq_align_cache'
-#                 env.WORKING_DIR = env._WORKING_DIR
-#             pipeline.align(ifiles, ofiles)
-#             env.logger.info('Please remove working directory {} if you would like '
-#                 'to rerun the test.'.format(env.WORKING_DIR))
-#         else:
-#             pipeline.align(args.input_files, args.output)
-#     elif args.action == 'call':
-#         env.jobs = args.jobs
-#         pipeline.checkResource()
-#         if args.test_run:
-#             ifiles = [os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.bam')]
-#             ofiles = os.path.join(env.RESOURCE_DIR, 'illumina_test_seq.vcf')
-#             if not env.WORKING_DIR:
-#                 env.logger.info('Using local cache directory illumina_test_seq_call_cache')
-#                 env._WORKING_DIR = 'illumina_test_seq_call_cache'
-#                 env.WORKING_DIR = env._WORKING_DIR
-#             pipeline.callVariants(ifiles, None, ofiles)
-#             env.logger.info('Please remove working directory {} if you would like '
-#                 'to rerun the test.'.format(env.WORKING_DIR))
-#         else:
-#             pipeline.callVariants(args.input_files, args.pedfile, args.output)
-# 
+
+if __name__ == '__main__':
+    # for testing purposes only. The main interface is provided in vtools
+    pass

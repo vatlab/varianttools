@@ -7,7 +7,51 @@
 [pipeline description]
 description=A pipeline to call genetic variants from fastq files using BWA
     and GATK best practice.
-resources=
+resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5
+
 
 
 [DEFAULT]
