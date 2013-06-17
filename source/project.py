@@ -55,31 +55,66 @@ Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
 # name: name of the step, for description only
-# comment (optional): description of the step
-# input (option): input files. Can be
-#     1. output of previous step, or command input for first step (default)
+#
+# input (optional):
+#     input file(s), which can be
+#     1. output of previous step, or command-line input for first step (default)
 #     2. one or more specified files
-#     3. ${INPUT} (program input), ${OUTPUT} (program output).
-#     4. ${INPUT[step]}, ${OUTPUT[step]} input/output of certain step
-# output (required): output files. Can be
-#     1. ${INPUT}_blah
-# command: command(s) to execute, can use
-#     1. %{VAR}s -- specified by pipeline parameter
-#     2. ${INPUT}, ${OUTPUT}, ${INPUT[ste]}, ${OUTPUT[step]} etc ...
-#     3. 
-# exe_mode: how to group input files
-#     1. all: all specified input files, (default)
-#     2. one_to_one: each file one by one, multi-processing can be used
-#     3. paired: paired by filename (filenames differ by 1/2)
+#      
+# output (required):
+#     output file(s). A step will be ignored if output files exist and are
+#     newer than the input files.
 #
-# variables that will be interpreted:
-# ${INPUT}: program input
-# ${OUTPUT}: program output
-# ${INPUT1}, ${INPUT2} etc: input of individual steps
-# ${OUTPUT1}, ${OUTPUT2} etc: 
+# working_dir (optional):
+#     A working directory under which the commands will be executed. All input
+#     files and output files should be relative to this directory (or use
+#     absolute filename). working_dir is assumed to be the project cache
+#     directory.
 #
+# input_group: how to group input files.
+#     1. single: the job process one input file at a time (default). If there
+#            are multiple input, multiple outputs will be generated. ${INPUT}
+#            will be a single file even if multiple input files are processed
+#            by this step.
+#     2. all: all input files will be passed. ${INPUT} will be a list if there
+#            are multiple input files.
+#     3. paired: input files will be paired by filename (filenames differ by
+#            1/2) and are passed pair by pair. ${INPUT} will be a list of 
+#            two even if there are more than two files.
 #
-Command = namedtuple('Command', ['name', 'command', 'input_group', 'comment'])
+# command: command(s) to execute, which should be a string that will be
+#     passed to command line. Variables in this string can have two forms
+#        1. %{VAR}s -- specified by pipeline parameter ([DEFAULT] section)
+#        2. ${INPUT}, ${OUTPUT} etc, see below for details.
+#     Note that:
+#        1. Multiple commands can be separated by ;
+#        2. pipe operations (|, >) are allowed
+#        3. chdir operation will not affect the next step
+#        4. All commands will be executed under the local cache directory.
+#           chdir is needed if you need to execute the command under a
+#           different directory.
+#     FIXME: how to specify vtools-provided functions?
+#
+# comment (optional): detailed description of the step
+#
+# variables that will be interpreted include:
+#
+# ${CMD_INPUT}: program input (vtools align ${CMD_INPUT})
+# ${CMD_OUTPUT}: program output (vtools align --output ${CMD_OUTPUT})
+# ${INPUT}: input file(s) of the current step
+# ${OUTPUT}: output file(s) of the current step
+# ${RESOURCE_DIR}: where the pipeline resource is located, which is
+#      defined as $local_resource/var_caller/$pipeline.
+#
+# If a : appears in ${}, the expression will be considered as a python lambda
+# function. For example,
+#
+#    ${INPUT: INPUT[:-3]} 
+#
+# will pass ${INPUT} to lambda function "lambda INPUT: INPUT[:-3]".
+#
+Command = namedtuple('Command', ['name', 'input', 'output', 'working_dir',
+    'input_group', 'command', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -703,15 +738,17 @@ class PipelineDescription:
                         self.resource = [x.strip() for x in item[1].split('\n')]
             else:
                 if section.split('_')[0] not in ('init', 'align', 'call'):
-                    raise ValueEror('Only sections init_#, align_# and call_# are allowed.')
+                    raise ValueError('Only sections init_#, align_# and call_# '
+                        'are allowed: {} specified.'.format(section))
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['name', 'command', 'input_group', 'comment'] + defaults.keys():
+                        if item not in ['name', 'input', 'output', 'working_dir',
+                                'command', 'input_group', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. '
-                                'Only name, command, input_group, and comment are allowed.'
+                                'Only name, input, output, command, input_group, and comment are allowed.'
                                 .format(item, section))
                     command = Command(name=parser.get(section, 'name', vars=defaults) if 'name' in items else '',
                             command=parser.get(section, 'command', vars=defaults) if 'command' in items else '',
