@@ -583,8 +583,8 @@ class RTest(ExternTest):
             else:
                 return str
         #
-        @timectrl(tmout, 'time expired')
-        # 
+        #@timectrl(tmout, 'time expired')
+        #
         self.loadData()
         # write data and R script to log file for this group
         if self.data_cache_counter < self.data_cache or self.data_cache < 0:

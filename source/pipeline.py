@@ -42,7 +42,7 @@ import platform
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadFile, downloadURL, \
-    existAndNewerThan, elapsed_time, run_command, wait_all
+    existAndNewerThan, elapsed_time, run_command, wait_all, TEMP
     
 from .project import PipelineDescription, Project
 
@@ -182,16 +182,6 @@ def fastqVersion(fastq_file):
     else:
         # no option is needed for bwa
         return 'Sanger'
-
-
-def TEMP(filename):
-    '''Temporary output of filename'''
-    # turn path/filename.ext to path/filename_tmp???.ext, where ??? is
-    # the process ID to avoid two processes writing to the same temp
-    # files. That is to say, if two processes are working on the same step
-    # they will produce different temp files, and the final results should 
-    # still be valid.
-    return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
 
 def decompress(filename, dest_dir=None):
     '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress

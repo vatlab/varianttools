@@ -1245,6 +1245,17 @@ def decompressIfNeeded(filename, inplace=True):
     else:
         return filename
 
+
+def TEMP(filename):
+    '''Temporary output of filename'''
+    # turn path/filename.ext to path/filename_tmp???.ext, where ??? is
+    # the process ID to avoid two processes writing to the same temp
+    # files. That is to say, if two processes are working on the same step
+    # they will produce different temp files, and the final results should 
+    # still be valid.
+    return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
+
+
 #
 # Well, it is not easy to do reliable download
 # 
@@ -1259,7 +1270,8 @@ def downloadURL(URL, dest, quiet, message=None):
         import pycurl
         if not quiet:
             prog = ProgressBar(message)
-        with open(dest, 'wb') as f:
+        dest_tmp = TEMP(dest)
+        with open(dest_tmp, 'wb') as f:
             c = pycurl.Curl()
             c.setopt(pycurl.URL, str(URL))
             c.setopt(pycurl.WRITEFUNCTION, f.write)
@@ -1271,10 +1283,11 @@ def downloadURL(URL, dest, quiet, message=None):
             prog.done()
         if c.getinfo(pycurl.HTTP_CODE) == 404:
             try:
-                os.remove(dest)
+                os.remove(dest_tmp)
             except OSError:
                 pass
             raise RuntimeError('ERROR 404: Not Found.')
+        os.move(dest_tmp, dest)
         if os.path.isfile(dest):
             return dest
         else:
@@ -1285,13 +1298,16 @@ def downloadURL(URL, dest, quiet, message=None):
     # use wget? Almost universally available under linux
     try:
         # for some strange reason, passing wget without shell=True can fail silently.
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+        dest_tmp = TEMP(dest)
+        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '',
+            dest_tmp, URL), shell=True)
         ret = p.wait()
+        os.move(dest_tmp, dest)
         if ret == 0 and os.path.isfile(dest):
             return dest
         else:
             try:
-                os.remove(dest)
+                os.remove(dest_tmp)
             except OSError:
                 pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
@@ -1310,7 +1326,9 @@ def downloadURL(URL, dest, quiet, message=None):
         else:
             raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
     else:
-        urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+        dest_tmp = TEMP(dest)
+        urllib.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
+        os.remove(dest_tmp, dest)
     if not quiet:
         prog.done()
     # all methods tried
