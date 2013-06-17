@@ -53,6 +53,32 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
+#
+# name: name of the step, for description only
+# comment (optional): description of the step
+# input (option): input files. Can be
+#     1. output of previous step, or command input for first step (default)
+#     2. one or more specified files
+#     3. ${INPUT} (program input), ${OUTPUT} (program output).
+#     4. ${INPUT[step]}, ${OUTPUT[step]} input/output of certain step
+# output (required): output files. Can be
+#     1. ${INPUT}_blah
+# command: command(s) to execute, can use
+#     1. %{VAR}s -- specified by pipeline parameter
+#     2. ${INPUT}, ${OUTPUT}, ${INPUT[ste]}, ${OUTPUT[step]} etc ...
+#     3. 
+# exe_mode: how to group input files
+#     1. all: all specified input files, (default)
+#     2. one_to_one: each file one by one, multi-processing can be used
+#     3. paired: paired by filename (filenames differ by 1/2)
+#
+# variables that will be interpreted:
+# ${INPUT}: program input
+# ${OUTPUT}: program output
+# ${INPUT1}, ${INPUT2} etc: input of individual steps
+# ${OUTPUT1}, ${OUTPUT2} etc: 
+#
+#
 Command = namedtuple('Command', ['name', 'command', 'input_group', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is

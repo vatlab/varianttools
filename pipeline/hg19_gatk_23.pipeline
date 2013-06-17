@@ -7,6 +7,7 @@
 [pipeline description]
 description=A pipeline to call genetic variants from fastq files using BWA
     and GATK best practice.
+# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
 resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
   ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
   ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
@@ -55,10 +56,6 @@ resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_
 
 
 [DEFAULT]
-picard_path=
-picard_path_comment=Path to the picard class files
-
-gatk_path=
 java=-Xmx4g -XX:-UseGCOverheadLimit
 #
 bwa_index=
@@ -98,10 +95,18 @@ gatk_applyrecalibration_snv=
 gatk_applyrecalibration_indel=
 
 [init_1]
-name=
-command=
-input_group=
-comment=create bwa index
+input=ucsc.hg19.fasta
+output=ucsc.hg19.fasta.amb
+working_dir=${resource_dir}
+command=bwa index %{bwa_index}s -a bwtsw ${input}
+comment=Build bwa index for build hg19 of reference genome
+
+[init_2]
+input=ucsc.hg19.fasta
+output=ucsc.hg19.fasta.fai
+working_dir=${resource_dir}
+command=samtools faidx %{samtools_faidx}s ${input}
+comment=Build samtools index for build hg19 of reference genome
 
 [align_1]
 name=
@@ -114,4 +119,69 @@ name=
 command=
 input_group=
 comment=mark duplicate
+
+[call_1]
+name=UnifiedGenotyper
+command=java %{opt_java}s -jar GenomeAnalysisTK.jar
+                -T UnifiedGenotyper
+                %{opt_gatk_unifiedgenotyper}s
+                -I ${INPUT}
+                -R {4}/{5}
+                --dbsnp {4}/{7}
+                --genotype_likelihoods_model BOTH
+                -o {6}
+
+
+[call_2]
+name=VariantRecalibrator_SNV
+command=java {0} -jar GenomeAnalysisTK.jar {2}
+                -input {4}
+                -T VariantRecalibrator
+                -R {5}/{6}
+                {3}
+                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 {5}/{7}
+                -resource:omni,known=false,training=true,truth=true,prior=12.0	{5}/{8}
+                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	{5}/{9}
+                -mode SNP 
+                -recalFile {10}.recal
+                -tranchesFile {10}.tranches
+                -rscriptFile {10}.R
+                -log {11}
+                
+[call_3]
+name=VariantRecalibrator_INDEL
+command=java {0} -jar GenomeAnalysisTK.jar {2} 
+                -input {4} 
+                -T VariantRecalibrator
+                -R {5}/{6}
+                {3}
+                -resource:mills,known=false,training=true,truth=true,prior=12.0 {5}/{7}
+                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 {5}/{8}
+                -mode INDEL 
+                -recalFile {9}.recal
+                -tranchesFile {9}.tranches
+                -rscriptFile {9}.R
+                -log {10}
+
+[call_4]
+name=ApplyRecalibrator_SNV
+command=java {0} -jar GenomeAnalysisTK.jar {2} {3}
+                --input {4} 
+                -R {5}/{6}
+                -T ApplyRecalibration
+                -mode {7} 
+                -recalFile {8}.recal
+                -tranchesFile {8}.tranches
+                -o {9}
+
+[call_5]
+name=ApplyRecalibrator_INDEL
+command=java {0} -jar GenomeAnalysisTK.jar {2} {3}
+                --input {4} 
+                -R {5}/{6}
+                -T ApplyRecalibration
+                -mode {7} 
+                -recalFile {8}.recal
+                -tranchesFile {8}.tranches
+                -o {9}
 

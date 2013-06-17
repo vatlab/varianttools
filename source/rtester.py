@@ -584,8 +584,6 @@ class RTest(ExternTest):
                 return str
         #
         @timectrl(tmout, 'time expired')
-        def timed_command(cmd, instream = None, msg = '', upon_succ=None):
-            return runCommand(cmd, instream, msg, upon_succ)
         # 
         self.loadData()
         # write data and R script to log file for this group
@@ -601,7 +599,7 @@ class RTest(ExternTest):
         cmd_logger = env.logger.debug
         na_value = float('nan')
         try:
-            out = timed_command(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
+            out = runCommand(cmd, "{0}".format('\n'.join(self.Rscript + self.Rdata) + self.formatOutput()),
                               "R message for {0}".format(self.pydata['name']))
             if out == 'time expired':
                 cmd_logger = env.logger.warning

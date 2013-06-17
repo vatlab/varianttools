@@ -41,8 +41,8 @@ import re
 import platform
 from collections import namedtuple
 
-from .utils import env, ProgressBar, downloadFile, downloadURL, existAndNewerThan,
-    elapsed_time, run_command, wait_all
+from .utils import env, ProgressBar, downloadFile, downloadURL, \
+    existAndNewerThan, elapsed_time, run_command, wait_all
     
 from .project import PipelineDescription, Project
 
@@ -98,7 +98,7 @@ class Pipeline:
             else:
                 decompress(gzipped_file, '.')
         os.chdir(saved_dir)
-    
+ 
     def executeStep(self):
         pass
 
@@ -109,61 +109,6 @@ class Pipeline:
 # All options, their default values, and a validator function
 # if needed.
 #
-def physicalMemory():
-    '''Get the amount of physical memory in the system'''
-    # MacOSX?
-    if platform.platform().startswith('Darwin'):
-        # FIXME
-        return None
-    elif platform.platform().startswith('Linux'):
-        try:
-            res = subprocess.check_output('free').decode().split('\n')
-            return int(res[1].split()[1])
-        except Exception as e:
-            return None
-
-def javaXmxCheck(val):
-    '''Check if the Xmx option is valid for OPT_JAVA'''
-    ram = physicalMemory()
-    # cannot check physical memory
-    if ram is None:
-        return
-    # find option matching '-Xmx???'
-    m = re.search('-Xmx(\d+)([^\s]*)(?:\s+|$)', val)
-    if m is None:  # no -Xmx specified
-        return
-    try:
-        size = int(m.group(1)) * {
-            't': 10**9,
-            'T': 10**9,
-            'g': 10**6,
-            'G': 10**6,
-            'm': 10**3,
-            'M': 10**3,
-            '': 1
-        }[m.group(2)]
-    except:
-        sys.exit('Invalid java option {}'.format(val))
-    #
-    if ram < size:
-        sys.exit('Specified -Xms size {} is larger than available physical memory {}'
-            .format(size, ram))
-
-options = [
-    ('RESOURCE_DIR', '~/.variant_tools/var_caller'),
-    ('WORKING_DIR', ''),
-    # notification emails
-    ('NOTIFICATION_EMAIL', ''),
-    # option, default value
-    ('PICARD_PATH', ''),
-    ('GATK_PATH', ''),
-    #
-    #
-    # for private use
-    ('_WORKING_DIR', ''),
-    ('_LOGFILE', ''),
-]
-
 ###############################################################################
 #
 # 

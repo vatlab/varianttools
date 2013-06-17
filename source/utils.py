@@ -53,6 +53,7 @@ import hashlib
 import ConfigParser
 import tarfile
 import binascii
+from collections import namedtuple
 
 try:
     # not all platforms/installations of python support bz2
@@ -1419,14 +1420,12 @@ def existAndNewerThan(ofiles, ifiles):
         # newer by at least 10 seconds.
         return True
 
-A simple job management scheme 
-#
+
 # NOTE:
 #   subprocess.PIPE cannot be used for NGS commands because they tend to send
 #   a lot of progress output to stderr, which might block PIPE and cause the
 #   command itself to fail, or stall (which is even worse).
 #
-###############################################################################
 JOB = namedtuple('JOB', 'proc cmd upon_succ start_time stdout stderr name')
 running_jobs = []
 
@@ -1437,6 +1436,8 @@ def elapsed_time(start):
     return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
+#
+# this command duplicate with runCommand, will merge them later on.
 def run_command(cmd, name=None, upon_succ=None, wait=True):
     '''Call an external command, raise an error if it fails.
     If upon_succ is specified, the specified function and parameters will be
@@ -1558,6 +1559,48 @@ def wait_all():
         # sleep ten seconds before checking job status again.
         time.sleep(10)
     running_jobs = []
+
+
+def physicalMemory():
+    '''Get the amount of physical memory in the system'''
+    # MacOSX?
+    if platform.platform().startswith('Darwin'):
+        # FIXME
+        return None
+    elif platform.platform().startswith('Linux'):
+        try:
+            res = subprocess.check_output('free').decode().split('\n')
+            return int(res[1].split()[1])
+        except Exception as e:
+            return None
+
+def javaXmxCheck(val):
+    '''Check if the Xmx option is valid for OPT_JAVA'''
+    ram = physicalMemory()
+    # cannot check physical memory
+    if ram is None:
+        return
+    # find option matching '-Xmx???'
+    m = re.search('-Xmx(\d+)([^\s]*)(?:\s+|$)', val)
+    if m is None:  # no -Xmx specified
+        return
+    try:
+        size = int(m.group(1)) * {
+            't': 10**9,
+            'T': 10**9,
+            'g': 10**6,
+            'G': 10**6,
+            'm': 10**3,
+            'M': 10**3,
+            '': 1
+        }[m.group(2)]
+    except:
+        sys.exit('Invalid java option {}'.format(val))
+    #
+    if ram < size:
+        sys.exit('Specified -Xms size {} is larger than available physical memory {}'
+            .format(size, ram))
+
 
 
 
