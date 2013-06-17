@@ -38,7 +38,7 @@ else:
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
-    consolidateFieldName, DatabaseEngine, env, encodeTableName
+    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName
 
  
 class JoinFields:
