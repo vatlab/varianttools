@@ -98,14 +98,14 @@ gatk_applyrecalibration_indel=
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.amb
 working_dir=${resource_dir}
-command=bwa index %{bwa_index}s -a bwtsw ${input}
+command=bwa index %(bwa_index)s -a bwtsw ${input}
 comment=Build bwa index for build hg19 of reference genome
 
 [init_2]
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.fai
 working_dir=${resource_dir}
-command=samtools faidx %{samtools_faidx}s ${input}
+command=samtools faidx %(samtools_faidx)s ${input}
 comment=Build samtools index for build hg19 of reference genome
 
 [align_1]
@@ -122,13 +122,13 @@ comment=mark duplicate
 
 [call_1]
 name=UnifiedGenotyper
-command=java %{opt_java}s -jar GenomeAnalysisTK.jar
-                -T UnifiedGenotyper
-                %{opt_gatk_unifiedgenotyper}s
-                -I ${INPUT}
-                -R {4}/{5}
-                --dbsnp {4}/{7}
-                --genotype_likelihoods_model BOTH
+command=java %(opt_java)s -jar GenomeAnalysisTK.jar \
+                -T UnifiedGenotyper \
+                %(gatk_unifiedgenotyper)s \
+                -I ${INPUT} \
+                -R {4}/{5} \
+                --dbsnp {4}/{7} \
+                --genotype_likelihoods_model BOTH \
                 -o {6}
 
 

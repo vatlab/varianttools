@@ -752,6 +752,9 @@ class PipelineDescription:
                                 .format(item, section))
                     command = Command(name=parser.get(section, 'name', vars=defaults) if 'name' in items else '',
                             command=parser.get(section, 'command', vars=defaults) if 'command' in items else '',
+                            input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
+                            output=parser.get(section, 'output', vars=defaults) if 'output' in items else '',
+                            working_dir=parser.get(section, 'working_dir', vars=defaults) if 'working_dir' in items else '',
                             input_group=parser.get(section, 'input_group', vars=defaults) if 'input_group' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                     # for example, cmd_idx = 5
@@ -759,9 +762,9 @@ class PipelineDescription:
                     # len(align_steps) = 4 (0, 1, 2, 3),
                     # need to add two elements with index 4, and 5
                     if section.startswith('init_'):
-                        if len(self.call_steps) < cmd_idx + 1:
-                            self.call_steps.extend([None] * (cmd_idx + 1 - len(self.call_steps)))
-                        self.call_steps[cmd_idx] = command
+                        if len(self.init_steps) < cmd_idx + 1:
+                            self.init_steps.extend([None] * (cmd_idx + 1 - len(self.init_steps)))
+                        self.init_steps[cmd_idx] = command
                     elif section.startswith('align_'):
                         if len(self.align_steps) < cmd_idx + 1:
                             self.align_steps.extend([None] * (cmd_idx + 1 - len(self.align_steps)))
@@ -772,7 +775,14 @@ class PipelineDescription:
                         self.call_steps[cmd_idx] = command
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
-           
+        # 
+        # validate
+        for pipeline in (self.init_steps, self.align_steps, self.call_steps):
+            for idx, cmd in enumerate(pipeline):
+                if cmd is None:
+                    raise ValueError('Invalid pipeline. Step {} is left unspecified.'
+                        .format(idx+1))
+     
     def describe(self):
         print('Pipeline:      {}'.format(self.name))
         if self.description is not None:

@@ -72,12 +72,16 @@ class Pipeline:
 
     def downloadResource(self):
         '''Download resource'''
+        # decompress all .gz files
+        saved_dir = os.getcwd()
+        os.chdir(self.pipeline_resource)
+        skipped = []
         for cnt, URL in enumerate(sorted(self.pipeline.resource)):
             filename = URL.rsplit('/', 1)[-1]
             dest_file = os.path.join(self.pipeline_resource, filename)
             try:
                 if os.path.isfile(dest_file):
-                    env.logger.info('Using existing resource file {}'.format(filename))
+                    skipped.append(filename)
                 else:
                     downloadURL(URL, dest_file, False,
                         message='{}/{} {}'.format(cnt+1, len(self.pipeline.resource), filename))
@@ -86,39 +90,30 @@ class Pipeline:
             except Exception as e:
                 env.logger.error('Failed to download {}: {} {}'
                     .format(filename, type(e).__name__, e))
-        #
-        # decompress all .gz files
-        saved_dir = os.getcwd()
-        os.chdir(self.pipeline_resource)
-        for gzipped_file in [x for x in os.listdir('.') if x.endswith('.gz') and 
-            not x.endswith('tar.gz')]:
-            if existAndNewerThan(ofiles=gzipped_file[:-3], ifiles=gzipped_file):
-                env.logger.warning('Using existing decompressed file {}'
-                    .format(gzipped_file[:-3]))
-            else:
-                decompress(gzipped_file, '.')
+            #
+            if filename.endswith('.gz') and not filename.endswith('tar.gz'):
+                if not existAndNewerThan(ofiles=filename[:-3], ifiles=filename):
+                    decompress(filename, '.')
         os.chdir(saved_dir)
+        if skipped:
+            env.logger.info('Using {} existing resource files under {}.'
+                .format(len(skipped), self.pipeline_resource))
  
-    def executeStep(self):
+    def executeCommand(self):
         pass
 
-    def execute(self):
-        pass
-
-#
-# All options, their default values, and a validator function
-# if needed.
-#
-###############################################################################
-#
-# 
+    def execute(self, steps, input_files=[], output_files=[]):
+        for command in {'init': self.pipeline.init_steps,
+                'align': self.pipeline.align_steps,
+                'call': self.pipeline.call_steps}[steps]:
+            print command.comment
+            
 
 ###############################################################################
 #
 # Utility functions
 #
 ###############################################################################
-
 
 
 def downloadFile(URL, dest, quiet=False):
@@ -1324,6 +1319,7 @@ def alignReads(args):
             # 
             # initialize
             pipeline.downloadResource()
+            pipeline.execute('init')
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
