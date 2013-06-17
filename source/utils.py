@@ -1287,7 +1287,7 @@ def downloadURL(URL, dest, quiet, message=None):
             except OSError:
                 pass
             raise RuntimeError('ERROR 404: Not Found.')
-        os.move(dest_tmp, dest)
+        os.rename(dest_tmp, dest)
         if os.path.isfile(dest):
             return dest
         else:
@@ -1302,7 +1302,7 @@ def downloadURL(URL, dest, quiet, message=None):
         p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '',
             dest_tmp, URL), shell=True)
         ret = p.wait()
-        os.move(dest_tmp, dest)
+        os.rename(dest_tmp, dest)
         if ret == 0 and os.path.isfile(dest):
             return dest
         else:
@@ -1328,7 +1328,7 @@ def downloadURL(URL, dest, quiet, message=None):
     else:
         dest_tmp = TEMP(dest)
         urllib.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
-        os.remove(dest_tmp, dest)
+        os.rename(dest_tmp, dest)
     if not quiet:
         prog.done()
     # all methods tried
