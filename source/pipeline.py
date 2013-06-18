@@ -53,6 +53,76 @@ except ImportError as e:
     hasPySam = False
 
 
+class SequentialAction:
+    def __init__(self, actions):
+        '''Define an action that calls a list of actions, specified
+        by Action1, Action2.'''
+        self.actions = []
+        for a in actions:
+            if hasattr(a, '__call__'):
+                self.actions.append(a.__call__)
+            else:
+                self.actions.append(a)
+
+    def __call__(self, input_files, output_files):
+        for a in self.actions:
+            if a(input_files, output_files):
+                raise RuntimeError('Execution of action failed')
+        return 0
+
+class RunCommand:
+    def __init__(self, cmd, working_dir=None):
+        self.cmd = cmd
+        self.working_dir = working_dir
+
+    def __call__(self, input_files, output_files):
+        # substitute cmd by input_files and output_files
+        pass
+
+class CheckCommand:
+    def __init__(self, cmd):
+        self.cmd = cmd
+
+    def __call__(self, input_files, output_files):
+        if not hasattr(shutil, 'which'):
+            # if shutil.which does not exist, use subprocess...
+            try:
+                subprocess.call(cmd, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
+                return 0
+            except:
+                env.logger.error('Command {} does not exist. Please install it and try again.'
+                    .format(cmd))
+                return 1
+        if shutil.which(cmd) is None:
+            env.logger.error('Command {} does not exist. Please install it and try again.'
+                .format(cmd))
+            return 1
+
+class GetFastqFiles:
+    def __init__(self):
+        pass
+
+    def __call__(self, input_files, output_files):
+        # decompress input files and return a list of output files
+        filenames = []
+        for filename in input_files:
+            if filename.lower().endswith('.bam') or filename.lower().endswith('.sam'):
+                filenames.extend(self.picard.bam2fastq(filename))
+                continue
+            for fastq_file in decompress(filename, env.WORKING_DIR):
+                try:
+                    with open(fastq_file) as fastq:
+                        line = fastq.readline()
+                        if not line.startswith('@'):
+                            raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
+                    filenames.append(fastq_file)
+                except Exception as e:
+                    env.logger.error('Ignoring non-fastq file {}: {}'
+                        .format(fastq_file, e))
+        filenames.sort()
+        return filenames        
+
+
 class Pipeline:
     def __init__(self, name):
         self.pipeline = PipelineDescription(name)
@@ -1135,26 +1205,6 @@ class b37_gatk_23(BasePipeline):
             self.GATK_resource_url, files=[self.REF_fasta + '.gz'])
         BWA(self.REF_fasta).buildIndex()
         SAMTOOLS(self.REF_fasta).buildIndex()
-
-    def getFastqFiles(self, input_files):
-        '''Decompress or extract input files to get a list of fastq files'''
-        filenames = []
-        for filename in input_files:
-            if filename.lower().endswith('.bam') or filename.lower().endswith('.sam'):
-                filenames.extend(self.picard.bam2fastq(filename))
-                continue
-            for fastq_file in decompress(filename, env.WORKING_DIR):
-                try:
-                    with open(fastq_file) as fastq:
-                        line = fastq.readline()
-                        if not line.startswith('@'):
-                            raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
-                    filenames.append(fastq_file)
-                except Exception as e:
-                    env.logger.error('Ignoring non-fastq file {}: {}'
-                        .format(fastq_file, e))
-        filenames.sort()
-        return filenames
 
     #
     # This is the actual pipeline ....

@@ -56,85 +56,84 @@ resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_
 
 
 [DEFAULT]
-java=-Xmx4g -XX:-UseGCOverheadLimit
+opt_java=-Xmx4g -XX:-UseGCOverheadLimit
 #
-bwa_index=
-bwa_aln=
-bwa_sampe=
-bwa_samse=
-#
-samtools_faidx=
-samtools_view=
-samtools_sort=
-samtools_index=
-#
+opt_bwa_index=
+opt_bwa_aln=
+opt_bwa_sampe=
+opt_bwa_samse=
+opt_samtools_faidx=
+opt_samtools_view=
+opt_samtools_sort=
+opt_samtools_index=
+
 # validation_stringency=leniant is used to correct an error
 # caused by some versions of BWA, see
 #
 #   http://seqanswers.com/forums/showthread.php?t=4246
 #
 # for details
-picard_sortsam=VALIDATION_STRINGENCY=LENIENT
-picard_mergesamfiles=MAX_RECORDS_IN_RAM=5000000
-picard_samtofastq=VALIDATION_STRINGENCY=LENIENT NON_PF=true
-picard_markduplicates=
+opt_picard_sortsam=VALIDATION_STRINGENCY=LENIENT
+opt_picard_mergesamfiles=MAX_RECORDS_IN_RAM=5000000
+opt_picard_samtofastq=VALIDATION_STRINGENCY=LENIENT NON_PF=true
+opt_picard_markduplicates=
 #
-gatk_realignertargetcreator=
+opt_gatk_realignertargetcreator=
 # http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
-gatk_indelrealigner=--filter_mismatching_base_and_quals
-gatk_baserecalibrator=-rf BadCigar
-gatk_printreads=
-gatk_reducereads=
-gatk_haplotypecaller=-minPruning 3
-gatk_unifiedgenotyper=-rf BadCigar  -stand_call_conf 50.0 -stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage
-gatk_variantrecalibrator=
-gatk_variantrecalibrator_snv= -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
-gatk_variantrecalibrator_indel=--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
-gatk_applyrecalibration=--ts_filter_level 99.9
-gatk_applyrecalibration_snv=
-gatk_applyrecalibration_indel=
+opt_gatk_indelrealigner=--filter_mismatching_base_and_quals
+opt_gatk_baserecalibrator=-rf BadCigar
+opt_gatk_printreads=
+opt_gatk_reducereads=
+opt_gatk_haplotypecaller=-minPruning 3
+opt_gatk_unifiedgenotyper=-rf BadCigar  -stand_call_conf 50.0 -stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage
+opt_gatk_variantrecalibrator=
+opt_gatk_variantrecalibrator_snv= -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+opt_gatk_variantrecalibrator_indel=--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
+opt_gatk_applyrecalibration=--ts_filter_level 99.9
+opt_gatk_applyrecalibration_snv=
+opt_gatk_applyrecalibration_indel=
 
 [init_1]
+name=bwa_index
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.amb
-working_dir=${resource_dir}
-command=bwa index %(bwa_index)s -a bwtsw ${input}
+action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${input}', working_dir='${RESOURCE_DIR}')
 comment=Build bwa index for build hg19 of reference genome
 
 [init_2]
+name=samtools_index
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.fai
-working_dir=${resource_dir}
-command=samtools faidx %(samtools_faidx)s ${input}
+action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${input}', working_dir='${RESOURCE_DIR}')
 comment=Build samtools index for build hg19 of reference genome
 
 [align_1]
-name=
-command=
+name=bwa_alignment
+action=RunCommand()
 input_group=
 comment=align using bwa
 
 [align_2]
-name=
-command=
+name=mark_duplicate
+action=RunCommand()
 input_group=
 comment=mark duplicate
 
 [call_1]
 name=UnifiedGenotyper
-command=java %(opt_java)s -jar GenomeAnalysisTK.jar \
-                -T UnifiedGenotyper \
-                %(gatk_unifiedgenotyper)s \
-                -I ${INPUT} \
-                -R {4}/{5} \
-                --dbsnp {4}/{7} \
-                --genotype_likelihoods_model BOTH \
+action=java %(opt_java)s -jar GenomeAnalysisTK.jar 
+                -T UnifiedGenotyper 
+                %(opt_gatk_unifiedgenotyper)s 
+                -I ${INPUT} 
+                -R {4}/{5} 
+                --dbsnp {4}/{7} 
+                --genotype_likelihoods_model BOTH 
                 -o {6}
 
 
 [call_2]
 name=VariantRecalibrator_SNV
-command=java {0} -jar GenomeAnalysisTK.jar {2}
+action=java {0} -jar GenomeAnalysisTK.jar {2}
                 -input {4}
                 -T VariantRecalibrator
                 -R {5}/{6}
@@ -150,7 +149,7 @@ command=java {0} -jar GenomeAnalysisTK.jar {2}
                 
 [call_3]
 name=VariantRecalibrator_INDEL
-command=java {0} -jar GenomeAnalysisTK.jar {2} 
+action=java {0} -jar GenomeAnalysisTK.jar {2} 
                 -input {4} 
                 -T VariantRecalibrator
                 -R {5}/{6}
@@ -165,7 +164,7 @@ command=java {0} -jar GenomeAnalysisTK.jar {2}
 
 [call_4]
 name=ApplyRecalibrator_SNV
-command=java {0} -jar GenomeAnalysisTK.jar {2} {3}
+action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
                 --input {4} 
                 -R {5}/{6}
                 -T ApplyRecalibration
@@ -176,7 +175,7 @@ command=java {0} -jar GenomeAnalysisTK.jar {2} {3}
 
 [call_5]
 name=ApplyRecalibrator_INDEL
-command=java {0} -jar GenomeAnalysisTK.jar {2} {3}
+action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
                 --input {4} 
                 -R {5}/{6}
                 -T ApplyRecalibration
