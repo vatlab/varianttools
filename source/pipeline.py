@@ -139,7 +139,7 @@ class CheckJavaClasses:
 #   a lot of progress output to stderr, which might block PIPE and cause the
 #   command itself to fail, or stall (which is even worse).
 #
-JOB = namedtuple('JOB', 'proc cmd upon_succ start_time stdout stderr name')
+JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr name')
 class RunCommand:
     def __init__(self, cmd, working_dir=None):
         '''This action execute the specified command under the
@@ -147,7 +147,7 @@ class RunCommand:
         '''
         self.cmd = cmd
         self.working_dir = working_dir
-        running_jobs = []
+        self.running_jobs = []
 
     def elapsed_time(self, start):
         '''Return the elapsed time in human readable format since start time'''
@@ -158,10 +158,8 @@ class RunCommand:
      
     #
     # this command duplicate with runCommand, will merge them later on.
-    def run_command(self, cmd, name=None, upon_succ=None, wait=True):
+    def run_command(self, cmd, name=None, wait=True):
         '''Call an external command, raise an error if it fails.
-        If upon_succ is specified, the specified function and parameters will be
-        evalulated after the job has been completed successfully.
         If a name is given, stdout and stderr will be sent to name.out and 
         name.err under env.WORKING_DIR. Otherwise, stdout and stderr will be
         ignored (send to /dev/null).
@@ -169,13 +167,9 @@ class RunCommand:
         # merge mulit-line command into one line and remove extra white spaces
         cmd = ' '.join(cmd.split())
         if name is None:
-            try:
-                proc_out = subprocess.DEVNULL
-                proc_err = subprocess.DEVNULL
-            except:
-                # subprocess.DEVNULL was introduced in Python 3.3
-                proc_out = open(os.devnull, 'w')
-                proc_err = open(os.devnull, 'w')
+            # subprocess.DEVNULL was introduced in Python 3.3
+            proc_out = open(os.devnull, 'w')
+            proc_err = open(os.devnull, 'w')
         else:
             name = name.replace('/', '_')
             proc_out = open(os.path.join(env.WORKING_DIR, name + '.out'), 'w')
@@ -186,30 +180,23 @@ class RunCommand:
                 env.logger.info('Running {}'.format(cmd))
                 proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
                 retcode = proc.wait()
-                if name is not None:
-                    proc_out.close()
-                    proc_err.close()
+                proc_out.close()
+                proc_err.close()
                 if retcode < 0:
-                    env.logger.error('Command {} was terminated by signal {} after executing {}'
+                    raise RuntimeError('Command {} was terminated by signal {} after executing {}'
                         .format(cmd, -retcode, elapsed_time(s)))
-                    sys.exit(1)
                 elif retcode > 0:
                     if name is not None:
                         with open(os.path.join(env.WORKING_DIR, name + '.err')) as err:
                             for line in err.read().split('\n')[-20:]:
                                 env.logger.error(line)
-                    env.logger.error("Command {} returned {} after executing {}"
+                    raise RuntimeError("Command {} returned {} after executing {}"
                         .format(cmd, retcode, elapsed_time(s)))
-                    sys.exit(1)
                 env.logger.info('Command {} completed successfully in {}'
                     .format(cmd, elapsed_time(s)))
             except OSError as e:
                 env.logger.error("Execution of command {} failed: {}".format(cmd, e))
                 sys.exit(1)
-            # everything is OK
-            if upon_succ:
-                # call the function (upon_succ) using others as parameters.
-                upon_succ[0](*(upon_succ[1:]))
         else:
             # wait for empty slot to run the job
             while True:
@@ -219,16 +206,14 @@ class RunCommand:
                     break
             # there is a slot, start running
             proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-            global running_jobs
-            running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ,
+            self.running_jobs.append(JOB(proc=proc, cmd=cmd, 
                 start_time=time.time(), stdout=proc_out, stderr=proc_err, name=name))
             env.logger.info('Running {}'.format(cmd))
 
     def poll_jobs(self):
         '''check the number of running jobs.'''
         count = 0
-        global running_jobs
-        for idx, job in enumerate(running_jobs):
+        for idx, job in enumerate(self.running_jobs):
             if job is None:
                 continue
             ret = job.proc.poll()
@@ -237,39 +222,28 @@ class RunCommand:
                 continue
             #
             # job completed, close redirected stdout and stderr
-            # for python 3.3. where job.stdout is DEVNULL, this will 
-            # fail so try/except is needed.
-            try:
-                job.stdout.close()
-                job.stderr.close()
-            except:
-                pass
+            job.stdout.close()
+            job.stderr.close()
             #
             if ret < 0:
-                env.logger.error("Command {} was terminated by signal {} after executing {}"
+                raise RuntimeError("Command {} was terminated by signal {} after executing {}"
                     .format(job.cmd, -ret, elapsed_time(job.start_time)))
-                sys.exit(1)
             elif ret > 0:
                 if job.name is not None:
                     with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
                         for line in err.read().split('\n')[-50:]:
                             env.logger.error(line)
-                env.logger.error('Execution of command {} failed after {} (return code {}).'
+                raise RuntimeError('Execution of command {} failed after {} (return code {}).'
                     .format(job.cmd, elapsed_time(job.start_time), ret))
-                sys.exit(1)
             else:
                 if job.name is not None:
                     with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
                         for line in err.read().split('\n')[-10:]:
                             env.logger.info(line)
-                # finish up
-                if job.upon_succ:
-                    # call the upon_succ function
-                    job.upon_succ[0](*(job.upon_succ[1:]))
                 env.logger.info('Command {} completed successfully in {}'
                     .format(job.cmd, elapsed_time(job.start_time)))
                 #
-                running_jobs[idx] = None
+                self.running_jobs[idx] = None
         return count
 
     def wait_all(self):
@@ -281,7 +255,6 @@ class RunCommand:
 
     def __call__(self, ifiles, ofiles):
         # substitute cmd by input_files and output_files
-        env.logger.info('Running command {}'.format(self.cmd))
         if self.working_dir:
             os.chdir(self.working_dir)
         self.run_command(self.cmd)
@@ -552,6 +525,7 @@ class Pipeline:
                     saved_dir = os.getcwd()
                     VARS['INPUT'] = ', '.join(step_input)
                     VARS['OUTPUT'] = ', '.join(step_output)
+                    VARS['PID'] = os.getpid()
                     action = eval(self.substitute(command.action, VARS))
                     if type(action) == tuple:
                         action = SequentialActions(action)
