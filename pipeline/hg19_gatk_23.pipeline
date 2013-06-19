@@ -94,33 +94,30 @@ opt_gatk_applyrecalibration_snv=
 opt_gatk_applyrecalibration_indel=
 
 [init_1]
-name=bwa_index
-input=ucsc.hg19.fasta
-output=ucsc.hg19.fasta.amb
-action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${input}', working_dir='${RESOURCE_DIR}')
-comment=Build bwa index for build hg19 of reference genome
+action=CheckCommand('bwa'), CheckCommand('samtools')
+comment=Check existence of commands bwa and samtools
 
 [init_2]
-name=samtools_index
+input=ucsc.hg19.fasta
+output=ucsc.hg19.fasta.amb
+action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}', working_dir='${RESOURCE_DIR}')
+comment=Build bwa index for build hg19 of reference genome
+
+[init_3]
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.fai
-action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${input}', working_dir='${RESOURCE_DIR}')
+action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}', working_dir='${RESOURCE_DIR}')
 comment=Build samtools index for build hg19 of reference genome
 
 [align_1]
-name=bwa_alignment
 action=RunCommand()
-input_group=
 comment=align using bwa
 
 [align_2]
-name=mark_duplicate
 action=RunCommand()
-input_group=
 comment=mark duplicate
 
 [call_1]
-name=UnifiedGenotyper
 action=java %(opt_java)s -jar GenomeAnalysisTK.jar 
                 -T UnifiedGenotyper 
                 %(opt_gatk_unifiedgenotyper)s 
@@ -132,7 +129,6 @@ action=java %(opt_java)s -jar GenomeAnalysisTK.jar
 
 
 [call_2]
-name=VariantRecalibrator_SNV
 action=java {0} -jar GenomeAnalysisTK.jar {2}
                 -input {4}
                 -T VariantRecalibrator
@@ -148,7 +144,6 @@ action=java {0} -jar GenomeAnalysisTK.jar {2}
                 -log {11}
                 
 [call_3]
-name=VariantRecalibrator_INDEL
 action=java {0} -jar GenomeAnalysisTK.jar {2} 
                 -input {4} 
                 -T VariantRecalibrator
@@ -163,7 +158,6 @@ action=java {0} -jar GenomeAnalysisTK.jar {2}
                 -log {10}
 
 [call_4]
-name=ApplyRecalibrator_SNV
 action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
                 --input {4} 
                 -R {5}/{6}
@@ -174,7 +168,6 @@ action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
                 -o {9}
 
 [call_5]
-name=ApplyRecalibrator_INDEL
 action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
                 --input {4} 
                 -R {5}/{6}

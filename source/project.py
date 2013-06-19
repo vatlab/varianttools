@@ -54,61 +54,10 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
-# name: name of the step, for description only
+# see http://varianttools.sourceforge.net/Calling/New for details
 #
-# input (optional):
-#     input file(s), which can be
-#     1. output of previous step, or command-line input for first step (default)
-#     2. one or more specified files
-#      
-# output:
-#     output file(s). A step will be ignored if output files exist and are
-#     newer than the input files. Output can be determined by actions.
-#
-# input_group: how to group input files.
-#     1. single: the job process one input file at a time (default). If there
-#            are multiple input, multiple outputs will be generated. ${INPUT}
-#            will be a single file even if multiple input files are processed
-#            by this step.
-#     2. all: all input files will be passed. ${INPUT} will be a list if there
-#            are multiple input files.
-#     3. paired: input files will be paired by filename (filenames differ by
-#            1/2) and are passed pair by pair. ${INPUT} will be a list of 
-#            two even if there are more than two files.
-#
-# action: A variant tools action. The most common one is
-#          RunCommand(cmd, working_dir=None),
-#     which execute specified cmd. 
-#
-#     Note that:
-#        1. Multiple actions can be specified (separated by ,)
-#        2. pipe operations (|, >) are allowed in RunCommand.
-#        3. chdir operation will not affect the next step
-#        4. All commands will be executed under the project directory,
-#           working_dir can be specified. 
-#        5. The pipeline will be terminated if any action returns
-#           non-zero value.
-#
-# comment (optional): detailed description of the step
-#
-# variables that will be interpreted include:
-#
-# ${CMD_INPUT}: program input (vtools align ${CMD_INPUT})
-# ${CMD_OUTPUT}: program output (vtools align --output ${CMD_OUTPUT})
-# ${INPUT}: input file(s) of the current step
-# ${OUTPUT}: output file(s) of the current step
-# ${RESOURCE_DIR}: where the pipeline resource is located, which is
-#      defined as $local_resource/var_caller/$pipeline.
-#
-# If a : appears in ${}, the expression will be considered as a python lambda
-# function. For example,
-#
-#    ${INPUT: INPUT[:-3]} 
-#
-# will pass ${INPUT} to lambda function "lambda INPUT: INPUT[:-3]".
-#
-PipelineCommand = namedtuple('PipelineCommand', ['name', 'input', 'output',
-    'input_group', 'action', 'comment'])
+PipelineCommand = namedtuple('PipelineCommand', ['input', 'output',
+    'action', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -738,20 +687,16 @@ class PipelineDescription:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     if 'action' not in items:
                         raise ValueError('Missing item "action" in section {}.'.format(section))
-                    if 'name' not in items:
-                        raise ValueError('Missing item "name" in section {}.'.format(section))
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['name', 'input', 'output', 'action',
-                                'input_group', 'comment'] + defaults.keys():
+                        if item not in ['input', 'output', 'action', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. '
-                                'Only name, input, output, command, input_group, and comment are allowed.'
+                                'Only input, output, action, and comment are allowed.'
                                 .format(item, section))
-                    command = PipelineCommand(name=parser.get(section, 'name', vars=defaults) if 'name' in items else '',
+                    command = PipelineCommand(
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
                             output=parser.get(section, 'output', vars=defaults) if 'output' in items else '',
-                            input_group=parser.get(section, 'input_group', vars=defaults) if 'input_group' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                     # for example, cmd_idx = 5
@@ -780,7 +725,7 @@ class PipelineDescription:
                     raise ValueError('Invalid pipeline. Step {} is left unspecified.'
                         .format(idx+1))
                 if not cmd.action:
-                    raise ValueError('Missing or empty action for step {}'.format(cmd.name))
+                    raise ValueError('Missing or empty action for step {}'.format(idx + 1))
      
     def describe(self):
         print('Pipeline:      {}'.format(self.name))
