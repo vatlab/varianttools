@@ -94,16 +94,20 @@ opt_gatk_applyrecalibration_snv=
 opt_gatk_applyrecalibration_indel=
 
 [init_1]
-action=CheckCommand('bwa'), CheckCommand('samtools')
-comment=Check existence of commands bwa and samtools
+action=CheckCommands(['bwa', 'samtools', 'java'])
+comment=Check existence of commands bwa, samtools and java
 
 [init_2]
+action=CheckJavaClasses(['SortSam.jar', 'GenomeAnalysisTK.jar'])
+comment=Check existence of class files for Picard and GATK
+
+[init_3]
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.amb
 action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}', working_dir='${RESOURCE_DIR}')
 comment=Build bwa index for build hg19 of reference genome
 
-[init_3]
+[init_4]
 input=ucsc.hg19.fasta
 output=ucsc.hg19.fasta.fai
 action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}', working_dir='${RESOURCE_DIR}')

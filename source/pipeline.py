@@ -78,29 +78,60 @@ class SequentialActions:
         return i
 
 
-class CheckCommand:
-    '''Check the existence of specified command and raise an error if the
-    command does not exist. This action returns specified output files
-    so it does not change the flow of files.'''
-    def __init__(self, cmd):
-        self.cmd = cmd
+class CheckCommands:
+    '''Check the existence of specified commands and raise an error if one of
+    the commands does not exist.'''
+    def __init__(self, cmds):
+        if type(cmds) == type(''):
+            self.cmd = [cmds]
+        else:
+            self.cmd = cmds
 
     def __call__(self, ifiles, ofiles):
         if not hasattr(shutil, 'which'):
             # if shutil.which does not exist, use subprocess...
-            try:
-                subprocess.call(self.cmd, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
-                env.logger.info('Command {} is located.'.format(self.cmd))
-                return ofiles
-            except:
+            for cmd in self.cmd:
+                try:
+                    subprocess.call(cmd, stdout=open(os.devnull, 'w'),
+                        stderr=open(os.devnull, 'w'))
+                    env.logger.info('Command {} is located.'.format(cmd))
+                except:
+                    raise RuntimeError('Command {} does not exist. Please '
+                        'install it and try again.'.format(self.cmd))
+            return ofiles
+        for cmd in self.cmd:
+            if shutil.which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
                     .format(self.cmd))
-        if shutil.which(cmd) is None:
-            raise RuntimeError('Command {} does not exist. Please install it and try again.'
-                .format(self.cmd))
+            else:
+                env.logger.info('Command {} is located.'.format(self.cmd))
+        return ofiles
+
+class CheckJavaClasses:
+    '''Check the existence of specified java class (.jar files) and raise an
+    error if one of the commands does not exist.'''
+    def __init__(self, classes):
+        if type(classes) == type(''):
+            self.java_class = [classes]
         else:
-            env.logger.info('Command {} is located.'.format(self.cmd))
-            return ofiles
+            self.java_class = classes
+
+    def __call__(self, ifiles, ofiles):
+        if 'CLASSPATH' not in os.environ:
+            raise RuntimeError('CLASSPATH is not defined.')
+        for java_class in self.java_class:
+            found = False
+            for path in os.environ['CLASSPATH'].split(os.pathsep):
+                if os.path.isfile(os.path.join(path, java_class)):
+                    found = True
+                    env.logger.info('Java class {} is located under {}.'
+                        .format(java_class, path))
+                    break
+            #
+            if not found:
+                raise RuntimeError('Cannot locate {} from environment variable CLASSPATH.'
+                    .format(java_class))
+        return ofiles
 
 
 # NOTE:
