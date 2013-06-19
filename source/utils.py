@@ -563,7 +563,7 @@ def hasCommand(cmd):
     return True
 
 
-def runCommand(cmd, instream = None, msg = '', upon_succ=None):
+def runCommand(cmd, instream = None, msg = ''):
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
     try:
@@ -591,10 +591,6 @@ def runCommand(cmd, instream = None, msg = '', upon_succ=None):
                     sys.stderr.write(msg + '\n')
     except OSError as e:
         raise OSError ("Execution of command '{0}' failed: {1}".format(cmd, e))
-    # everything is OK
-    if upon_succ:
-        # call the function (upon_succ) using others as parameters.
-        upon_succ[0](*(upon_succ[1:]))
     return out
 
 
