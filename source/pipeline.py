@@ -42,7 +42,8 @@ import platform
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadFile, downloadURL, \
-    existAndNewerThan, elapsed_time, run_command, wait_all, TEMP
+    existAndNewerThan, elapsed_time, run_command, wait_all, TEMP, \
+    decompressIfNeeded
     
 from .project import PipelineDescription, Project
 
@@ -54,9 +55,12 @@ except ImportError as e:
 
 
 class SequentialAction:
+    '''Define an action that calls a list of actions, specified by Action1,
+    Action2 etc. The input of the first Action is ${INPUT} (for the first
+    action), or the output of the previous action. The output of the last
+    action becomes the output of the action sequence, or $OUTPUT if the last
+    action does not return any output.'''
     def __init__(self, actions):
-        '''Define an action that calls a list of actions, specified
-        by Action1, Action2.'''
         self.actions = []
         for a in actions:
             if hasattr(a, '__call__'):
@@ -64,63 +68,372 @@ class SequentialAction:
             else:
                 self.actions.append(a)
 
-    def __call__(self, input_files, output_files):
+    def __call__(self, ifiles, ofiles):
+        i = ifiles
+        o = ofiles
         for a in self.actions:
-            if a(input_files, output_files):
-                raise RuntimeError('Execution of action failed')
-        return 0
+            # the input of the next action is the output of the
+            # previous action.
+            i = a(i, ofiles)
+        # return the output of the last action
+        return i
 
-class RunCommand:
-    def __init__(self, cmd, working_dir=None):
-        self.cmd = cmd
-        self.working_dir = working_dir
-
-    def __call__(self, input_files, output_files):
-        # substitute cmd by input_files and output_files
-        pass
 
 class CheckCommand:
+    '''Check the existence of specified command and raise an error if the
+    command does not exist. This action returns specified output files
+    so it does not change the flow of files.'''
     def __init__(self, cmd):
         self.cmd = cmd
 
-    def __call__(self, input_files, output_files):
+    def __call__(self, ifiles, ofiles):
         if not hasattr(shutil, 'which'):
             # if shutil.which does not exist, use subprocess...
             try:
                 subprocess.call(cmd, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
-                return 0
+                return ofiles
             except:
-                env.logger.error('Command {} does not exist. Please install it and try again.'
+                raise RuntimeError('Command {} does not exist. Please install it and try again.'
                     .format(cmd))
-                return 1
+                return ofiles
         if shutil.which(cmd) is None:
-            env.logger.error('Command {} does not exist. Please install it and try again.'
+            raise RuntimeError('Command {} does not exist. Please install it and try again.'
                 .format(cmd))
-            return 1
+            return ofiles
+
+
+# NOTE:
+#   subprocess.PIPE cannot be used for NGS commands because they tend to send
+#   a lot of progress output to stderr, which might block PIPE and cause the
+#   command itself to fail, or stall (which is even worse).
+#
+JOB = namedtuple('JOB', 'proc cmd upon_succ start_time stdout stderr name')
+class RunCommand:
+    def __init__(self, cmd, working_dir=None):
+        '''This action execute the specified command under the
+        specified working directory, and return specified ofiles.
+        '''
+        self.cmd = cmd
+        self.working_dir = working_dir
+        running_jobs = []
+
+    def elapsed_time(self, start):
+        '''Return the elapsed time in human readable format since start time'''
+        second_elapsed = int(time.time() - start)
+        days_elapsed = second_elapsed // 86400
+        return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
+            time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
+     
+    #
+    # this command duplicate with runCommand, will merge them later on.
+    def run_command(self, cmd, name=None, upon_succ=None, wait=True):
+        '''Call an external command, raise an error if it fails.
+        If upon_succ is specified, the specified function and parameters will be
+        evalulated after the job has been completed successfully.
+        If a name is given, stdout and stderr will be sent to name.out and 
+        name.err under env.WORKING_DIR. Otherwise, stdout and stderr will be
+        ignored (send to /dev/null).
+        '''
+        # merge mulit-line command into one line and remove extra white spaces
+        cmd = ' '.join(cmd.split())
+        if name is None:
+            try:
+                proc_out = subprocess.DEVNULL
+                proc_err = subprocess.DEVNULL
+            except:
+                # subprocess.DEVNULL was introduced in Python 3.3
+                proc_out = open(os.devnull, 'w')
+                proc_err = open(os.devnull, 'w')
+        else:
+            name = name.replace('/', '_')
+            proc_out = open(os.path.join(env.WORKING_DIR, name + '.out'), 'w')
+            proc_err = open(os.path.join(env.WORKING_DIR, name + '.err'), 'w')
+        if wait or env.jobs == 1:
+            try:
+                s = time.time()
+                env.logger.info('Running {}'.format(cmd))
+                proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+                retcode = proc.wait()
+                if name is not None:
+                    proc_out.close()
+                    proc_err.close()
+                if retcode < 0:
+                    env.logger.error('Command {} was terminated by signal {} after executing {}'
+                        .format(cmd, -retcode, elapsed_time(s)))
+                    sys.exit(1)
+                elif retcode > 0:
+                    if name is not None:
+                        with open(os.path.join(env.WORKING_DIR, name + '.err')) as err:
+                            for line in err.read().split('\n')[-20:]:
+                                env.logger.error(line)
+                    env.logger.error("Command {} returned {} after executing {}"
+                        .format(cmd, retcode, elapsed_time(s)))
+                    sys.exit(1)
+                env.logger.info('Command {} completed successfully in {}'
+                    .format(cmd, elapsed_time(s)))
+            except OSError as e:
+                env.logger.error("Execution of command {} failed: {}".format(cmd, e))
+                sys.exit(1)
+            # everything is OK
+            if upon_succ:
+                # call the function (upon_succ) using others as parameters.
+                upon_succ[0](*(upon_succ[1:]))
+        else:
+            # wait for empty slot to run the job
+            while True:
+                if poll_jobs() >= env.jobs:
+                    time.sleep(5)
+                else:
+                    break
+            # there is a slot, start running
+            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+            global running_jobs
+            running_jobs.append(JOB(proc=proc, cmd=cmd, upon_succ=upon_succ,
+                start_time=time.time(), stdout=proc_out, stderr=proc_err, name=name))
+            env.logger.info('Running {}'.format(cmd))
+
+    def poll_jobs(self):
+        '''check the number of running jobs.'''
+        count = 0
+        global running_jobs
+        for idx, job in enumerate(running_jobs):
+            if job is None:
+                continue
+            ret = job.proc.poll()
+            if ret is None:  # still running
+                count += 1
+                continue
+            #
+            # job completed, close redirected stdout and stderr
+            # for python 3.3. where job.stdout is DEVNULL, this will 
+            # fail so try/except is needed.
+            try:
+                job.stdout.close()
+                job.stderr.close()
+            except:
+                pass
+            #
+            if ret < 0:
+                env.logger.error("Command {} was terminated by signal {} after executing {}"
+                    .format(job.cmd, -ret, elapsed_time(job.start_time)))
+                sys.exit(1)
+            elif ret > 0:
+                if job.name is not None:
+                    with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
+                        for line in err.read().split('\n')[-50:]:
+                            env.logger.error(line)
+                env.logger.error('Execution of command {} failed after {} (return code {}).'
+                    .format(job.cmd, elapsed_time(job.start_time), ret))
+                sys.exit(1)
+            else:
+                if job.name is not None:
+                    with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
+                        for line in err.read().split('\n')[-10:]:
+                            env.logger.info(line)
+                # finish up
+                if job.upon_succ:
+                    # call the upon_succ function
+                    job.upon_succ[0](*(job.upon_succ[1:]))
+                env.logger.info('Command {} completed successfully in {}'
+                    .format(job.cmd, elapsed_time(job.start_time)))
+                #
+                running_jobs[idx] = None
+        return count
+
+    def wait_all(self):
+        '''Wait for all pending jobs to complete'''
+        while poll_jobs() > 0:
+            # sleep ten seconds before checking job status again.
+            time.sleep(10)
+        self.running_jobs = []
+
+    def __call__(self, ifiles, ofiles):
+        # substitute cmd by input_files and output_files
+        pass
+
 
 class GetFastqFiles:
+    '''This action gets a list of fastq files from input file, decompressing
+    input files (.tar.gz, .zip, etc) if necessary. Non-fastq files are ignored
+    with a warning message. '''
     def __init__(self):
         pass
 
-    def __call__(self, input_files, output_files):
+    def _decompress(self, ifile):
+        '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
+        it to dest_dir (current directory if unspecified), and return a list of files.
+        Uncompressed files will be returned untouched. If the destination files exist
+        and newer, this function will return immediately.'''
+        mode = None
+        if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
+            mode = 'r:gz'
+        elif filename.lower().endswith('.tbz2') or filename.lower().endswith('.tgz'):
+            mode = 'r:bz2'
+        elif filename.lower().endswith('.tar'):
+            mode = 'r'
+        elif filename.lower().endswith('.gz'):
+            dest_file = os.path.join('.' if dest_dir is None else dest_dir,
+                os.path.basename(filename)[:-3])
+            if existAndNewerThan(ofiles=dest_file, ifiles=filename):
+                env.logger.warning('Using existing decompressed file {}'.format(dest_file))
+            else:
+                env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
+                with gzip.open(filename, 'rb') as gzinput, open(TEMP(dest_file), 'wb') as output:
+                    content = gzinput.read(10000000)
+                    while content:
+                        output.write(content)
+                        content = gzinput.read(10000000)
+                # only rename the temporary file to the right one after finishing everything
+                # this avoids corrupted files
+                os.rename(TEMP(dest_file), dest_file)
+            return [dest_file]
+        elif filename.lower().endswith('.bz2'):
+            dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
+            if existAndNewerThan(ofiles=dest_file, ifiles=filename):
+                env.logger.warning('Using existing decompressed file {}'.format(dest_file))
+            else:
+                env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
+                with bz2.open(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
+                    content = bzinput.read(10000000)
+                    while content:
+                        output.write(content)
+                        content = bzinput.read(10000000)
+                # only rename the temporary file to the right one after finishing everything
+                # this avoids corrupted files
+                os.rename(TEMP(dest_file), dest_file)
+            return [dest_file]
+        elif filename.lower().endswith('.zip'):
+            bundle = zipfile.ZipFile(filename)
+            dest_dir = '.' if dest_dir is None else dest_dir
+            bundle.extractall(dest_dir)
+            env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
+            return [os.path.join(dest_dir, name) for name in bundle.namelist()]
+        #
+        # if it is a tar file
+        if mode is not None:
+            env.logger.info('Extracting fastq sequences from tar file {}'
+                .format(filename))
+            #
+            # MOTE: open a compressed tar file can take a long time because it needs to scan
+            # the whole file to determine its content. I am therefore creating a manifest
+            # file for the tar file in the dest_dir, and avoid re-opening when the tar file
+            # is processed again.
+            manifest = os.path.join( '.' if dest_dir is None else dest_dir,
+                os.path.basename(filename) + '.manifest')
+            all_extracted = False
+            dest_files = []
+            if existAndNewerThan(ofiles=manifest, ifiles=filename):
+                all_extracted = True
+                for f in [x.strip() for x in open(manifest).readlines()]:
+                    dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
+                    if existAndNewerThan(ofiles=dest_file, ifiles=filename):
+                        dest_files.append(dest_file)
+                        env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                    else:
+                        all_extracted = False
+            #
+            if all_extracted:
+                return dest_files
+            #
+            # create a temporary directory to avoid corrupted file due to interrupted decompress
+            try:
+                os.mkdir('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+            except:
+                # directory might already exist
+                pass
+            #
+            dest_files = []
+            with tarfile.open(filename, mode) as tar:
+                files = tar.getnames()
+                # save content to a manifest
+                with open(manifest, 'w') as manifest:
+                    for f in files:
+                        manifest.write(f + '\n')
+                for f in files:
+                    # if there is directory structure within tar file, decompress all to the current directory
+                    dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
+                    dest_files.append(dest_file)
+                    if existAndNewerThan(ofiles=dest_file, ifiles=filename):
+                        env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                    else:
+                        env.logger.info('Extracting {} to {}'.format(f, dest_file))
+                        tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+                        # move to the top directory with the right name only after the file has been properly extracted
+                        shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
+                # set dest_files to the same modification time. This is used to
+                # mark the right time when the files are created and avoid the use
+                # of archieved but should-not-be-used files that might be generated later
+                [os.utime(x, None) for x in dest_files]
+            return dest_files
+        # return source file if 
+        return [filename]
+        
+    def __call__(self, ifiles, ofiles):
         # decompress input files and return a list of output files
         filenames = []
-        for filename in input_files:
-            if filename.lower().endswith('.bam') or filename.lower().endswith('.sam'):
-                filenames.extend(self.picard.bam2fastq(filename))
-                continue
-            for fastq_file in decompress(filename, env.WORKING_DIR):
+        for filename in ifiles:
+            for fastq_file in self._decompress(filename, env.WORKING_DIR):
                 try:
                     with open(fastq_file) as fastq:
                         line = fastq.readline()
                         if not line.startswith('@'):
-                            raise ValueError('Wrong FASTA file {}'.foramt(fastq_file))
+                            env.logger.warning('Wrong FASTA file {}'.format(fastq_file))
+                            continue
                     filenames.append(fastq_file)
                 except Exception as e:
-                    env.logger.error('Ignoring non-fastq file {}: {}'
+                    env.logger.warning('Ignoring non-fastq file {}: {}'
                         .format(fastq_file, e))
         filenames.sort()
         return filenames        
+
+
+class CountUnmappedReads:
+    '''This action reads the input files in sam format and count the total
+    number of reads and number of unmapped reads. It raises a RuntimeError
+    if the proportion of unmapped reads exceeds the specified cutoff value
+    (default to 0.2). This action writes a count file to specified output
+    files and read from this file directly if the file already exists.'''
+    def __init__(self, cutoff=0.2):
+        self.cutoff = cutoff
+
+    def __call__(self, ifiles, ofiles):
+        #
+        # count total reads and unmapped reads
+        #
+        # The previous implementation uses grep and wc -l, but
+        # I cannot understand why these commands are so slow...
+        #
+        targets = ['{}.counts'.format(x) for x in sam_files]
+        if not existAndNewerThan(ofiles=targets, ifiles=sam_files):
+            for sam_file, target_file in zip(sam_files, targets):
+                env.logger.info('Counting unmapped reads in {}'.format(sam_file))
+                unmapped_count = 0
+                total_count = 0
+                with open(sam_file) as sam:
+                   for line in sam:
+                       total_count += 1
+                       if 'XT:A:N' in line:
+                           unmapped_count += 1
+                with open(target_file, 'w') as target:
+                    target.write('{}\n{}\n'.format(unmapped_count, total_count))
+        #
+        counts = []
+        for count_file in targets:
+            with open(count_file) as cnt:
+                unmapped = int(cnt.readline())
+                total = int(cnt.readline())
+                counts.append((unmapped, total))
+        return counts
+        for f,c in zip(sam_files, counts):
+            # more than 40% unmapped
+            if c[1] == 0 or c[0]/c[1] > 0.4:
+                env.logger.error('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
+                    .format(f, c[0], c[1], 0 if c[1] == 0 else (100*(1 - c[0]/c[1]))))
+                sys.exit(1)
+            else:
+                env.logger.info('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
+                    .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
+        # 
 
 
 class Pipeline:
@@ -163,7 +476,7 @@ class Pipeline:
             #
             if filename.endswith('.gz') and not filename.endswith('tar.gz'):
                 if not existAndNewerThan(ofiles=filename[:-3], ifiles=filename):
-                    decompress(filename, '.')
+                    decompressIfNeeded(filename, inplace=False)
         os.chdir(saved_dir)
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'
@@ -184,8 +497,6 @@ class Pipeline:
 # Utility functions
 #
 ###############################################################################
-
-
 def downloadFile(URL, dest, quiet=False):
     '''Download a file from URL and save to dest'''
     # for some strange reason, passing wget without shell=True can fail silently.
@@ -248,116 +559,7 @@ def fastqVersion(fastq_file):
         # no option is needed for bwa
         return 'Sanger'
 
-def decompress(filename, dest_dir=None):
-    '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
-    it to dest_dir (current directory if unspecified), and return a list of files.
-    Uncompressed files will be returned untouched. If the destination files exist
-    and newer, this function will return immediately.'''
-    mode = None
-    if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
-        mode = 'r:gz'
-    elif filename.lower().endswith('.tbz2') or filename.lower().endswith('.tgz'):
-        mode = 'r:bz2'
-    elif filename.lower().endswith('.tar'):
-        mode = 'r'
-    elif filename.lower().endswith('.gz'):
-        dest_file = os.path.join('.' if dest_dir is None else dest_dir,
-            os.path.basename(filename)[:-3])
-        if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-            env.logger.warning('Using existing decompressed file {}'.format(dest_file))
-        else:
-            env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with gzip.open(filename, 'rb') as gzinput, open(TEMP(dest_file), 'wb') as output:
-                content = gzinput.read(10000000)
-                while content:
-                    output.write(content)
-                    content = gzinput.read(10000000)
-            # only rename the temporary file to the right one after finishing everything
-            # this avoids corrupted files
-            os.rename(TEMP(dest_file), dest_file)
-        return [dest_file]
-    elif filename.lower().endswith('.bz2'):
-        dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
-        if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-            env.logger.warning('Using existing decompressed file {}'.format(dest_file))
-        else:
-            env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-            with bz2.open(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
-                content = bzinput.read(10000000)
-                while content:
-                    output.write(content)
-                    content = bzinput.read(10000000)
-            # only rename the temporary file to the right one after finishing everything
-            # this avoids corrupted files
-            os.rename(TEMP(dest_file), dest_file)
-        return [dest_file]
-    elif filename.lower().endswith('.zip'):
-        bundle = zipfile.ZipFile(filename)
-        dest_dir = '.' if dest_dir is None else dest_dir
-        bundle.extractall(dest_dir)
-        env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
-        return [os.path.join(dest_dir, name) for name in bundle.namelist()]
-    #
-    # if it is a tar file
-    if mode is not None:
-        env.logger.info('Extracting fastq sequences from tar file {}'
-            .format(filename))
-        #
-        # MOTE: open a compressed tar file can take a long time because it needs to scan
-        # the whole file to determine its content. I am therefore creating a manifest
-        # file for the tar file in the dest_dir, and avoid re-opening when the tar file
-        # is processed again.
-        manifest = os.path.join( '.' if dest_dir is None else dest_dir,
-            os.path.basename(filename) + '.manifest')
-        all_extracted = False
-        dest_files = []
-        if existAndNewerThan(ofiles=manifest, ifiles=filename):
-            all_extracted = True
-            for f in [x.strip() for x in open(manifest).readlines()]:
-                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
-                if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-                    dest_files.append(dest_file)
-                    env.logger.warning('Using existing extracted file {}'.format(dest_file))
-                else:
-                    all_extracted = False
-        #
-        if all_extracted:
-            return dest_files
-        #
-        # create a temporary directory to avoid corrupted file due to interrupted decompress
-        try:
-            os.mkdir('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
-        except:
-            # directory might already exist
-            pass
-        #
-        dest_files = []
-        with tarfile.open(filename, mode) as tar:
-            files = tar.getnames()
-            # save content to a manifest
-            with open(manifest, 'w') as manifest:
-                for f in files:
-                    manifest.write(f + '\n')
-            for f in files:
-                # if there is directory structure within tar file, decompress all to the current directory
-                dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
-                dest_files.append(dest_file)
-                if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-                    env.logger.warning('Using existing extracted file {}'.format(dest_file))
-                else:
-                    env.logger.info('Extracting {} to {}'.format(f, dest_file))
-                    tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
-                    # move to the top directory with the right name only after the file has been properly extracted
-                    shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
-            # set dest_files to the same modification time. This is used to
-            # mark the right time when the files are created and avoid the use
-            # of archieved but should-not-be-used files that might be generated later
-            [os.utime(x, None) for x in dest_files]
-        return dest_files
-    # return source file if 
-    return [filename]
-   
-   
+
 def getReadGroup(fastq_filename, output_bam):
     '''Get read group information from names of fastq files.'''
     # Extract read group information from filename such as
@@ -427,34 +629,6 @@ def getReadGroup(fastq_filename, output_bam):
     return rg
 
 
-def countUnmappedReads(sam_files):
-    #
-    # count total reads and unmapped reads
-    #
-    # The previous implementation uses grep and wc -l, but
-    # I cannot understand why these commands are so slow...
-    #
-    targets = ['{}.counts'.format(x) for x in sam_files]
-    if not existAndNewerThan(ofiles=targets, ifiles=sam_files):
-        for sam_file, target_file in zip(sam_files, targets):
-            env.logger.info('Counting unmapped reads in {}'.format(sam_file))
-            unmapped_count = 0
-            total_count = 0
-            with open(sam_file) as sam:
-               for line in sam:
-                   total_count += 1
-                   if 'XT:A:N' in line:
-                       unmapped_count += 1
-            with open(target_file, 'w') as target:
-                target.write('{}\n{}\n'.format(unmapped_count, total_count))
-    #
-    counts = []
-    for count_file in targets:
-        with open(count_file) as cnt:
-            unmapped = int(cnt.readline())
-            total = int(cnt.readline())
-            counts.append((unmapped, total))
-    return counts
 
 def isBamPairedEnd(input_file):
     # we need pysam for this but pysam does not yet work for Python 3.3.
