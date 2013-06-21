@@ -456,12 +456,17 @@ class Pipeline:
         #
         # resource directory
         #
-        self.pipeline_resource = os.path.join(os.path.expanduser(
-            env.local_resource), 'var_caller', self.pipeline.name)
+        if self.pipeline.resource_dir:
+            if os.path.isabs(os.path.expanduser(self.pipeline.resource_dir)):
+                self.pipeline_resource = os.path.expanduser(self.pipeline.resource_dir)
+            else:
+                self.pipeline_resource = os.path.join(os.path.expanduser(
+                    env.local_resource), 'pipeline_resource', self.pipeline.resource_dir)
+        else:
+            self.pipeline_resource = os.path.join(os.path.expanduser(
+                    env.local_resource), 'pipeline_resource', self.pipeline.name)
         try:
             if not os.path.isdir(self.pipeline_resource):
-                sys.stderr.write('Creating pipeline resource directory {}\n'
-                    .format(self.pipeline_resource))
                 os.makedirs(self.pipeline_resource)
         except:
             raise RuntimeError('Failed to create pipeline resource directory '

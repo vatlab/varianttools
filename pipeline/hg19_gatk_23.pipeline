@@ -8,6 +8,7 @@
 description=A pipeline to call genetic variants from fastq files using BWA
     and GATK best practice.
 # resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
+resource_dir=gatk23_hg19
 resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
   ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
   ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
@@ -93,27 +94,36 @@ opt_gatk_applyrecalibration=--ts_filter_level 99.9
 opt_gatk_applyrecalibration_snv=
 opt_gatk_applyrecalibration_indel=
 
-[init_10]
+[align_10]
 action=CheckCommands(['bwa', 'samtools', 'java'])
 comment=Check existence of commands bwa, samtools and java
 
-[init_20]
+[align_20]
 action=CheckJavaClasses(['SortSam.jar', 'GenomeAnalysisTK.jar'])
 comment=Check existence of class files for Picard and GATK
 
-[init_30]
+[align_30]
 input=${RESOURCE_DIR}/ucsc.hg19.fasta
 action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}',
     working_dir='${RESOURCE_DIR}', 
     output='${RESOURCE_DIR}/ucsc.hg19.fasta.amb')
 comment=Build bwa index for build hg19 of reference genome
 
-[init_40]
+[align_40]
 input=${RESOURCE_DIR}/ucsc.hg19.fasta
 action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}',
     working_dir='${RESOURCE_DIR}',
     output='${RESOURCE_DIR}/ucsc.hg19.fasta.fai')
 comment=Build samtools index for build hg19 of reference genome
+
+[align_100]
+action=RunCommand("java %(opt_java)s -jar SamToFastq.jar %(opt_picard_samtofastq)s
+    INPUT=${INPUT} 
+    FASTQ=${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
+    SECOND_END_FASTQ=${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}",
+    working_dir='${CACHE_DIR}')
+comment=Convert bam files to paired fastq files if the input is in bam/sam format.
+    Other input files are returned untouched.
 
 [align_1]
 action=GetFastqFiles()

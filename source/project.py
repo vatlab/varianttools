@@ -614,6 +614,7 @@ class PipelineDescription:
         '''Pipeline configuration file'''
         self.description = None
         self.resource = []
+        self.resource_dir = None
         self.init_steps = []
         self.align_steps = []
         self.call_steps = []
@@ -679,6 +680,8 @@ class PipelineDescription:
                         self.description = item[1]
                     elif item[0] == 'resource':
                         self.resource = [x.strip() for x in item[1].split('\n')]
+                    elif item[0] == 'resource_dir':
+                        self.resource_dir = item[1]
             else:
                 if section.split('_')[0] not in ('init', 'align', 'call') or \
                     not section.split('_')[-1].isdigit():
