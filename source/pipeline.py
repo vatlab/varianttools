@@ -53,42 +53,24 @@ except ImportError as e:
     hasPySam = False
 
 ###################################
+
 class GroupInput:
-    def __init__(self, group_by='single'):
+    '''Select input files of certain types, group them, and send input files
+    to action. filetype can be all (all input file types), fastq (check 
+    content of files), or one or more file extensions (e.g. ['sam', 'bam']).
+    Eligible files are by default sent individually (group_by='single') to 
+    action (${INPUT} is a list of a single file), but can also be sent all
+    together (group_by='all', ${INPUT} equals to ${INPUT#} where # is the
+    index of step) or in pairs (group_by='paired', e.g. filename_1.txt and
+    filename_2.txt). Unselected files are by default passed directly as 
+    output of a step.'''
+    def __init__(self, group_by='single', filetypes='all', pass_unselected=True):
         self.group_by = group_by
-
-    def __call__(self, ifiles):
-        if self.group_by == 'single':
-            return [[x] for x in ifiles], []
-        elif self.group_by == 'all':
-            return [ifiles], []
-        elif self.group_by == 'paired':
-            if len(ifiles) // 2 * 2 != len(ifiles):
-                raise RuntimeError('Cannot emit input files by pairs: odd number of input files {}'
-                    .format(', '.join(ifiles)))
-            ifiles.sort()
-            pairs = []
-            for idx in range(len(ifiles)//2):
-                f1 = ifiles[2*idx]
-                f2 = ifiles[2*idx + 1]
-                if len(f1) != len(f2):
-                    raise RuntimeError('Cannot emit input files by pairs: '
-                        'Filenames {}, {} are not paired'
-                        .format(f1, f2))
-                diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
-                if diff != [1]:
-                    raise RuntimeError('Cannot emit input files by pairs: '
-                        'Filenames {}, {} are not paired'
-                        .format(f1, f2))
-                pairs.append([f1, f2])
-            return pairs, []
-
-class SelectInput:
-    def __init__(self, filetypes, pass_unselected=True):
         if type(filetypes) == str:
             self.filetypes = [filetypes]
         else:
             self.filetypes = filetypes
+        self.pass_unselected = pass_unselected
 
     def _isFastq(self, filename):
         try:
@@ -104,18 +86,57 @@ class SelectInput:
         unselected = []
         for filename in ifiles:
             for t in self.filetypes:
+                if t == 'all':
+                    selected.append(filename)
+                    break
                 if t == 'fastq':
                     if self._isFastq(filename):
                         selected.append(filename)
                         break
-                else:
-                    if filename.lower().endswith('.' + t):
-                        selected.append(filename)
-                        break
-            if not selected or selected[-1] != filename:
+                if filename.lower().endswith('.' + t.lstrip('.').lower()):
+                    selected.append(filename)
+            if self.pass_unselected and (not selected or selected[-1] != filename):
                 unselected.append(filename)
-        return [selected], unselected
+        # 
+        if self.group_by == 'single':
+            return [[x] for x in selected], unselected
+        elif self.group_by == 'all':
+            return [selected], unselected
+        elif self.group_by == 'paired':
+            if len(selected) // 2 * 2 != len(selected):
+                raise RuntimeError('Cannot emit input files by pairs: odd number of input files {}'
+                    .format(', '.join(selected)))
+            selected.sort()
+            pairs = []
+            for idx in range(len(selected)//2):
+                f1 = selected[2*idx]
+                f2 = selected[2*idx + 1]
+                if len(f1) != len(f2):
+                    raise RuntimeError('Cannot emit input files by pairs: '
+                        'Filenames {}, {} are not paired'
+                        .format(f1, f2))
+                diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
+                if diff != [1]:
+                    raise RuntimeError('Cannot emit input files by pairs: '
+                        'Filenames {}, {} are not paired'
+                        .format(f1, f2))
+                pairs.append([f1, f2])
+            return pairs, unselected
         
+
+class SkipIfSingle:
+    '''Skip action if there is only one input file'''
+    def __init__(self, group_by='single'):
+        self.group_by = group_by
+
+    def __call__(self, ifiles):
+        if len(ifiles) <= 1:
+            return [], ifiles
+        elif group_by == 'single':
+            return [[x] for x in ifiles], []
+        elif group_by == 'all':
+            return [ifiles], []
+
 
 ###################################
 
@@ -172,31 +193,142 @@ class CheckCommands:
         return ifiles
 
 
-class CheckJavaClasses:
-    '''Check the existence of specified java class (.jar files) and raise an
-    error if one of the commands does not exist.'''
-    def __init__(self, classes):
-        if type(classes) == type(''):
-            self.java_class = [classes]
+class CheckFiles:
+    '''Check the existence of specified files and raise an
+    error if one of the files does not exist.'''
+    def __init__(self, files):
+        if type(files) == type(''):
+            self.files = [files]
         else:
-            self.java_class = classes
+            self.files = files
 
     def __call__(self, ifiles):
-        if 'CLASSPATH' not in os.environ:
-            raise RuntimeError('CLASSPATH is not defined.')
-        for java_class in self.java_class:
-            found = False
-            for path in os.environ['CLASSPATH'].split(os.pathsep):
-                if os.path.isfile(os.path.join(path, java_class)):
-                    found = True
-                    env.logger.info('Java class {} is located under {}.'
-                        .format(java_class, path))
-                    break
-            #
-            if not found:
-                raise RuntimeError('Cannot locate {} from environment variable CLASSPATH.'
-                    .format(java_class))
+        for f in self.files:
+            if os.path.isfile(f):
+                env.logger.info('{} is located'.format(f))
+            else:
+                raise RuntimeError('Cannot locate {}.'.format(f))
         return ifiles
+
+
+class CheckFastqVersion:
+    def __init__(self, output):
+        self.output = output
+
+    def __call__(self, fastq_file):
+        '''Detect the version of input fastq file. This can be very inaccurate'''
+        with open(self.output, 'w') as aln_param:
+            #
+            # This function assumes each read take 4 lines, and the last line contains
+            # quality code. It collects about 1000 quality code and check their range,
+            # and use it to determine if it is Illumina 1.3+
+            #
+            qual_scores = ''
+            with open(fastq_file[0]) as fastq:
+                while len(qual_scores) < 1000:
+                    try:
+                        line = fastq.readline()
+                    except Exception as e:
+                        raise RuntimeError('Failed to read fastq file {}: {}'
+                            .format(fastq_file, e))
+                    if not line.startswith('@'):
+                        raise ValueError('Wrong FASTA file {}'.format(fastq_file))
+                    line = fastq.readline()
+                    line = fastq.readline()
+                    if not line.startswith('+'):
+                        env.logger.warning(
+                            'Suspiciout FASTA file {}: third line does not start with "+".'
+                            .foramt(fastq_file))
+                        return 
+                    line = fastq.readline()
+                    qual_scores += line.strip()
+            #
+            min_qual = min([ord(x) for x in qual_scores])
+            max_qual = max([ord(x) for x in qual_scores])
+            env.logger.debug('FASTA file with quality score ranging {} to {}'
+                .format(min_qual, max_qual))
+            # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
+            # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
+            if min_qual >= 64 or max_qual > 90:
+                # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
+                aln_param.write('-I')
+        return self.output
+
+
+class GuessReadGroup:
+    def __init__(self, bamfile, rgfile):
+        self.output_bam = bamfile
+        self.rg_output = rgfile
+
+    def __call__(self, fastq_filename):
+        '''Get read group information from names of fastq files.'''
+        # Extract read group information from filename such as
+        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
+        # according to the lane that produced them and whether they
+        # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
+        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
+        # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
+        #
+        # This function return a read group string like '@RG\tID:foo\tSM:bar'
+        #
+        # ID* Read group identifier. Each @RG line must have a unique ID. The
+        # value of ID is used in the RG
+        #     tags of alignment records. Must be unique among all read groups
+        #     in header section. Read group
+        #     IDs may be modifid when merging SAM fies in order to handle collisions.
+        # CN Name of sequencing center producing the read.
+        # DS Description.
+        # DT Date the run was produced (ISO8601 date or date/time).
+        # FO Flow order. The array of nucleotide bases that correspond to the
+        #     nucleotides used for each
+        #     flow of each read. Multi-base flows are encoded in IUPAC format, 
+        #     and non-nucleotide flows by
+        #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
+        # KS The array of nucleotide bases that correspond to the key sequence
+        #     of each read.
+        # LB Library.
+        # PG Programs used for processing the read group.
+        # PI Predicted median insert size.
+        # PL Platform/technology used to produce the reads. Valid values: 
+        #     CAPILLARY, LS454, ILLUMINA,
+        #     SOLID, HELICOS, IONTORRENT and PACBIO.
+        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
+        #     SOLiD). Unique identifier.
+        # SM Sample. Use pool name where a pool is being sequenced.
+        #
+        with open(self.rg_output, 'w') as rg_output:
+            filename = os.path.basename(fastq_filename[0])
+            output = os.path.basename(self.output_bam)
+            # sample name is obtained from output filename without file extension
+            SM = output.split('.', 1)[0]
+            # always assume ILLUMINA for this script and BWA for processing
+            PL = 'ILLUMINA'  
+            PG = 'BWA'
+            #
+            # PU is for flowcell and lane information, ID should be unique for each
+            #     readgroup
+            # ID is temporarily obtained from input filename without exteion
+            ID = filename.split('.')[0]
+            # try to get lan information from s_x_1/2 pattern
+            try:
+                PU = re.search('s_([^_]+)_', filename).group(1)
+            except AttributeError:
+                env.logger.warning('Failed to guess lane information from filename {}'
+                    .format(filename))
+                PU = 'NA'
+            # try to get some better ID
+            try:
+                # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
+                m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
+                ID = '{}.{}'.format(m.group(1), m.group(4))
+            except AttributeError as e:
+                env.logger.warning('Input fasta filename {} does not match a known'
+                    ' pattern. ID is directly obtained from filename.'.format(filename))
+            #
+            rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
+            env.logger.info('Setting read group tag to {}'.format(rg))
+            rg_output.write(rg)
+        return self.rg_output
 
 
 # NOTE:
@@ -205,12 +337,123 @@ class CheckJavaClasses:
 #   command itself to fail, or stall (which is even worse).
 #
 JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr output')
+running_jobs = []
+max_running_jobs = 1
+
+def elapsed_time(start):
+    '''Return the elapsed time in human readable format since start time'''
+    second_elapsed = int(time.time() - start)
+    days_elapsed = second_elapsed // 86400
+    return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
+        time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
+ 
+def run_command(cmd, output=None, wait=True):
+    '''Call an external command, raise an error if it fails.
+    '''
+    global running_jobs
+    if not output:
+        # subprocess.DEVNULL was introduced in Python 3.3
+        proc_out = open(os.devnull, 'w')
+        proc_err = open(os.devnull, 'w')
+    else:
+        proc_out = open(output[0] + '.out_{}'.format(os.getpid()), 'w')
+        proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
+    if wait or max_running_jobs == 1:
+        try:
+            s = time.time()
+            env.logger.info('Running {}'.format(cmd))
+            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+            retcode = proc.wait()
+            proc_out.close()
+            proc_err.close()
+            if retcode < 0:
+                raise RuntimeError('Command {} was terminated by signal {} after executing {}'
+                    .format(cmd, -retcode, elapsed_time(s)))
+            elif retcode > 0:
+                if output:
+                    with open(output[0] + '.err_{}'.format(os.getpid())) as err:
+                        for line in err.read().split('\n')[-20:]:
+                            env.logger.error(line)
+                raise RuntimeError("Command {} returned {} after executing {}"
+                    .format(cmd, retcode, elapsed_time(s)))
+            if output:
+                with open(output[0] + '.exe_info', 'w') as exe_info:
+                    exe_info.write('{}\nStart: {}\nEnd: {}\n'
+                        .format(cmd, time.asctime(time.localtime(s)), time.asctime(time.localtime())))
+            env.logger.info('Command {} completed successfully in {}'
+                .format(cmd, elapsed_time(s)))
+        except OSError as e:
+            env.logger.error("Execution of command {} failed: {}".format(cmd, e))
+            sys.exit(1)
+    else:
+        # wait for empty slot to run the job
+        while True:
+            if poll_jobs() >= max_running_jobs:
+                time.sleep(5)
+            else:
+                break
+        # there is a slot, start running
+        proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+        running_jobs.append(JOB(proc=proc, cmd=cmd, 
+            start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
+        env.logger.info('Running {}'.format(cmd))
+
+def poll_jobs():
+    '''check the number of running jobs.'''
+    global running_jobs
+    count = 0
+    for idx, job in enumerate(running_jobs):
+        if job is None:
+            continue
+        ret = job.proc.poll()
+        if ret is None:  # still running
+            count += 1
+            continue
+        #
+        # job completed, close redirected stdout and stderr
+        job.stdout.close()
+        job.stderr.close()
+        #
+        if ret < 0:
+            raise RuntimeError("Command {} was terminated by signal {} after executing {}"
+                .format(job.cmd, -ret, elapsed_time(job.start_time)))
+        elif ret > 0:
+            if job.output:
+                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
+                    for line in err.read().split('\n')[-50:]:
+                        env.logger.error(line)
+            raise RuntimeError('Execution of command {} failed after {} (return code {}).'
+                .format(job.cmd, elapsed_time(job.start_time), ret))
+        else:
+            if job.output:
+                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
+                    for line in err.read().split('\n')[-10:]:
+                        env.logger.info(line)
+                with open(job.output[0] + '.exe_info', 'w') as exe_info:
+                    exe_info.write('{}\nStart: {}\nEnd:{}\n'
+                        .format(job.cmd, job.start_time, time.time()))
+            env.logger.info('Command {} completed successfully in {}'
+                .format(job.cmd, elapsed_time(job.start_time)))
+            #
+            running_jobs[idx] = None
+    return count
+
+def wait_all():
+    '''Wait for all pending jobs to complete'''
+    global running_jobs
+    while poll_jobs() > 0:
+        # sleep ten seconds before checking job status again.
+        time.sleep(10)
+    running_jobs = []
+
+
 class RunCommand:
-    def __init__(self, cmd='', working_dir=None, output=None):
+    def __init__(self, cmd='', working_dir=None, output=[]):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         '''
-        self.cmd = cmd
+        # merge mulit-line command into one line and remove extra white spaces
+        self.cmd = ' '.join(cmd.split())
         if not self.cmd:
             raise RuntimeError('Invalid command to execute: "{}"'.format(cmd))
         self.working_dir = working_dir
@@ -218,117 +461,22 @@ class RunCommand:
             self.output = [output]
         else:
             self.output = output
-        self.running_jobs = []
-
-    def elapsed_time(self, start):
-        '''Return the elapsed time in human readable format since start time'''
-        second_elapsed = int(time.time() - start)
-        days_elapsed = second_elapsed // 86400
-        return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
-            time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
-     
-    #
-    # this command duplicate with runCommand, will merge them later on.
-    def run_command(self, cmd, output=None, wait=True):
-        '''Call an external command, raise an error if it fails.
-        '''
-        # merge mulit-line command into one line and remove extra white spaces
-        cmd = ' '.join(cmd.split())
-        if not output:
-            # subprocess.DEVNULL was introduced in Python 3.3
-            proc_out = open(os.devnull, 'w')
-            proc_err = open(os.devnull, 'w')
-        else:
-            proc_out = open(output[0] + '.out', 'w')
-            proc_err = open(output[0] + '.err', 'w')
-        if wait or env.jobs == 1:
-            try:
-                s = time.time()
-                env.logger.info('Running {}'.format(cmd))
-                proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-                retcode = proc.wait()
-                proc_out.close()
-                proc_err.close()
-                if retcode < 0:
-                    raise RuntimeError('Command {} was terminated by signal {} after executing {}'
-                        .format(cmd, -retcode, elapsed_time(s)))
-                elif retcode > 0:
-                    if output:
-                        with open(output[0] + '.err') as err:
-                            for line in err.read().split('\n')[-20:]:
-                                env.logger.error(line)
-                    raise RuntimeError("Command {} returned {} after executing {}"
-                        .format(cmd, retcode, elapsed_time(s)))
-                env.logger.info('Command {} completed successfully in {}'
-                    .format(cmd, elapsed_time(s)))
-            except OSError as e:
-                env.logger.error("Execution of command {} failed: {}".format(cmd, e))
-                sys.exit(1)
-        else:
-            # wait for empty slot to run the job
-            while True:
-                if poll_jobs() >= env.jobs:
-                    time.sleep(5)
-                else:
-                    break
-            # there is a slot, start running
-            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-            self.running_jobs.append(JOB(proc=proc, cmd=cmd, 
-                start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
-            env.logger.info('Running {}'.format(cmd))
-
-    def poll_jobs(self):
-        '''check the number of running jobs.'''
-        count = 0
-        for idx, job in enumerate(self.running_jobs):
-            if job is None:
-                continue
-            ret = job.proc.poll()
-            if ret is None:  # still running
-                count += 1
-                continue
-            #
-            # job completed, close redirected stdout and stderr
-            job.stdout.close()
-            job.stderr.close()
-            #
-            if ret < 0:
-                raise RuntimeError("Command {} was terminated by signal {} after executing {}"
-                    .format(job.cmd, -ret, elapsed_time(job.start_time)))
-            elif ret > 0:
-                if job.output:
-                    with open(job.output[0] + '.err') as err:
-                        for line in err.read().split('\n')[-50:]:
-                            env.logger.error(line)
-                raise RuntimeError('Execution of command {} failed after {} (return code {}).'
-                    .format(job.cmd, elapsed_time(job.start_time), ret))
-            else:
-                if job.output:
-                    with open(job.output[0] + '.err') as err:
-                        for line in err.read().split('\n')[-10:]:
-                            env.logger.info(line)
-                env.logger.info('Command {} completed successfully in {}'
-                    .format(job.cmd, elapsed_time(job.start_time)))
-                #
-                self.running_jobs[idx] = None
-        return count
-
-    def wait_all(self):
-        '''Wait for all pending jobs to complete'''
-        while poll_jobs() > 0:
-            # sleep ten seconds before checking job status again.
-            time.sleep(10)
-        self.running_jobs = []
 
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
-        if existAndNewerThan(ifiles=ifiles, ofiles=self.output):
-            env.logger.info('Reuse existing files {}'
-                .format(', '.join(self.output)))
-            return self.output
+        if self.output:
+            all_output = self.output + [self.output[0] + '.exe_info']
+            if os.path.isfile(self.output[0] + '.exe_info'):
+                with open(self.output[0] + '.exe_info') as exe_info:
+                    cmd = exe_info.readline().strip()
+                # if the exact command has been used to produce output, and the
+                # output files are newer than input file, ignore the step
+                if cmd == self.cmd.strip() and existAndNewerThan(ifiles=ifiles, ofiles=all_output):
+                    env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
+                    return self.output
         if self.working_dir:
             os.chdir(self.working_dir)
-        self.run_command(self.cmd, output=self.output)
+        run_command(self.cmd, output=self.output, wait=False)
         return self.output
 
 
@@ -336,8 +484,8 @@ class DecompressFiles:
     '''This action gets a list of fastq files from input file, decompressing
     input files (.tar.gz, .zip, etc) if necessary. Non-fastq files are ignored
     with a warning message. '''
-    def __init__(self, dest_dir):
-        self.dest_dir = dest_dir
+    def __init__(self, dest_dir=None):
+        self.dest_dir = dest_dir if dest_dir else '.'
 
     def _decompress(self, filename):
         '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
@@ -352,10 +500,9 @@ class DecompressFiles:
         elif filename.lower().endswith('.tar'):
             mode = 'r'
         elif filename.lower().endswith('.gz'):
-            dest_file = os.path.join('.' if dest_dir is None else dest_dir,
-                os.path.basename(filename)[:-3])
+            dest_file = os.path.join(self.dest_dir, os.path.basename(filename)[:-3])
             if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-                env.logger.warning('Using existing decompressed file {}'.format(dest_file))
+                env.logger.info('Using existing decompressed file {}'.format(dest_file))
             else:
                 env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
                 with gzip.open(filename, 'rb') as gzinput, open(TEMP(dest_file), 'wb') as output:
@@ -368,7 +515,7 @@ class DecompressFiles:
                 os.rename(TEMP(dest_file), dest_file)
             return [dest_file]
         elif filename.lower().endswith('.bz2'):
-            dest_file = os.path.join('.' if dest_dir is None else dest_dir, os.path.basename(filename)[:-4])
+            dest_file = os.path.join(self.dest_dir, os.path.basename(filename)[:-4])
             if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                 env.logger.warning('Using existing decompressed file {}'.format(dest_file))
             else:
@@ -384,10 +531,9 @@ class DecompressFiles:
             return [dest_file]
         elif filename.lower().endswith('.zip'):
             bundle = zipfile.ZipFile(filename)
-            dest_dir = '.' if dest_dir is None else dest_dir
-            bundle.extractall(dest_dir)
-            env.logger.info('Decompressing {} to {}'.format(filename, dest_dir))
-            return [os.path.join(dest_dir, name) for name in bundle.namelist()]
+            bundle.extractall(self.dest_dir)
+            env.logger.info('Decompressing {} to {}'.format(filename, self.dest_dir))
+            return [os.path.join(self.dest_dir, name) for name in bundle.namelist()]
         #
         # if it is a tar file
         if mode is not None:
@@ -398,17 +544,16 @@ class DecompressFiles:
             # the whole file to determine its content. I am therefore creating a manifest
             # file for the tar file in the dest_dir, and avoid re-opening when the tar file
             # is processed again.
-            manifest = os.path.join( '.' if dest_dir is None else dest_dir,
-                os.path.basename(filename) + '.manifest')
+            manifest = os.path.join(self.dest_dir, os.path.basename(filename) + '.manifest')
             all_extracted = False
             dest_files = []
             if existAndNewerThan(ofiles=manifest, ifiles=filename):
                 all_extracted = True
                 for f in [x.strip() for x in open(manifest).readlines()]:
-                    dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
+                    dest_file = os.path.join(self.dest_dir, os.path.basename(f))
                     if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                         dest_files.append(dest_file)
-                        env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                        env.logger.info('Using existing extracted file {}'.format(dest_file))
                     else:
                         all_extracted = False
             #
@@ -417,7 +562,7 @@ class DecompressFiles:
             #
             # create a temporary directory to avoid corrupted file due to interrupted decompress
             try:
-                os.mkdir('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+                os.mkdir(os.path.join(self.dest_dir, 'tmp'))
             except:
                 # directory might already exist
                 pass
@@ -431,94 +576,81 @@ class DecompressFiles:
                         manifest.write(f + '\n')
                 for f in files:
                     # if there is directory structure within tar file, decompress all to the current directory
-                    dest_file = os.path.join( '.' if dest_dir is None else dest_dir, os.path.basename(f))
+                    dest_file = os.path.join(self.dest_dir, os.path.basename(f))
                     dest_files.append(dest_file)
                     if existAndNewerThan(ofiles=dest_file, ifiles=filename):
-                        env.logger.warning('Using existing extracted file {}'.format(dest_file))
+                        env.logger.info('Using existing extracted file {}'.format(dest_file))
                     else:
                         env.logger.info('Extracting {} to {}'.format(f, dest_file))
-                        tar.extract(f, 'tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'))
+                        tar.extract(f, os.path.join(self.dest_dir, 'tmp'))
                         # move to the top directory with the right name only after the file has been properly extracted
-                        shutil.move(os.path.join('tmp' if dest_dir is None else os.path.join(dest_dir, 'tmp'), f), dest_file)
+                        shutil.move(os.path.join(self.dest_dir, 'tmp', f), dest_file)
                 # set dest_files to the same modification time. This is used to
                 # mark the right time when the files are created and avoid the use
                 # of archieved but should-not-be-used files that might be generated later
                 [os.utime(x, None) for x in dest_files]
             return dest_files
-        # return source file if 
+        # return source file if nothing needs to be decompressed
         return [filename]
         
     def __call__(self, ifiles):
         # decompress input files and return a list of output files
         filenames = []
         for filename in ifiles:
-            for fastq_file in self._decompress(filename, env.cache_dir):
-                try:
-                    with open(fastq_file) as fastq:
-                        line = fastq.readline()
-                        if not line.startswith('@'):
-                            env.logger.warning('Wrong FASTA file {}'.format(fastq_file))
-                            continue
-                    filenames.append(fastq_file)
-                except Exception as e:
-                    env.logger.warning('Ignoring non-fastq file {}: {}'
-                        .format(fastq_file, e))
+            filenames.extend(self._decompress(filename))
         filenames.sort()
         return filenames        
 
-
-class CountUnmappedReads:
+class CountMappedReads:
     '''This action reads the input files in sam format and count the total
-    number of reads and number of unmapped reads. It raises a RuntimeError
-    if the proportion of unmapped reads exceeds the specified cutoff value
-    (default to 0.2). This action writes a count file to specified output
+    number of reads and number of mapped reads. It raises a RuntimeError
+    if the proportion of unmapped reads lower than the specified cutoff value
+    (default to 0.8). This action writes a count file to specified output
     files and read from this file directly if the file already exists.'''
-    def __init__(self, cutoff=0.2):
+    def __init__(self, output, cutoff=0.2):
         self.cutoff = cutoff
+        self.output = output
 
-    def __call__(self, ifiles):
+    def __call__(self, sam_file):
         #
         # count total reads and unmapped reads
         #
         # The previous implementation uses grep and wc -l, but
         # I cannot understand why these commands are so slow...
         #
-        targets = ['{}.counts'.format(x) for x in sam_files]
-        if not existAndNewerThan(ofiles=targets, ifiles=sam_files):
-            for sam_file, target_file in zip(sam_files, targets):
-                env.logger.info('Counting unmapped reads in {}'.format(sam_file))
-                unmapped_count = 0
-                total_count = 0
-                with open(sam_file) as sam:
-                   for line in sam:
-                       total_count += 1
-                       if 'XT:A:N' in line:
-                           unmapped_count += 1
-                with open(target_file, 'w') as target:
-                    target.write('{}\n{}\n'.format(unmapped_count, total_count))
-        #
-        counts = []
-        for count_file in targets:
-            with open(count_file) as cnt:
-                unmapped = int(cnt.readline())
-                total = int(cnt.readline())
-                counts.append((unmapped, total))
-        return counts
-        for f,c in zip(sam_files, counts):
-            # more than 40% unmapped
-            if c[1] == 0 or c[0]/c[1] > 0.4:
-                env.logger.error('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
-                    .format(f, c[0], c[1], 0 if c[1] == 0 else (100*(1 - c[0]/c[1]))))
-                sys.exit(1)
-            else:
-                env.logger.info('{}: {} out of {} reads are unmapped ({:.2f}% mapped)'
-                    .format(f, c[0], c[1], 100*(1 - c[0]/c[1])))
-        # 
+        if not existAndNewerThan(ofiles=self.output, ifiles=sam_file):
+            env.logger.info('Counting unmapped reads in {}'.format(sam_file[0]))
+            unmapped_count = 0
+            total_count = 0
+            with open(sam_file[0]) as sam:
+               for line in sam:
+                   total_count += 1
+                   if 'XT:A:N' in line:
+                       unmapped_count += 1
+            mapped_count = total_count - unmapped_count
+            with open(self.output, 'w') as target:
+                target.write('{}\n{}\n'.format(mapped_count, total_count))
+        else:
+            env.logger.info('Using existing counts in {}'.format(self.output))
+            #
+            with open(self.output) as cnt:
+                mapped_count = int(cnt.readline())
+                total_count = int(cnt.readline())
+        # more than 40% unmapped
+        if total_count == 0 or mapped_count * 1.0 / total_count < self.cutoff:
+            raise RuntimeError('{}: {} out of {} reads ({:.2f}%) are mapped.'
+                .format(sam_file[0], mapped_count, total_count,
+                    0 if total_count == 0 else (100.*mapped_count/total_count)))
+        else:
+            env.logger.info('{}: {} out of {} reads ({:.2f}%) are mapped.'
+                .format(sam_file[0], mapped_count, total_count,
+                    0 if total_count == 0 else (100.*mapped_count/total_count)))
+        return self.output
 
 
 class Pipeline:
-    def __init__(self, name):
-        self.pipeline = PipelineDescription(name)
+    def __init__(self, name, extra_args=[]):
+        self.pipeline = PipelineDescription(name, extra_args)
         #
         # resource directory
         #
@@ -582,15 +714,12 @@ class Pipeline:
                             .format(piece, e))
                     KEY = KEY.split(':', 1)[0].strip()
                     if KEY in VARS:
-                        if type(VARS[KEY]) == str:
-                            VAL = VARS[KEY]
-                        else:
-                            VAL = ' '.join(VARS[KEY])
+                        VAL = VARS[KEY]
                     else:
                         raise RuntimeError('Failed to substitute variable {}: key {} not found'
                             .format(piece, KEY))
                     try:
-                        pieces[idx] = FUNC(VAL)
+                        pieces[idx] = str(FUNC(VAL))
                     except Exception as e:
                         raise RuntimeError('Failed to substitute variable {}: {}'
                             .format(piece, e))
@@ -600,14 +729,16 @@ class Pipeline:
                         if type(VARS[KEY]) == str:
                             pieces[idx] = VARS[KEY]
                         else:
-                            pieces[idx] = ' '.join(VARS[KEY])
+                            pieces[idx] = ', '.join(VARS[KEY])
                     else:
                         raise RuntimeError('Failed to substitute variable {}'
                             .format(piece))
-        # now, join the pieces together
-        return ''.join(pieces)
+        # now, join the pieces together, but remove all newlines
+        return ' '.join(''.join(pieces).split())
 
-    def execute(self, steps, input_files=[], output_files=[]):
+    def execute(self, steps, input_files=[], output_files=[], jobs=1):
+        global max_running_jobs 
+        max_running_jobs = jobs
         VARS = {
             'CMD_INPUT': input_files,
             'CMD_OUTPUT': output_files,
@@ -624,8 +755,14 @@ class Pipeline:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
             else:
                 step_input = ifiles
+            # if there is no input file?
+            if not step_input:
+                raise RuntimeError('Pipeline stops at step {} of {}: No input file is available.'
+                    .format(command.index, steps))
             #
             VARS['INPUT{}'.format(command.index)] = step_input
+            env.logger.debug('INPUT of step {} of {}: {}'
+                    .format(command.index, steps, step_input))
             # 
             # now, group input files
             if not command.input_emitter:
@@ -644,7 +781,9 @@ class Pipeline:
                     if not ig:
                         continue
                     VARS['INPUT'] = ig
-                    action = eval(self.substitute(command.action, VARS))
+                    action = self.substitute(command.action, VARS)
+                    env.logger.debug('Input: {} Action: {}' .format(ig, action))
+                    action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
                     ofiles = action(step_input)
@@ -652,123 +791,17 @@ class Pipeline:
                         step_output.append(ofiles)
                     else:
                         step_output.extend(ofiles)
-                #
+                # wait for all pending jobs to finish
+                wait_all()
                 VARS['OUTPUT{}'.format(command.index)] = step_output
+                env.logger.debug('OUTPUT of step {} of {}: {}'
+                    .format(command.index, steps, step_output))
             except Exception as e:
                 raise RuntimeError('Failed to execute step {} of {}: {}'
                     .format(command.index, steps, e))
             os.chdir(saved_dir)
+            ifiles = step_output
                 
-
-def fastqVersion(fastq_file):
-    '''Detect the version of input fastq file. This can be very inaccurate'''
-    #
-    # This function assumes each read take 4 lines, and the last line contains
-    # quality code. It collects about 1000 quality code and check their range,
-    # and use it to determine if it is Illumina 1.3+
-    #
-    qual_scores = ''
-    with open(fastq_file) as fastq:
-        while len(qual_scores) < 1000:
-            try:
-                line = fastq.readline()
-            except Exception as e:
-                env.logger.error('Failed to read fastq file {}: {}'
-                    .format(fastq_file, e))
-                sys.exit(1)
-            if not line.startswith('@'):
-                raise ValueError('Wrong FASTA file {}'.format(fastq_file))
-            line = fastq.readline()
-            line = fastq.readline()
-            if not line.startswith('+'):
-                env.logger.warning(
-                    'Suspiciout FASTA file {}: third line does not start with "+".'
-                    .foramt(fastq_file))
-                return 'Unknown'
-            line = fastq.readline()
-            qual_scores += line.strip()
-    #
-    min_qual = min([ord(x) for x in qual_scores])
-    max_qual = max([ord(x) for x in qual_scores])
-    env.logger.debug('FASTA file with quality score ranging {} to {}'
-        .format(min_qual, max_qual))
-    # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
-    # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
-    if min_qual >= 64 or max_qual > 90:
-        # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
-        return 'Illumina 1.3+'
-    else:
-        # no option is needed for bwa
-        return 'Sanger'
-
-
-def getReadGroup(fastq_filename, output_bam):
-    '''Get read group information from names of fastq files.'''
-    # Extract read group information from filename such as
-    # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
-    # according to the lane that produced them and whether they
-    # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
-    # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
-    # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
-    #
-    # This function return a read group string like '@RG\tID:foo\tSM:bar'
-    #
-    # ID* Read group identifier. Each @RG line must have a unique ID. The
-    # value of ID is used in the RG
-    #     tags of alignment records. Must be unique among all read groups
-    #     in header section. Read group
-    #     IDs may be modifid when merging SAM fies in order to handle collisions.
-    # CN Name of sequencing center producing the read.
-    # DS Description.
-    # DT Date the run was produced (ISO8601 date or date/time).
-    # FO Flow order. The array of nucleotide bases that correspond to the
-    #     nucleotides used for each
-    #     flow of each read. Multi-base flows are encoded in IUPAC format, 
-    #     and non-nucleotide flows by
-    #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
-    # KS The array of nucleotide bases that correspond to the key sequence
-    #     of each read.
-    # LB Library.
-    # PG Programs used for processing the read group.
-    # PI Predicted median insert size.
-    # PL Platform/technology used to produce the reads. Valid values: 
-    #     CAPILLARY, LS454, ILLUMINA,
-    #     SOLID, HELICOS, IONTORRENT and PACBIO.
-    # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
-    #     SOLiD). Unique identifier.
-    # SM Sample. Use pool name where a pool is being sequenced.
-    #
-    filename = os.path.basename(fastq_filename)
-    output = os.path.basename(output_bam)
-    # sample name is obtained from output filename without file extension
-    SM = output.split('.', 1)[0]
-    # always assume ILLUMINA for this script and BWA for processing
-    PL = 'ILLUMINA'  
-    PG = 'BWA'
-    #
-    # PU is for flowcell and lane information, ID should be unique for each
-    #     readgroup
-    # ID is temporarily obtained from input filename without exteion
-    ID = filename.split('.')[0]
-    # try to get lan information from s_x_1/2 pattern
-    try:
-        PU = re.search('s_([^_]+)_', filename).group(1)
-    except AttributeError:
-        env.logger.warning('Failed to guess lane information from filename {}'
-            .format(filename))
-        PU = 'NA'
-    # try to get some better ID
-    try:
-        # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
-        m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
-        ID = '{}.{}'.format(m.group(1), m.group(4))
-    except AttributeError as e:
-        env.logger.warning('Input fasta filename {} does not match a known'
-            ' pattern. ID is directly obtained from filename.'.format(filename))
-    #
-    rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
-    env.logger.info('Setting read group tag to {}'.format(rg))
-    return rg
 
 
 
@@ -801,17 +834,17 @@ def alignReadsArguments(parser):
         help='''Maximum number of concurrent jobs.''')
 
 def alignReads(args):
-    try:
+    #try:
         with Project(verbosity=args.verbosity) as proj:
-            pipeline = Pipeline(args.pipeline)
+            pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
             # 
             # initialize
             pipeline.downloadResource()
-            pipeline.execute('init', args.input_files, args.output)
-            pipeline.execute('align', args.input_files, args.output)
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
+            pipeline.execute('init', args.input_files, args.output, args.jobs)
+            pipeline.execute('align', args.input_files, args.output, args.jobs)
+    #except Exception as e:
+    #    env.logger.error(e)
+    #    sys.exit(1)
 
 
 def callVariantsArguments(parser):
