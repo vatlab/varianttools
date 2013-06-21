@@ -117,19 +117,20 @@ action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}',
 comment=Build samtools index for build hg19 of reference genome
 
 [align_100]
+input=${CMD_INPUT}
 action=RunCommand("java %(opt_java)s -jar SamToFastq.jar %(opt_picard_samtofastq)s
     INPUT=${INPUT} 
-    FASTQ=${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
-    SECOND_END_FASTQ=${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}",
-    working_dir='${CACHE_DIR}')
+    FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
+    SECOND_END_FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}")
+input_emitter=SelectInput(filetypes=['bam', 'sam'], pass_unselected=True)
 comment=Convert bam files to paired fastq files if the input is in bam/sam format.
     Other input files are returned untouched.
 
-[align_1]
+[align_200]
 action=GetFastqFiles()
 comment=align using bwa
 
-[align_2]
+[align_300]
 action=RunCommand()
 comment=mark duplicate
 

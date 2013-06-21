@@ -57,7 +57,7 @@ Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 # see http://varianttools.sourceforge.net/Calling/New for details
 #
 PipelineCommand = namedtuple('PipelineCommand', ['index', 'input',
-    'input_group', 'action', 'comment'])
+    'input_emitter', 'action', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -694,13 +694,13 @@ class PipelineDescription:
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['input', 'input_group', 'action', 'comment'] + defaults.keys():
+                        if item not in ['input', 'input_emitter', 'action', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. '
-                                'Only input, input_group, action, and comment are allowed.'
+                                'Only input, input_emitter, action, and comment are allowed.'
                                 .format(item, section))
                     command = PipelineCommand(index=int(section.split('_', 1)[1]),
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
-                            input_group=parser.get(section, 'input_group', vars=defaults) if 'input_group' in items else '',
+                            input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                     if section.startswith('init_'):

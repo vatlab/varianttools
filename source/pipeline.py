@@ -52,6 +52,72 @@ try:
 except ImportError as e:
     hasPySam = False
 
+###################################
+class GroupInput:
+    def __init__(self, group_by='single'):
+        self.group_by = group_by
+
+    def __call__(self, ifiles):
+        if self.group_by == 'single':
+            return [[x] for x in ifiles], []
+        elif self.group_by == 'all':
+            return [ifiles], []
+        elif self.group_by == 'paired':
+            if len(ifiles) // 2 * 2 != len(ifiles):
+                raise RuntimeError('Cannot emit input files by pairs: odd number of input files {}'
+                    .format(', '.join(ifiles)))
+            ifiles.sort()
+            pairs = []
+            for idx in range(len(ifiles)//2):
+                f1 = ifiles[2*idx]
+                f2 = ifiles[2*idx + 1]
+                if len(f1) != len(f2):
+                    raise RuntimeError('Cannot emit input files by pairs: '
+                        'Filenames {}, {} are not paired'
+                        .format(f1, f2))
+                diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
+                if diff != [1]:
+                    raise RuntimeError('Cannot emit input files by pairs: '
+                        'Filenames {}, {} are not paired'
+                        .format(f1, f2))
+                pairs.append([f1, f2])
+            return pairs, []
+
+class SelectInput:
+    def __init__(self, filetypes, pass_unselected=True):
+        if type(filetypes) == str:
+            self.filetypes = [filetypes]
+        else:
+            self.filetypes = filetypes
+
+    def _isFastq(self, filename):
+        try:
+            with open(filename) as fastq:
+                line = fastq.readline()
+                if not line.startswith('@'):
+                    return False
+        except Exception as e:
+            return False
+
+    def __call__(self, ifiles):
+        selected = []
+        unselected = []
+        for filename in ifiles:
+            for t in self.filetypes:
+                if t == 'fastq':
+                    if self._isFastq(filename):
+                        selected.append(filename)
+                        break
+                else:
+                    if filename.lower().endswith('.' + t):
+                        selected.append(filename)
+                        break
+            if not selected or selected[-1] != filename:
+                unselected.append(filename)
+        return [selected], unselected
+        
+
+###################################
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -266,14 +332,14 @@ class RunCommand:
         return self.output
 
 
-class GetFastqFiles:
+class DecompressFiles:
     '''This action gets a list of fastq files from input file, decompressing
     input files (.tar.gz, .zip, etc) if necessary. Non-fastq files are ignored
     with a warning message. '''
-    def __init__(self):
-        pass
+    def __init__(self, dest_dir):
+        self.dest_dir = dest_dir
 
-    def _decompress(self, filename, dest_dir):
+    def _decompress(self, filename):
         '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
         it to dest_dir (current directory if unspecified), and return a list of files.
         Uncompressed files will be returned untouched. If the destination files exist
@@ -501,20 +567,53 @@ class Pipeline:
             env.logger.info('Using {} existing resource files under {}.'
                 .format(len(skipped), self.pipeline_resource))
  
-    def substitute(self, action, VARS):
-        # FIXME: advanced cases not handled
-        for key, value in VARS.iteritems():
-            action = action.replace('${' + key + '}', value)
-        return action
+    def substitute(self, text, VARS):
+        # now, find ${}
+        pieces = re.split('(\${[^}]*})', text)
+        for idx, piece in enumerate(pieces):
+            if piece.startswith('${') and piece.endswith('}'):
+                KEY = piece[2:-1]
+                if ':' in KEY:
+                    # a lambda function?
+                    try:
+                        FUNC = eval('lambda {}'.format(KEY))
+                    except Exception as e:
+                        raise RuntimeError('Failed to substitute variable {}: {}'
+                            .format(piece, e))
+                    KEY = KEY.split(':', 1)[0].strip()
+                    if KEY in VARS:
+                        if type(VARS[KEY]) == str:
+                            VAL = VARS[KEY]
+                        else:
+                            VAL = ' '.join(VARS[KEY])
+                    else:
+                        raise RuntimeError('Failed to substitute variable {}: key {} not found'
+                            .format(piece, KEY))
+                    try:
+                        pieces[idx] = FUNC(VAL)
+                    except Exception as e:
+                        raise RuntimeError('Failed to substitute variable {}: {}'
+                            .format(piece, e))
+                else:
+                    # if KEY in VARS, replace it
+                    if KEY in VARS:
+                        if type(VARS[KEY]) == str:
+                            pieces[idx] = VARS[KEY]
+                        else:
+                            pieces[idx] = ' '.join(VARS[KEY])
+                    else:
+                        raise RuntimeError('Failed to substitute variable {}'
+                            .format(piece))
+        # now, join the pieces together
+        return ''.join(pieces)
 
     def execute(self, steps, input_files=[], output_files=[]):
         VARS = {
-            'CMD_INPUT': ', '.join(input_files),
-            'CMD_OUTPUT': ', '.join(output_files),
+            'CMD_INPUT': input_files,
+            'CMD_OUTPUT': output_files,
             'RESOURCE_DIR': self.pipeline_resource,
             'TEMP_DIR': env.temp_dir,
             'CACHE_DIR': env.cache_dir,
-            'PID': str(os.getpid())
         }
         ifiles = input_files
         for command in {'init': self.pipeline.init_steps,
@@ -525,20 +624,40 @@ class Pipeline:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
             else:
                 step_input = ifiles
+            #
+            VARS['INPUT{}'.format(command.index)] = step_input
             # 
-            # now, execute it
+            # now, group input files
+            if not command.input_emitter:
+                emitter = GroupInput()
+            else:
+                try:
+                    emitter = eval(command.input_emitter)
+                except Exception as e:
+                    raise RuntimeError('Failed to group input files: {}'
+                        .format(e))
+            #
+            saved_dir = os.getcwd()
+            igroups, step_output = emitter(step_input)
             try:
-                saved_dir = os.getcwd()
-                VARS['INPUT'] = ', '.join(step_input)
-                VARS['PID'] = str(os.getpid())
-                action = eval(self.substitute(command.action, VARS))
-                if type(action) == tuple:
-                    action = SequentialActions(action)
-                ifiles = action(step_input)
-                os.chdir(saved_dir)
+                for ig in igroups:
+                    if not ig:
+                        continue
+                    VARS['INPUT'] = ig
+                    action = eval(self.substitute(command.action, VARS))
+                    if type(action) == tuple:
+                        action = SequentialActions(action)
+                    ofiles = action(step_input)
+                    if type(ofiles) == str:
+                        step_output.append(ofiles)
+                    else:
+                        step_output.extend(ofiles)
+                #
+                VARS['OUTPUT{}'.format(command.index)] = step_output
             except Exception as e:
                 raise RuntimeError('Failed to execute step {} of {}: {}'
                     .format(command.index, steps, e))
+            os.chdir(saved_dir)
                 
 
 def fastqVersion(fastq_file):
