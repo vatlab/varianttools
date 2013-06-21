@@ -93,28 +93,30 @@ opt_gatk_applyrecalibration=--ts_filter_level 99.9
 opt_gatk_applyrecalibration_snv=
 opt_gatk_applyrecalibration_indel=
 
-[init_1]
+[init_10]
 action=CheckCommands(['bwa', 'samtools', 'java'])
 comment=Check existence of commands bwa, samtools and java
 
-[init_2]
+[init_20]
 action=CheckJavaClasses(['SortSam.jar', 'GenomeAnalysisTK.jar'])
 comment=Check existence of class files for Picard and GATK
 
-[init_3]
-input=ucsc.hg19.fasta
-output=ucsc.hg19.fasta.amb
-action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}', working_dir='${RESOURCE_DIR}')
+[init_30]
+input=${RESOURCE_DIR}/ucsc.hg19.fasta
+action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}',
+    working_dir='${RESOURCE_DIR}', 
+    output='${RESOURCE_DIR}/ucsc.hg19.fasta.amb')
 comment=Build bwa index for build hg19 of reference genome
 
-[init_4]
-input=ucsc.hg19.fasta
-output=ucsc.hg19.fasta.fai
-action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}', working_dir='${RESOURCE_DIR}')
+[init_40]
+input=${RESOURCE_DIR}/ucsc.hg19.fasta
+action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}',
+    working_dir='${RESOURCE_DIR}',
+    output='${RESOURCE_DIR}/ucsc.hg19.fasta.fai')
 comment=Build samtools index for build hg19 of reference genome
 
 [align_1]
-action=RunCommand()
+action=GetFastqFiles()
 comment=align using bwa
 
 [align_2]

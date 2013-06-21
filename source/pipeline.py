@@ -67,15 +67,13 @@ class SequentialActions:
             else:
                 self.actions.append(a)
 
-    def __call__(self, ifiles, ofiles):
-        i = ifiles
-        o = ofiles
+    def __call__(self, ifiles):
         for a in self.actions:
             # the input of the next action is the output of the
             # previous action.
-            i = a(i, ofiles)
+            ifiles = a(ifiles)
         # return the output of the last action
-        return i
+        return ifiles
 
 
 class CheckCommands:
@@ -87,7 +85,7 @@ class CheckCommands:
         else:
             self.cmd = cmds
 
-    def __call__(self, ifiles, ofiles):
+    def __call__(self, ifiles):
         if not hasattr(shutil, 'which'):
             # if shutil.which does not exist, use subprocess...
             for cmd in self.cmd:
@@ -98,14 +96,15 @@ class CheckCommands:
                 except:
                     raise RuntimeError('Command {} does not exist. Please '
                         'install it and try again.'.format(self.cmd))
-            return ofiles
+            return ifiles
         for cmd in self.cmd:
             if shutil.which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
                     .format(self.cmd))
             else:
                 env.logger.info('Command {} is located.'.format(self.cmd))
-        return ofiles
+        return ifiles
+
 
 class CheckJavaClasses:
     '''Check the existence of specified java class (.jar files) and raise an
@@ -116,7 +115,7 @@ class CheckJavaClasses:
         else:
             self.java_class = classes
 
-    def __call__(self, ifiles, ofiles):
+    def __call__(self, ifiles):
         if 'CLASSPATH' not in os.environ:
             raise RuntimeError('CLASSPATH is not defined.')
         for java_class in self.java_class:
@@ -131,7 +130,7 @@ class CheckJavaClasses:
             if not found:
                 raise RuntimeError('Cannot locate {} from environment variable CLASSPATH.'
                     .format(java_class))
-        return ofiles
+        return ifiles
 
 
 # NOTE:
@@ -139,14 +138,20 @@ class CheckJavaClasses:
 #   a lot of progress output to stderr, which might block PIPE and cause the
 #   command itself to fail, or stall (which is even worse).
 #
-JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr name')
+JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr output')
 class RunCommand:
-    def __init__(self, cmd, working_dir=None):
+    def __init__(self, cmd='', working_dir=None, output=None):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         '''
         self.cmd = cmd
+        if not self.cmd:
+            raise RuntimeError('Invalid command to execute: "{}"'.format(cmd))
         self.working_dir = working_dir
+        if type(output) == str:
+            self.output = [output]
+        else:
+            self.output = output
         self.running_jobs = []
 
     def elapsed_time(self, start):
@@ -158,22 +163,18 @@ class RunCommand:
      
     #
     # this command duplicate with runCommand, will merge them later on.
-    def run_command(self, cmd, name=None, wait=True):
+    def run_command(self, cmd, output=None, wait=True):
         '''Call an external command, raise an error if it fails.
-        If a name is given, stdout and stderr will be sent to name.out and 
-        name.err under env.WORKING_DIR. Otherwise, stdout and stderr will be
-        ignored (send to /dev/null).
         '''
         # merge mulit-line command into one line and remove extra white spaces
         cmd = ' '.join(cmd.split())
-        if name is None:
+        if not output:
             # subprocess.DEVNULL was introduced in Python 3.3
             proc_out = open(os.devnull, 'w')
             proc_err = open(os.devnull, 'w')
         else:
-            name = name.replace('/', '_')
-            proc_out = open(os.path.join(env.WORKING_DIR, name + '.out'), 'w')
-            proc_err = open(os.path.join(env.WORKING_DIR, name + '.err'), 'w')
+            proc_out = open(output[0] + '.out', 'w')
+            proc_err = open(output[0] + '.err', 'w')
         if wait or env.jobs == 1:
             try:
                 s = time.time()
@@ -186,8 +187,8 @@ class RunCommand:
                     raise RuntimeError('Command {} was terminated by signal {} after executing {}'
                         .format(cmd, -retcode, elapsed_time(s)))
                 elif retcode > 0:
-                    if name is not None:
-                        with open(os.path.join(env.WORKING_DIR, name + '.err')) as err:
+                    if output:
+                        with open(output[0] + '.err') as err:
                             for line in err.read().split('\n')[-20:]:
                                 env.logger.error(line)
                     raise RuntimeError("Command {} returned {} after executing {}"
@@ -207,7 +208,7 @@ class RunCommand:
             # there is a slot, start running
             proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
             self.running_jobs.append(JOB(proc=proc, cmd=cmd, 
-                start_time=time.time(), stdout=proc_out, stderr=proc_err, name=name))
+                start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
             env.logger.info('Running {}'.format(cmd))
 
     def poll_jobs(self):
@@ -229,15 +230,15 @@ class RunCommand:
                 raise RuntimeError("Command {} was terminated by signal {} after executing {}"
                     .format(job.cmd, -ret, elapsed_time(job.start_time)))
             elif ret > 0:
-                if job.name is not None:
-                    with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
+                if job.output:
+                    with open(job.output[0] + '.err') as err:
                         for line in err.read().split('\n')[-50:]:
                             env.logger.error(line)
                 raise RuntimeError('Execution of command {} failed after {} (return code {}).'
                     .format(job.cmd, elapsed_time(job.start_time), ret))
             else:
-                if job.name is not None:
-                    with open(os.path.join(env.WORKING_DIR, job.name + '.err')) as err:
+                if job.output:
+                    with open(job.output[0] + '.err') as err:
                         for line in err.read().split('\n')[-10:]:
                             env.logger.info(line)
                 env.logger.info('Command {} completed successfully in {}'
@@ -253,11 +254,16 @@ class RunCommand:
             time.sleep(10)
         self.running_jobs = []
 
-    def __call__(self, ifiles, ofiles):
+    def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
+        if existAndNewerThan(ifiles=ifiles, ofiles=self.output):
+            env.logger.info('Reuse existing files {}'
+                .format(', '.join(self.output)))
+            return self.output
         if self.working_dir:
             os.chdir(self.working_dir)
-        self.run_command(self.cmd)
+        self.run_command(self.cmd, output=self.output)
+        return self.output
 
 
 class GetFastqFiles:
@@ -267,7 +273,7 @@ class GetFastqFiles:
     def __init__(self):
         pass
 
-    def _decompress(self, ifile):
+    def _decompress(self, filename, dest_dir):
         '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
         it to dest_dir (current directory if unspecified), and return a list of files.
         Uncompressed files will be returned untouched. If the destination files exist
@@ -376,11 +382,11 @@ class GetFastqFiles:
         # return source file if 
         return [filename]
         
-    def __call__(self, ifiles, ofiles):
+    def __call__(self, ifiles):
         # decompress input files and return a list of output files
         filenames = []
         for filename in ifiles:
-            for fastq_file in self._decompress(filename, env.WORKING_DIR):
+            for fastq_file in self._decompress(filename, env.cache_dir):
                 try:
                     with open(fastq_file) as fastq:
                         line = fastq.readline()
@@ -404,7 +410,7 @@ class CountUnmappedReads:
     def __init__(self, cutoff=0.2):
         self.cutoff = cutoff
 
-    def __call__(self, ifiles, ofiles):
+    def __call__(self, ifiles):
         #
         # count total reads and unmapped reads
         #
@@ -497,43 +503,37 @@ class Pipeline:
         return action
 
     def execute(self, steps, input_files=[], output_files=[]):
-        VARS = {'CMD_INPUT': ', '.join(input_files),
+        VARS = {
+            'CMD_INPUT': ', '.join(input_files),
             'CMD_OUTPUT': ', '.join(output_files),
             'RESOURCE_DIR': self.pipeline_resource,
             'TEMP_DIR': env.temp_dir,
-            'CACHE_DIR': env.cache_dir}                
+            'CACHE_DIR': env.cache_dir,
+            'PID': str(os.getpid())
+        }
         ifiles = input_files
-        for idx, command in enumerate({'init': self.pipeline.init_steps,
+        for command in {'init': self.pipeline.init_steps,
                 'align': self.pipeline.align_steps,
-                'call': self.pipeline.call_steps}[steps]):
+                'call': self.pipeline.call_steps}[steps]:
             # substitute ${} variables
             if command.input:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
             else:
                 step_input = ifiles
-            if command.output:
-                step_output = [x.strip() for x in self.substitute(command.output, VARS).split(',')]
-            else:
-                step_output = ifiles
-            # should we skip it?
-            if existAndNewerThan(ifiles=command.input, ofiles=command.output):
-                env.logger.info('Reuse existing files {} and skip step {}'
-                    .format(', '.join(command.output), idx+1))
-            else:
-                # now, execute it
-                try:
-                    saved_dir = os.getcwd()
-                    VARS['INPUT'] = ', '.join(step_input)
-                    VARS['OUTPUT'] = ', '.join(step_output)
-                    VARS['PID'] = os.getpid()
-                    action = eval(self.substitute(command.action, VARS))
-                    if type(action) == tuple:
-                        action = SequentialActions(action)
-                    ifiles = action(step_input, step_output)
-                    os.chdir(saved_dir)
-                except Exception as e:
-                    raise RuntimeError('Failed to execute step {} of {}: {}'
-                        .format(idx + 1, steps, e))
+            # 
+            # now, execute it
+            try:
+                saved_dir = os.getcwd()
+                VARS['INPUT'] = ', '.join(step_input)
+                VARS['PID'] = str(os.getpid())
+                action = eval(self.substitute(command.action, VARS))
+                if type(action) == tuple:
+                    action = SequentialActions(action)
+                ifiles = action(step_input)
+                os.chdir(saved_dir)
+            except Exception as e:
+                raise RuntimeError('Failed to execute step {} of {}: {}'
+                    .format(command.index, steps, e))
                 
 
 def fastqVersion(fastq_file):

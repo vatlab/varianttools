@@ -56,8 +56,8 @@ Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
 # see http://varianttools.sourceforge.net/Calling/New for details
 #
-PipelineCommand = namedtuple('PipelineCommand', ['input', 'output',
-    'action', 'comment'])
+PipelineCommand = namedtuple('PipelineCommand', ['index', 'input',
+    'input_group', 'action', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -680,7 +680,8 @@ class PipelineDescription:
                     elif item[0] == 'resource':
                         self.resource = [x.strip() for x in item[1].split('\n')]
             else:
-                if section.split('_')[0] not in ('init', 'align', 'call'):
+                if section.split('_')[0] not in ('init', 'align', 'call') or \
+                    not section.split('_')[-1].isdigit():
                     raise ValueError('Only sections init_#, align_# and call_# '
                         'are allowed: {} specified.'.format(section))
                 try:
@@ -690,33 +691,27 @@ class PipelineDescription:
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['input', 'output', 'action', 'comment'] + defaults.keys():
+                        if item not in ['input', 'input_group', 'action', 'comment'] + defaults.keys():
                             raise ValueError('Incorrect key {} in section {}. '
-                                'Only input, output, action, and comment are allowed.'
+                                'Only input, input_group, action, and comment are allowed.'
                                 .format(item, section))
-                    command = PipelineCommand(
+                    command = PipelineCommand(index=int(section.split('_', 1)[1]),
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
-                            output=parser.get(section, 'output', vars=defaults) if 'output' in items else '',
+                            input_group=parser.get(section, 'input_group', vars=defaults) if 'input_group' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    # for example, cmd_idx = 5
-                    cmd_idx = int(section.split('_', 1)[1]) - 1
-                    # len(align_steps) = 4 (0, 1, 2, 3),
-                    # need to add two elements with index 4, and 5
                     if section.startswith('init_'):
-                        if len(self.init_steps) < cmd_idx + 1:
-                            self.init_steps.extend([None] * (cmd_idx + 1 - len(self.init_steps)))
-                        self.init_steps[cmd_idx] = command
+                        self.init_steps.append(command)
                     elif section.startswith('align_'):
-                        if len(self.align_steps) < cmd_idx + 1:
-                            self.align_steps.extend([None] * (cmd_idx + 1 - len(self.align_steps)))
-                        self.align_steps[cmd_idx] = command
+                        self.align_steps.append(command)
                     elif section.startswith('call_'):
-                        if len(self.call_steps) < cmd_idx + 1:
-                            self.call_steps.extend([None] * (cmd_idx + 1 - len(self.call_steps)))
-                        self.call_steps[cmd_idx] = command
+                        self.call_steps.append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
+        # sort steps
+        self.init_steps.sort(key=lambda x: x[0])
+        self.align_steps.sort(key=lambda x: x[0])
+        self.call_steps.sort(key=lambda x: x[0])
         # 
         # validate
         for pipeline in (self.init_steps, self.align_steps, self.call_steps):
@@ -750,9 +745,6 @@ class PipelineDescription:
                     subsequent_indent=' '*15))))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
-
-
-
 
 
 class AnnoDBWriter:

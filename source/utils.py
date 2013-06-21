@@ -1408,6 +1408,17 @@ def existAndNewerThan(ofiles, ifiles):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 
     ofiles or ifiles is a list.'''
+    # if there is no input or output file, ofiles cannot be newer than ifiles.
+    if not ifiles or not ofiles or ifiles == ofiles:
+        return False
+    if type(ifiles) == list:
+        for ifile in ifiles:
+            if not os.path.isfile(ifile):
+                raise RuntimeError('Input file {} is not found.'.format(ifile))
+    else:
+        if not os.path.isfile(ifiles):
+            raise RuntimeError('Input file {} is not found.'.format(ifiles))
+    #
     if type(ofiles) == list:
         if not all([os.path.isfile(x) for x in ofiles]):
             return False
@@ -1427,7 +1438,7 @@ def existAndNewerThan(ofiles, ifiles):
     #
     if output_timestamp - input_timestamp < 2:
         env.logger.warning(
-            'Existing output file {} is ignored because it is older than input file.'
+            'Ignoring existing output file {}.'
             .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
         return False
     else:
