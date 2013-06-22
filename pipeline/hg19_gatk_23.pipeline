@@ -275,96 +275,172 @@ action=RunCommand(cmd="java %(opt_java)s
         -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
         -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
     output="${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}")
-comment=Realign indels create indel realigner tager
+comment=Realign indels create indel realigner target
+
+[align_710]
+# input is still the bam file, not the realigner tager intervals
+input=${OUTPUT600}
+action=RunCommand(cmd="java %(opt_java)s 
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar 
+        -T IndelRealigner 
+        %(opt_gatk_indelrealigner)s 
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        --targetIntervals ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
+        --consensusDeterminationModel USE_READS
+        -compress 0 
+        -o ${INPUT: INPUT[0][:-4] + '.clean.bam'}
+        -known ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
+    output="${INPUT: INPUT[0][:-4] + '.clean.bam'}")
+comment=Apply indel realigner target to bam file
+
+[align_800]
+action=RunCommand(cmd="java %(opt_java)s 
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar 
+        -T BaseRecalibrator
+        %(opt_gatk_baserecalibrator)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -cov ReadGroupCovariate
+        -cov QualityScoreCovariate
+        -cov CycleCovariate
+        -cov ContextCovariate
+        -o ${INPUT: INPUT[0][:-4] + '.grp'}
+        -knownSites ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
+    output="${INPUT: INPUT[0][:-4] + '.grp'}")
+comment=Create base recalibrator target
+
+[align_810]
+input=${OUTPUT710}
+action=RunCommand(cmd="java %(opt_java)s 
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar 
+        -T PrintReads
+        %(opt_gatk_printreads)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -BQSR ${INPUT: INPUT[0][:-4] + '.grp'}
+        -o ${CMD_OUTPUT}",
+    output="${CMD_OUTPUT}")
+comment=Apply base recalibrator target
+
+[align_900]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T ReduceReads
+        %(opt_gatk_reducereads)s
+        -I ${INPUT} 
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -o ${INPUT: INPUT[0][:-4] + '_reduced.bam'}",
+    output="${INPUT: INPUT[0][:-4] + '_reduced.bam'}")
+comment=Generated bam file with reduced reads
 
 
-#
-#java {0} -jar {1}/GenomeAnalysisTK.jar {2} -I {3} 
-#                -R {4}/{5}
-#                -T IndelRealigner 
-#                --targetIntervals {6}
-#                --consensusDeterminationModel USE_READS
-#                -compress 0 -o {7} {8}
-#
-#               
-#               java {0} -jar {1}/GenomeAnalysisTK.jar {2}
-#                -T PrintReads
-#                -I {3} 
-#                -R {4}/{5}
-#                -BQSR {6}
-#                -o {7}
-#
-#[align_800]
-#
-#comment=
-#
-#java {0} -jar {1}/GenomeAnalysisTK.jar {2} 
-#                -T BaseRecalibrator
-#                -I {3} 
-#                -R {4}/{5}
-#                -cov ReadGroupCovariate
-#                -cov QualityScoreCovariate
-#                -cov CycleCovariate
-#                -cov ContextCovariate
-#                -o {6} {7}
-#
-[call_1]
-action=java %(opt_java)s -jar GenomeAnalysisTK.jar 
-                -T UnifiedGenotyper 
-                %(opt_gatk_unifiedgenotyper)s 
-                -I ${INPUT} 
-                -R {4}/{5} 
-                --dbsnp {4}/{7} 
-                --genotype_likelihoods_model BOTH 
-                -o {6}
+[call_20]
+# input = output = ${CMD_INPUT}
+action=CheckFiles("%(gatk_path)s/GenomeAnalysisTK.jar")
+comment=Check existence of class files for GATK
 
 
-[call_2]
-action=java {0} -jar GenomeAnalysisTK.jar {2}
-                -input {4}
-                -T VariantRecalibrator
-                -R {5}/{6}
-                {3}
-                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 {5}/{7}
-                -resource:omni,known=false,training=true,truth=true,prior=12.0	{5}/{8}
-                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	{5}/{9}
-                -mode SNP 
-                -recalFile {10}.recal
-                -tranchesFile {10}.tranches
-                -rscriptFile {10}.R
-                -log {11}
+[call_100]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T UnifiedGenotyper 
+        %(opt_gatk_unifiedgenotyper)s 
+        -I ${INPUT} 
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        --genotype_likelihoods_model BOTH 
+        -o %{CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
+    output="%{CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
+# make sure the input is a bam file
+input_emitter=GroupInput(filetypes='.bam')
+comment=Use unified genotyper to get raw variants
+
+
+[call_200]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -I ${INPUT} 
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_SNV)s
+        -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -resource:omni,known=false,training=true,truth=true,prior=12.0	${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -mode SNP 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.SNPs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'",
+    output=["${INPUT: INPUT[0][:-4] + '.SNPs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.log'}"])
+comment=Recalibrate SNPs
                 
-[call_3]
-action=java {0} -jar GenomeAnalysisTK.jar {2} 
-                -input {4} 
-                -T VariantRecalibrator
-                -R {5}/{6}
-                {3}
-                -resource:mills,known=false,training=true,truth=true,prior=12.0 {5}/{7}
-                -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 {5}/{8}
-                -mode INDEL 
-                -recalFile {9}.recal
-                -tranchesFile {9}.tranches
-                -rscriptFile {9}.R
-                -log {10}
+[call_210]
+# use the same .vcf file, not the output files of the SNP recalibration step
+input=${OUTPUT100}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -I ${INPUT} 
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_INDEL)s
+        -resource:mills,known=false,training=true,truth=true,prior=12.0 
+            ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 
+            ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -mode INDEL 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.INDELs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'",
+    output=["${INPUT: INPUT[0][:-4] + '.INDELs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.log'}"])
+comment=Recalibrate INDELs
 
-[call_4]
-action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
-                --input {4} 
-                -R {5}/{6}
-                -T ApplyRecalibration
-                -mode {7} 
-                -recalFile {8}.recal
-                -tranchesFile {8}.tranches
-                -o {9}
+[call_300]
+input=${OUTPUT100}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar GenomeAnalysisTK.jar 
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_SNV)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -mode SNP 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNVs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNVs.tranches'}
+        -o ${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}",
+    output="${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}")
+comment=Apply SNV recalibration
 
-[call_5]
-action=java {0} -jar GenomeAnalysisTK.jar {2} {3}
-                --input {4} 
-                -R {5}/{6}
-                -T ApplyRecalibration
-                -mode {7} 
-                -recalFile {8}.recal
-                -tranchesFile {8}.tranches
-                -o {9}
+[call_310]
+# use input from last step (.recal.SNPs.vcf)
+action=RunCommand(cmd="java %(opt_java)s
+        -jar GenomeAnalysisTK.jar 
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_INDEL)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -mode INDEL
+        -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
+        -o ${CMD_OUTPUT}",
+    output="${CMD_OUTPUT}")
+comment=Apply INDEL recalibration
 

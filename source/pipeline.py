@@ -205,7 +205,7 @@ class CheckFiles:
     def __call__(self, ifiles):
         for f in self.files:
             if os.path.isfile(f):
-                env.logger.info('{} is located'.format(f))
+                env.logger.info('{} is located.'.format(f))
             else:
                 raise RuntimeError('Cannot locate {}.'.format(f))
         return ifiles
