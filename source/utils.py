@@ -1456,27 +1456,46 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     #
     # compare timestamp of input and output files
     if md5file:
+        nFiles = [0]
         with open(md5file) as md5:
             md5.readline()   # command
-            md5.readline()   # start time
-            md5.readline()   # end time
+            line = md5.readline().decode()
+            if not line.startswith('#Start:'):
+                env.logger.warning('Invalid exe_info file {}'.format(md5file))
+                return False
             for line in md5:
+                line = line.decode()
+                if line.startswith('#'):
+                    if not line.startswith('#End:'):
+                        env.logger.warning('Invalid exe_info file {}'.format(md5file))
+                        return False
+                    nFiles.append(0)
+                    continue
                 try:
                     f, s, m = line.split('\t')
-                except:
+                    nFiles[-1] += 1
+                    s = int(s)
+                except Exception as e:
+                    env.logger.error('Wrong md5 line {} in {}'.format(line, md5file))
                     continue
+                # we do not check if f is one of ifiles or ofiles because presentation
+                # of files might differ
                 if not os.path.isfile(f):
-                    raise RuntimeError('{} in {} does not exist.'.format(f, md5file))
+                    env.logger.warning('{} in {} does not exist.'.format(f, md5file))
+                    return False
                 if os.path.getsize(f) != s:
                     env.logger.warning(
                         'Size of existing file differ from recorded file: {}'
                         .format(f))
                     return False
-                if calculateMD5(f) != m:
+                if calculateMD5(f, partial=True) != m.strip():
                     env.logger.warning(
                         'md5 of existing file differ from recorded file: {}'
                         .format(f))
                     return False
+        if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
+            env.logger.warning('Incomplete exe_info file {}'.format(md5file))
+            return False    
     #
     if output_timestamp - input_timestamp < 2:
         env.logger.warning(

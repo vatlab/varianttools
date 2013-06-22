@@ -377,9 +377,8 @@ def run_command(cmd, output=None, wait=True):
                 raise RuntimeError("Command {} returned {} after executing {}"
                     .format(cmd, retcode, elapsed_time(s)))
             if output:
-                with open(output[0] + '.exe_info', 'w') as exe_info:
-                    exe_info.write('{}\nStart: {}\nEnd: {}\n'
-                        .format(cmd, time.asctime(time.localtime(s)), time.asctime(time.localtime())))
+                with open(output[0] + '.exe_info', 'a') as exe_info:
+                    exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                     for f in output:
                         if not os.path.isfile(f):
                             raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
@@ -435,9 +434,8 @@ def poll_jobs():
                 with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
                     for line in err.read().split('\n')[-10:]:
                         env.logger.info(line)
-                with open(job.output[0] + '.exe_info', 'w') as exe_info:
-                    exe_info.write('{}\nStart: {}\nEnd:{}\n'
-                        .format(job.cmd, job.start_time, time.time()))
+                with open(job.output[0] + '.exe_info', 'a') as exe_info:
+                    exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                     for f in job.output:
                         if not os.path.isfile(f):
                             raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
@@ -491,7 +489,9 @@ class RunCommand:
         run_command(self.cmd, output=self.output, wait=False)
         # add md5 signature of input and output files
         if self.output:
-            with open(self.output[0] + '.exe_info', 'a') as exe_info:
+            with open(self.output[0] + '.exe_info', 'w') as exe_info:
+                exe_info.write('{}\n'.format(self.cmd))
+                exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
@@ -801,7 +801,10 @@ class Pipeline:
                         continue
                     VARS['INPUT'] = ig
                     action = self.substitute(command.action, VARS)
-                    env.logger.debug('Input: {} Action: {}' .format(ig, action))
+                    env.logger.debug('Emitted input of step {} of {}: {}'
+                        .format(command.index, steps, ig))
+                    env.logger.debug('Action of step {} of {}: {}'
+                        .format(command.index, steps, action))
                     action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
