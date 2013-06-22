@@ -41,7 +41,7 @@ import re
 import platform
 from collections import namedtuple
 
-from .utils import env, ProgressBar, downloadURL, \
+from .utils import env, ProgressBar, downloadURL, calculateMD5, \
     existAndNewerThan, TEMP, decompressIfNeeded
     
 from .project import PipelineDescription, Project
@@ -465,18 +465,25 @@ class RunCommand:
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
         if self.output:
-            all_output = self.output + [self.output[0] + '.exe_info']
             if os.path.isfile(self.output[0] + '.exe_info'):
                 with open(self.output[0] + '.exe_info') as exe_info:
                     cmd = exe_info.readline().strip()
                 # if the exact command has been used to produce output, and the
                 # output files are newer than input file, ignore the step
-                if cmd == self.cmd.strip() and existAndNewerThan(ifiles=ifiles, ofiles=all_output):
+                if cmd == self.cmd.strip() and existAndNewerThan(ifiles=ifiles,
+                        ofiles=self.output, md5=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
         if self.working_dir:
             os.chdir(self.working_dir)
         run_command(self.cmd, output=self.output, wait=False)
+        # add md5 signature of input and output files
+        if self.output:
+            with open(self.output[0] + '.exe_info', 'a') as exe_info:
+                for f in ifiles + self.output:
+                    # for performance considerations, use partial MD5
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                        calculateMD5(f, partial=True)))
         return self.output
 
 

@@ -980,6 +980,35 @@ class ShelfDB:
                 self.db.close()
 
 
+def calculateMD5(filename, partial=False):
+    filesize = os.path.getsize(filename)
+    # calculate md5 for specified file
+    md5 = hashlib.md5()
+    block_size = 2**20  # buffer of 1M
+    try:
+        if partial or filesize < 2**26:
+            with open(filename, 'rb') as f:
+                while True:
+                    data = f.read(block_size)
+                    if not data:
+                        break
+                    md5.update(data)
+        else:
+            count = 64
+            # otherwise, use the first and last 500M
+            with open(filename, 'rb') as f:
+                while True:
+                    data = f.read(block_size)
+                    count -= 1
+                    if count == 32:
+                        f.seek(-2**25, 2)
+                    if not data or count == 0:
+                        break
+                    md5.update(data)
+    except IOError as e:
+        sys.exit('Failed to read {}: {}'.format(filename, e))
+    return md5.hexdigest()
+
 class ResourceManager:
     def __init__(self):
         # get a manifest of remote files
@@ -1026,7 +1055,7 @@ class ResourceManager:
         if rel_path.startswith('.'):
             raise ValueError('Cannot add a resource that is not under the resoure directory {}'.format(resource_dir))
         filesize = os.path.getsize(filename)
-        md5 = self.calculateMD5(filename)
+        md5 = calculateMD5(filename)
         refGenome = self.getRefGenome(filename)
         comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
         self.manifest[rel_path] = (filesize, md5, refGenome, comment)
@@ -1166,7 +1195,7 @@ class ResourceManager:
         total_size = 0
         for filename, rel_name, filesize in filenames:
             # if file size are different, will be copied
-            if filesize == self.manifest[rel_name][0] and self.calculateMD5(filename) == self.manifest[rel_name][1]:
+            if filesize == self.manifest[rel_name][0] and calculateMD5(filename) == self.manifest[rel_name][1]:
                 self.manifest.pop(rel_name)
             total_size += filesize
             prog.update(total_size)
@@ -1184,24 +1213,13 @@ class ResourceManager:
                     os.path.join(env.local_resource, filename), False,
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
-                md5 = self.calculateMD5(os.path.join(env.local_resource, filename))
+                md5 = calculateMD5(os.path.join(env.local_resource, filename))
                 if md5 != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
                 env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
-
-    def calculateMD5(self, filename, block_size=2**20):
-        # calculate md5 for specified file
-        md5 = hashlib.md5()
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(block_size)
-                if not data:
-                    break
-                md5.update(data)
-        return md5.hexdigest()
 
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
@@ -1404,7 +1422,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
     raise Exception('Failed to download file {}'.format(fileToGet))
 
 
-def existAndNewerThan(ofiles, ifiles):
+def existAndNewerThan(ofiles, ifiles, md5file=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 
     ofiles or ifiles is a list.'''
@@ -1436,9 +1454,33 @@ def existAndNewerThan(ofiles, ifiles):
     else:
         input_timestamp = os.path.getmtime(ifiles)
     #
+    # compare timestamp of input and output files
+    if md5file:
+        with open(md5file) as md5:
+            md5.readline()   # command
+            md5.readline()   # start time
+            md5.readline()   # end time
+            for line in md5:
+                try:
+                    f, s, m = line.split('\t')
+                except:
+                    continue
+                if not os.path.isfile(f):
+                    raise RuntimeError('{} in {} does not exist.'.format(f, md5file))
+                if os.path.getsize(f) != s:
+                    env.logger.warning(
+                        'Size of existing file differ from recorded file: {}'
+                        .format(f))
+                    return False
+                if calculateMD5(f) != m:
+                    env.logger.warning(
+                        'md5 of existing file differ from recorded file: {}'
+                        .format(f))
+                    return False
+    #
     if output_timestamp - input_timestamp < 2:
         env.logger.warning(
-            'Ignoring existing output file {}.'
+            'Ignoring older existing output file {}.'
             .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
         return False
     else:
