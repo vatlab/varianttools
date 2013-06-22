@@ -361,7 +361,7 @@ def run_command(cmd, output=None, wait=True):
     if wait or max_running_jobs == 1:
         try:
             s = time.time()
-            env.logger.info('Running {}'.format(cmd))
+            env.logger.info('Running "{}"'.format(cmd))
             proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
             retcode = proc.wait()
             proc_out.close()
@@ -380,6 +380,12 @@ def run_command(cmd, output=None, wait=True):
                 with open(output[0] + '.exe_info', 'w') as exe_info:
                     exe_info.write('{}\nStart: {}\nEnd: {}\n'
                         .format(cmd, time.asctime(time.localtime(s)), time.asctime(time.localtime())))
+                    for f in output:
+                        if not os.path.isfile(f):
+                            raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                        # for performance considerations, use partial MD5
+                        exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                            calculateMD5(f, partial=True)))
             env.logger.info('Command {} completed successfully in {}'
                 .format(cmd, elapsed_time(s)))
         except OSError as e:
@@ -396,7 +402,7 @@ def run_command(cmd, output=None, wait=True):
         proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
         running_jobs.append(JOB(proc=proc, cmd=cmd, 
             start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
-        env.logger.info('Running {}'.format(cmd))
+        env.logger.info('Running "{}"'.format(cmd))
 
 def poll_jobs():
     '''check the number of running jobs.'''
@@ -432,6 +438,12 @@ def poll_jobs():
                 with open(job.output[0] + '.exe_info', 'w') as exe_info:
                     exe_info.write('{}\nStart: {}\nEnd:{}\n'
                         .format(job.cmd, job.start_time, time.time()))
+                    for f in job.output:
+                        if not os.path.isfile(f):
+                            raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                        # for performance considerations, use partial MD5
+                        exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                            calculateMD5(f, partial=True)))
             env.logger.info('Command {} completed successfully in {}'
                 .format(job.cmd, elapsed_time(job.start_time)))
             #
@@ -471,7 +483,7 @@ class RunCommand:
                 # if the exact command has been used to produce output, and the
                 # output files are newer than input file, ignore the step
                 if cmd == self.cmd.strip() and existAndNewerThan(ifiles=ifiles,
-                        ofiles=self.output, md5=self.output[0] + '.exe_info'):
+                        ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
         if self.working_dir:
@@ -480,7 +492,7 @@ class RunCommand:
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'a') as exe_info:
-                for f in ifiles + self.output:
+                for f in ifiles:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
@@ -803,6 +815,9 @@ class Pipeline:
                 VARS['OUTPUT{}'.format(command.index)] = step_output
                 env.logger.debug('OUTPUT of step {} of {}: {}'
                     .format(command.index, steps, step_output))
+                for f in step_output:
+                    if not os.path.isfile(f):
+                        raise RuntimeError('Output file {} does not exist after completion of step {} of {}'.format(f, command.index, steps))
             except Exception as e:
                 raise RuntimeError('Failed to execute step {} of {}: {}'
                     .format(command.index, steps, e))

@@ -358,8 +358,8 @@ action=RunCommand(cmd="java %(opt_java)s
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         --genotype_likelihoods_model BOTH 
-        -o %{CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
-    output="%{CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
+        -o ${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
+    output="${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
 # make sure the input is a bam file
 input_emitter=GroupInput(filetypes='.bam')
 comment=Use unified genotyper to get raw variants
