@@ -28,7 +28,9 @@ import sys
 try:
     import argparse
 except ImportError:
-    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
+    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 '
+        'or higher. Please upgrade your version ({}) of Python and try again.'
+        .format(sys.version.split()[0]))
 
 from variant_tools.utils import env
 # save the command line that has been processed by the shell. It might not work as shown.
@@ -55,19 +57,21 @@ def addCommonArgs(parser):
 
 if __name__ == '__main__':
     #
-    master_parser = argparse.ArgumentParser(description='''A variant processing, annotation and analysis tool
-        for next-generation sequencing studies.''',
-        prog='vtools',
+    master_parser = argparse.ArgumentParser(description='''A variant calling, 
+        processing, annotation and analysis tool for next-generation sequencing
+        studies.''', prog='vtools',
         #formatter_class=argparse.RawDescriptionHelpFormatter,
         fromfile_prefix_chars='@',
         epilog='''Use 'vtools cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
-    master_parser.add_argument('--version', action='version', version='%(prog)s {}'.format(project.VTOOLS_FULL_VERSION))
+    master_parser.add_argument('--version', action='version',
+        version='%(prog)s {}'.format(project.VTOOLS_FULL_VERSION))
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init
-    parser = subparsers.add_parser('init', help='''Create a new project, or a subproject 
-        from an existing parent project, or merge several existing projects into one''',
+    parser = subparsers.add_parser('init', help='''Create a new project, or a
+        subproject from an existing parent project, or merge several existing
+        projects into one''',
         # FIXME: we should add descriptions to other commands as well.
         description='''Create a new project in the current directory. This
         command will fail if another project already exists in this directory,
@@ -78,25 +82,26 @@ if __name__ == '__main__':
     #
     # command align
     parser = subparsers.add_parser('align',
-        help='''Align raw reads in the format of fastq or bam/sam formats to
-            a reference genome and produce variant-call ready .bam file.''',
-        description='''Align raw reads to reference genome and return a
-            compressed BAM file. The input files should be reads for the same 
-            sample, which could be individual fastq files, a tar file with 
-            all fastq files, or their gziped or bzipped versions. Filenames
-            ending with _1 _2 will be considered as paired end reads. The 
-            process utilizes external tools such as BWA, samtools, and PICARD
-            and is controlled by pipelines defined in external configuration
-            files.''')
+        help='''Align raw sequence reads to a reference genome and produce
+            variant-call ready .bam file.''',
+        description='''Align raw reads to a reference genome and return a
+            compressed BAM file. The process utilizes external tools such as
+            BWA, samtools, and PICARD and is controlled by pipelines defined
+            in pipeline configuration files. The input files should be reads
+            for the same sample which could be individual or compressed fastq
+            files, or sam/bam files. ''')
     pipeline.alignReadsArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=pipeline.alignReads)
     # 
     # command call
     parser = subparsers.add_parser('call',
-        help='''Call variants from a list of calibrated BAM files and produce
-            a VCF file that can be imported into variant tools.''',
-        description=''' ''')
+        help='''Call variants from aligned sequence reads, to be imported
+            by variant tools for further annotation and analysis.''',
+        description='''Call variants from aligned sequence files from one
+            or more samples, usually in BAM format. The process utilizes 
+            external tools such as GATK and is controlled by pipelines
+            defined in pipeline configuration files.''')
     pipeline.callVariantsArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=pipeline.callVariants)
@@ -168,7 +173,8 @@ if __name__ == '__main__':
     #
     # command exclude
     parser = subparsers.add_parser('exclude',
-        help='''Output or save variants after excluding variants that match specified conditions''')
+        help='''Output or save variants after excluding variants that match
+            specified conditions''')
     variant.excludeArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -198,7 +204,8 @@ if __name__ == '__main__':
     parser.set_defaults(func=exporter.export)
     #
     # command remove
-    parser = subparsers.add_parser('remove', help='Remove project or its contents (entries, tables, fields, etc.)')
+    parser = subparsers.add_parser('remove', help='''Remove project or its
+        contents such as variant tables, fields, and annotation databases.''')
     project.removeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
@@ -210,7 +217,7 @@ if __name__ == '__main__':
         parser = subparsers.add_parser('associate',
             help='''Test association between variants and phenotypes''',
             description='''Call one or more statistical association tests and
-            return test results as fields to variants tested.''')
+                return test results as fields to variants tested.''')
         association.associateArguments(parser)
         addCommonArgs(parser)
         parser.set_defaults(func=association.associate)
@@ -221,7 +228,7 @@ if __name__ == '__main__':
         help='''Perform various administrative tasks including merge and
             rename samples.''',
         description='''Optimize or modify projects. Currently supports merging
-        and rename of samples''')
+            and rename of samples''')
     project.adminArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.admin)
@@ -241,7 +248,8 @@ if __name__ == '__main__':
     if not hasattr(args, 'func'):
         master_parser.print_help()
         sys.exit(0)
-    # commands that accepts format and other subparsers can pass arbitrary parameter to subparsers
+    # commands that accepts format and other subparsers can pass arbitrary
+    # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
         update.update, exporter.export, pipeline.alignReads, pipeline.callVariants]:
         args.unknown_args = argv

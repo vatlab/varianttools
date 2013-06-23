@@ -826,7 +826,6 @@ class Pipeline:
                     .format(command.index, steps, e))
             os.chdir(saved_dir)
             ifiles = step_output
-                
 
 
 
@@ -846,40 +845,39 @@ def isBamPairedEnd(input_file):
 
 def alignReadsArguments(parser):
     parser.add_argument('input_files', nargs='+',
-        help='''One or more .txt, .fa, .fastq, .tar, .tar.gz, .tar.bz2, .tbz2, .tgz files
-            that contain raw reads of a single sample. Files in sam/bam format are also
-            acceptable, in which case raw reads will be extracted and aligned again to 
-            generate a new bam file. ''')
+        help='''One or more files that contains raw sequence reads from the
+            same sample. Depending on the pipeline used, the input files can
+            be in plain fastq files (.txt, .fa, .fastq,), compressed files 
+            (e.g. .tar, .tar.gz, .tar.bz2, .tbz2, .tgz formats), or in sam/bam
+            format. The input will be passed to the pipelines as ${CMD_INPUT}.''')
     parser.add_argument('-o', '--output', nargs='+',
-        help='''Output aligned reads to a sorted, indexed, dedupped, and recalibrated
-            BAM file $output.bam.''')
+        help='''Names of output files that contain aligned reads, usually in
+            BAM format. They will be passed to the pipelines as ${CMD_OUTPUT}.''')
     parser.add_argument('--pipeline', required=True,
-        help='Name of the pipeline to be used to call variants.')
+        help='Name of the pipeline to be used to align raw reads.')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs.''')
 
 def alignReads(args):
-    #try:
+    try:
         with Project(verbosity=args.verbosity) as proj:
             pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
-            # 
-            # initialize
             pipeline.downloadResource()
-            pipeline.execute('init', args.input_files, args.output, args.jobs)
             pipeline.execute('align', args.input_files, args.output, args.jobs)
-    #except Exception as e:
-    #    env.logger.error(e)
-    #    sys.exit(1)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 
 def callVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
-        help='''One or more BAM files.''')
+        help='''One or more files that contain aligned reads from one or
+            more samples. The input will be passed to the pipelines as
+            ${CMD_INPUT}.''')
     parser.add_argument('-o', '--output', nargs='+',
-        help='''Output parsered variants to the specified VCF file''')
-    parser.add_argument('--pedfile',
-        help='''A pedigree file that specifies the relationship between input
-            samples, used for multi-sample parsering.''')
+        help='''Names of output files that contained variants called by
+            the variant calling pipeline. They will be passed to the pipelines
+            as ${CMD_OUTPUT}''')
     parser.add_argument('--pipeline', required=True,
         help='Name of the pipeline to be used to call variants.')
     parser.add_argument('-j', '--jobs', default=1, type=int,
@@ -888,7 +886,9 @@ def callVariantsArguments(parser):
 def callVariants(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            pass
+            pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
+            pipeline.downloadResource()
+            pipeline.execute('call', args.input_files, args.output, args.jobs)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
