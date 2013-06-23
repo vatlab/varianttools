@@ -989,7 +989,7 @@ def calculateMD5(filename, partial=False):
     md5 = hashlib.md5()
     block_size = 2**20  # buffer of 1M
     try:
-        if partial or filesize < 2**26:
+        if (not partial) or filesize < 2**26:
             with open(filename, 'rb') as f:
                 while True:
                     data = f.read(block_size)

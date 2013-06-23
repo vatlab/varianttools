@@ -41,7 +41,7 @@ import re
 import platform
 from collections import namedtuple
 
-from .utils import env, ProgressBar, downloadURL, calculateMD5, \
+from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressIfNeeded
     
 from .project import PipelineDescription, Project
@@ -713,6 +713,22 @@ class Pipeline:
             if filename.endswith('.gz') and not filename.endswith('tar.gz'):
                 if not existAndNewerThan(ofiles=filename[:-3], ifiles=filename):
                     decompressIfNeeded(filename, inplace=False)
+            # because URLs are sorted, filename.md5 must be downloaded after
+            # filename.
+            if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
+                try:
+                    s = delayedAction(env.logger.info, 'Validating md5 signature of {}'
+                        .format(filename[:-4]))
+                    downloaded_md5 = open(filename).readline().split()[0]
+                    calculated_md5 = calculateMD5(filename[:-4], partial=False)
+                    del s
+                    if downloaded_md5 != calculated_md5:
+                        env.logger.warning('md5 signature of {} mismatch. '
+                            'Please remove this file and try again.'
+                            .format(filename[:-4]))
+                except Exception as e:
+                    env.logger.warning('Failed to verify md5 signature of {}: {}'
+                        .format(filename[:-4], e))
         os.chdir(saved_dir)
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'
