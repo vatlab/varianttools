@@ -189,7 +189,7 @@ class CheckCommands:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
                     .format(self.cmd))
             else:
-                env.logger.info('Command {} is located.'.format(self.cmd))
+                env.logger.info('Command {} is located.'.format(cmd))
         return ifiles
 
 

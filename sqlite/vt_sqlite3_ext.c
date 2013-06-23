@@ -162,9 +162,49 @@ static void fisher_exact(
 // so that it can be imported and recogznied by pyinstaller. The library
 // is actually imported into sqlite using SELECT load_extension()
 #include <Python.h>
+#if PY_VERSION_HEX >= 0x03000000
+struct module_state {
+    PyObject *error;
+};
+
+static PyMethodDef myextension_methods[] = {
+    {NULL, NULL}
+};
+
+/*
+static int myextension_traverse(PyObject *m, visitproc visit, void *arg)
+{
+    Py_VISIT(GETSTATE(m)->error);
+    return 0;
+}
+
+static int myextension_clear(PyObject *m)
+{
+    Py_CLEAR(GETSTATE(m)->error);
+    return 0;
+} */
+#endif
+
 PyMODINIT_FUNC init_vt_sqlite3_ext()
 {
+#if PY_VERSION_HEX >= 0x03000000
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "_vt_sqlite3_ext",
+        NULL,
+        sizeof(struct module_state),
+        myextension_methods,
+        NULL,
+        NULL, //myextension_traverse,
+        NULL, //myextension_clear,
+        NULL
+    };
+
+    PyModule_Create(&moduledef);
+#else
 	Py_InitModule3("_vt_sqlite3_ext", NULL, "Fake sqlite3 extension module");
+#endif
+    return NULL;
 }
 
 
