@@ -1462,12 +1462,11 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
         nFiles = [0]
         with open(md5file) as md5:
             md5.readline()   # command
-            line = md5.readline().decode()
+            line = md5.readline()
             if not line.startswith('#Start:'):
                 env.logger.warning('Invalid exe_info file {}'.format(md5file))
                 return False
             for line in md5:
-                line = line.decode()
                 if line.startswith('#'):
                     if not line.startswith('#End:'):
                         env.logger.warning('Invalid exe_info file {}'.format(md5file))

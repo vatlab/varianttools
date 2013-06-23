@@ -49,7 +49,7 @@ from .project import PipelineDescription, Project
 try:
     import pysam
     hasPySam = True
-except ImportError as e:
+except (ImportError, ValueError) as e:
     hasPySam = False
 
 ###################################
