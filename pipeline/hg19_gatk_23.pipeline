@@ -64,6 +64,10 @@ resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_
 
 
 [DEFAULT]
+strict_prog_version=True
+strict_prog_version_comment=Whether or not use other version of programs if the exact version does not
+	exist. Setting it to False allows variant tools to use other versions of the programs.
+
 picard_path=
 picard_path_comment=Path to picard jar files
 
@@ -132,6 +136,18 @@ opt_gatk_applyrecalibration_indel=
 # input = output = ${CMD_INPUT}
 action=CheckCommands(['bwa', 'samtools', 'java'])
 comment=Check existence of commands bwa, samtools and java
+
+[align_11]
+action=CheckOutput('bwa', 'Version: 0.7.*', %(strict_prog_version)s)
+comment=Check if the version of bwa is 0.7.4
+
+[align_12]
+action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.72', %(strict_prog_version)s)
+comment=Check if the version of picard is 1.82
+
+[align_13]
+action=CheckOutput('java -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
+comment=Check the version of GATK
 
 [align_20]
 # input = output = ${CMD_INPUT}

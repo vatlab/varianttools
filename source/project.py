@@ -615,7 +615,6 @@ class PipelineDescription:
         self.description = None
         self.resource = []
         self.resource_dir = None
-        self.init_steps = []
         self.align_steps = []
         self.call_steps = []
         #
@@ -683,9 +682,9 @@ class PipelineDescription:
                     elif item[0] == 'resource_dir':
                         self.resource_dir = item[1]
             else:
-                if section.split('_')[0] not in ('init', 'align', 'call') or \
+                if section.split('_')[0] not in ('align', 'call') or \
                     not section.split('_')[-1].isdigit():
-                    raise ValueError('Only sections init_#, align_# and call_# '
+                    raise ValueError('Only sections align_# and call_# '
                         'are allowed: {} specified.'.format(section))
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
@@ -703,21 +702,18 @@ class PipelineDescription:
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    if section.startswith('init_'):
-                        self.init_steps.append(command)
-                    elif section.startswith('align_'):
+                    if section.startswith('align_'):
                         self.align_steps.append(command)
                     elif section.startswith('call_'):
                         self.call_steps.append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
         # sort steps
-        self.init_steps.sort(key=lambda x: x[0])
         self.align_steps.sort(key=lambda x: x[0])
         self.call_steps.sort(key=lambda x: x[0])
         # 
         # validate
-        for pipeline in (self.init_steps, self.align_steps, self.call_steps):
+        for pipeline in (self.align_steps, self.call_steps):
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
                     raise ValueError('Invalid pipeline. Step {} is left unspecified.'

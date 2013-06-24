@@ -182,6 +182,38 @@ class CheckCommands:
         return ifiles
 
 
+class CheckOutput:
+    '''Check out of of an command, and check if it matches a particular
+    pattern. The pipeline will exit if fail is set to True (default).'''
+    def __init__(self, cmd, pattern, failIfMismatch=True):
+        self.cmd = cmd
+        self.pattern = pattern
+        self.fail = failIfMismatch
+
+    def __call__(self, ifiles):
+        try:
+            # do not use subprocess.check_output because I need to get
+            # output even when the command returns non-zero return code
+            p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, shell=True)
+            odata, edata = p.communicate()
+            output = odata.decode() + edata.decode()
+            env.logger.debug('Output of command "{}" is "{}"'
+                .format(self.cmd, output))
+        except Exception as e:
+            raise RuntimeError('Failed to execute command "{}": {}'
+                .format(self.cmd, e))
+        #
+        if re.search(self.pattern, output, re.MULTILINE) is None:
+            msg = ('Output of command "{}" ("{}") does not ' + 
+                    'match specified regular expression "{}".').format(self.cmd,
+                        ' '.join(output[:40].split()), self.pattern)
+            if self.fail:
+                raise RuntimeError(msg)
+            else:
+                env.logger.warning(msg)
+        return ifiles
+
 class CheckFiles:
     '''Check the existence of specified files and raise an
     error if one of the files does not exist.'''
@@ -782,8 +814,7 @@ class Pipeline:
             'CACHE_DIR': env.cache_dir,
         }
         ifiles = input_files
-        for command in {'init': self.pipeline.init_steps,
-                'align': self.pipeline.align_steps,
+        for command in {'align': self.pipeline.align_steps,
                 'call': self.pipeline.call_steps}[steps]:
             # substitute ${} variables
             if command.input:
