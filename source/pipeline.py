@@ -52,24 +52,22 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
-###################################
-
-class GroupInput:
+class EmitInput:
     '''Select input files of certain types, group them, and send input files
-    to action. filetype can be all (all input file types), fastq (check 
-    content of files), or one or more file extensions (e.g. ['sam', 'bam']).
-    Eligible files are by default sent individually (group_by='single') to 
-    action (${INPUT} is a list of a single file), but can also be sent all
-    together (group_by='all', ${INPUT} equals to ${INPUT#} where # is the
-    index of step) or in pairs (group_by='paired', e.g. filename_1.txt and
-    filename_2.txt). Unselected files are by default passed directly as 
-    output of a step.'''
-    def __init__(self, group_by='single', filetypes='all', pass_unselected=True):
+    to action. Selection criteria can be True (all input file types, default),
+    False (select no input file), 'fastq' (check content of files), or one or
+    more file extensions (e.g. ['sam', 'bam']).  Eligible files are by default
+    sent individually (group_by='single') to action (${INPUT} is a list of a
+    single file), but can also be sent altogether (group_by='all', ${INPUT}
+    equals to ${INPUT#} where # is the index of step) or in pairs 
+    (group_by='paired', e.g. filename_1.txt and filename_2.txt). Unselected
+    files are by default passed directly as output of a step.'''
+    def __init__(self, group_by='single', select=True, pass_unselected=True):
         self.group_by = group_by
-        if type(filetypes) == str:
-            self.filetypes = [filetypes]
+        if type(select) == str:
+            self.select = [select]
         else:
-            self.filetypes = filetypes
+            self.select = select
         self.pass_unselected = pass_unselected
 
     def _isFastq(self, filename):
@@ -85,17 +83,24 @@ class GroupInput:
         selected = []
         unselected = []
         for filename in ifiles:
-            for t in self.filetypes:
-                if t == 'all':
-                    selected.append(filename)
-                    break
-                if t == 'fastq':
-                    if self._isFastq(filename):
-                        selected.append(filename)
+            match = False
+            if self.select == True:
+                match = True
+            elif self.select == False:
+                pass
+            else:   # list of types
+                for t in self.select:
+                    if t == 'fastq':
+                        if self._isFastq(filename):
+                            match = True
+                            break
+                    if filename.lower().endswith('.' + t.lstrip('.').lower()):
+                        match = True
                         break
-                if filename.lower().endswith('.' + t.lstrip('.').lower()):
-                    selected.append(filename)
-            if self.pass_unselected and (not selected or selected[-1] != filename):
+            #
+            if match:
+                selected.append(filename)
+            elif self.pass_unselected:
                 unselected.append(filename)
         # 
         if self.group_by == 'single':
@@ -122,23 +127,7 @@ class GroupInput:
                         .format(f1, f2))
                 pairs.append([f1, f2])
             return pairs, unselected
-        
 
-class SkipIfSingle:
-    '''Skip action if there is only one input file'''
-    def __init__(self, group_by='single'):
-        self.group_by = group_by
-
-    def __call__(self, ifiles):
-        if len(ifiles) <= 1:
-            return [], ifiles
-        elif group_by == 'single':
-            return [[x] for x in ifiles], []
-        elif group_by == 'all':
-            return [ifiles], []
-
-
-###################################
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -804,7 +793,11 @@ class Pipeline:
                 emitter = GroupInput()
             else:
                 try:
-                    emitter = eval(command.input_emitter)
+                    # remove ${INPUT} because it is determined by the emitter
+                    if 'INPUT' in VARS:
+                        VARS.pop('INPUT')
+                    # ${CMD_INPUT} etc can be used.
+                    emitter = eval(self.substitute(command.input_emitter, VARS))
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
