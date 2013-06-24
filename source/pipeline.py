@@ -662,7 +662,7 @@ class LinkToDir:
             path, name = os.path.split(filename)
             if not os.path.samefile(filename,  os.path.join(self.dest, basename)):
                 env.logger.info('Linking {} to {}'.format(filename, self.dest))
-                os.link(filename, os.path.join(self.dest, basename)
+                os.link(filename, os.path.join(self.dest, basename))
             ofiles.append(os.path.join(self.dest, basename))
         return ofiles
 
