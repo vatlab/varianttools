@@ -790,7 +790,7 @@ class Pipeline:
             # 
             # now, group input files
             if not command.input_emitter:
-                emitter = GroupInput()
+                emitter = EmitInput()
             else:
                 try:
                     # remove ${INPUT} because it is determined by the emitter
