@@ -42,7 +42,7 @@ import platform
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressIfNeeded
+    existAndNewerThan, TEMP, decompressGzFile
     
 from .project import PipelineDescription, Project
 
@@ -684,6 +684,7 @@ class Pipeline:
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
         skipped = []
+        md5_files = []
         for cnt, URL in enumerate(sorted(self.pipeline.resource)):
             filename = URL.rsplit('/', 1)[-1]
             dest_file = os.path.join(self.pipeline_resource, filename)
@@ -701,23 +702,33 @@ class Pipeline:
             #
             if filename.endswith('.gz') and not filename.endswith('tar.gz'):
                 if not existAndNewerThan(ofiles=filename[:-3], ifiles=filename):
-                    decompressIfNeeded(filename, inplace=False)
-            # because URLs are sorted, filename.md5 must be downloaded after
-            # filename.
-            if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
-                try:
-                    s = delayedAction(env.logger.info, 'Validating md5 signature of {}'
-                        .format(filename[:-4]))
-                    downloaded_md5 = open(filename).readline().split()[0]
-                    calculated_md5 = calculateMD5(filename[:-4], partial=False)
+                    s = delayedAction(env.logger.info,
+                        'Decompressing {}'.format(filename))
+                    decompressGzFile(filename, inplace=False, force=True)
                     del s
+            #
+            if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
+                md5_files.append([filename[:-4], os.path.getsize(filename[:-4])])
+        #
+        if md5_files:
+            prog = ProgressBar('Validating md5 signature', sum([x[1] for x in md5_files]))
+            mismatched_files = []
+            for filename, s in md5_files:
+                try:
+                    downloaded_md5 = open(filename + '.md5').readline().split()[0]
+                    calculated_md5 = calculateMD5(filename, partial=False)
                     if downloaded_md5 != calculated_md5:
-                        env.logger.warning('md5 signature of {} mismatch. '
-                            'Please remove this file and try again.'
-                            .format(filename[:-4]))
+                        mismatched_files.append(filename)
                 except Exception as e:
                     env.logger.warning('Failed to verify md5 signature of {}: {}'
                         .format(filename[:-4], e))
+                prog.update(prog.count + s)
+            prog.done()
+            if mismatched_files:
+                env.logger.warning('md5 signature of {} mismatch. '
+                      'Please remove {} and try again.'
+                      .format(', '.join(mismatched_files),
+                      'this file' if len(mismatched_files) == 1 else 'these files'))
         os.chdir(saved_dir)
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'

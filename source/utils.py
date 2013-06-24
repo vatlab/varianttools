@@ -1233,11 +1233,11 @@ def compressFile(infile, outfile):
                 buffer = input.read(100000)
     return outfile
 
-def decompressIfNeeded(filename, inplace=True):
+def decompressGzFile(filename, inplace=True, force=False):
     '''Decompress a file.gz and return file if needed'''
     if filename.lower().endswith('.gz'):
         new_filename = filename[:-3]
-        if os.path.isfile(new_filename):
+        if os.path.isfile(new_filename) and not force:
             return new_filename
         #
         try:
@@ -1496,10 +1496,10 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                         .format(f))
                     return False
         if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
-            env.logger.warning('Incomplete exe_info file {}'.format(md5file))
+            env.logger.warning('Corrupted exe_info file {}'.format(md5file))
             return False    
     #
-    if output_timestamp - input_timestamp < 2:
+    if output_timestamp < input_timestamp:
         env.logger.warning(
             'Ignoring older existing output file {}.'
             .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
