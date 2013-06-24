@@ -171,7 +171,7 @@ class CheckCommands:
                     env.logger.info('Command {} is located.'.format(cmd))
                 except:
                     raise RuntimeError('Command {} does not exist. Please '
-                        'install it and try again.'.format(self.cmd))
+                        'install it and try again.'.format(cmd))
             return ifiles
         for cmd in self.cmd:
             if shutil.which(cmd) is None:
