@@ -722,26 +722,25 @@ class PipelineDescription:
                     raise ValueError('Missing or empty action for step {}'.format(idx + 1))
      
     def describe(self):
-        print('Pipeline:      {}'.format(self.name))
+        print('Pipeline:     {}'.format(self.name))
         if self.description is not None:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
         #
-        for name, commands in [('Initialization', self.init_steps), 
-            ('Align', self.align_steps), ('Variant calling', self.call_steps)]:
+        for name, commands in [('Align', self.align_steps), ('Variant calling', self.call_steps)]:
             if not commands:
                 continue
             print('\n{} steps:'.format(name))
             for idx, step in enumerate(commands):
-                print('  {:12} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
-                    subsequent_indent=' '*15))))
+                print('  {:2} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
+                    subsequent_indent=' '*5))))
         #
         if self.parameters:
             print('\nPipeline parameters:')
             for item in self.parameters:
-                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
+                print('  {:2} {}'.format(item[0],  '\n'.join(textwrap.wrap(
                     '{} (default: {})'.format(item[2], item[1]),
-                    subsequent_indent=' '*15))))
+                    subsequent_indent=' '*5))))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
