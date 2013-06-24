@@ -641,6 +641,32 @@ class DecompressFiles:
         filenames.sort()
         return filenames        
 
+class LinkToDir:
+    '''Create hard links of input files to a specified directory. This is 
+    usually used to link input files to a common cache directory so that 
+    all operations can be performed on that directory.'''
+    def __init__(self, dest):
+        self.dest = dest
+        if not os.path.isdir(self.dest):
+            env.logger.info('Creating directory {}'.format(self.dest))
+            try:
+                os.mkdirs(self.dest)
+            except Exception as e:
+                raise RuntimeError('Failed to create directory {}'.format(self.dest))
+            if not os.path.isdir(self.dest):
+                raise RuntimeError('Failed to create directory {}'.format(self.dest))
+
+    def __call__(self, ifiles):
+        ofiles = []
+        for filename in ifiles:
+            path, name = os.path.split(filename)
+            if not os.path.samefile(filename,  os.path.join(self.dest, basename)):
+                env.logger.info('Linking {} to {}'.format(filename, self.dest))
+                os.link(filename, os.path.join(self.dest, basename)
+            ofiles.append(os.path.join(self.dest, basename))
+        return ofiles
+
+        
 class CountMappedReads:
     '''This action reads the input files in sam format and count the total
     number of reads and number of mapped reads. It raises a RuntimeError

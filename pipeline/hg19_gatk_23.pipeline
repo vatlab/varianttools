@@ -188,9 +188,9 @@ comment=Convert bam files to paired fastq files if the input is in bam/sam forma
 
 [align_101]
 # input is output of previous step ${OUTPUT100}
-action=DecompressFiles(dest_dir="${CACHE_DIR}")
+action=DecompressFiles(dest_dir="${CACHE_DIR}"), LinkToDir('${CACHE_DIR)')
 comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
-    a cache directory. The original files are untouched if not compressed.
+    a cache directory. Uncompressed files are hard-linked to the cache directory.
 
 [align_200]
 # input of ${OUTPUT101}, which is a list of fastq files
