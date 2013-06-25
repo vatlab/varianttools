@@ -613,10 +613,8 @@ class PipelineDescription:
     def __init__(self, name, extra_args=[]):
         '''Pipeline configuration file'''
         self.description = None
-        self.resource = []
-        self.resource_dir = None
-        self.align_steps = []
-        self.call_steps = []
+        self.pipeline_vars = {}
+        self.pipeline_steps = []
         #
         if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
@@ -677,14 +675,14 @@ class PipelineDescription:
                 for item in parser.items(section, vars=defaults):
                     if item[0] == 'description':
                         self.description = item[1]
-                    elif item[0] == 'resource':
-                        self.resource = [x.strip() for x in item[1].split('\n')]
-                    elif item[0] == 'resource_dir':
-                        self.resource_dir = item[1]
+                    elif item[0] in defaults:
+                        pass
+                    else:
+                        self.pipeline_vars[item[0]] = item[1]
             else:
-                if section.split('_')[0] not in ('align', 'call') or \
+                if section.split('_')[0] != 'step' or \
                     not section.split('_')[-1].isdigit():
-                    raise ValueError('Only sections align_# and call_# '
+                    raise ValueError('Only sections step_# '
                         'are allowed: {} specified.'.format(section))
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
@@ -702,24 +700,20 @@ class PipelineDescription:
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    if section.startswith('align_'):
-                        self.align_steps.append(command)
-                    elif section.startswith('call_'):
-                        self.call_steps.append(command)
+                    if section.startswith('step_'):
+                        self.pipeline_steps.append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
         # sort steps
-        self.align_steps.sort(key=lambda x: x[0])
-        self.call_steps.sort(key=lambda x: x[0])
+        self.pipeline_steps.sort(key=lambda x: x[0])
         # 
         # validate
-        for pipeline in (self.align_steps, self.call_steps):
-            for idx, cmd in enumerate(pipeline):
-                if cmd is None:
-                    raise ValueError('Invalid pipeline. Step {} is left unspecified.'
-                        .format(idx+1))
-                if not cmd.action:
-                    raise ValueError('Missing or empty action for step {}'.format(idx + 1))
+        for idx, cmd in enumerate(self.pipeline_steps):
+            if cmd is None:
+                raise ValueError('Invalid pipeline. Step {} is left unspecified.'
+                    .format(idx+1))
+            if not cmd.action:
+                raise ValueError('Missing or empty action for step {}'.format(idx + 1))
      
     def describe(self):
         print('Pipeline:     {}'.format(self.name))
@@ -727,13 +721,15 @@ class PipelineDescription:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
         #
-        for name, commands in [('Align', self.align_steps), ('Variant calling', self.call_steps)]:
-            if not commands:
-                continue
-            print('\n{} steps:'.format(name))
-            for idx, step in enumerate(commands):
-                print('  {:2} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
-                    subsequent_indent=' '*5))))
+        if self.pipeline_vars:
+            print('Pipeline variables:')
+            for key, val in self.pipeline_vars.items():
+                print('  {:10} {}'.format(key, val))
+        #
+        print('Pipeline steps:')
+        for idx, step in enumerate(self.pipeline_steps):
+            print('  {:2} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
+                subsequent_indent=' '*5))))
         #
         if self.parameters:
             print('\nPipeline parameters:')
@@ -3821,39 +3817,6 @@ def show(args):
         sys.exit(1)
 
 
-def executeArguments(parser):
-    parser.add_argument('query', nargs='*',
-        help='''A SQL query to be executed. The project genotype database is
-        attached as genotype. Annotation databases used in the project
-        are attached and are available by their names.''')
-    parser.add_argument('-d', '--delimiter', default='\t',
-        help='Delimiter used to output results, default to tab.')
-
-def execute(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            # preferred
-            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-            # for backward compatibility
-            proj.db.attach('{}_genotype'.format(proj.name))
-            cur = proj.db.cursor()
-            query = ' '.join(args.query)
-            if query.upper().startswith('SELECT'):
-                env.logger.debug('Analyze statement: "{}"'.format(query))
-                cur.execute('EXPLAIN QUERY PLAN ' + query)
-                for rec in cur:
-                    env.logger.debug('\t'.join([str(x) for x in rec]))
-            # really execute the query
-            cur.execute(query)
-            proj.db.commit()
-            sep = args.delimiter
-            for rec in cur:
-                print(sep.join(['{}'.format(x) for x in rec]))
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
-
 def adminArguments(parser):
     resource = parser.add_argument_group('Download or update resources')
     resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
@@ -3914,6 +3877,15 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
+    #
+    execute = parser.add_argument_group('Execute SQL query')
+    execute.add_argument('--query', nargs='*',
+        help='''A SQL query to be executed. The project genotype database is
+        attached as genotype. Annotation databases used in the project
+        are attached and are available by their names.''')
+    execute.add_argument('-d', '--delimiter', default='\t',
+        help='Delimiter used to output results, default to tab.')
+
 
 
 def admin(args):
@@ -4040,6 +4012,23 @@ def admin(args):
                 res.excludeExistingLocalFiles()
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
+            elif args.query:
+                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+                # for backward compatibility
+                proj.db.attach('{}_genotype'.format(proj.name))
+                cur = proj.db.cursor()
+                query = ' '.join(args.query)
+                if query.upper().startswith('SELECT'):
+                    env.logger.debug('Analyze statement: "{}"'.format(query))
+                    cur.execute('EXPLAIN QUERY PLAN ' + query)
+                    for rec in cur:
+                        env.logger.debug('\t'.join([str(x) for x in rec]))
+                # really execute the query
+                cur.execute(query)
+                proj.db.commit()
+                sep = args.delimiter
+                for rec in cur:
+                    print(sep.join(['{}'.format(x) for x in rec]))
             else:
                 env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:

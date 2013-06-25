@@ -659,7 +659,7 @@ class LinkToDir:
     def __call__(self, ifiles):
         ofiles = []
         for filename in ifiles:
-            path, name = os.path.split(filename)
+            path, basename = os.path.split(filename)
             if not os.path.samefile(filename,  os.path.join(self.dest, basename)):
                 env.logger.info('Linking {} to {}'.format(filename, self.dest))
                 os.link(filename, os.path.join(self.dest, basename))
@@ -714,21 +714,24 @@ class CountMappedReads:
         return self.output
 
 
-class Pipeline:
-    def __init__(self, name, extra_args=[]):
-        self.pipeline = PipelineDescription(name, extra_args)
-        #
-        # resource directory
-        #
-        if self.pipeline.resource_dir:
-            if os.path.isabs(os.path.expanduser(self.pipeline.resource_dir)):
-                self.pipeline_resource = os.path.expanduser(self.pipeline.resource_dir)
+class DownloadResource:
+    '''Download resources to specified destination directory. resource_dir can
+    be a full path name or a directory relative to 
+    $local_resource/pipeline_resource where $local_resource is the local
+    resource directory of the project (default to ~/.variant_tools,
+    see runtime option local_resource for details). The default pipeline 
+    resource directory is $local_resource/pipeline_resource/NAME where NAME
+    is the name of the pipeline.'''
+    def __init__(self, resource, resource_dir):
+        self.resource = resource.split()
+        if not resource_dir or type(resource_dir) != str:
+            raise ValueError('Invalid resource directory {}'.format(resourece_dir))
+        else:
+            if os.path.isabs(os.path.expanduser(resource_dir)):
+                self.pipeline_resource = os.path.expanduser(resource_dir)
             else:
                 self.pipeline_resource = os.path.join(os.path.expanduser(
-                    env.local_resource), 'pipeline_resource', self.pipeline.resource_dir)
-        else:
-            self.pipeline_resource = os.path.join(os.path.expanduser(
-                    env.local_resource), 'pipeline_resource', self.pipeline.name)
+                    env.local_resource), 'pipeline_resource', resource_dir)
         try:
             if not os.path.isdir(self.pipeline_resource):
                 os.makedirs(self.pipeline_resource)
@@ -736,14 +739,14 @@ class Pipeline:
             raise RuntimeError('Failed to create pipeline resource directory '
                 .format(self.pipeline_resource))
 
-    def downloadResource(self):
+    def __call__(self, ifiles):
         '''Download resource'''
         # decompress all .gz files
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
         skipped = []
         md5_files = []
-        for cnt, URL in enumerate(sorted(self.pipeline.resource)):
+        for cnt, URL in enumerate(sorted(self.resource)):
             filename = URL.rsplit('/', 1)[-1]
             dest_file = os.path.join(self.pipeline_resource, filename)
             try:
@@ -751,7 +754,7 @@ class Pipeline:
                     skipped.append(filename)
                 else:
                     downloadURL(URL, dest_file, False,
-                        message='{}/{} {}'.format(cnt+1, len(self.pipeline.resource), filename))
+                        message='{}/{} {}'.format(cnt+1, len(self.resource), filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
@@ -791,13 +794,19 @@ class Pipeline:
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'
                 .format(len(skipped), self.pipeline_resource))
+        return ifiles
  
+
+class Pipeline:
+    def __init__(self, name, extra_args=[]):
+        self.pipeline = PipelineDescription(name, extra_args)
+
     def substitute(self, text, VARS):
         # now, find ${}
         pieces = re.split('(\${[^}]*})', text)
         for idx, piece in enumerate(pieces):
             if piece.startswith('${') and piece.endswith('}'):
-                KEY = piece[2:-1]
+                KEY = piece[2:-1].lower()
                 if ':' in KEY:
                     # a lambda function?
                     try:
@@ -829,19 +838,21 @@ class Pipeline:
         # now, join the pieces together, but remove all newlines
         return ' '.join(''.join(pieces).split())
 
-    def execute(self, steps, input_files=[], output_files=[], jobs=1):
+    def execute(self, input_files=[], output_files=[], jobs=1):
         global max_running_jobs 
         max_running_jobs = jobs
         VARS = {
-            'CMD_INPUT': input_files,
-            'CMD_OUTPUT': output_files,
-            'RESOURCE_DIR': self.pipeline_resource,
-            'TEMP_DIR': env.temp_dir,
-            'CACHE_DIR': env.cache_dir,
+            'cmd_input': input_files,
+            'cmd_output': output_files,
+            'temp_dir': env.temp_dir,
+            'cache_dir': env.cache_dir,
+            'local_resource': env.local_resource,
         }
+        for key, val in self.pipeline.pipeline_vars.items():
+            VARS[key.lower()] = self.substitute(val, VARS)
+        #
         ifiles = input_files
-        for command in {'align': self.pipeline.align_steps,
-                'call': self.pipeline.call_steps}[steps]:
+        for command in self.pipeline.pipeline_steps:
             # substitute ${} variables
             if command.input:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
@@ -849,12 +860,12 @@ class Pipeline:
                 step_input = ifiles
             # if there is no input file?
             if not step_input:
-                raise RuntimeError('Pipeline stops at step {} of {}: No input file is available.'
-                    .format(command.index, steps))
+                raise RuntimeError('Pipeline stops at step {}: No input file is available.'
+                    .format(command.index))
             #
-            VARS['INPUT{}'.format(command.index)] = step_input
-            env.logger.debug('INPUT of step {} of {}: {}'
-                    .format(command.index, steps, step_input))
+            VARS['input{}'.format(command.index)] = step_input
+            env.logger.debug('INPUT of step {}: {}'
+                    .format(command.index, step_input))
             # 
             # now, group input files
             if not command.input_emitter:
@@ -862,8 +873,8 @@ class Pipeline:
             else:
                 try:
                     # remove ${INPUT} because it is determined by the emitter
-                    if 'INPUT' in VARS:
-                        VARS.pop('INPUT')
+                    if 'input' in VARS:
+                        VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
                     emitter = eval(self.substitute(command.input_emitter, VARS))
                 except Exception as e:
@@ -876,12 +887,12 @@ class Pipeline:
                 for ig in igroups:
                     if not ig:
                         continue
-                    VARS['INPUT'] = ig
+                    VARS['input'] = ig
                     action = self.substitute(command.action, VARS)
-                    env.logger.debug('Emitted input of step {} of {}: {}'
-                        .format(command.index, steps, ig))
-                    env.logger.debug('Action of step {} of {}: {}'
-                        .format(command.index, steps, action))
+                    env.logger.debug('Emitted input of step {}: {}'
+                        .format(command.index, ig))
+                    env.logger.debug('Action of step {}: {}'
+                        .format(command.index, action))
                     action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
@@ -892,15 +903,15 @@ class Pipeline:
                         step_output.extend(ofiles)
                 # wait for all pending jobs to finish
                 wait_all()
-                VARS['OUTPUT{}'.format(command.index)] = step_output
-                env.logger.debug('OUTPUT of step {} of {}: {}'
-                    .format(command.index, steps, step_output))
+                VARS['output{}'.format(command.index)] = step_output
+                env.logger.debug('OUTPUT of step {}: {}'
+                    .format(command.index, step_output))
                 for f in step_output:
                     if not os.path.isfile(f):
-                        raise RuntimeError('Output file {} does not exist after completion of step {} of {}'.format(f, command.index, steps))
+                        raise RuntimeError('Output file {} does not exist after completion of step {}'.format(f, command.index))
             except Exception as e:
-                raise RuntimeError('Failed to execute step {} of {}: {}'
-                    .format(command.index, steps, e))
+                raise RuntimeError('Failed to execute step {}: {}'
+                    .format(command.index, e))
             os.chdir(saved_dir)
             ifiles = step_output
 
@@ -920,7 +931,9 @@ def isBamPairedEnd(input_file):
         return read.is_paired
 
 
-def alignReadsArguments(parser):
+def executeArguments(parser):
+    parser.add_argument('pipeline', 
+        help='Name of the pipeline to be used to be executed.')
     parser.add_argument('input_files', nargs='+',
         help='''One or more files that contains raw sequence reads from the
             same sample. Depending on the pipeline used, the input files can
@@ -930,46 +943,17 @@ def alignReadsArguments(parser):
     parser.add_argument('-o', '--output', nargs='+',
         help='''Names of output files that contain aligned reads, usually in
             BAM format. They will be passed to the pipelines as ${CMD_OUTPUT}.''')
-    parser.add_argument('--pipeline', required=True,
-        help='Name of the pipeline to be used to align raw reads.')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs.''')
 
-def alignReads(args):
+def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
-            pipeline.downloadResource()
-            pipeline.execute('align', args.input_files, args.output, args.jobs)
+            pipeline.execute(args.input_files, args.output, args.jobs)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
-
-
-def callVariantsArguments(parser):
-    parser.add_argument('input_files', nargs='+',
-        help='''One or more files that contain aligned reads from one or
-            more samples. The input will be passed to the pipelines as
-            ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='+',
-        help='''Names of output files that contained variants called by
-            the variant calling pipeline. They will be passed to the pipelines
-            as ${CMD_OUTPUT}''')
-    parser.add_argument('--pipeline', required=True,
-        help='Name of the pipeline to be used to call variants.')
-    parser.add_argument('-j', '--jobs', default=1, type=int,
-            help='''Maximum number of concurrent jobs.''')
-
-def callVariants(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
-            pipeline.downloadResource()
-            pipeline.execute('call', args.input_files, args.output, args.jobs)
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
 
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools

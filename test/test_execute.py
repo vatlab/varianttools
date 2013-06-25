@@ -37,16 +37,16 @@ class TestExecute(ProcessTestCase):
     def removeProj(self):
         runCmd('vtools remove project')
     def testExecute(self):
-        'Test command vtools execute'
-        self.assertFail('vtools execute')
-        self.assertSucc('vtools execute -h')
-        self.assertFail('vtools execute select non_existing_field from sample -v2')
-        self.assertSucc('vtools execute select sample_name from sample -v2')
-        self.assertFail('vtools execute select * from sample -v0')
-        self.assertSucc('vtools execute \'select * from sample\'')
-        self.assertSucc('vtools execute \'delete FROM variant where chr=1\' -v2')
-        self.assertSucc('vtools execute \'delete FROM variant where ref="T"\' -v2')
-        self.assertSucc('vtools execute \'delete FROM sample where aff=2\' -v2')
+        'Test command vtools admin --query'
+        self.assertFail('vtools admin --query')
+        self.assertSucc('vtools admin --query -h')
+        self.assertFail('vtools admin --query select non_existing_field from sample -v2')
+        self.assertSucc('vtools admin --query select sample_name from sample -v2')
+        self.assertFail('vtools admin --query select * from sample -v0')
+        self.assertSucc('vtools admin --query \'select * from sample\'')
+        self.assertSucc('vtools admin --query \'delete FROM variant where chr=1\' -v2')
+        self.assertSucc('vtools admin --query \'delete FROM variant where ref="T"\' -v2')
+        self.assertSucc('vtools admin --query \'delete FROM sample where aff=2\' -v2')
     
     def testExeAnno(self):
         runCmd('vtools init test -f')
@@ -54,16 +54,16 @@ class TestExecute(ProcessTestCase):
         runCmd('vtools import vcf/SAMP2.vcf')
         runCmd('vtools use refGene')
         runCmd('vtools update variant --set ref_name=refGene.name')
-        self.assertSucc('vtools execute \'select chr,txStart,txEnd,name from refGene where name is not null\'')
-        self.assertOutput('vtools execute \'select chr,txStart,txEnd,name from refGene where name="NR_024321"\'','1\t761586\t762902\tNR_024321\n')
-        out2 = output2list('vtools execute \'select chr from variant where ref_name = "NR_024321"\'')
+        self.assertSucc('vtools admin --query \'select chr,txStart,txEnd,name from refGene where name is not null\'')
+        self.assertOutput('vtools admin --query \'select chr,txStart,txEnd,name from refGene where name="NR_024321"\'','1\t761586\t762902\tNR_024321\n')
+        out2 = output2list('vtools admin --query \'select chr from variant where ref_name = "NR_024321"\'')
         for y in out2:
             print(y)
             if int(y) != 1:
                raise ValueError('The chromosome numbers are not same in variant table and annotation file')            
         pass
 
-        out1 = output2list('vtools execute \'select pos from variant where ref_name = "NR_024321"\'')
+        out1 = output2list('vtools admin --query \'select pos from variant where ref_name = "NR_024321"\'')
         for x in out1:
             print(x)
             if int(x) < 761586:

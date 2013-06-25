@@ -6,91 +6,67 @@
 
 [pipeline description]
 description=A pipeline to call genetic variants from fastq files using BWA
-    and GATK best practice. It uses b37 of human reference genome and assumes
+    and GATK best practice. It uses hg19 of human reference genome and assumes
     paired-end reads in plain text and compressed formats. It also accepts
-    bam/sam files as input, in which case raw reads will be extracted and 
+    bam/sam files as input, in which case raw reads will be extracted and
     re-aligned. Reduced bam files will be generated if there are multiple
     output files in the align step.
 #
-# resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_b37
-resource_dir=gatk23_b37
-# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/b37/*
+# resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_hg19
+resource_dir=gatk23_hg19
+# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
 # the .gz files will be automatically decompressed
-resource=ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_omni2.5.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_omni2.5.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_omni2.5.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_omni2.5.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_phase1.indels.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_phase1.indels.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_phase1.indels.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/1000G_phase1.indels.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.excluding_sites_after_129.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.excluding_sites_after_129.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.excluding_sites_after_129.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.excluding_sites_after_129.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/dbsnp_137.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/hapmap_3.3.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/hapmap_3.3.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/hapmap_3.3.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/hapmap_3.3.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.dict.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.dict.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.fasta.fai.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.fasta.fai.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.fasta.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.fasta.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.stats.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37_decoy.stats.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.dict.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.dict.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.fasta.fai.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.fasta.fai.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.fasta.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.fasta.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.stats.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/human_g1k_v37.stats.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.sites.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.sites.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.sites.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.sites.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.b37.vcf.idx.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.bam
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.bam.bai.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.bam.bai.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.bam.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.vcf.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.vcf.gz.md5
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.vcf.idx.gz
-  ftp://ftp.broadinstitute.org/bundle/2.3/b37/NA12878.HiSeq.WGS.bwa.cleaned.recal.b37.20.vcf.idx.gz.md5
-  
+resource=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/CEUTrio.HiSeq.WGS.b37.bestPractices.phased.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.idx.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.vcf.idx.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz.md5
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
+  ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5
+
+
 
 [DEFAULT]
 strict_prog_version=True
 strict_prog_version_comment=Whether or not use other version of programs if the exact version does not
 	exist. Setting it to False allows variant tools to use other versions of the programs.
-
-bwa=bwa
-bwa_comment=path to bwa. Default to bwa (use $PATH to determine actual path)
-
-samtools=samtools
-samtools_comment=path to samtools. Default to samtools (use $PATH to determine actual path)
-
-java=java
-java_comment=path to java. Default to java (use $PATH to determine actual path)
 
 picard_path=
 picard_path_comment=Path to picard jar files
@@ -158,11 +134,11 @@ opt_gatk_applyrecalibration_indel=
 
 [align_10]
 # input = output = ${CMD_INPUT}
-action=CheckCommands(['%(bwa)s', '%(samtools)s', '%(java)s'])
+action=CheckCommands(['bwa', 'samtools', 'java'])
 comment=Check existence of commands bwa, samtools and java
 
 [align_11]
-action=CheckOutput('%(bwa)s', 'Version: 0.7.*', %(strict_prog_version)s)
+action=CheckOutput('bwa', 'Version: 0.7.*', %(strict_prog_version)s)
 comment=Check if the version of bwa is 0.7.4
 
 [align_12]
@@ -170,7 +146,7 @@ action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.72', %(strict_pro
 comment=Check if the version of picard is 1.82
 
 [align_13]
-action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
+action=CheckOutput('java -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
 comment=Check the version of GATK
 
 [align_20]
@@ -180,25 +156,25 @@ comment=Check existence of class files for Picard and GATK
 
 [align_30]
 # customized input and output 
-input=${RESOURCE_DIR}/human_g1k_v37.fasta
+input=${RESOURCE_DIR}/ucsc.hg19.fasta
 # this step will be ignored if output exists and newer than $INPUT
-action=RunCommand('%(bwa)s index %(opt_bwa_index)s -a bwtsw ${INPUT}',
+action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}',
     working_dir='${RESOURCE_DIR}', 
-    output='${RESOURCE_DIR}/human_g1k_v37.fasta.amb')
-comment=Build bwa index for build b37 of reference genome
+    output='${RESOURCE_DIR}/ucsc.hg19.fasta.amb')
+comment=Build bwa index for build hg19 of reference genome
 
 [align_40]
 # customized input and output 
-input=${RESOURCE_DIR}/human_g1k_v37.fasta
-action=RunCommand('%(samtools)s faidx %(opt_samtools_faidx)s ${INPUT}',
+input=${RESOURCE_DIR}/ucsc.hg19.fasta
+action=RunCommand('samtools faidx %(opt_samtools_faidx)s ${INPUT}',
     working_dir='${RESOURCE_DIR}',
-    output='${RESOURCE_DIR}/human_g1k_v37.fasta.fai')
-comment=Build samtools index for build b37 of reference genome
+    output='${RESOURCE_DIR}/ucsc.hg19.fasta.fai')
+comment=Build samtools index for build hg19 of reference genome
 
 [align_100]
 # input is reset to command input ${CMD_INPUT}
 input=${CMD_INPUT}
-action=RunCommand("%(java)s %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(opt_picard_samtofastq)s
+action=RunCommand("java %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(opt_picard_samtofastq)s
     INPUT=${INPUT} 
     FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
     SECOND_END_FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}")
@@ -214,7 +190,7 @@ comment=Convert bam files to paired fastq files if the input is in bam/sam forma
 # input is output of previous step ${OUTPUT100}
 action=DecompressFiles(dest_dir="${CACHE_DIR}"), LinkToDir('${CACHE_DIR)')
 comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
-    a cache directory.  Uncompressed files are hard-linked to the cache directory.
+    a cache directory. Uncompressed files are hard-linked to the cache directory.
 
 [align_200]
 # input of ${OUTPUT101}, which is a list of fastq files
@@ -227,9 +203,9 @@ comment=Check the format of the input fastq file and write an option file
 [align_201]
 # cannot use output of step align200, because we need a list of fastq files
 input=${OUTPUT101}
-action=RunCommand(cmd='%(bwa)s aln 
+action=RunCommand(cmd='bwa aln 
         ${INPUT: open(INPUT[0] + ".aln_param").read().strip()}
-        %(opt_bwa_aln)s -t 4 ${RESOURCE_DIR}/human_g1k_v37.fasta 
+        %(opt_bwa_aln)s -t 4 ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT} > ${INPUT: INPUT[0] + '.sai'}',
     output="${INPUT: INPUT[0] + '.sai'}")
 # remove all non-fastq files that might have been inputted
@@ -249,9 +225,9 @@ comment=Determine (guess) a read group tag and write to a .RG file.
 # cannot use output of step align201, because we need a list of fastq files
 input=${OUTPUT101}
 # cmd=r" " is needed because there are \t in the readgroup string
-action=RunCommand(cmd=r"%(bwa)s sampe %(opt_bwa_sampe)s
+action=RunCommand(cmd=r"bwa sampe %(opt_bwa_sampe)s
         -r '${INPUT: open(INPUT[0] + ".RG").read().strip()}'
-        ${RESOURCE_DIR}/human_g1k_v37.fasta 
+        ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT: INPUT[0] + '.sai'} ${INPUT: INPUT[1] + '.sai'}
         ${INPUT: INPUT[0]} ${INPUT: INPUT[1]} > ${INPUT: INPUT[0] + '.sam'}",
     output="${INPUT: INPUT[0] + '.sam'}")
@@ -266,7 +242,7 @@ comment=Check the proportion of aligned reads and exit if there are less than
 
 [align_400]
 input=${OUTPUT301}
-action=RunCommand(cmd="%(java)s %(opt_java)s -jar %(picard_path)s/MergeSamFiles.jar
+action=RunCommand(cmd="java %(opt_java)s -jar %(picard_path)s/MergeSamFiles.jar
         %(opt_picard_mergesamfiles)s ${INPUT: ' '.join(INPUT)}
         USE_THREADING=true
         VALIDATION_STRINGENCY=LENIENT
@@ -274,11 +250,11 @@ action=RunCommand(cmd="%(java)s %(opt_java)s -jar %(picard_path)s/MergeSamFiles.
         OUTPUT=${INPUT: INPUT[0][:-4] + '_merged.bam'}",
     output="${INPUT: INPUT[0][:-4] + '_merged.bam'}")
 # if there is only one input file, skip this step and pass the input to output
-input_emitter=EmitInput(select=${INPUT400: len(INPUT400) > 1}, group_by="all")
+input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1}, group_by="all")
 comment=Merge multiple sam files
 
 [align_500]
-action=RunCommand(cmd="%(java)s %(opt_java)s 
+action=RunCommand(cmd="java %(opt_java)s 
         -jar %(picard_path)s/SortSam.jar 
         %(opt_picard_sortsam)s I=${INPUT}
         O=${INPUT: INPUT[0][:-4] + '_sorted.bam'} SO=coordinate",
@@ -286,7 +262,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
 comment=Sort merged bam file
 
 [align_600]
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(picard_path)s/MarkDuplicates.jar 
         %(opt_picard_markduplicates)s 
         INPUT=${INPUT}
@@ -298,78 +274,78 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
 comment=Mark duplicates
 
 [align_610]
-action=RunCommand(cmd="%(samtools)s index
+action=RunCommand(cmd="samtools index
         %(opt_samtools_index)s ${INPUT}",
     output="${INPUT: INPUT[0] + '.bai'}")
 comment=index dedupped bam file
 
 [align_700]
 input=${OUTPUT600}
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -T RealignerTargetCreator
         %(opt_gatk_realignertargetcreator)s
         -I ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --mismatchFraction 0.0
         -o ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
-        -known ${RESOURCE_DIR}/dbsnp_137.b37.vcf
-        -known ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
-        -known ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
-        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
-        -known ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+        -known ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
     output="${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}")
 comment=Realign indels create indel realigner target
 
 [align_710]
 # input is still the bam file, not the realigner tager intervals
 input=${OUTPUT600}
-action=RunCommand(cmd="%(java)s %(opt_java)s 
+action=RunCommand(cmd="java %(opt_java)s 
         -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T IndelRealigner 
         %(opt_gatk_indelrealigner)s 
         -I ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --targetIntervals ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
         --consensusDeterminationModel USE_READS
         -compress 0 
         -o ${INPUT: INPUT[0][:-4] + '.clean.bam'}
-        -known ${RESOURCE_DIR}/dbsnp_137.b37.vcf
-        -known ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
-        -known ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
-        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
-        -known ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+        -known ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
     output="${INPUT: INPUT[0][:-4] + '.clean.bam'}")
 comment=Apply indel realigner target to bam file
 
 [align_800]
-action=RunCommand(cmd="%(java)s %(opt_java)s 
+action=RunCommand(cmd="java %(opt_java)s 
         -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T BaseRecalibrator
         %(opt_gatk_baserecalibrator)s
         -I ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -cov ReadGroupCovariate
         -cov QualityScoreCovariate
         -cov CycleCovariate
         -cov ContextCovariate
         -o ${INPUT: INPUT[0][:-4] + '.grp'}
-        -knownSites ${RESOURCE_DIR}/dbsnp_137.b37.vcf
-        -knownSites ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
-        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
-        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
-        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+        -knownSites ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
     output="${INPUT: INPUT[0][:-4] + '.grp'}")
 comment=Create base recalibrator target
 
 [align_810]
 input=${OUTPUT710}
-action=RunCommand(cmd="%(java)s %(opt_java)s 
+action=RunCommand(cmd="java %(opt_java)s 
         -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T PrintReads
         %(opt_gatk_printreads)s
         -I ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -BQSR ${INPUT: INPUT[0][:-4] + '.grp'}
         -o ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     output="${CMD_OUTPUT: CMD_OUTPUT[0]}")
@@ -378,17 +354,16 @@ comment=Apply base recalibrator target
 [align_900]
 # if there are more than 1 output file, emit input file for further processing
 # output file is specifed as the second command output
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -T ReduceReads
         %(opt_gatk_reducereads)s
         -I ${INPUT} 
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -o ${CMD_OUTPUT: CMD_OUTPUT[1]}",
     output="${CMD_OUTPUT: CMD_OUTPUT[1]}")
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 1})
 comment=Generated bam file with reduced reads if more than one output file is specified
-
 
 [call_20]
 # input = output = ${CMD_INPUT}
@@ -397,13 +372,13 @@ comment=Check existence of class files for GATK
 
 
 [call_100]
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -T UnifiedGenotyper 
         %(opt_gatk_unifiedgenotyper)s 
         -I ${INPUT} 
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
-        --dbsnp ${RESOURCE_DIR}/dbsnp_137.b37.vcf
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         --genotype_likelihoods_model BOTH 
         -o ${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
     output="${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
@@ -413,16 +388,16 @@ comment=Use unified genotyper to get raw variants
 
 
 [call_200]
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -I ${INPUT} 
         -T VariantRecalibrator
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         %(opt_gatk_variantrecalibrator)s
         %(opt_gatk_variantrecalibrator_SNV)s
-        -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
-        -resource:omni,known=false,training=true,truth=true,prior=12.0	${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
-        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	${RESOURCE_DIR}/dbsnp_137.b37.vcf
+        -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -resource:omni,known=false,training=true,truth=true,prior=12.0	${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         -mode SNP 
         -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
@@ -437,17 +412,17 @@ comment=Recalibrate SNPs
 [call_210]
 # use the same .vcf file, not the output files of the SNP recalibration step
 input=${OUTPUT100}
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -I ${INPUT} 
         -T VariantRecalibrator
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         %(opt_gatk_variantrecalibrator)s
         %(opt_gatk_variantrecalibrator_INDEL)s
         -resource:mills,known=false,training=true,truth=true,prior=12.0 
-            ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
+            ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
         -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 
-            ${RESOURCE_DIR}/dbsnp_137.b37.vcf
+            ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         -mode INDEL 
         -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
@@ -461,13 +436,13 @@ comment=Recalibrate INDELs
 
 [call_300]
 input=${OUTPUT100}
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar GenomeAnalysisTK.jar 
         -T ApplyRecalibration
         %(opt_gatk_applyrecalibration)s
         %(opt_gatk_applyrecalibration_SNV)s
         --input ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -mode SNP 
         -recalFile ${INPUT: INPUT[0][:-4] + '.SNVs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNVs.tranches'}
@@ -477,13 +452,13 @@ comment=Apply SNV recalibration
 
 [call_310]
 # use input from last step (.recal.SNPs.vcf)
-action=RunCommand(cmd="%(java)s %(opt_java)s
+action=RunCommand(cmd="java %(opt_java)s
         -jar GenomeAnalysisTK.jar 
         -T ApplyRecalibration
         %(opt_gatk_applyrecalibration)s
         %(opt_gatk_applyrecalibration_INDEL)s
         --input ${INPUT}
-        -R ${RESOURCE_DIR}/human_g1k_v37.fasta
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -mode INDEL
         -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
