@@ -3501,14 +3501,16 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'genotypes', 'fields', 'annotations', 'annotation',
-        'formats', 'format', 'tests', 'test', 'runtime_options', 'runtime_option',
-        'snapshot', 'snapshots', 'pipeline', 'pipelines'],
+        'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
+        'annotation', 'formats', 'format', 'tests', 'test', 'runtime_options',
+        'runtime_option', 'snapshot', 'snapshots', 'pipeline', 'pipelines'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
-            table TBL, 'samples' for a list of sample and associated phenotypes,
+            table TBL, 'samples [COND]' for sample name, files from which samples
+            are imported, and associated phenotypes of all or selected samples
+            'phenotypes [P1 P2...]' for all or specified phenotypes of samples, 
             'fields' for fields from variant tables and all used annotation
             databases, 'annotations' for a list of all available annotation
             databases, 'annotation ANN' for details about annotation database ANN,
@@ -3525,9 +3527,10 @@ def showArguments(parser):
             of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, names of tables for
-            type 'table', name of an annotation database for type 'annotation',
-            name of a format for type 'format', and name of an association test
-            for type 'test'.''')
+            type 'table', conditions to select samples for type 'samples', 
+            a list of phenotypes for type 'phenotypes', name of an annotation
+            database for type 'annotation', name of a format for type 'format',
+            and name of an association test for type 'test'.''')
     parser.add_argument('-l', '--limit', metavar='N', type=int,
         help='''Limit output to the first N records.''')
 
@@ -3592,12 +3595,46 @@ def show(args):
                 # headers are ID, file, sample, FIELDS
                 print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
-                    'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
-                    .format(' '.join([','+x for x in fields[3:]]), limit_clause))
+                    'WHERE sample.file_id = filename.file_id {} ORDER BY sample_name {};'
+                    .format(' '.join([','+x for x in fields[3:]]),
+                    ' '.join(['AND ({})'.format(x) for x in args.items]),
+                    limit_clause))
                 for rec in cur:
                     if args.verbosity != '2' and len(rec[1]) > 25:
                         rec = list(rec)
                         rec[1] = rec[1][:8] + '...' + rec[1][-14:]
+                    print('\t'.join(['{}'.format(x) for x in rec]))
+                nAll = proj.db.numOfRows('sample')
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'phenotypes':
+                if not proj.db.hasTable('sample'):
+                    env.logger.warning('Project does not have a sample table.')
+                    return
+                cur = proj.db.cursor()
+                fields = proj.db.getHeaders('sample')[3:]
+                if args.items:
+                    env.logger.error(args.items)
+                    found = []
+                    unfound = []
+                    for item in args.items:
+                        if item.lower() in [x.lower() for x in fields]:
+                            idx = [x.lower() for x in fields].index(item.lower())
+                            found.append(fields[idx])
+                        else:
+                            unfound.append(item)
+                    #
+                    if unfound:
+                        env.logger.warning('Phenotypes {} not found.'
+                            .format(', '.join(unfound)))
+                    fields = found
+                # headers are ID, file, sample, FIELDS
+                print('sample_name{}'.format(''.join(['\t'+x for x in fields])))
+                cur.execute('SELECT sample_name {} FROM sample, filename '
+                    'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
+                    .format(' '.join([','+x for x in fields]),
+                    limit_clause))
+                for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
