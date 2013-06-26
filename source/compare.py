@@ -40,13 +40,13 @@ def compareArguments(parser):
         help='''deprecated, use --intersect instead.''')
     parser.add_argument('--A_or_B', metavar= 'TABLE',
         help='''deprecated, use --union instead.''')
-    parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+    parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name
              is specified. An optional message can be added to describe the table.''')
-    parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+    parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name
              is specified. An optional message can be added to describe the table.''')
-    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*', default=[],
+    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in the first, but not in the others (T1 - T2 - T3...) to TABLE
               if a name is specified. An optional message can be added to describe the table.''')
     parser.add_argument('-c', '--count', action='store_true',
@@ -120,13 +120,13 @@ def compareMultipleTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
     # display a progress bar during query. We therefore only use that faster method (3m38s
     # instead of 2m33s) in the case of -v0.
-    if args.count and sum([args.difference != [], args.union != [], args.intersection != []]) > 1:
+    if args.count and sum([args.difference is not None, args.union is not None, args.intersection is not None]) > 1:
         raise ValueError('Argument --count can be used only with one operation.')
     # args.difference is
     #    None  for --difference
     #    value for --difference value
     #    ''    for not specified
-    if not args.count and (args.difference is None or args.union is None or args.intersection is None):
+    if not args.count and (args.difference == [] or args.union == [] or args.intersection == []):
         raise ValueError('Please specify either a table to output variants, or --count')
     #
     cur = proj.db.cursor()
@@ -172,13 +172,17 @@ def compareMultipleTables(proj, args):
         if table == 'variant':
             raise ValueError('Cannot overwrite the master variant table')
         if '*' in table or '?' in table:
-            env.logger.warning('Use of wildcard character * or ? in table names is not recommended because such names can be expanded to include other tables in some commands.')
+            env.logger.warning('Use of wildcard character * or ? in table '
+                'names is not recommended because such names can be expanded '
+                'to include other tables in some commands.')
         desc = table_with_desc[1] if len(table_with_desc) == 2 else ''
         if len(table_with_desc) > 2:
-            raise ValueError('Only a table name and an optional table description is allowed: %s provided'.format(table_with_desc))
+            raise ValueError('Only a table name and an optional table '
+                'description is allowed: %s provided'.format(table_with_desc))
         if proj.db.hasTable(encodeTableName(table)):
             new_table = proj.db.backupTable(encodeTableName(table))
-            env.logger.warning('Existing table {} is renamed to {}.'.format(table, decodeTableName(new_table)))
+            env.logger.warning('Existing table {} is renamed to {}.'
+                .format(table, decodeTableName(new_table)))
         proj.createVariantTable(encodeTableName(table))
         prog = ProgressBar('Writing to ' + table, len(var))
         query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)
@@ -207,7 +211,8 @@ def compare(args):
                             match = True
                     if not match:
                         # * should match a table with '*' in its name.
-                        env.logger.warning('Name {} does not match any existing table.'.format(table))
+                        env.logger.warning('Name {} does not match any existing table.'
+                            .format(table))
                 else:
                     tables.append(table)
             # table?
@@ -217,7 +222,7 @@ def compare(args):
             # set args.tables to its expanded version
             args.tables = tables
             # this is the old behavior
-            if args.intersection or args.union or args.difference:
+            if args.intersection is not None or args.union is not None or args.difference is not None:
                 if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
                     raise ValueError('Cannot mix deprecated and new parameters.')
                 compareMultipleTables(proj, args)
