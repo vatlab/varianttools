@@ -3872,15 +3872,6 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
-    #
-    execute = parser.add_argument_group('Execute SQL query')
-    execute.add_argument('--query', nargs='*',
-        help='''A SQL query to be executed. The project genotype database is
-        attached as genotype. Annotation databases used in the project
-        are attached and are available by their names.''')
-    execute.add_argument('-d', '--delimiter', default='\t',
-        help='Delimiter used to output results, default to tab.')
-
 
 
 def admin(args):
@@ -4007,23 +3998,6 @@ def admin(args):
                 res.excludeExistingLocalFiles()
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
-            elif args.query:
-                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-                # for backward compatibility
-                proj.db.attach('{}_genotype'.format(proj.name))
-                cur = proj.db.cursor()
-                query = ' '.join(args.query)
-                if query.upper().startswith('SELECT'):
-                    env.logger.debug('Analyze statement: "{}"'.format(query))
-                    cur.execute('EXPLAIN QUERY PLAN ' + query)
-                    for rec in cur:
-                        env.logger.debug('\t'.join([str(x) for x in rec]))
-                # really execute the query
-                cur.execute(query)
-                proj.db.commit()
-                sep = args.delimiter
-                for rec in cur:
-                    print(sep.join(['{}'.format(x) for x in rec]))
             else:
                 env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:

@@ -114,14 +114,14 @@ def executeRScript(script):
 #
 def getNumOfSamples():
     logger.info('Getting number of samples')
-    return int(getoutput(['vtools', 'admin', '--query', 'SELECT count(1) FROM sample']))
+    return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
 
 def getSamples(samples, group_by=[]):
     '''return a generator that returns samples group by group. To use this functions, call it like
     for group, IDs in getSamples(condi, group_by):
         # do something with group and IDs.
     '''
-    output = getoutput(['vtools', 'admin', '--query', 'SELECT {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {} {};'\
+    output = getoutput(['vtools', 'execute', 'SELECT {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {} {};'\
         .format('sample_id, sample_name, {}'.format(', '.join(group_by)) if group_by else 'sample_id, sample_name',
             'WHERE {}'.format(' AND '.join(samples)) if samples else '',
             'GROUP BY {}'.format(', '.join(group_by)) if group_by else '')]).split('\n')
@@ -265,7 +265,7 @@ def variantStat(args):
         num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
             ['vtools', 'select', args.table, "alt='-'",
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
-        num_samples = getoutput(['vtools', 'admin', '--query', 'SELECT COUNT(sample_id) FROM sample'])
+        num_samples = getoutput(['vtools', 'execute', 'SELECT COUNT(sample_id) FROM sample'])
         #
         print('\t'.join([num_samples, num_snps, num_insertions, num_deletions,
             num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
@@ -329,7 +329,7 @@ def discordanceRate(args):
             rates.append([0] * len(sample_ids))
             output_items = []
             var_i = {}
-            for line in getoutput(['vtools', 'admin', '--query', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i,
+            for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i,
                 ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
                 var, gt = line.split()
                 var_i[var] = gt
@@ -340,7 +340,7 @@ def discordanceRate(args):
                     output_items.append('0/{0}'.format(len(var_i)))
                 else:
                     var_j = {}
-                    for line in getoutput(['vtools', 'admin', '--query', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j,
+                    for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j,
                         ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
                         var, gt = line.split()
                         var_j[var] = gt
@@ -425,18 +425,18 @@ def expandRegions(args):
                     raise ValueError('Cannot locate field {} in the current project'.format(field))
                 # now we have annotation database
                 # but we need to figure out how to use it
-                anno_type = getoutput(['vtools', 'admin', '--query', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
+                anno_type = getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
                 if anno_type.strip() != 'range':
                     raise ValueError('Only field from a range-based annotation database could be used.')
                 # get the fields?
-                build = eval(getoutput(['vtools', 'admin', '--query', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
+                build = eval(getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
                 if args.build in build:
                     chr_field, start_field, end_field = build[args.build]
                 else:
                     raise ValueError('Specified build {} does not match that of the annotation database.'.format(args.build))
                 #
                 # find the regions
-                output = getoutput(['vtools', 'admin', '--query', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                output = getoutput(['vtools', 'execute', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
                     chr_field, start_field, end_field, annoDB, annoDB, field, value)])
                 for idx, line in enumerate(output.split('\n')):
                     try:
@@ -453,7 +453,7 @@ def expandRegions(args):
 def sequence(args):
     # get build
     if args.build is None:
-        args.build = getoutput(['vtools', 'admin', '--query', 'SELECT value FROM project WHERE name="build"'])
+        args.build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
     if not args.build:
         raise RuntimeError('Failed to get build of reference from the current project.')
     #
@@ -530,7 +530,7 @@ def samInfo(args):
     # get reference genome
     ref_info = 'nref' in args.info or 'prop_ref' in args.info
     if ref_info:
-        build = getoutput(['vtools', 'admin', '--query', 'SELECT value FROM project WHERE name="build"'])
+        build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
         if not build:
             raise RuntimeError('Failed to get build of reference from the current project.')
         refGenome = RefGenome(build)
@@ -716,7 +716,7 @@ def plotGenoFields(args):
                 output.write(name + '\t')
                 for field in args.fields:
                     output.write(field)
-                    values = getoutput(['vtools', 'admin', '--query',
+                    values = getoutput(['vtools', 'execute',
                         'SELECT {} FROM genotype.genotype_{} {}'.format(field, id,
                             ('WHERE ' + ','.join(['({})' % x for x in args.genotypes])) if args.genotypes else '')])
                     for line in values.split('\n'):

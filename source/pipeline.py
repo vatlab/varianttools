@@ -933,24 +933,56 @@ def isBamPairedEnd(input_file):
 
 def executeArguments(parser):
     parser.add_argument('pipeline', 
-        help='Name of the pipeline to be used to be executed.')
-    parser.add_argument('input_files', nargs='+',
+        help='''Name of the pipeline to be used to be executed. It can be path
+            to a pipeline description file (with or without extension), or one
+            of the online pipelines listed by command "vtools show pipelines".
+            To keep backward compatibility, this option also accept a SQL query
+            that will be executed, with project genotype database is attached
+            as "genotype", and annotation databases attached by their names.''')
+    parser.add_argument('input_files', nargs='*',
         help='''One or more files that contains raw sequence reads from the
             same sample. Depending on the pipeline used, the input files can
             be in plain fastq files (.txt, .fa, .fastq,), compressed files 
             (e.g. .tar, .tar.gz, .tar.bz2, .tbz2, .tgz formats), or in sam/bam
             format. The input will be passed to the pipelines as ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='+',
-        help='''Names of output files that contain aligned reads, usually in
-            BAM format. They will be passed to the pipelines as ${CMD_OUTPUT}.''')
+    parser.add_argument('-o', '--output', nargs='*',
+        help='''Names of output files of the pipeline, which will be passed to
+            the pipelines as ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs.''')
+    parser.add_argument('-d', '--delimiter', default='\t',
+        help='''(Deprecated) Delimiter used to output results of a SQL query.''')
 
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
-            pipeline.execute(args.input_files, args.output, args.jobs)
+            # old usage with a SQL query? The pipeline interface should
+            # have input files, should have option --output, and should not
+            # specify delimiter, and the input file should exist.
+            if not args.input_files or not args.output or args.delimieter != '\t':
+                # if there is no output, 
+                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+                # for backward compatibility
+                proj.db.attach('{}_genotype'.format(proj.name))
+                cur = proj.db.cursor()
+                # the original interface has args.query with '*' parameters
+                # which is provided by two options args.pipeline and 
+                # args.input_files
+                query = ' '.join([args.pipeline] + args.input_files)
+                if query.upper().startswith('SELECT'):
+                    env.logger.debug('Analyze statement: "{}"'.format(query))
+                    cur.execute('EXPLAIN QUERY PLAN ' + query)
+                    for rec in cur:
+                        env.logger.debug('\t'.join([str(x) for x in rec]))
+                # really execute the query
+                cur.execute(query)
+                proj.db.commit()
+                sep = args.delimiter
+                for rec in cur:
+                    print(sep.join(['{}'.format(x) for x in rec]))
+            else:
+                pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
+                pipeline.execute(args.input_files, args.output, args.jobs)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
