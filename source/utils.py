@@ -53,6 +53,7 @@ import hashlib
 import ConfigParser
 import tarfile
 import binascii
+from collections import namedtuple
 
 try:
     # not all platforms/installations of python support bz2
@@ -88,7 +89,10 @@ class RuntimeEnvironments(object):
     _instance = None
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(RuntimeEnvironments, cls).__new__(cls, *args, **kwargs)
+            # *args, **kwargs are not passed to avoid
+            # DeprecationWarning: object.__new__() takes no parameters
+            # cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs) 
+            cls._instance = super(RuntimeEnvironments, cls).__new__(cls) #, *args, **kwargs)
         return cls._instance
 
     def __init__(self):
@@ -562,7 +566,7 @@ def hasCommand(cmd):
     return True
 
 
-def runCommand(cmd, instream = None, msg = '', upon_succ=None):
+def runCommand(cmd, instream = None, msg = ''):
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
     try:
@@ -590,10 +594,6 @@ def runCommand(cmd, instream = None, msg = '', upon_succ=None):
                     sys.stderr.write(msg + '\n')
     except OSError as e:
         raise OSError ("Execution of command '{0}' failed: {1}".format(cmd, e))
-    # everything is OK
-    if upon_succ:
-        # call the function (upon_succ) using others as parameters.
-        upon_succ[0](*(upon_succ[1:]))
     return out
 
 
@@ -983,6 +983,35 @@ class ShelfDB:
                 self.db.close()
 
 
+def calculateMD5(filename, partial=False):
+    filesize = os.path.getsize(filename)
+    # calculate md5 for specified file
+    md5 = hashlib.md5()
+    block_size = 2**20  # buffer of 1M
+    try:
+        if (not partial) or filesize < 2**26:
+            with open(filename, 'rb') as f:
+                while True:
+                    data = f.read(block_size)
+                    if not data:
+                        break
+                    md5.update(data)
+        else:
+            count = 64
+            # otherwise, use the first and last 500M
+            with open(filename, 'rb') as f:
+                while True:
+                    data = f.read(block_size)
+                    count -= 1
+                    if count == 32:
+                        f.seek(-2**25, 2)
+                    if not data or count == 0:
+                        break
+                    md5.update(data)
+    except IOError as e:
+        sys.exit('Failed to read {}: {}'.format(filename, e))
+    return md5.hexdigest()
+
 class ResourceManager:
     def __init__(self):
         # get a manifest of remote files
@@ -1029,7 +1058,7 @@ class ResourceManager:
         if rel_path.startswith('.'):
             raise ValueError('Cannot add a resource that is not under the resoure directory {}'.format(resource_dir))
         filesize = os.path.getsize(filename)
-        md5 = self.calculateMD5(filename)
+        md5 = calculateMD5(filename)
         refGenome = self.getRefGenome(filename)
         comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
         self.manifest[rel_path] = (filesize, md5, refGenome, comment)
@@ -1079,8 +1108,10 @@ class ResourceManager:
                 return self.getCommentFromConfigFile(filename[:-6] + '.ann', 'data sources', 'description')
             else:
                 return ''
-        elif filename.lower().endswith('ann'):      # annotation
+        elif filename.lower().endswith('.ann'):      # annotation
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
+        elif filename.lower().endswith('.pipeline'):      # annotation
+            return self.getCommentFromConfigFile(filename, 'pipeline description', 'description')
         elif 'snapshot' in filename and filename.lower().endswith('.tar.gz'):  # snapshot
             (name, date, message) = getSnapshotInfo(filename)
             return '' if message is None else message
@@ -1124,6 +1155,8 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('snapshot/')}
         elif resource_type == 'annotation':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
+        elif resource_type == 'pipeline':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/')}
         elif resource_type == 'hg18':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':
@@ -1165,7 +1198,7 @@ class ResourceManager:
         total_size = 0
         for filename, rel_name, filesize in filenames:
             # if file size are different, will be copied
-            if filesize == self.manifest[rel_name][0] and self.calculateMD5(filename) == self.manifest[rel_name][1]:
+            if filesize == self.manifest[rel_name][0] and calculateMD5(filename) == self.manifest[rel_name][1]:
                 self.manifest.pop(rel_name)
             total_size += filesize
             prog.update(total_size)
@@ -1183,24 +1216,13 @@ class ResourceManager:
                     os.path.join(env.local_resource, filename), False,
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
-                md5 = self.calculateMD5(os.path.join(env.local_resource, filename))
+                md5 = calculateMD5(os.path.join(env.local_resource, filename))
                 if md5 != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
                 env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
-
-    def calculateMD5(self, filename, block_size=2**20):
-        # calculate md5 for specified file
-        md5 = hashlib.md5()
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(block_size)
-                if not data:
-                    break
-                md5.update(data)
-        return md5.hexdigest()
 
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
@@ -1211,11 +1233,11 @@ def compressFile(infile, outfile):
                 buffer = input.read(100000)
     return outfile
 
-def decompressIfNeeded(filename, inplace=True):
+def decompressGzFile(filename, inplace=True, force=False):
     '''Decompress a file.gz and return file if needed'''
     if filename.lower().endswith('.gz'):
         new_filename = filename[:-3]
-        if os.path.isfile(new_filename):
+        if os.path.isfile(new_filename) and not force:
             return new_filename
         #
         try:
@@ -1240,6 +1262,17 @@ def decompressIfNeeded(filename, inplace=True):
     else:
         return filename
 
+
+def TEMP(filename):
+    '''Temporary output of filename'''
+    # turn path/filename.ext to path/filename_tmp???.ext, where ??? is
+    # the process ID to avoid two processes writing to the same temp
+    # files. That is to say, if two processes are working on the same step
+    # they will produce different temp files, and the final results should 
+    # still be valid.
+    return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
+
+
 #
 # Well, it is not easy to do reliable download
 # 
@@ -1254,7 +1287,8 @@ def downloadURL(URL, dest, quiet, message=None):
         import pycurl
         if not quiet:
             prog = ProgressBar(message)
-        with open(dest, 'wb') as f:
+        dest_tmp = TEMP(dest)
+        with open(dest_tmp, 'wb') as f:
             c = pycurl.Curl()
             c.setopt(pycurl.URL, str(URL))
             c.setopt(pycurl.WRITEFUNCTION, f.write)
@@ -1266,10 +1300,11 @@ def downloadURL(URL, dest, quiet, message=None):
             prog.done()
         if c.getinfo(pycurl.HTTP_CODE) == 404:
             try:
-                os.remove(dest)
+                os.remove(dest_tmp)
             except OSError:
                 pass
             raise RuntimeError('ERROR 404: Not Found.')
+        os.rename(dest_tmp, dest)
         if os.path.isfile(dest):
             return dest
         else:
@@ -1280,13 +1315,16 @@ def downloadURL(URL, dest, quiet, message=None):
     # use wget? Almost universally available under linux
     try:
         # for some strange reason, passing wget without shell=True can fail silently.
-        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '', dest, URL), shell=True)
+        dest_tmp = TEMP(dest)
+        p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '',
+            dest_tmp, URL), shell=True)
         ret = p.wait()
+        os.rename(dest_tmp, dest)
         if ret == 0 and os.path.isfile(dest):
             return dest
         else:
             try:
-                os.remove(dest)
+                os.remove(dest_tmp)
             except OSError:
                 pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
@@ -1305,7 +1343,9 @@ def downloadURL(URL, dest, quiet, message=None):
         else:
             raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
     else:
-        urllib.urlretrieve(URL, dest, reporthook=None if quiet else prog.urllibUpdate)
+        dest_tmp = TEMP(dest)
+        urllib.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
+        os.rename(dest_tmp, dest)
     if not quiet:
         prog.done()
     # all methods tried
@@ -1313,6 +1353,7 @@ def downloadURL(URL, dest, quiet, message=None):
         return dest
     # if all failed
     raise RuntimeError('Failed to download {}'.format(fileToGet))
+
 
 def downloadFile(fileToGet, dest_dir = None, quiet = False):
     '''Download file from URL to filename.'''
@@ -1382,6 +1423,132 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
                 continue
     # failed to get file
     raise Exception('Failed to download file {}'.format(fileToGet))
+
+
+def existAndNewerThan(ofiles, ifiles, md5file=None):
+    '''Check if ofiles is newer than ifiles. The oldest timestamp
+    of ofiles and newest timestam of ifiles will be used if 
+    ofiles or ifiles is a list.'''
+    # if there is no input or output file, ofiles cannot be newer than ifiles.
+    if not ifiles or not ofiles or ifiles == ofiles:
+        return False
+    if type(ifiles) == list:
+        for ifile in ifiles:
+            if not os.path.isfile(ifile):
+                raise RuntimeError('Input file {} is not found.'.format(ifile))
+    else:
+        if not os.path.isfile(ifiles):
+            raise RuntimeError('Input file {} is not found.'.format(ifiles))
+    #
+    if type(ofiles) == list:
+        if not all([os.path.isfile(x) for x in ofiles]):
+            return False
+    else:
+        if not os.path.isfile(ofiles):
+            return False
+    #
+    if type(ofiles) == list:
+        output_timestamp = min([os.path.getmtime(x) for x in ofiles])
+    else:
+        output_timestamp = os.path.getmtime(ofiles)
+    #
+    if type(ifiles) == list:
+        input_timestamp = max([os.path.getmtime(x) for x in ifiles])
+    else:
+        input_timestamp = os.path.getmtime(ifiles)
+    #
+    # compare timestamp of input and output files
+    if md5file:
+        nFiles = [0]
+        with open(md5file) as md5:
+            md5.readline()   # command
+            line = md5.readline()
+            if not line.startswith('#Start:'):
+                env.logger.warning('Invalid exe_info file {}'.format(md5file))
+                return False
+            for line in md5:
+                if line.startswith('#'):
+                    if not line.startswith('#End:'):
+                        env.logger.warning('Invalid exe_info file {}'.format(md5file))
+                        return False
+                    nFiles.append(0)
+                    continue
+                try:
+                    f, s, m = line.split('\t')
+                    nFiles[-1] += 1
+                    s = int(s)
+                except Exception as e:
+                    env.logger.error('Wrong md5 line {} in {}'.format(line, md5file))
+                    continue
+                # we do not check if f is one of ifiles or ofiles because presentation
+                # of files might differ
+                if not os.path.isfile(f):
+                    env.logger.warning('{} in {} does not exist.'.format(f, md5file))
+                    return False
+                if os.path.getsize(f) != s:
+                    env.logger.warning(
+                        'Size of existing file differ from recorded file: {}'
+                        .format(f))
+                    return False
+                if calculateMD5(f, partial=True) != m.strip():
+                    env.logger.warning(
+                        'md5 of existing file differ from recorded file: {}'
+                        .format(f))
+                    return False
+        if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
+            env.logger.warning('Corrupted exe_info file {}'.format(md5file))
+            return False    
+    #
+    if output_timestamp < input_timestamp:
+        env.logger.warning(
+            'Ignoring older existing output file {}.'
+            .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
+        return False
+    else:
+        # newer by at least 10 seconds.
+        return True
+
+def physicalMemory():
+    '''Get the amount of physical memory in the system'''
+    # MacOSX?
+    if platform.platform().startswith('Darwin'):
+        # FIXME
+        return None
+    elif platform.platform().startswith('Linux'):
+        try:
+            res = subprocess.check_output('free').decode().split('\n')
+            return int(res[1].split()[1])
+        except Exception as e:
+            return None
+
+def javaXmxCheck(val):
+    '''Check if the Xmx option is valid for OPT_JAVA'''
+    ram = physicalMemory()
+    # cannot check physical memory
+    if ram is None:
+        return
+    # find option matching '-Xmx???'
+    m = re.search('-Xmx(\d+)([^\s]*)(?:\s+|$)', val)
+    if m is None:  # no -Xmx specified
+        return
+    try:
+        size = int(m.group(1)) * {
+            't': 10**9,
+            'T': 10**9,
+            'g': 10**6,
+            'G': 10**6,
+            'm': 10**3,
+            'M': 10**3,
+            '': 1
+        }[m.group(2)]
+    except:
+        sys.exit('Invalid java option {}'.format(val))
+    #
+    if ram < size:
+        sys.exit('Specified -Xms size {} is larger than available physical memory {}'
+            .format(size, ram))
+
+
 
 
 #

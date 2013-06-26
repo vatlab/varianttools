@@ -54,6 +54,11 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
+# see http://varianttools.sourceforge.net/Calling/New for details
+#
+PipelineCommand = namedtuple('PipelineCommand', ['index', 'input',
+    'input_emitter', 'action', 'comment'])
+#
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
 #   field = dbNSFP.sift
@@ -259,16 +264,17 @@ class AnnoDB:
         print('Annotation database {} {}'.format(self.name, '(version {})'
             .format(self.version) if self.version else ''))
         if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*4))))
-        print('Database type: {}'.format(self.anno_type))
+            print('\n'.join(textwrap.wrap(
+                '{:<23} {}'.format('Description:', self.description),
+                subsequent_indent=' '*2, width=78)))
+        print('{:<23} {}'.format('Database type:', self.anno_type))
         # get linking fields
         if verbose:
             # number of records
             cur = self.db.cursor()
             cur.execute('SELECT value FROM {}_info WHERE name="num_records";'.format(self.name))
             num_records = int(cur.fetchone()[0])
-            print('Number of records: {:,}'.format(num_records))
+            print('{:<23} {:,}'.format('Number of records:', num_records))
             fields = self.refGenomes.values()[0]
             
             # Get number of unique keys
@@ -277,51 +283,58 @@ class AnnoDB:
             
             #
             if self.anno_type == 'variant':
-                print('Number of distinct variants: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct variants:', count))
             elif self.anno_type == 'position':
-                print('Number of distinct positions: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct positions:', count))
             elif self.anno_type == 'range':
-                print('Number of distinct ranges: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct ranges:', count))
             elif self.anno_type == 'field':
-                print('Number of distinct entries: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct entries:', count))
         #
         for key in self.refGenomes:
-            print('Reference genome {}: {}'.format(key, self.refGenomes[key]))
+            print('{:<23} {}'.format(
+                '{} {}:'.format('Reference genome', key), 
+                ', '.join(self.refGenomes[key])))
         for field in self.fields:
             if not verbose:
-                print('    {:<20}{}'.format(field.name, '\n'.join(textwrap.wrap(
-                    field.comment, initial_indent=' ', subsequent_indent=' '*25))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(field.name, field.comment),
+                    subsequent_indent=' '*24, width=78)))
             else:
-                print('\nField:           {}'.format(field.name))
+                print('\nField:                  {}'.format(field.name))
                 numeric = False
                 if 'chromosome' in field.type.lower():
-                    print('Type:            chromosome')
+                    print('Type:                   chromosome')
                 elif 'position' in field.type.lower():
-                    print('Type:            integer')
+                    print('Type:                   integer')
                     numeric = True
                 elif 'int' in field.type.lower():
-                    print('Type:            integer')
+                    print('Type:                   integer')
                     numeric = True
                 elif 'float' in field.type.lower():
-                    print('Type:            float')
+                    print('Type:                   float')
                     numeric = True
                 else:
-                    print('Type:            string')
+                    print('Type:                   string')
                 if field.comment:
-                    print('Comment: {}'.format('\n'.join(textwrap.wrap(
-                        field.comment, initial_indent='        ', subsequent_indent=' '*17))))
-                cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'.format(self.name, field.name))
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format('Comment:', field.comment),
+                        width=78, subsequent_indent=' '*24)))
+                cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'
+                    .format(self.name, field.name))
                 missing = cur.fetchone()[0]
                 #
-                print('Missing entries: {:,} {}'.format(missing, '({:.1f}% of {:,} records)'.format(100. * missing/num_records, num_records) if missing else ''))
+                print('Missing entries:        {:,} {}'
+                    .format(missing, '({:.1f}% of {:,} records)'
+                        .format(100. * missing/num_records, num_records) if missing else ''))
                 if missing == num_records:
                     continue
                 cur.execute('SELECT distinct_entries {2} FROM {0}_field WHERE name={1};'.format(
                     self.name, self.db.PH, ', min_value, max_value' if numeric else ''), (field.name,))
                 res = cur.fetchone()
-                print('Unique Entries:  {:,}'.format(res[0]))
+                print('Unique Entries:         {:,}'.format(res[0]))
                 if numeric:
-                    print('Range:           {} - {}'.format(res[1], res[2]))
+                    print('Range:                  {} - {}'.format(res[1], res[2]))
 
 
 class fileFMT:
@@ -550,10 +563,11 @@ class fileFMT:
             self.columns.append(col)
 
     def describe(self):
-        print('Format:      {}'.format(self.name))
+        print('{:<23} {}'.format('Format:', self.name))
         if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*2))))
+            print('\n'.join(textwrap.wrap(
+                '{:<23} {}'.format('Description:', self.description),
+                subsequent_indent=' '*2, width=78)))
         #
         if self.preprocessor is not None:
             print('Preprocessor: {}'.format(self.preprocessor))
@@ -561,8 +575,9 @@ class fileFMT:
         print('\nColumns:')
         if self.columns:
             for col in self.columns:
-                print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(col.index, col.comment),
+                    subsequent_indent=' '*24, width=78)))
             if self.formatter:
                 print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
         else:
@@ -571,37 +586,181 @@ class fileFMT:
         if self.input_type == 'variant':
             print('\n{0}:'.format(self.input_type))
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
-            print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*15))))
+            print('\n'.join(textwrap.wrap(
+                '  {:<21} {}'.format(fld.name, fld.comment),
+                subsequent_indent=' '*24, width=78)))
         if self.ranges[1] != self.ranges[2]:
             print('\nVariant info:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.ranges[2] != self.ranges[3]:
             print('\nGenotype:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.ranges[3] != self.ranges[4]:
             print('\nGenotype info:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.other_fields:
             print('\nOther fields (usable through parameters):')
             for fld in self.other_fields:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.parameters:
             print('\nFormat parameters:')
             for item in self.parameters:
-                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
-                    '{} (default: {})'.format(item[2], item[1]),
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {} (default: {})'.format(item[0], item[2], item[1]),
+                    subsequent_indent=' '*24, width=78)))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
+
+
+class PipelineDescription:
+    def __init__(self, name, extra_args=[]):
+        '''Pipeline configuration file'''
+        self.description = None
+        self.pipeline_vars = {}
+        self.pipeline_steps = []
+        #
+        if name.endswith('.pipeline'):
+            if os.path.isfile(name):
+                self.name = os.path.split(name)[-1].rsplit('.', 1)[0]
+                args = self.parseArgs(name, extra_args)
+                self.parsePipeline(name, defaults=args) 
+            else:
+                raise ValueError('Pipeline description file not found: {}'
+                    .format(name))
+        elif os.path.isfile(name + '.pipeline'):
+            self.name = os.path.split(name)[-1]
+            args = self.parseArgs(name + '.pipeline', extra_args)
+            self.parsePipeline(name + '.pipeline', defaults=args) 
+        elif name.endswith('.pipeline') and os.path.isfile(name):
+            self.name = os.path.split(name)[-1][:-9]
+            args = self.parseArgs(name, extra_args)
+            self.parsePipeline(name, defaults=args) 
+        else:
+            url = 'pipeline/{}.pipeline'.format(name)
+            try:
+                pipeline = downloadFile(url, quiet=True)
+            except Exception as e:
+                raise ValueError('Failed to download pipeline specification '
+                    'file {}.pipeline: {}'.format(name, e))
+            self.name = name
+            args = self.parseArgs(pipeline, extra_args)
+            self.parsePipeline(pipeline, defaults=args)
+
+    def parseArgs(self, filename, fmt_args):
+        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser.read(filename)
+        parameters = fmt_parser.items('DEFAULT')
+        parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
+            .format(os.path.split(filename)[-1]),
+            description='Parameters to override parameters of existing steps.')
+        self.parameters = []
+        for par in parameters:
+            # $NAME_comment is used for documentation only
+            if par[0].endswith('_comment'):
+                continue
+            par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
+            self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
+            parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
+                nargs='*', default=par[1])
+        args = vars(parser.parse_args(fmt_args))
+        for key in args:
+            if type(args[key]) == list:
+                args[key] = ','.join(args[key])
+        return args
+
+    def parsePipeline(self, filename, defaults):
+        parser = ConfigParser.SafeConfigParser()
+        # this allows python3 to read .pipeline file with non-ascii characters,
+        # but there is no simple way to make it python2 compatible.
+        #with open(filename, 'r', encoding='UTF-8') as inputfile:
+        #    parser.readfp(inputfile)
+        parser.read(filename)
+        # sections?
+        sections = parser.sections()
+        if 'pipeline description' not in sections:
+            raise ValueError("Missing section 'pipeline description' in "
+                "configuration file {}".format(filename))
+        #
+        for section in sections:
+            if section.lower() == 'pipeline description':
+                for item in parser.items(section, vars=defaults):
+                    if item[0] == 'description':
+                        self.description = item[1]
+                    elif item[0] in defaults or item[0].endswith('_comment'):
+                        pass
+                    else:
+                        self.pipeline_vars[item[0]] = item[1]
+            else:
+                if section.split('_')[0] != 'step' or \
+                    not section.split('_')[-1].isdigit():
+                    raise ValueError('Only sections step_# '
+                        'are allowed: {} specified.'.format(section))
+                try:
+                    items = [x[0] for x in parser.items(section, raw=True)]
+                    if 'action' not in items:
+                        raise ValueError('Missing item "action" in section {}.'.format(section))
+                    for item in items:
+                        if item.endswith('_comment'):
+                            continue
+                        if item not in ['input', 'input_emitter', 'action', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. '
+                                'Only input, input_emitter, action, and comment are allowed.'
+                                .format(item, section))
+                    command = PipelineCommand(index=int(section.split('_', 1)[1]),
+                            input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
+                            input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
+                            action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
+                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                    if section.startswith('step_'):
+                        self.pipeline_steps.append(command)
+                except Exception as e:
+                    raise ValueError('Invalid section {}: {}'.format(section, e))
+        # sort steps
+        self.pipeline_steps.sort(key=lambda x: x[0])
+        # 
+        # validate
+        for idx, cmd in enumerate(self.pipeline_steps):
+            if cmd is None:
+                raise ValueError('Invalid pipeline. Step {} is left unspecified.'
+                    .format(idx+1))
+            if not cmd.action:
+                raise ValueError('Missing or empty action for step {}'.format(idx + 1))
+     
+    def describe(self):
+        print('Pipeline:    {}'.format(self.name))
+        if self.description is not None:
+            print('\n'.join(textwrap.wrap(
+                'Description: ' +  self.description,
+                subsequent_indent=' '*2)))
+        #
+        print('\nPipeline steps:')
+        for idx, step in enumerate(self.pipeline_steps):
+            text = '{:<22}'.format('  step {}:'.format(step.index)) + step.comment
+            print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
+        #
+        if self.parameters:
+            print('\nPipeline parameters:')
+            for item in self.parameters:
+                #
+                text = '  ' + item[0] + \
+                    (' '*(22-len(item[0])-2) if len(item[0])<20 else ' ') + \
+                    (item[2] + ' ' if item[2] else '') + \
+                    ('(default: {})'.format(item[1]) if item[1] else '')
+                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
+        else:
+            print('\nNo configurable parameter is defined for this format.\n')
 
 
 class AnnoDBWriter:
@@ -873,7 +1032,10 @@ class Project:
     _instance = None
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(Project, cls).__new__(cls, *args, **kwargs)
+            # *args, **kwargs are not passed to avoid
+            # DeprecationWarning: object.__new__() takes no parameters
+            # cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs) 
+            cls._instance = super(Project, cls).__new__(cls) #, *args, **kwargs)
         return cls._instance
 
     def __init__(self, name=None, build=None, new=False, verbosity=None, verify=True, **kwargs):
@@ -3357,13 +3519,17 @@ def remove(args):
 
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
-        'samples', 'genotypes', 'fields', 'annotations', 'annotation', 'formats', 'format',
-        'tests', 'test', 'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
+        'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
+        'annotation', 'formats', 'format', 'tests', 'test', 'runtime_options',
+        'runtime_option', 'snapshot', 'snapshots', 'pipeline', 'pipelines'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
-            table TBL, 'samples' for a list of sample and associated phenotypes,
+            table TBL, 'samples [COND]' for sample name, files from which
+            samples are imported, and associated phenotypes (can be supressed
+            by option --verbosity 0) of all or selected samples, 
+            'phenotypes [P1 P2...]' for all or specified phenotypes of samples, 
             'fields' for fields from variant tables and all used annotation
             databases, 'annotations' for a list of all available annotation
             databases, 'annotation ANN' for details about annotation database ANN,
@@ -3371,16 +3537,19 @@ def showArguments(parser):
             details of format FMT, 'tests' for a list of all association tests, and
             'test TST' for details of an association test TST, 'runtime_options'
             for a list of runtime options and their descriptions, 'runtime_option
-            OPT' for value of specified runtime option OPT. 'snapshot' for a
+            OPT' for value of specified runtime option OPT, 'snapshot' for a
             particular snapshot by name or filename, 'snapshots' for a list of
             publicly available snapshots, and snapshots of the current project
-            saved by command 'vtools admin --save_snapshots'. The default
-            parameter of this command is 'project'.''')
+            saved by command 'vtools admin --save_snapshots', 'pipeline PIPELINE'
+            for details of a particular align and variant calling pipeline, and
+            'pipelines' for a list of available pipelines. The default parameter
+            of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, names of tables for
-            type 'table', name of an annotation database for type 'annotation',
-            name of a format for type 'format', and name of an association test
-            for type 'test'.''')
+            type 'table', conditions to select samples for type 'samples', 
+            a list of phenotypes for type 'phenotypes', name of an annotation
+            database for type 'annotation', name of a format for type 'format',
+            and name of an association test for type 'test'.''')
     parser.add_argument('-l', '--limit', metavar='N', type=int,
         help='''Limit output to the first N records.''')
 
@@ -3442,15 +3611,51 @@ def show(args):
                     return
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
+                # if -v0, do not show phenotypes
+                if args.verbosity == '0':
+                    fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
                 print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
-                    'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
-                    .format(' '.join([','+x for x in fields[3:]]), limit_clause))
+                    'WHERE sample.file_id = filename.file_id {} ORDER BY sample_name {};'
+                    .format(' '.join([','+x for x in fields[3:]]),
+                    ' '.join(['AND ({})'.format(x) for x in args.items]),
+                    limit_clause))
                 for rec in cur:
                     if args.verbosity != '2' and len(rec[1]) > 25:
                         rec = list(rec)
                         rec[1] = rec[1][:8] + '...' + rec[1][-14:]
+                    print('\t'.join(['{}'.format(x) for x in rec]))
+                nAll = proj.db.numOfRows('sample')
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'phenotypes':
+                if not proj.db.hasTable('sample'):
+                    env.logger.warning('Project does not have a sample table.')
+                    return
+                cur = proj.db.cursor()
+                fields = proj.db.getHeaders('sample')[3:]
+                if args.items:
+                    found = []
+                    unfound = []
+                    for item in args.items:
+                        if item.lower() in [x.lower() for x in fields]:
+                            idx = [x.lower() for x in fields].index(item.lower())
+                            found.append(fields[idx])
+                        else:
+                            unfound.append(item)
+                    #
+                    if unfound:
+                        env.logger.warning('Phenotypes {} not found.'
+                            .format(', '.join(unfound)))
+                    fields = found
+                # headers are ID, file, sample, FIELDS
+                print('sample_name{}'.format(''.join(['\t'+x for x in fields])))
+                cur.execute('SELECT sample_name {} FROM sample, filename '
+                    'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
+                    .format(' '.join([','+x for x in fields]),
+                    limit_clause))
+                for rec in cur:
                     print('\t'.join(['{}'.format(x) for x in rec]))
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3495,9 +3700,9 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
                 for fmt, prop in res.manifest.iteritems():
-                    print('{}\n{}\n'.format(fmt[7:-4],
-                        '\n'.join(textwrap.wrap(prop[3], initial_indent=' '*10,
-                            subsequent_indent=' '*10))))
+                    text = '{:<23} {}'.format(fmt[7:-4], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
             elif args.type == 'format':
                 if not args.items:
                     raise ValueError('Please specify a format to display')
@@ -3548,9 +3753,10 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
-                print('\n'.join(['{}{}{}'.format(test, ' '*(22-len(test)),
-                    '\n'.join(textwrap.wrap('' if obj.__doc__ is None else obj.__doc__, initial_indent=' '*22, width=78,
-                        subsequent_indent=' '*22))[22:]) for test, obj in getAllTests()]))
+                for test, obj in getAllTests():
+                    print('\n'.join(textwrap.wrap(
+                        '{:<24}'.format(test) + ('' if obj.__doc__ is None else obj.__doc__),
+                        subsequent_indent=' '*24, width=78)))
             elif args.type == 'test':
                 from .association import getAllTests
                 if len(args.items) == 0:
@@ -3571,10 +3777,10 @@ def show(args):
                 for opt, (def_value, description) in sorted(env.persistent_options.iteritems()):
                     # get the raw value of option (not the attribute, which might not be a string)
                     val = str(getattr(env, '_' + opt))
-                    print('{}{}{} {}'.format(opt, ' '*(27-len(opt)), val,
+                    print('{:<23} {} {}'.format(opt, val,
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
-                    print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
-                        subsequent_indent=' '*27)))
+                    print('\n'.join(textwrap.wrap(description, width=78,
+                        initial_indent=' '*24, subsequent_indent=' '*24)))
             elif args.type == 'runtime_option':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of a runtime option')
@@ -3597,51 +3803,41 @@ def show(args):
                     if name is not None:
                         snapshots.append((name, date, desc))
                 #
-                width = 18 if not snapshots else max(18, max([len(x[0]) for x in snapshots]))
-                print(('{:<' + str(width) + '} {:<15} {}').format('snapshot', 'date', 'description'))
                 for name, date, desc in sorted(snapshots):
-                    print(('{:<' + str(width) + '} {:<15} {}').format(name, date, 
-                        '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
+                    text = '{:<23} {} (created: {})'.format(name, desc, date)
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
                 #
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
-                    print(('{:<' + str(width) + '} {:15} {}').format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
-                        initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
-
-def executeArguments(parser):
-    parser.add_argument('query', nargs='*',
-        help='''A SQL query to be executed. The project genotype database is
-        attached as genotype. Annotation databases used in the project
-        are attached and are available by their names.''')
-    parser.add_argument('-d', '--delimiter', default='\t',
-        help='Delimiter used to output results, default to tab.')
-
-def execute(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            # preferred
-            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-            # for backward compatibility
-            proj.db.attach('{}_genotype'.format(proj.name))
-            cur = proj.db.cursor()
-            query = ' '.join(args.query)
-            if query.upper().startswith('SELECT'):
-                env.logger.debug('Analyze statement: "{}"'.format(query))
-                cur.execute('EXPLAIN QUERY PLAN ' + query)
-                for rec in cur:
-                    env.logger.debug('\t'.join([str(x) for x in rec]))
-            # really execute the query
-            cur.execute(query)
-            proj.db.commit()
-            sep = args.delimiter
-            for rec in cur:
-                print(sep.join(['{}'.format(x) for x in rec]))
+                    text = '{:<23} {} (online snapshot)'.format(ss[9:-7], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
+            elif args.type == 'pipelines':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
+                        .pipeline(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='pipeline')
+                for pipeline, prop in res.manifest.iteritems():
+                    text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
+            elif args.type == 'pipeline':
+                if not args.items:
+                    raise ValueError('Please specify a pipeline to display')
+                for item in args.items:
+                    try:
+                        pipeline = PipelineDescription(item)
+                    except Exception as e:
+                        env.logger.debug(e)
+                        raise IndexError('Unrecognized pipeline: {}\nPlease '
+                            'check your input parameters or configuration file "{}"'
+                            .format(e, item))
+                    pipeline.describe()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
@@ -3651,7 +3847,8 @@ def adminArguments(parser):
     resource = parser.add_argument_group('Download or update resources')
     resource.add_argument('--update_resource', nargs='?', metavar='TYPE', 
         const='current', 
-        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 
+            'format', 'snapshot', 'pipeline'],
         help='''Download resources of specified type, which can be 'current' (latest version
             of all resources excluding snapshots), 'all' (all resources including obsolete
             databases), 'existing' (only update resources that exist locally), 

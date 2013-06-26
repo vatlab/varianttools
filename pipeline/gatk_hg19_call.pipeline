@@ -1,0 +1,190 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=A pipeline to call genetic variants from aligned reads in
+	BWA format, using GATK's unified genotyper.
+#
+# resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_hg19
+RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk23_hg19
+
+[DEFAULT]
+strict_prog_version=True
+strict_prog_version_comment=Whether or not use other version of programs if the exact version does not
+	exist. Setting it to False allows variant tools to use other versions of the programs.
+
+java=java
+java_comment=path to java. Default to java (use $PATH to determine actual path)
+
+gatk_path=
+gatk_path_comment=Path to GATK jar file GenomeAnalysisTK.jar
+
+opt_java=-Xmx4g -XX:-UseGCOverheadLimit
+
+opt_gatk_unifiedgenotyper=-rf BadCigar  -stand_step_conf 50.0 -stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage
+
+opt_gatk_variantrecalibrator=
+
+opt_gatk_variantrecalibrator_snv= -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+
+opt_gatk_variantrecalibrator_indel=--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
+
+opt_gatk_applyrecalibration=--ts_filter_level 99.9
+
+opt_gatk_applyrecalibration_snv=
+
+opt_gatk_applyrecalibration_indel=
+
+
+[step_0]
+# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
+# the .gz files will be automatically decompressed
+action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_phase1.indels.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.excluding_sites_after_129.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/dbsnp_137.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/hapmap_3.3.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.dict.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.fai.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5',
+    resource_dir="${RESOURCE_DIR}")
+
+
+[step_10]
+# input = output = ${CMD_INPUT}
+action=CheckCommands('%(java)s')
+comment=Check existence of commands bwa, samtools and java
+
+[step_13]
+action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
+comment=Check the version of GATK
+
+
+[step_20]
+# input = output = ${CMD_INPUT}
+action=CheckFiles("%(gatk_path)s/GenomeAnalysisTK.jar")
+comment=Check existence of class files for GATK
+
+
+[step_100]
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T UnifiedGenotyper 
+        %(opt_gatk_unifiedgenotyper)s 
+        -I ${INPUT} 
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        --genotype_likelihoods_model BOTH 
+        -o ${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
+    output="${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
+# make sure the input is a bam file
+input_emitter=EmitInput(select='.bam')
+comment=Use unified genotyper to get raw variants
+
+
+[step_200]
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -I ${INPUT} 
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_SNV)s
+        -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
+        -resource:omni,known=false,training=true,truth=true,prior=12.0	${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -mode SNP 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.SNPs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'",
+    output=["${INPUT: INPUT[0][:-4] + '.SNPs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.log'}"])
+comment=Recalibrate SNPs
+                
+[step_210]
+# use the same .vcf file, not the output files of the SNP recalibration step
+input=${OUTPUT100}
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -I ${INPUT} 
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_INDEL)s
+        -resource:mills,known=false,training=true,truth=true,prior=12.0 
+            ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 
+            ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
+        -mode INDEL 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.INDELs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'",
+    output=["${INPUT: INPUT[0][:-4] + '.INDELs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.log'}"])
+comment=Recalibrate INDELs
+
+[step_300]
+input=${OUTPUT100}
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar GenomeAnalysisTK.jar 
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_SNV)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -mode SNP 
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNVs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNVs.tranches'}
+        -o ${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}",
+    output="${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}")
+comment=Apply SNV recalibration
+
+[step_310]
+# use input from last step (.recal.SNPs.vcf)
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar GenomeAnalysisTK.jar 
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_INDEL)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/ucsc.hg19.fasta
+        -mode INDEL
+        -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
+        -o ${CMD_OUTPUT}",
+    output="${CMD_OUTPUT}")
+comment=Apply INDEL recalibration
+

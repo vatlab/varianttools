@@ -29,6 +29,7 @@ import threading
 import Queue
 import time
 import re
+import csv
 from collections import defaultdict
 from .project import Project
 from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env
@@ -170,15 +171,16 @@ class Sample:
             return
         # num sample, num new field, num update field
         count = [0, 0, 0]
-        delimiter = '\t'
+        csv_dialect = csv.Sniffer().sniff(open(filename, 'rU').read(2048))
+        delimiter = csv_dialect.delimiter
         with open(filename, 'rU') as input:
-            line = input.readline().rstrip()
-            headers = line.split(delimiter)
-            # if there is no tab
-            if len(headers) == 1:
-                env.logger.warning('Header line is not tab delimitered, using space instead.')
-                headers = line.split()
-                delimiter = None
+            reader = csv.reader(input, dialect=csv_dialect)
+            headers = reader.next()
+            if len(set(headers)) != len(headers):
+                for x in set(headers):
+                    headers.remove(x)
+                raise ValueError('Duplicated header names in input file {}: {}'
+                    .format(filename, ', '.join(headers)))
             # determine fields to identify sample
             sample_idx = []
             if 'filename' in headers:
@@ -210,15 +212,14 @@ class Sample:
             #
             records = {}
             nCol = len(headers)
-            for idx, line in enumerate(input.readlines()):
-                if line.startswith('#') or line.strip() == '':
-                    continue
-                fields = [x.strip() for x in line.split(delimiter)]
+            for fields in reader:
                 if len(fields) != nCol:
                     env.logger.warning('Number of fields mismatch (expecting {}). Ignoring line "{}"'
                         .format(nCol, line.strip()))
                     continue
-                #
+                # ignore empty line (line with empty sample name)
+                if not any([fields[x] for x in sample_idx]):
+                    continue
                 key = tuple([fields[x] for x in sample_idx])
                 if key in records:
                     raise ValueError('Duplicate sample name ({}).'
@@ -511,4 +512,5 @@ def phenotype(args):
                 raise ValueError('Please add "-h" after phenotype to get more help for this command')
         proj.close()
     except Exception as e:
-        sys.exit(e)
+        env.logger.error(e)
+        sys.exit(1)

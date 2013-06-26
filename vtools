@@ -28,7 +28,9 @@ import sys
 try:
     import argparse
 except ImportError:
-    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
+    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 '
+        'or higher. Please upgrade your version ({}) of Python and try again.'
+        .format(sys.version.split()[0]))
 
 from variant_tools.utils import env
 # save the command line that has been processed by the shell. It might not work as shown.
@@ -42,6 +44,8 @@ import variant_tools.annotation as annotation
 import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
+import variant_tools.pipeline as pipeline
+
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
     import variant_tools.association as association
@@ -53,19 +57,21 @@ def addCommonArgs(parser):
 
 if __name__ == '__main__':
     #
-    master_parser = argparse.ArgumentParser(description='''A variant processing, annotation and analysis tool
-        for next-generation sequencing studies.''',
-        prog='vtools',
+    master_parser = argparse.ArgumentParser(description='''A variant calling, 
+        processing, annotation and analysis tool for next-generation sequencing
+        studies.''', prog='vtools',
         #formatter_class=argparse.RawDescriptionHelpFormatter,
         fromfile_prefix_chars='@',
         epilog='''Use 'vtools cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
-    master_parser.add_argument('--version', action='version', version='%(prog)s {}'.format(project.VTOOLS_FULL_VERSION))
+    master_parser.add_argument('--version', action='version',
+        version='%(prog)s {}'.format(project.VTOOLS_FULL_VERSION))
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init
-    parser = subparsers.add_parser('init', help='''Create a new project, or a subproject 
-        from an existing parent project, or merge several existing projects into one''',
+    parser = subparsers.add_parser('init', help='''Create a new project, or a
+        subproject from an existing parent project, or merge several existing
+        projects into one''',
         # FIXME: we should add descriptions to other commands as well.
         description='''Create a new project in the current directory. This
         command will fail if another project already exists in this directory,
@@ -101,8 +107,8 @@ if __name__ == '__main__':
     # command liftover
     if sys.platform != 'win32':
         parser = subparsers.add_parser('liftover',
-            help='''Set alternative reference genome and update alternative coordinates
-                of all variant tables''',
+            help='''Set alternative reference genome and update alternative
+                coordinates of all variant tables''',
             description='''Convert coordinates of existing variants to alternative 
                 coordinates in an alternative reference genome. The UCSC liftover
                 tool will be automatically downloaded if it is not available.''')
@@ -119,10 +125,13 @@ if __name__ == '__main__':
     #
     # command update
     parser = subparsers.add_parser('update',
-        help='Add or update fields of existing variants and genotype using information from specified existing fields, sample genotype, or external files',
-        description='''Add or update fields of existing variants and genotype from other fields,
-            statistics of genotypes and genotype info, or files that annotate variants or their
-            locations (e.g. Read annotation from ANNOVAR output files, import additional variant
+        help='''Add or update fields of existing variants and genotype using
+            information from specified existing fields, sample genotype, 
+            or external files''',
+        description='''Add or update fields of existing variants and genotype
+            from other fields, statistics of genotypes and genotype info, or
+            files that annotate variants or their locations (e.g. Read 
+            annotation from ANNOVAR output files, import additional variant
             or genotype fields from .vcf files).''')
     update.updateArguments(parser)
     addCommonArgs(parser)
@@ -138,7 +147,8 @@ if __name__ == '__main__':
     #
     # command exclude
     parser = subparsers.add_parser('exclude',
-        help='''Output or save variants after excluding variants that match specified conditions''')
+        help='''Output or save variants after excluding variants that match
+            specified conditions''')
     variant.excludeArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -168,7 +178,8 @@ if __name__ == '__main__':
     parser.set_defaults(func=exporter.export)
     #
     # command remove
-    parser = subparsers.add_parser('remove', help='Remove project or its contents (entries, tables, fields, etc.)')
+    parser = subparsers.add_parser('remove', help='''Remove project or its
+        contents such as variant tables, fields, and annotation databases.''')
     project.removeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
@@ -180,7 +191,7 @@ if __name__ == '__main__':
         parser = subparsers.add_parser('associate',
             help='''Test association between variants and phenotypes''',
             description='''Call one or more statistical association tests and
-            return test results as fields to variants tested.''')
+                return test results as fields to variants tested.''')
         association.associateArguments(parser)
         addCommonArgs(parser)
         parser.set_defaults(func=association.associate)
@@ -191,16 +202,20 @@ if __name__ == '__main__':
         help='''Perform various administrative tasks including merge and
             rename samples.''',
         description='''Optimize or modify projects. Currently supports merging
-        and rename of samples''')
+            and rename of samples''')
     project.adminArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.admin)
     #
     # command execute
-    parser = subparsers.add_parser('execute', help='Execute arbitrary SQL statement')
-    project.executeArguments(parser)
+    parser = subparsers.add_parser('execute', help='Execute a pipeline',
+        description='''Execute a pipeline that uses external commands
+            to process input files, usually to align raw reads to a
+            reference genome and call variants from aligned reads. The
+            pipelines are controlled by pipeline description files.''')
+    pipeline.executeArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=project.execute)
+    parser.set_defaults(func=pipeline.execute)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
@@ -211,9 +226,10 @@ if __name__ == '__main__':
     if not hasattr(args, 'func'):
         master_parser.print_help()
         sys.exit(0)
-    # commands that accepts format and other subparsers can pass arbitrary parameter to subparsers
+    # commands that accepts format and other subparsers can pass arbitrary
+    # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export]:
+        update.update, exporter.export, pipeline.execute]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

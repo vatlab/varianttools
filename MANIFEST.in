@@ -27,6 +27,7 @@ include vtools
 include vtools_report
 include source/__init__.py
 include source/annotation.py
+include source/pipeline.py
 include source/importer.py
 include source/update.py
 include source/exporter.py

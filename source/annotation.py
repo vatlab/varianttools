@@ -36,7 +36,7 @@ from multiprocessing import Process, Pipe
 
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
-    DatabaseEngine, getMaxUcscBin, delayedAction, decompressIfNeeded, \
+    DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField, env
 from .importer import LineProcessor, TextReader
   
@@ -341,7 +341,7 @@ class AnnoDBConfiger:
                 try:
                     dbFile = downloadFile(self.direct_url)
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(dbFile))
-                    dbFile = decompressIfNeeded(dbFile, inplace=False)
+                    dbFile = decompressGzFile(dbFile, inplace=False)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except Exception as e:
@@ -401,11 +401,11 @@ def use(args):
                 # if a local file?
                 s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source))
                 # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
-                annoDB = decompressIfNeeded(args.source, inplace=False)
+                annoDB = decompressGzFile(args.source, inplace=False)
                 del s
             elif os.path.isfile(args.source + '.DB.gz'):
                 s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
-                annoDB = decompressIfNeeded(args.source + '.DB.gz', inplace=False)
+                annoDB = decompressGzFile(args.source + '.DB.gz', inplace=False)
                 del s
             elif os.path.isfile(args.source + '.DB'):
                 annoDB = args.source + '.DB'
@@ -424,7 +424,7 @@ def use(args):
                     annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.', quiet=args.source.endswith('.ann'))
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(annoDB))
                     # for downloaded file, we decompress inplace
-                    annoDB = decompressIfNeeded(annoDB, inplace=True)
+                    annoDB = decompressGzFile(annoDB, inplace=True)
                     del s
                 except Exception as e:
                     env.logger.debug(e)
