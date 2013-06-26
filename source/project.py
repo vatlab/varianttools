@@ -675,7 +675,7 @@ class PipelineDescription:
                 for item in parser.items(section, vars=defaults):
                     if item[0] == 'description':
                         self.description = item[1]
-                    elif item[0] in defaults:
+                    elif item[0] in defaults or item[0].endswith('_comment'):
                         pass
                     else:
                         self.pipeline_vars[item[0]] = item[1]
@@ -721,22 +721,18 @@ class PipelineDescription:
             print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
                 initial_indent='', subsequent_indent=' '*2))))
         #
-        if self.pipeline_vars:
-            print('Pipeline variables:')
-            for key, val in self.pipeline_vars.items():
-                print('  {:10} {}'.format(key, val))
-        #
-        print('Pipeline steps:')
+        print('\nPipeline steps:')
         for idx, step in enumerate(self.pipeline_steps):
-            print('  {:2} {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
-                subsequent_indent=' '*5))))
+            print('  {:2}    {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
+                subsequent_indent=' '*8))))
         #
         if self.parameters:
             print('\nPipeline parameters:')
             for item in self.parameters:
-                print('  {:2} {}'.format(item[0],  '\n'.join(textwrap.wrap(
-                    '{} (default: {})'.format(item[2], item[1]),
-                    subsequent_indent=' '*5))))
+                print('  {}\t{}\n{}'.format(item[0],
+                    '(default: {})'.format(item[1]) if item[1] else '',
+                    '\n'.join(textwrap.wrap(item[2],
+                    initial_indent=' '*10, subsequent_indent=' '*10))))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
@@ -3610,7 +3606,6 @@ def show(args):
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')[3:]
                 if args.items:
-                    env.logger.error(args.items)
                     found = []
                     unfound = []
                     for item in args.items:
