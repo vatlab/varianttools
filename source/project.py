@@ -264,16 +264,17 @@ class AnnoDB:
         print('Annotation database {} {}'.format(self.name, '(version {})'
             .format(self.version) if self.version else ''))
         if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*4))))
-        print('Database type: {}'.format(self.anno_type))
+            print('\n'.join(textwrap.wrap(
+                '{:<23} {}'.format('Description:', self.description),
+                subsequent_indent=' '*2, width=78)))
+        print('{:<23} {}'.format('Database type:', self.anno_type))
         # get linking fields
         if verbose:
             # number of records
             cur = self.db.cursor()
             cur.execute('SELECT value FROM {}_info WHERE name="num_records";'.format(self.name))
             num_records = int(cur.fetchone()[0])
-            print('Number of records: {:,}'.format(num_records))
+            print('{:<23} {:,}'.format('Number of records:', num_records))
             fields = self.refGenomes.values()[0]
             
             # Get number of unique keys
@@ -282,51 +283,58 @@ class AnnoDB:
             
             #
             if self.anno_type == 'variant':
-                print('Number of distinct variants: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct variants:', count))
             elif self.anno_type == 'position':
-                print('Number of distinct positions: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct positions:', count))
             elif self.anno_type == 'range':
-                print('Number of distinct ranges: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct ranges:', count))
             elif self.anno_type == 'field':
-                print('Number of distinct entries: {:,}'.format(count))
+                print('{:<23} {:,}'.format('Distinct entries:', count))
         #
         for key in self.refGenomes:
-            print('Reference genome {}: {}'.format(key, self.refGenomes[key]))
+            print('{:<23} {}'.format(
+                '{} {}:'.format('Reference genome', key), 
+                ', '.join(self.refGenomes[key])))
         for field in self.fields:
             if not verbose:
-                print('    {:<20}{}'.format(field.name, '\n'.join(textwrap.wrap(
-                    field.comment, initial_indent=' ', subsequent_indent=' '*25))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(field.name, field.comment),
+                    subsequent_indent=' '*24, width=78)))
             else:
-                print('\nField:           {}'.format(field.name))
+                print('\nField:                  {}'.format(field.name))
                 numeric = False
                 if 'chromosome' in field.type.lower():
-                    print('Type:            chromosome')
+                    print('Type:                   chromosome')
                 elif 'position' in field.type.lower():
-                    print('Type:            integer')
+                    print('Type:                   integer')
                     numeric = True
                 elif 'int' in field.type.lower():
-                    print('Type:            integer')
+                    print('Type:                   integer')
                     numeric = True
                 elif 'float' in field.type.lower():
-                    print('Type:            float')
+                    print('Type:                   float')
                     numeric = True
                 else:
-                    print('Type:            string')
+                    print('Type:                   string')
                 if field.comment:
-                    print('Comment: {}'.format('\n'.join(textwrap.wrap(
-                        field.comment, initial_indent='        ', subsequent_indent=' '*17))))
-                cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'.format(self.name, field.name))
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format('Comment:', field.comment),
+                        width=78, subsequent_indent=' '*24)))
+                cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'
+                    .format(self.name, field.name))
                 missing = cur.fetchone()[0]
                 #
-                print('Missing entries: {:,} {}'.format(missing, '({:.1f}% of {:,} records)'.format(100. * missing/num_records, num_records) if missing else ''))
+                print('Missing entries:        {:,} {}'
+                    .format(missing, '({:.1f}% of {:,} records)'
+                        .format(100. * missing/num_records, num_records) if missing else ''))
                 if missing == num_records:
                     continue
                 cur.execute('SELECT distinct_entries {2} FROM {0}_field WHERE name={1};'.format(
                     self.name, self.db.PH, ', min_value, max_value' if numeric else ''), (field.name,))
                 res = cur.fetchone()
-                print('Unique Entries:  {:,}'.format(res[0]))
+                print('Unique Entries:         {:,}'.format(res[0]))
                 if numeric:
-                    print('Range:           {} - {}'.format(res[1], res[2]))
+                    print('Range:                  {} - {}'.format(res[1], res[2]))
 
 
 class fileFMT:
@@ -555,10 +563,11 @@ class fileFMT:
             self.columns.append(col)
 
     def describe(self):
-        print('Format:      {}'.format(self.name))
+        print('{:<23} {}'.format('Format:', self.name))
         if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*2))))
+            print('\n'.join(textwrap.wrap(
+                '{:<23} {}'.format('Description:', self.description),
+                subsequent_indent=' '*2, width=78)))
         #
         if self.preprocessor is not None:
             print('Preprocessor: {}'.format(self.preprocessor))
@@ -566,8 +575,9 @@ class fileFMT:
         print('\nColumns:')
         if self.columns:
             for col in self.columns:
-                print('  {:12} {}'.format(str(col.index), '\n'.join(textwrap.wrap(col.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(col.index, col.comment),
+                    subsequent_indent=' '*24, width=78)))
             if self.formatter:
                 print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
         else:
@@ -576,34 +586,39 @@ class fileFMT:
         if self.input_type == 'variant':
             print('\n{0}:'.format(self.input_type))
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
-            print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                subsequent_indent=' '*15))))
+            print('\n'.join(textwrap.wrap(
+                '  {:<21} {}'.format(fld.name, fld.comment),
+                subsequent_indent=' '*24, width=78)))
         if self.ranges[1] != self.ranges[2]:
             print('\nVariant info:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.ranges[2] != self.ranges[3]:
             print('\nGenotype:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.ranges[3] != self.ranges[4]:
             print('\nGenotype info:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.other_fields:
             print('\nOther fields (usable through parameters):')
             for fld in self.other_fields:
-                print('  {:12} {}'.format(fld.name, '\n'.join(textwrap.wrap(fld.comment,
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {}'.format(fld.name, fld.comment),
+                    subsequent_indent=' '*24, width=78)))
         if self.parameters:
             print('\nFormat parameters:')
             for item in self.parameters:
-                print('  {:12} {}'.format(item[0],  '\n'.join(textwrap.wrap(
-                    '{} (default: {})'.format(item[2], item[1]),
-                    subsequent_indent=' '*15))))
+                print('\n'.join(textwrap.wrap(
+                    '  {:<21} {} (default: {})'.format(item[0], item[2], item[1]),
+                    subsequent_indent=' '*24, width=78)))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
@@ -616,7 +631,15 @@ class PipelineDescription:
         self.pipeline_vars = {}
         self.pipeline_steps = []
         #
-        if os.path.isfile(name + '.pipeline'):
+        if name.endswith('.pipeline'):
+            if os.path.isfile(name):
+                self.name = os.path.split(name)[-1].rsplit('.', 1)[0]
+                args = self.parseArgs(name, extra_args)
+                self.parsePipeline(name, defaults=args) 
+            else:
+                raise ValueError('Pipeline description file not found: {}'
+                    .format(name))
+        elif os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
             args = self.parseArgs(name + '.pipeline', extra_args)
             self.parsePipeline(name + '.pipeline', defaults=args) 
@@ -716,23 +739,26 @@ class PipelineDescription:
                 raise ValueError('Missing or empty action for step {}'.format(idx + 1))
      
     def describe(self):
-        print('Pipeline:     {}'.format(self.name))
+        print('Pipeline:    {}'.format(self.name))
         if self.description is not None:
-            print('Description: {}'.format('\n'.join(textwrap.wrap(self.description,
-                initial_indent='', subsequent_indent=' '*2))))
+            print('\n'.join(textwrap.wrap(
+                'Description: ' +  self.description,
+                subsequent_indent=' '*2)))
         #
         print('\nPipeline steps:')
         for idx, step in enumerate(self.pipeline_steps):
-            print('  {:2}    {}'.format(idx + 1, '\n'.join(textwrap.wrap(step.comment,
-                subsequent_indent=' '*8))))
+            text = '{:<22}'.format('  step {}:'.format(step.index)) + step.comment
+            print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
         #
         if self.parameters:
             print('\nPipeline parameters:')
             for item in self.parameters:
-                print('  {}\t{}\n{}'.format(item[0],
-                    '(default: {})'.format(item[1]) if item[1] else '',
-                    '\n'.join(textwrap.wrap(item[2],
-                    initial_indent=' '*10, subsequent_indent=' '*10))))
+                #
+                text = '  ' + item[0] + \
+                    (' '*(22-len(item[0])-2) if len(item[0])<20 else ' ') + \
+                    (item[2] + ' ' if item[2] else '') + \
+                    ('(default: {})'.format(item[1]) if item[1] else '')
+                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
@@ -3500,8 +3526,9 @@ def showArguments(parser):
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
             tables if --verbosity=2), 'table TBL' for details of a specific
-            table TBL, 'samples [COND]' for sample name, files from which samples
-            are imported, and associated phenotypes of all or selected samples
+            table TBL, 'samples [COND]' for sample name, files from which
+            samples are imported, and associated phenotypes (can be supressed
+            by option --verbosity 0) of all or selected samples, 
             'phenotypes [P1 P2...]' for all or specified phenotypes of samples, 
             'fields' for fields from variant tables and all used annotation
             databases, 'annotations' for a list of all available annotation
@@ -3584,6 +3611,9 @@ def show(args):
                     return
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
+                # if -v0, do not show phenotypes
+                if args.verbosity == '0':
+                    fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
                 print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
@@ -3670,9 +3700,9 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
                 for fmt, prop in res.manifest.iteritems():
-                    print('{}\n{}\n'.format(fmt[7:-4],
-                        '\n'.join(textwrap.wrap(prop[3], initial_indent=' '*10,
-                            subsequent_indent=' '*10))))
+                    text = '{:<23} {}'.format(fmt[7:-4], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
             elif args.type == 'format':
                 if not args.items:
                     raise ValueError('Please specify a format to display')
@@ -3723,9 +3753,10 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
-                print('\n'.join(['{}{}{}'.format(test, ' '*(22-len(test)),
-                    '\n'.join(textwrap.wrap('' if obj.__doc__ is None else obj.__doc__, initial_indent=' '*22, width=78,
-                        subsequent_indent=' '*22))[22:]) for test, obj in getAllTests()]))
+                for test, obj in getAllTests():
+                    print('\n'.join(textwrap.wrap(
+                        '{:<24}'.format(test) + ('' if obj.__doc__ is None else obj.__doc__),
+                        subsequent_indent=' '*24, width=78)))
             elif args.type == 'test':
                 from .association import getAllTests
                 if len(args.items) == 0:
@@ -3746,10 +3777,10 @@ def show(args):
                 for opt, (def_value, description) in sorted(env.persistent_options.iteritems()):
                     # get the raw value of option (not the attribute, which might not be a string)
                     val = str(getattr(env, '_' + opt))
-                    print('{}{}{} {}'.format(opt, ' '*(27-len(opt)), val,
+                    print('{:<23} {} {}'.format(opt, val,
                         '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
-                    print('\n'.join(textwrap.wrap(description, initial_indent=' '*27, width=78,
-                        subsequent_indent=' '*27)))
+                    print('\n'.join(textwrap.wrap(description, width=78,
+                        initial_indent=' '*24, subsequent_indent=' '*24)))
             elif args.type == 'runtime_option':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of a runtime option')
@@ -3772,18 +3803,18 @@ def show(args):
                     if name is not None:
                         snapshots.append((name, date, desc))
                 #
-                width = 18 if not snapshots else max(18, max([len(x[0]) for x in snapshots]))
-                print(('{:<' + str(width) + '} {:<15} {}').format('snapshot', 'date', 'description'))
                 for name, date, desc in sorted(snapshots):
-                    print(('{:<' + str(width) + '} {:<15} {}').format(name, date, 
-                        '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
+                    text = '{:<23} {} (created: {})'.format(name, desc, date)
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
                 #
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 for ss, prop in res.manifest.iteritems():
-                    print(('{:<' + str(width) + '} {:15} {}').format(ss[9:-7], 'NA', '\n'.join(textwrap.wrap(' '*35 + prop[3],
-                        initial_indent='', subsequent_indent=' '*(width+17)))[35:]))
+                    text = '{:<23} {} (online snapshot)'.format(ss[9:-7], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                        subsequent_indent=' '*24)))
             elif args.type == 'pipelines':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
@@ -3792,9 +3823,9 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='pipeline')
                 for pipeline, prop in res.manifest.iteritems():
-                    print('{}\n{}\n'.format(pipeline[9:-9],
-                        '\n'.join(textwrap.wrap(prop[3], initial_indent=' '*10,
-                            subsequent_indent=' '*10))))
+                    text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
             elif args.type == 'pipeline':
                 if not args.items:
                     raise ValueError('Please specify a pipeline to display')

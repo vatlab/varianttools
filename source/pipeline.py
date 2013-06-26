@@ -853,6 +853,8 @@ class Pipeline:
         #
         ifiles = input_files
         for command in self.pipeline.pipeline_steps:
+            env.logger.info('Executing step {} of pipeline {}'
+                .format(command.index, self.pipeline.name))
             # substitute ${} variables
             if command.input:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
@@ -937,15 +939,16 @@ def executeArguments(parser):
             to a pipeline description file (with or without extension), or one
             of the online pipelines listed by command "vtools show pipelines".
             To keep backward compatibility, this option also accept a SQL query
-            that will be executed, with project genotype database is attached
-            as "genotype", and annotation databases attached by their names.''')
-    parser.add_argument('input_files', nargs='*',
+            that will be executed, with project genotype database attached
+            as "genotype" and annotation databases attached by their names.''')
+    parser.add_argument('input_files', nargs='*', metavar='INPUT_FILE',
         help='''One or more files that contains raw sequence reads from the
             same sample. Depending on the pipeline used, the input files can
             be in plain fastq files (.txt, .fa, .fastq,), compressed files 
             (e.g. .tar, .tar.gz, .tar.bz2, .tbz2, .tgz formats), or in sam/bam
-            format. The input will be passed to the pipelines as ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='*',
+            format. The input will be passed to the pipelines as pipeline
+            variable ${CMD_INPUT}.''')
+    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT_FILE',
         help='''Names of output files of the pipeline, which will be passed to
             the pipelines as ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
@@ -959,7 +962,7 @@ def execute(args):
             # old usage with a SQL query? The pipeline interface should
             # have input files, should have option --output, and should not
             # specify delimiter, and the input file should exist.
-            if not args.input_files or not args.output or args.delimieter != '\t':
+            if not args.input_files or not args.output or args.delimiter != '\t':
                 # if there is no output, 
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
