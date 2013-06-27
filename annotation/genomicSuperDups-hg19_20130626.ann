@@ -1,0 +1,53 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+# 
+[linked fields]
+hg19=chr, start, end
+
+[data sources]
+anno_type=range
+description=regions detected as putative genomic duplications within the golden path
+version=hg19_20130626
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/genomicSuperDups-hg19_20130626.DB.gz
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
+source_type=txt
+
+[chr]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[start]
+index=3
+type=INTEGER
+adj=IncreaseBy(1)
+comment=Start position in chromosome
+
+[end]
+index=4
+type=INTEGER
+comment=End position in chromosome
+
+[name]
+index=5
+type=VARCHAR(225)
+comment=Name of conserved region
+
+[otherChr]
+index=8
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[otherStart]
+index=9
+type=INTEGER
+comment=Start position of other region
+
+[otherEnd]
+index=10
+type=INTEGER
+comment=End position in chromosome
+
