@@ -1038,7 +1038,8 @@ class Project:
             cls._instance = super(Project, cls).__new__(cls) #, *args, **kwargs)
         return cls._instance
 
-    def __init__(self, name=None, build=None, new=False, verbosity=None, verify=True, **kwargs):
+    def __init__(self, name=None, build=None, new=False, verbosity=None, 
+        verify=True, readonly=False, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
         if new: # new project
@@ -1076,7 +1077,7 @@ class Project:
         #
         # create a temporary directory
         self.db = DatabaseEngine()
-        self.db.connect(self.proj_file)
+        self.db.connect(self.proj_file, readonly=readonly)
         env.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
         env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
@@ -1105,7 +1106,7 @@ class Project:
         if new:
             self.create(build=build, **kwargs)
         else:
-            self.open(verify)
+            self.open(verify, readonly)
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1163,12 +1164,12 @@ class Project:
         self.createMasterVariantTable()
         self.createSampleTableIfNeeded()
 
-    def open(self, verify=True):
+    def open(self, verify=True, readonly=False):
         '''Open an existing project'''
         # open the project file
         env.logger.debug('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
-        self.db.connect(self.proj_file)
+        self.db.connect(self.proj_file, readonly=readonly)
         if not self.db.hasTable('project'):
             raise ValueError('Invalid project database (missing project table)')
         #
@@ -1189,7 +1190,7 @@ class Project:
             # pass things like batch ... and re-connect
             # env['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
-            self.db.connect(self.proj_file)
+            self.db.connect(self.proj_file, readonly=readonly)
         # loading other options if they have been set
         env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         env.local_resource = self.loadProperty('__option_local_resource', None)
