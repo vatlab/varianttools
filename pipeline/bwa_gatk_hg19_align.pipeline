@@ -6,9 +6,9 @@
 
 [pipeline description]
 description=A pipeline to align raw reads from fastq or BAW/SAM files using BWA
-    and GATK best practice. It uses hg19 of human reference genome and assumes
-    paired-end reads in plain text and compressed formats. Reduced bam files
-	will be produced if more than one output files are specified.
+  and GATK best practice. It uses hg19 of human reference genome and assumes
+  paired-end reads in plain text and compressed formats. Reduced bam files
+  are produced if more than one output files are specified.
 #
 # resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_hg19
 RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk23_hg19
@@ -19,13 +19,13 @@ strict_prog_version_comment=Whether or not use other version of programs if the 
 	exist. Setting it to False allows variant tools to use other versions of the programs.
 
 bwa=bwa
-bwa_comment=path to bwa. Default to bwa (use $PATH to determine actual path)
+bwa_comment=path to bwa. Default to 'bwa' (use $PATH to determine actual path)
 
 samtools=samtools
-samtools_comment=path to samtools. Default to samtools (use $PATH to determine actual path)
+samtools_comment=path to samtools. Default to 'samtools' (use $PATH to determine actual path)
 
 java=java
-java_comment=path to java. Default to java (use $PATH to determine actual path)
+java_comment=path to java. Default to 'java' (use $PATH to determine actual path)
 
 picard_path=
 picard_path_comment=Path to picard jar files
@@ -34,44 +34,50 @@ gatk_path=
 gatk_path_comment=Path to GATK jar file GenomeAnalysisTK.jar
 
 opt_java=-Xmx4g -XX:-UseGCOverheadLimit
+opt_java_comment=Option to java program. -Djava.io.tmpdir is frequently used to set java
+	temporary directory if system temporary partition is not big enough.
 
 opt_bwa_index=
+opt_bwa_index_comment=Option to command 'bwa index'
 
 opt_bwa_aln=
+opt_bwa_aln_comment=Option to command 'bwa aln'
 
 opt_bwa_sampe=
-
-opt_bwa_samse=
+opt_bwa_sampe_comment=Option to command 'bwa sampe'
 
 opt_samtools_faidx=
-
-opt_samtools_view=
-
-opt_samtools_sort=
+opt_samtools_faidx_comment=Option to command 'samtools faidx'
 
 opt_samtools_index=
+opt_samtools_index_comment=Option to command 'samtools index'
 
 opt_picard_sortsam=VALIDATION_STRINGENCY=LENIENT
-opt_picard_sortsam_comment=VALIDATION_STRINGENCY=LENIANT is used to correct an error
-    caused by some versions of BWA, see http://seqanswers.com/forums/showthread.php?t=4246
-    for details.
+opt_picard_sortsam_comment=Option to picard SortSam.jar
 
 opt_picard_mergesamfiles=MAX_RECORDS_IN_RAM=5000000
+opt_picard_mergesamfiles_comment=Option to picard MergeSamFiles.jar
 
 opt_picard_samtofastq=VALIDATION_STRINGENCY=LENIENT NON_PF=true
+opt_picard_samtofastq_comment=Option to picard SamToFastq.jar
 
 opt_picard_markduplicates=
+opt_picard_markduplicates_comment=Option to picard MarkDuplicates.jar
 #
 opt_gatk_realignertargetcreator=
-# http://gatkforums.broadinstitute.org/discussion/1429/error-bam-file-has-a-read-with-mismatching-number-of-bases-and-base-qualities
+opt_gatk_realignertargetcreator_comment=Option to command gatk RealignerTargetCreator
 
 opt_gatk_indelrealigner=--filter_mismatching_base_and_quals
+opt_gatk_indelrealigner_comment=Option to command gatk IndelRealigner
 
 opt_gatk_baserecalibrator=-rf BadCigar
+opt_gatk_baserecalibrator_comment=Option to command gatk BaseRecalibrator
 
 opt_gatk_printreads=
+opt_gatk_printreads_comment=Option to command gatk PrintReads
 
 opt_gatk_reducereads=
+opt_gatk_reducereads_comment=Option to command gatk ReduceReads
 
 
 [step_0]
@@ -116,7 +122,7 @@ action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.o
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5',
     resource_dir="${RESOURCE_DIR}")
-
+comment=Download required resources to resource directory
 
 [step_10]
 # input = output = ${CMD_INPUT}
@@ -125,15 +131,15 @@ comment=Check existence of commands bwa, samtools and java
 
 [step_11]
 action=CheckOutput('%(bwa)s', 'Version: 0.7.*', %(strict_prog_version)s)
-comment=Check if the version of bwa is 0.7.4
+comment=Check if the version of bwa. Version is 0.7.4 is recommended
 
 [step_12]
-action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.72', %(strict_prog_version)s)
-comment=Check if the version of picard is 1.82
+action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.82', %(strict_prog_version)s)
+comment=Check if the version of picard. Version is 1.82 is recommended.
 
 [step_13]
 action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
-comment=Check the version of GATK
+comment=Check the version of GATK. Version 2.4 is recommended.
 
 [step_20]
 # input = output = ${CMD_INPUT}
@@ -159,15 +165,13 @@ comment=Build samtools index for build hg19 of reference genome
 
 [step_100]
 # input is reset to command input ${CMD_INPUT}
+# This step is optional because it convert Sam files to fastq files (assuming
+# paired). Non-sam files are passed directly to the next step.
 input=${CMD_INPUT}
 action=RunCommand("%(java)s %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(opt_picard_samtofastq)s
     INPUT=${INPUT} 
     FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
     SECOND_END_FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}")
-#
-# This step is optional because it convert Sam files to fastq files (assuming
-# paired). Non-sam files are passed directly to the next step.
-#
 input_emitter=EmitInput(select=['bam', 'sam'], pass_unselected=True)
 comment=Convert bam files to paired fastq files if the input is in bam/sam format.
     Other input files are returned untouched.
@@ -237,7 +241,8 @@ action=RunCommand(cmd="%(java)s %(opt_java)s -jar %(picard_path)s/MergeSamFiles.
     output="${INPUT: INPUT[0][:-4] + '_merged.bam'}")
 # if there is only one input file, skip this step and pass the input to output
 input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1}, group_by="all")
-comment=Merge multiple sam files
+comment=Merge per-lane sam files into a single bam file. This step is skipped
+	if there is only one input file.
 
 [step_500]
 action=RunCommand(cmd="%(java)s %(opt_java)s 
@@ -245,7 +250,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         %(opt_picard_sortsam)s I=${INPUT}
         O=${INPUT: INPUT[0][:-4] + '_sorted.bam'} SO=coordinate",
     output="${INPUT: INPUT[0][:-4] + '_sorted.bam'}")
-comment=Sort merged bam file
+comment=Sort merged bam file using picard SortSam
 
 [step_600]
 action=RunCommand(cmd="%(java)s %(opt_java)s
@@ -257,13 +262,13 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         ASSUME_SORTED=true
         VALIDATION_STRINGENCY=LENIENT",
     output="${INPUT: INPUT[0][:-4] + '_dedup.bam'}")
-comment=Mark duplicates
+comment=Mark duplicates using picard MarkDuplicates command
 
 [step_610]
 action=RunCommand(cmd="%(samtools)s index
         %(opt_samtools_index)s ${INPUT}",
     output="${INPUT: INPUT[0] + '.bai'}")
-comment=index dedupped bam file
+comment=Index dedupped bam file using samtools
 
 [step_700]
 input=${OUTPUT600}
@@ -349,6 +354,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -o ${CMD_OUTPUT: CMD_OUTPUT[1]}",
     output="${CMD_OUTPUT: CMD_OUTPUT[1]}")
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 1})
-comment=Generated bam file with reduced reads if more than one output file is specified
+comment=Generated bam file with reduced reads if more than one output file
+	is specified
 
 
