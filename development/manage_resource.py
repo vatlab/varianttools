@@ -105,7 +105,8 @@ if __name__ == '__main__':
             resources with filename containing specified words are displayed.''')
     parser.add_argument('--update',  nargs='?', metavar='TYPE', 
         const='current', 
-        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format', 'snapshot'],
+        choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 'format',
+           'snapshot', 'pipeline'],
         help='''Download resources of specified type, which can be 'current' (latest version
             of all resources excluding snapshots), 'all' (all resources including obsolete
             databases), 'existing' (only update resources that exist locally), 

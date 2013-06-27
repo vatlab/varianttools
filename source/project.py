@@ -629,7 +629,7 @@ class PipelineDescription:
         '''Pipeline configuration file'''
         self.description = None
         self.pipeline_vars = {}
-        self.pipeline_steps = []
+        self.pipelines = {}
         #
         if name.endswith('.pipeline'):
             if os.path.isfile(name):
@@ -703,10 +703,16 @@ class PipelineDescription:
                     else:
                         self.pipeline_vars[item[0]] = item[1]
             else:
-                if section.split('_')[0] != 'step' or \
-                    not section.split('_')[-1].isdigit():
-                    raise ValueError('Only sections step_# '
-                        'are allowed: {} specified.'.format(section))
+                try:
+                    pname, pidx = section.rsplit('_', 1)
+                except Exception as e:
+                    raise ValueError('Invalid section name {} in pipeline description file {}'
+                        .format(section, filename))
+                if not pidx.isdigit():
+                    raise ValueError('Index of a pipeline step should be an integer: {} provided'
+                        .format(pidx))
+                if pname not in self.pipelines:
+                    self.pipelines[pname] = []
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     if 'action' not in items:
@@ -723,32 +729,35 @@ class PipelineDescription:
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    if section.startswith('step_'):
-                        self.pipeline_steps.append(command)
+                    self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
         # sort steps
-        self.pipeline_steps.sort(key=lambda x: x[0])
+        for pname in self.pipelines:
+            self.pipelines[pname].sort(key=lambda x: x[0])
         # 
         # validate
-        for idx, cmd in enumerate(self.pipeline_steps):
-            if cmd is None:
-                raise ValueError('Invalid pipeline. Step {} is left unspecified.'
-                    .format(idx+1))
-            if not cmd.action:
-                raise ValueError('Missing or empty action for step {}'.format(idx + 1))
+        for pname, pipeline in self.pipelines.items():
+            for idx, cmd in enumerate(pipeline):
+                if cmd is None:
+                    raise ValueError('Invalid pipeline {}. Step {} is left unspecified.'
+                        .format(pname, idx+1))
+                if not cmd.action:
+                    raise ValueError('Missing or empty action for step {} of pipeline {}'
+                        .format(pname, idx + 1))
      
     def describe(self):
-        print('Pipeline:    {}'.format(self.name))
+        print('Name:        {}'.format(self.name))
         if self.description is not None:
             print('\n'.join(textwrap.wrap(
                 'Description: ' +  self.description,
                 subsequent_indent=' '*2)))
         #
-        print('\nPipeline steps:')
-        for idx, step in enumerate(self.pipeline_steps):
-            text = '{:<22}'.format('  step {}:'.format(step.index)) + step.comment
-            print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
+        for pname, pipeline in self.pipelines.items():
+            print('\nPipeline {}:'.format(pname))
+            for idx, step in enumerate(pipeline):
+                text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
+                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
         #
         if self.parameters:
             print('\nPipeline parameters:')

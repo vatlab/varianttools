@@ -916,7 +916,22 @@ class Pipeline:
         # now, join the pieces together, but remove all newlines
         return ' '.join(''.join(pieces).split())
 
-    def execute(self, input_files=[], output_files=[], jobs=1):
+    def execute(self, pname, input_files=[], output_files=[], jobs=1):
+        if pname is None:
+            if len(self.pipeline.pipelines) == 1:
+                pname = self.pipeline.pipelines.keys()[0]
+            else:
+                raise ValueError('Name of pipeline should be specified because '
+                    '{}.pipeline defines more than one pipelines. '
+                    'Available pipelines are: {}.'.format(self.pipeline.name,
+                    ', '.join(self.pipeline.pipelines.keys())))
+        else:
+            if pname not in self.pipeline.pipelines.keys():
+                raise ValueError('Pipeline {} is undefined in configuraiton file '
+                    '{}. Available pipelines are: {}'.format(pname,
+                    self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
+        psteps = self.pipeline.pipelines[pname]
+        #
         global max_running_jobs 
         max_running_jobs = jobs
         VARS = {
@@ -930,9 +945,9 @@ class Pipeline:
             VARS[key.lower()] = self.substitute(val, VARS)
         #
         ifiles = input_files
-        for command in self.pipeline.pipeline_steps:
-            env.logger.info('Executing step {} of pipeline {}'
-                .format(command.index, self.pipeline.name))
+        for command in psteps:
+            env.logger.info('Executing step {}_{} of pipeline {}'
+                .format(pname, command.index, self.pipeline.name))
             # substitute ${} variables
             if command.input:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
@@ -940,12 +955,12 @@ class Pipeline:
                 step_input = ifiles
             # if there is no input file?
             if not step_input:
-                raise RuntimeError('Pipeline stops at step {}: No input file is available.'
-                    .format(command.index))
+                raise RuntimeError('Pipeline stops at step {}_{}: No input file is available.'
+                    .format(pname, command.index))
             #
             VARS['input{}'.format(command.index)] = step_input
-            env.logger.debug('INPUT of step {}: {}'
-                    .format(command.index, step_input))
+            env.logger.debug('INPUT of step {}_{}: {}'
+                    .format(pname, command.index, step_input))
             # 
             # now, group input files
             if not command.input_emitter:
@@ -969,10 +984,10 @@ class Pipeline:
                         continue
                     VARS['input'] = ig
                     action = self.substitute(command.action, VARS)
-                    env.logger.debug('Emitted input of step {}: {}'
-                        .format(command.index, ig))
-                    env.logger.debug('Action of step {}: {}'
-                        .format(command.index, action))
+                    env.logger.debug('Emitted input of step {}_{}: {}'
+                        .format(pname, command.index, ig))
+                    env.logger.debug('Action of step {}_{}: {}'
+                        .format(pname, command.index, action))
                     action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
@@ -984,14 +999,16 @@ class Pipeline:
                 # wait for all pending jobs to finish
                 wait_all()
                 VARS['output{}'.format(command.index)] = step_output
-                env.logger.debug('OUTPUT of step {}: {}'
-                    .format(command.index, step_output))
+                env.logger.debug('OUTPUT of step {}_{}: {}'
+                    .format(pname, command.index, step_output))
                 for f in step_output:
                     if not os.path.isfile(f):
-                        raise RuntimeError('Output file {} does not exist after completion of step {}'.format(f, command.index))
+                        raise RuntimeError('Output file {} does not exist after '
+                            'completion of step {}_{}'
+                            .format(f, pname, command.index))
             except Exception as e:
-                raise RuntimeError('Failed to execute step {}: {}'
-                    .format(command.index, e))
+                raise RuntimeError('Failed to execute step {}_{}: {}'
+                    .format(pname, command.index, e))
             os.chdir(saved_dir)
             ifiles = step_output
 
@@ -1012,20 +1029,18 @@ def isBamPairedEnd(input_file):
 
 
 def executeArguments(parser):
-    parser.add_argument('pipeline', 
-        help='''Name of the pipeline to be used to be executed. It can be path
-            to a pipeline description file (with or without extension), or one
+    parser.add_argument('pipeline', nargs='+', metavar='PIPELINE/QUERY',
+        help='''Name of a pipeline configuration file with optional names of
+            pipelines to be executed if the configuration file defines more
+            than one pipelines. The configuration file can be identified by
+            path to a .pipeline file (with or without extension), or one
             of the online pipelines listed by command "vtools show pipelines".
             To keep backward compatibility, this option also accept a SQL query
             that will be executed, with project genotype database attached
             as "genotype" and annotation databases attached by their names.''')
-    parser.add_argument('input_files', nargs='*',
-        help='''One or more files that contains raw sequence reads from the
-            same sample. Depending on the pipeline used, the input files can
-            be in plain fastq files (.txt, .fa, .fastq,), compressed files 
-            (e.g. .tar, .tar.gz, .tar.bz2, .tbz2, .tgz formats), or in sam/bam
-            format. The input will be passed to the pipelines as pipeline
-            variable ${CMD_INPUT}.''')
+    parser.add_argument('-i', '--input', nargs='*', metavar='OUTPUT_FILE',
+        help='''Input files to the pipeline, which will be passed to the
+            pipelines as pipeline variable ${CMD_INPUT}.''')
     parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT_FILE',
         help='''Names of output files of the pipeline, which will be passed to
             the pipelines as ${CMD_OUTPUT}.''')
@@ -1039,17 +1054,15 @@ def execute(args):
         # old usage with a SQL query? The pipeline interface should
         # have input files, should have option --output, and should not
         # specify delimiter, and the input file should exist.
-        if not args.input_files or not args.output or args.delimiter != '\t':
+        if not args.input or not args.output or args.delimiter != '\t':
             with Project(verbosity=args.verbosity) as proj:
                 # if there is no output, 
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
                 proj.db.attach('{}_genotype'.format(proj.name))
                 cur = proj.db.cursor()
-                # the original interface has args.query with '*' parameters
-                # which is provided by two options args.pipeline and 
-                # args.input_files
-                query = ' '.join([args.pipeline] + args.input_files)
+                # 
+                query = ' '.join(args.pipeline)
                 if query.upper().startswith('SELECT'):
                     env.logger.debug('Analyze statement: "{}"'.format(query))
                     cur.execute('EXPLAIN QUERY PLAN ' + query)
@@ -1063,8 +1076,15 @@ def execute(args):
                     print(sep.join(['{}'.format(x) for x in rec]))
         else:
             with Project(verbosity=args.verbosity, readonly=True) as proj:
-                pipeline = Pipeline(args.pipeline, extra_args=args.unknown_args)
-                pipeline.execute(args.input_files, args.output, args.jobs)
+                pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
+                # unspecified
+                if len(args.pipeline) == 1:
+                    pipeline.execute(None, args.input, args.output,
+                        args.jobs)
+                else:
+                    for name in args.pipeline[1:]:
+                        pipeline.execute(name, args.input, args.output,
+                            args.jobs)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
