@@ -740,6 +740,26 @@ class DownloadResource:
                 .format(self.pipeline_resource))
 
     def __call__(self, ifiles):
+        lockfile = os.path.join(self.pipeline_resource, '.varianttools.lck')
+        while True:
+            if os.path.isfile(lockfile):
+                env.logger.warning('Wait till file lock {} is release.'.format(lockfile))
+                time.sleep(10)
+            else:
+                break
+        # if there is no lock file, proceed
+        # create a lock file
+        open(lockfile, 'a').close()
+        try:
+            return self._downloadFiles(ifiles)
+        finally:
+            try:
+                os.remove(lockfile)
+            except Exception as e:
+                env.logger.warning('Failed to remove lock file {}: e'
+                    .format(lockfile, e))
+
+    def _downloadFiles(self, ifiles):
         '''Download resource'''
         # decompress all .gz files
         saved_dir = os.getcwd()
