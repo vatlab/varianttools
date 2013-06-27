@@ -376,11 +376,22 @@ def run_command(cmd, output=None, wait=True):
         # subprocess.DEVNULL was introduced in Python 3.3
         proc_out = open(os.devnull, 'w')
         proc_err = open(os.devnull, 'w')
+        proc_lck = None
     else:
-        proc_out = open(output[0] + '.out_{}'.format(os.getpid()), 'w')
-        proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
+        proc_out = open(output[0] + '.out', 'w')
+        proc_err = open(output[0] + '.err', 'w')
+        proc_lck = output[0] + '.lck'
     if wait or max_running_jobs == 1:
         try:
+            if proc_lck:
+                if os.path.isfile(proc_lck):
+                    proc_lck = None   # do not remove lock
+                    raise RuntimeError('Output of pipeline locked by {}.lck. '
+                        'Please remove this file and try again if no other '
+                        'process is writing to this file.'
+                        .format(output[0])) 
+                else:
+                    open(proc_lck, 'a').close()
             s = time.time()
             env.logger.info('Running "{}"'.format(cmd))
             proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
@@ -392,7 +403,7 @@ def run_command(cmd, output=None, wait=True):
                     .format(cmd, -retcode, elapsed_time(s)))
             elif retcode > 0:
                 if output:
-                    with open(output[0] + '.err_{}'.format(os.getpid())) as err:
+                    with open(output[0] + '.err') as err:
                         for line in err.read().split('\n')[-20:]:
                             env.logger.error(line)
                 raise RuntimeError("Command {} returned {} after executing {}"
@@ -411,6 +422,12 @@ def run_command(cmd, output=None, wait=True):
         except OSError as e:
             env.logger.error("Execution of command {} failed: {}".format(cmd, e))
             sys.exit(1)
+        finally:
+            if proc_lck:
+                try:
+                    os.remove(proc_lck)
+                except:
+                    env.logger.warning('Failed to remove lock file {}'.format(proc_lck))
     else:
         # wait for empty slot to run the job
         while True:
@@ -419,6 +436,15 @@ def run_command(cmd, output=None, wait=True):
             else:
                 break
         # there is a slot, start running
+        if proc_lck:
+            if os.path.isfile(proc_lck):
+                proc_lck = None   # do not remove lock
+                raise RuntimeError('Output of pipeline locked by {}.lck. '
+                    'Please remove this file and try again if no other '
+                    'process is writing to this file.'
+                    .format(output[0])) 
+            else:
+                open(proc_lck, 'a').close()
         proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
         running_jobs.append(JOB(proc=proc, cmd=cmd, 
             start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
@@ -441,18 +467,27 @@ def poll_jobs():
         job.stderr.close()
         #
         if ret < 0:
-            raise RuntimeError("Command {} was terminated by signal {} after executing {}"
+            if job.output:
+                try:
+                    os.remove(job.output[0] + '.lck')
+                except:
+                    pass
+            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                 .format(job.cmd, -ret, elapsed_time(job.start_time)))
         elif ret > 0:
             if job.output:
-                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
+                with open(job.output[0] + '.err') as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            raise RuntimeError('Execution of command {} failed after {} (return code {}).'
+                try:
+                    os.remove(job.output[0] + '.lck')
+                except:
+                    pass
+            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(job.cmd, elapsed_time(job.start_time), ret))
         else:
             if job.output:
-                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
+                with open(job.output[0] + '.err') as err:
                     for line in err.read().split('\n')[-10:]:
                         env.logger.info(line)
                 with open(job.output[0] + '.exe_info', 'a') as exe_info:
@@ -463,6 +498,11 @@ def poll_jobs():
                         # for performance considerations, use partial MD5
                         exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                             calculateMD5(f, partial=True)))
+                try:
+                    os.remove(job.output[0] + '.lck')
+                except Exception as e:
+                    self.logger.warning('Failed to remove lock file {}'
+                        .format(job.output[0] + '.lck'))
             env.logger.info('Command {} completed successfully in {}'
                 .format(job.cmd, elapsed_time(job.start_time)))
             #
@@ -472,9 +512,20 @@ def poll_jobs():
 def wait_all():
     '''Wait for all pending jobs to complete'''
     global running_jobs
-    while poll_jobs() > 0:
-        # sleep ten seconds before checking job status again.
-        time.sleep(10)
+    try:
+        while poll_jobs() > 0:
+            # sleep ten seconds before checking job status again.
+            time.sleep(10)
+    except KeyboardInterrupt:
+        # clean up lock files
+        for job in running_jobs:
+            if job is not None and job.stdout:
+                try:
+                    os.remove(job.output[0] + '.lck')
+                except:
+                    pass
+        env.logger.error('Keyboard interrupted')
+        sys.exit(1)
     running_jobs = []
 
 
@@ -492,6 +543,10 @@ class RunCommand:
             self.output = [output]
         else:
             self.output = output
+        #
+        for filename in self.output:
+            if filename.lower().rsplit('.', 1)[-1] in ['out', 'err', 'lck']:
+                raise RuntimeError('Output file with extension .out, .err and .lck are reserved.')
 
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
@@ -740,6 +795,8 @@ class DownloadResource:
                 .format(self.pipeline_resource))
 
     def __call__(self, ifiles):
+        saved_dir = os.getcwd()
+        os.chdir(self.pipeline_resource)
         lockfile = os.path.join(self.pipeline_resource, '.varianttools.lck')
         while True:
             if os.path.isfile(lockfile):
@@ -751,19 +808,41 @@ class DownloadResource:
         # create a lock file
         open(lockfile, 'a').close()
         try:
-            return self._downloadFiles(ifiles)
+            ofiles, md5files = self._downloadFiles(ifiles)
         finally:
             try:
                 os.remove(lockfile)
             except Exception as e:
                 env.logger.warning('Failed to remove lock file {}: e'
                     .format(lockfile, e))
+        self._validate(md5files)
+        os.chdir(saved_dir)
+        return ofiles
+
+    def _validate(self, md5_files):
+        if md5_files:
+            prog = ProgressBar('Validating md5 signature', sum([x[1] for x in md5_files]))
+            mismatched_files = []
+            for filename, s in md5_files:
+                try:
+                    downloaded_md5 = open(filename + '.md5').readline().split()[0]
+                    calculated_md5 = calculateMD5(filename, partial=False)
+                    if downloaded_md5 != calculated_md5:
+                        mismatched_files.append(filename)
+                except Exception as e:
+                    env.logger.warning('Failed to verify md5 signature of {}: {}'
+                        .format(filename[:-4], e))
+                prog.update(prog.count + s)
+            prog.done()
+            if mismatched_files:
+                env.logger.warning('md5 signature of {} mismatch. '
+                      'Please remove {} and try again.'
+                      .format(', '.join(mismatched_files),
+                      'this file' if len(mismatched_files) == 1 else 'these files'))
 
     def _downloadFiles(self, ifiles):
         '''Download resource'''
         # decompress all .gz files
-        saved_dir = os.getcwd()
-        os.chdir(self.pipeline_resource)
         skipped = []
         md5_files = []
         for cnt, URL in enumerate(sorted(self.resource)):
@@ -790,31 +869,10 @@ class DownloadResource:
             #
             if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
                 md5_files.append([filename[:-4], os.path.getsize(filename[:-4])])
-        #
-        if md5_files:
-            prog = ProgressBar('Validating md5 signature', sum([x[1] for x in md5_files]))
-            mismatched_files = []
-            for filename, s in md5_files:
-                try:
-                    downloaded_md5 = open(filename + '.md5').readline().split()[0]
-                    calculated_md5 = calculateMD5(filename, partial=False)
-                    if downloaded_md5 != calculated_md5:
-                        mismatched_files.append(filename)
-                except Exception as e:
-                    env.logger.warning('Failed to verify md5 signature of {}: {}'
-                        .format(filename[:-4], e))
-                prog.update(prog.count + s)
-            prog.done()
-            if mismatched_files:
-                env.logger.warning('md5 signature of {} mismatch. '
-                      'Please remove {} and try again.'
-                      .format(', '.join(mismatched_files),
-                      'this file' if len(mismatched_files) == 1 else 'these files'))
-        os.chdir(saved_dir)
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'
                 .format(len(skipped), self.pipeline_resource))
-        return ifiles
+        return ifiles, md5_files
  
 
 class Pipeline:
