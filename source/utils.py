@@ -1428,36 +1428,24 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
 def existAndNewerThan(ofiles, ifiles, md5file=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 
-    ofiles or ifiles is a list.'''
+    ofiles or ifiles is a list. If a md5file is specified,
+    timestamp will be ignored if md5 signature of all ofiles
+    and ifiles match.'''
     # if there is no input or output file, ofiles cannot be newer than ifiles.
     if not ifiles or not ofiles or ifiles == ofiles:
         return False
-    if type(ifiles) == list:
-        for ifile in ifiles:
-            if not os.path.isfile(ifile):
-                raise RuntimeError('Input file {} is not found.'.format(ifile))
-    else:
-        if not os.path.isfile(ifiles):
-            raise RuntimeError('Input file {} is not found.'.format(ifiles))
-    #
-    if type(ofiles) == list:
-        if not all([os.path.isfile(x) for x in ofiles]):
-            return False
-    else:
-        if not os.path.isfile(ofiles):
-            return False
-    #
-    if type(ofiles) == list:
-        output_timestamp = min([os.path.getmtime(x) for x in ofiles])
-    else:
-        output_timestamp = os.path.getmtime(ofiles)
-    #
-    if type(ifiles) == list:
-        input_timestamp = max([os.path.getmtime(x) for x in ifiles])
-    else:
-        input_timestamp = os.path.getmtime(ifiles)
+    _ifiles = [ifiles] if type(ifiles) != list else ifiles
+    _ofiles = [ofiles] if type(ofiles) != list else ofiles
+    # file exist?
+    for ifile in _ifiles:
+        if not os.path.isfile(ifile):
+            raise RuntimeError('Input file {} is not found.'.format(ifile))
+    # out file does not exist
+    if not all([os.path.isfile(x) for x in _ofiles]):
+        return False
     #
     # compare timestamp of input and output files
+    md5matched = []
     if md5file:
         nFiles = [0]
         with open(md5file) as md5:
@@ -1480,7 +1468,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                 except Exception as e:
                     env.logger.error('Wrong md5 line {} in {}'.format(line, md5file))
                     continue
-                # we do not check if f is one of ifiles or ofiles because presentation
+                # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
                 if not os.path.isfile(f):
                     env.logger.warning('{} in {} does not exist.'.format(f, md5file))
@@ -1495,17 +1483,22 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                         'md5 of existing file differ from recorded file: {}'
                         .format(f))
                     return False
+                md5matched.append(f)
         if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
             env.logger.warning('Corrupted exe_info file {}'.format(md5file))
             return False    
-    #
+    # check if all files have matching signature, do not check timestamp
+    if all([any([os.path.samefile(x, y) for y in md5matched]) for x in _ifiles]) \
+        and all([any([os.path.samefile(x, y) for y in md5matched]) for x in _ofiles]):
+        return True
+    # md5 not available 
+    output_timestamp = min([os.path.getmtime(x) for x in _ofiles])
+    input_timestamp = max([os.path.getmtime(x) for x in _ifiles])
     if output_timestamp < input_timestamp:
-        env.logger.warning(
-            'Ignoring older existing output file {}.'
-            .format(', '.join(ofiles) if type(ofiles) == list else ofiles))
+        env.logger.warning('Ignoring older existing output file {}.'
+            .format(', '.join(_ofiles)))
         return False
     else:
-        # newer by at least 10 seconds.
         return True
 
 def physicalMemory():

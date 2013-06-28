@@ -149,23 +149,28 @@ comment=Download required resources to resource directory
 
 [align_10]
 # input = output = ${CMD_INPUT}
+input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckCommands(['%(bwa)s', '%(samtools)s', '%(java)s'])
 comment=Check existence of commands bwa, samtools and java
 
 [align_11]
+input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('%(bwa)s', 'Version: 0.7.*', %(strict_prog_version)s)
 comment=Check if the version of bwa. Version is 0.7.4 is recommended
 
 [align_12]
+input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.82', %(strict_prog_version)s)
 comment=Check if the version of picard. Version is 1.82 is recommended.
 
 [align_13]
+input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
 comment=Check the version of GATK. Version 2.4 is recommended.
 
 [align_20]
 # input = output = ${CMD_INPUT}
+input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckFiles(["%(picard_path)s/SortSam.jar", "%(gatk_path)s/GenomeAnalysisTK.jar"])
 comment=Check existence of class files for Picard and GATK
 

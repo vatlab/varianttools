@@ -218,7 +218,7 @@ class CheckFiles:
     '''Check the existence of specified files and raise an
     error if one of the files does not exist.'''
     def __init__(self, files):
-        if type(files) == type(''):
+        if type(files) == str:
             self.files = [files]
         else:
             self.files = files
@@ -368,87 +368,42 @@ def elapsed_time(start):
     return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
-def run_command(cmd, output=None, wait=True):
+def run_command(cmd, output=None):
     '''Call an external command, raise an error if it fails.
     '''
     global running_jobs
     if not output:
         # subprocess.DEVNULL was introduced in Python 3.3
-        proc_out = open(os.devnull, 'w')
-        proc_err = open(os.devnull, 'w')
+        proc_out = None
+        proc_err = None
         proc_lck = None
     else:
         proc_out = open(output[0] + '.out', 'w')
         proc_err = open(output[0] + '.err', 'w')
         proc_lck = output[0] + '.lck'
-    if wait or max_running_jobs == 1:
-        try:
-            if proc_lck:
-                if os.path.isfile(proc_lck):
-                    proc_lck = None   # do not remove lock
-                    raise RuntimeError('Output of pipeline locked by {}.lck. '
-                        'Please remove this file and try again if no other '
-                        'process is writing to this file.'
-                        .format(output[0])) 
-                else:
-                    open(proc_lck, 'a').close()
-            s = time.time()
-            env.logger.info('Running "{}"'.format(cmd))
-            proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-            retcode = proc.wait()
-            proc_out.close()
-            proc_err.close()
-            if retcode < 0:
-                raise RuntimeError('Command {} was terminated by signal {} after executing {}'
-                    .format(cmd, -retcode, elapsed_time(s)))
-            elif retcode > 0:
-                if output:
-                    with open(output[0] + '.err') as err:
-                        for line in err.read().split('\n')[-20:]:
-                            env.logger.error(line)
-                raise RuntimeError("Command {} returned {} after executing {}"
-                    .format(cmd, retcode, elapsed_time(s)))
-            if output:
-                with open(output[0] + '.exe_info', 'a') as exe_info:
-                    exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-                    for f in output:
-                        if not os.path.isfile(f):
-                            raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                        # for performance considerations, use partial MD5
-                        exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                            calculateMD5(f, partial=True)))
-            env.logger.info('Command {} completed successfully in {}'
-                .format(cmd, elapsed_time(s)))
-        except OSError as e:
-            env.logger.error("Execution of command {} failed: {}".format(cmd, e))
-            sys.exit(1)
-        finally:
-            if proc_lck:
-                try:
-                    os.remove(proc_lck)
-                except:
-                    env.logger.warning('Failed to remove lock file {}'.format(proc_lck))
-    else:
-        # wait for empty slot to run the job
-        while True:
-            if poll_jobs() >= max_running_jobs:
-                time.sleep(5)
-            else:
-                break
-        # there is a slot, start running
-        if proc_lck:
-            if os.path.isfile(proc_lck):
-                proc_lck = None   # do not remove lock
-                raise RuntimeError('Output of pipeline locked by {}.lck. '
-                    'Please remove this file and try again if no other '
-                    'process is writing to this file.'
-                    .format(output[0])) 
-            else:
-                open(proc_lck, 'a').close()
-        proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-        running_jobs.append(JOB(proc=proc, cmd=cmd, 
-            start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
-        env.logger.info('Running "{}"'.format(cmd))
+    #
+    # wait for empty slot to run the job
+    while True:
+        if poll_jobs() >= max_running_jobs:
+            time.sleep(5)
+        else:
+            break
+    # there is a slot, start running
+    if proc_lck:
+        if os.path.isfile(proc_lck):
+            proc_lck = None   # do not remove lock
+            raise RuntimeError('Output of pipeline locked by {}.lck. '
+                'Please remove this file and try again if no other '
+                'process is writing to this file.'
+                .format(output[0])) 
+        else:
+            open(proc_lck, 'a').close()
+    proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
+    running_jobs.append(JOB(proc=proc, cmd=cmd, 
+        start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
+    env.logger.info('Running "{}"'.format(cmd))
+    if proc_out is not None:
+        env.logger.info('Output redirected to {}.out (and .err)'.format(output[0]))
 
 def poll_jobs():
     '''check the number of running jobs.'''
@@ -459,12 +414,17 @@ def poll_jobs():
             continue
         ret = job.proc.poll()
         if ret is None:  # still running
+            # flush so that we can check output easily
+            if job.stdout is not None:
+                job.stdout.flush()
+                job.stderr.flush()
             count += 1
             continue
         #
         # job completed, close redirected stdout and stderr
-        job.stdout.close()
-        job.stderr.close()
+        if job.stdout is not None:
+            job.stdout.close()
+            job.stderr.close()
         #
         if ret < 0:
             if job.output:
@@ -562,7 +522,7 @@ class RunCommand:
                     return self.output
         if self.working_dir:
             os.chdir(self.working_dir)
-        run_command(self.cmd, output=self.output, wait=False)
+        run_command(self.cmd, output=self.output)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
@@ -946,8 +906,9 @@ class Pipeline:
         #
         ifiles = input_files
         for command in psteps:
-            env.logger.info('Executing step {}_{} of pipeline {}'
-                .format(pname, command.index, self.pipeline.name))
+            env.logger.info('Executing step {}_{} of pipeline {}: {}'
+                .format(pname, command.index, self.pipeline.name,
+                    command.comment))
             # substitute ${} variables
             if command.input:
                 step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
@@ -991,7 +952,7 @@ class Pipeline:
                     action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
-                    ofiles = action(step_input)
+                    ofiles = action(ig)
                     if type(ofiles) == str:
                         step_output.append(ofiles)
                     else:
@@ -1051,11 +1012,11 @@ def executeArguments(parser):
 
 def execute(args):
     try:
-        # old usage with a SQL query? The pipeline interface should
-        # have input files, should have option --output, and should not
-        # specify delimiter, and the input file should exist.
-        if not args.input or not args.output or args.delimiter != '\t':
-            with Project(verbosity=args.verbosity) as proj:
+        with Project(verbosity=args.verbosity) as proj:
+            # old usage with a SQL query? The pipeline interface should
+            # have input files, should have option --output, and should not
+            # specify delimiter, and the input file should exist.
+            if not args.input or not args.output or args.delimiter != '\t':
                 # if there is no output, 
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
@@ -1074,8 +1035,7 @@ def execute(args):
                 sep = args.delimiter
                 for rec in cur:
                     print(sep.join(['{}'.format(x) for x in rec]))
-        else:
-            with Project(verbosity=args.verbosity, readonly=True) as proj:
+            else:
                 pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
                 # unspecified
                 if len(args.pipeline) == 1:
