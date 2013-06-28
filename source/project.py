@@ -1112,10 +1112,28 @@ class Project:
             # use a random directory
             env.temp_dir = None
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
-        if new:
-            self.create(build=build, **kwargs)
-        else:
-            self.open(verify)
+        #
+        # check a lock file
+        lock_file = self.proj_file + '.lck'
+        while True:
+            if os.path.isfile(lock_file):
+                print('Project {} is being opened by another process. Remove '
+                    '{} if this is not the case.'.format(self.name, lock_file))
+                time.sleep(10)
+            else:
+                break
+        # create a lock file
+        open(lock_file, 'a').close()
+        try:
+            if new:
+                self.create(build=build, **kwargs)
+            else:
+                self.open(verify)
+        finally:
+            try:
+                os.remove(lock_file)
+            except:
+                pass
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1175,26 +1193,6 @@ class Project:
 
     def open(self, verify=True):
         '''Open an existing project'''
-        # check a lock file
-        lock_file = self.proj_file + '.lck'
-        while True:
-            if os.path.isfile(lock_file):
-                print('Project being opened by another process. Remove {} if '
-                    'that is not case.'.format(lock_file))
-                time.sleep(10)
-            else:
-                break
-        # create a lock file
-        open(lock_file, 'a').close()
-        try:
-            self._open(verify)
-        finally:
-            try:
-                os.remove(lock_file)
-            except:
-                pass
-
-    def _open(self, verify=True):
         # open the project file
         env.logger.debug('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
