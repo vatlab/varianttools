@@ -859,7 +859,11 @@ class Pipeline:
                         raise RuntimeError('Failed to substitute variable {}: key {} not found'
                             .format(piece, KEY))
                     try:
-                        pieces[idx] = str(FUNC(VAL))
+                        ret = FUNC(VAL)
+                        if type(ret) == str:
+                            pieces[idx] = ret
+                        else:
+                            pieces[idx] = ', '.join(ret)
                     except Exception as e:
                         raise RuntimeError('Failed to substitute variable {}: {}'
                             .format(piece, e))
