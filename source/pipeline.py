@@ -369,8 +369,8 @@ def elapsed_time(start):
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
 def run_command(cmd, output=None):
-    '''Call an external command, raise an error if it fails.
-    '''
+    '''Call a list of external command cmd, raise an error if any of them
+    fails. '''
     global running_jobs
     if not output:
         # subprocess.DEVNULL was introduced in Python 3.3
@@ -398,10 +398,10 @@ def run_command(cmd, output=None):
                 .format(output[0])) 
         else:
             open(proc_lck, 'a').close()
-    proc = subprocess.Popen(cmd, shell=True, stdout=proc_out, stderr=proc_err)
-    running_jobs.append(JOB(proc=proc, cmd=cmd, 
+    proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err)
+    running_jobs.append(JOB(proc=proc, cmd=cmd,
         start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
-    env.logger.info('Running "{}"'.format(cmd))
+    env.logger.info('Running "{}"'.format(cmd[0]))
     if proc_out is not None:
         env.logger.info('Output redirected to {}.out (and .err)'.format(output[0]))
 
@@ -422,7 +422,7 @@ def poll_jobs():
             continue
         #
         # job completed, close redirected stdout and stderr
-        if job.stdout is not None:
+        if len(job.cmd) == 1 and job.stdout is not None:
             job.stdout.close()
             job.stderr.close()
         #
@@ -433,7 +433,7 @@ def poll_jobs():
                 except:
                     pass
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                .format(job.cmd, -ret, elapsed_time(job.start_time)))
+                .format(job.cmd[0], -ret, elapsed_time(job.start_time)))
         elif ret > 0:
             if job.output:
                 with open(job.output[0] + '.err') as err:
@@ -444,29 +444,46 @@ def poll_jobs():
                 except:
                     pass
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                .format(job.cmd, elapsed_time(job.start_time), ret))
+                .format(job.cmd[0], elapsed_time(job.start_time), ret))
         else:
             if job.output:
                 with open(job.output[0] + '.err') as err:
                     for line in err.read().split('\n')[-10:]:
                         env.logger.info(line)
-                with open(job.output[0] + '.exe_info', 'a') as exe_info:
-                    exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-                    for f in job.output:
-                        if not os.path.isfile(f):
-                            raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                        # for performance considerations, use partial MD5
-                        exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                            calculateMD5(f, partial=True)))
-                try:
-                    os.remove(job.output[0] + '.lck')
-                except Exception as e:
-                    self.logger.warning('Failed to remove lock file {}'
-                        .format(job.output[0] + '.lck'))
             env.logger.info('Command {} completed successfully in {}'
-                .format(job.cmd, elapsed_time(job.start_time)))
-            #
-            running_jobs[idx] = None
+                .format(job.cmd[0], elapsed_time(job.start_time)))
+            # 
+            # if there are no more jobs, complete .exe_info
+            env.logger.error(job.cmd)
+            if len(job.cmd) == 1:
+                #
+                if job.output:
+                    with open(job.output[0] + '.exe_info', 'a') as exe_info:
+                        exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+                        for f in job.output:
+                            if not os.path.isfile(f):
+                                raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                            # for performance considerations, use partial MD5
+                            exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                                calculateMD5(f, partial=True)))
+                    try:
+                        os.remove(job.output[0] + '.lck')
+                    except Exception as e:
+                        self.logger.warning('Failed to remove lock file {}'
+                            .format(job.output[0] + '.lck'))
+                #
+                running_jobs[idx] = None
+            else:
+                # wait for empty slot to run the job
+                proc = subprocess.Popen(job.cmd[1], shell=True, stdout=job.stdout,
+                    stderr=job.stderr)
+                # use the same slot for the next job
+                running_jobs[idx] = JOB(proc=proc, cmd=job.cmd[1:],
+                    start_time=job.start_time, stdout=job.stdout,
+                    stderr=job.stderr, output=job.output)
+                env.logger.info('Running "{}"'.format(job.cmd[1]))
+                # increase the running job count
+                count += 1
     return count
 
 def wait_all():
@@ -495,7 +512,10 @@ class RunCommand:
         specified working directory, and return specified ofiles.
         '''
         # merge mulit-line command into one line and remove extra white spaces
-        self.cmd = ' '.join(cmd.split())
+        if type(cmd) == str:
+            self.cmd = [' '.join(cmd.split())]
+        else:
+            self.cmd = [' '.join(x.split()) for x in cmd]
         if not self.cmd:
             raise RuntimeError('Invalid command to execute: "{}"'.format(cmd))
         self.working_dir = working_dir
@@ -516,7 +536,7 @@ class RunCommand:
                     cmd = exe_info.readline().strip()
                 # if the exact command has been used to produce output, and the
                 # output files are newer than input file, ignore the step
-                if cmd == self.cmd.strip() and existAndNewerThan(ifiles=ifiles,
+                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(ifiles=ifiles,
                         ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
@@ -526,7 +546,7 @@ class RunCommand:
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
-                exe_info.write('{}\n'.format(self.cmd))
+                exe_info.write('{}\n'.format('; '.join(self.cmd)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
                     # for performance considerations, use partial MD5
@@ -840,6 +860,8 @@ class Pipeline:
         self.pipeline = PipelineDescription(name, extra_args)
 
     def substitute(self, text, VARS):
+        # if text has new line, replace it with space
+        text =  ' '.join(text.split())
         # now, find ${}
         pieces = re.split('(\${[^}]*})', text)
         for idx, piece in enumerate(pieces):
