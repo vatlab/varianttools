@@ -1048,7 +1048,7 @@ class Project:
         return cls._instance
 
     def __init__(self, name=None, build=None, new=False, verbosity=None, 
-        verify=True, readonly=False, **kwargs):
+        verify=True, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
         if new: # new project
@@ -1086,7 +1086,7 @@ class Project:
         #
         # create a temporary directory
         self.db = DatabaseEngine()
-        self.db.connect(self.proj_file, readonly=readonly)
+        self.db.connect(self.proj_file)
         env.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
         env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
@@ -1115,7 +1115,7 @@ class Project:
         if new:
             self.create(build=build, **kwargs)
         else:
-            self.open(verify, readonly)
+            self.open(verify)
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1173,12 +1173,32 @@ class Project:
         self.createMasterVariantTable()
         self.createSampleTableIfNeeded()
 
-    def open(self, verify=True, readonly=False):
+    def open(self, verify=True):
         '''Open an existing project'''
+        # check a lock file
+        lock_file = self.proj_file + '.lck'
+        while True:
+            if os.path.isfile(lock_file):
+                print('Project being opened by another process. Remove {} if '
+                    'that is not case.'.format(lock_file))
+                time.sleep(10)
+            else:
+                break
+        # create a lock file
+        open(lock_file, 'a').close()
+        try:
+            self._open(verify)
+        finally:
+            try:
+                os.remove(lock_file)
+            except:
+                pass
+
+    def _open(self, verify=True):
         # open the project file
         env.logger.debug('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
-        self.db.connect(self.proj_file, readonly=readonly)
+        self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
             raise ValueError('Invalid project database (missing project table)')
         #
@@ -1199,7 +1219,7 @@ class Project:
             # pass things like batch ... and re-connect
             # env['sqlite_pragma'] will be used 
             self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
-            self.db.connect(self.proj_file, readonly=readonly)
+            self.db.connect(self.proj_file)
         # loading other options if they have been set
         env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         env.local_resource = self.loadProperty('__option_local_resource', None)
