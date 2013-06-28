@@ -724,7 +724,7 @@ class PipelineDescription:
                             raise ValueError('Incorrect key {} in section {}. '
                                 'Only input, input_emitter, action, and comment are allowed.'
                                 .format(item, section))
-                    command = PipelineCommand(index=int(section.split('_', 1)[1]),
+                    command = PipelineCommand(index=pidx,
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
@@ -3558,7 +3558,8 @@ def showArguments(parser):
         help='''Items to display, which can be, for example, names of tables for
             type 'table', conditions to select samples for type 'samples', 
             a list of phenotypes for type 'phenotypes', name of an annotation
-            database for type 'annotation', name of a format for type 'format',
+            database for type 'annotation', a pattern to selected annotation
+            databases for type 'annotations', name of a format for type 'format',
             and name of an association test for type 'test'.''')
     parser.add_argument('-l', '--limit', metavar='N', type=int,
         help='''Limit output to the first N records.''')
@@ -3696,12 +3697,23 @@ def show(args):
                         raise IndexError('Database {} is not currently used in the project'.format(item))
                     annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
-                if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show annotations"'
-                        .format(', '.join(args.items)))
-                DBs = filesInURL('http://vtools.houstonbioinformatics.org/annoDB', ext='.ann')
-                for db in DBs:
-                    print(db)
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='annotation')
+                for annoDB, prop in sorted(res.manifest.iteritems()):
+                    if not annoDB.endswith('.ann'):
+                        continue
+                    if args.items:
+                        match = False
+                        for item in args.items:
+                            if item.lower() in annoDB[7:-4].lower():
+                                match = True
+                                break
+                        if not match:
+                            continue
+                    text = '{:<23} {}'.format(annoDB[7:-4], prop[3])
+                    print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
             elif args.type == 'formats':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'
