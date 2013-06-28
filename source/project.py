@@ -630,6 +630,7 @@ class PipelineDescription:
         self.description = None
         self.pipeline_vars = {}
         self.pipelines = {}
+        self.pipeline_descriptions = {}
         #
         if name.endswith('.pipeline'):
             if os.path.isfile(name):
@@ -698,6 +699,8 @@ class PipelineDescription:
                 for item in parser.items(section, vars=defaults):
                     if item[0] == 'description':
                         self.description = item[1]
+                    elif item[0].endswith('_description'):
+                        self.pipeline_descriptions[item[0].rsplit('_', 1)[0]] = item[1]
                     elif item[0] in defaults or item[0].endswith('_comment'):
                         pass
                     else:
@@ -737,7 +740,13 @@ class PipelineDescription:
             self.pipelines[pname].sort(key=lambda x: x[0])
         # 
         # validate
+        for pname in self.pipeline_descriptions:
+            if pname not in self.pipelines.keys():
+                raise ValueError('Invalid item {0}_description because pipeline '
+                    '{0} is not defined in this file.'.format(pname))
         for pname, pipeline in self.pipelines.items():
+            if pname not in self.pipeline_descriptions:
+                self.pipeline_descriptions[pname] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
                     raise ValueError('Invalid pipeline {}. Step {} is left unspecified.'
@@ -747,17 +756,18 @@ class PipelineDescription:
                         .format(pname, idx + 1))
      
     def describe(self):
-        print('Name:        {}'.format(self.name))
         if self.description is not None:
-            print('\n'.join(textwrap.wrap(
-                'Description: ' +  self.description,
-                subsequent_indent=' '*2)))
+            print('\n'.join(textwrap.wrap(self.description, width=78)))
         #
-        for pname, pipeline in self.pipelines.items():
-            print('\nPipeline {}:'.format(pname))
+        text = 'Available pipelines: {}'.format(', '.join(sorted(self.pipelines.keys())))
+        print('\n' + '\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*8)))
+        for pname, pipeline in sorted(self.pipelines.items()):
+            print('\n' + '\n'.join(textwrap.wrap('Pipeline "{}":  {}'
+                .format(pname, self.pipeline_descriptions[pname]),
+                width=78)))
             for idx, step in enumerate(pipeline):
                 text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
-                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
+                print('\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*22)))
         #
         if self.parameters:
             print('\nPipeline parameters:')
