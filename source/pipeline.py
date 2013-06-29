@@ -378,8 +378,8 @@ def run_command(cmd, output=None):
         proc_err = None
         proc_lck = None
     else:
-        proc_out = open(output[0] + '.out', 'w')
-        proc_err = open(output[0] + '.err', 'w')
+        proc_out = open(output[0] + '.out_{}'.format(os.getpid()), 'w')
+        proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
         proc_lck = output[0] + '.lck'
     #
     # wait for empty slot to run the job
@@ -403,7 +403,9 @@ def run_command(cmd, output=None):
         start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
     env.logger.info('Running "{}"'.format(cmd[0]))
     if proc_out is not None:
-        env.logger.info('Output redirected to {}.out (and .err)'.format(output[0]))
+        env.logger.info('Output redirected to {0}.out_{1} and {0}.err_{1} and '
+            'will be saved to {0}.exe_info after completion of command.'
+            .format(output[0], os.getpid()))
 
 def poll_jobs():
     '''check the number of running jobs.'''
@@ -436,7 +438,7 @@ def poll_jobs():
                 .format(job.cmd[0], -ret, elapsed_time(job.start_time)))
         elif ret > 0:
             if job.output:
-                with open(job.output[0] + '.err') as err:
+                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
                 try:
@@ -447,7 +449,7 @@ def poll_jobs():
                 .format(job.cmd[0], elapsed_time(job.start_time), ret))
         else:
             if job.output:
-                with open(job.output[0] + '.err') as err:
+                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
                     for line in err.read().split('\n')[-10:]:
                         env.logger.info(line)
             env.logger.info('Command {} completed successfully in {}'
@@ -466,11 +468,25 @@ def poll_jobs():
                             # for performance considerations, use partial MD5
                             exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                                 calculateMD5(f, partial=True)))
-                    try:
-                        os.remove(job.output[0] + '.lck')
-                    except Exception as e:
-                        self.logger.warning('Failed to remove lock file {}'
-                            .format(job.output[0] + '.lck'))
+                        # write standard output to exe_info
+                        exe_info.write('\n\nSTDOUT\n\n')
+                        with open(job.output[0] + '.out_{}'.format(os.getpid())) as stdout:
+                            for line in stdout:
+                                exe_info.write(line)
+                        # write standard error to exe_info
+                        exe_info.write('\n\nSTDERR\n\n')
+                        with open(job.output[0] + '.err_{}'.format(os.getpid())) as stderr:
+                            for line in stderr:
+                                exe_info.write(line)
+                    # if command succeed, remove all out_ and err_ files, 
+                    # including output from previous failed runs
+                    for filename in glob.glob(output[0] + '.out_*') + \
+                        glob.glob(output[0] + '.err_*') + [output[0] + '.lck']:
+                        try:
+                            os.remove(filename)
+                        except Exception as e:
+                            env.logger.warning('Fail to remove {}: {}'
+                                .format(filename, e))
                 #
                 running_jobs[idx] = None
             else:
@@ -525,8 +541,8 @@ class RunCommand:
             self.output = output
         #
         for filename in self.output:
-            if filename.lower().rsplit('.', 1)[-1] in ['out', 'err', 'lck']:
-                raise RuntimeError('Output file with extension .out, .err and .lck are reserved.')
+            if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
+                raise RuntimeError('Output file with extension .exe_info and .lck are reserved.')
 
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
