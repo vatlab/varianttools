@@ -68,6 +68,14 @@ class TestAdmin(ProcessTestCase):
         self.assertFail('vtools admin --merge_samples')
         #the reason is that the two samepls have some identical variants. If you want to merge them, the samples should have different unique variant information.
 
+    def testRenameSamples(self):
+        'Test command vtools admin --rename_samples'
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.assertFail('vtools admin --rename_samples 1')
+        # all samples are assigned name NA
+        self.assertFail('vtools admin --rename_samples "sample_name like \'NA1\'" NA')
+        self.assertFail('vtools admin --rename_samples 1 NA NNA')
+
     def testRenameTable(self):
         'test rename tables'
         self.assertSucc('vtools select variant -t "%ad name"')

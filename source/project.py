@@ -1769,8 +1769,9 @@ class Project:
                 .format(self.name, ID, cond))
             env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
 
-    def renameSamples(self, cond, name):
-        '''Rename selected samples to specified name, return the number of rows changed'''
+    def renameSamples(self, cond, name1, name2=None):
+        '''If name2 is none, rename selected samples to specified name1. 
+        Otherwise, replace the first occurance of name1 to name2'''
         cur = self.db.cursor()
         try:
             where_clause = ' WHERE {}'.format(cond) if cond.strip() else ''
@@ -1778,16 +1779,39 @@ class Project:
                 '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
                 '  sample.file_id = filename.file_id {});'
                 .format(where_clause))
-            names = cur.fetchall()
-            if names:
+            names = [x[0] for x in cur.fetchall()]
+            if not names:
+                env.logger.warning('No sample is selected using condition "{}"'
+                    .format(cond))
+            if name2 is None:
+                # rename all names to name1
                 cur.execute('UPDATE sample SET sample_name={} WHERE sample_id IN '
                     '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
                     'sample.file_id = filename.file_id {});'
-                    .format(self.db.PH, where_clause), (name, ))
-            return [x[0] for x in names]
+                    .format(self.db.PH, where_clause), (name1, ))
+                env.logger.info('{} samples with names {} are renamed to {}'
+                    .format(cur.rowcount, ', '.join(sorted(set(names))), name1))
+            else:
+                for oldname in sorted(set(names)):
+                    newname = oldname.replace(name1, name2, 1)
+                    if cond.strip():
+                        where_clause = ' WHERE {} AND sample.sample_name={}'.format(cond, self.db.PH)
+                    else:
+                        where_clause = ' WHERE sample.sample_name={}'.format(self.db.PH)
+                    if newname == oldname:
+                        continue
+                    # rename all names to name1
+                    cur.execute('UPDATE sample SET sample_name={} WHERE sample_id IN '
+                        '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
+                        'sample.file_id = filename.file_id {});'
+                        .format(self.db.PH, where_clause),
+                        (newname, oldname))
+                    env.logger.info('Rename {} sample{} with name {} to {}'
+                        .format(cur.rowcount, 's' if cur.rowcount > 1 else '',
+                            oldname, newname))
         except Exception as e:
-            env.logger.debug(e)
-            raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
+            raise ValueError('Failed to retrieve samples by condition "{}": {}'
+                .format(cond, e))
 
     def mergeSamples(self):
         '''Merge samples with the same name to the same samples'''
@@ -3914,8 +3938,11 @@ def adminArguments(parser):
         belonging to these samples. Phenotypes related to individual samples will
         be merged.''')
     rename_samples = parser.add_argument_group('Rename samples')
-    rename_samples.add_argument('--rename_samples', nargs=2, metavar=('COND', 'NAME'),
-        help='''Rename samples that match specified COND to a new NAME.''')
+    rename_samples.add_argument('--rename_samples', nargs='+', metavar='COND',
+        help='''This argument takes a condition by which samples are selected,
+            followed by either a new sample name (assign a new name to selected
+            samples) or an OLDNAME NEWNAME pair of patterns for which the first
+            instance of OLDNAME in sample names will be replaced by NEWNAME.''')
     rename_table = parser.add_argument_group('Rename/describe tables')
     rename_table.add_argument('--rename_table', nargs=2, metavar=('NAME', 'NEW_NAME'),
         help='''Change table NAME to a NEW_NAME.''')
@@ -3958,19 +3985,13 @@ def adminArguments(parser):
 def admin(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            if args.merge_samples and args.rename_samples:
-                raise ValueError('Please specify only one of --merge_samples and --rename_samples')
             if args.rename_samples:
-                names = proj.renameSamples(args.rename_samples[0], args.rename_samples[1])
-                if len(names) > 1:
-                    env.logger.info('Samples {} are renamed to {}'
-                        .format(', '.join(names), args.rename_samples[1]))
-                elif len(names) == 1:
-                    env.logger.info('Sample {} is renamed to {}'
-                        .format(names[0], args.rename_samples[1]))
-                else:
-                    env.logger.warning('No sample matching condition {} is found.'
-                        .format(args.rename_samples[0]))
+                if len(args.rename_samples) not in [2, 3]:
+                    raise ValueError('Option --rename_samples accept either '
+                        'a new name or a pair of oldname newname patterns.')
+                proj.renameSamples(args.rename_samples[0],
+                    args.rename_samples[1].strip(),
+                    None if len(args.rename_samples) == 2 else args.rename_samples[2].strip())
             elif args.merge_samples:
                 # need to merge genotype tables
                 proj.db.attach(proj.name + '_genotype')

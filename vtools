@@ -219,6 +219,16 @@ if __name__ == '__main__':
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
+    #
+    # http://bugs.python.org/issue12353
+    # parse_known_args cannot handle arguments with empty string '', we need
+    # to manually change it to ' ' to get around of this problem.
+    # Hopefully this will not cause any trouble in later argument processing.
+    if '' in sys.argv:
+        for idx, arg in enumerate(sys.argv):
+            if arg == '':
+                sys.argv[idx] = ' '
+    #
     args, argv = master_parser.parse_known_args()
     # python3 does not raise an error "too few arguments" when no argument is
     # provided so we have to explicitly handle this case. The output of command
