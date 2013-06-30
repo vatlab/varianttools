@@ -149,28 +149,23 @@ comment=Download required resources to resource directory
 
 [align_10]
 # input = output = ${CMD_INPUT}
-input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckCommands(['%(bwa)s', '%(samtools)s', '%(java)s'])
 comment=Check existence of commands bwa, samtools and java
 
 [align_11]
-input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('%(bwa)s', 'Version: 0.7.*', %(strict_prog_version)s)
 comment=Check if the version of bwa. Version is 0.7.4 is recommended
 
 [align_12]
-input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.82', %(strict_prog_version)s)
 comment=Check if the version of picard. Version is 1.82 is recommended.
 
 [align_13]
-input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
 comment=Check the version of GATK. Version 2.4 is recommended.
 
 [align_20]
 # input = output = ${CMD_INPUT}
-input_emitter=EmitInput('all')  # avoid checking for each input file
 action=CheckFiles(["%(picard_path)s/SortSam.jar", "%(gatk_path)s/GenomeAnalysisTK.jar"])
 comment=Check existence of class files for Picard and GATK
 
@@ -206,12 +201,14 @@ comment=Convert bam files to paired fastq files if the input is in bam/sam forma
 
 [align_101]
 # input is output of previous step ${OUTPUT100}
+input_emitter=EmitInput('single')
 action=DecompressFiles(dest_dir="${CACHE_DIR}"), LinkToDir('${CACHE_DIR}')
 comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
     a cache directory. Uncompressed files are hard-linked to the cache directory.
 
 [align_200]
 # input of ${OUTPUT101}, which is a list of fastq files
+input_emitter=EmitInput('single')
 action=CheckFastqVersion(output="${INPUT: INPUT[0] + '.aln_param'}")
 # remove all non-fastq files that might have been inputted
 input_emitter=EmitInput(select='fastq', pass_unselected=False)
@@ -227,7 +224,7 @@ action=RunCommand(cmd='%(bwa)s aln
         ${INPUT} > ${INPUT: INPUT[0] + '.sai'}',
     output="${INPUT: INPUT[0] + '.sai'}")
 # remove all non-fastq files that might have been inputted
-input_emitter=EmitInput(select='fastq', pass_unselected=False)
+input_emitter=EmitInput('single', select='fastq', pass_unselected=False)
 comment=Call bwa aln to produce .sai files
 
 [align_300]
@@ -255,6 +252,7 @@ comment=Running bwa sampe for paired end reads, using read group tag saved
 
 [align_302]
 action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}", cutoff=0.8)
+input_emitter=EmitInput('single')
 comment=Check the proportion of aligned reads and exit if there are less than
     80% of aligned reads.
 

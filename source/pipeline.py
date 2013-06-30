@@ -28,6 +28,7 @@ import os
 import sys
 import subprocess
 import glob
+import shlex
 import argparse
 import logging
 import shutil
@@ -55,14 +56,14 @@ except (ImportError, ValueError) as e:
 class EmitInput:
     '''Select input files of certain types, group them, and send input files
     to action. Selection criteria can be True (all input file types, default),
-    False (select no input file), 'fastq' (check content of files), or one or
+    'False' (select no input file), 'fastq' (check content of files), or one or
     more file extensions (e.g. ['sam', 'bam']).  Eligible files are by default
-    sent individually (group_by='single') to action (${INPUT} is a list of a
-    single file), but can also be sent altogether (group_by='all', ${INPUT}
-    equals to ${INPUT#} where # is the index of step) or in pairs 
+    sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
+    # is the index of step, but can also be sent individually (group_by='single',
+    ${INPUT} equals to a list of a single file) or in pairs 
     (group_by='paired', e.g. filename_1.txt and filename_2.txt). Unselected
     files are by default passed directly as output of a step.'''
-    def __init__(self, group_by='single', select=True, pass_unselected=True):
+    def __init__(self, group_by='all', select=True, pass_unselected=True):
         self.group_by = group_by
         if type(select) == str:
             self.select = [select]
@@ -397,7 +398,7 @@ def run_command(cmd, output=None):
                 'process is writing to this file.'
                 .format(output[0])) 
         else:
-            open(proc_lck, 'a').close()
+            env.lock(proc_lck)
     proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err)
     running_jobs.append(JOB(proc=proc, cmd=cmd,
         start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
@@ -430,10 +431,7 @@ def poll_jobs():
         #
         if ret < 0:
             if job.output:
-                try:
-                    os.remove(job.output[0] + '.lck')
-                except:
-                    pass
+                env.unlock(job.output[0] + '.lck')
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                 .format(job.cmd[0], -ret, elapsed_time(job.start_time)))
         elif ret > 0:
@@ -441,22 +439,18 @@ def poll_jobs():
                 with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-                try:
-                    os.remove(job.output[0] + '.lck')
-                except:
-                    pass
+                env.unlock(job.output[0] + '.lck')
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(job.cmd[0], elapsed_time(job.start_time), ret))
         else:
-            if job.output:
-                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
-                    for line in err.read().split('\n')[-10:]:
-                        env.logger.info(line)
+            #if job.output:
+            #    with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
+            #        for line in err.read().split('\n')[-10:]:
+            #            env.logger.info(line)
             env.logger.info('Command {} completed successfully in {}'
                 .format(job.cmd[0], elapsed_time(job.start_time)))
             # 
             # if there are no more jobs, complete .exe_info
-            env.logger.error(job.cmd)
             if len(job.cmd) == 1:
                 #
                 if job.output:
@@ -480,8 +474,9 @@ def poll_jobs():
                                 exe_info.write(line)
                     # if command succeed, remove all out_ and err_ files, 
                     # including output from previous failed runs
-                    for filename in glob.glob(output[0] + '.out_*') + \
-                        glob.glob(output[0] + '.err_*') + [output[0] + '.lck']:
+                    env.unlock(job.output[0] + '.lck')
+                    for filename in glob.glob(job.output[0] + '.out_*') + \
+                        glob.glob(job.output[0] + '.err_*'):
                         try:
                             os.remove(filename)
                         except Exception as e:
@@ -490,7 +485,7 @@ def poll_jobs():
                 #
                 running_jobs[idx] = None
             else:
-                # wait for empty slot to run the job
+                # start the next job in the same slot
                 proc = subprocess.Popen(job.cmd[1], shell=True, stdout=job.stdout,
                     stderr=job.stderr)
                 # use the same slot for the next job
@@ -513,10 +508,7 @@ def wait_all():
         # clean up lock files
         for job in running_jobs:
             if job is not None and job.stdout:
-                try:
-                    os.remove(job.output[0] + '.lck')
-                except:
-                    pass
+                env.unlock(job.output[0] + '.lck')
         env.logger.error('Keyboard interrupted')
         sys.exit(1)
     running_jobs = []
@@ -875,6 +867,18 @@ class Pipeline:
     def __init__(self, name, extra_args=[]):
         self.pipeline = PipelineDescription(name, extra_args)
 
+    def var_expr(self, var):
+        if type(var) == str:
+            # tries to be clever and quote filenames with space
+            if os.path.isfile(var) and ' ' in var:
+                return "'{}'".format(var)
+            else:
+                return var
+        elif type(var) == list:
+            return ' '.join([self.var_expr(x) for x in var])
+        else:
+            return str(var)
+
     def substitute(self, text, VARS):
         # if text has new line, replace it with space
         text =  ' '.join(text.split())
@@ -897,24 +901,17 @@ class Pipeline:
                         raise RuntimeError('Failed to substitute variable {}: key {} not found'
                             .format(piece, KEY))
                     try:
-                        ret = FUNC(VAL)
-                        if type(ret) == str:
-                            pieces[idx] = ret
-                        else:
-                            pieces[idx] = ', '.join(ret)
+                        pieces[idx] = self.var_expr(FUNC(VAL))
                     except Exception as e:
                         raise RuntimeError('Failed to substitute variable {}: {}'
                             .format(piece, e))
                 else:
                     # if KEY in VARS, replace it
                     if KEY in VARS:
-                        if type(VARS[KEY]) == str:
-                            pieces[idx] = VARS[KEY]
-                        else:
-                            pieces[idx] = ', '.join(VARS[KEY])
+                        pieces[idx] = self.var_expr(VARS[KEY])
                     else:
-                        raise RuntimeError('Failed to substitute variable {}'
-                            .format(piece))
+                        raise RuntimeError('Failed to substitute variable {}: key {} not found'
+                            .format(piece, KEY))
         # now, join the pieces together, but remove all newlines
         return ' '.join(''.join(pieces).split())
 
@@ -950,10 +947,10 @@ class Pipeline:
         for command in psteps:
             env.logger.info('Executing step {}_{} of pipeline {}: {}'
                 .format(pname, command.index, self.pipeline.name,
-                    command.comment))
+                    ' '.join(command.comment.split())))
             # substitute ${} variables
             if command.input:
-                step_input = [x.strip() for x in self.substitute(command.input, VARS).split(',')]
+                step_input = shlex.split(self.substitute(command.input, VARS))
             else:
                 step_input = ifiles
             # if there is no input file?

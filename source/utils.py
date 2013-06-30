@@ -164,6 +164,28 @@ class RuntimeEnvironments(object):
         self._search_path = self.persistent_options['search_path'][0]
         # logger
         self._logger = None
+        #
+        # a list of lock file that will be removed when the project is killed
+        self._lock_files = []
+    #
+    def lock(self, filename):
+        open(filename, 'a').close()
+        self._lock_files.append(filename)
+
+    def unlock(self, filename):
+        try:
+            os.remove(filename)
+        except Exception as e:
+            self._logger.warning('Failed to remove lock file {}'.format(filename))
+        self._lock_files.remove(filename)
+
+    def unlock_all(self):
+        for filename in self._lock_files:
+            try:
+                os.remove(filename)
+            except Exception as e:
+                self._logger.warning('Failed to remove lock file {}'.format(filename))
+        self._lock_files = []
     #
     # attribute command line
     #
@@ -1461,6 +1483,9 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                         return False
                     nFiles.append(0)
                     continue
+                # stdout and stderr are separated from md5 by newlines
+                if not line.strip():
+                    break
                 try:
                     f, s, m = line.split('\t')
                     nFiles[-1] += 1

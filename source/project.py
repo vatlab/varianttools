@@ -37,6 +37,7 @@ import ConfigParser
 import argparse
 import threading
 import Queue
+import signal
 import time
 import re
 import tarfile
@@ -965,6 +966,11 @@ class AnnoDBWriter:
 
 #  Project management
 #
+def unlock_proj(*args):
+    env.unlock_all()
+    env.logger.error('Killed by signal')
+    sys.exit(1)
+
 class Project:
     '''
     A project maintains the following tables:
@@ -1134,6 +1140,8 @@ class Project:
                 break
         # create a lock file
         open(lock_file, 'a').close()
+        handler1 = signal.signal(signal.SIGINT, unlock_proj)
+        handler2 = signal.signal(signal.SIGTERM, unlock_proj)
         try:
             if new:
                 self.create(build=build, **kwargs)
@@ -1141,6 +1149,8 @@ class Project:
                 self.open(verify)
         finally:
             try:
+                signal.signal(signal.SIGINT, handler1)
+                signal.signal(signal.SIGTERM, handler2)
                 os.remove(lock_file)
             except:
                 pass
@@ -3401,7 +3411,9 @@ def init(args):
                     for f in files:
                         try:
                             os.remove(f)
-                            os.remove(f.replace('.proj', '_genotype.DB'))
+                            geno_file = f.replace('.proj', '_genotype.DB')
+                            if os.path.isfile(geno_file):
+                                os.remove(geno_file)
                         except:
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))
