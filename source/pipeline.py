@@ -447,7 +447,7 @@ def poll_jobs():
             #    with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
             #        for line in err.read().split('\n')[-10:]:
             #            env.logger.info(line)
-            env.logger.info('Command {} completed successfully in {}'
+            env.logger.info('Command "{}" completed successfully in {}'
                 .format(job.cmd[0], elapsed_time(job.start_time)))
             # 
             # if there are no more jobs, complete .exe_info
@@ -509,8 +509,9 @@ def wait_all():
         for job in running_jobs:
             if job is not None and job.stdout:
                 env.unlock(job.output[0] + '.lck')
-        env.logger.error('Keyboard interrupted')
-        sys.exit(1)
+        # raise an error instead of exit right now to give vtools
+        # a chance to close databases
+        raise RuntimeError('Keyboard interrupted')
     running_jobs = []
 
 

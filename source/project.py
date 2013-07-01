@@ -3411,9 +3411,10 @@ def init(args):
                     for f in files:
                         try:
                             os.remove(f)
-                            geno_file = f.replace('.proj', '_genotype.DB')
-                            if os.path.isfile(geno_file):
-                                os.remove(geno_file)
+                            for other in [f.replace('.proj', '_genotype.DB'),
+                                    f + '.lck', f + '.proj-journal']:
+                                if os.path.isfile(other):
+                                    os.remove(other)
                         except:
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))
