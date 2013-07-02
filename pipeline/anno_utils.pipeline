@@ -12,8 +12,14 @@ proj2annoDB_description=This pipeline creates an annotation database using
   variants and variant info fields of a variant tools project. The database
   can then be used, for example, to filter variants from another project.
   The input of this pipeline should be a vtools project database ($name.proj),
-  the output are .ann and .DB files that can be used by another project.
+  the output is a .ann file ($name.ann). $name.ann, $name.DB and $name.DB.gz
+  will be created. If a variant table is specified through parameter -export,
+  only variants in specified variant table will be dumped.
 
+
+[DEFAULT]
+export=variant
+export_comment=A variant table to create annotation database from for pipeline proj2annoDB
 
 [proj2annoDB_0]
 action=CheckCommands('sqlite3')
@@ -22,11 +28,12 @@ comment=Check the existence of command sqlite3, which is required for this pipel
 [proj2annoDB_10]
 action=RunCommand(cmd='sqlite3 ${INPUT} ".schema variant" > ${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}', 
 	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}')
-comment=Dump the structure of the the variant table to a file.
+comment=Dump the structure of the the variant table to cache/$PROJ.schema.
 
 [proj2annoDB_11]
 # this step does not execute any command but make use of a lambda function
-# to convert .schema file to .ann_tmp file.
+# to convert .schema file to .ann_tmp file. This (read write files within
+# a lambda function) is ugly but using shell command is uglier.
 action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".ann_tmp", 'w').write(
 	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 1, x.strip().split(None, 1)[-1])
 		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[2:])]))},
@@ -36,23 +43,26 @@ comment=Convert .schema to .ann definitions
 [proj2annoDB_20]
 # now we have the .schema file, we need to write a .ann file
 action=RunCommand(cmd=[
-	"echo '[linked fields]' > ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo '*=chr, pos, ref, alt' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo '[data sources]' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"echo '*=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"echo '[data sources]'             >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
 	"echo 'description=Annotation database dumped from project ${CMD_INPUT}' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'delimiter=\"|\"' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'anno_type=variant' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'source_type=txt'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"cat ${INPUT} >> ${CMD_OUTPUT: CMD_OUTPUT[0]}" ],
+	"echo 'delimiter=\"|\"'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"echo 'anno_type=variant'          >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"echo 'source_type=txt'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+	"cat ${INPUT}                      >> ${CMD_OUTPUT: CMD_OUTPUT[0]}" ],
 	output='${CMD_OUTPUT: CMD_OUTPUT[0]}')
 comment=Create an annotation definition file (.ann)
 
 [proj2annoDB_30]
-action=RunCommand(cmd='sqlite3 ${CMD_INPUT} "select * from variant;" > ${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}',
+action=RunCommand(cmd='sqlite3 ${CMD_INPUT} 
+	"select * from variant ${: "" if "%(export)s" == "variant" else ", %(export)s WHERE %(export)s.variant_id = variant.variant_id"};"
+	> ${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}',
 	output='${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}')
 comment=Dump the variant table to a text file
 
 [proj2annoDB_40]
-action=RunCommand(cmd='vtools use ${OUTPUT20} --files ${OUTPUT30} --rebuild')
+action=RunCommand(cmd='vtools use ${OUTPUT20} --files ${OUTPUT30} --rebuild',
+	output='${CMD_OUTPUT: CMD_OUTPUT[0].rsplit('.', 1)[0] + '.DB.gz'}')
 comment=Create annotation database from dumped text file
 
