@@ -795,15 +795,11 @@ class DownloadResource:
                 break
         # if there is no lock file, proceed
         # create a lock file
-        open(lockfile, 'a').close()
+        env.lock(lockfile)
         try:
             ofiles, md5files = self._downloadFiles(ifiles)
         finally:
-            try:
-                os.remove(lockfile)
-            except Exception as e:
-                env.logger.warning('Failed to remove lock file {}: e'
-                    .format(lockfile, e))
+            env.unlock(lockfile)
         self._validate(md5files)
         os.chdir(saved_dir)
         return ofiles
@@ -1090,6 +1086,7 @@ def execute(args):
                         pipeline.execute(name, args.input, args.output,
                             args.jobs)
     except Exception as e:
+        env.unlock_all()
         env.logger.error(e)
         sys.exit(1)
 
