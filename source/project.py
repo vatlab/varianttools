@@ -742,12 +742,13 @@ class PipelineDescription:
         # 
         # validate
         for pname in self.pipeline_descriptions:
-            if pname not in self.pipelines.keys():
+            if pname not in [x.lower() for x in  self.pipelines.keys()]:
                 raise ValueError('Invalid item {0}_description because pipeline '
-                    '{0} is not defined in this file.'.format(pname))
+                    '{0} is not defined in this file (available: {1}).'
+                    .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
-            if pname not in self.pipeline_descriptions:
-                self.pipeline_descriptions[pname] = ''
+            if pname.lower() not in self.pipeline_descriptions:
+                self.pipeline_descriptions[pname.lower()] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
                     raise ValueError('Invalid pipeline {}. Step {} is left unspecified.'
@@ -764,7 +765,7 @@ class PipelineDescription:
         print('\n' + '\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*8)))
         for pname, pipeline in sorted(self.pipelines.items()):
             print('\n' + '\n'.join(textwrap.wrap('Pipeline "{}":  {}'
-                .format(pname, self.pipeline_descriptions[pname]),
+                .format(pname, self.pipeline_descriptions[pname.lower()]),
                 width=78)))
             for idx, step in enumerate(pipeline):
                 text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
