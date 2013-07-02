@@ -16,6 +16,12 @@ proj2annoDB_description=This pipeline creates an annotation database using
   will be created. If a variant table is specified through parameter -export,
   only variants in specified variant table will be dumped.
 
+annoDB2proj_description=This pipeline creates a variant tools project 
+  from a variant-based annotation database. The input of this pipeline should
+  be the .DB or .DB.gz file of an annotation database. The output should be
+  name of a directory within which the project will be created. The output 
+  directory should already exist. Any existing project in that directory
+  will be removed.
 
 [DEFAULT]
 export=variant
@@ -42,15 +48,15 @@ comment=Convert .schema to .ann definitions
 
 [proj2annoDB_20]
 # now we have the .schema file, we need to write a .ann file
-action=RunCommand(cmd=[
-	"echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo '*=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo '[data sources]'             >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'description=Annotation database dumped from project ${CMD_INPUT}' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'delimiter=\"|\"'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'anno_type=variant'          >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"echo 'source_type=txt'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-	"cat ${INPUT}                      >> ${CMD_OUTPUT: CMD_OUTPUT[0]}" ],
+action=RunCommand(cmd="
+    echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo '*=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo '[data sources]'             >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo 'description=Annotation database dumped from project ${CMD_INPUT}' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
+	echo 'delimiter=\"|\"'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
+	echo 'anno_type=variant'          >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo 'source_type=txt'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	cat ${INPUT}                      >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
 	output='${CMD_OUTPUT: CMD_OUTPUT[0]}')
 comment=Create an annotation definition file (.ann)
 
@@ -65,4 +71,56 @@ comment=Dump the variant table to a text file
 action=RunCommand(cmd='vtools use ${OUTPUT20} --files ${OUTPUT30} --rebuild',
 	output='${CMD_OUTPUT: CMD_OUTPUT[0].rsplit('.', 1)[0] + '.DB.gz'}')
 comment=Create annotation database from dumped text file
+
+
+[annoDB2proj_0]
+action=CheckCommands('sqlite3')
+comment=Check the existence of command sqlite3, which is required for this pipeline
+
+[annoDB2proj_10]
+action=DecompressFiles(dest_dir='${CACHE_DIR}')
+comment=Decompress .DB.gz file if needed
+
+[annoDB2proj_20]
+action=RunCommand(cmd='sqlite3 ${INPUT} ".schema ${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0]}" 
+	> ${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".schema"}', 
+	output='${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".schema"}')
+comment=Dump the structure of the the variant table to cache/$PROJ.schema.
+
+[annoDB2proj_30]
+# this step does not execute any command but make use of a lambda function
+# to convert .schema file to .fmt_tmp file. This (read write files within
+# a lambda function) is ugly but using shell command is uglier.
+action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".fmt_tmp", 'w').write(
+	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 1, x.strip().split(None, 1)[-1])
+		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[1:])]))},
+	output="${INPUT: INPUT[0][:-7] + '.fmt_tmp'}")
+comment=Create a .fmt file for variants in annotation database
+
+[annoDB2proj_40]
+# now we have the .schema file, we need to write a .fmt file
+action=RunCommand(cmd="
+    echo '[format description]'            > ${INPUT: INPUT[0][:-8] + '.fmt'};
+	echo 'description=Project created from annotation database ${CMD_INPUT}' >> ${INPUT: INPUT[0][:-8] + '.fmt'};
+	echo 'variant=chr, pos, ref, alt'      >> ${INPUT: INPUT[0][:-8] + '.fmt'};
+	echo 'delimiter=\"|\"'                 >> ${INPUT: INPUT[0][:-8] + '.fmt'};
+	cat ${INPUT}                           >> ${INPUT: INPUT[0][:-8] + '.fmt'}",
+	output='${INPUT: INPUT[0][:-8] + '.fmt'}')
+comment=Create an input format definition file .fmt
+
+[annoDB2proj_50]
+action=RunCommand(cmd='sqlite3 ${OUTPUT10} 
+	"select * from ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]};"
+	> ${INPUT: INPUT[0][:-4] + ".dump"}',
+	output='${INPUT: INPUT[0][:-4] + ".dump"}')
+comment=Dump the annotation database to a text file
+
+[annoDB2proj_60]
+action=RunCommand(cmd=[
+	'vtools init --force ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]}'
+	'vtools import ${INPUT} --format {OUTPUT40} --build hg19'],
+	working_dir='${CMD_OUTPUT}',
+	output='${CMD_OUTPUT}/${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0] + ".proj"}')
+comment=Create a project and import data
+
 
