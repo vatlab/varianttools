@@ -1117,7 +1117,7 @@ def execute(args):
             # old usage with a SQL query? The pipeline interface should
             # have input files, should have option --output, and should not
             # specify delimiter, and the input file should exist.
-            if not args.input or not args.output or args.delimiter != '\t':
+            if (not args.input and not args.output) or args.delimiter != '\t':
                 # if there is no output, 
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
@@ -1131,12 +1131,22 @@ def execute(args):
                     for rec in cur:
                         env.logger.debug('\t'.join([str(x) for x in rec]))
                 # really execute the query
-                cur.execute(query)
+                try:
+                    cur.execute(query)
+                except Exception as e:
+                    raise RuntimeError('Failed to execute SQL query "{}": {}'
+                        .format(query, e))
                 proj.db.commit()
                 sep = args.delimiter
                 for rec in cur:
                     print(sep.join(['{}'.format(x) for x in rec]))
             else:
+                if not args.output:
+                    raise ValueError('Missing output of pipeline {}'
+                        .format(args.pipeline[0]))
+                if not args.input:
+                    raise ValueError('Missing input of pipeline {}'
+                        .format(args.pipeline[0]))
                 pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
                 # unspecified
                 if len(args.pipeline) == 1:
