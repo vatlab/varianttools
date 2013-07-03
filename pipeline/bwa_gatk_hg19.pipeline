@@ -144,7 +144,7 @@ action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.o
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5',
-    resource_dir="${RESOURCE_DIR}")
+    dest_dir="${RESOURCE_DIR}")
 comment=Download required resources to resource directory
 
 [align_10]
@@ -420,7 +420,7 @@ action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.o
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.fasta.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/ucsc.hg19.stats.gz.md5',
-    resource_dir="${RESOURCE_DIR}")
+    dest_dir="${RESOURCE_DIR}")
 
 
 [call_10]

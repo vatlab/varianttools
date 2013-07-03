@@ -32,11 +32,16 @@ action=CheckCommands('sqlite3')
 comment=Check the existence of command sqlite3, which is required for this pipeline
 
 [proj2annoDB_10]
+# input   $name.proj
+# output  cache/$name.proj.schema
 action=RunCommand(cmd='sqlite3 ${INPUT} ".schema variant" > ${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}', 
 	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}')
 comment=Dump the structure of the the variant table to cache/$PROJ.schema.
 
 [proj2annoDB_11]
+# input  cache/$name.proj.schema
+# output cache/$name.proj.ann_tmp
+#
 # this step does not execute any command but make use of a lambda function
 # to convert .schema file to .ann_tmp file. This (read write files within
 # a lambda function) is ugly but using shell command is uglier.
@@ -47,6 +52,9 @@ action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".ann_tmp", 'w').write(
 comment=Convert .schema to .ann definitions
 
 [proj2annoDB_20]
+# input   cache/$name.proj.ann_tmp
+# output  $anno.ann
+# 
 # now we have the .schema file, we need to write a .ann file
 action=RunCommand(cmd="
     echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]};
@@ -61,6 +69,8 @@ action=RunCommand(cmd="
 comment=Create an annotation definition file (.ann)
 
 [proj2annoDB_30]
+# input   not used
+# output  cache/$name.proj.dump
 action=RunCommand(cmd='sqlite3 ${CMD_INPUT} 
 	"select * from variant ${: "" if "%(export)s" == "variant" else ", %(export)s WHERE %(export)s.variant_id = variant.variant_id"};"
 	> ${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}',
@@ -68,47 +78,75 @@ action=RunCommand(cmd='sqlite3 ${CMD_INPUT}
 comment=Dump the variant table to a text file
 
 [proj2annoDB_40]
+# input    not used
+# output   $anno.DB.gz
 action=RunCommand(cmd='vtools use ${OUTPUT20} --files ${OUTPUT30} --rebuild',
 	output='${CMD_OUTPUT: CMD_OUTPUT[0].rsplit('.', 1)[0] + '.DB.gz'}')
 comment=Create annotation database from dumped text file
 
 
 [annoDB2proj_0]
+# input    $anno-ver.DB.gz (or $anno-ver.DB.gz)
+# output   unchanged
 action=CheckCommands('sqlite3')
 comment=Check the existence of command sqlite3, which is required for this pipeline
 
 [annoDB2proj_10]
+# input    $anno-ver.DB.gz (if .gz)
+# output   cache/$anno-ver.DB
 action=DecompressFiles(dest_dir='${CACHE_DIR}')
 comment=Decompress .DB.gz file if needed
 
 [annoDB2proj_20]
+# input    cache/$anno-ver.DB
+# output   cache/$anno.schema
 action=RunCommand(cmd='sqlite3 ${INPUT} ".schema ${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0]}" 
 	> ${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".schema"}', 
 	output='${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".schema"}')
 comment=Dump the structure of the the variant table to cache/$PROJ.schema.
 
+[annoDB2proj_25]
+# input    cache/$anno-var.DB
+# output   cache/$anno.build
+input=${OUTPUT10}
+action=RunCommand(cmd='sqlite3 ${INPUT} 
+	"select value from ${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + '_info'} WHERE name = \'build\'" 
+	> ${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".build"}', 
+	output='${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).split('-')[0].split('.')[0] + ".build"}')
+comment=Determine build information for the annotation database
+
 [annoDB2proj_30]
+# input   cache/$anno.schema
+# output  cache/$anno.fmt_tmp
+#
 # this step does not execute any command but make use of a lambda function
 # to convert .schema file to .fmt_tmp file. This (read write files within
 # a lambda function) is ugly but using shell command is uglier.
+input=${OUTPUT20}
 action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".fmt_tmp", 'w').write(
-	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 1, x.strip().split(None, 1)[-1])
+	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 2, x.strip().split(None, 1)[-1])
 		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[1:])]))},
 	output="${INPUT: INPUT[0][:-7] + '.fmt_tmp'}")
 comment=Create a .fmt file for variants in annotation database
 
 [annoDB2proj_40]
+# input     cache/$anno.fmt_tmp
+# output    cache/$anno.fmt
+#
 # now we have the .schema file, we need to write a .fmt file
 action=RunCommand(cmd="
     echo '[format description]'            > ${INPUT: INPUT[0][:-8] + '.fmt'};
 	echo 'description=Project created from annotation database ${CMD_INPUT}' >> ${INPUT: INPUT[0][:-8] + '.fmt'};
-	echo 'variant=chr, pos, ref, alt'      >> ${INPUT: INPUT[0][:-8] + '.fmt'};
+	echo '${INPUT: 'variant=%%s' %% (', '.join(eval(open(INPUT[0][:-8] + '.build').read()).items()[0][1]))}' 
+		 >> ${INPUT: INPUT[0][:-8] + '.fmt'};
 	echo 'delimiter=\"|\"'                 >> ${INPUT: INPUT[0][:-8] + '.fmt'};
 	cat ${INPUT}                           >> ${INPUT: INPUT[0][:-8] + '.fmt'}",
 	output='${INPUT: INPUT[0][:-8] + '.fmt'}')
 comment=Create an input format definition file .fmt
 
 [annoDB2proj_50]
+# input      cache/$anno.fmt (not used)
+# output     cache/$anno.dump
 action=RunCommand(cmd='sqlite3 ${OUTPUT10} 
 	"select * from ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]};"
 	> ${INPUT: INPUT[0][:-4] + ".dump"}',
@@ -116,9 +154,11 @@ action=RunCommand(cmd='sqlite3 ${OUTPUT10}
 comment=Dump the annotation database to a text file
 
 [annoDB2proj_60]
+# input      cache/$anno.dump
+# output     $dest/$anno.proj
 action=RunCommand(cmd=[
-	'vtools init --force ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]}'
-	'vtools import ${INPUT} --format {OUTPUT40} --build hg19'],
+	'vtools init -v2 --force ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]}',
+	'vtools import ${INPUT: os.path.abspath(INPUT[0])} --format ${OUTPUT40: os.path.abspath(OUTPUT40[0])} --build hg19'],
 	working_dir='${CMD_OUTPUT}',
 	output='${CMD_OUTPUT}/${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0] + ".proj"}')
 comment=Create a project and import data
