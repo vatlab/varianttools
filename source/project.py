@@ -1134,15 +1134,15 @@ class Project:
         lock_file = self.proj_file + '.lck'
         while True:
             if os.path.isfile(lock_file):
-                print('Project {} is being opened by another process. Remove '
+                env.logger.warning('Project {} is being opened by another process. Remove '
                     '{} if this is not the case.'.format(self.name, lock_file))
                 time.sleep(10)
             else:
                 break
         # create a lock file
-        open(lock_file, 'a').close()
-        handler1 = signal.signal(signal.SIGINT, unlock_proj)
-        handler2 = signal.signal(signal.SIGTERM, unlock_proj)
+        env.lock(lock_file)
+        signal.signal(signal.SIGINT, unlock_proj)
+        signal.signal(signal.SIGTERM, unlock_proj)
         try:
             if new:
                 self.create(build=build, **kwargs)
@@ -1150,9 +1150,9 @@ class Project:
                 self.open(verify)
         finally:
             try:
-                signal.signal(signal.SIGINT, handler1)
-                signal.signal(signal.SIGTERM, handler2)
-                os.remove(lock_file)
+                env.unlock(lock_file)
+                signal.signal(signal.SIGINT, signal.SIG_DFL)
+                signal.signal(signal.SIGTERM, signal.SIG_DFL)
             except:
                 pass
 
@@ -1417,7 +1417,9 @@ class Project:
         # step 4: remove project file
         env.logger.info('Removing project file {}'.format(self.proj_file))
         os.remove(self.proj_file)
-        # step 5: remove log file
+        # step 5: remove lck and log file
+        if os.path.isfile(self.proj_file[:-5] + '.lck'):
+            os.remove(self.proj_file[:-5] + '.log')
         env.logger.info('Removing log file {}'.format(self.proj_file[:-5] + '.log'))
         os.remove(self.proj_file[:-5] + '.log')
     
@@ -3407,15 +3409,12 @@ def init(args):
                 # we might not be able to open a non-exist project if it is malformed.
                 # however, this will not completely remove the project if the project
                 # uses a MySQL engine.
-                files = glob.glob('*.proj')
+                files = glob.glob('*.proj') + glob.glob('*.lck') + \
+                    glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
                 if len(files) > 0:
                     for f in files:
                         try:
                             os.remove(f)
-                            for other in [f.replace('.proj', '_genotype.DB'),
-                                    f + '.lck', f + '.proj-journal']:
-                                if os.path.isfile(other):
-                                    os.remove(other)
                         except:
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))

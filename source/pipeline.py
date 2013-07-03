@@ -401,7 +401,7 @@ class GuessReadGroup:
 #   a lot of progress output to stderr, which might block PIPE and cause the
 #   command itself to fail, or stall (which is even worse).
 #
-JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr output')
+JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr working_dir output')
 running_jobs = []
 max_running_jobs = 1
 
@@ -412,7 +412,7 @@ def elapsed_time(start):
     return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
-def run_command(cmd, output=None):
+def run_command(cmd, output=None, working_dir=None):
     '''Call a list of external command cmd, raise an error if any of them
     fails. '''
     global running_jobs
@@ -442,9 +442,11 @@ def run_command(cmd, output=None):
                 .format(output[0])) 
         else:
             env.lock(proc_lck)
-    proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err)
+    proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err,
+        cwd=working_dir)
     running_jobs.append(JOB(proc=proc, cmd=cmd,
-        start_time=time.time(), stdout=proc_out, stderr=proc_err, output=output))
+        start_time=time.time(), stdout=proc_out, stderr=proc_err, 
+        working_dir=working_dir, output=output))
     env.logger.info('Running "{}"'.format(cmd[0]))
     if proc_out is not None:
         env.logger.info('Output redirected to {0}.out_{1} and {0}.err_{1} and '
@@ -530,11 +532,11 @@ def poll_jobs():
             else:
                 # start the next job in the same slot
                 proc = subprocess.Popen(job.cmd[1], shell=True, stdout=job.stdout,
-                    stderr=job.stderr)
+                    stderr=job.stderr, cwd=job.working_dir)
                 # use the same slot for the next job
                 running_jobs[idx] = JOB(proc=proc, cmd=job.cmd[1:],
                     start_time=job.start_time, stdout=job.stdout,
-                    stderr=job.stderr, output=job.output)
+                    stderr=job.stderr, working_dir=job.working_dir, output=job.output)
                 env.logger.info('Running "{}"'.format(job.cmd[1]))
                 # increase the running job count
                 count += 1
@@ -592,9 +594,7 @@ class RunCommand:
                         ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
-        if self.working_dir:
-            os.chdir(self.working_dir)
-        run_command(self.cmd, output=self.output)
+        run_command(self.cmd, output=self.output, working_dir=self.working_dir)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
@@ -732,8 +732,8 @@ class LinkToDir:
     '''Create hard links of input files to a specified directory. This is 
     usually used to link input files to a common cache directory so that 
     all operations can be performed on that directory.'''
-    def __init__(self, dest):
-        self.dest = dest
+    def __init__(self, dest_dir):
+        self.dest = dest_dir
         if not os.path.isdir(self.dest):
             env.logger.info('Creating directory {}'.format(self.dest))
             try:
@@ -802,23 +802,23 @@ class CountMappedReads:
 
 
 class DownloadResource:
-    '''Download resources to specified destination directory. resource_dir can
+    '''Download resources to specified destination directory. dest_dir can
     be a full path name or a directory relative to 
     $local_resource/pipeline_resource where $local_resource is the local
     resource directory of the project (default to ~/.variant_tools,
     see runtime option local_resource for details). The default pipeline 
     resource directory is $local_resource/pipeline_resource/NAME where NAME
     is the name of the pipeline.'''
-    def __init__(self, resource, resource_dir):
+    def __init__(self, resource, dest_dir):
         self.resource = resource.split()
-        if not resource_dir or type(resource_dir) != str:
-            raise ValueError('Invalid resource directory {}'.format(resourece_dir))
+        if not dest_dir or type(dest_dir) != str:
+            raise ValueError('Invalid resource directory {}'.format(dest_dir))
         else:
-            if os.path.isabs(os.path.expanduser(resource_dir)):
-                self.pipeline_resource = os.path.expanduser(resource_dir)
+            if os.path.isabs(os.path.expanduser(dest_dir)):
+                self.pipeline_resource = os.path.expanduser(dest_dir)
             else:
                 self.pipeline_resource = os.path.join(os.path.expanduser(
-                    env.local_resource), 'pipeline_resource', resource_dir)
+                    env.local_resource), 'pipeline_resource', dest_dir)
         try:
             if not os.path.isdir(self.pipeline_resource):
                 os.makedirs(self.pipeline_resource)
