@@ -168,7 +168,7 @@ comment=Create a project if it does not exist
 # input      cache/$anno.dump
 # output     $dest/$anno.proj
 action=RunCommand(cmd=[
-	'vtools init -v2 --force ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]}',
+	'vtools init --force ${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0]}',
 	'vtools import ${INPUT: os.path.abspath(INPUT[0])} --format ${OUTPUT40: os.path.abspath(OUTPUT40[0])} --build hg19'],
 	working_dir='${CMD_OUTPUT}',
 	output='${CMD_OUTPUT}/${CMD_INPUT: os.path.basename(CMD_INPUT[0]).split('-')[0].split('.')[0] + ".proj"}')
