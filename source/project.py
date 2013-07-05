@@ -3905,7 +3905,7 @@ def show(args):
             elif args.type == 'pipelines':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
-                        .pipeline(', '.join(args.items)))
+                        .format(', '.join(args.items)))
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='pipeline')
