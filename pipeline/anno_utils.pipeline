@@ -20,8 +20,8 @@ annoDB2proj_description=This pipeline creates a variant tools project
   from a variant-based annotation database. The input of this pipeline should
   be the .DB or .DB.gz file of an annotation database. The output should be
   name of a directory within which the project will be created. The output 
-  directory should already exist. Any existing project in that directory
-  will be removed.
+  directory will be created if it does not exist. Any existing project in
+  that directory will be removed.
 
 [DEFAULT]
 export=variant
@@ -154,6 +154,10 @@ action=RunCommand(cmd='sqlite3 ${OUTPUT10}
 comment=Dump the annotation database to a text file
 
 [annoDB2proj_60]
+action=RunCommand(cmd='if [ ! -d ${CMD_OUTPUT} ]; then mkdir ${CMD_OUTPUT}; fi')
+comment=Create a project if it does not exist
+
+[annoDB2proj_70]
 # input      cache/$anno.dump
 # output     $dest/$anno.proj
 action=RunCommand(cmd=[

@@ -467,6 +467,8 @@ def poll_jobs():
                 job.stdout.flush()
                 job.stderr.flush()
             count += 1
+            # if a job is running, wait ... but not to the end
+            time.sleep(10)
             continue
         #
         # job completed, close redirected stdout and stderr
@@ -547,8 +549,9 @@ def wait_all():
     global running_jobs
     try:
         while poll_jobs() > 0:
-            # sleep ten seconds before checking job status again.
-            time.sleep(10)
+            # sleep one second, but poll_jobs will wait 10s for each running
+            # job. This avoid waiting at least 10s for simple commands
+            time.sleep(1)
     except KeyboardInterrupt:
         # clean up lock files
         for job in running_jobs:
@@ -604,7 +607,11 @@ class RunCommand:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
-        return self.output
+        if self.output:
+            return self.output
+        else:
+            # if no output is specified, pass ifiles through
+            return ifiles
 
 
 class DecompressFiles:
