@@ -31,9 +31,16 @@ export_comment=A variant table to create annotation database from for pipeline p
 action=CheckCommands('sqlite3')
 comment=Check the existence of command sqlite3, which is required for this pipeline
 
+[proj2annoDB_5]
+action=RunCommand(cmd='sqlite3 Arun_Ctrl.proj \'select value from project where name="build"\'
+	> ${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}',
+	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}')
+comment=Dump project build information
+
 [proj2annoDB_10]
 # input   $name.proj
 # output  cache/$name.proj.schema
+input=${CMD_INPUT}
 action=RunCommand(cmd='sqlite3 ${INPUT} ".schema variant" > ${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}', 
 	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".schema"}')
 comment=Dump the structure of the the variant table to cache/$PROJ.schema.
@@ -46,7 +53,7 @@ comment=Dump the structure of the the variant table to cache/$PROJ.schema.
 # to convert .schema file to .ann_tmp file. This (read write files within
 # a lambda function) is ugly but using shell command is uglier.
 action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".ann_tmp", 'w').write(
-	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 1, x.strip().split(None, 1)[-1])
+	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 3, x.strip().split(None, 1)[-1])
 		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[2:])]))},
 	output="${INPUT: INPUT[0][:-7] + '.ann_tmp'}")
 comment=Convert .schema to .ann definitions
@@ -58,7 +65,7 @@ comment=Convert .schema to .ann definitions
 # now we have the .schema file, we need to write a .ann file
 action=RunCommand(cmd="
     echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]};
-	echo '*=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo '${OUTPUT5:open(OUTPUT5[0]).read().strip()}=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
 	echo '[data sources]'             >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
 	echo 'description=Annotation database dumped from project ${CMD_INPUT}' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
 	echo 'delimiter=\"|\"'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
