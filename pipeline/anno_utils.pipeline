@@ -32,7 +32,7 @@ action=CheckCommands('sqlite3')
 comment=Check the existence of command sqlite3, which is required for this pipeline
 
 [proj2annoDB_5]
-action=RunCommand(cmd='sqlite3 Arun_Ctrl.proj \'select value from project where name="build"\'
+action=RunCommand(cmd='sqlite3 ${CMD_INPUT} \'select value from project where name="build"\'
 	> ${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}',
 	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}')
 comment=Dump project build information
