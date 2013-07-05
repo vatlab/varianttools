@@ -738,7 +738,7 @@ class PipelineDescription:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
         # sort steps
         for pname in self.pipelines:
-            self.pipelines[pname].sort(key=lambda x: x[0])
+            self.pipelines[pname].sort(key=lambda x: int(x[0].rsplit('_')[-1]))
         # 
         # validate
         for pname in self.pipeline_descriptions:
