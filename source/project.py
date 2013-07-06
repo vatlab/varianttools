@@ -47,7 +47,7 @@ from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
     VTOOLS_CITATION, VTOOLS_REVISION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
-    RefGenome, filesInURL, downloadFile, makeTableName, getMaxUcscBin, env, \
+    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
 
 
@@ -67,7 +67,6 @@ PipelineCommand = namedtuple('PipelineCommand', ['index', 'input',
 #   link = chr=dbNSFP.chr AND pos=dbNSFP.h18pos
 #
 FieldConnection = namedtuple('FieldConnection', ['field', 'table', 'link'])
-
 
 class AnnoDB:
     '''A structure that is created from an existing annotation database.
@@ -187,13 +186,13 @@ class AnnoDB:
 
     def binningRanges(self, proj, build, keys):
         cur = self.db.cursor()
-        tbl = makeTableName([build] + keys)
+        tbl = '__rng_' + encodeTableName('_'.join([build] + keys))
         if self.db.hasTable(tbl):
             return
         cur.execute('SELECT rowid, {} FROM {}'.format(','.join(keys), self.name))
         ranges = cur.fetchall()
-        cur.execute('CREATE TABLE {} (bin INT, chr VARCHAR(255), range_id INT)'.format(tbl))
-        insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1});'.format(tbl, self.db.PH)
+        cur.execute('CREATE TABLE {} (bin INT, chr VARCHAR(255), start INT, end INT, range_id INT)'.format(tbl))
+        insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1}, {1}, {1});'.format(tbl, self.db.PH)
         for rowid, chr, start, end in ranges:
             if start > end:
                 raise ValueError('Start position {} greater than ending position {} in database {}'.format(start, end, self.name))
@@ -201,7 +200,7 @@ class AnnoDB:
             ebin = getMaxUcscBin(end-1, end)
             if sbin > ebin:
                 raise SystemError('Start bin greater than end bin...')
-            cur.executemany(insert_query, [(bin, chr, rowid) for bin in range(sbin, ebin + 1)])
+            cur.executemany(insert_query, [(bin, chr, start, end, rowid) for bin in range(sbin, ebin + 1)])
         self.db.commit()          
         cur.execute('CREATE INDEX {0}_idx ON {0} (bin ASC, chr ASC, range_id ASC);'.format(tbl))
         self.db.commit()
@@ -2234,18 +2233,18 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = makeTableName([self.build] + db.build)
+                        binningTable = '__rng_' + encodeTableName('_'.join([self.build] + db.build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr '
+                                'AND variant.pos >= {0}.start AND variant.pos <= {0}.end '
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'
-                                    .format(table, db.build[0], db.build[1], db.build[2]))
+                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))
                             ]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
@@ -2265,19 +2264,19 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = makeTableName([self.alt_build] + db.alt_build)
+                        binningTable = '__rng_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr '
+                                'AND variant.alt_pos >= {0}.start AND variant.alt_pos <= {0}.end '
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
                             # FIXME: how to use bin here?
-                            link= 'variant.alt_chr = {0}.{1} AND variant.alt_pos >= {0}.{2} AND variant.alt_pos <= {0}.{3}'\
-                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
             raise ValueError('Failed to locate field {}'.format(field))
@@ -2346,18 +2345,18 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = makeTableName([self.build] + db.build)
+                        binningTable = '__rng_' + encodeTableName('_'.join([self.build] + db.build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr '
+                                'AND variant.pos >= {0}.start AND variant.pos <= {0}.end '
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'\
-                                    .format(table, db.build[0], db.build[1], db.build[2]))]
+                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 elif db.alt_build is not None:
@@ -2376,18 +2375,18 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = makeTableName([self.alt_build] + db.alt_build)
+                        binningTable = '__rng_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr AND {0}.range_id = {1}.rowid'
+                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr '
+                                'AND variant.alt_pos >= {0}.start AND variant.alt_pos <= {0}.end '
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, table),
-                            link= 'variant.chr = {0}.{1} AND variant.pos >= {0}.{2} AND variant.pos <= {0}.{3}'\
-                                    .format(table, db.alt_build[0], db.alt_build[1], db.alt_build[2]))]
+                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
                 else:
