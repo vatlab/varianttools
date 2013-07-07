@@ -86,15 +86,9 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     processed = set()
     # the normal annotation databases that are 'LEFT OUTER JOIN'
     for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-        if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
+        if (tbl.lower(), conn.lower()) not in processed:
             from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
             processed.add((tbl.lower(), conn.lower()))
-    # temporary connection tables are appended as WHERE clause.
-    #for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-    #    if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
-    #        from_clause += ' , {}'.format(tbl)
-    #        where_conditions.append(conn)
-    #        processed.add((tbl.lower(), conn.lower()))
     # WHERE clause
     if query is not None:
         # FIXME: if the query has a simple where clause, we should use that directly.
