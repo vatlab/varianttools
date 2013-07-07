@@ -1968,6 +1968,32 @@ class DatabaseEngine:
             fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
             return [x.split(None, 1) for x in fields]
 
+    def binningRanges(self, build, keys, anno_name):
+        '''Create a binning table for a range based annotation
+        database for specified build and keys'''
+        cur = self.database.cursor()
+        tbl = '__rng_' + encodeTableName('_'.join([build] + keys))
+        if self.hasTable(tbl):
+            return
+        cur.execute('SELECT rowid, {} FROM {}'.format(','.join(keys), anno_name))
+        ranges = cur.fetchall()
+        cur.execute('CREATE TABLE {} (bin INT, chr VARCHAR(255), start INT, end INT, range_id INT)'.format(tbl))
+        insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1}, {1}, {1});'.format(tbl, self.PH)
+        prog = ProgressBar('Binning ranges', len(ranges))
+        for idx, (rowid, chr, start, end) in enumerate(ranges):
+            if start > end:
+                raise ValueError('Start position {} greater than ending position {} in database {}'.format(start, end, anno_name))
+            sbin = getMaxUcscBin(start-1, start)
+            ebin = getMaxUcscBin(end-1, end)
+            if sbin > ebin:
+                raise SystemError('Start bin greater than end bin...')
+            cur.executemany(insert_query, [(bin, chr, start, end, rowid) for bin in range(sbin, ebin + 1)])
+            if idx % 100 == 99:
+                prog.update(idx + 1)
+        prog.done()
+        cur.execute('CREATE INDEX {0}_idx ON {0} (bin ASC, chr ASC, range_id ASC);'.format(tbl))
+        self.database.commit()          
+
     def removeFields(self, table, cols):
         '''Remove fields from a table'''
         if len(cols) == 0:

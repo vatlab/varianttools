@@ -177,33 +177,10 @@ class AnnoDB:
             self.indexLinkedField(proj, linked_by)
             del s
         if self.anno_type == 'range':
-            s = delayedAction(env.logger.info, 'Binning ranges')
             if self.build is not None:
-                self.binningRanges(proj, proj.build, self.build)
+                self.db.binningRanges(proj.build, self.build, self.name)
             elif self.alt_build is not None:
-                self.binningRanges(proj, proj.alt_build, self.alt_build)
-
-
-    def binningRanges(self, proj, build, keys):
-        cur = self.db.cursor()
-        tbl = '__rng_' + encodeTableName('_'.join([build] + keys))
-        if self.db.hasTable(tbl):
-            return
-        cur.execute('SELECT rowid, {} FROM {}'.format(','.join(keys), self.name))
-        ranges = cur.fetchall()
-        cur.execute('CREATE TABLE {} (bin INT, chr VARCHAR(255), start INT, end INT, range_id INT)'.format(tbl))
-        insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1}, {1}, {1});'.format(tbl, self.db.PH)
-        for rowid, chr, start, end in ranges:
-            if start > end:
-                raise ValueError('Start position {} greater than ending position {} in database {}'.format(start, end, self.name))
-            sbin = getMaxUcscBin(start-1, start)
-            ebin = getMaxUcscBin(end-1, end)
-            if sbin > ebin:
-                raise SystemError('Start bin greater than end bin...')
-            cur.executemany(insert_query, [(bin, chr, start, end, rowid) for bin in range(sbin, ebin + 1)])
-        self.db.commit()          
-        cur.execute('CREATE INDEX {0}_idx ON {0} (bin ASC, chr ASC, range_id ASC);'.format(tbl))
-        self.db.commit()
+                self.db.binningRanges(proj.alt_build, self.alt_build, self.name)
 
     def indexLinkedField(self, proj, linked_fields):
         '''Create index for fields that are linked by'''
@@ -919,7 +896,7 @@ class AnnoDBWriter:
         except Exception as e:
             env.logger.debug(e)
             raise ValueError('Failed to create table')
-    
+
     def finalize(self):
         '''Create index and get statistics of the database'''
         cur = self.db.cursor()
@@ -936,6 +913,10 @@ class AnnoDBWriter:
                     cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
                         .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         del s
+        # binning ranges
+        if self.anno_type == 'range':
+            for build, keys in self.build.items():
+                self.db.binningRanges(build, keys, self.name)
         s = delayedAction(env.logger.info, 'Analyzing and tuning database ...')
         # This is only useful for sqlite
         self.db.analyze()
