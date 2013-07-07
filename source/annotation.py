@@ -214,7 +214,7 @@ class AnnoDBConfiger:
         try:
             if os.path.isfile(self.source_url):
                 if not self.source_url.lower().endswith('.zip'):
-                    return self.source_url
+                    return [self.source_url]
                 else:
                     tempFile = self.source_url
             elif os.path.isfile(os.path.join(self.path, self.source_url)):

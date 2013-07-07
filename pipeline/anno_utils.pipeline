@@ -23,9 +23,18 @@ annoDB2proj_description=This pipeline creates a variant tools project
   directory will be created if it does not exist. Any existing project in
   that directory will be removed.
 
+annFileFromText_description=This pipeline reads a tab, comma or space delimited
+  file, take its header as name of fields, guess the type of each column, and
+  output an .ann file with these fields. The annotation database is assumed to
+  be of type "field" and use the first column as the linked field. The input
+  file of this pipeline should be the text file, and the ouput file should be an
+  .ann file. If the .ann file is created correctly, it can be used to create an
+  annotation database from the input text file.
+
 [DEFAULT]
 export=variant
 export_comment=A variant table to create annotation database from for pipeline proj2annoDB
+
 
 [proj2annoDB_0]
 action=CheckCommands('sqlite3')
@@ -175,3 +184,22 @@ action=RunCommand(cmd=[
 comment=Create a project and import data
 
 
+[annFileFromText_10]
+action=FieldsFromTextFile("${CACHE_DIR}/${CMD_INPUT: os.path.basename(CMD_INPUT[0]) + '.fields'}")
+comment=Create a feild description file from input text file.
+
+[annFileFromText_20]
+action=RunCommand(cmd=[
+	"echo '[linked fields]' > ${CMD_OUTPUT};
+	 echo '*=${INPUT: open(INPUT[0]).readlines()[2].split('[')[-1].split(']')[0]}'   >> ${CMD_OUTPUT};
+	 echo ''                >> ${CMD_OUTPUT};
+	 echo '[data sources]'  >> ${CMD_OUTPUT};
+	 echo 'description=Field annotation database created by pipeline annFileFromText
+		(in anno_utils.pipeline) from text file ${CMD_INPUT}' >> ${CMD_OUTPUT};
+	 echo 'anno_type=field' >> ${CMD_OUTPUT};
+     echo 'header=1'        >> ${CMD_OUTPUT};
+	 echo 'source_url=${CMD_INPUT}' >> ${CMD_OUTPUT};
+     echo 'source_type=txt' >> ${CMD_OUTPUT};",
+	"cat ${INPUT}           >> ${CMD_OUTPUT}"],
+	output="${CMD_OUTPUT}")
+comment=Create an annotation file from fields guessed from input file

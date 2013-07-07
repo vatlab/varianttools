@@ -39,11 +39,12 @@ import bz2
 import zipfile
 import time
 import re
+import csv
 import platform
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressGzFile
+    existAndNewerThan, TEMP, decompressGzFile, typeOfValues
     
 from .project import PipelineDescription, Project
 
@@ -320,6 +321,42 @@ class CheckFastqVersion:
         return self.output
 
 
+class FieldsFromTextFile:
+    '''Read a text file, guess its delimeter, field name (from header)
+    and create field descriptions.'''
+    
+    def __init__(self, output):
+        self.field_output = output
+
+    def __call__(self, ifiles):
+        if len(ifiles) > 1:
+            raise RuntimeError('Action FieldsFromTextFile only take one input file at a time.')
+        #
+        try:
+            with open(self.field_output, 'w') as fo:
+                csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(2048))
+                fo.write('delimiter="{}"\n\n'.format(csv_dialect.delimiter.replace('\t', r'\t')))
+                values = []
+                with open(ifiles[0], 'rU') as fi:
+                    reader = csv.reader(fi, dialect=csv_dialect)
+                    headers = reader.next()
+                    values = [[] for x in headers]
+                    for line in reader:
+                        for idx in range(len(headers)):
+                            values[idx].append(line[idx])
+                        if len(values[0]) > 100:
+                            break
+                #
+                for idx, header in enumerate(headers):
+                    fo.write('[{}]\n'.format(re.sub('\W', '_', header.strip())))
+                    fo.write('index={}\n'.format(idx+1))
+                    fo.write('type={}\n\n'.format(typeOfValues(values[idx])))
+        except Exception as e:
+            raise RuntimeError('Failed to guess fields from {}: {}'.format(ifiles[0], e))
+        #
+        return self.field_output
+        
+    
 class GuessReadGroup:
     def __init__(self, bamfile, rgfile):
         self.output_bam = bamfile
