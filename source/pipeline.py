@@ -44,7 +44,7 @@ import platform
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressGzFile, typeOfValues
+    existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName
     
 from .project import PipelineDescription, Project
 
@@ -348,7 +348,7 @@ class FieldsFromTextFile:
                             break
                 #
                 for idx, header in enumerate(headers):
-                    fo.write('[{}]\n'.format(re.sub('\W', '_', header.strip())))
+                    fo.write('[{}]\n'.format(validFieldName(header)))
                     fo.write('index={}\n'.format(idx+1))
                     fo.write('type={}\n\n'.format(typeOfValues(values[idx])))
         except Exception as e:
@@ -585,10 +585,12 @@ def wait_all():
     '''Wait for all pending jobs to complete'''
     global running_jobs
     try:
-        while poll_jobs() > 0:
+        while True:
             # sleep one second, but poll_jobs will wait 10s for each running
             # job. This avoid waiting at least 10s for simple commands
             time.sleep(1)
+            if poll_jobs() == 0:
+                break
     except KeyboardInterrupt:
         # clean up lock files
         for job in running_jobs:

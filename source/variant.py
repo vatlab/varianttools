@@ -30,7 +30,7 @@ import tempfile
 import subprocess
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
-    delayedAction, encodeTableName, decodeTableName, env
+    delayedAction, encodeTableName, decodeTableName, env, validFieldName
 from .phenotype import Sample
 
 
@@ -113,7 +113,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     if args.header is not None:
         if len(args.header) == 0:
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
-            sys.stdout.write(args.delimiter.join([re.sub('[\W]+', ' ', x) for x in output_fields]) + '\n')
+            sys.stdout.write(args.delimiter.join([validFieldName(x) for x in output_fields]) + '\n')
         elif args.header == ['-']:
             env.logger.info('Reading header from standard input')
             sys.stdout.write(sys.stdin.read().rstrip() + '\n')

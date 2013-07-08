@@ -894,8 +894,7 @@ class AnnoDBWriter:
         try:
             cur.execute(query)
         except Exception as e:
-            env.logger.debug(e)
-            raise ValueError('Failed to create table')
+            raise ValueError('Failed to create table: {}'.format(e))
 
     def finalize(self):
         '''Create index and get statistics of the database'''

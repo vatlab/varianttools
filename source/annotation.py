@@ -310,7 +310,8 @@ class AnnoDBConfiger:
         if self.source_pattern is not None:
             source_files = [x for x in source_files if self.source_pattern in x]
         #
-        env.logger.info('Importing database {} from source files {}'.format(self.name, source_files))
+        env.logger.info('Importing database {} from source files {}'.format(self.name,
+            ', '.join(source_files)))
         #
         writer = AnnoDBWriter(self.name, self.fields, self.anno_type, self.description,
             self.version, self.build)

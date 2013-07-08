@@ -486,6 +486,15 @@ SQL_KEYWORDS = set([
 ])
 
 
+def validFieldName(name, reserved=[]):
+    '''Return a valid field name from a name by converting non-alnum 
+    characters with _, and add _ if the name starts with a number. If
+    the new name is one of reserved, prefix it with _'''
+    new_name = re.sub('[\W]', '_', name.strip())
+    if new_name[0].isdigit() or new_name in reserved:
+        new_name = '_' + new_name
+    return new_name
+
 def decodeTableName(name):
     '''Decode a table to its name that could contain special characters'''
     if name.startswith('_'):

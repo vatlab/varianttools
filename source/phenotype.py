@@ -32,7 +32,8 @@ import re
 import csv
 from collections import defaultdict
 from .project import Project
-from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env
+from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env, \
+    validFieldName
 
 class GenotypeStatStatus:
     def __init__(self):
@@ -150,20 +151,6 @@ class Sample:
         self.jobs = jobs
         self.db = proj.db
 
-    def encodeFieldName(self, name):
-        '''Convert name to a valid field name. E.g. a(b) to a_b_'''
-        new_name = name
-        if not new_name.replace('_', '').isalnum():
-            new_name = ''.join([x if x.isalnum() else '_' for x in name])
-        if new_name[0].isdigit():
-            new_name = '_' + new_name
-        if new_name in ['filename', 'sample_name', 'sample_id', 'file_id']:
-            new_name = '_' + new_name
-        if new_name != name:
-            env.logger.warning('Phenotype "{}" is renamed to "{}".'
-                .format(name, new_name))
-        return new_name
-
     def load(self, filename, allowed_fields, samples):
         '''Load phenotype information from a file'''
         if not self.db.hasTable('sample'):
@@ -208,7 +195,14 @@ class Sample:
                 env.logger.error('No phenotype field to be imported')
                 return
             #
-            new_fields = [self.encodeFieldName(headers[x]) for x in phenotype_idx]
+            new_fields = []
+            for idx in phenotype_idx:
+                new_header = validFieldName(headers[idx],
+                    reserved=['filename', 'sample_name', 'sample_id', 'file_id'])
+                if new_header != headers[idx]: 
+                    env.logger.warning('Phenotype "{}" is renamed to "{}".'
+                        .format(headers[idx], new_header))
+                new_fields.append(new_header)
             #
             records = {}
             nCol = len(headers)
