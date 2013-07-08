@@ -35,11 +35,16 @@ order_by_comment=Fields used to order output in ascending order.
 
 [field formatter]
 fmt_*=CSVFormatter()
+fmt_GT=GenoFormatter(style='vcf')
 
 [col_1]
 field=%(fields)s
 adj=JoinRecords(',')
 comment=Output all fields as one column
+
+[col_2]
+field=GT
+comment=genotype
 
 [chr]
 index=%(chr_col)s
