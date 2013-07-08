@@ -435,19 +435,13 @@ class BaseVariantReader:
         # the normal annotation databases that are 'LEFT OUTER JOIN'
         where_conditions = []
         for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-            if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
+            if (tbl.lower(), conn.lower()) not in processed:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
         if self.geno_fields:
             for id in self.IDs:
                 from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
                     .format(self.proj.name, id, self.table)
-        # temporary connection tables are appended as WHERE clause.
-        #for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-        #    if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
-        #        from_clause += ' , {}'.format(tbl)
-        #        where_conditions.append(conn)
-        #        processed.add((tbl.lower(), conn.lower()))
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
