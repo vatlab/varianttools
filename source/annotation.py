@@ -237,11 +237,12 @@ class AnnoDBConfiger:
                 return [filename]
             else:
                 filename = os.path.split(self.source_url)[-1]
+                if not filename.strip():
+                    raise ValueError('No source_url is specified.')
                 env.logger.info('Downloading {}'.format(filename))
                 tempFile = downloadFile(self.source_url, dest_dir=env.cache_dir)
         except Exception as e:
-            env.logger.error(e)
-            raise ValueError('Failed to download database source from {}'.format(self.source_url))
+            raise ValueError('Failed to download database source from {}: {}'.format(self.source_url, e))
         #
         if not os.path.isfile(tempFile):
             raise ValueError('Could not find downloaded database source')
@@ -346,8 +347,8 @@ class AnnoDBConfiger:
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
                 except Exception as e:
-                    env.logger.debug(e)
-                    env.logger.info('Failed to download database or downloaded database unusable.')
+                    env.logger.warning('Failed to download database or downloaded database unusable: {}'
+                        .format(e))
         # have to build from source
         self.importFromSource(source_files)
         #

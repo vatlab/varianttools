@@ -111,7 +111,10 @@ class AnnoDB:
         self.anno_type = 'variant'
         self.linked_by = []
         for f in linked_by:
-            self.linked_by.append(proj.linkFieldToTable(f, 'variant')[-1].field)
+            try:
+                self.linked_by.append(proj.linkFieldToTable(f, 'variant')[-1].field)
+            except Exception as e:
+                raise RuntimeError('Failed to locate linked_by field {}: {}'.format(f, e))
         self.description = ''
         self.refGenomes = None
         self.build = None
