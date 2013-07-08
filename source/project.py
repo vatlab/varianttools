@@ -2214,7 +2214,7 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = '__rng_' + encodeTableName('_'.join([self.build] + db.build))
+                        binningTable = '__rng_' + table + '_' + encodeTableName('_'.join([self.build] + db.build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
@@ -2245,7 +2245,7 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = '__rng_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
+                        binningTable = '__rng_' + table + '_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
@@ -2326,7 +2326,7 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = '__rng_' + encodeTableName('_'.join([self.build] + db.build))
+                        binningTable = '__rng_' + table + '_' +  encodeTableName('_'.join([self.build] + db.build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
@@ -2356,7 +2356,7 @@ class Project:
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = '__rng_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
+                        binningTable = '__rng_' + table + '_' + encodeTableName('_'.join([self.alt_build] + db.alt_build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),

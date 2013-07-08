@@ -1972,7 +1972,7 @@ class DatabaseEngine:
         '''Create a binning table for a range based annotation
         database for specified build and keys'''
         cur = self.database.cursor()
-        tbl = '__rng_' + encodeTableName('_'.join([build] + keys))
+        tbl = '__rng_' + anno_name + '_' + encodeTableName('_'.join([build] + keys))
         if self.hasTable(tbl):
             return
         cur.execute('SELECT rowid, {} FROM {}'.format(','.join(keys), anno_name))
