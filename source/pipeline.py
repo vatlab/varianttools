@@ -57,7 +57,8 @@ except (ImportError, ValueError) as e:
 class EmitInput:
     '''Select input files of certain types, group them, and send input files
     to action. Selection criteria can be True (all input file types, default),
-    'False' (select no input file), 'fastq' (check content of files), or one or
+    'False' (select no input file, return None to skip a step of the pipeline),
+    'fastq' (check content of files), or one or
     more file extensions (e.g. ['sam', 'bam']).  Eligible files are by default
     sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
     # is the index of step, but can also be sent individually (group_by='single',
@@ -104,8 +105,10 @@ class EmitInput:
                 selected.append(filename)
             elif self.pass_unselected:
                 unselected.append(filename)
-        # 
-        if self.group_by == 'single':
+        # for this special case, the step is skipped
+        if self.select == False:
+            return [None], unselected
+        elif self.group_by == 'single':
             return [[x] for x in selected], unselected
         elif self.group_by == 'all':
             return [selected], unselected
@@ -602,6 +605,22 @@ def wait_all():
     running_jobs = []
 
 
+class NullAction:
+    def __init__(self, output=[], action=''):
+        '''A null action that is used to change input, output, or
+        execute lambda function of substituted variable.'''
+        if type(output) == str:
+            self.output = [output]
+        else:
+            self.output = output
+
+    def __call__(self, ifiles):
+        if self.output:
+            return self.output
+        else:
+            # if no output is specified, pass ifiles through
+            return ifiles
+        
 class RunCommand:
     def __init__(self, cmd='', working_dir=None, output=[]):
         '''This action execute the specified command under the
@@ -1061,10 +1080,6 @@ class Pipeline:
                 step_input = shlex.split(self.substitute(command.input, VARS))
             else:
                 step_input = ifiles
-            # if there is no input file?
-            if not step_input:
-                raise RuntimeError('Pipeline stops at step {}_{}: No input file is available.'
-                    .format(pname, command.index))
             #
             VARS['input{}'.format(command.index)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
@@ -1088,7 +1103,9 @@ class Pipeline:
             igroups, step_output = emitter(step_input)
             try:
                 for ig in igroups:
-                    if not ig:
+                    # this is a special case when EmitInput(select=False). In
+                    # this case the whole step is skipped.
+                    if ig is None:
                         continue
                     VARS['input'] = ig
                     action = self.substitute(command.action, VARS)
@@ -1148,12 +1165,12 @@ def executeArguments(parser):
             will be executed against the project database, with project genotype
             database attached as "genotype" and annotation databases attached
             by their names.''')
-    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT_FILE',
-        help='''Input files to the pipeline, which will be passed to the
-            pipelines as pipeline variable ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT_FILE',
-        help='''Names of output files of the pipeline, which will be passed to
-            the pipelines as ${CMD_OUTPUT}.''')
+    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT',
+        help='''Input to the pipelines, usually a list of input files, that
+            will bepassed to the pipelines as variable ${CMD_INPUT}.''')
+    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT',
+        help='''Output of the pipelines, usually a list of output files, that
+            will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs to execute.''')
     parser.add_argument('-d', '--delimiter', default='\t',
@@ -1162,10 +1179,10 @@ def executeArguments(parser):
 def execute(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            # old usage with a SQL query? The pipeline interface should
-            # have input files, should have option --output, and should not
-            # specify delimiter, and the input file should exist.
-            if (not args.input and not args.output) or args.delimiter != '\t':
+            # to keep backward compatibility, the vtools execute command
+            # can execute a SQL query and a pipeline
+            #
+            def executeQuery():
                 # if there is no output, 
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
@@ -1188,13 +1205,8 @@ def execute(args):
                 sep = args.delimiter
                 for rec in cur:
                     print(sep.join(['{}'.format(x) for x in rec]))
-            else:
-                if not args.output:
-                    raise ValueError('Missing output of pipeline {}'
-                        .format(args.pipeline[0]))
-                if not args.input:
-                    raise ValueError('Missing input of pipeline {}'
-                        .format(args.pipeline[0]))
+            #
+            def executePipeline():                
                 pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
                 # unspecified
                 if len(args.pipeline) == 1:
@@ -1204,6 +1216,18 @@ def execute(args):
                     for name in args.pipeline[1:]:
                         pipeline.execute(name, args.input, args.output,
                             args.jobs)
+            # definitely a pipeline
+            if args.input or args.output or args.unknown_args:
+                executePipeline()
+            # definitely a sql query
+            elif args.delimiter != '\t':
+                executeQuery()
+            else:
+                try:
+                    # try to execute as a SQL query
+                    executeQuery()
+                except RuntimeError:
+                    executePipeline()
     except Exception as e:
         env.unlock_all()
         env.logger.error(e)

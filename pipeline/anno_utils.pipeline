@@ -61,7 +61,7 @@ comment=Dump the structure of the the variant table to cache/$PROJ.schema.
 # this step does not execute any command but make use of a lambda function
 # to convert .schema file to .ann_tmp file. This (read write files within
 # a lambda function) is ugly but using shell command is uglier.
-action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".ann_tmp", 'w').write(
+action=NullAction(action=${INPUT: open(INPUT[0][:-7] + ".ann_tmp", 'w').write(
 	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 3, x.strip().split(None, 1)[-1])
 		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[2:])]))},
 	output="${INPUT: INPUT[0][:-7] + '.ann_tmp'}")
@@ -139,7 +139,7 @@ comment=Determine build information for the annotation database
 # to convert .schema file to .fmt_tmp file. This (read write files within
 # a lambda function) is ugly but using shell command is uglier.
 input=${OUTPUT20}
-action=RunCommand(cmd=${INPUT: open(INPUT[0][:-7] + ".fmt_tmp", 'w').write(
+action=NullAction(action=${INPUT: open(INPUT[0][:-7] + ".fmt_tmp", 'w').write(
 	''.join(['[%%s]\nindex=%%s\ntype=%%s\n\n' %% (x.strip().split(None, 1)[0], idx + 2, x.strip().split(None, 1)[-1])
 		for idx,x in enumerate(open(INPUT[0]).read().split(';')[0].split('(', 1)[1].rsplit(')', 1)[0].split(',')[1:])]))},
 	output="${INPUT: INPUT[0][:-7] + '.fmt_tmp'}")
