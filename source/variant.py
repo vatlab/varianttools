@@ -64,8 +64,11 @@ def generalOutputArguments(parser):
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
     grp.add_argument('-u', '--unique', default=False, action='store_true',
-        help='''Sort output and remove duplicated records, which is equivalent
-            to piping ouput to "| sort | uniq".''')
+        help='''Remove duplicated records while keeping the order of output.
+            This option can be time- and RAM-consuming RAM because it keeps
+            all outputted records in RAM to identify duplicated records. You
+            should pipe output to command 'uniq' if you only need to remove
+            adjacent duplicated lines.''')
 
 def outputVariants(proj, table_name, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
@@ -128,56 +131,13 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
             sys.stdout.write(line)
     else:
-        # hold at most half a million records in RAM
-        MAX_IN_MEM_RECORDS = 500000
-        temp_files = []
-        uniq_output = set()
+        # a set to hold all outputted lines
+        seen = set()
         for rec in cur:
             line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-            uniq_output.add(line)
-            # if there are MAX_IN_MEM_RECORDS records, it might not fit in ram,
-            # and we should better write output to a file.
-            if len(uniq_output) == MAX_IN_MEM_RECORDS:
-                with tempfile.NamedTemporaryFile(mode='w', dir=env.temp_dir,
-                    delete=False) as temp_file:
-                    temp_files.append(temp_file.name)
-                    for line in sorted(uniq_output):
-                        temp_file.write(line)
-                # reset in memory uniq_output
-                uniq_output = set()
-        # if there are less than MAX_IN_MEM_RECORDS OUTPUT, everything is in RAM
-        if not temp_files:
-            for line in sorted(uniq_output):
+            if not line in seen:
                 sys.stdout.write(line)
-        else:
-            # if there is at least one temp file, write the rest to another file
-            with tempfile.NamedTemporaryFile(mode='w', dir=env.temp_dir,
-                delete=False) as temp_file:
-                temp_files.append(temp_file.name)
-                for line in sorted(uniq_output):
-                    temp_file.write(line)
-                uniq_output = set()
-            #
-            env.logger.debug('Sort output from {} temporary files.'
-                .format(len(temp_files)))
-            try:
-                # output will be standard output
-                # --merge: merge already sorted files
-                # --unique: remove duplicated records
-                sort = subprocess.Popen(['sort', '--merge', '--unique'] + temp_files)
-                ret = sort.wait()
-                if ret != 0:
-                    raise RuntimeError('Failed to sort output from {} temporary files'
-                        .format(len(temp_files)))
-                #
-                # remove temporary files, which might not be needed
-            finally:
-                for temp_file in temp_files:
-                    try:
-                        os.remove(temp_file)
-                    except:
-                        pass
-
+                seen.add(line)
 
 def output(args):
     try:

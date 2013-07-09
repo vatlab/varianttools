@@ -689,9 +689,11 @@ class VariantWorker(Process):
 
 class Exporter:
     '''A general class for importing variants'''
-    def __init__(self, proj, table, filename, samples, format, build, header, jobs, fmt_args):
+    def __init__(self, proj, table, filename, samples, format, build, header,
+        unique, jobs, fmt_args):
         self.proj = proj
         self.db = proj.db
+        self.unique = unique
         self.jobs = jobs
         #
         # table
@@ -927,6 +929,8 @@ class Exporter:
                         self.format.delimiter.join(self.samples))
             print >> output, header.rstrip()
         global rec_ref, rec_alt
+        # a set to hold all exported lines, used by option --unique
+        seen = set()
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False
             try:
@@ -993,8 +997,15 @@ class Exporter:
                 # no adj: must be single
                 columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
                 # step three: output columns
-                print >> output, sep.join(columns)
-                count += 1
+                line = sep.join(columns)
+                if self.unique:
+                    if line not in seen:
+                        output.write(line + '\n')
+                        seen.add(line)
+                        count += 1
+                else:
+                    output.write(line + '\n')
+                    count += 1
             except Exception as e:
                 env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
@@ -1017,40 +1028,59 @@ class Exporter:
                 # step one: apply formatters
                 if multi_records:
                     try:
-                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                            if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
+                        fields = [fmt(None if col is None else (rec[col] \
+                            if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col][0] is None)\
+                            else default_formatter(rec[col][0])) for fmt, col in formatters]
                     except:
                         for fmt, col in formatters:
                             try:
                                 if fmt:
-                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                                    fmt(None if col is None else (rec[col] \
+                                    if type(col) is int else [rec[x] for x in col]))
                             except Exception as e:
-                                raise ValueError('Failed to format value {} at col {}: {}'.format(
-                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
+                                raise ValueError('Failed to format value {} at col {}: {}'
+                                    .format(rec[col] if type(col) is int else \
+                                        [rec[x] for x in col], col, e))
                 else:
                     try:
-                        fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                            if fmt else ('' if (col is None or rec[col] is None) else default_formatter(rec[col])) for fmt, col in formatters]
+                        fields = [fmt(None if col is None else (rec[col] \
+                            if type(col) is int else [rec[x] for x in col])) \
+                            if fmt else ('' if (col is None or rec[col] is None)\
+                            else default_formatter(rec[col])) for fmt, col in formatters]
                     except:
                         for fmt, col in formatters:
                             try:
                                 if fmt:
-                                    fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col]))
+                                    fmt(None if col is None else (rec[col] \
+                                    if type(col) is int else [rec[x] for x in col]))
                             except Exception as e:
-                                raise ValueError('Failed to format value {} at col {}: {}'.format(
-                                    rec[col] if type(col) is int else [rec[x] for x in col], col, e))
+                                raise ValueError('Failed to format value {} at col {}: {}'
+                                    .format(rec[col] if type(col) is int else \
+                                        [rec[x] for x in col], col, e))
                 # step two: apply adjusters
-                columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
+                columns = [adj(fields[col] if type(col) is int else \
+                    [fields[x] for x in col]) if adj else fields[col] \
+                    for adj, col in col_adj]
                 # step three: output columns
-                print >> output, sep.join(columns)
-                count += 1
+                line = sep.join(columns)
+                if self.unique:
+                    if line not in seen:
+                        output.write(line + '\n')
+                        seen.add(line)
+                        count += 1
+                else:
+                    output.write(line + '\n')
+                    count += 1
             except Exception as e:
                 env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
         if self.filename is not None:
             output.close()
         prog.done()
-        env.logger.info('{} lines are exported from variant table {} {}'.format(count, self.table, '' if failed_count == 0 else 'with {} failed records'.format(failed_count)))
+        env.logger.info('{} lines are exported from variant table {} {}'
+            .format(count, self.table, '' if failed_count == 0 else \
+                'with {} failed records'.format(failed_count)))
 
 
 
@@ -1080,7 +1110,7 @@ def exportArguments(parser):
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
-            genome of the project.'''),
+            genome of the project.''')
     parser.add_argument('--header', nargs='*', 
         help='''A complete header or a list of names that will be joined by a
             delimiter specified by the file format to form a header. If a special
@@ -1089,6 +1119,12 @@ def exportArguments(parser):
             cat myheader | vtools export --header -). Strings in the form of
             %%(VAR)s will be interpolated to values of variable VAR, which can be
             "sample_names" for list of sample names.''')
+    parser.add_argument('-u', '--unique', default=False, action='store_true',
+        help='''Remove duplicated records while keeping the order of output.
+            This option can be time- and RAM-consuming because it keeps
+            all outputted records in RAM to identify duplicated records. You
+            should pipe output to command 'uniq' if you only need to remove
+            adjacent duplicated lines.''')
     parser.add_argument('-j', '--jobs', type=int, default=1,
         help='''Number of processes to export data. Multiple threads will be automatically
             used if there are a large number of samples.''')
@@ -1099,8 +1135,8 @@ def export(args):
             proj.db.attach(proj.name + '_genotype')
             exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
                 samples=' AND '.join(['({})'.format(x) for x in args.samples]), format=args.format,
-                build=args.build, header=args.header, jobs=args.jobs,
-                fmt_args=args.unknown_args)
+                build=args.build, header=args.header, unique=args.unique, 
+                jobs=args.jobs, fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()
     except Exception as e:
