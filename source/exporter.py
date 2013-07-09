@@ -581,7 +581,6 @@ class MultiVariantReader(BaseVariantReader):
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
-        IDs.sort()
         # we may need more jobs due to the limit of max columns
         # but we will only have self.jobs active jobs
         jobs = min(1, jobs)
@@ -707,7 +706,7 @@ class Exporter:
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
         self.samples = []
         if samples:
-            env.logger.info('File and sample names of {} selected samples are outputted in project log file.'.format(len(self.IDs)))
+            env.logger.info('Genotypes of {} samples are exported.'.format(len(self.IDs)))
             cur = self.db.cursor()
             for ID in self.IDs:
                 cur.execute('SELECT filename, sample_name FROM sample, filename WHERE sample.file_id = filename.file_id AND sample.sample_id = {};'\

@@ -1686,16 +1686,15 @@ class Project:
         '''Select samples by conditions such as "aff=1", return IDs as a sorted list'''
         cur = self.db.cursor()
         try:
-            query = 'SELECT sample_id FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {};'.format(' WHERE {}'.format(cond) if cond.strip() else '')
-            env.logger.debug('Select samples using query {}'.format(query))
-            cur.execute(query)
+            cur.execute('SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
+                'sample.file_id = filename.file_id {} ORDER BY sample.sample_name;'
+                .format(' WHERE {}'.format(cond) if cond.strip() else ''))
             IDs = [x[0] for x in cur.fetchall()]
-            IDs.sort()
             # return a tuple to avoid future change of order
             return tuple(IDs)
         except Exception as e:
-            env.logger.debug(e)
-            raise ValueError('Failed to retrieve samples by condition "{}"'.format(cond))
+            raise ValueError('Failed to retrieve samples by condition "{}": {}'
+                .format(cond, e))
 
     def removeSamples(self, IDs):
         '''Remove sample and their genotype, but not variants'''
