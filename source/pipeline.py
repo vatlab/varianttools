@@ -1143,17 +1143,19 @@ def executeArguments(parser):
             than one pipelines. The configuration file can be identified by
             path to a .pipeline file (with or without extension), or one
             of the online pipelines listed by command "vtools show pipelines".
-            To keep backward compatibility, this option also accept a SQL query
-            that will be executed, with project genotype database attached
-            as "genotype" and annotation databases attached by their names.''')
-    parser.add_argument('-i', '--input', nargs='*', metavar='OUTPUT_FILE',
+            If no input and output files are specified (options --input and
+            --output), values of this option is treated as a SQL query that
+            will be executed against the project database, with project genotype
+            database attached as "genotype" and annotation databases attached
+            by their names.''')
+    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT_FILE',
         help='''Input files to the pipeline, which will be passed to the
             pipelines as pipeline variable ${CMD_INPUT}.''')
     parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT_FILE',
         help='''Names of output files of the pipeline, which will be passed to
             the pipelines as ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs.''')
+        help='''Maximum number of concurrent jobs to execute.''')
     parser.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter used to output results of a SQL query.''')
 
