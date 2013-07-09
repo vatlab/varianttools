@@ -1165,10 +1165,10 @@ def executeArguments(parser):
             will be executed against the project database, with project genotype
             database attached as "genotype" and annotation databases attached
             by their names.''')
-    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT',
+    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT', default=[],
         help='''Input to the pipelines, usually a list of input files, that
             will bepassed to the pipelines as variable ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT',
+    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT', default=[],
         help='''Output of the pipelines, usually a list of output files, that
             will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
