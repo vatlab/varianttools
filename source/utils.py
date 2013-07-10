@@ -1229,6 +1229,38 @@ class ResourceManager:
             prog.update(total_size)
         prog.done()
 
+    def updateDescriptionFiles(self):
+        '''Go through the manifest and download small files (.ann, .pipeline etc)'''
+        updated = {'ann': [], 'fmt': [], 'pipeline': []}
+        added = {'ann': [], 'fmt': [], 'pipeline': []}
+        for cnt, filename in enumerate(sorted(self.manifest.keys())):
+            fileprop = self.manifest[filename]
+            dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+            dest_file = os.path.join(env.local_resource, filename)
+            # 
+            if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
+                continue
+            if os.path.isfile(dest_file):
+                if os.path.getsize(dest_file) == fileprop[0] and calculateMD5(dest_file) == fileprop[1]:
+                    continue
+                else:
+                    updated[filename.rsplit('.', 1)[-1]].append(os.path.basename(filename))
+            else:
+                added[filename.rsplit('.', 1)[-1]].append(os.path.basename(filename))
+            try:
+                downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
+                    os.path.join(env.local_resource, filename), True)
+                # check md5
+                if calculateMD5(dest_file) != fileprop[1]:
+                    env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
+            except KeyboardInterrupt as e:
+                raise e
+            except Exception as e:
+                env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e)) 
+        return updated, added
+
     def downloadResources(self):
         '''Download resources'''
         for cnt, filename in enumerate(sorted(self.manifest.keys())):

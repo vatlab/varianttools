@@ -27,9 +27,9 @@
 import os
 import sys
 import glob
+import random
 import logging
 import getpass
-import random
 import textwrap
 import tempfile
 import shutil
@@ -41,6 +41,7 @@ import signal
 import time
 import re
 import tarfile
+import urllib
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
@@ -1126,7 +1127,7 @@ class Project:
         signal.signal(signal.SIGINT, unlock_proj)
         signal.signal(signal.SIGTERM, unlock_proj)
         try:
-            if new:
+            if new: 
                 self.create(build=build, **kwargs)
             else:
                 self.open(verify)
@@ -1137,6 +1138,9 @@ class Project:
                 signal.signal(signal.SIGTERM, signal.SIG_DFL)
             except:
                 pass
+        # check update, 1 out of 5 times when a project is opened. :-)
+        if random.randint(1, 10) == 1:
+            self.checkUpdate()
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1285,6 +1289,48 @@ class Project:
             self.createIndexOnMasterVariantTable()
             if not self.db.hasIndex('variant_index'):
                 raise RuntimeError('Corrupted project: failed to create index on master variant table.')
+
+    def checkUpdate(self):
+        res = ResourceManager()
+        try:
+            res.getRemoteManifest()
+        except:
+            # if the machine is not connected to the internet,
+            # do not get any update
+            env.logger.debug('Failed to check update: {}'.format(e))
+            return
+        res.selectFiles('all')
+        # skip checking md5 file of large files ...
+        updated, added = res.updateDescriptionFiles()
+        resource_type = {'ann': 'annotation databases', 
+            'fmt': 'file formats',
+            'pipeline': 'pipelines'}
+        for k, v in updated.items():
+            if v:
+                env.logger.warning('{} existing {} {} updated: {}'
+                    .format(len(v), resource_type[k],
+                    'has been' if len(v) == 1 else 'have been', ', '.join(v)))
+        for k, v in added.items():
+            if v:
+                env.logger.warning('{} new {} {} added: {}'
+                    .format(len(v), resource_type[k], 
+                    'has been' if len(v) == 1 else 'have been', ', '.join(v)))
+        #
+        # check current version of variant tools.
+        try:
+            (version_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/CURRENT_VERSION.txt')
+            with open(version_file, 'r') as version:
+                current_version = version.readline().decode('UTF8').strip()
+            if [int(x) for x in re.sub('\D', ' ', current_version).split()] > \
+                [int(x) for x in re.sub('\D', ' ', VTOOLS_VERSION).split()]:
+                env.logger.warning('A new version of variant tools ({}) is available.'
+                    .format(current_version))
+        except Exception as e:
+            env.logger.debug('Failed to check latest version: {}'.format(e))
+        finally:
+            # remove manifest_file
+            urllib.urlcleanup()
+
 
     def analyze(self, force=False):
         '''Automatically analyze project to make sure queries are executed optimally.
@@ -2138,17 +2184,6 @@ class Project:
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
         
-    #
-    # temporary table which are created in separate database
-    # because it is very slow for delite to remove temporary table
-    # def getTempTable(self):
-    #     '''Return a table name that does not exist in database'''
-    #     self.db.attach('{}_temp'.format(self.name))
-    #     while True:
-    #         name = '{}_temp._tmp_{}'.format(self.name, random.randint(0, 10000))
-    #         if not self.db.hasTable(name):
-    #             return name   
-
     def checkFieldName(self, name, exclude=None):
         '''Check if a field name has been used, or is the SQL keyword'''
         if name.upper() in SQL_KEYWORDS:

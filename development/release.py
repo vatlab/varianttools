@@ -378,4 +378,6 @@ if __name__ == '__main__':
         tagRelease(version)
     # if everything is done
     print('Source packages and executables are successfully generated and '
-        'saved to directory dist.')
+        'saved to directory dist. PLEASE REMEMBER UPDATING '
+        'http://vtools.houstonbioinformatics.org/CURRENT_VERSION.txt '
+        'WITH THE CORRECT VERSION NUMBER.')

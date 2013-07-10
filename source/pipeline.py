@@ -653,7 +653,8 @@ class RunCommand:
                         ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
-        run_command(self.cmd, output=self.output, working_dir=self.working_dir, self.max_jobs)
+        run_command(self.cmd, output=self.output, working_dir=self.working_dir,
+            max_jobs=self.max_jobs)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
