@@ -449,7 +449,7 @@ def elapsed_time(start):
     return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
-def run_command(cmd, output=None, working_dir=None):
+def run_command(cmd, output=None, working_dir=None, max_jobs=1):
     '''Call a list of external command cmd, raise an error if any of them
     fails. '''
     global running_jobs
@@ -465,7 +465,7 @@ def run_command(cmd, output=None, working_dir=None):
     #
     # wait for empty slot to run the job
     while True:
-        if poll_jobs() >= max_running_jobs:
+        if poll_jobs() >= min(max_jobs, max_running_jobs):
             time.sleep(5)
         else:
             break
@@ -619,7 +619,7 @@ class NullAction:
             return ifiles
         
 class RunCommand:
-    def __init__(self, cmd='', working_dir=None, output=[]):
+    def __init__(self, cmd='', working_dir=None, output=[], max_jobs=1):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         '''
@@ -630,6 +630,7 @@ class RunCommand:
             self.cmd = [' '.join(cmd.split())]
         else:
             self.cmd = [' '.join(x.split()) for x in cmd]
+        self.max_jobs = max_jobs
         self.working_dir = working_dir
         if type(output) == str:
             self.output = [output]
@@ -652,7 +653,7 @@ class RunCommand:
                         ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
-        run_command(self.cmd, output=self.output, working_dir=self.working_dir)
+        run_command(self.cmd, output=self.output, working_dir=self.working_dir, self.max_jobs)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
@@ -1172,7 +1173,8 @@ def executeArguments(parser):
         help='''Output of the pipelines, usually a list of output files, that
             will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs to execute.''')
+        help='''Maximum number of concurrent jobs to execute, for steps
+            of a pipeline that allows multi-processing.''')
     parser.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter used to output results of a SQL query.''')
 
