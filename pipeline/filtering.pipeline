@@ -7,7 +7,20 @@
 [pipeline description]
 description=Pipelines to filter variants.
 
-exon_novel_1_description=This pipeline "Assumes hg19"
+exon_novel_hg19_description=This pipeline removes variants that are
+  in a specified annotation database (e.g. database built from a
+  control project), all variants from the thousand genomes project
+  except those are probably pathogenic, variants that are in duplicated
+  regions, variants that are not in conserved regions, and keep
+  variants that are in exonic regions of UCSC ref genes. It takes
+  a snapshot or the current project (no --input is needed) as
+  input, starting from the master variant table or a table 
+  specified by option --source_table, generate a number of
+  intermediate variant tables, and generate a variant table
+  spacified by option --dest_table. This pipeline assumes hg19
+  as the build of the project.
+
+
 
 [DEFAULT]
 
@@ -24,34 +37,86 @@ exclude=
 exclude_comment=Name of an annotation database (a name, or a .DB or .ann file)
   whose variants will be removed from the present project. 
 
-[exon_novel_1_0]
-# if there is CMD_INPUT, treat is as a snapshot, otherwise use the project database
+[exon_novel_hg19_0]
+# if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
+# database as step input
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
 input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
 action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
   existing project.
 
-[exon_novel_1_10]
-action=RunCommand(cmd='vtools select %(source_table)s -t "%(prefix)s_0"
-	"Copied from %(source_table)s."')
+[exon_novel_hg19_1]
+# input: CMD_INPUT or project file
+# output: cache/_0.info
+action=RunCommand(cmd=[
+	'vtools show table %(source_table)s > ${CACHE_DIR}/%(prefix)s_0.info'],
+	output="${CACHE_DIR}/%(prefix)s_0.info")
+comment=Retrieve information of source variant table.
+
+[exon_novel_hg19_10]
+# execute if no --exclude is specified
+# input: cache/_0.info
+# output: cache/_1.info 
+action=RunCommand(cmd=[
+	'vtools select %(source_table)s -t "%(prefix)s_1" "Copied from %(source_table)s."',
+	'vtools show table %(prefix)s_1 > ${CACHE_DIR}/%(prefix)s_1.info'],
+	output="${CACHE_DIR}/%(prefix)s_1.info")
 input_emitter=EmitInput(select=${:not bool("%(exclude)s")})
-comment=Copy source variant table to $prefix_0 if no exclusion table
+comment=Copy source variant table to $prefix_1 if no exclusion table
   is specified.
 
-[exon_novel_1_11]
+[exon_novel_hg19_11]
+# execute if --exclude is specified
+# input: cache/_0.info
+# output: cache/_1.info 
 action=RunCommand(cmd=[
 	'vtools use %(exclude)s',
-	'vtools select %(source_table)s "${:os.path.basename("%(exclude)s").split('-')[0].split('.')[0]}.chr is NULL" 
-        -t "%(prefix)s_0" "Remove variants in %(source_table)s from annotation database %(exclude)s"'
-	])
+	'vtools select %(source_table)s "${:os.path.basename("%(exclude)s").split('-')[0].split('.')[0]}.chr IS NULL" 
+        -t "%(prefix)s_0" "Remove variants in %(source_table)s from annotation database %(exclude)s"',
+	'vtools show table %(prefix)s_1 > ${CACHE_DIR}/%(prefix)s_1.info'],
+	output="${CACHE_DIR}/%(prefix)s_1.info")
 input_emitter=EmitInput(select=${:bool("%(exclude)s")})
 comment=Remove variants from specified annotation database if a database
   is specified using parameter --exclude
 
-[exon_novel_1_20]
+[exon_novel_hg19_20]
 action=RunCommand(cmd=[
 	'vtools use thousandGenomes',
-	'vtools select %(prefix)s_0 "thousandGenomes.chr is NULL OR thousandGenomes.SCS_INFO > 3"
-		-t "%(prefix)s_1" "With variants in 1000 genomes, but with those that are probably pathogenic"'])
+	'vtools select %(prefix)s_1 "thousandGenomes.chr IS NULL OR thousandGenomes.SCS_INFO > 3"
+		-t "%(prefix)s_2" "With variants in 1000 genomes, but with those that are probably pathogenic"',
+	'vtools show table %(prefix)s_2 > ${CACHE_DIR}/%(prefix)s_2.info'],
+	output="${CACHE_DIR}/%(prefix)s_2.info")
 comment=Remove variants that are in 1000 genomes, but keep those with SCS_INFO > 3 (probably pathogenic)
+
+[exon_novel_hg19_30]
+action=RunCommand(cmd=[
+	'vtools use genomicSuperDups',
+	'vtools select %(prefix)s_2 "genomicSuperDups.chr IS NULL"
+		-t "%(prefix)s_3" "Remove variants in duplicated regions."',
+	'vtools show table %(prefix)s_3 > ${CACHE_DIR}/%(prefix)s_3.info'],
+	output="${CACHE_DIR}/%(prefix)s_3.info")
+comment=Remove variants in duplicated regions
+
+[exon_novel_hg19_40]
+action=RunCommand(cmd=[
+	'vtools use phastCons',
+	'vtools select %(prefix)s_3 "phastCons.chr IS NOT NULL"
+		-t "%(prefix)s_4" "Keep variants in conserved regions."',
+	'vtools show table %(prefix)s_4 > ${CACHE_DIR}/%(prefix)s_4.info'],
+	output="${CACHE_DIR}/%(prefix)s_4.info")
+comment=Remove variants that are not in conserved regions
+
+[exon_novel_hg19_50]
+action=RunCommand(cmd=[
+	'vtools use refGene_exon',
+	'vtools select %(prefix)s_4 "refGene_exon.chr IS NOT NULL"
+		-t "%(prefix)s_5" "Keep variants in exonic regions of UCSC ref seq genes"',
+	'vtools show table %(prefix)s_5 > ${CACHE_DIR}/%(prefix)s_5.info'],
+	output="${CACHE_DIR}/%(prefix)s_5.info")
+comment=Keep variants in exonic regions of UCSC ref seq genes
+
+
+
+
+
