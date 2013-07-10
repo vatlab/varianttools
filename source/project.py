@@ -1472,6 +1472,7 @@ class Project:
                 ref VARCHAR(255) NOT NULL,
                 alt VARCHAR(255) NOT NULL {1});'''.format(self.db.AI,
                 ''.join([', {} {}\n'.format(x,y) for x,y in fields])))
+        self.describeTable('variant', 'Master variant table', True, False)
         self.createIndexOnMasterVariantTable()
 
     def createIndexOnMasterVariantTable(self, quiet=False):
@@ -3635,33 +3636,41 @@ def show(args):
                 if not args.items:
                     raise ValueError('Please specify a table to display')
                 table = args.items[0]
+                table_type = None
                 # showing an annotation database
                 if table in [x.name for x in proj.annoDB]:
                     table = '{0}.{0}'.format(table)
-                elif not proj.db.hasTable(encodeTableName(table)):
-                    if table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'
-                        .format(proj.name, encodeTableName(table))):
-                        table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
-                    else:
-                        raise ValueError('Table {} does not exist'.format(table))
-                else:
+                    table_type = 'annoDB'
+                elif table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'
+                    .format(proj.name, encodeTableName(table))):
+                    table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
+                    table_type = 'genotype'
+                elif proj.isVariantTable(encodeTableName(table)):
                     table = encodeTableName(table)
-                # print description of table
-                desc, date, cmd = proj.descriptionOfTable(table)
-                if date:  # if date is available, project has such information
-                    print('# Description:   {}'.format(desc))
-                    print('# Creation date: {}'.format(date))
-                    print('# From command:  {}'.format(cmd))
-                # print content of table
-                headers = proj.db.getHeaders(table)
-                print(', '.join(headers))
-                cur = proj.db.cursor()
-                cur.execute('SELECT * FROM {} {};'.format(table, limit_clause))
-                for rec in cur:
-                    print(', '.join([str(x) for x in rec]))
-                nAll = proj.db.numOfRows(table)
-                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print (omitted.format(nAll - args.limit))
+                    table_type = 'variant'
+                else:
+                    raise ValueError('{} is not a variant, a genotype, or an '
+                        'annotation table'.format(table))
+                if table_type == 'variant':
+                    # print description of table
+                    desc, date, cmd = proj.descriptionOfTable(table)
+                    print('{:<23} {}'.format('Name:', table))
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format('Description:', desc),
+                        width=78, subsequent_indent=' '*24)))
+                    print('{:<23} {}'.format('Creation date:', date))
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format('Command:', cmd),
+                        width=78, subsequent_indent=' '*24)))
+                    # 
+                    headers = proj.db.getHeaders(table)
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format('Fields:', ', '.join(headers)),
+                        width=78, subsequent_indent=' '*24)))
+                    print('{:<23} {}'.format('Number of variants:',
+                        proj.db.numOfRows(encodeTableName(table))))
+                elif table_type == 'genotype':
+                    pass
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     env.logger.warning('Project does not have a sample table.')

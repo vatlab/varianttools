@@ -7,7 +7,7 @@
 [pipeline description]
 description=Pipelines to filter variants.
 
-exon_novel_1_description=This pipeline 
+exon_novel_1_description=This pipeline "Assumes hg19"
 
 [DEFAULT]
 
@@ -25,28 +25,33 @@ exclude_comment=Name of an annotation database (a name, or a .DB or .ann file)
   whose variants will be removed from the present project. 
 
 [exon_novel_1_0]
+# if there is CMD_INPUT, treat is as a snapshot, otherwise use the project database
+input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
+input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
 action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
-input_emitter=EmitInput(select=${CMD_INPUT: len(CMD_INPUT)>0})
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
   existing project.
 
 [exon_novel_1_10]
 action=RunCommand(cmd='vtools select %(source_table)s -t "%(prefix)s_0"
-	"Copy %(source_table)s to %(prefix)s_0 to start filtering."')
+	"Copied from %(source_table)s."')
 input_emitter=EmitInput(select=${:not bool("%(exclude)s")})
-comment=Copy source variant table to %(prefix)s_0 if no exclusion table
+comment=Copy source variant table to $prefix_0 if no exclusion table
   is specified.
 
 [exon_novel_1_11]
 action=RunCommand(cmd=[
 	'vtools use %(exclude)s',
 	'vtools select %(source_table)s "${:os.path.basename("%(exclude)s").split('-')[0].split('.')[0]}.chr is NULL" 
-        -t "%(prefix)s_0" "Remove variants from specified annotation database %(exclude)s"'
+        -t "%(prefix)s_0" "Remove variants in %(source_table)s from annotation database %(exclude)s"'
 	])
 input_emitter=EmitInput(select=${:bool("%(exclude)s")})
 comment=Remove variants from specified annotation database if a database
   is specified using parameter --exclude
 
 [exon_novel_1_20]
-action=RunCommand(cmd=
-comment=Remove variants that are in 1000 genomes
+action=RunCommand(cmd=[
+	'vtools use thousandGenomes',
+	'vtools select %(prefix)s_0 "thousandGenomes.chr is NULL OR thousandGenomes.SCS_INFO > 3"
+		-t "%(prefix)s_1" "With variants in 1000 genomes, but with those that are probably pathogenic"'])
+comment=Remove variants that are in 1000 genomes, but keep those with SCS_INFO > 3 (probably pathogenic)
