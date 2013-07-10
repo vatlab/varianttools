@@ -65,7 +65,7 @@ def generalOutputArguments(parser):
         help='''Order output by specified fields in ascending order.''')
     grp.add_argument('-u', '--unique', default=False, action='store_true',
         help='''Remove duplicated records while keeping the order of output.
-            This option can be time- and RAM-consuming RAM because it keeps
+            This option can be time- and RAM-consuming because it keeps
             all outputted records in RAM to identify duplicated records. You
             should pipe output to command 'uniq' if you only need to remove
             adjacent duplicated lines.''')
