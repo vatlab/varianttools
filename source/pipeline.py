@@ -57,8 +57,7 @@ except (ImportError, ValueError) as e:
 class EmitInput:
     '''Select input files of certain types, group them, and send input files
     to action. Selection criteria can be True (all input file types, default),
-    'False' (select no input file, return None to skip a step of the pipeline),
-    'fastq' (check content of files), or one or
+    'False' (select no input file), 'fastq' (check content of files), or one or
     more file extensions (e.g. ['sam', 'bam']).  Eligible files are by default
     sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
     # is the index of step, but can also be sent individually (group_by='single',
@@ -106,9 +105,7 @@ class EmitInput:
             elif self.pass_unselected:
                 unselected.append(filename)
         # for this special case, the step is skipped
-        if self.select == False:
-            return [None], unselected
-        elif self.group_by == 'single':
+        if self.group_by == 'single':
             return [[x] for x in selected], unselected
         elif self.group_by == 'all':
             return [selected], unselected
@@ -1081,6 +1078,11 @@ class Pipeline:
             else:
                 step_input = ifiles
             #
+            # if there is no input file?
+            if not step_input:
+                raise RuntimeError('Pipeline stops at step {}_{}: No input file is available.'
+                    .format(pname, command.index))
+            #
             VARS['input{}'.format(command.index)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
@@ -1103,9 +1105,7 @@ class Pipeline:
             igroups, step_output = emitter(step_input)
             try:
                 for ig in igroups:
-                    # this is a special case when EmitInput(select=False). In
-                    # this case the whole step is skipped.
-                    if ig is None:
+                    if not ig:
                         continue
                     VARS['input'] = ig
                     action = self.substitute(command.action, VARS)
