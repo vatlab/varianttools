@@ -1132,8 +1132,6 @@ class Project:
         finally:
             try:
                 env.unlock(lock_file)
-                signal.signal(signal.SIGINT, signal.SIG_DFL)
-                signal.signal(signal.SIGTERM, signal.SIG_DFL)
             except:
                 pass
         #if random.randint(1, 10) == 1:
