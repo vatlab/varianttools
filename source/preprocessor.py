@@ -308,6 +308,18 @@ class Preprocessor:
         for item, ofile in zip(files, output_files):
             env.logger.info('Convert {} to {}'.format(item, ofile))
         
+class Dos2Unix(Preprocessor):
+    def __init__(self):
+        Preprocessor.__init__(self)
+
+    def convert(self, files, output_files):
+        for ifile, ofile in zip(files, output_files):
+            env.logger.info('Converting {} with \r newline charater to unix format.'
+                .format(ifile))
+            with open(ifile, 'rU') as input, open(ofile, 'w') as output:
+                for line in input:
+                    output.write(line)
+
 
 class PlinkConverter(Preprocessor):
     def __init__(self, build, chrom_namemap = {}):
