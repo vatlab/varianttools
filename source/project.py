@@ -27,7 +27,6 @@
 import os
 import sys
 import glob
-import random
 import logging
 import getpass
 import textwrap
@@ -1109,7 +1108,6 @@ class Project:
             env.temp_dir = self.loadProperty('__option_temp_dir', None)
         except Exception as e:
             env.logger.warning('Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
-            # use a random directory
             env.temp_dir = None
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         #
@@ -1138,9 +1136,8 @@ class Project:
                 signal.signal(signal.SIGTERM, signal.SIG_DFL)
             except:
                 pass
-        # check update, 1 out of 5 times when a project is opened. :-)
-        if random.randint(1, 10) == 1:
-            self.checkUpdate()
+        #if random.randint(1, 10) == 1:
+        self.checkUpdate()
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1294,33 +1291,20 @@ class Project:
         res = ResourceManager()
         try:
             res.getRemoteManifest()
-        except:
+            # check small files (.ann, .format and .pipelines) and
+            # update at most 5 of them them silently
+            res.casualUpdate(5)
+        except Exception as e:
             # if the machine is not connected to the internet,
             # do not get any update
             env.logger.debug('Failed to check update: {}'.format(e))
             return
-        res.selectFiles('all')
-        # skip checking md5 file of large files ...
-        updated, added = res.updateDescriptionFiles()
-        resource_type = {'ann': 'annotation databases', 
-            'fmt': 'file formats',
-            'pipeline': 'pipelines'}
-        for k, v in updated.items():
-            if v:
-                env.logger.warning('{} existing {} {} updated: {}'
-                    .format(len(v), resource_type[k],
-                    'has been' if len(v) == 1 else 'have been', ', '.join(v)))
-        for k, v in added.items():
-            if v:
-                env.logger.warning('{} new {} {} added: {}'
-                    .format(len(v), resource_type[k], 
-                    'has been' if len(v) == 1 else 'have been', ', '.join(v)))
         #
         # check current version of variant tools.
         try:
             (version_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/CURRENT_VERSION.txt')
             with open(version_file, 'r') as version:
-                current_version = version.readline().decode('UTF8').strip()
+                current_version = version.readline().strip()
             if [int(x) for x in re.sub('\D', ' ', current_version).split()] > \
                 [int(x) for x in re.sub('\D', ' ', VTOOLS_VERSION).split()]:
                 env.logger.warning('A new version of variant tools ({}) is available.'

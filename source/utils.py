@@ -1151,12 +1151,13 @@ class ResourceManager:
             self.manifest = {}
             with open(manifest_file, 'r') as manifest:
                 for line in manifest:
-                    filename, sz, md5, refGenome, comment = line.decode('UTF8').split('\t', 4)
+                    filename, sz, md5, refGenome, comment = line.split('\t', 4)
                     # ref genome might be unsorted
                     refGenome = ','.join(sorted(refGenome.split(',')))
                     self.manifest[filename] = (int(sz), md5, refGenome, comment.strip())
-        except:
-            raise RuntimeError('Failed to connect to variant tools resource website.')
+        except Exception as e:
+            raise RuntimeError('Failed to connect to variant tools resource website: {}'
+                .format(e))
         finally:
             # remove manifest_file
             urllib.urlcleanup()
@@ -1229,37 +1230,42 @@ class ResourceManager:
             prog.update(total_size)
         prog.done()
 
-    def updateDescriptionFiles(self):
-        '''Go through the manifest and download small files (.ann, .pipeline etc)'''
-        updated = {'ann': [], 'fmt': [], 'pipeline': []}
-        added = {'ann': [], 'fmt': [], 'pipeline': []}
+    def casualUpdate(self, max_updates):
+        '''Go through the manifest and download at most max_updates small files
+        (.ann, .pipeline etc), and take at most max_updates seconds'''
+        updated = 0
+        start_time = time.time()
         for cnt, filename in enumerate(sorted(self.manifest.keys())):
+            if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
+                continue
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
             dest_file = os.path.join(env.local_resource, filename)
             # 
-            if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
-                continue
             if os.path.isfile(dest_file):
-                if os.path.getsize(dest_file) == fileprop[0] and calculateMD5(dest_file) == fileprop[1]:
+                # do not check md5 to increase speed
+                if os.path.getsize(dest_file) == fileprop[0]:
                     continue
-                else:
-                    updated[filename.rsplit('.', 1)[-1]].append(os.path.basename(filename))
+                env.logger.debug('Update resource {}'.format(filename))
             else:
-                added[filename.rsplit('.', 1)[-1]].append(os.path.basename(filename))
+                env.logger.debug('Download resource {}'.format(filename))
             try:
                 downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
                     os.path.join(env.local_resource, filename), True)
                 # check md5
                 if calculateMD5(dest_file) != fileprop[1]:
-                    env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
+                    env.logger.error('Failed to download {}: file signature mismatch.'
+                        .format(filename))
+                updated += 1
+                if updated == max_updates or time.time() - start_time > max_updates:
+                    return
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
-                env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e)) 
-        return updated, added
+                env.logger.warning('Failed to download {}: {} {}'
+                    .format(filename, type(e).__name__, e)) 
 
     def downloadResources(self):
         '''Download resources'''
