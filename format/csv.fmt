@@ -35,7 +35,7 @@ order_by_comment=Fields used to order output in ascending order.
 
 [field formatter]
 fmt_*=CSVFormatter()
-fmt_GT=GenoFormatter(style='vcf')
+fmt_GT=GenoFormatter(style='numeric')
 
 [col_1]
 field=%(fields)s
