@@ -39,6 +39,7 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
     normalizeVariant, compressFile, SQL_KEYWORDS, extractField, env
 from .importer import LineProcessor, TextReader
+from .preprocessor import *
   
 class AnnoDBConfiger:
     '''An annotation database can be created from either a configuration file
@@ -73,6 +74,7 @@ class AnnoDBConfiger:
         self.delimiter = '\t'
         self.version = None
         self.encoding = 'utf-8'
+        self.preprocessor = None
         self.header = None
         # where is annoDB, in which form?
         self.parseConfigFile(annoDB)
@@ -146,6 +148,8 @@ class AnnoDBConfiger:
                 self.direct_url = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
+            elif item[0] == 'preprocessor':
+                self.preprocessor = item[1]
             elif item[0] == 'header':
                 if item[1] in ('none', 'None'):
                     self.header = None
@@ -173,7 +177,7 @@ class AnnoDBConfiger:
                 self.version = item[1]
             else:
                 raise ValueError('Invalid keyword {} in section "data sources".'.format(item[0]) + 
-                    'Only direct_url, source_url, source_type, version, source_pattern and description are allowed')
+                    'Only direct_url, source_url, source_type, version, preprocessor, source_pattern and description are allowed')
         # sections
         self.fields = []
         for section in sections:
@@ -314,6 +318,29 @@ class AnnoDBConfiger:
         env.logger.info('Importing database {} from source files {}'.format(self.name,
             ', '.join(source_files)))
         #
+        if self.preprocessor is not None:
+            env.logger.info('Preprocessing data [{}] to generate intermediate input files for import'.format(', '.join(source_files)))
+            # if this is the case, only one input stream will be allowed.
+            # process command line
+            command = self.preprocessor
+            # replace command with other stuff, if applicable
+            command = command.replace('$build', "'{}'".format(self.build))
+            #
+            # create temp files
+            temp_files = [os.path.join(env.cache_dir, os.path.basename(x) + '.' + self.name) for x in source_files]
+            try:
+                processor = eval(command)
+                # intermediate files will be named as "cache_dir/$inputfilename.$(self.name)"
+                processor.convert(source_files, temp_files)
+                for output in temp_files:
+                    if not os.path.isfile(output):
+                        raise ValueError("Preprocessed file {} does not exist.".format(output))
+            except Exception as e:
+                raise ValueError("Failed to execute preprocessor '{}': {}".\
+                                 format(re.sub(r'\((.*)\)', '', command), e))
+            #
+            # we record file as cache files
+            source_files = temp_files
         writer = AnnoDBWriter(self.name, self.fields, self.anno_type, self.description,
             self.version, self.build)
         # read records from files
