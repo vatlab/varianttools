@@ -1246,11 +1246,12 @@ class ResourceManager:
             # 
             if os.path.isfile(dest_file):
                 # do not check md5 to increase speed
-                if os.path.getsize(dest_file) == fileprop[0]:
-                    continue
-                env.logger.debug('Update resource {}'.format(filename))
-            else:
-                env.logger.debug('Download resource {}'.format(filename))
+                if os.path.getsize(dest_file) != fileprop[0]:
+                    env.logger.warning('Resource {} has been updated. Please update '
+                        'it using command "vtools admin --update_resource '
+                        '[format|pipeline|...]"'.format(filename))
+                continue
+            env.logger.debug('Download resource {}'.format(filename))
             try:
                 downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
                     os.path.join(env.local_resource, filename), True)
