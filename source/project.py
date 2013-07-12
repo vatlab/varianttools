@@ -1295,11 +1295,11 @@ class Project:
             if len(changed) == 1:
                 env.logger.warning('Resouce file {} has been updated. Please '
                     'update it using command "vtools admin --update_resource '
-                    'existing."'.format(changed[0]))
+                    'existing".'.format(changed[0]))
             elif len(changed) > 1:
                 env.logger.warning('Resouce files {} have been updated. Please '
                     'update them using command "vtools admin --update_resource '
-                    'existing."'.format(', '.join(changed)))
+                    'existing".'.format(', '.join(changed)))
         except Exception as e:
             # if the machine is not connected to the internet,
             # do not get any update
@@ -3659,80 +3659,29 @@ def show(args):
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
-                    raise ValueError('Please specify a table to display')
+                    raise ValueError('Please specify a variant table to display')
                 table = args.items[0]
-                table_type = None
-                # showing an annotation database
-                if table in [x.name for x in proj.annoDB]:
-                    table = '{0}.{0}'.format(table)
-                    table_type = 'annotation'
-                elif table.startswith('genotype_') and proj.db.hasTable('{}_genotype.{}'
-                    .format(proj.name, encodeTableName(table))):
-                    table = '{}_genotype.{}'.format(proj.name, encodeTableName(table))
-                    table_type = 'genotype'
-                elif proj.isVariantTable(encodeTableName(table)):
+                if proj.isVariantTable(encodeTableName(table)):
                     table = encodeTableName(table)
-                    table_type = 'variant'
                 else:
-                    raise ValueError('{} is not a variant, a genotype, or an '
-                        'annotation table'.format(table))
-                if table_type == 'variant':
-                    # print description of table
-                    desc, date, cmd = proj.descriptionOfTable(table)
-                    print('{:<23} {}'.format('Name:', table))
-                    print('{:<23} {}'.format('Type:', 'variant'))
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Description:', desc),
-                        width=78, subsequent_indent=' '*24)))
-                    print('{:<23} {}'.format('Creation date:', date))
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Command:', cmd),
-                        width=78, subsequent_indent=' '*24)))
-                    # 
-                    headers = proj.db.getHeaders(table)
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Fields:', ', '.join(headers)),
-                        width=78, subsequent_indent=' '*24)))
-                    print('{:<23} {}'.format('Number of variants:',
-                        proj.db.numOfRows(encodeTableName(table))))
-                elif table_type == 'genotype':
-                    # get sample name
-                    cur = proj.db.cursor()
-                    try:
-                        cur.execute('SELECT sample_name, filename FROM sample, '
-                            'filename WHERE sample.file_id = filename.file_id '
-                            'AND sample.sample_id = {};'.format(proj.db.PH),
-                            (table.rsplit('_')[-1],))
-                        sample_name, filename = cur.fetchall()[0]
-                    except Exception as e:
-                        sample_name, filename = '', ''
-                        env.logger.warning('Failed to get sample and file name '
-                            'for genotype table {}: {}'.format(table, e))
-                    # 
-                    print('{:<23} {}'.format('Name:', table))
-                    print('{:<23} {}'.format('Type:', 'genotype'))
-                    print('{:<23} {}'.format('Sample name:', sample_name))
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Filename:', filename),
-                        width=78, subsequent_indent=' '*24)))
-
-                    headers = proj.db.getHeaders(table)
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Fields:', ', '.join(headers)),
-                        width=78, subsequent_indent=' '*24)))
-                    print('{:<23} {}'.format('Number of genotypes:',
-                        proj.db.numOfRows(table)))
-                elif table_type == 'annotation':
-                    print('{:<23} {}'.format('Name:', table))
-                    print('{:<23} {}'.format('Type:', 'annotation'))
-                    # 
-                    headers = proj.db.getHeaders(table)
-                    print('\n'.join(textwrap.wrap(
-                        '{:<23} {}'.format('Fields:', ', '.join(headers)),
-                        width=78, subsequent_indent=' '*24)))
-                    print('{:<23} {}'.format('Number of records:',
-                        proj.db.numOfRows(table)))
-                    
+                    raise ValueError('{} is not a valid variant table'.format(table))
+                # print description of table
+                desc, date, cmd = proj.descriptionOfTable(table)
+                print('{:<23} {}'.format('Name:', table))
+                print('\n'.join(textwrap.wrap(
+                    '{:<23} {}'.format('Description:', desc),
+                    width=78, subsequent_indent=' '*24)))
+                print('{:<23} {}'.format('Creation date:', date))
+                print('\n'.join(textwrap.wrap(
+                    '{:<23} {}'.format('Command:', cmd),
+                    width=78, subsequent_indent=' '*24)))
+                # 
+                headers = proj.db.getHeaders(table)
+                print('\n'.join(textwrap.wrap(
+                    '{:<23} {}'.format('Fields:', ', '.join(headers)),
+                    width=78, subsequent_indent=' '*24)))
+                print('{:<23} {}'.format('Number of variants:',
+                    proj.db.numOfRows(encodeTableName(table))))
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     env.logger.warning('Project does not have a sample table.')
