@@ -3627,7 +3627,7 @@ def showArguments(parser):
             'pipelines' for a list of available pipelines. The default parameter
             of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
-        help='''Items to display, which can be, for example, names of tables for
+        help='''Items to display, which can be, for example, name of table for
             type 'table', conditions to select samples for type 'samples', 
             a list of phenotypes for type 'phenotypes', name of an annotation
             database for type 'annotation', a pattern to selected annotation
@@ -3660,6 +3660,8 @@ def show(args):
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
                     raise ValueError('Please specify a variant table to display')
+                if len(args.items) > 1:
+                    raise ValueError('Only a single variant table is allowed.')
                 table = args.items[0]
                 if proj.isVariantTable(encodeTableName(table)):
                     table = encodeTableName(table)
@@ -3755,18 +3757,21 @@ def show(args):
             elif args.type == 'annotation':
                 if len(args.items) == 0:
                     raise ValueError('Please specify the annotation(s) to display')
-                for item in args.items:
-                    try:
-                        annoDB = [x for x in proj.annoDB if x.name.lower() == item.lower()][0]
-                    except Exception as e:
-                        env.logger.debug(e)
-                        raise IndexError('Database {} is not currently used in the project'.format(item))
-                    annoDB.describe(args.verbosity == '2')
+                elif len(args.items) > 1:
+                    raise ValueError('Only one annotation database is allowed.')
+                try:
+                    annoDB = [x for x in proj.annoDB if x.name.lower() == args.items[0].lower()][0]
+                except Exception as e:
+                    raise IndexError('Database {} is not currently used in the project: {}'
+                        .format(args.items[0], e))
+                annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='annotation')
-                for annoDB, prop in sorted(res.manifest.iteritems()):
+                nAll = 0
+                displayed = 0
+                for idx, (annoDB, prop) in enumerate(sorted(res.manifest.iteritems())):
                     if not annoDB.endswith('.ann'):
                         continue
                     if args.items:
@@ -3777,9 +3782,17 @@ def show(args):
                                 break
                         if not match:
                             continue
-                    text = '{:<23} {}'.format(annoDB[7:-4], prop[3])
-                    print('\n'.join(textwrap.wrap(text, width=78,
-                            subsequent_indent=' '*24)))
+                    nAll += 1
+                    if args.limit is None or args.limit > displayed:
+                        if args.verbosity == '0':
+                            print(annoDB[7:-4])
+                        else:
+                            text = '{:<23} {}'.format(annoDB[7:-4], prop[3])
+                            print('\n'.join(textwrap.wrap(text, width=78,
+                                    subsequent_indent=' '*24)))
+                        displayed += 1
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'formats':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'
@@ -3787,20 +3800,29 @@ def show(args):
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
-                for fmt, prop in res.manifest.iteritems():
-                    text = '{:<23} {}'.format(fmt[7:-4], prop[3])
-                    print('\n'.join(textwrap.wrap(text, width=78,
-                        subsequent_indent=' '*24)))
+                nAll = len(res.manifest)
+                for idx, (fmt, prop) in enumerate(res.manifest.iteritems()):
+                    if args.limit is not None and idx == args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(fmt[7:-4])
+                    else:
+                        text = '{:<23} {}'.format(fmt[7:-4], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'format':
                 if not args.items:
                     raise ValueError('Please specify a format to display')
-                for item in args.items:
-                    try:
-                        fmt = fileFMT(item)
-                    except Exception as e:
-                        env.logger.debug(e)
-                        raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file "{}"'.format(e, item))
-                    fmt.describe()
+                elif len(args.item):
+                    raise ValueError('Only one file format is allowed.')
+                try:
+                    fmt = fileFMT(args.items[0])
+                except Exception as e:
+                    raise IndexError('Unrecognized input format {}: {}'
+                        .format(args.items[0], e))
+                fmt.describe()
             elif args.type == 'genotypes':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show genotypes"'.format(', '.join(args.items)))
@@ -3841,10 +3863,19 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tests"'.format(', '.join(args.items)))
                 from .association import getAllTests
-                for test, obj in getAllTests():
-                    print('\n'.join(textwrap.wrap(
-                        '{:<24}'.format(test) + ('' if obj.__doc__ is None else obj.__doc__),
-                        subsequent_indent=' '*24, width=78)))
+                all_tests = getAllTests()
+                nAll = len(all_tests)
+                for idx, (test, obj) in enumerate(all_tests):
+                    if args.limit is not None and idx == args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(test)
+                    else:
+                        print('\n'.join(textwrap.wrap(
+                            '{:<23} {}'.format(test, '' if obj.__doc__ is None else obj.__doc__),
+                            subsequent_indent=' '*24, width=78)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'test':
                 from .association import getAllTests
                 if len(args.items) == 0:
@@ -3862,26 +3893,54 @@ def show(args):
                 # create an instance of the test and pass -h to it
                 test(1, ['-h']) 
             elif args.type == 'runtime_options':
-                for opt, (def_value, description) in sorted(env.persistent_options.iteritems()):
+                for idx, (opt, (def_value, description)) in enumerate(sorted(env.persistent_options.iteritems())):
+                    if args.limit is not None and idx == args.limit:
+                        break
                     # get the raw value of option (not the attribute, which might not be a string)
-                    val = str(getattr(env, '_' + opt))
-                    print('{:<23} {} {}'.format(opt, val,
-                        '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
-                    print('\n'.join(textwrap.wrap(description, width=78,
-                        initial_indent=' '*24, subsequent_indent=' '*24)))
+                    if args.verbosity == '0':
+                        print(opt)
+                    else:
+                        val = str(getattr(env, '_' + opt))
+                        print('{:<23} {} {}'.format(opt, val,
+                            '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
+                        print('\n'.join(textwrap.wrap(description, width=78,
+                            initial_indent=' '*24, subsequent_indent=' '*24)))
+                nAll = len(env.persistent_options)
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'runtime_option':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of a runtime option')
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one runtime option')
                 print(getattr(env, '_' + args.items[0]))
             elif args.type == 'snapshot':
                 if not args.items:
-                    raise ValueError('Please provide a list of snapshot name or filenames')
-                print('{:<18} {:<15} {}'.format('snapshot', 'date', 'description'))
-                for snapshot in args.items:
-                    name, date, desc = getSnapshotInfo(snapshot)
-                    if name is not None:
-                        print('{:<18} {:<15} {}'.format(name, date, 
-                            '\n'.join(textwrap.wrap(' '*35 + desc, initial_indent='', subsequent_indent=' '*35))[35:]))
+                    raise ValueError('Please provide a snapshot name or filename')
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one snapshot')
+                if args.items[0].startswith('vt_'): # only snapshot
+                    source = 'online'
+                    name = None
+                    res = ResourceManager()
+                    res.getRemoteManifest()
+                    res.selectFiles(resource_type='snapshot')
+                    for ss, prop in res.manifest.iteritems():
+                        if ss[9:-7].lower() == args.items[0].lower():
+                            name = ss[9:-7]
+                            date = ''
+                            desc = prop[3]
+                    if not name:
+                        raise ValueError('Cannot locate an online snapshot with '
+                            'name "{}"'.format(args.items[0]))
+                else:
+                    source = 'local'
+                    name, date, desc = getSnapshotInfo(args.items[0])
+                print('{:<23} {}'.format('Name:', name))
+                print('{:<23} {}'.format('Source:', source))
+                print('{:<23} {}'.format('Creation date:', date))
+                print('\n'.join(textwrap.wrap('{:<23} {}'.format('Description:',
+                    desc),  width=78, subsequent_indent=' '*24)))
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
@@ -3891,18 +3950,32 @@ def show(args):
                     if name is not None:
                         snapshots.append((name, date, desc))
                 #
-                for name, date, desc in sorted(snapshots):
-                    text = '{:<23} {} (created: {})'.format(name, desc, date)
-                    print('\n'.join(textwrap.wrap(text, width=78,
-                        subsequent_indent=' '*24)))
+                for idx, (name, date, desc) in enumerate(sorted(snapshots)):
+                    if args.limit is not None and idx == args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(name)
+                    else:
+                        text = '{:<23} {} (created: {})'.format(name, desc, date)
+                        print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
                 #
+                nLocal = len(snapshots)
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
-                for ss, prop in res.manifest.iteritems():
-                    text = '{:<23} {} (online snapshot)'.format(ss[9:-7], prop[3])
-                    print('\n'.join(textwrap.wrap(text, width=78,
-                        subsequent_indent=' '*24)))
+                for idx, (ss, prop) in enumerate(res.manifest.iteritems()):
+                    if args.limit is not None and nLocal + idx >= args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(ss[9:-7])
+                    else:
+                        text = '{:<23} {} (online snapshot)'.format(ss[9:-7], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=78,
+                            subsequent_indent=' '*24)))
+                nAll = nLocal + idx
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'pipelines':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
@@ -3910,22 +3983,29 @@ def show(args):
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='pipeline')
-                for pipeline, prop in res.manifest.iteritems():
-                    text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
-                    print('\n'.join(textwrap.wrap(text, width=78,
+                nAll = len(res.manifest)
+                for idx, (pipeline, prop) in enumerate(res.manifest.iteritems()):
+                    if args.limit is not None and idx >= args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(pipeline[9:-9])
+                    else:
+                        text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=78,
                             subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'pipeline':
                 if not args.items:
                     raise ValueError('Please specify a pipeline to display')
-                for item in args.items:
-                    try:
-                        pipeline = PipelineDescription(item)
-                    except Exception as e:
-                        env.logger.debug(e)
-                        raise IndexError('Unrecognized pipeline: {}\nPlease '
-                            'check your input parameters or configuration file "{}"'
-                            .format(e, item))
-                    pipeline.describe()
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one pipeline to display')
+                try:
+                    pipeline = PipelineDescription(args.items[0])
+                except Exception as e:
+                    raise IndexError('Unrecognized pipeline {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
