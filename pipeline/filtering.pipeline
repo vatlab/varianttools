@@ -7,27 +7,33 @@
 [pipeline description]
 description=Pipelines to filter variants.
 
-exon_novel_hg19_description=This pipeline removes variants that are
-  in a specified annotation database (e.g. database built from a
-  control project), all variants from the thousand genomes project
-  except those are probably pathogenic, variants that are in duplicated
-  regions, variants that are not in conserved regions, and keep
-  variants that are in exonic regions of UCSC ref genes. It takes
-  a snapshot or the current project (no --input is needed) as
-  input, starting from the master variant table or a table 
-  specified by option --source_table, generate a number of
-  intermediate variant tables, and generate a variant table
-  spacified by option --dest_table. This pipeline assumes hg19
-  as the build of the project.
+exon_novel_hg19_description=This pipeline 1) removes variants that are in a
+  specified annotation database (e.g. database built from a control project),
+  2) removes all variants from the thousand genomes project except those are
+  probably pathogenic, 3) removes variants that are in duplicated regions,
+  4) removes variants that are not in phastCons46ways conserved regions, and
+  5) removes variants that are not in exonic regions of UCSC ref genes. The
+  source and result variant tables can be specified by parameters --source_table
+  and --dest_table. The pipeline can be applied to the existing project 
+  (no --input is required), or a snapshot (provided to --input, project in
+  the current folder will be overwritten). If an output file is specified,
+  variants will be exported in csv format, with annotation fields refGene.name2
+  (gene name), dbSNP name and function estimate, SIFT and PolyPhen2 scores
+  and prediction, phastCons scores for highly conserved regions
+  (phastConsElements), and all sample genotypes (0 for wildtype, 1 for
+  heterozygote, 2 for homozygote). Additional fields such as quality
+  score could be specified via option --extra_export_fields 
 
 
+cancer_gene_description=This pipeline selects variants in genes listed in
+  cancer gene census 
 
 [DEFAULT]
 
 source_table=variant
 source_table_comment=Variant table at the beginning of the filtering process
 
-dest_table=filtered
+dest_table=exon_novel_hg19
 dest_table_comment=Variant table at the end of the filtering process
 
 prefix=
@@ -36,6 +42,9 @@ prefix_comment=A prefix for all intermediate variant tables
 exclude=
 exclude_comment=Name of an annotation database (a name, or a .DB or .ann file)
   whose variants will be removed from the present project. 
+
+extra_export_fields=
+extra_export_fields_comment=Additional export fields such as quality score
 
 [exon_novel_hg19_0]
 # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
@@ -87,7 +96,8 @@ action=RunCommand(cmd=[
 		-t "%(prefix)s_2" "With variants in 1000 genomes, but with those that are probably pathogenic"',
 	'vtools show table %(prefix)s_2 > ${CACHE_DIR}/%(prefix)s_2.info'],
 	output="${CACHE_DIR}/%(prefix)s_2.info")
-comment=Remove variants that are in 1000 genomes, but keep those with SCS_INFO > 3 (probably pathogenic)
+comment=Remove variants that are in 1000 genomes, but keep those with 
+  SCS_INFO > 3 (probably pathogenic)
 
 [exon_novel_hg19_30]
 action=RunCommand(cmd=[
@@ -111,12 +121,32 @@ comment=Remove variants that are not in conserved regions
 action=RunCommand(cmd=[
 	'vtools use refGene_exon',
 	'vtools select %(prefix)s_4 "refGene_exon.chr IS NOT NULL"
-		-t "%(prefix)s_5" "Keep variants in exonic regions of UCSC ref seq genes"',
-	'vtools show table %(prefix)s_5 > ${CACHE_DIR}/%(prefix)s_5.info'],
-	output="${CACHE_DIR}/%(prefix)s_5.info")
-comment=Keep variants in exonic regions of UCSC ref seq genes
+		-t "%(dest_table)s" "Keep variants in exonic regions of UCSC ref seq genes"',
+	'vtools show table %(dest_table)s > ${CACHE_DIR}/%(dest_table)s.info'],
+	output="${CACHE_DIR}/%(dest_table)s.info")
+comment=Remove variants not in exonic regions of UCSC ref seq genes and 
+  create a variant table specified by parameter --dest_table (default to
+  exon_novel_hg19).
 
+[exon_novel_hg19_60]
+action=RunCommand(cmd=[
+    'vtools use dbNSFP',
+    'vtools use phastConsElements',
+    'vtools export %(dest_table)s --format csv --samples 1 
+        --fields chr pos ref alt dbSNP.name refGene.name2
+          dbNSFP.SIFT_score dbNSFP.Polyphen2_HDIV_score
+          Polyphen2_HDIV_pred Polyphen2_HVAR_score Polyphen2_HVAR_pred
+          phastConsElements.score dbSNP.func %(extra_export_fields)s
+        --order_by chr pos 
+        --header chr pos ref alt rsname Gene
+          "SIFT score (<0.05 for damaging)" "Polyphen2 HDIV score"
+          "Polyphen2 HDIV prediction"  "Polyphen2 HVAR score"  "Polyphen2 HVAR prediction"
+          "phastCons score" "dbSNP func code" %(extra_export_fields)s "%%(sample_names)s"
+        > ${CMD_OUTPUT} '
+    ],
+    output="${CMD_OUTPUT}")
+input_emitter=EmitInput(select=${CMD_OUTPUT: bool(CMD_OUTPUT)})
+comment=Output selected variants in csv format
 
-
-
+[cancer_gene_0]
 

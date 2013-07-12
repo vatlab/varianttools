@@ -3642,7 +3642,7 @@ def show(args):
         with Project(verbosity=args.verbosity) as proj:
             #
             limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
-            omitted = '({} records omitted, use parameter --limit to display more or all records)'
+            omitted = '({} records omitted)'
             if args.type == 'project':
                 print(proj.summarize())
             elif args.type == 'tables':
