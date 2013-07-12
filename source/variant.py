@@ -61,6 +61,11 @@ def generalOutputArguments(parser):
     grp.add_argument('-g', '--group_by', nargs='*', metavar='FIELD',
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
+    grp.add_argument('--first_only', action='store_true',
+        help='''Output only the first record if a variant matches multiple 
+            entries in an annotation database. This might lead to loss of
+            information but is sometimes requires to calculate correct
+            summary statistics when annotation databases are involved.''')
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
     grp.add_argument('-u', '--unique', default=False, action='store_true',
@@ -100,7 +105,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     # GROUP BY clause
     group_clause = ''
     if args.group_by:
-        group_fields, tmp = consolidateFieldName(proj, table, ','.join(args.group_by))
+        group_fields, group_field_names = consolidateFieldName(proj, table, ','.join(args.group_by))
         group_clause = ' GROUP BY {}'.format(group_fields)
     order_clause = ''
     if args.order_by:
@@ -108,7 +113,37 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         order_clause = ' ORDER BY {}'.format(order_fields)
     # LIMIT clause
     limit_clause = '' if args.limit is None or args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
-    query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
+    if args.first_only:
+        #
+        # In the first_only mode, all the fields are first selected to a table
+        # named _FIRST_ONLY, with only one variant (min(variant.variant_id)).
+        # Fields in the select and group_by clause are repalced by fields in this
+        # temporary table. It is tricky that group_by clause should be used twice
+        # here because min(variant_id)
+        #
+        first_only_fields = [x for x in fields]
+        if args.group_by:
+            first_only_fields.extend(group_field_names)
+        first_only_fields = list(set(first_only_fields))
+        if 'variant.variant_id' in first_only_fields:
+            first_only_fields.remove('variant.variant_id')
+        from_clause = 'FROM (SELECT min(variant.variant_id) AS variant_variant_ID, {} {} {} {} {}) AS _FIRST_ONLY'.format(
+            ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in first_only_fields]),
+            from_clause, where_clause, group_clause if group_clause else ' GROUP BY variant.variant_id', order_clause)
+        # group by and select should be changed
+        for fld in fields:
+            select_clause = re.sub(fld.replace('.', '\.'), '_FIRST_ONLY.' + fld.replace('.', '_'),
+                select_clause, flags=re.IGNORECASE)
+            env.logger.error(select_clause)
+        if args.group_by:
+            for fld in group_field_names:
+                group_clause = re.sub(fld.replace('.', '\.'), '_FIRST_ONLY.' + fld.replace('.', '_'),
+                    group_clause, flags=re.IGNORECASE)
+                env.logger.error(group_clause)
+        # order and where clauses are used inside the query in from_clause
+        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, group_clause, limit_clause)
+    else:
+        query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
     env.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
