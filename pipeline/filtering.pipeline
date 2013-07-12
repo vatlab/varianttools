@@ -7,26 +7,24 @@
 [pipeline description]
 description=Pipelines to filter variants.
 
-exon_novel_hg19_description=This pipeline 1) removes variants that are in a
-  specified annotation database (e.g. database built from a control project),
-  2) removes all variants from the thousand genomes project except those are
-  probably pathogenic, 3) removes variants that are in duplicated regions,
-  4) removes variants that are not in phastCons46ways conserved regions, and
-  5) removes variants that are not in exonic regions of UCSC ref genes. The
-  source and result variant tables can be specified by parameters --source_table
-  and --dest_table. The pipeline can be applied to the existing project 
-  (no --input is required), or a snapshot (provided to --input, project in
-  the current folder will be overwritten). If an output file is specified,
-  variants will be exported in csv format, with annotation fields refGene.name2
-  (gene name), dbSNP name and function estimate, SIFT and PolyPhen2 scores
-  and prediction, phastCons scores for highly conserved regions
-  (phastConsElements), and all sample genotypes (0 for wildtype, 1 for
+exon_novel_hg19_description=This pipeline 1) removes all variants from the
+  thousand genomes project except those are probably pathogenic (SCS score > 3),
+  2) removes variants that are in duplicated regions, 3) removes variants that
+  are not in phastCons46ways conserved regions, and 4) removes variants that are
+  not in exonic regions of UCSC ref genes. The source and result variant tables
+  can be specified by parameters --source_table and --dest_table. The pipeline
+  can be applied to the existing project (no --input is required), or a snapshot
+  (provided to --input, project in the current folder will be overwritten). If
+  an output file is specified, variants will be exported in csv format, with 
+  annotation fields refGene.name2 (gene name), dbSNP name and function estimate,
+  SIFT and PolyPhen2 scores and prediction, phastCons scores for highly conserved
+  regions (phastConsElements), and all sample genotypes (0 for wildtype, 1 for
   heterozygote, 2 for homozygote). Additional fields such as quality
   score could be specified via option --extra_export_fields 
 
 
-cancer_gene_description=This pipeline selects variants in genes listed in
-  cancer gene census 
+#cancer_gene_description=This pipeline selects variants in genes listed in
+#  cancer gene census 
 
 [DEFAULT]
 
@@ -36,12 +34,8 @@ source_table_comment=Variant table at the beginning of the filtering process
 dest_table=exon_novel_hg19
 dest_table_comment=Variant table at the end of the filtering process
 
-prefix=
+prefix=exon_novel
 prefix_comment=A prefix for all intermediate variant tables
-
-exclude=
-exclude_comment=Name of an annotation database (a name, or a .DB or .ann file)
-  whose variants will be removed from the present project. 
 
 extra_export_fields=
 extra_export_fields_comment=Additional export fields such as quality score
@@ -55,44 +49,18 @@ action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
   existing project.
 
-[exon_novel_hg19_1]
+[exon_novel_hg19_10]
 # input: CMD_INPUT or project file
 # output: cache/_0.info
 action=RunCommand(cmd=[
-	'vtools show table %(source_table)s > ${CACHE_DIR}/%(prefix)s_0.info'],
-	output="${CACHE_DIR}/%(prefix)s_0.info")
+	'vtools show table %(source_table)s > ${CACHE_DIR}/%(prefix)s_1.info'],
+	output="${CACHE_DIR}/%(prefix)s_1.info")
 comment=Retrieve information of source variant table.
-
-[exon_novel_hg19_10]
-# execute if no --exclude is specified
-# input: cache/_0.info
-# output: cache/_1.info 
-action=RunCommand(cmd=[
-	'vtools select %(source_table)s -t "%(prefix)s_1" "Copied from %(source_table)s."',
-	'vtools show table %(prefix)s_1 > ${CACHE_DIR}/%(prefix)s_1.info'],
-	output="${CACHE_DIR}/%(prefix)s_1.info")
-input_emitter=EmitInput(select=${:not bool("%(exclude)s")})
-comment=Copy source variant table to $prefix_1 if no exclusion table
-  is specified.
-
-[exon_novel_hg19_11]
-# execute if --exclude is specified
-# input: cache/_0.info
-# output: cache/_1.info 
-action=RunCommand(cmd=[
-	'vtools use %(exclude)s',
-	'vtools select %(source_table)s "${:os.path.basename("%(exclude)s").split('-')[0].split('.')[0]}.chr IS NULL" 
-        -t "%(prefix)s_0" "Remove variants in %(source_table)s from annotation database %(exclude)s"',
-	'vtools show table %(prefix)s_1 > ${CACHE_DIR}/%(prefix)s_1.info'],
-	output="${CACHE_DIR}/%(prefix)s_1.info")
-input_emitter=EmitInput(select=${:bool("%(exclude)s")})
-comment=Remove variants from specified annotation database if a database
-  is specified using parameter --exclude
 
 [exon_novel_hg19_20]
 action=RunCommand(cmd=[
 	'vtools use thousandGenomes',
-	'vtools select %(prefix)s_1 "thousandGenomes.chr IS NULL OR thousandGenomes.SCS_INFO > 3"
+	'vtools select %(source_table)s "thousandGenomes.chr IS NULL OR thousandGenomes.SCS_INFO > 3"
 		-t "%(prefix)s_2" "With variants in 1000 genomes, but with those that are probably pathogenic"',
 	'vtools show table %(prefix)s_2 > ${CACHE_DIR}/%(prefix)s_2.info'],
 	output="${CACHE_DIR}/%(prefix)s_2.info")
@@ -148,5 +116,4 @@ action=RunCommand(cmd=[
 input_emitter=EmitInput(select=${CMD_OUTPUT: bool(CMD_OUTPUT)})
 comment=Output selected variants in csv format
 
-[cancer_gene_0]
 
