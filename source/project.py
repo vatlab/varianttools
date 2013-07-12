@@ -3654,13 +3654,25 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'
                         .format(', '.join(args.items)))
-                width = max([len(decodeTableName(x)) for x in proj.getVariantTables()])
-                print(('{:<' + str(width+2) + '} {:>10} {:>8}  {}').format('table', '#variants', 'date', 'message'))
-                for table in sorted(proj.getVariantTables(), key=lambda x: decodeTableName(x)):
-                    desc, date, cmd = proj.descriptionOfTable(table) 
-                    print(('{:<' + str(width+2) + '} {: >10,} {:>8}  {}')
-                        .format(decodeTableName(table), proj.db.numOfRows(table), date, 
-                        '\n'.join(textwrap.wrap(desc, initial_indent='', subsequent_indent=' '*50))))
+                all_tables = sorted(proj.getVariantTables(), key=lambda x: decodeTableName(x))
+                width = max([len(x) for x in all_tables])
+                if args.verbosity != '0':
+                    print(('{:<' + str(width+2) + '} {:>10} {:>8} {}')
+                        .format('table', '#variants', 'date', 'message'))
+                for idx, table in enumerate(all_tables):
+                    if args.limit is not None and idx == args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(decodeTableName(table))
+                    else:
+                        desc, date, cmd = proj.descriptionOfTable(table) 
+                        print(('{:<' + str(width+2) + '} {: >10,} {:>8} {}')
+                            .format(decodeTableName(table), proj.db.numOfRows(table), date, 
+                            '\n'.join(textwrap.wrap(desc, initial_indent='',
+                            subsequent_indent=' '*(width+23)))))
+                nAll = len(all_tables)
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
             elif args.type == 'table':
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
@@ -3674,7 +3686,7 @@ def show(args):
                     raise ValueError('{} is not a valid variant table'.format(table))
                 # print description of table
                 desc, date, cmd = proj.descriptionOfTable(table)
-                print('{:<23} {}'.format('Name:', table))
+                print('{:<23} {}'.format('Name:', decodeTableName(table)))
                 print('\n'.join(textwrap.wrap(
                     '{:<23} {}'.format('Description:', desc),
                     width=78, subsequent_indent=' '*24)))
@@ -3688,7 +3700,7 @@ def show(args):
                     '{:<23} {}'.format('Fields:', ', '.join(headers)),
                     width=78, subsequent_indent=' '*24)))
                 print('{:<23} {}'.format('Number of variants:',
-                    proj.db.numOfRows(encodeTableName(table))))
+                    proj.db.numOfRows(table)))
             elif args.type == 'samples':
                 if not proj.db.hasTable('sample'):
                     env.logger.warning('Project does not have a sample table.')
