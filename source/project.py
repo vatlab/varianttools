@@ -1715,8 +1715,9 @@ class Project:
         if table == 'variant':
             raise ValueError('Master variant table cannot be removed.')
         if not self.isVariantTable(table):
-            raise ValueError('{} is not found or is not a variant table.'.format(table))
-        env.logger.info('Removing table {}'.format(table))
+            raise ValueError('{} is not found or is not a variant table.'
+                .format(decodeTableName(table)))
+        env.logger.info('Removing table {}'.format(decodeTableName(table)))
         self.db.removeTable(table)
 
     def selectSampleByPhenotype(self, cond):
@@ -3486,7 +3487,11 @@ def remove(args):
                         matchd = False
                         for tbl in [decodeTableName(x) for x in allTables]:
                             if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
-                                proj.removeVariantTable(encodeTableName(tbl))
+                                try:
+                                    proj.removeVariantTable(encodeTableName(tbl))
+                                except Exception as e:
+                                    env.logger.warning('Failed to remove table {}: {}'
+                                        .format(tbl, e))
                                 removed.append(tbl)
                                 matched = True
                         if not matched:

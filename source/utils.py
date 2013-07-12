@@ -499,6 +499,7 @@ def decodeTableName(name):
     '''Decode a table to its name that could contain special characters'''
     if name.startswith('_'):
         if '_' in name[1:]:
+            # the tablename is suffixed with date as a temporary table
             realname, suffix = name[1:].split('_', 1)
             realname = binascii.unhexlify(realname)
             return '_'.join([realname, suffix])
@@ -511,7 +512,8 @@ def encodeTableName(name):
     '''Get a normalized name for variant table. The returned name is a valid
     table name so calling encodeTableName on an encoded name is safe.'''
     # if the table name is not ALPHA + ALPHANUM, use an internal name
-    if name.upper() in SQL_KEYWORDS or not name[0].isalpha() or not name.replace('_', '').isalnum():
+    if name.upper() in SQL_KEYWORDS or not name[0].isalpha() \
+        or name.startswith('_') or not name.replace('_', '').isalnum():
         return '_' + binascii.hexlify(name)
     else:
         return name
