@@ -1230,14 +1230,13 @@ class ResourceManager:
             prog.update(total_size)
         prog.done()
 
-    def casualUpdate(self, max_updates):
+    def checkUpdate(self, max_updates):
         '''Go through the manifest and download at most max_updates small files
         (.ann, .pipeline etc), and take at most max_updates seconds'''
-        updated = 0
+        changed = []
+        added = 0
         start_time = time.time()
         for cnt, filename in enumerate(sorted(self.manifest.keys())):
-            if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
-                continue
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
@@ -1247,9 +1246,10 @@ class ResourceManager:
             if os.path.isfile(dest_file):
                 # do not check md5 to increase speed
                 if os.path.getsize(dest_file) != fileprop[0]:
-                    env.logger.warning('Resource {} has been updated. Please update '
-                        'it using command "vtools admin --update_resource '
-                        '[format|pipeline|...]"'.format(filename))
+                    changed.append(filename)
+                continue
+            # check all files, but only update small files during casualUpdate
+            if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
                 continue
             env.logger.debug('Download resource {}'.format(filename))
             try:
@@ -1259,14 +1259,15 @@ class ResourceManager:
                 if calculateMD5(dest_file) != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'
                         .format(filename))
-                updated += 1
-                if updated == max_updates or time.time() - start_time > max_updates:
+                added += 1
+                if added == max_updates or time.time() - start_time > max_updates:
                     return
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
                 env.logger.warning('Failed to download {}: {} {}'
                     .format(filename, type(e).__name__, e)) 
+        return changed
 
     def downloadResources(self):
         '''Download resources'''

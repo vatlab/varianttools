@@ -1291,7 +1291,15 @@ class Project:
             res.getRemoteManifest()
             # check small files (.ann, .format and .pipelines) and
             # update at most 5 of them them silently
-            res.casualUpdate(5)
+            changed = res.checkUpdate(5)
+            if len(changed) == 1:
+                env.logger.warning('Resouce file {} has been updated. Please '
+                    'update it using command "vtools admin --update_resource '
+                    'existing."'.format(changed[0]))
+            elif len(changed) > 1:
+                env.logger.warning('Resouce files {} have been updated. Please '
+                    'update them using command "vtools admin --update_resource '
+                    'existing."'.format(', '.join(changed)))
         except Exception as e:
             # if the machine is not connected to the internet,
             # do not get any update
@@ -3980,15 +3988,16 @@ def adminArguments(parser):
         const='current', 
         choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 
             'format', 'snapshot', 'pipeline'],
-        help='''Download resources of specified type, which can be 'current' (latest version
-            of all resources excluding snapshots), 'all' (all resources including obsolete
-            databases), 'existing' (only update resources that exist locally), 
-            'hg18' or 'hg19' (all resources for reference genome hg18 or hg19),
-            'annotation' (all current annotation databases), 'format' (all formats), and
-            'snapshot' (all online snapshots). Identical resources that are available locally 
-            (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
-            option 'all' will download all versions of annotation databases which can be
-            slow and take a lot of disk spaces.''')
+        help='''Download resources of specified type, which can be 'current' 
+            (latest version of all resources excluding snapshots), 'all' (all 
+            resources including obsolete databases), 'existing' (only update
+            resources that exist locally), 'hg18' or 'hg19' (all resources for
+            reference genome hg18 or hg19), 'annotation' (all current annotation
+            databases), 'format' (all formats), and 'snapshot' (all online
+            snapshots). Identical resources that are available locally (under
+            ~/.variant_tools or runtime option $local_resource) are ignored.
+            Note that option 'all' will download all versions of annotation 
+            databases which can be slow and take a lot of disk spaces.''')
     merge = parser.add_argument_group('Merge samples')
     merge.add_argument('--merge_samples', action='store_true',
         help='''Merge samples with the same sample names by combining genotypes
