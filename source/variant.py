@@ -61,19 +61,12 @@ def generalOutputArguments(parser):
     grp.add_argument('-g', '--group_by', nargs='*', metavar='FIELD',
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
-    grp.add_argument('--first_only', action='store_true',
-        help='''Output only the first record if a variant matches multiple 
-            entries in an annotation database. This might lead to loss of
-            information but is sometimes requires to calculate correct
-            summary statistics when annotation databases are involved.''')
+    grp.add_argument('--all', action='store_true',
+        help='''Variant tools by default output only the first record if 
+            a variant matches multiple records in an annotation database.
+            This option tells variant tools to output all matching record.''')
     grp.add_argument('--order_by', nargs='*', metavar='FIELD',
         help='''Order output by specified fields in ascending order.''')
-    grp.add_argument('-u', '--unique', default=False, action='store_true',
-        help='''Remove duplicated records while keeping the order of output.
-            This option can be time- and RAM-consuming because it keeps
-            all outputted records in RAM to identify duplicated records. You
-            should pipe output to command 'uniq' if you only need to remove
-            adjacent duplicated lines.''')
 
 def outputVariants(proj, table_name, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
@@ -83,13 +76,16 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         raise ValueError('Variant table {} does not exist.'.format(table_name))
     #
     # fields
-    select_clause, fields = consolidateFieldName(proj, table, ','.join(output_fields),
+    select_clause, select_fields = consolidateFieldName(proj, table, ','.join(output_fields),
         args.build and args.build == proj.alt_build)
+    #
+    # if there is no annotation database involved, the query can be simpler
+    noAnnoDBInvolved = all([proj.isVariantTable(x.rsplit('.', 1)[0]) for x in select_fields])
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
     where_conditions = []
-    fields_info = sum([proj.linkFieldToTable(x, table) for x in fields], [])
+    fields_info = sum([proj.linkFieldToTable(x, table) for x in select_fields], [])
     #
     processed = set()
     # the normal annotation databases that are 'LEFT OUTER JOIN'
@@ -113,37 +109,43 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         order_clause = ' ORDER BY {}'.format(order_fields)
     # LIMIT clause
     limit_clause = '' if args.limit is None or args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
-    if args.first_only:
+    if args.all or noAnnoDBInvolved:
+        query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause,
+            where_clause, group_clause, order_clause, limit_clause)
+    else:
         #
-        # In the first_only mode, all the fields are first selected to a table
-        # named _FIRST_ONLY, with only one variant (min(variant.variant_id)).
-        # Fields in the select and group_by clause are repalced by fields in this
-        # temporary table. It is tricky that group_by clause should be used twice
-        # here because min(variant_id)
+        # the 'args.all' query links to annotation databases directly and will
+        # yield multiple records if a variant matches multiple records in the
+        # database. The following code change the query so that the outputs
+        # are sent to a temporary database, group_by variant_id or specified
+        # group_by fields, effectively removing extra lines, and then output
+        # variants.
         #
-        first_only_fields = [x for x in fields]
-        if args.group_by:
-            first_only_fields.extend(group_field_names)
-        first_only_fields = list(set(first_only_fields))
-        if 'variant.variant_id' in first_only_fields:
-            first_only_fields.remove('variant.variant_id')
-        from_clause = 'FROM (SELECT min(variant.variant_id) AS variant_variant_ID, {} {} {} {} {}) AS _FIRST_ONLY'.format(
-            ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in first_only_fields]),
-            from_clause, where_clause, group_clause if group_clause else ' GROUP BY variant.variant_id', order_clause)
-        # group by and select should be changed
-        for fld in fields:
-            select_clause = re.sub(fld.replace('.', '\.'), '_FIRST_ONLY.' + fld.replace('.', '_'),
+        # step1: determine what fields are needed for the intermediate table
+        # which should contain all select and group_by fields.
+        tmp_fields = list(set(select_fields + (group_field_names if args.group_by else [])))
+        if 'variant.variant_id' in tmp_fields:
+            tmp_fields.remove('variant.variant_id')
+        #
+        # change the from_clause to FROM the result of a SELECT clause. The 
+        # key here is the use of group_by variant_id clause.
+        from_clause = ('FROM (SELECT min(variant.variant_id) AS variant_variant_ID, '
+            '{} {} {} GROUP BY variant.variant_id {}) AS _TMP'.format(
+                ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in tmp_fields]),
+                from_clause, where_clause, order_clause))
+        # 
+        # because SELECT and GROUP BY are now from the intermediate table,
+        # group by and select clause should be changed
+        for fld in select_fields:
+            select_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
                 select_clause, flags=re.IGNORECASE)
-            env.logger.error(select_clause)
         if args.group_by:
             for fld in group_field_names:
-                group_clause = re.sub(fld.replace('.', '\.'), '_FIRST_ONLY.' + fld.replace('.', '_'),
+                group_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
                     group_clause, flags=re.IGNORECASE)
-                env.logger.error(group_clause)
-        # order and where clauses are used inside the query in from_clause
-        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause, group_clause, limit_clause)
-    else:
-        query = 'SELECT {} {} {} {} {} {};'.format(select_clause, from_clause, where_clause, group_clause, order_clause, limit_clause)
+        # order and where clauses are used inside the query in the new from_clause
+        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause,
+            group_clause, limit_clause)
     env.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
@@ -160,19 +162,9 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             if len(args.header) != len(output_fields):
                 env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
             sys.stdout.write(args.delimiter.join(args.header) + '\n')
-    # output with a warning to potentially duplicated lines
-    if not args.unique:
-        for rec in cur:
-            line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-            sys.stdout.write(line)
-    else:
-        # a set to hold all outputted lines
-        seen = set()
-        for rec in cur:
-            line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-            if not line in seen:
-                sys.stdout.write(line)
-                seen.add(line)
+    for rec in cur:
+        line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
+        sys.stdout.write(line)
 
 def output(args):
     try:
