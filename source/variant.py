@@ -65,8 +65,9 @@ def generalOutputArguments(parser):
         help='''Variant tools by default output only the first record if 
             a variant matches multiple records in an annotation database.
             This option tells variant tools to output all matching record.''')
-    grp.add_argument('--order_by', nargs='*', metavar='FIELD',
-        help='''Order output by specified fields in ascending order.''')
+    grp.add_argument('--order_by', nargs='+', metavar='FIELD',
+        help='''Order output by specified fields in ascending order, or descending
+            order if field name is followed by DESC (e.g. --order_by 'num DESC')''')
 
 def outputVariants(proj, table_name, output_fields, args, query=None, reverse=False):
     '''Output selected fields'''
@@ -155,7 +156,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
             sys.stdout.write(args.delimiter.join([validFieldName(x) for x in output_fields]) + '\n')
         elif args.header == ['-']:
-            env.logger.info('Reading header from standard input')
+            #env.logger.info('Reading header from standard input')
             sys.stdout.write(sys.stdin.read().rstrip() + '\n')
         else:
             # other wise, use the user-provided header
