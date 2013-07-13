@@ -484,7 +484,7 @@ def run_command(cmd, output=None, working_dir=None, max_jobs=1):
     running_jobs.append(JOB(proc=proc, cmd=cmd,
         start_time=time.time(), stdout=proc_out, stderr=proc_err, 
         working_dir=working_dir, output=output))
-    env.logger.info('Running "{}"'.format(cmd[0]))
+    env.logger.info('Running [[{}]]'.format(cmd[0]))
     if proc_out is not None:
         env.logger.info('Output redirected to {0}.out_{1} and {0}.err_{1} and '
             'will be saved to {0}.exe_info after completion of command.'
@@ -576,7 +576,7 @@ def poll_jobs():
                 running_jobs[idx] = JOB(proc=proc, cmd=job.cmd[1:],
                     start_time=job.start_time, stdout=job.stdout,
                     stderr=job.stderr, working_dir=job.working_dir, output=job.output)
-                env.logger.info('Running "{}"'.format(job.cmd[1]))
+                env.logger.info('Running [[{}]]'.format(job.cmd[1]))
                 # increase the running job count
                 count += 1
     return count

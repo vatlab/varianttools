@@ -392,11 +392,20 @@ class RuntimeEnvironments(object):
             }
 
         def colorstr(self, astr, color):
-            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr, self.COLOR_CODE['ENDC'])
+            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr,
+                self.COLOR_CODE['ENDC'])
+
+        def emphasize(self, msg):
+            # display text within [[  and ]] in green
+            # This is done for levelname not in self.LEVEL_COLOR, e.g.
+            # for info that uses native color. The text will not be 
+            # visible if someone is using a green background
+            return re.sub(r'\[\[(.*)\]\]', '\033[32m\\1\033[0m', msg)
 
         def format(self, record):
             record = copy.copy(record)
             levelname = record.levelname
+            record.msg = self.emphasize(record.msg)
             if levelname in self.LEVEL_COLOR:
                 record.levelname = self.colorstr(levelname, self.LEVEL_COLOR[levelname])
                 record.name = self.colorstr(record.name, 'BOLD')
