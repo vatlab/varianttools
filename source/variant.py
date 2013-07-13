@@ -62,9 +62,9 @@ def generalOutputArguments(parser):
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
     grp.add_argument('--all', action='store_true',
-        help='''Variant tools by default output only the first record if 
-            a variant matches multiple records in an annotation database.
-            This option tells variant tools to output all matching record.''')
+        help='''Variant tools by default output only one of the records if a
+            variant matches multiple records in an annotation database. This
+            option tells variant tools to output all matching records.''')
     grp.add_argument('--order_by', nargs='+', metavar='FIELD',
         help='''Order output by specified fields in ascending order, or descending
             order if field name is followed by DESC (e.g. --order_by 'num DESC')''')
