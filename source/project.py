@@ -47,7 +47,7 @@ from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
     VTOOLS_CITATION, VTOOLS_REVISION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
-    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, \
+    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
 
 
@@ -3947,14 +3947,17 @@ def show(args):
                             name = ss[9:-7]
                             date = ''
                             desc = prop[3]
+                            sz = prop[0]
                     if not name:
                         raise ValueError('Cannot locate an online snapshot with '
                             'name "{}"'.format(args.items[0]))
                 else:
                     source = 'local'
                     name, date, desc = getSnapshotInfo(args.items[0])
+                    sz = os.path.getsize(args.items[0])
                 print('{:<23} {}'.format('Name:', name))
                 print('{:<23} {}'.format('Source:', source))
+                print('{:<23} {} ({})'.format('Size:', sz, sizeExpr(sz)))
                 print('{:<23} {}'.format('Creation date:', date))
                 print('\n'.join(textwrap.wrap('{:<23} {}'.format('Description:',
                     desc),  width=78, subsequent_indent=' '*24)))
@@ -3964,16 +3967,18 @@ def show(args):
                 snapshots = []
                 for snapshot_file in glob.glob(os.path.join(env.cache_dir, 'snapshot_*.tar')):
                     name, date, desc = getSnapshotInfo(snapshot_file)
+                    sz = os.path.getsize(snapshot_file)
                     if name is not None:
-                        snapshots.append((name, date, desc))
+                        snapshots.append((name, date, desc, sz))
                 #
-                for idx, (name, date, desc) in enumerate(sorted(snapshots)):
+                for idx, (name, date, desc, sz) in enumerate(sorted(snapshots)):
                     if args.limit is not None and idx == args.limit:
                         break
                     if args.verbosity == '0':
                         print(name)
                     else:
-                        text = '{:<23} {} (created: {})'.format(name, desc, date)
+                        text = '{:<23} {} ({}, created: {})'.format(name, desc,
+                            sizeExpr(sz), date)
                         print('\n'.join(textwrap.wrap(text, width=78,
                             subsequent_indent=' '*24)))
                 #
@@ -3987,7 +3992,8 @@ def show(args):
                     if args.verbosity == '0':
                         print(ss[9:-7])
                     else:
-                        text = '{:<23} {} (online snapshot)'.format(ss[9:-7], prop[3])
+                        text = '{:<23} {} ({}, online snapshot)'.format(ss[9:-7],
+                            prop[3], sizeExpr(prop[0]))
                         print('\n'.join(textwrap.wrap(text, width=78,
                             subsequent_indent=' '*24)))
                 nAll = nLocal + idx

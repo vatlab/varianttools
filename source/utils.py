@@ -521,6 +521,18 @@ def encodeTableName(name):
     else:
         return name
 
+def sizeExpr(sz, multiple=1000):
+    if sz == 0:
+        sz = +0
+    SUFFIXES = ["B"] + [i + {1000: "B", 1024: "iB"}[multiple] for i in "KMGTPEZY"]
+    for suffix in SUFFIXES:
+        if sz < multiple or suffix == SUFFIXES[-1]:
+            if suffix == SUFFIXES[0]:
+                return "%d%s" % (sz, suffix)
+            else:
+                return "%.1f%s" % (sz, suffix)
+        else:
+            sz /= multiple
 
 #
 # Utility functions
