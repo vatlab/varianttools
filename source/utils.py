@@ -507,13 +507,7 @@ def validFieldName(name, reserved=[]):
 def decodeTableName(name):
     '''Decode a table to its name that could contain special characters'''
     if name.startswith('_'):
-        if '_' in name[1:]:
-            # the tablename is suffixed with date as a temporary table
-            realname, suffix = name[1:].split('_', 1)
-            realname = binascii.unhexlify(realname)
-            return '_'.join([realname, suffix])
-        else:
-            return binascii.unhexlify(name[1:])
+        return binascii.unhexlify(name[1:])
     else:
         return name
 
@@ -2000,7 +1994,7 @@ class DatabaseEngine:
     def backupTable(self, table):
         '''Backup a table to table_timestamp'''
         while True:
-            new_table = '{}_{}'.format(table, time.strftime('%b%d_%H%M%S', time.gmtime()))
+            new_table = encodeTableName('{}_{}'.format(decodeTableName(table), time.strftime('%b%d_%H%M%S', time.gmtime())))
             if not self.hasTable(new_table):
                 self.renameTable(table, new_table)
                 return new_table

@@ -3484,13 +3484,13 @@ def remove(args):
                 removed = []
                 for table in args.items:
                     if '?' in table or '*' in table:
-                        matchd = False
+                        matched = False
                         for tbl in [decodeTableName(x) for x in allTables]:
                             if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
                                 try:
                                     proj.removeVariantTable(encodeTableName(tbl))
                                 except Exception as e:
-                                    env.logger.warning('Failed to remove table {}: {}'
+                                    env.logger.warning('Failed to remove table "{}": {}'
                                         .format(tbl, e))
                                 removed.append(tbl)
                                 matched = True
