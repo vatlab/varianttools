@@ -52,21 +52,8 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show')
         # show project
         self.assertSucc('vtools show project')
-        self.assertEqual(output2list('vtools show table variant')[:11], ['variant_id, bin, chr, pos, ref, alt', \
-                                                         '1, 585, 1, 75927, G, C', \
-                                                         '2, 585, 1, 76193, A, G', \
-                                                         '3, 585, 1, 77052, G, A', \
-                                                         '4, 585, 1, 78178, G, A', \
-                                                         '5, 585, 1, 78200, G, A', \
-                                                         '6, 585, 1, 81398, G, T', \
-                                                         '7, 585, 1, 98172, T, C', \
-                                                         '8, 586, 1, 223335, C, G', \
-                                                         '9, 586, 1, 224622, A, T', \
-                                                         '10, 586, 1, 225791, G, A'])
-        self.assertSucc('vtools show table variant -l 20')
-        self.assertSucc('vtools show table variant -l -1')
+        self.assertSucc('vtools show table variant')
         self.assertSucc('vtools show samples')
-        self.assertSucc('vtools show table testNSFP')
         self.assertFail('vtools show field')
         self.assertSucc('vtools show fields')
         self.assertFail('vtools show format')

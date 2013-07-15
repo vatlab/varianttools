@@ -3832,7 +3832,7 @@ def show(args):
             elif args.type == 'format':
                 if not args.items:
                     raise ValueError('Please specify a format to display')
-                elif len(args.item):
+                elif len(args.items) > 1:
                     raise ValueError('Only one file format is allowed.')
                 try:
                     fmt = fileFMT(args.items[0])
@@ -4129,7 +4129,7 @@ def admin(args):
                     raise ValueError('Cannot rename a table to itself.')
                 proj.db.renameTable(encodeTableName(args.rename_table[0]),
                     encodeTableName(args.rename_table[1]))
-                env.logger.info('Table {} is renamed to {}'.format(args.rename_table[0],
+                env.logger.info('Table "{}" is renamed to "{}"'.format(args.rename_table[0],
                     args.rename_table[1]))
                 # change the meta information of the table
                 cur = proj.db.cursor()

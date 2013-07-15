@@ -28,7 +28,8 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd, getGenotypes, getSamplenames, output2list, getGenotypeInfo
+from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, \
+    outputOfCmd, getGenotypes, getSamplenames, output2list, getGenotypeInfo
 
 class TestImport(ProcessTestCase):
     
@@ -213,9 +214,9 @@ class TestImport(ProcessTestCase):
         samples = outputOfCmd('vtools show samples -l -1')
         genotype = outputOfCmd('vtools show genotypes -l -1')
         variants = outputOfCmd('vtools show table variant -l -1')
-        #genotypes = []
-        #for i in range(60):
-        #    genotypes.append(outputOfCmd('vtools show table genotype_{}'.format(i+1)))
+        genotypes = []
+        for i in range(60):
+            genotypes.append(outputOfCmd("vtools execute 'select * from genotype.genotype_{}'".format(i+1)))
         #
         # compare results with -j3
         #
@@ -227,8 +228,8 @@ class TestImport(ProcessTestCase):
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
         self.assertEqual(variants, outputOfCmd('vtools show table variant -l -1'))
-        #for i in range(60):
-        #    self.assertEqual(genotypes[i], outputOfCmd('vtools show table genotype_{}'.format(i+1)))
+        for i in range(60):
+            self.assertEqual(genotypes[i], outputOfCmd("vtools execute 'select * from genotype.genotype_{}'".format(i+1)))
         #
         # compare results with -j10
         #
@@ -238,8 +239,8 @@ class TestImport(ProcessTestCase):
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
         self.assertEqual(variants, outputOfCmd('vtools show table variant -l -1'))
-        #for i in range(60):
-        #    self.assertEqual(genotypes[i], outputOfCmd('vtools show table genotype_{}'.format(i+1)))
+        for i in range(60):
+            self.assertEqual(genotypes[i], outputOfCmd("vtools execute 'select * from genotype.genotype_{}'".format(i+1)))
     
     def testMPImportMultiFiles(self):
         runCmd('vtools init test -f')
@@ -247,9 +248,9 @@ class TestImport(ProcessTestCase):
         samples = outputOfCmd('vtools show samples -l -1')
         genotype = outputOfCmd('vtools show genotypes -l -1')
         variants = outputOfCmd('vtools show table variant -l -1')
-        #genotypes = []
-        #for i in range(3):
-        #    genotypes.append(outputOfCmd('vtools show table genotype_{}'.format(i+1)))
+        genotypes = []
+        for i in range(3):
+            genotypes.append(outputOfCmd("vtools execute 'select * from genotype.genotype_{}'".format(i+1)))
         #
         # compare results with -j3
         #
@@ -259,8 +260,8 @@ class TestImport(ProcessTestCase):
         self.assertEqual(samples, outputOfCmd('vtools show samples -l -1'))
         self.assertEqual(genotype, outputOfCmd('vtools show genotypes -l -1'))
         self.assertEqual(variants, outputOfCmd('vtools show table variant -l -1'))
-        #for i in range(3):
-        #    self.assertEqual(genotypes[i], outputOfCmd('vtools show table genotype_{}'.format(i+1)))
+        for i in range(3):
+            self.assertEqual(genotypes[i], outputOfCmd("vtools execute 'select * from genotype.genotype_{}'".format(i+1)))
  
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'
@@ -433,7 +434,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.maxDiff=None
-        self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCreation date:          Jul13\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     6\n''')
+        self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     6\n''', skip=3)
         self.assertOutput('vtools show samples', '''sample_name	filename\nSMP1	txt/sample_chr22.txt\nSMP2	txt/sample_chr22.txt\nSMP3	txt/sample_chr22.txt\n''') 
 
     def testMultiSamples_2(self):
@@ -442,7 +443,7 @@ class TestImport(ProcessTestCase):
         #based on the files format, Dr. Peng modified the format file: new_format.fmt
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
-        self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCreation date:          Jul13\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     9\n''')
+        self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     9\n''', skip=3)
         self.assertOutput('vtools show samples', '''sample_name	filename\nSMP1	txt/sample_1_chr22.txt\nSMP2	txt/sample_1_chr22.txt\nSMP3	txt/sample_1_chr22.txt\n''') 
      
 
