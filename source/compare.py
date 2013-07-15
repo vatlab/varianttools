@@ -63,6 +63,8 @@ def compareTwoTables(proj, args):
     cur = proj.db.cursor()
     variant_A = set()
     variant_B = set()
+    if len(args.tables) > 2:
+        env.logger.warning('Only the first two specified tables will be compared for option --count.')
     if args.count or not direct_query:
         # read variants in tables[0]
         env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
@@ -221,6 +223,8 @@ def compare(args):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             # set args.tables to its expanded version
             args.tables = tables
+            if len(args.tables) == 1:
+                raise ValueError('Please specify at least two tables to compare.')
             # this is the old behavior
             if args.intersection is not None or args.union is not None or args.difference is not None:
                 if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
