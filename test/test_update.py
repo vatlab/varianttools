@@ -149,8 +149,8 @@ class TestUpdate(ProcessTestCase):
             self.assertEqual(values[-2], values[-1])
         runCmd('vtools update variant --set "vname=refGene.name"')
         lines = output2list('vtools output variant chr pos ref alt vname refGene.name')
-        # there should be more lines
-        self.assertNotEqual(line_count, len(set(lines)))
+        # there should not be more lines
+        self.assertEqual(line_count, len(set(lines)))
         
 if __name__ == '__main__':
     unittest.main()
