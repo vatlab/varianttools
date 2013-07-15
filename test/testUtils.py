@@ -46,7 +46,7 @@ class ProcessTestCase(unittest.TestCase):
         runCmd('vtools remove project')
 
 # compare if the command output is what we want
-    def assertOutput(self, cmd, output=None, numOfLines=0, skip=None, file=None):
+    def assertOutput(self, cmd, output=None, numOfLines=0, file=None, skip=None):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
         if skip is not None:
