@@ -53,8 +53,8 @@ action=RunCommand(cmd=[
         'vtools remove variants empty',
 		'for name in `vtools show samples | tail -n +2 | cut -f 1`; do
 			vtools select variant --samples "sample_name = \'$name\'" -t "$name";
-			vtools select "$name" "length(alt)=1" "length(ref)=1" "alt!=\'-\'" "ref!=\'-\'" -t "${name}_SNV";
-			vtools compare "$name" "${name}_SNV" --difference "${name}_INDEL";
+			vtools select "$name" "length(alt)=1" "length(ref)=1" "alt!=\'-\'" "ref!=\'-\'" -t "${name}_SNV" "SNPs in table ${name}";
+			vtools compare "$name" "${name}_SNV" --difference "${name}_INDEL" "Indels in table ${name}";
 		done',
         'vtools admin --save_snapshot ${CMD_OUTPUT: CMD_OUTPUT[1]}
             "Raw data from MAXGT model after removing samples and variants from the POLY model"' ],
