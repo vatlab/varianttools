@@ -12,7 +12,7 @@ hg19=chr, pos, ref, alt
 description=NHLBI GO Exome Sequencing Project (Exome Variant Server, NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [6500 samples, February, 2013].)
 version=6500SI-V2-SSA137
 source_url=http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.snps_indels.vcf.tar.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ESP-6500SI-V2-SSA137.ann.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ESP-6500SI-V2-SSA137.DB.gz
 anno_type=variant
 source_type=txt
 
