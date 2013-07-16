@@ -456,8 +456,8 @@ def use(args):
                     annoDB = decompressGzFile(annoDB, inplace=True)
                     del s
                 except Exception as e:
-                    env.logger.debug(e)
-                    raise ValueError('Failed to download database.')
+                    raise ValueError('Database {} not found: {}'
+                        .format(args.source, e))
             #
             # annDB is now a local file
             if annoDB.endswith('.ann'):

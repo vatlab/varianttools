@@ -1362,7 +1362,13 @@ class Project:
         env.logger.info(db.description)
         if db.name not in [x.name for x in self.annoDB]:
             self.annoDB.append(db)
-            self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
+        # if db.name is in the list, put it to the end because it is the last
+        # one to be used, and might reply on some other db
+        else:
+            i = [x.name for x in self.annoDB].index(db.name)
+            self.annoDB.append(db)
+            self.annoDB.pop(i)
+        self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
         # an annotation database might be re-used with a different linked_field
         self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
         self.saveProperty('{}_anno_type'.format(db.name), str(db.anno_type))
@@ -3779,8 +3785,8 @@ def show(args):
                 try:
                     annoDB = [x for x in proj.annoDB if x.name.lower() == args.items[0].lower()][0]
                 except Exception as e:
-                    raise IndexError('Database {} is not currently used in the project: {}'
-                        .format(args.items[0], e))
+                    raise IndexError('Database {} is not currently used in the project.'
+                        .format(args.items[0]))
                 annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
                 res = ResourceManager()
