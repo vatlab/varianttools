@@ -646,6 +646,8 @@ def runCommand(cmd, instream = None, msg = ''):
 
 
 def openFile(filename):
+    if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tgz'):
+        raise RuntimeError('Please decompress {} before reading.'.format(filename))
     if filename.lower().endswith('.gz'):
         return gzip.open(filename, 'rb')
     elif filename.lower().endswith('.bz2'):

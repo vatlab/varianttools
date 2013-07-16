@@ -30,6 +30,7 @@ import ConfigParser
 import shutil
 import urlparse
 import gzip
+import tarfile
 import re
 import zipfile
 from multiprocessing import Process, Pipe
@@ -251,12 +252,20 @@ class AnnoDBConfiger:
         if not os.path.isfile(tempFile):
             raise ValueError('Could not find downloaded database source')
         # regular file?
-        if not tempFile.endswith('.zip'):
+        if tempFile.endswith('.zip'):
+            # if zip file?
+            bundle = zipfile.ZipFile(tempFile)
+            bundle.extractall(env.cache_dir)
+            return [os.path.join(env.cache_dir, name) for name in bundle.namelist()]
+        elif tempFile.endswith('.tar.gz') or tempFile.endswith('.tgz'):
+            with tarfile.open(tempFile, 'r:gz') as tfile:
+                s = delayedAction(env.logger.info, 'Decompressing {}'.format(tempFile))
+                names = tfile.getnames()
+                tfile.extractall(env.cache_dir)
+                del s
+            return [os.path.join(env.cache_dir, name) for name in names]
+        else:
             return [tempFile]
-        # if zip file?
-        bundle = zipfile.ZipFile(tempFile)
-        bundle.extractall(env.cache_dir)
-        return [os.path.join(env.cache_dir, name) for name in bundle.namelist()]
     
     def importTxtRecords(self, db, source_files):
         #
@@ -282,12 +291,13 @@ class AnnoDBConfiger:
         cur = db.cursor()
         insert_query = 'INSERT INTO {0} VALUES ('.format(self.name) + \
                             ','.join([db.PH] * (len(self.fields) + len(build_info))) + ');'
-        for f in source_files:
+        for idx, f in enumerate(source_files):
             env.logger.info('Importing annotation data from {0}'.format(f))
             lc = lineCount(f, self.encoding)
             update_after = min(max(lc//200, 100), 100000)
             p = TextReader(processor, f, None, None, self.jobs - 1, self.encoding, self.header)
-            prog = ProgressBar(os.path.split(f)[-1], lc)
+            prog = ProgressBar('{} ({}/{})'.format(os.path.split(f)[-1], idx+1, len(source_files)),
+                lc)
             all_records = 0
             skipped_records = 0
             for all_records, bins, rec in p.records():
@@ -315,8 +325,8 @@ class AnnoDBConfiger:
         if self.source_pattern is not None:
             source_files = [x for x in source_files if self.source_pattern in x]
         #
-        env.logger.info('Importing database {} from source files {}'.format(self.name,
-            ', '.join(source_files)))
+        env.logger.info('Importing database {} from {} source files {}'.format(self.name,
+            len(source_files), ', '.join(source_files)))
         #
         if self.preprocessor is not None:
             env.logger.info('Preprocessing data [{}] to generate intermediate input files for import'.format(', '.join(source_files)))
