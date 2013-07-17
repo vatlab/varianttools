@@ -229,6 +229,7 @@ class GenoFormatter:
             None: None,
             (None, None): None,
             (None, None, None): None,
+            (None, None, None, None): None,
             # 
             (0,0): 0,
             #
@@ -343,9 +344,9 @@ class GenoFormatter:
             if cnt is None:
                 return self.missing
             else:
-                return cnt + self.base
-        except:
-            raise ValueError('Failed to export genotype {} in numeric style'.format(item))
+                return str(cnt + self.base)
+        except Exception as e:
+            raise ValueError('Failed to export genotype {} in numeric style: {}'.format(item, e))
 
     def fmt_vcf(self, item):
         try:
@@ -417,19 +418,11 @@ class BaseVariantReader:
         pass
 
     def getQuery(self):
-        select_clause, fields = consolidateFieldName(self.proj, self.table,
-            ','.join(self.var_fields), self.export_alt_build)
-        if self.geno_fields:
-            for id in self.IDs:
-                header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
-                for fld in self.geno_fields:
-                    if fld.lower() in header:
-                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
-                    else:
-                        select_clause += ', NULL'
-        # FROM clause
+        select_clause, select_fields = consolidateFieldName(self.proj, self.table,
+            ','.join(['variant.ref', 'variant.alt'] + self.var_fields),
+            self.export_alt_build)
         from_clause = 'FROM {} '.format(self.table)
-        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in select_fields], [])
         #
         processed = set()
         # the normal annotation databases that are 'LEFT OUTER JOIN'
@@ -438,19 +431,80 @@ class BaseVariantReader:
             if (tbl.lower(), conn.lower()) not in processed:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
-        if self.geno_fields:
-            for id in self.IDs:
-                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
-                    .format(self.proj.name, id, self.table)
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
         if self.order_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields)
+            order_fields, order_field_names = consolidateFieldName(self.proj, self.table, self.order_by_fields)
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ''
-        return 'SELECT variant.ref,variant.alt,{} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+        #
+        #
+        tmp_fields = list(set(select_fields + (order_field_names if self.order_by_fields else [])))
+        if 'variant.variant_id' in tmp_fields:
+            tmp_fields.remove('variant.variant_id')
+        from_clause = ('FROM (SELECT min(variant.variant_id) AS variant_variant_ID, '
+            '{} {} {} GROUP BY variant.variant_id) AS _TMP'.format(
+                ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in tmp_fields]),
+                from_clause, where_clause))
+        for fld in select_fields:
+            select_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
+                select_clause, flags=re.IGNORECASE)
+        if self.order_by_fields:
+            for fld in order_field_names:
+                order_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
+                    order_clause, flags=re.IGNORECASE)
+        if self.geno_fields:
+            for id in self.IDs:
+                header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+                for fld in self.geno_fields:
+                    if fld.lower() in header:
+                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
+                    else:
+                        select_clause += ', NULL'
+                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = variant_variant_id '\
+                    .format(self.proj.name, id, self.table)
+
+        return 'SELECT {} {} {};'.format(select_clause, from_clause, order_clause)
+
+#    def getQuery(self):
+#        select_clause, fields = consolidateFieldName(self.proj, self.table,
+#            ','.join(self.var_fields), self.export_alt_build)
+#        if self.geno_fields:
+#            for id in self.IDs:
+#                header = [x.lower() for x in self.proj.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+#                for fld in self.geno_fields:
+#                    if fld.lower() in header:
+#                        select_clause += ', {}_genotype.genotype_{}.{}'.format(self.proj.name, id, fld)
+#                    else:
+#                        select_clause += ', NULL'
+#        # FROM clause
+#        from_clause = 'FROM {} '.format(self.table)
+#        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+#        #
+#        processed = set()
+#        # the normal annotation databases that are 'LEFT OUTER JOIN'
+#        where_conditions = []
+#        for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
+#            if (tbl.lower(), conn.lower()) not in processed:
+#                from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
+#                processed.add((tbl.lower(), conn.lower()))
+#        if self.geno_fields:
+#            for id in self.IDs:
+#                from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} ON {0}_genotype.genotype_{1}.variant_id = {2}.variant_id '\
+#                    .format(self.proj.name, id, self.table)
+#        # WHERE clause
+#        where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
+#        # GROUP BY clause
+#        if self.order_by_fields:
+#            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields)
+#            order_clause = ' ORDER BY {}'.format(order_fields)
+#        else:
+#            order_clause = ''
+#        return 'SELECT variant.ref,variant.alt,{} {} {} {};'.format(select_clause,
+#            from_clause, where_clause, order_clause)
+
 
     def getVariantQuery(self):
         select_clause, fields = consolidateFieldName(self.proj, self.table,
@@ -466,12 +520,6 @@ class BaseVariantReader:
             if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
-        # temporary connection tables are appended as WHERE clause.
-        #for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-        #    if (tbl.lower(), conn.lower()) not in processed and '.__' in tbl:
-        #        from_clause += ' , {}'.format(tbl)
-        #        where_conditions.append(conn)
-        #        processed.add((tbl.lower(), conn.lower()))
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
