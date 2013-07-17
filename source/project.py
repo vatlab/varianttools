@@ -543,11 +543,8 @@ class fileFMT:
             self.columns.append(col)
 
     def describe(self):
-        print('{:<23} {}'.format('Format:', self.name))
         if self.description is not None:
-            print('\n'.join(textwrap.wrap(
-                '{:<23} {}'.format('Description:', self.description),
-                subsequent_indent=' '*2, width=78)))
+            print('\n'.join(textwrap.wrap(self.description, width=78)))
         #
         if self.preprocessor is not None:
             print('Preprocessor: {}'.format(self.preprocessor))

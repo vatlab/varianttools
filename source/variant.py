@@ -106,7 +106,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         group_clause = ' GROUP BY {}'.format(group_fields)
     order_clause = ''
     if args.order_by:
-        order_fields, tmp = consolidateFieldName(proj, table, ','.join(args.order_by))
+        order_fields, order_field_names = consolidateFieldName(proj, table, ','.join(args.order_by))
         order_clause = ' ORDER BY {}'.format(order_fields)
     # LIMIT clause
     limit_clause = '' if args.limit is None or args.limit < 0 else ' LIMIT 0,{}'.format(args.limit)
@@ -131,9 +131,9 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         # change the from_clause to FROM the result of a SELECT clause. The 
         # key here is the use of group_by variant_id clause.
         from_clause = ('FROM (SELECT min(variant.variant_id) AS variant_variant_ID, '
-            '{} {} {} GROUP BY variant.variant_id {}) AS _TMP'.format(
+            '{} {} {} GROUP BY variant.variant_id) AS _TMP'.format(
                 ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in tmp_fields]),
-                from_clause, where_clause, order_clause))
+                from_clause, where_clause))
         # 
         # because SELECT and GROUP BY are now from the intermediate table,
         # group by and select clause should be changed
@@ -144,9 +144,13 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             for fld in group_field_names:
                 group_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
                     group_clause, flags=re.IGNORECASE)
+        if args.order_by:
+            for fld in order_field_names:
+                order_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
+                    order_clause, flags=re.IGNORECASE)
         # order and where clauses are used inside the query in the new from_clause
         query = 'SELECT {} {} {} {};'.format(select_clause, from_clause,
-            group_clause, limit_clause)
+            group_clause, order_clause, limit_clause)
     env.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
