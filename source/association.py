@@ -988,9 +988,9 @@ def associate(args):
             # the loaders can start working only after all of them are ready. Otherwise one
             # worker might block the database when others are trying to retrieve data
             # which is a non-blocking procedure.
-            ready_flags = Array(ctypes.c_int64, [0]*nLoaders)
+            ready_flags = Array(ctypes.c_uint64, [0]*nLoaders)
             # Tells the master process which samples are loaded, used by the progress bar.
-            cached_samples = Array(ctypes.c_int64, max(asso.sample_IDs) + 1)
+            cached_samples = Array(ctypes.c_uint64, max(asso.sample_IDs) + 1)
             #
             for id in asso.sample_IDs:
                 sampleQueue.put(id)
@@ -1037,7 +1037,7 @@ def associate(args):
             for loader in loaders:
                 loader.join()
             # step 1.5, start a maintenance process to create indexes, if needed.
-            maintenance_flag = Value(ctypes.c_int64, 1)
+            maintenance_flag = Value(ctypes.c_uint64, 1)
             maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
             maintenance.start()
             # step 2: workers work on genotypes
@@ -1046,7 +1046,7 @@ def associate(args):
             # the result queue is used by workers to return results
             resQueue = Queue()
             # see if all workers are ready
-            ready_flags = Array(ctypes.c_int64, [0]*nJobs)
+            ready_flags = Array(ctypes.c_uint64, [0]*nJobs)
             shelf_lock = Lock()
             for j in range(nJobs):
                 # the dictionary has the number of temporary database for each sample

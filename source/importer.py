@@ -1274,7 +1274,7 @@ class ImportStatus:
         self.lock = Lock()
         self.total_sample_count = 0
         self.total_genotype_count = 0
-        self.all_done = Value(ctypes.c_int64, 0)
+        self.all_done = Value(ctypes.c_uint64, 0)
 
     def add(self, item, num_lines):
         '''Add a job, each item has
@@ -2036,9 +2036,9 @@ class Importer:
         '''
         importers = [None] * self.jobs
         # number of genotypes each process have imported
-        genotype_import_count = [Value(ctypes.c_int64, 0) for x in range(self.jobs)]
+        genotype_import_count = [Value(ctypes.c_uint64, 0) for x in range(self.jobs)]
         # number of sample copied
-        sample_copy_count = Value(ctypes.c_int64, 0)
+        sample_copy_count = Value(ctypes.c_uint64, 0)
         # import queue that accept jobs sample 1.1, 1.2, etc
         status = ImportStatus()
         # start copier
