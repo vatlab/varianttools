@@ -786,7 +786,11 @@ class ProgressBar:
     def update(self, count, failed_count=0):
         '''completed count jobs, with failed_count failed jobs'''
         if failed_count > count:
-            raise RuntimeError('Failed count should always less than or equal to completed count.')
+            env.logger.warning('Failed count {} greater than completed count {}.'
+                .format(failed_count, count))
+            # if there is error ... just give it a number
+            failed_count = abs(failed_count)
+            count = failed_count
         # do not update if the diferent is less than 0.1% of the total count.
         # this is to avoid excess of calling the time() function
         if self.totalCount is not None and (count - self.count) * 1000 < self.totalCount:
