@@ -113,11 +113,17 @@ class EmitInput:
             if len(selected) // 2 * 2 != len(selected):
                 raise RuntimeError('Cannot emit input files by pairs: odd number of input files {}'
                     .format(', '.join(selected)))
-            selected.sort()
+            # separate filenames into _1 and _2 names before sort
+            g1 = [x for x in selected if '_1' in x]
+            g2 = [x for x in selected if '_2' in x]
+            if not g1 or not g2 or len(g1) != len(g2):
+                raise RuntimeError('Emitting files by pair can only pair '
+                    'filenames with "_1" and "_2"')
+            # sort but remove _1 and _2 first (although this does not seem to matter)
+            g1.sort(key=lambda x: x.replace('_1', ''))
+            g2.sort(key=lambda x: x.replace('_2', ''))
             pairs = []
-            for idx in range(len(selected)//2):
-                f1 = selected[2*idx]
-                f2 = selected[2*idx + 1]
+            for f1, f2 in zip(g1, g2):
                 if len(f1) != len(f2):
                     raise RuntimeError('Cannot emit input files by pairs: '
                         'Filenames {}, {} are not paired'
