@@ -138,8 +138,6 @@ class RuntimeEnvironments(object):
                 'directory is usually downloaded automatically upon use, but can also be '
                 'synchronized directly from http://vtools.houstonbioinformatics.org/.')
         }
-        # this will be the raw command that will be saved to log file
-        self._command_line = ''
         # path to the project cache
         self._cache_dir = 'cache'
         #
@@ -186,9 +184,6 @@ class RuntimeEnvironments(object):
             except Exception as e:
                 self._logger.warning('Failed to remove lock file {}'.format(filename))
         self._lock_files = []
-    #
-    # attribute command line
-    #
     #
     # attribute logfile_verbosity
     #

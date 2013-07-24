@@ -29,6 +29,7 @@ import sys
 import gzip
 import re
 import time
+import datetime
 from multiprocessing import Process, Pipe, Lock
 if sys.version_info.major == 2:
     from itertools import izip, repeat
@@ -965,15 +966,22 @@ class Exporter:
         # write header
         if self.header:
             # we can support more variables later
-            header_keywords = ['sample_names']
+            header_keywords = ['sample_names', 'datetime', 'command']
             # interpolate %(VAR)s with values
             for m in re.finditer('%\((\w+)\)s', self.header):
                 if m.group(1) not in header_keywords:
-                    env.logger.warning('variable {} is not supported in --header.'.format(m.group(1)))
+                    env.logger.warning('Unknown variable {} in header specification. '
+                        'Only {} are supported'.format(m.group(1), ', '.join(header_keywords)))
             #
             # sample_names
             header = self.header.replace('%(sample_names)s',
                         self.format.delimiter.join(self.samples))
+            # datetime
+            header = header.replace('%(datetime)s',
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+            # command
+            header = heaer.replace('%(command)s',
+                env.command_line)
             print >> output, header.rstrip()
         global rec_ref, rec_alt
         for idx, raw_rec in enumerate(reader.records()):
@@ -1151,7 +1159,8 @@ def exportArguments(parser):
             which is the preferred way to specify large multi-line headers (e.g.
             cat myheader | vtools export --header -). Strings in the form of
             %%(VAR)s will be interpolated to values of variable VAR, which can be
-            "sample_names" for list of sample names.''')
+            "sample_names" for list of sample names, "datetime" for current date
+            and time, and "command" for the command used to create output.''')
     parser.add_argument('-j', '--jobs', type=int, default=1,
         help='''Number of processes to export data. Multiple threads will be automatically
             used if there are a large number of samples.''')
