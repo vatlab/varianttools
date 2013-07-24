@@ -2622,6 +2622,8 @@ class VariantMapper(threading.Thread):
         self.alt_build = alt_build
         self.status = status
         threading.Thread.__init__(self, name='Read and map variants')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
 
     def run(self):
         existing = {}
@@ -2720,6 +2722,8 @@ class VariantProcessor(threading.Thread):
         self.queue = queue
         self.status = status
         threading.Thread.__init__(self, name='cache variants')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
 
     def run(self):
         while True:
@@ -2822,6 +2826,8 @@ class SampleProcessor(threading.Thread):
         self.queue = queue
         self.status = status
         threading.Thread.__init__(self, name='cache samples')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
     
     def run(self):
         while True:
@@ -2900,6 +2906,8 @@ class VariantCopier(threading.Thread):
         self.projects = projects
         self.status = status
         threading.Thread.__init__(self, name='copy variants')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
         
     def run(self):
         db = DatabaseEngine()
@@ -2972,6 +2980,8 @@ class SampleCopier(threading.Thread):
         self.status = status
         #
         threading.Thread.__init__(self, name='copy samples')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
 
     def run(self):
         # connect to cache geno
