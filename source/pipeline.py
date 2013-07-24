@@ -81,6 +81,21 @@ class EmitInput:
         except Exception as e:
             return False
 
+    def _is_paired(self, f1, f2, at=None):
+        if len(f1) != len(f2):
+            return False
+        if f1 >= f2:
+            return False
+        diffs = [x != y for x,y in zip(f1, f2)]
+        if sum(diffs) != 1:
+            return False
+        diff_at = diffs.index(True)
+        if sorted([f1[diff_at], f2[diff_at]]) != ['1', '2']:
+            return False
+        if at is not None and diff_at not in at:
+            return False
+        return True
+
     def __call__(self, ifiles):
         selected = []
         unselected = []
@@ -110,31 +125,41 @@ class EmitInput:
         elif self.group_by == 'all':
             return [selected], unselected
         elif self.group_by == 'paired':
-            if len(selected) // 2 * 2 != len(selected):
-                raise RuntimeError('Cannot emit input files by pairs: odd number of input files {}'
-                    .format(', '.join(selected)))
-            # separate filenames into _1 and _2 names before sort
-            g1 = [x for x in selected if '_1' in x]
-            g2 = [x for x in selected if '_2' in x]
-            if not g1 or not g2 or len(g1) != len(g2):
-                raise RuntimeError('Emitting files by pair can only pair '
-                    'filenames with "_1" and "_2"')
-            # sort but remove _1 and _2 first (although this does not seem to matter)
-            g1.sort(key=lambda x: x.replace('_1', ''))
-            g2.sort(key=lambda x: x.replace('_2', ''))
-            pairs = []
-            for f1, f2 in zip(g1, g2):
-                if len(f1) != len(f2):
-                    raise RuntimeError('Cannot emit input files by pairs: '
-                        'Filenames {}, {} are not paired'
-                        .format(f1, f2))
-                diff = [ord(y)-ord(x) for x,y in zip(f1, f2) if x!=y]
-                if diff != [1]:
-                    raise RuntimeError('Cannot emit input files by pairs: '
-                        'Filenames {}, {} are not paired'
-                        .format(f1, f2))
-                pairs.append([f1, f2])
-            return pairs, unselected
+            # there is a possibility that one name differ at multiple parts
+            # with another name. e.g
+            #
+            #      A1_TAGCTT_L007_R1_001.fastq.gz
+            #
+            # differ with the following two names by a number
+            #
+            #      A1_TAGCTT_L007_R1_002.fastq.gz
+            #      A1_TAGCTT_L007_R2_001.fastq.gz
+            # 
+            # the code below tries to find good pairs first, then use matched
+            # locations to pair others
+            all_pairs = [(x,y) for x in selected for y in selected if self._is_paired(x,y)]
+            # count the time a name is paired
+            unpaired = [x for x in selected if not any([x in y for y in all_pairs])]
+            if unpaired:
+                raise ValueError('Failed to pair input filenames: {} is not paired'
+                    'with any other names.'.format(', '.join(unpaired)))
+            uniquely_paired = [x for x in selected if sum([x in y for y in all_pairs]) == 1]
+            # pairs are now the uniquely paired
+            pairs = [x for x in all_pairs if x[0] in uniquely_paired or x[1] in uniquely_paired]
+            if not uniquely_paired:
+                raise ValueError('Failed to pair input filenames: all names '
+                    'match multiple names.')
+            if len(pairs) != all_pairs:
+                # find the differentiating index of existing pairs
+                diff_at = set([[i != j for i,j in zip(x[0],x[1])].index(True) for x in pairs])
+                # use the diff_at locations to screen the rest of the pairs
+                pairs.extend([x for x in all_pairs if x not in pairs and self._is_paired(x[0], x[1], diff_at)])
+                #
+                if len(pairs) * 2 != len(selected):
+                    unpaired = [x for x in selected if not any([x in y for y in pairs])]
+                    raise ValueError('Failed to pair input files because they '
+                        'match multiple filenames: {}'.format(', '.join(unpaired)))
+            return sorted(pairs), unselected
 
 
 class SequentialActions:
