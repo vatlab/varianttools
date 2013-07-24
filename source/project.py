@@ -2835,9 +2835,8 @@ class SampleProcessor(threading.Thread):
             self.samples = self.status.get(self.src_proj, 'old_ids')
             #
             if self.identical_ids:
-                self.status.set(self.src_proj, 'completed', 3)
+                self.status.set(self.src_proj, 'completed', 2 + len(self.samples))
             else:
-                self.status.set(self.src_proj, 'total_count', 2 + len(self.samples))
                 self.src_geno = self.src_proj.replace('.proj', '_genotype.DB')
                 if not os.path.isfile(self.src_geno):
                     self.src_geno = None
@@ -3236,7 +3235,7 @@ class ProjectsMerger:
         # for projects, total_count means
         # 1: read
         # 2. variant processed
-        # 3. sample processed
+        # 3. sample processed (need to be updated with samples to be cached)
         for proj in self.projects:
             status.add(proj, {'completed': 0, 'stage': 0, 'scheduled': False, 'total_count': 3})
         # this will set for each project
@@ -3247,6 +3246,10 @@ class ProjectsMerger:
             env.logger.warning('{} samples from the same source files have been '
                 'copied, leading to potentially duplicated samples.'
                 .format(duplicated_samples))
+        #
+        # update project status for total number of jobs
+        for proj in self.projects:
+            status.set(proj, 'total_count', 2 + len(status.get(proj, 'old_ids')))
         # stop the database so that it can be opened in thread
         self.proj.db.close()
         #
