@@ -41,6 +41,9 @@ class TestAdmin(ProcessTestCase):
 
     def testMergeSamples(self):
         'Test command vtools admin --merge_samples'
+        #
+        # FIXME: merge that involves all genotype tables will use a 
+        # different algorithm that needs to be tested
         self.assertFail('vtools admin')
         self.assertSucc('vtools admin -h')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')

@@ -1863,68 +1863,74 @@ class Project:
                 samples[rec[0]] = [rec[1]]
         # who is going to be merged?
         merged = {}
-        count = 0
         for name, ids in samples.iteritems():
             if len(ids) > 1:
                 merged[name] = sorted(ids)
-                count += len(ids)
-        #
         if len(merged) == 0:
             env.logger.info('No sample is merged because all samples have unique names')
             return
+        count = sum([len(x) for x in merged.values()])
+        env.logger.info('{} samples that share identical names will be merged to {} samples'
+            .format(count, len(merged)))
+        # if all samples will be involved in merging, using
+        # a separate database to speed up merging.
+        inPlace=(count != sum([len(x) for x in samples.values()]))
         #
-        env.logger.info('{} samples that share identical names will be merged to {} samples'.format(count, len(merged)))
+        self.db.attach(self.name + '_genotype')
+        if not inPlace:
+            if os.path.isfile('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name)):
+                os.remove('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name))
+            self.db.attach('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name),
+                '{}_genotype_merged'.format(self.name))
         # merge genotypes
         prog = ProgressBar('Merging samples', count)
-        merged_count = 0
+        copied = 0
         for name, ids in merged.iteritems():
             #
             # ranges of variant_id is used to check overlap of genotypes. If the ranges
             # overlap, a more thorough check will be used.
+            if inPlace:
+                new_table = '{}_genotype._tmp_{}'.format(self.name, ids[0])
+            else:
+                new_table = '{}_genotype_merged.genotype_{}'.format(self.name, ids[0])
             #
-            ranges = []
-            new_table = '{}_genotype._tmp_{}'.format(self.name, ids[0])
-            # we could use a single query by something like
-            #
-            #    INSERT INTO ... SELECT ... UNION SELECT .... UNION SELECT ...
-            #
-            # but we may have too many sample tables and blow up the query.
-            #
-            # we could insert directly to ids[0] but it is safer to create a temporary table first
-            # 
-            # step 1: get schema of sample_ids[0]
             try:
                 # remove existing temporary table if exists
                 self.db.removeTable(new_table)
             except:
                 pass
-            # the genotype tables might have different fields, so we will have to use a super set 
-            # of the columns
+            #
+            # get schema
             new_fields = []
             # get a list of fields for old ids
             old_fields = {}
-            for id in ids:
-                cur.execute('SELECT sql FROM {}_genotype.sqlite_master WHERE type="table" AND name="genotype_{}"'.format(self.name,
-                    id))
-                schema = cur.fetchone()[0]
-                fields = [x.strip() for x in schema.split(',')]
-                fields[0] = fields[0].split('(')[1].strip()
-                fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-                old_fields[id] = ', '.join([fld.split(None, 1)[0] for fld in fields])
-                # if two fields have the same name and different types, they will be merged silently.
-                new_fields.extend([fld for fld in fields if fld.split(None, 1)[0] not in [x.split(None, 1)[0] for x in new_fields]])
+            cur.execute('SELECT name, sql FROM {}_genotype.sqlite_master '
+                    'WHERE type="table" AND name in ({})'
+                    .format(self.name, 
+                    ', '.join(["'genotype_{}'".format(x) for x in ids])))
+            for name, schema in cur:
+                try:
+                    fields = [x.strip() for x in schema.split(',')]
+                    fields[0] = fields[0].split('(')[1].strip()
+                    fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
+                    old_fields[int(name.rsplit('_', 1)[-1])] = ', '.join([fld.split(None, 1)[0] for fld in fields])
+                    # if two fields have the same name and different types, they will be merged silently.
+                    new_fields.extend([fld for fld in fields if fld.split(None, 1)[0] not in [x.split(None, 1)[0] for x in new_fields]])
+                except Exception as e:
+                    raise RuntimeError('Corrupted genotype database: Failed to '
+                        'get structure of genotype table {}'.format(id))
             #
             sql = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
             env.logger.debug('Executing {}'.format(sql))
-            #
-            # step 2: create temp table
             try:
                 cur.execute(sql)
             except Exception as e:
                 raise RuntimeError('Failed to create new genotype table: {}'.format(e))
             # copying genotypes to the temp table
+            ranges = []
             for id in ids:
-                cur.execute('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'.format(self.name, id))
+                cur.execute('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'
+                    .format(self.name, id))
                 ranges.append(cur.fetchone())
                 try:
                     cur.execute('INSERT INTO {1} ({3}) SELECT * FROM {0}_genotype.genotype_{2};'.format(
@@ -1936,15 +1942,14 @@ class Project:
                     except:
                         pass
                     prog.done()
-                    raise RuntimeError('Failed to merge genotype tables. Either the tables have identical '
-                        'variants, or have different genotype information fields.: {}'.format(e))
-                merged_count += 1
-                prog.update(merged_count)
+                    raise RuntimeError('Failed to merge genotype tables: {}'.format(e))
+                copied += 1
+                prog.update(copied)
             #
-            # step 2.5: verify table if the ranges overlap
+            # verify table if the ranges overlap
             check_overlap = False
             for i in range(len(ranges) - 1):
-                for j in range(i+1, len(ranges)):
+                for j in range(i + 1, len(ranges)):
                     # skip when either range (a,b) or (c,d) are empty
                     # i.e., no variants for a sample from a particular file
                     if not any(ranges[i]) or not any(ranges[j]):
@@ -1957,7 +1962,8 @@ class Project:
                     break
             #
             if check_overlap:
-                cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'.format(new_table))
+                cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'
+                    .format(new_table))
                 counts = cur.fetchone()
                 if counts[0] != counts[1]:
                     try:
@@ -1966,10 +1972,15 @@ class Project:
                     except:
                         pass
                     prog.done()
-                    raise ValueError('Failed to merge samples with name {} because there are {} genotypes for {} unique variants.'.format(name, counts[0], counts[1]))
-            #
-            # step 3: collect filenames
-            #
+                    raise ValueError('Failed to merge samples with name {} because '
+                        'there are {} genotypes for {} unique variants.'
+                        .format(name, counts[0], counts[1]))
+        #
+        prog.done()
+        # the above steps are slow but will not affect project (process can be terminated)
+        # the following will be fast
+        for name, ids in merged.iteritems():
+            # change filenames
             filenames = []
             for id in ids:
                 cur.execute('SELECT filename FROM sample JOIN filename ON sample.file_id = filename.file_id WHERE sample_id = {}'.format(self.db.PH), (id,))
@@ -1994,16 +2005,34 @@ class Project:
                 else:
                     cur.execute('UPDATE sample SET file_id={0} WHERE sample_id = {0}'.format(self.db.PH),
                         (file_id, ids[0]))
-                self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, id))
-            #
-            # step 5, rename genotype back
-            self.db.renameTable(new_table, 'genotype_{}'.format(ids[0]))
-            self.db.commit()
+            # step 5: prepare tables to be removed
+            if inPlace:
+                for idx, id in enumerate(ids):
+                    self.db.renameTable('{}_genotype.genotype_{}'.format(self.name, id),
+                        '{}_genotype.__genotype_{}'.format(self.name, id))
+                self.db.renameTable(new_table, 'genotype_{}'.format(ids[0]))
         # finally, remove filenames that are associated with no sample. The individual files can then
         # be imported again, which I am not sure is good or bad
         self.db.execute('DELETE FROM filename WHERE filename.file_id NOT IN (SELECT file_id FROM sample)')
         self.db.commit()
-        prog.done()
+        if not inPlace:
+            self.db.detach('{}_genotype_merged'.format(self.name))
+            self.db.detach('{}_genotype'.format(self.name))
+            os.remove('{}_genotype.DB'.format(self.name))
+            os.rename('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name),
+                '{}_genotype.DB'.format(self.name))
+        # 
+        # actually remove obsolete tables, this can be slow but interruption of
+        # command will not break the database
+        if inPlace:
+            prog = ProgressBar('Removing obsolete tables', count)
+            for name, ids in merged.iteritems():
+                for id in ids:
+                    self.db.removeTable('{}_genotype.__genotype_{}'.format(self.name, id))
+                    prog.increment()
+            self.db.commit()
+            prog.done()
+
 
     def createVariantMap(self, table='variant', alt_build=False):
         '''Create a map of all variants from specified table.
@@ -4127,8 +4156,6 @@ def admin(args):
                     args.rename_samples[1].strip(),
                     None if len(args.rename_samples) == 2 else args.rename_samples[2].strip())
             elif args.merge_samples:
-                # need to merge genotype tables
-                proj.db.attach(proj.name + '_genotype')
                 proj.mergeSamples()
             elif args.rename_table:
                 if args.rename_table[0] == 'variant':

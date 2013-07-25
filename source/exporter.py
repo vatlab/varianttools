@@ -980,7 +980,7 @@ class Exporter:
             header = header.replace('%(datetime)s',
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
             # command
-            header = heaer.replace('%(command)s',
+            header = header.replace('%(command)s',
                 env.command_line)
             print >> output, header.rstrip()
         global rec_ref, rec_alt
