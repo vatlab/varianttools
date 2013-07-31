@@ -675,6 +675,16 @@ class RunCommand:
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
         if self.output:
+            lock_file = self.output[0] + '.lck'
+            if os.path.isfile(lock_file):
+                env.logger.warning('Output of pipeline locked by {}. Please remove '
+                    'this file if no other process is writing to this file.'
+                    .format(lock_file))
+            while True:
+                if os.path.isfile(lock_file):
+                    time.sleep(10)
+                else:
+                    break
             if os.path.isfile(self.output[0] + '.exe_info'):
                 with open(self.output[0] + '.exe_info') as exe_info:
                     cmd = exe_info.readline().strip()
