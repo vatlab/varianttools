@@ -120,7 +120,7 @@ class Jobs:
                 # first protect double $ sign.
                 s = re.sub(r'\$\$', r'%%%', s)
                 # subsitute in script
-                if True in [x in str(v) for x in [' ', '*', ',', '[', ']']]:
+                if True in [x in str(v) for x in [' ', ',', '[', ']']]:
                     if '"' in str(v):
                         quote = '"'
                     else:

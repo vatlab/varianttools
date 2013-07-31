@@ -694,6 +694,15 @@ class RunCommand:
                         ofiles=self.output, md5file=self.output[0] + '.exe_info'):
                     env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
                     return self.output
+            # create directory if output directory does not exist
+            for dir in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
+                if not os.path.isdir(dir):
+                    try:
+                        os.makedirs(dir)
+                    except Exception as e:
+                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
+                    if not os.path.isdir(dir):
+                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
         run_command(self.cmd, output=self.output, working_dir=self.working_dir,
             max_jobs=self.max_jobs)
         # add md5 signature of input and output files
@@ -752,7 +761,7 @@ class DecompressFiles:
                 env.logger.warning('Using existing decompressed file {}'.format(dest_file))
             else:
                 env.logger.info('Decompressing {} to {}'.format(filename, dest_file))
-                with bz2.open(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
+                with bz2.BZ2File(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
                     content = bzinput.read(10000000)
                     while content:
                         output.write(content)
@@ -842,11 +851,11 @@ class LinkToDir:
         if not os.path.isdir(self.dest):
             env.logger.info('Creating directory {}'.format(self.dest))
             try:
-                os.mkdirs(self.dest)
+                os.makedirs(self.dest)
             except Exception as e:
-                raise RuntimeError('Failed to create directory {}'.format(self.dest))
+                raise RuntimeError('Failed to create directory {}: {}'.format(self.dest, e))
             if not os.path.isdir(self.dest):
-                raise RuntimeError('Failed to create directory {}'.format(self.dest))
+                raise RuntimeError('Failed to create directory {}: {}'.format(self.dest, e))
 
     def __call__(self, ifiles):
         ofiles = []

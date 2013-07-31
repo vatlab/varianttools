@@ -1174,24 +1174,24 @@ class GenotypeWriter:
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
-        duplicated_genotype = 0
-        for id in self.cache.keys():
-            self.cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM genotype_{}'.format(id))
-            nRec, nVar = self.cur.fetchone()
-            if nRec != nVar:
-                self.cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
-                    '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
-                    .format(id))
-                if self.cur.rowcount != nRec - nVar:
-                    raise SystemError('Failed to remove duplicated variants from '
-                        'genotype table genotype_{}'.format(id))
-            duplicated_genotype += nRec - nVar
-        self.db.commit()
+        #duplicated_genotype = 0
+        #for id in self.cache.keys():
+        #    self.cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM genotype_{}'.format(id))
+        #    nRec, nVar = self.cur.fetchone()
+            #if nRec != nVar:
+            #    self.cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
+            #        '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
+            #        .format(id))
+            #    if self.cur.rowcount != nRec - nVar:
+            #        raise SystemError('Failed to remove duplicated variants from '
+            #            'genotype table genotype_{}'.format(id))
+            #duplicated_genotype += nRec - nVar
+        #self.db.commit()
         self.db.close()
-        if duplicated_genotype:
-            env.logger.warning('{} duplicated genotypes are removed from {} sample{}.'
-                .format(duplicated_genotype, len(self.cache.keys()),
-                    's' if len(self.cache.keys()) > 1 else ''))
+        #if duplicated_genotype:
+        #    env.logger.warning('{} duplicated genotypes are removed from {} sample{}.'
+        #        .format(duplicated_genotype, len(self.cache.keys()),
+        #            's' if len(self.cache.keys()) > 1 else ''))
 
 #
 #

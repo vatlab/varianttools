@@ -7,16 +7,34 @@
 [pipeline description]
 description=A pipeline to align raw reads from fastq or BAW/SAM files using BWA
   and GATK best practice. It uses hg19 of human reference genome and assumes
-  paired-end reads in plain text and compressed formats. Reduced bam files
-  are produced if more than one output files are specified.
-#
+  paired-end reads in plain text and compressed formats.
+
+align_description=Align raw reads from input files using bwa, gatk, and picard.
+  This pipeline accepts raw input files in plain text format, SAM/BAM format,
+  and their compressed versions (.zip, .tar.gz, .tgz, .bz2, .tbz2 etc). All
+  input files are assumed to be raw reads from the same sample. This pipeline
+  generates a calibrated bam file (--output), and its reduced version if an
+  additional output file is specified.
+
+call_description=Call and validate variants (SNVs and Indels) from a input bam
+  file. This pipeline accepts a bam file as input and a vcf file as output.
+
 # resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_hg19
 RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk23_hg19
 
+# directory to save all intermediate files
+AUXILIARY_DIR=${CACHE_DIR}/%(name)s
+
 [DEFAULT]
-strict_prog_version=True
-strict_prog_version_comment=Whether or not use other version of programs if the exact version does not
-	exist. Setting it to False allows variant tools to use other versions of the programs.
+name=bwa_gatk_hg19
+name_comment=Name of the job to be executed. All intermediate files generated
+  from this pipeline will be saved to $CACHE_DIR/$NAME where $CACHE_DIR is
+  the cache directory of the project.
+
+strict_prog_version=False
+strict_prog_version_comment=Whether or not use other version of programs if the
+  exact version does not exist. Setting it to False allows variant tools to 
+  use other versions of the programs.
 
 bwa=bwa
 bwa_comment=path to bwa. Default to 'bwa' (use $PATH to determine actual path)
@@ -193,8 +211,10 @@ comment=Build samtools index for build hg19 of reference genome
 input=${CMD_INPUT}
 action=RunCommand("%(java)s %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(opt_picard_samtofastq)s
     INPUT=${INPUT} 
-    FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
-    SECOND_END_FASTQ=${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}")
+    FASTQ=${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
+    SECOND_END_FASTQ=${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}",
+    output=["${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}",
+         "${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}"])
 input_emitter=EmitInput(select=['bam', 'sam'], pass_unselected=True)
 comment=Convert bam files to paired fastq files if the input is in bam/sam format.
     Other input files are returned untouched.
@@ -202,7 +222,7 @@ comment=Convert bam files to paired fastq files if the input is in bam/sam forma
 [align_101]
 # input is output of previous step ${OUTPUT100}
 input_emitter=EmitInput('single')
-action=DecompressFiles(dest_dir="${CACHE_DIR}"), LinkToDir('${CACHE_DIR}')
+action=DecompressFiles(dest_dir="${AUXILIARY_DIR}"), LinkToDir('${AUXILIARY_DIR}')
 comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
     a cache directory. Uncompressed files are hard-linked to the cache directory.
 
@@ -450,8 +470,8 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         --genotype_likelihoods_model BOTH 
-        -o ${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
-    output="${CACHE_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
+        -o ${AUXILIARY_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
+    output="${AUXILIARY_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
 # make sure the input is a bam file
 input_emitter=EmitInput(select='.bam')
 comment=Use unified genotyper to get raw variants
