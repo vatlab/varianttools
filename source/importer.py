@@ -1338,8 +1338,8 @@ class ImportStatus:
         # directly, we have to wait till it is finished to let others
         # copy genotype tables to this database
         main_item = [(x, y) for x ,y in self.tasks.items() if '/' not in x[1]]
-        if main_item and main_item[0][1] >= 4:
-            if main_item[0][1][0] == 4:
+        if main_item and main_item[0][1] >= 3:
+            if main_item[0][1][0] == 3:
                 # set status to copied because no copying is needed, and continue
                 self.tasks[main_item[0][0]] = (5, self.tasks[main_item[0][0]][1])
             # if main item status is 5, can start copying stuff
@@ -2136,7 +2136,6 @@ class Importer:
             workload = [max(10, int((1.2*len(sample_ids)/self.jobs)*(1-x/(3.*(self.jobs - 1))))) for x in range(self.jobs)]
             # if there are missing ones, give it to workload
             workload[0] += max(0, len(sample_ids) - sum(workload))
-            env.logger.error(workload)
             start_sample = 0
             for job in range(self.jobs):
                 if workload[job] == 0:
