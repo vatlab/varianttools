@@ -79,7 +79,9 @@ class EmitInput:
                 if not line.startswith('@'):
                     return False
         except Exception as e:
+            env.logger.warning('Input file {} is not in fastq format: {}'.format(filename, e))
             return False
+        return True
 
     def _is_paired(self, f1, f2, at=None):
         if len(f1) != len(f2):
