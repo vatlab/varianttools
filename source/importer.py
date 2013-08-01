@@ -1165,33 +1165,35 @@ class GenotypeWriter:
         if self.count % 1000 == 0:
             self.db.commit()
     
-    def close(self):
+    def commit_remaining(self):
         for id, val in self.cache.iteritems():
             if len(val) > 0:
                 self.cur.executemany(self.query.format(id), val)
         self.db.commit()
+
+    def dedup(self, counter = None):
         # checking if there are duplicated variant_ids in genotype tables
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
-        #duplicated_genotype = 0
-        #for id in self.cache.keys():
-        #    self.cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM genotype_{}'.format(id))
-        #    nRec, nVar = self.cur.fetchone()
-            #if nRec != nVar:
-            #    self.cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
-            #        '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
-            #        .format(id))
-            #    if self.cur.rowcount != nRec - nVar:
-            #        raise SystemError('Failed to remove duplicated variants from '
-            #            'genotype table genotype_{}'.format(id))
-            #duplicated_genotype += nRec - nVar
-        #self.db.commit()
+        duplicated_genotype = 0
+        for id in self.cache.keys():
+            self.cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
+                'FROM genotype_{}'.format(id))
+            nRec, nVar = self.cur.fetchone()
+            if nRec != nVar:
+                env.logger.warning('Removing {} duplicated genotypes from sample {}.'
+                    .format(nRec - nVar, id))
+                self.cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
+                    '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
+                    .format(id))
+                if self.cur.rowcount != nRec - nVar:
+                    raise SystemError('Failed to remove duplicated variants from '
+                        'genotype table genotype_{}'.format(id))
+            if counter:
+                counter.value += 1
+        self.db.commit()
         self.db.close()
-        #if duplicated_genotype:
-        #    env.logger.warning('{} duplicated genotypes are removed from {} sample{}.'
-        #        .format(duplicated_genotype, len(self.cache.keys()),
-        #            's' if len(self.cache.keys()) > 1 else ''))
 
 #
 #
@@ -1286,9 +1288,10 @@ class ImportStatus:
 
         (0,0):  initial input, not imported
         (1,x):  being imported
-        (2,x):  imported
-        (3,1):  being copied
-        (4,1):  copied (done)
+        (2,x):  imported and being dedupped
+        (3,1):  dedupped
+        (4,1):  being copied
+        (5,1):  copied (done)
 
         x is 0, or 1 indicating if the genotype tables have been created.
         '''
@@ -1321,7 +1324,7 @@ class ImportStatus:
 
     def pendingCopy(self):
         # return waiting 
-        return sum([x[0] == 2 for x in self.tasks.values()])
+        return sum([x[0] == 3 for x in self.tasks.values()])
 
     def numItems(self):
         return len(self.tasks)
@@ -1335,19 +1338,20 @@ class ImportStatus:
         # directly, we have to wait till it is finished to let others
         # copy genotype tables to this database
         main_item = [(x, y) for x ,y in self.tasks.items() if '/' not in x[1]]
-        if main_item and main_item[0][1] >= 2:
-            if main_item[0][1][0] == 2:
+        if main_item and main_item[0][1] >= 4:
+            if main_item[0][1][0] == 4:
                 # set status to copied because no copying is needed, and continue
-                self.tasks[main_item[0][0]] = (4, self.tasks[main_item[0][0]][1])
-            # if main item status is 4, can start copying stuff
+                self.tasks[main_item[0][0]] = (5, self.tasks[main_item[0][0]][1])
+            # if main item status is 5, can start copying stuff
             for item in sorted(self.tasks.keys()):
-                # only check for status 2 items
+                # create genotype tables
                 if self.tasks[item][1] == 0:
                     self.tasks[item] = (self.tasks[item][0], 1)
                     ret = (item, 0)
                     break
-                if self.tasks[item] == (2, 1):
-                    self.tasks[item] = (3, 1)
+                # only check for status 3 items (dedupped)
+                if self.tasks[item] == (3, 1):
+                    self.tasks[item] = (4, 1)
                     ret = (item, 1)
                     break
         self.lock.release()
@@ -1366,7 +1370,7 @@ class ImportStatus:
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, variantIndex, filelist, processor, encoding, header, genotype_field, genotype_info, ranges, 
-        geno_count, proc_index, status):
+        geno_count, dedup_count, proc_index, status):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
@@ -1388,6 +1392,7 @@ class GenotypeImportWorker(Process):
         self.ranges = ranges
         #
         self.geno_count = geno_count
+        self.dedup_count = dedup_count
         self.proc_index = proc_index
         #
         self.status = status
@@ -1412,8 +1417,10 @@ class GenotypeImportWorker(Process):
             self.start_count = self.geno_count.value
             start_import_time = time.time()
             self._importData()
-            # set the status to be imported (2)
+            # set the status to be imported (2) (and being dedupped)
             self.status.set(item, 2)
+            self._dedupData()
+            self.status.set(item, 3)
             end_import_time = time.time()
             todo, going = self.status.pendingImport()
             env.logger.debug('Importing {} samples ({} - {}) to {} took importer {} {:.1f} seconds, {} onging, {} to go.'.format(
@@ -1424,7 +1431,7 @@ class GenotypeImportWorker(Process):
         env.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
             min(self.sample_ids), max(self.sample_ids)))
         reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.header)
-        writer = GenotypeWriter(self.genotype_file, self.genotype_info, self.genotype_status, self.sample_ids)
+        self.writer = GenotypeWriter(self.genotype_file, self.genotype_info, self.genotype_status, self.sample_ids)
         fld_cols = None
         last_count = 0
         for self.count[0], bins, rec in reader.records():
@@ -1449,20 +1456,22 @@ class GenotypeImportWorker(Process):
                         # variant index
                         if rec[self.ranges[1] + idx] is not None:
                             self.count[1] += 1
-                            writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
+                            self.writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
                     except IndexError:
                         env.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
                             len(rec), fld_cols[-1][-1] + 1, rec))
             else:
                 # should have only one sample
                 for id in self.sample_ids:
-                    writer.write(id, [variant_id])
+                    self.writer.write(id, [variant_id])
             if self.count[0] - last_count > 100:
                 self.geno_count.value = self.start_count + self.count[0] * len(self.sample_ids)
                 last_count = self.count[0]
-        writer.close()
+        self.writer.commit_remaining()
 
-
+    def _dedupData(self):
+        self.writer.dedup(self.dedup_count)
+        
 class GenotypeCopier(Process):
     def __init__(self, main_genotype_file, genotype_info, copied_samples, status):
         '''copied_samples is a shared variable that should be increased with
@@ -1513,8 +1522,8 @@ class GenotypeCopier(Process):
                 start_copy_time = time.time()
                 # get parameters
                 self._copySamples()
-                # set the status of the item to be copied (4)
-                self.status.set(item[0], 4)
+                # set the status of the item to be copied (5)
+                self.status.set(item[0], 5)
                 end_copy_time = time.time()
                 env.logger.debug('Copying {} samples ({} - {}) from {} took {:.1f} seconds, {} to go.'.format(
                     len(self.sample_ids), min(self.sample_ids), max(self.sample_ids),
@@ -1898,7 +1907,8 @@ class Importer:
         self.count[7] = reader.unprocessable_lines
         # stop writers
         if genotype_status != 0:
-            writer.close()
+            writer.commit_remaining()
+            writer.dedup()
         self.db.commit()
        
     def importVariant(self, input_filename):
@@ -2054,6 +2064,7 @@ class Importer:
         importers = [None] * self.jobs
         # number of genotypes each process have imported
         genotype_import_count = [Value('L', 0) for x in range(self.jobs)]
+        sample_dedup_count = [Value('L', 0) for x in range(self.jobs)]
         # number of sample copied
         sample_copy_count = Value('L', 0)
         # import queue that accept jobs sample 1.1, 1.2, etc
@@ -2107,21 +2118,25 @@ class Importer:
             # from our benchmark, if we split jobs evenly, the last trunk will
             # take about double time to finish because the extra time to reach the end
             # if the lines are long. Therefore, we are using an algorithm that the last
-            # piece will handle half of the samples of the first one.
+            # piece will handle 2/3 of the samples of the first one.
             #
             # n -- len(sample_ids)
             # m -- number of processes
             # k -- workload of the first one
-            # k - k/2(m-1) -- workload of the second one
+            # k - k/3(m-1) -- workload of the second one
             # ...
-            # k/2 -- workload of the last one
+            # 2k/3 -- workload of the last one
             # 
-            # k =  4n/3m
+            # k = 6n/(5m)
+            # d=k/3(m-1)
+            #
+            # k-xd (x=0, ..., m-1)
             #
             # each process handle at least 10 samples
-            workload = [max(10, int(4*len(sample_ids)/(3.*self.jobs)*(1-x/(2.*(self.jobs - 1))))) for x in range(self.jobs)]
+            workload = [max(10, int((1.2*len(sample_ids)/self.jobs)*(1-x/(3.*(self.jobs - 1))))) for x in range(self.jobs)]
             # if there are missing ones, give it to workload
             workload[0] += max(0, len(sample_ids) - sum(workload))
+            env.logger.error(workload)
             start_sample = 0
             for job in range(self.jobs):
                 if workload[job] == 0:
@@ -2147,7 +2162,7 @@ class Importer:
                     if importers[i] is None or not importers[i].is_alive():
                         importers[i] = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
                             self.processor, self.encoding, self.header, self.genotype_field, self.genotype_info, self.ranges,
-                            genotype_import_count[i], i, status)
+                            genotype_import_count[i], sample_dedup_count[i], i, status)
                         importers[i].start()
                         break
                 start_sample = end_sample
@@ -2172,15 +2187,25 @@ class Importer:
                     if importers[i] is None or not importers[i].is_alive():
                         importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding, self.header,
                             self.genotype_field, self.genotype_info, self.ranges,
-                            genotype_import_count[i], i, status)
+                            genotype_import_count[i], sample_dedup_count[i], i, status)
                         importers[i] = importer
                         importer.start()
                         new_count += 1
                     if new_count >= queued:
                         break
             time.sleep(2)
+        # monitor the dedup of genotypes
+        prog = ProgressBar('Removing duplicates', status.total_sample_count,
+            initCount=sum([x.value for x in sample_dedup_count]))
+        while True:
+            dedupped = sum([x.value for x in sample_dedup_count])
+            prog.update(dedupped)
+            if dedupped == status.total_sample_count:
+                prog.done()
+                break
+            time.sleep(1)
         # monitor the copy of genotypes
-        prog = ProgressBar('Copying genotype', status.total_sample_count, initCount=sample_copy_count.value)
+        prog = ProgressBar('Copying samples', status.total_sample_count, initCount=sample_copy_count.value)
         while True:
             prog.update(sample_copy_count.value)
             if sample_copy_count.value == status.total_sample_count:
