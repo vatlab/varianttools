@@ -1127,7 +1127,7 @@ class GenotypeWriter:
         s = delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
         for idx, sid in enumerate(sample_ids):
             # create table
-            self.createNewSampleVariantTable(self.cur,
+            self._createNewSampleVariantTable(self.cur,
                 'genotype_{0}'.format(sid), genotype_status == 2, geno_info)
         self.db.commit()
         del s
@@ -1139,7 +1139,7 @@ class GenotypeWriter:
         # calling 1000 'execute'.
         self.cache = {}
 
-    def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
+    def _createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
         '''Create a table ``genotype_??`` to store genotype data'''
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
@@ -1331,16 +1331,25 @@ class ImportStatus:
         indicating whether or not the tables have been created.'''
         ret = None
         self.lock.acquire()
-        for item in sorted(self.tasks.keys()):
-            # only check for status 2 items
-            if self.tasks[item][1] == 0:
-                self.tasks[item] = (self.tasks[item][0], 1)
-                ret = (item, 0)
-                break
-            if self.tasks[item] == (2, 1):
-                self.tasks[item] = (3, 1)
-                ret = (item, 1)
-                break
+        # becaue the first process write to the main genotype database
+        # directly, we have to wait till it is finished to let others
+        # copy genotype tables to this database
+        main_item = [(x, y) for x ,y in self.tasks.items() if '/' not in x[1]]
+        if main_item and main_item[0][1] >= 2:
+            if main_item[0][1][0] == 2:
+                # set status to copied because no copying is needed, and continue
+                self.tasks[main_item[0][0]] = (4, self.tasks[main_item[0][0]][1])
+            # if main item status is 4, can start copying stuff
+            for item in sorted(self.tasks.keys()):
+                # only check for status 2 items
+                if self.tasks[item][1] == 0:
+                    self.tasks[item] = (self.tasks[item][0], 1)
+                    ret = (item, 0)
+                    break
+                if self.tasks[item] == (2, 1):
+                    self.tasks[item] = (3, 1)
+                    ret = (item, 1)
+                    break
         self.lock.release()
         return ret
 
@@ -1466,9 +1475,8 @@ class GenotypeCopier(Process):
         self.status = status
 
     def run(self):
-        self.db = DatabaseEngine()
-        self.db.connect(self.main_genotype_file)
         file_count = 0
+        self.db = None
         while True:
             try:
                 item = self.status.itemToCopy()
@@ -1477,12 +1485,21 @@ class GenotypeCopier(Process):
                 sys.exit(1)
             if item is None:
                 if self.status.all_done.value == 1:
-                    self.db.close()
-                    env.logger.debug('Genotype of {} samples are copied from {} files'.format(
-                        self.copied_samples.value, file_count))
+                    if self.db is not None:
+                        self.db.close()
+                    env.logger.debug('Genotype of {} samples are copied from {} files'
+                        .format(self.copied_samples.value, file_count))
                     break
                 time.sleep(1)
-            elif item[1] == 0:   # create table only
+                continue
+            # only connect to the database engine when the main process is done
+            if self.db is None:
+                self.db = DatabaseEngine()
+                self.db.connect(self.main_genotype_file)
+                # copied samples should include the number of samples in the main
+                # genotype table
+                self.copied_samples.value += len(self.db.tables())
+            if item[1] == 0:   # create table only
                 infile, self.genotype_file, self.genotype_status, ss, es, self.sample_ids = item[0]
                 start_create_time = time.time()
                 self._createTables()
@@ -1505,7 +1522,7 @@ class GenotypeCopier(Process):
                 file_count += 1
 
 
-    def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
+    def _createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
         '''Create a table ``genotype_??`` to store genotype data'''
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
@@ -1518,7 +1535,7 @@ class GenotypeCopier(Process):
     def _createTables(self):
         cur = self.db.cursor()
         for ID in self.sample_ids:
-            self.createNewSampleVariantTable(cur, 'genotype_{}'.format(ID), self.genotype_status == 2, self.genotype_info)
+            self._createNewSampleVariantTable(cur, 'genotype_{}'.format(ID), self.genotype_status == 2, self.genotype_info)
         
     def _copySamples(self):
         self.db.attach(self.genotype_file, '__from')
@@ -2024,6 +2041,7 @@ class Importer:
 
         A: 2 TextReader processes <--> main process read variant1, 2, 3 --> master variant table
         B: self.jobs GenotypeImportWorker reads sample 1.1, 1.2, 1.3, 2.1 etc ... --> temporary genotype tables
+           except for the first process, which writes to the main genotype table directly.
         C: 1 GenotypeCopier -> copy temporary genotype tables to the master genotype table
 
         The processes are organized so that 
@@ -2060,6 +2078,7 @@ class Importer:
         # to pass it with other parameters.
         #
         # process each file
+        tmp_file = None
         for count, input_filename in enumerate(self.files):
             env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
             self.importVariant(input_filename)
@@ -2111,7 +2130,11 @@ class Importer:
                 if end_sample <= start_sample:
                     continue
                 # tell the processor do not import variant info, import part of the sample
-                tmp_file = os.path.join(env.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
+                if not tmp_file:
+                    # for the first process, write to the main genotype table (to avoid copying)
+                    tmp_file = '{}_genotype.DB'.format(self.proj.name)
+                else:
+                    tmp_file = os.path.join(env.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
                 if os.path.isfile(tmp_file):
                     os.remove(tmp_file)
                 if os.path.isfile(tmp_file):
