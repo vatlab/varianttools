@@ -1290,11 +1290,11 @@ class Project:
             # update at most 5 of them them silently
             changed = res.checkUpdate(5)
             if len(changed) == 1:
-                env.logger.warning('Resouce file {} has been updated. Please '
+                env.logger.warning('Resource file {} has been updated. Please '
                     'update it using command "vtools admin --update_resource '
                     'existing".'.format(changed[0]))
             elif len(changed) > 1:
-                env.logger.warning('Resouce files {} have been updated. Please '
+                env.logger.warning('Resource files {} have been updated. Please '
                     'update them using command "vtools admin --update_resource '
                     'existing".'.format(', '.join(changed)))
         except Exception as e:
