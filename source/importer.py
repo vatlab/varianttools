@@ -862,7 +862,7 @@ class LineProcessor:
 # Read record from disk file
 #
 
-def TextReader(processor, input, varIdx, getNew, jobs, encoding, header):
+def TextReader(processor, input, varIdx, getNew, jobs, encoding, header, quiet=False):
     '''
     input: input file
     varIdx: variant index, if specified, only matching variants will be returned
@@ -873,17 +873,17 @@ def TextReader(processor, input, varIdx, getNew, jobs, encoding, header):
     encoding: file encoding
     '''
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, header)
+        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, header, quiet)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, header)
+        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, header, quiet)
     else:
-        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, header)
+        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, header, quiet)
 
 class EmbeddedTextReader:
     #
     # This reader read the file from the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, getNew, encoding, header):
+    def __init__(self, processor, input, varIdx, getNew, encoding, header, quiet=False):
         self.num_records = 0
         self.unprocessable_lines = 0
         self.processor = processor
@@ -892,6 +892,7 @@ class EmbeddedTextReader:
         self.getNew = getNew
         self.encoding = encoding
         self.header = header
+        self.quiet = quiet
 
     def records(self): 
         first = True
@@ -934,7 +935,8 @@ class EmbeddedTextReader:
                                     continue
                         yield (line_no, bins, rec)
                 except Exception as e:
-                    env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    if not self.quiet:
+                        env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
                     self.unprocessable_lines += 1
 
 
@@ -944,7 +946,8 @@ class ReaderWorker(Process):
     to process input line. If multiple works are started,
     they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     '''
-    def __init__(self, processor, input, varIdx, getNew, output, step, index, encoding, header):
+    def __init__(self, processor, input, varIdx, getNew, output, step, index, 
+        encoding, header, quiet=False):
         '''
         processor:  line processor
         input:      input filename
@@ -964,6 +967,7 @@ class ReaderWorker(Process):
         self.index = index
         self.encoding = encoding
         self.header = header
+        self.quiet = quiet
 
     def run(self): 
         first = True
@@ -1010,7 +1014,8 @@ class ReaderWorker(Process):
                                     continue
                         self.output.send((line_no, bins, rec))
                 except Exception as e:
-                    env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                    if not self.quiet:
+                        env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
                     unprocessable_lines += 1
         # if still first (this thread has not read anything), still send the columnRange stuff
         if first:
@@ -1026,12 +1031,13 @@ class StandaloneTextReader:
     ''' This processor fire up 1 worker to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, encoding, header):
+    def __init__(self, processor, input, varIdx, getNew, encoding, header, quiet=False):
         self.num_records = 0
         self.unprocessable_lines = 0
         #
         self.reader, w = Pipe(False)
-        self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0, encoding, header)
+        self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0,
+            encoding, header, quiet)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -1050,14 +1056,16 @@ class MultiTextReader:
     '''This processor fire up num workers to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, jobs, encoding, header):
+    def __init__(self, processor, input, varIdx, getNew, jobs, encoding,
+        header, quiet=False):
         self.readers = []
         self.workers = []
         self.num_records = 0
         self.unprocessable_lines = 0
         for i in range(jobs):
             r, w = Pipe(False)
-            p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i, encoding, header)
+            p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i,
+                encoding, header, quiet)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -1430,7 +1438,8 @@ class GenotypeImportWorker(Process):
     def _importData(self):
         env.logger.debug('Importer {} starts importing genotypes for {} samples ({} - {})'.format(self.proc_index, len(self.sample_ids),
             min(self.sample_ids), max(self.sample_ids)))
-        reader = TextReader(self.processor, self.input_filename, None, False, 0, self.encoding, self.header)
+        reader = TextReader(self.processor, self.input_filename, None, False, 0,
+            self.encoding, self.header, quiet=True)
         self.writer = GenotypeWriter(self.genotype_file, self.genotype_info, self.genotype_status, self.sample_ids)
         fld_cols = None
         last_count = 0
@@ -1865,7 +1874,8 @@ class Importer:
         update_after = min(max(lc//200, 100), 100000)
         # one process is for the main program, the
         # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, False, self.jobs - 1, self.encoding, self.header)
+        reader = TextReader(self.processor, input_filename, None, False, 
+            self.jobs - 1, self.encoding, self.header, quiet=False)
         if genotype_status != 0:
             writer = GenotypeWriter(
                 # write directly to the genotype table
@@ -1924,10 +1934,10 @@ class Importer:
         # variant info is imported
         if self.variant_info:
             reader = TextReader(self.processor, input_filename, None, True, 
-                env.import_num_of_readers, self.encoding, self.header)
+                env.import_num_of_readers, self.encoding, self.header, quiet=False)
         else:
             reader = TextReader(self.processor, input_filename, self.variantIndex, True,
-                env.import_num_of_readers, self.encoding, self.header)
+                env.import_num_of_readers, self.encoding, self.header, quiet=False)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
