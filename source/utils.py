@@ -2311,6 +2311,9 @@ def normalizeVariant(pos, ref, alt):
     #    (as shown in 1000g vcf files)
     #
     if len(ref) > 1 or len(alt) > 1:
+        # STEP 0: structural variants with <> and [ ] stuff in VCF file? 
+        if len(alt) > 1 and not alt.isalpha():
+            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
         # STEP 1: remove leading common string
         # 1. C -> G  (SNV)  
         #    C -> G  
@@ -2349,10 +2352,16 @@ def normalizeVariant(pos, ref, alt):
     # ref or alt is something like '', '-', '.' or '*'
     if not alt.isalpha():
         if not ref.isalpha():
-            raise ValueError('Invalid reference and alternative alleles: {}, {}'.format(ref, alt))
-        alt = '-'
+            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
+        if len(alt) <= 1:  # something like '', '-', '.', '*'
+            alt = '-'
+        else:
+            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
     elif not ref.isalpha():
-        ref = '-'
+        if len(ref) <= 1:
+            ref = '-'
+        else:
+            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
     bin = getMaxUcscBin(pos - 1, pos) if pos else None
     return bin, pos, ref, alt
 
