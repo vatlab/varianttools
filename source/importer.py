@@ -2017,7 +2017,7 @@ class Importer:
             env.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
                 .format(total_var, self.count[2],
                     ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.count[0],
                     'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
                         self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
@@ -2030,7 +2030,7 @@ class Importer:
             env.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
                 .format(total_var, self.total_count[2],
                     ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.total_count[0],
                     'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
                         self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
@@ -2096,7 +2096,7 @@ class Importer:
             env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
                 .format(self.count[2], "(" if self.count[2] else '', 
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                         ")" if self.count[2] else '', self.count[0]))
             # genotypes?
             if self.genotype_field:
@@ -2218,7 +2218,7 @@ class Importer:
             env.logger.info('{:,} new variants ({}) from {:,} lines ({:,} samples) are imported.'\
                 .format(self.total_count[2],
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'invalid']) if x > 0]),
+                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.total_count[0], status.total_sample_count))
 
 
