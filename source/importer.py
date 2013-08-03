@@ -1131,9 +1131,11 @@ class GenotypeWriter:
                 .format(','.join([self.db.PH] * (2 + len(geno_info))))
         else:
             self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db.PH)
+        self.sample_ids = sample_ids
         self.cur = self.db.cursor()
-        s = delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sample_ids)))
-        for idx, sid in enumerate(sample_ids):
+        s = delayedAction(env.logger.info, 'Creating {} genotype tables'
+            .format(len(self.sample_ids)))
+        for idx, sid in enumerate(self.sample_ids):
             # create table
             self._createNewSampleVariantTable(self.cur,
                 'genotype_{0}'.format(sid), genotype_status == 2, geno_info)
@@ -1185,7 +1187,7 @@ class GenotypeWriter:
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
         duplicated_genotype = 0
-        for id in self.cache.keys():
+        for id in self.sample_ids:
             self.cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
                 'FROM genotype_{}'.format(id))
             nRec, nVar = self.cur.fetchone()
@@ -2127,7 +2129,8 @@ class Importer:
                 continue
             #
             # determine workload:
-            # from our benchmark, if we split jobs evenly, the last trunk will
+            # from our benchmark, if there are a large number of jobs and if
+            # we split jobs evenly, the last trunk will
             # take about double time to finish because the extra time to reach the end
             # if the lines are long. Therefore, we are using an algorithm that the last
             # piece will handle 2/3 of the samples of the first one.
@@ -2145,9 +2148,15 @@ class Importer:
             # k-xd (x=0, ..., m-1)
             #
             # each process handle at least 10 samples
-            workload = [max(10, int((1.2*len(sample_ids)/self.jobs)*(1-x/(3.*(self.jobs - 1))))) for x in range(self.jobs)]
-            # if there are missing ones, give it to workload
-            workload[0] += max(0, len(sample_ids) - sum(workload))
+            if len(sample_ids) > 2000:
+                workload = [max(10, int((1.2*len(sample_ids)/self.jobs)*(1-x/(3.*(self.jobs - 1))))) for x in range(self.jobs)]
+            else:
+                workload = [max(10, int(float(len(sample_ids)) / self.jobs))] * self.jobs
+            # if there are missing ones, spread it across workers ...
+            # less than 0 is possible because of the at least 10 policy
+            unallocated = max(0, len(sample_ids) - sum(workload))
+            for i in range(unallocated):
+                workload[i % self.jobs] += 1
             start_sample = 0
             for job in range(self.jobs):
                 if workload[job] == 0:
@@ -2196,9 +2205,11 @@ class Importer:
                 new_count = 0
                 for i in range(self.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        importer = GenotypeImportWorker(self.variantIndex, self.files, self.processor, self.encoding, self.header,
+                        importer = GenotypeImportWorker(self.variantIndex, 
+                            self.files, self.processor, self.encoding, self.header,
                             self.genotype_field, self.genotype_info, self.ranges,
-                            genotype_import_count[i], sample_dedup_count[i], i, status)
+                            genotype_import_count[i], sample_dedup_count[i],
+                            i, status)
                         importers[i] = importer
                         importer.start()
                         new_count += 1
@@ -2216,7 +2227,8 @@ class Importer:
                 break
             time.sleep(1)
         # monitor the copy of genotypes
-        prog = ProgressBar('Copying samples', status.total_sample_count, initCount=sample_copy_count.value)
+        prog = ProgressBar('Copying samples', status.total_sample_count,
+            initCount=sample_copy_count.value)
         while True:
             prog.update(sample_copy_count.value)
             if sample_copy_count.value == status.total_sample_count:
@@ -2230,7 +2242,8 @@ class Importer:
             env.logger.info('{:,} new variants ({}) from {:,} lines ({:,} samples) are imported.'\
                 .format(self.total_count[2],
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
+                        zip(self.total_count[3:8], ['SNVs', 'insertions',
+                        'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.total_count[0], status.total_sample_count))
 
 
