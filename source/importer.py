@@ -1427,6 +1427,8 @@ class GenotypeImportWorker(Process):
             self._importData()
             # set the status to be imported (2) (and being dedupped)
             self.status.set(item, 2)
+            env.logger.debug('Importer {} starts deduplicating {} samples after importing genotypes in {:.1f} seconds'
+                .format(self.proc_index, len(self.sample_ids), time.time() - start_import_time))
             self._dedupData()
             self.status.set(item, 3)
             end_import_time = time.time()
