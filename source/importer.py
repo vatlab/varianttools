@@ -2162,6 +2162,15 @@ class Importer:
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % self.jobs] += 1
+            # if there are many samples, we would like to reduce the workload
+            # of the master thread a little bit so that it can finish first and
+            # start dedupping and copy sample first. In the extreme case, if the 
+            # master process is hold up, everything will stop and wait...
+            if tmp_file is None and workload[0] > 50:
+                workload[0] -= self.jobs - 1
+                for i in range(1, self.jobs):
+                    workload[i] -= 1
+            env.logger.debug('Workload of processes: {}'.format(workload))
             start_sample = 0
             for job in range(self.jobs):
                 if workload[job] == 0:
