@@ -102,6 +102,17 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/dup_geno.vcf --sample_name DUP --build hg18')
         out = outputOfCmd('vtools show genotypes').split('\n')[1:]
         self.assertEqual(out[0].split()[2], out[1].split()[2])
+        #
+        runCmd('vtools init test -f')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertEqual(numOfVariant(), 288)
+        g1 = getGenotypes()
+        runCmd('vtools init test -f')
+        self.assertSucc('vtools import vcf/CEU_dup.vcf.gz --build hg18')
+        self.assertEqual(numOfVariant(), 288)
+        g2 = getGenotypes()
+        self.assertEqual(g1, g2)
+
 
     def testANNOVAR(self):
         'Testing the annovar input format'

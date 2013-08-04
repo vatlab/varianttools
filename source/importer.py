@@ -1185,15 +1185,16 @@ class GenotypeWriter:
         self.db.commit()
         self.db.close()
 
-    def dedup(self, status, counter = None):
+    def dedup(self, status=None, counter = None):
         # checking if there are duplicated variant_ids in genotype tables
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
-        db = DatabaseEngine()
-        db.connect(self.geno_db, readonly=True)
+        #
         # if this is a temporary genotype, '/' should be in geno_db
         inPlace = '/' not in self.geno_db
+        db = DatabaseEngine()
+        db.connect(self.geno_db, readonly=not inPlace)
         cur = db.cursor()
         duplicated_genotype = 0
         for id in self.sample_ids:
@@ -1205,14 +1206,17 @@ class GenotypeWriter:
                     cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
                         '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
                         .format(id))
+                    if cur.rowcount != nRec - nVar:
+                        raise SystemError('Failed to identify duplicated variants from '
+                            'genotype table genotype_{}'.format(id))
                 else:
                     cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
                         '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
                         .format(id))
                     deleted_rows = [x[0] for x in cur.fetchall()]
-                if cur.rowcount != nRec - nVar:
-                    raise SystemError('Failed to identify duplicated variants from '
-                        'genotype table genotype_{}'.format(id))
+                    if len(deleted_rows) != nRec - nVar:
+                        raise SystemError('Failed to identify duplicated variants from '
+                            'genotype table genotype_{}'.format(id))
             else:
                 deleted_rows = []
             #
@@ -1221,7 +1225,8 @@ class GenotypeWriter:
             if not inPlace:
                 status.addCopyingItem(self.geno_db, self.genotype_status, id, deleted_rows)
         # add a final item to indicate everything is done
-        status.addCopyingItem(self.geno_db, self.genotype_status, None, None)
+        if status:
+            status.addCopyingItem(self.geno_db, self.genotype_status, None, None)
         db.commit()
         db.close()
 
@@ -1537,9 +1542,6 @@ class GenotypeCopier(Process):
             if db is None:
                 db = DatabaseEngine()
                 db.connect(self.main_genotype_file)
-                # copied samples should include the number of samples in the main
-                # genotype table
-                self.copied_samples.value += len(db.tables())
             #
             cur = db.cursor()
             genotype_file, genotype_status, ID_and_DUPs = item
@@ -2171,12 +2173,14 @@ class Importer:
                 if not tmp_file:
                     # for the first process, write to the main genotype table (to avoid copying)
                     tmp_file = '{}_genotype.DB'.format(self.proj.name)
+                    # these genotypes do not need to be copied again
+                    sample_copy_count.value += end_sample - start_sample
                 else:
                     tmp_file = os.path.join(env.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
-                if os.path.isfile(tmp_file):
-                    os.remove(tmp_file)
-                if os.path.isfile(tmp_file):
-                    raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
+                    if os.path.isfile(tmp_file):
+                        os.remove(tmp_file)
+                    if os.path.isfile(tmp_file):
+                        raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
                 # send a import job to the importer workers
                 status.add((input_filename, tmp_file, genotype_status, start_sample, end_sample, 
                     tuple(sample_ids[start_sample : end_sample])), num_of_lines)
