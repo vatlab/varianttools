@@ -43,13 +43,14 @@ comment=Equal length sequences corresponding to the reference and indel cases wh
 
 [ref]
 index=5
-adj=ExtractField(1, '/')
+adj=ExtractField(1, '/'), lambda x: '-' if x.startswith('-') else x
 type=VARCHAR(255)
 comment=Reference allele, '-' for insertion
 
 [alt]
 index=5
-adj=ExtractField(2, '/')
+# the field has multiple - (eg. ---/CTT)
+adj=ExtractField(2, '/'), lambda x: '-' if x.startswith('-') else x
 type=VARCHAR(255)
 comment=Alternative allele, '-' for deletion
 
