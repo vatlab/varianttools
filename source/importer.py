@@ -1209,6 +1209,9 @@ class GenotypeWriter:
                     if cur.rowcount != nRec - nVar:
                         raise SystemError('Failed to identify duplicated variants from '
                             'genotype table genotype_{}'.format(id))
+                    # cannot get variant id easily
+                    env.logger.debug('Removing {} duplicated records from sample {}'
+                        .format(cur.rowcount, id))
                 else:
                     cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
                         '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
@@ -1225,7 +1228,7 @@ class GenotypeWriter:
             if not inPlace:
                 status.addCopyingItem(self.geno_db, self.genotype_status, id, deleted_rows)
         # add a final item to indicate everything is done
-        if status:
+        if not inPlace:
             status.addCopyingItem(self.geno_db, self.genotype_status, None, None)
         db.commit()
         db.close()
@@ -1560,6 +1563,12 @@ class GenotypeCopier(Process):
                 query += ');'
                 cur.execute(query)
                 if rowids:
+                    query = ('SELECT variant_id FROM  __from.genotype_{0} '
+                        'WHERE rowid IN ({1});').format(ID, ','.join([str(x) for x in rowids]))
+                    cur.execute(query)
+                    var_ids = [x[0] for x in cur.fetchall()]
+                    env.logger.debug('Removing {} records for variants {} from sample {}'
+                        .format(len(rowids), ', '.join([str(x) for x in var_ids]), ID))
                     query = ('INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0} '
                         'WHERE rowid NOT IN ({1});').format(ID, ','.join([str(x) for x in rowids]))
                 else:
