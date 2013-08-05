@@ -31,6 +31,8 @@ import array
 import time
 from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe, Value, Lock, Manager
+import threading
+import Queue
 if sys.version_info.major == 2:
     from itertools import izip, repeat
 else:
@@ -1115,6 +1117,45 @@ class MultiTextReader:
 # 
 #
 
+class DedupWorker(threading.Thread):
+    def __init__(self, geno_db, dedup_queue, result_queue):
+        self.geno_db = geno_db
+        self.queue = dedup_queue
+        self.result = result_queue
+        #
+        threading.Thread.__init__(self, name='Dedup samples')
+        # set it to daemon so that it will stop after the master thread is killed
+        self.daemon = True
+
+    def run(self):
+        db = DatabaseEngine()
+        db.connect(self.geno_db, readonly=True)
+        cur = db.cursor()
+        cplt = 0
+        while True:
+            id = self.queue.get()
+            if id is None:
+                self.queue.task_done()
+                break
+            cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
+                'FROM genotype_{}'.format(id))
+            nRec, nVar = cur.fetchone()
+            # create a temporary database
+            deleted_rows = []
+            if nRec != nVar:
+                cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
+                    '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
+                    .format(id))
+                deleted_rows = [x[0] for x in cur.fetchall()]
+                if len(deleted_rows) != nRec - nVar:
+                    raise SystemError('Failed to identify duplicated variants from '
+                        'genotype table genotype_{}'.format(id))
+            cplt += 1
+            self.queue.task_done()
+            self.result.put((id, deleted_rows))
+        db.close()
+
+
 class GenotypeWriter:
     '''This class write genotypes to a genotype database, which does
     not have to be the project genotype database.'''
@@ -1190,46 +1231,53 @@ class GenotypeWriter:
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
-        #
-        # if this is a temporary genotype, '/' should be in geno_db
-        inPlace = '/' not in self.geno_db
-        db = DatabaseEngine()
-        db.connect(self.geno_db, readonly=not inPlace)
-        cur = db.cursor()
-        duplicated_genotype = 0
+        queue = Queue.Queue()
+        result = Queue.Queue()
+        dedupWorkers = [DedupWorker(self.geno_db, queue, result) for x in range(10)]
+        for worker in dedupWorkers:
+            worker.start()
         for id in self.sample_ids:
-            cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
-                'FROM genotype_{}'.format(id))
-            nRec, nVar = cur.fetchone()
-            if nRec != nVar:
-                if inPlace:
-                    cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
-                        '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
-                        .format(id))
-                    if cur.rowcount != nRec - nVar:
-                        raise SystemError('Failed to identify duplicated variants from '
-                            'genotype table genotype_{}'.format(id))
-                    # cannot get variant id easily
-                    env.logger.debug('Removing {} duplicated records from sample {}'
-                        .format(cur.rowcount, id))
-                else:
-                    cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
-                        '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
-                        .format(id))
-                    deleted_rows = [x[0] for x in cur.fetchall()]
-                    if len(deleted_rows) != nRec - nVar:
-                        raise SystemError('Failed to identify duplicated variants from '
-                            'genotype table genotype_{}'.format(id))
+            queue.put(id)
+        #
+        inPlace = '/' not in self.geno_db
+        inPlaceChanges = []
+        completed = 0
+        while True:
+            if completed == len(self.sample_ids):
+                break
+            res = result.get()
+            if inPlace:
+                if res[1]:   # need to change
+                    inPlaceChanges.append(res)
             else:
-                deleted_rows = []
-            #
+                status.addCopyingItem(self.geno_db, self.genotype_status, 
+                    res[0], res[1])
             if counter:
                 counter.value += 1
-            if not inPlace:
-                status.addCopyingItem(self.geno_db, self.genotype_status, id, deleted_rows)
-        # add a final item to indicate everything is done
+            completed += 1
+            result.task_done()
+        for i in range(10):
+            queue.put(None)
+        queue.join()
+        result.join()
         if not inPlace:
             status.addCopyingItem(self.geno_db, self.genotype_status, None, None)
+        for worker in dedupWorkers:
+            worker.join()
+        # in place changes
+        if not inPlaceChanges:
+            return
+        db = DatabaseEngine()
+        db.connect(self.geno_db)
+        cur = db.cursor()
+        for id, deleted_rows in inPlaceChanges:
+             cur.execute('SELECT variant_id FROM genotype_{} WHERE rowid IN ({})'
+                 .format(id, ','.join([str(x) for x in deleted_rows])))
+             var_ids = [x for x in cur.fetchall()]
+             env.logger.debug('Removing {} records for variants {} from sample {}'
+                        .format(len(deleted_rows), ', '.join([str(x) for x in var_ids]), id))
+             cur.execute('DELETE FROM genotype_{} WHERE rowid IN ({})'
+                 .format(id, ','.join([str(x) for x in deleted_rows])))
         db.commit()
         db.close()
 
