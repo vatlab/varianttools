@@ -281,10 +281,10 @@ comment=Check the proportion of aligned reads and exit if there are less than
 [align_400]
 input=${OUTPUT301}
 action=RunCommand(cmd="%(java)s %(opt_java)s -jar %(picard_path)s/MergeSamFiles.jar
-        %(opt_picard_mergesamfiles)s ${INPUT: ' '.join(INPUT)}
+        %(opt_picard_mergesamfiles)s 
+        ${INPUT: ' '.join(['INPUT=' + x for x in INPUT])}
         USE_THREADING=true
         VALIDATION_STRINGENCY=LENIENT
-        ASSUME_SORTED=true
         OUTPUT=${INPUT: INPUT[0][:-4] + '_merged.bam'}",
     output="${INPUT: INPUT[0][:-4] + '_merged.bam'}")
 # if there is only one input file, skip this step and pass the input to output
