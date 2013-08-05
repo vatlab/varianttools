@@ -747,8 +747,8 @@ class ProgressBar:
         #    # signal only works in main thread, so this might not work in all cases
         #    pass
         # total count, including failed ones
-        self.count = 0
-        self.failed_count = 0
+        self.count = max(0, initCount)
+        self.failed_count = max(0, initFailedCount)
         # total initial count
         self.init_count = initCount
         self.init_failed_count = initFailedCount
@@ -818,7 +818,8 @@ class ProgressBar:
             self.last_time = self.start_time
         cur_time = time.time()
         # stop update progress bar more than once per second.
-        if self.count > 0 and self.count != self.totalCount and cur_time - self.last_time < 1:
+        if self.count > 0 and self.count > self.init_count and \
+            self.count != self.totalCount and cur_time - self.last_time < 1:
             return
         msg = ['', '', '', '', '', '', '']
         # message

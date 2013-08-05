@@ -139,7 +139,7 @@ class EmitInput:
             # 
             # the code below tries to find good pairs first, then use matched
             # locations to pair others
-            all_pairs = [(x,y) for x in selected for y in selected if self._is_paired(x,y)]
+            all_pairs = [[x,y] for x in selected for y in selected if self._is_paired(x,y)]
             unpaired = [x for x in selected if not any([x in y for y in all_pairs])]
             if unpaired:
                 raise ValueError('Failed to pair input filenames: {} is not paired'
