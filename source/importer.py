@@ -31,8 +31,6 @@ import array
 import time
 from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe, Value, Lock, Manager
-import threading
-import Queue
 if sys.version_info.major == 2:
     from itertools import izip, repeat
 else:
@@ -1117,69 +1115,112 @@ class MultiTextReader:
 # 
 #
 
-class DedupWorker(threading.Thread):
-    '''This dedup worker
-    1. if in place, return a list of rowid to be removed
-    2. otherwise, copy table to a separate database
-    '''
-    def __init__(self, geno_db, geno_info, geno_status, dedup_queue, result_queue):
-        self.geno_db = geno_db
-        self.queue = dedup_queue
-        self.result = result_queue
+class BaseGenotypeWriter:
+    def __init__(self, geno_info, genotype_status, sample_ids):
+        self.sample_ids = sample_ids
         self.geno_info = geno_info
-        self.geno_status = geno_status
-        #
-        threading.Thread.__init__(self, name='Dedup samples')
-        # set it to daemon so that it will stop after the master thread is killed
-        self.daemon = True
+        self.geno_status = genotype_status
 
-    def _createNewSampleVariantTable(self, cur, table):
+    def _createNewSampleVariantTable(self, cur, table, genotype=True):
         '''Create a table ``genotype_??`` to store genotype data'''
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
             '''.format(table) + 
-            (', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.geno_info]) \
-                if self.geno_status == 2 else '')
+            (', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.geno_info]) if genotype else '')
             + ');'
          )
 
-    def run(self):
-        db = DatabaseEngine()
-        db.connect(self.geno_db, readonly=True)
-        cur = db.cursor()
-        while True:
-            id = self.queue.get()
-            if id is None:
-                self.queue.task_done()
-                break
-            #
+
+class MultiGenotypeWriter(BaseGenotypeWriter):
+    '''This class write genotypes to a genotype database, which does
+    not have to be the project genotype database.'''
+    def __init__(self, geno_db, geno_info, genotype_status, sample_ids):
+        '''geno_db:   genotype database
+        geno_info:    genotype information fields
+        sample_ids:   ID of samples that will be written to this database
+        '''
+        BaseGenotypeWriter.__init__(self, geno_info, genotype_status, sample_ids)
+        # we save genotypes to many small files, with a minimal of 5 samples
+        # and a maximum of 10 
+        nDBs = min(10, len(sample_ids) / 5)
+        #
+        self.dispatcher = {}
+        self.geno_db = []
+        self.db = []
+        self.cur = []
+        for x in range(nDBs):
+            self.geno_db.append(geno_db.replace('.DB', '_{}.DB'.format(x)))
+            self.db.append(DatabaseEngine())
+            self.db[-1].connect(self.geno_db[-1])
+            self.cur.append(self.db[-1].cursor())
+        #
+        if self.geno_status == 2:
+            self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'\
+                .format(','.join([self.db[0].PH] * (2 + len(geno_info))))
+        else:
+            self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db[0].PH)
+        #
+        s = delayedAction(env.logger.info, 'Creating {} genotype tables'
+            .format(len(self.sample_ids)))
+        for idx, sid in enumerate(self.sample_ids):
+            self.dispatcher[sid] = idx % nDBs
+            # create table
+            self._createNewSampleVariantTable(self.cur[idx % nDBs],
+                'genotype_{0}'.format(sid), self.geno_status == 2)
+            self.db[idx % nDBs].commit()
+        del s
+        #
+        # number of genotype batches that has been written
+        self.count = 0
+        # cache of genotypes. This class will accumulate 1000 genotypes before
+        # it writes to the disk using 'executemany', which will be faster than
+        # calling 1000 'execute'.
+        self.cache = {}
+
+    def write(self, id, rec):
+        try:
+            if len(self.cache[id]) == 1000:
+                # this will fail if id does not exist, so we do not need 
+                # extra test if id is valid
+                self.cur[self.dispatcher[id]].executemany(self.query.format(id),
+                    self.cache[id])
+                self.cache[id] = [rec]
+                self.count += 1
+            else:
+                self.cache[id].append(rec)
+        except KeyError:
+            # if this is a new id
+            self.cache[id] = [rec]
+    
+    def commit_remaining(self):
+        for id, val in self.cache.iteritems():
+            if len(val) > 0:
+                self.cur[self.dispatcher[id]].executemany(self.query.format(id), val)
+        for db in self.db:
+            db.commit()
+            db.close()
+
+    def dedup(self, status=None, counter = None):
+        # checking if there are duplicated variant_ids in genotype tables
+        # we do not do it during data insertion because (potentially) many tables
+        # are handled simultenously, and keeping track of ids in each sample can
+        # take a lot of ram.
+        #
+        # if this is a temporary genotype, '/' should be in geno_db
+        inPlace = '/' not in self.geno_db
+        self.cur = []
+        for geno_db, db in zip(self.geno_db, self.db):
+            db.connect(geno_db, readonly=True)
+            self.cur.append(db.cursor())
+        #
+        duplicated_genotype = 0
+        for id in self.sample_ids:
+            cur = self.cur[self.dispatcher[id]]
             cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
                 'FROM genotype_{}'.format(id))
             nRec, nVar = cur.fetchone()
-            # if temporary database, save table to another ...
-            if '/' in self.geno_db:
-                # create a temporary database
-                tmp_db = DatabaseEngine()
-                tmp_db.connect('{}_{}.DB'.format(self.geno_db, id))
-                tmp_cur = tmp_db.cursor()
-                self._createNewSampleVariantTable(tmp_cur, 'genotype_{}'.format(id))
-                #
-                if nRec != nVar:
-                    where_clause = ('WHERE rowid IN (SELECT MAX(rowid) '
-                        'FROM genotype_{0} GROUP BY variant_id)'.format(id))
-                else:
-                    where_clause = ''
-                # copy data
-                cur.execute('SELECT * FROM genotype_{} {}'.format(id, where_clause))
-                tmp_cur.executemany('INSERT INTO genotype_{} VALUES ({})'
-                        .format(id, ','.join([tmp_db.PH]*(
-                            (len(self.geno_info) + 2) if self.geno_status == 2 else 1))),
-                        cur)
-                tmp_db.commit()
-                tmp_db.close()
-                deleted_rows = []
-            else:
+            if nRec != nVar:
                 cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
                     '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
                     .format(id))
@@ -1187,12 +1228,17 @@ class DedupWorker(threading.Thread):
                 if len(deleted_rows) != nRec - nVar:
                     raise SystemError('Failed to identify duplicated variants from '
                         'genotype table genotype_{}'.format(id))
-            self.queue.task_done()
-            self.result.put((id, deleted_rows))
-        db.close()
+            else:
+                deleted_rows = []
+            #
+            counter.value += 1
+            status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, id, deleted_rows)
+        for db in self.db:
+            status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, None, None)
+            db.close()
 
 
-class GenotypeWriter:
+class InPlaceGenotypeWriter(BaseGenotypeWriter):
     '''This class write genotypes to a genotype database, which does
     not have to be the project genotype database.'''
     def __init__(self, geno_db, geno_info, genotype_status, sample_ids):
@@ -1201,10 +1247,9 @@ class GenotypeWriter:
         sample_ids:   ID of samples that will be written to this database
         '''
         #
-        self.geno_db = geno_db
-        self.geno_info = geno_info
-        self.geno_status = genotype_status
+        BaseGenotypeWriter.__init__(self, geno_info, genotype_status, sample_ids)
         #
+        self.geno_db = geno_db
         self.db = DatabaseEngine()
         self.db.connect(self.geno_db)
         if self.geno_status == 2:
@@ -1212,7 +1257,6 @@ class GenotypeWriter:
                 .format(','.join([self.db.PH] * (2 + len(geno_info))))
         else:
             self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db.PH)
-        self.sample_ids = sample_ids
         self.cur = self.db.cursor()
         s = delayedAction(env.logger.info, 'Creating {} genotype tables'
             .format(len(self.sample_ids)))
@@ -1229,17 +1273,7 @@ class GenotypeWriter:
         # it writes to the disk using 'executemany', which will be faster than
         # calling 1000 'execute'.
         self.cache = {}
-
-    def _createNewSampleVariantTable(self, cur, table, genotype=True):
-        '''Create a table ``genotype_??`` to store genotype data'''
-        cur.execute('''\
-            CREATE TABLE IF NOT EXISTS {0} (
-                variant_id INT NOT NULL
-            '''.format(table) + 
-            (', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.geno_info]) if genotype else '')
-            + ');'
-         )
-     
+   
     def write(self, id, rec):
         try:
             if len(self.cache[id]) == 1000:
@@ -1268,60 +1302,34 @@ class GenotypeWriter:
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
         # take a lot of ram.
-        queue = Queue.Queue()
-        result = Queue.Queue()
-        dedupWorkers = []
-        for x in range(1):
-            worker = DedupWorker(self.geno_db, self.geno_info, self.geno_status, queue, result)
-            dedupWorkers.append(worker)
-            worker.start()
-        for id in self.sample_ids:
-            queue.put(id)
         #
-        inPlace = '/' not in self.geno_db
-        inPlaceChanges = []
-        completed = 0
-        while True:
-            if completed == len(self.sample_ids):
-                break
-            res = result.get()
-            if inPlace:
-                if res[1]:   # need to change
-                    inPlaceChanges.append(res)
-            else:
-                status.addCopyingItem('{}_{}.DB'.format(self.geno_db, res[0]),
-                    self.geno_status, res[0])
-            if counter:
-                counter.value += 1
-            completed += 1
-            result.task_done()
-        for i in range(1):
-            queue.put(None)
-        queue.join()
-        result.join()
-        for worker in dedupWorkers:
-            worker.join()
-        # in place changes
-        if not inPlaceChanges:
-            try:
-                # all data has been copied out
-                os.remove(self.geno_db)
-            except:
-                pass
-            return
         db = DatabaseEngine()
         db.connect(self.geno_db)
         cur = db.cursor()
-        for id, deleted_rows in inPlaceChanges:
-             cur.execute('SELECT variant_id FROM genotype_{} WHERE rowid IN ({})'
-                 .format(id, ','.join([str(x) for x in deleted_rows])))
-             var_ids = [x[0] for x in cur.fetchall()]
-             env.logger.debug('Removing {} records for variants {} from sample {}'
-                        .format(len(deleted_rows), ', '.join([str(x) for x in var_ids]), id))
-             cur.execute('DELETE FROM genotype_{} WHERE rowid IN ({})'
-                 .format(id, ','.join([str(x) for x in deleted_rows])))
+        duplicated_genotype = 0
+        for id in self.sample_ids:
+            cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
+                'FROM genotype_{}'.format(id))
+            nRec, nVar = cur.fetchone()
+            if nRec != nVar:
+                cur.execute('DELETE from genotype_{0} WHERE rowid NOT IN '
+                    '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
+                    .format(id))
+                if cur.rowcount != nRec - nVar:
+                    raise SystemError('Failed to identify duplicated variants from '
+                        'genotype table genotype_{}'.format(id))
+                # cannot get variant id easily
+                env.logger.debug('{} duplicated records have been removed from sample {}'
+                    .format(cur.rowcount, id))
         db.commit()
         db.close()
+
+
+def GenotypeWriter(geno_db, geno_info, genotype_status, sample_ids):
+    if '/' in geno_db:
+        return MultiGenotypeWriter(geno_db, geno_info, genotype_status, sample_ids)
+    else:
+        return InPlaceGenotypeWriter(geno_db, geno_info, genotype_status, sample_ids)
 
 #
 #
@@ -1400,7 +1408,7 @@ class ImportStatus:
     def __init__(self):
         self.manager = Manager()
         self.tasks = self.manager.dict()
-        self.pending_copied = self.manager.list()
+        self.pending_copied = self.manager.dict()
         self.lock = Lock()
         self.total_sample_count = 0
         self.total_genotype_count = 0
@@ -1449,12 +1457,14 @@ class ImportStatus:
         # return waiting (queued, to be imported) and ongoing import
         return sum([x == 0 for x in self.tasks.values()]), sum([x == 1 for x in self.tasks.values()])
 
-    def addCopyingItem(self, geno_file, geno_status, ID):
+    def addCopyingItem(self, geno_file, geno_status, ID, dup_rows):
         #
         self.lock.acquire()
-        # put item to the last
-        self.pending_copied.append((geno_file, geno_status, ID))
-        env.logger.error('PUT {} {}'.format(ID, len(self.pending_copied)))
+        if (geno_file, geno_status) in self.pending_copied:
+            self.pending_copied[(geno_file, geno_status)] = \
+                self.pending_copied[(geno_file, geno_status)] + [(ID, dup_rows)]
+        else:
+            self.pending_copied[(geno_file, geno_status)] = [(ID, dup_rows)]
         self.lock.release()
 
     def itemToCopy(self):
@@ -1464,8 +1474,8 @@ class ImportStatus:
             ret = None
         else:
             # return any item
-            ret = self.pending_copied.pop(0)
-            env.logger.error('GET {} {} '.format(ret, len(self.pending_copied)))
+            key = self.pending_copied.keys()[0]
+            ret = key[0], key[1], self.pending_copied.pop(key)
         self.lock.release()
         return ret
 
@@ -1626,34 +1636,49 @@ class GenotypeCopier(Process):
                 db.connect(self.main_genotype_file)
             #
             cur = db.cursor()
-            genotype_file, genotype_status, ID = item
+            genotype_file, genotype_status, ID_and_DUPs = item
             #
             db.attach(genotype_file, '__from')
             # start copying genotype
             # copy genotype table
             start_copy_time = time.time()
             cur = db.cursor()
-            query = 'CREATE TABLE IF NOT EXISTS genotype_{0} (variant_id INT NOT NULL'.format(ID)
-            if genotype_status == 2:
-                query += ', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.genotype_info])
-            query += ');'
-            cur.execute(query)
-            query = 'INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0};'.format(ID)
-            cur.execute(query)
-            db.commit()
-            # update progress
-            self.copied_samples.value += 1
+            for ID, rowids in ID_and_DUPs:
+                if ID is None:
+                    continue
+                query = 'CREATE TABLE IF NOT EXISTS genotype_{0} (variant_id INT NOT NULL'.format(ID)
+                if genotype_status == 2:
+                    query += ', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.genotype_info])
+                query += ');'
+                cur.execute(query)
+                if rowids:
+                    query = ('SELECT variant_id FROM  __from.genotype_{0} '
+                        'WHERE rowid IN ({1});').format(ID, ','.join([str(x) for x in rowids]))
+                    cur.execute(query)
+                    var_ids = [x[0] for x in cur.fetchall()]
+                    env.logger.debug('Removing {} records for variants {} from sample {}'
+                        .format(len(rowids), ', '.join([str(x) for x in var_ids]), ID))
+                    query = ('INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0} '
+                        'WHERE rowid NOT IN ({1});').format(ID, ','.join([str(x) for x in rowids]))
+                else:
+                    query = 'INSERT INTO genotype_{0} SELECT * FROM __from.genotype_{0};'.format(ID)
+                cur.execute(query)
+                db.commit()
+                # update progress
+                self.copied_samples.value += 1
             db.detach('__from')
-            env.logger.debug('Copying sample {} from {} took {:.1f} seconds.'
-                .format(ID, os.path.basename(genotype_file),
-                time.time() - start_copy_time))
-            # 
-            try:
-                # remove the temporary file
-                os.remove(genotype_file)
-            except:
-                pass
-
+            end_copy_time = time.time()
+            env.logger.debug('Copying {} samples from {} took {:.1f} seconds.'.format(
+                len([x for x in ID_and_DUPs if x[0] is not None]),
+                os.path.basename(genotype_file),
+                end_copy_time - start_copy_time))
+            # if no IDs, all samples have been copied.
+            if None in ID_and_DUPs[-1]:
+                try:
+                    # remove the temporary file
+                    os.remove(self.genotype_file)
+                except:
+                    pass
 #
 #
 #  Command import
