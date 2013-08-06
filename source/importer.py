@@ -1271,7 +1271,7 @@ class GenotypeWriter:
         queue = Queue.Queue()
         result = Queue.Queue()
         dedupWorkers = []
-        for x in range(10):
+        for x in range(1):
             worker = DedupWorker(self.geno_db, self.geno_info, self.geno_status, queue, result)
             dedupWorkers.append(worker)
             worker.start()
@@ -1295,7 +1295,7 @@ class GenotypeWriter:
                 counter.value += 1
             completed += 1
             result.task_done()
-        for i in range(10):
+        for i in range(1):
             queue.put(None)
         queue.join()
         result.join()
@@ -1454,24 +1454,18 @@ class ImportStatus:
         self.lock.acquire()
         # put item to the last
         self.pending_copied.append((geno_file, geno_status, ID))
+        env.logger.error('PUT {} {}'.format(ID, len(self.pending_copied)))
         self.lock.release()
 
     def itemToCopy(self):
         ret = None
         self.lock.acquire()
-        # becaue the first process write to the main genotype database
-        # directly, we have to wait till it is finished to let others
-        # copy genotype tables to this database
-        main_item = [(x, y) for x ,y in self.tasks.items() if '/' not in x[1]]
-        if main_item and main_item[0][1] >= 3:
-            if main_item[0][1] == 3:
-                # set status to copied because no copying is needed, and continue
-                self.tasks[main_item[0][0]] = 5
-            if not self.pending_copied:
-                ret = None
-            else:
-                # return any item
-                ret = self.pending_copied.pop(0)
+        if not self.pending_copied:
+            ret = None
+        else:
+            # return any item
+            ret = self.pending_copied.pop(0)
+            env.logger.error('GET {} {} '.format(ret, len(self.pending_copied)))
         self.lock.release()
         return ret
 
@@ -2186,7 +2180,6 @@ class Importer:
         # to pass it with other parameters.
         #
         # process each file
-        tmp_file = None
         for count, input_filename in enumerate(self.files):
             env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(self.files)))
             self.importVariant(input_filename)
@@ -2240,14 +2233,7 @@ class Importer:
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % self.jobs] += 1
-            # if there are many samples, we would like to reduce the workload
-            # of the master thread a little bit so that it can finish first and
-            # start dedupping and copy sample first. In the extreme case, if the 
-            # master process is hold up, everything will stop and wait...
-            if tmp_file is None and workload[0] > 50:
-                workload[0] -= self.jobs - 1
-                for i in range(1, self.jobs):
-                    workload[i] -= 1
+            # 
             env.logger.debug('Workload of processes: {}'.format(workload))
             start_sample = 0
             for job in range(self.jobs):
@@ -2257,17 +2243,13 @@ class Importer:
                 if end_sample <= start_sample:
                     continue
                 # tell the processor do not import variant info, import part of the sample
-                if not tmp_file:
-                    # for the first process, write to the main genotype table (to avoid copying)
-                    tmp_file = '{}_genotype.DB'.format(self.proj.name)
-                    # these genotypes do not need to be copied again
-                    sample_copy_count.value += end_sample - start_sample
-                else:
-                    tmp_file = os.path.join(env.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
-                    if os.path.isfile(tmp_file):
-                        os.remove(tmp_file)
-                    if os.path.isfile(tmp_file):
-                        raise RuntimeError('Failed to remove existing temporary database {}. Remove clean your cache directory'.format(tmp_file))
+                tmp_file = os.path.join(env.temp_dir, 'tmp_{}_{}_genotype.DB'.format(count, job))
+                if os.path.isfile(tmp_file):
+                    os.remove(tmp_file)
+                if os.path.isfile(tmp_file):
+                    raise RuntimeError('Failed to remove existing temporary '
+                        'database {}. Remove clean your cache directory'
+                            .format(tmp_file))
                 # send a import job to the importer workers
                 status.add((input_filename, tmp_file, genotype_status, start_sample, end_sample, 
                     tuple(sample_ids[start_sample : end_sample])), num_of_lines)
@@ -2282,7 +2264,8 @@ class Importer:
                 start_sample = end_sample
         # 
         # monitor the import of genotypes
-        prog = ProgressBar('Importing genotypes', status.total_genotype_count, initCount=sum([x.value for x in genotype_import_count]))
+        prog = ProgressBar('Importing genotypes', status.total_genotype_count,
+            initCount=sum([x.value for x in genotype_import_count]))
         while True:
             # each process update their passed shared value
             # the master process add them and get the total number of genotypes imported
