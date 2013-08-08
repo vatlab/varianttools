@@ -1920,17 +1920,22 @@ class Project:
                     raise RuntimeError('Corrupted genotype database: Failed to '
                         'get structure of genotype table {}'.format(id))
             #
-            sql = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
-            env.logger.debug('Executing {}'.format(sql))
+            query = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
+            env.logger.debug('Executing {}'.format(query))
             try:
-                cur.execute(sql)
+                cur.execute(query)
             except Exception as e:
                 raise RuntimeError('Failed to create new genotype table: {}'.format(e))
             # copying genotypes to the temp table
             ranges = []
             for id in ids:
-                cur.execute('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'
+                query = ('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'
                     .format(self.name, id))
+                try:
+                    cur.execute(query)
+                except Exception as e:
+                    raise RuntimeError('Failed to get ID range of table {}: {}'
+                        .format(id, e))
                 ranges.append(cur.fetchone())
                 try:
                     cur.execute('INSERT INTO {1} ({3}) SELECT * FROM {0}_genotype.genotype_{2};'.format(
@@ -1962,8 +1967,13 @@ class Project:
                     break
             #
             if check_overlap:
-                cur.execute('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'
+                query = ('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'
                     .format(new_table))
+                try:
+                    cur.execute(query)
+                except Exception as e:
+                    raise RuntimeError('Failed to check overlap of table {}: {}'
+                        .format(new_table, e))
                 counts = cur.fetchone()
                 if counts[0] != counts[1]:
                     try:
@@ -1983,7 +1993,14 @@ class Project:
             # change filenames
             filenames = []
             for id in ids:
-                cur.execute('SELECT filename FROM sample JOIN filename ON sample.file_id = filename.file_id WHERE sample_id = {}'.format(self.db.PH), (id,))
+                query = ('SELECT filename FROM sample JOIN filename ON '
+                    'sample.file_id = filename.file_id WHERE sample_id = {}'
+                    .format(self.db.PH))
+                try:
+                    cur.execute(query, (id, ))
+                except Exception as e:
+                    raise RuntimeError('Failed to get filename for sample {}: {}'.
+                        format(id, e))
                 rec = cur.fetchone()
                 filenames.extend(rec[0].split(','))
             #
@@ -2009,7 +2026,7 @@ class Project:
             if inPlace:
                 for idx, id in enumerate(ids):
                     self.db.renameTable('{}_genotype.genotype_{}'.format(self.name, id),
-                        '{}_genotype.__genotype_{}'.format(self.name, id))
+                        '__genotype_{}'.format(id))
                 self.db.renameTable(new_table, 'genotype_{}'.format(ids[0]))
         # finally, remove filenames that are associated with no sample. The individual files can then
         # be imported again, which I am not sure is good or bad
@@ -2026,10 +2043,10 @@ class Project:
         # command will not break the database
         if inPlace:
             prog = ProgressBar('Removing obsolete tables', count)
-            for name, ids in merged.iteritems():
+            for idx, (name, ids) in enumerate(merged.iteritems()):
                 for id in ids:
                     self.db.removeTable('{}_genotype.__genotype_{}'.format(self.name, id))
-                    prog.increment()
+                    prog.update(idx + 1)
             self.db.commit()
             prog.done()
 

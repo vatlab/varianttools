@@ -461,6 +461,7 @@ comment=Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias
 
 [STR]
 index=8
+type=INTEGER
 adj=ExtractFlag('STR', ';')
 comment=Variant is a short tandem repeat
 
