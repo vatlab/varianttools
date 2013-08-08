@@ -444,7 +444,7 @@ def expandRegions(args):
                         regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
                     except:
                         pass
-                if not idx:
+                if not regions:
                     logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))

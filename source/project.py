@@ -3369,7 +3369,7 @@ def remove_duplicate_genotype(proj):
     db = DatabaseEngine()
     db.connect('{}_genotype'.format(proj.name))
     tables = [x for x in db.tables() if x.startswith('genotype_')]
-    prog = ProgressBar('Upgrading to 1.0.7', len(tables))
+    prog = ProgressBar('Upgrading project to 1.0.7', len(tables))
     duplicated_genotype = 0
     cur = db.cursor()
     for idx, table in enumerate(tables):
