@@ -26,9 +26,10 @@
 
 import sys, os
 import itertools as it
-from .utils import ProgressBar, RefGenome, env
+from .utils import ProgressBar, RefGenome, env, openFile, DatabaseEngine, downloadFile
 from .plinkfile import PlinkFile
 
+from collections import defaultdict
 from multiprocessing import Lock
 #
 #
