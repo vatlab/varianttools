@@ -28,7 +28,7 @@ pos_adj=0
 pos_adj_comment=Set to 1 to import variants with 0-based positions,
     or to -1 to export variants in 0-based positions.
 
-fields=chr,pos,ref,alt
+fields=
 fields_comment=Fields to output, simple arithmetics are allowed
     (e.g. pos+1) but aggregation functions are not supported.
 
@@ -81,13 +81,13 @@ comment=reference allele
 field=alt
 comment=alternative allele
 
-[col_1]
+[col_5]
 field=%(fields)s
 adj=JoinRecords('\t')
 comment=Output variant info fields as one column
 
 
-[col_5]
+[col_6]
 field=GT
 comment=genotype in numeric style
 
