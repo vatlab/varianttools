@@ -4234,8 +4234,13 @@ def admin(args):
                     if opt not in env.persistent_options:
                         raise ValueError('Only options {} are currently supported.'
                             .format(', '.join(env.persistent_options)))
-                    proj.saveProperty('__option_{}'.format(opt), value)
-                    env.logger.info('Option {} is set to {}'.format(opt, value))
+                    try:
+                        setattr(env, opt, value)
+                    except Exception as e:
+                        raise ValueError('Failed to set value {} to runtime options {}: {}'
+                            .format(value, opt, e))
+                    proj.saveProperty('__option_{}'.format(opt), getattr(env, opt))
+                    env.logger.info('Option {} is set to {}'.format(opt, getattr(env, opt)))
             elif args.reset_runtime_option is not None:
                 if args.reset_runtime_option not in env.persistent_options:
                     raise ValueError('Option {} is not a valid runtime option. '

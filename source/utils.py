@@ -190,7 +190,7 @@ class RuntimeEnvironments(object):
     # attribute check_update
     #
     def _set_check_update(self, v):
-        if v in [1, True, 'T', 'True', 'Y', 'Yes']:
+        if v in ['1', True, 'T', 'True', 'Y', 'Yes']:
             self._check_update = True
         else:
             self._check_update = False
