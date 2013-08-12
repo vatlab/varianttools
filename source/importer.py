@@ -615,7 +615,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
             db.commit()
             db.close()
 
-    def dedup(self, status=None, counter = None):
+    def dedup(self, status=None):
         # checking if there are duplicated variant_ids in genotype tables
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
@@ -645,7 +645,6 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
             else:
                 deleted_rows = []
             #
-            counter.value += 1
             status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, id, deleted_rows)
         for db in self.db:
             status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, None, None)
@@ -711,7 +710,7 @@ class InPlaceGenotypeWriter(BaseGenotypeWriter):
         self.db.commit()
         self.db.close()
 
-    def dedup(self, status=None, counter = None):
+    def dedup(self, status=None):
         # checking if there are duplicated variant_ids in genotype tables
         # we do not do it during data insertion because (potentially) many tables
         # are handled simultenously, and keeping track of ids in each sample can
@@ -906,7 +905,7 @@ class ImportStatus:
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, variantIndex, filelist, processor, encoding, header, 
-        genotype_field, genotype_info, ranges, geno_count, dedup_count,
+        genotype_field, genotype_info, ranges, geno_count, 
         proc_index, status):
         '''
         variantIndex: a dictionary that returns ID for each variant.
@@ -929,7 +928,6 @@ class GenotypeImportWorker(Process):
         self.ranges = ranges
         #
         self.geno_count = geno_count
-        self.dedup_count = dedup_count
         self.proc_index = proc_index
         #
         self.status = status
@@ -1012,9 +1010,11 @@ class GenotypeImportWorker(Process):
                 self.geno_count.value = self.start_count + self.count[0] * len(self.sample_ids)
                 last_count = self.count[0]
         self.writer.commit_remaining()
+        # free some RAM
+        del self.variantIndex
 
     def _dedupData(self):
-        self.writer.dedup(self.status, self.dedup_count)
+        self.writer.dedup(self.status)
         
 class GenotypeCopier(Process):
     def __init__(self, main_genotype_file, genotype_info, copied_samples, status):
@@ -1438,6 +1438,8 @@ class Importer:
         # stop writers
         if genotype_status != 0:
             writer.commit_remaining()
+            # free some RAM
+            del self.variantIndex
             writer.dedup()
         self.db.commit()
        
@@ -1594,8 +1596,6 @@ class Importer:
         importers = [None] * self.jobs
         # number of genotypes each process have imported
         genotype_import_count = [Value('L', 0) for x in range(self.jobs)]
-        sample_dedup_count = [Value('L', 0) for x in range(self.jobs)]
-        # number of sample copied
         sample_copy_count = Value('L', 0)
         # import queue that accept jobs sample 1.1, 1.2, etc
         status = ImportStatus()
@@ -1697,7 +1697,7 @@ class Importer:
                     if importers[i] is None or not importers[i].is_alive():
                         importers[i] = GenotypeImportWorker(self.variantIndex, self.files[:count+1], 
                             self.processor, self.encoding, self.header, self.genotype_field, self.genotype_info, self.ranges,
-                            genotype_import_count[i], sample_dedup_count[i], i, status)
+                            genotype_import_count[i], i, status)
                         importers[i].start()
                         break
                 start_sample = end_sample
@@ -1724,8 +1724,7 @@ class Importer:
                         importer = GenotypeImportWorker(self.variantIndex, 
                             self.files, self.processor, self.encoding, self.header,
                             self.genotype_field, self.genotype_info, self.ranges,
-                            genotype_import_count[i], sample_dedup_count[i],
-                            i, status)
+                            genotype_import_count[i], i, status)
                         importers[i] = importer
                         importer.start()
                         new_count += 1
@@ -1733,16 +1732,6 @@ class Importer:
                         break
             time.sleep(2)
         # monitor the dedup of genotypes
-        prog = ProgressBar('Removing duplicates', status.total_sample_count,
-            initCount=sum([x.value for x in sample_dedup_count]))
-        while True:
-            dedupped = sum([x.value for x in sample_dedup_count])
-            prog.update(dedupped)
-            if dedupped == status.total_sample_count:
-                prog.done()
-                break
-            time.sleep(1)
-        # monitor the copy of genotypes
         prog = ProgressBar('Copying samples', status.total_sample_count,
             initCount=sample_copy_count.value)
         while True:
