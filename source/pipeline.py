@@ -651,7 +651,8 @@ class NullAction:
             return ifiles
         
 class RunCommand:
-    def __init__(self, cmd='', working_dir=None, output=[], max_jobs=1):
+    def __init__(self, cmd='', working_dir=None, output=[], max_jobs=1,
+        locking="exclusive"):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         '''
@@ -664,6 +665,7 @@ class RunCommand:
             self.cmd = [' '.join(x.split()) for x in cmd]
         self.max_jobs = max_jobs
         self.working_dir = working_dir
+        self.locking = locking
         if type(output) == str:
             self.output = [output]
         else:
@@ -678,14 +680,20 @@ class RunCommand:
         if self.output:
             lock_file = self.output[0] + '.lck'
             if os.path.isfile(lock_file):
-                env.logger.warning('Output of pipeline locked by {}. Please remove '
-                    'this file if no other process is writing to this file.'
-                    .format(lock_file))
-            while True:
-                if os.path.isfile(lock_file):
-                    time.sleep(10)
+                if self.locking == 'wait':
+                    env.logger.warning('Output of pipeline locked by {}. Please remove '
+                        'this file if no other process is writing to this file.'
+                        .format(lock_file))
+                    while True:
+                        if os.path.isfile(lock_file):
+                            time.sleep(10)
+                        else:
+                            break
                 else:
-                    break
+                    raise RuntimeError('Output of pipeline locked by {} created '
+                        'by another process. Please remove this file and try again '
+                        'if no other process is writing to this file.'
+                        .format(lock_file))
             if os.path.isfile(self.output[0] + '.exe_info'):
                 with open(self.output[0] + '.exe_info') as exe_info:
                     cmd = exe_info.readline().strip()
