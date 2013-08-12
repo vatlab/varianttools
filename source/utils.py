@@ -104,9 +104,8 @@ class RuntimeEnvironments(object):
                 'This option can be set during vtools init where the verbosity level set by option'
                 ' --verbosity will be set as the project default.'),
             'check_update': (True, 'Automatically check update of variant tools and resources.'),
-            'sqlite_pragma': ('synchronous=OFF,default_cache_size=2000', 'If your project uses a '
-                'sqlite database engine, you can optimize its performance by setting appropriate '
-                'pragma, which will be applied to all opened database connections.'),
+            'sqlite_pragma': ('', 'pragmas for sqlite database that can be used to optimize the '
+                'performance of database operations.'),
             'import_num_of_readers': (2, 'variant tools by default uses two processes to read from '
                 'input files during multi-process importing (--jobs > 0). You can want to set it '
                 'to zero if a single process provides better performance or reduces disk traffic.'),
@@ -230,7 +229,8 @@ class RuntimeEnvironments(object):
         except:
             sys.stderr.write('Invalid pragma {}\n'.format(pragma))
     #
-    sqlite_pragma = property(lambda self: self._sqlite_pragma.split(','), _set_sqlite_pragma)
+    sqlite_pragma = property(lambda self: self._sqlite_pragma.split(',') if self._sqlite_pragma else [],
+        _set_sqlite_pragma)
     #
     # attribute import_num_of_readers
     #
@@ -1766,7 +1766,7 @@ class DatabaseEngine:
             # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
             # We may need to reconsider this though because some pragma applies to 
             # readonly databases (e.g. cache_size)
-            if readonly:
+            if readonly or not env.sqlite_pragma:
                 return
             if lock is not None:
                 lock.acquire()
