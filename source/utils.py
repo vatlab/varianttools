@@ -103,6 +103,7 @@ class RuntimeEnvironments(object):
             'verbosity': ('1', 'Default verbosity level (to the standard output) of the project. '
                 'This option can be set during vtools init where the verbosity level set by option'
                 ' --verbosity will be set as the project default.'),
+            'check_update': (True, 'Automatically check update of variant tools and resources.'),
             'sqlite_pragma': ('synchronous=OFF,default_cache_size=2000', 'If your project uses a '
                 'sqlite database engine, you can optimize its performance by setting appropriate '
                 'pragma, which will be applied to all opened database connections.'),
@@ -145,6 +146,7 @@ class RuntimeEnvironments(object):
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
+        self._check_update = self.persistent_options['check_update'][0]
         # default sqlite pragma
         self._sqlite_pragma = self.persistent_options['sqlite_pragma'][0]
         # number of processes used for reader under multi-processing mode
@@ -184,6 +186,17 @@ class RuntimeEnvironments(object):
             except Exception as e:
                 self._logger.warning('Failed to remove lock file {}'.format(filename))
         self._lock_files = []
+
+    # 
+    # attribute check_update
+    #
+    def _set_check_update(self, v):
+        if v in [1, True, 'T', 'True', 'Y', 'Yes']:
+            self._check_update = True
+        else:
+            self._check_update = False
+    #
+    check_update = property(lambda self: self._check_update, _set_check_update)
     #
     # attribute logfile_verbosity
     #

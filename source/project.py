@@ -1086,9 +1086,9 @@ class Project:
         env.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
         env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
-        #
         env.association_timeout = self.loadProperty('__option_association_timeout', None)
-        #
+        env.logfile_verbosity = self.loadProperty('__option_logfile_verbosity', None)
+        env.check_update = self.loadProperty('__option_check_update', True)
         env.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
         if verbosity is None and not new:
             # try to get saved verbosity level
@@ -1131,8 +1131,8 @@ class Project:
                 env.unlock(lock_file)
             except:
                 pass
-        #if random.randint(1, 10) == 1:
-        self.checkUpdate()
+        if env.check_update:
+            self.checkUpdate()
 
     def create(self, build, **kwargs):
         '''Create a new project'''
