@@ -415,7 +415,14 @@ def setFieldValue(proj, table, items, build):
                 count[2] += 1  # updated
         proj.db.commit()
         # really update things
-        query = 'UPDATE {} SET {};'.format(table, ','.join(items))
+        # update clause is more difficult because it needs to consolidate the
+        # right hand side, not the left hand side of expression
+        update_clause = []
+        for item in items:
+            k, v = item.split('=', 1)
+            v = consolidateFieldName(proj, table, v, build and build == proj.alt_build)[0]
+            update_clause.append('{}={}'.format(k, v))
+        query = 'UPDATE {} SET {};'.format(table, ', '.join(update_clause))
         env.logger.debug('Running {}'.format(query))
         cur.execute(query)
     else:
@@ -449,7 +456,8 @@ def setFieldValue(proj, table, items, build):
         for field, fldType in zip(new_fields, fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if fldType is None:
-                    env.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
+                    env.logger.warning('Use type VARCHAR for a new field {} '
+                        'because the values are all NULL'.format(field))
                     fldType = str
                 proj.checkFieldName(field, exclude=table)
                 env.logger.info('Adding variant info field {}'.format(field))
