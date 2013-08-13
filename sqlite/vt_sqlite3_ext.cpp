@@ -77,6 +77,7 @@ static void least_not_null_func(
 
 #include <vector>
 #include <utility>
+#include <sstream>
 
 typedef std::map<std::string, cgatools::reference::CrrFile*> RefGenomeFileMap;
 typedef std::map<std::string, int> ChrNameMap;
@@ -163,6 +164,83 @@ static void ref_sequence(
 	// get ...
 	std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
 	sqlite3_result_text(context, (char*)(res.c_str()), -1, SQLITE_TRANSIENT);
+}
+
+
+static void vcf_variant(
+                       sqlite3_context * context,
+                       int argc,
+                       sqlite3_value ** argv
+                       )
+{
+	if (argc < 5 || 
+	    sqlite3_value_type(argv[0]) == SQLITE_NULL || 
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL || 
+		sqlite3_value_type(argv[2]) == SQLITE_NULL ||
+		sqlite3_value_type(argv[3]) == SQLITE_NULL ||
+		sqlite3_value_type(argv[4]) == SQLITE_NULL) {
+      sqlite3_result_null(context);
+	  return;
+	}
+
+	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
+	std::string chr = std::string((char*)sqlite3_value_text(argv[1]));
+	int pos = sqlite3_value_int(argv[2]);
+	std::string ref = std::string((char*)sqlite3_value_text(argv[3]));
+	std::string alt = std::string((char*)sqlite3_value_text(argv[4]));
+	std::string name;
+	if (argc == 6) {
+		if (sqlite3_value_type(argv[5]) == SQLITE_NULL)
+			name = ".";
+		else
+			name = std::string((char*)sqlite3_value_text(argv[5]));
+	}
+	//
+	std::stringstream res;
+	if (ref != "-" && alt != "-") {
+		res << chr << '\t' << pos << '\t';
+		if (argc == 6)
+			res << name << '\t';
+		res << ref << '\t' << alt;
+	} else {
+		// get reference genome file
+		cgatools::reference::CrrFile * cf = NULL;
+		RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
+		if (it == refFileMap.end()) {
+			cf = new cgatools::reference::CrrFile(ref_file);
+			refFileMap[ref_file] = cf;
+		} else {
+			cf = it->second;
+		}
+		//
+		// get chromosome index
+		int chrIdx = 0;
+		ChrNameMap::const_iterator cit = chrNameMap.find(chr);
+		if (cit == chrNameMap.end()) {
+			try {
+				chrIdx = cf->getChromosomeId(chr);
+			} catch (...) {
+				chrIdx = cf->getChromosomeId("chr" + chr);
+			}
+			chrNameMap[chr] = chrIdx;
+		} else {
+			chrIdx = cit->second;
+		}
+	
+		char pad = cf->getBase(cgatools::reference::Location(chrIdx, pos - 2));
+		// 10 - A
+		// 9  G GA
+		res << chr << '\t' << (pos - 1) << '\t';
+		if (argc == 6)
+			res << name << '\t';
+		if (ref == "-")
+			res << pad << '\t' << pad << alt;
+		else
+			// 10 A -
+			// 9 GA G
+			res << pad << ref << '\t' << pad;
+	}
+	sqlite3_result_text(context, (char*)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 }
 
 
@@ -336,8 +414,12 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "least_not_null", -1, SQLITE_ANY, 0, least_not_null_func, 0, 0);
 	sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
+	// ref_base(file, chr, pos)
 	sqlite3_create_function(db, "ref_base", 3, SQLITE_ANY, 0, ref_base, 0, 0);
+	// ref_sequence(file, chr, start, end)
 	sqlite3_create_function(db, "ref_sequence", 4, SQLITE_ANY, 0, ref_sequence, 0, 0);
+	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
+	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
 	return 0;
 }
 

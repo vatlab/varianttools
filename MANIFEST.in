@@ -72,7 +72,7 @@ include source/vt_sqlite3_py3.py
 include sqlite/sqlite3.c
 include sqlite/sqlite3.h
 include sqlite/sqlite3ext.h
-include sqlite/vt_sqlite3_ext.c
+include sqlite/vt_sqlite3_ext.cpp
 recursive-include sqlite/py2 *.h *.c
 recursive-include sqlite/py3 *.h *.c
 #

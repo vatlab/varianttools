@@ -2182,6 +2182,10 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     res = []
     fields = []
     has_ref_query = False
+    ref_tokens = {'ref_base': '__REFBASE__',
+        'ref_sequence': '__REFSEQ__',
+        'vcf_variant': '__VCFVARIANT__'
+    }
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2191,14 +2195,10 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         if alt_build and toval in ['chr', 'pos'] and not before_dot:
             toval = 'alt_' + toval
         #
-        if toval.lower() == 'ref_base':
-            # replace ref_base with __REFBASE__ to make sure it is not part
-            # of another work such as xx_ref_base
-            toval = '__REFBASE__'
+        if toval.lower() in ref_tokens:
+            toval = ref_tokens[toval.lower()];
             has_ref_query = True
-        elif toval.lower() == 'ref_sequence':
-            toval = '__REFSEQ__'
-            has_ref_query = True
+        #
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             if before_dot:
                 # A.B, does not try to expand A
@@ -2236,8 +2236,8 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
         elif build in ['hg19', 'build37']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
-        query = re.sub(r'__REFBASE__\s*\(', ' ref_base("{}", '.format(crrFile), query)
-        query = re.sub(r'__REFSEQ__\s*\(', ' ref_sequence("{}", '.format(crrFile), query)
+        for k,v in ref_tokens.items():
+            query = re.sub(r'{}\s*\('.format(v), ' {}("{}", '.format(k, crrFile), query)
     return query, fields
 
 def extractField(field):
