@@ -23,7 +23,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+
+extern "C"  {
 #include <sqlite3ext.h>
+
+int sqlite3_extension_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi);
+}
 SQLITE_EXTENSION_INIT1
 
 /*
@@ -57,6 +63,106 @@ static void least_not_null_func(
 		}
 	}
 	sqlite3_result_value(context, argv[iBest == -1 ? 0 : iBest]);
+}
+
+
+#include "cgatools/reference/ChromosomeIdField.hpp"
+#include "cgatools/reference/CompactDnaSequence.hpp"
+#include "cgatools/reference/CrrFile.hpp"
+#include "cgatools/reference/CrrFileWriter.hpp"
+#include "cgatools/reference/GeneDataStore.hpp"
+#include "cgatools/reference/RangeAnnotationStore.hpp"
+#include "cgatools/reference/RepeatMaskerStore.hpp"
+#include "cgatools/reference/range.hpp"
+
+#include <vector>
+#include <utility>
+
+typedef std::map<std::string, cgatools::reference::CrrFile*> RefGenomeFileMap;
+typedef std::map<std::string, int> ChrNameMap;
+
+RefGenomeFileMap refFileMap;
+ChrNameMap chrNameMap;
+
+static void ref_base(
+                       sqlite3_context * context,
+                       int argc,
+                       sqlite3_value ** argv
+                       )
+{
+	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
+	std::string chr = std::string((char*)sqlite3_value_text(argv[1]));
+	int pos = sqlite3_value_int(argv[2]);
+	//
+	// get reference genome file
+	cgatools::reference::CrrFile * cf = NULL;
+	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
+	if (it == refFileMap.end()) {
+		cf = new cgatools::reference::CrrFile(ref_file);
+		refFileMap[ref_file] = cf;
+	} else {
+		cf = it->second;
+	}
+	//
+	// get chromosome index
+	int chrIdx = 0;
+	ChrNameMap::const_iterator cit = chrNameMap.find(chr);
+	if (cit == chrNameMap.end()) {
+		try {
+			chrIdx = cf->getChromosomeId(chr);
+		} catch (...) {
+			chrIdx = cf->getChromosomeId("chr" + chr);
+		}
+		chrNameMap[chr] = chrIdx;
+	} else {
+		chrIdx = cit->second;
+	}
+	//
+	// get ...
+	char res[2];
+	res[0] = cf->getBase(cgatools::reference::Location(chrIdx, pos - 1));
+	res[1] = '\0';
+	sqlite3_result_text(context, (char*)res, -1, SQLITE_TRANSIENT);
+}
+
+static void ref_sequence(
+                       sqlite3_context * context,
+                       int argc,
+                       sqlite3_value ** argv
+                       )
+{
+	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
+	std::string chr = std::string((char*)sqlite3_value_text(argv[1]));
+	int start = sqlite3_value_int(argv[2]);
+	int end = sqlite3_value_int(argv[3]);
+	//
+	// get reference genome file
+	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
+	cgatools::reference::CrrFile * cf = NULL;
+	if (it == refFileMap.end()) {
+		cf = new cgatools::reference::CrrFile(ref_file);
+		refFileMap[ref_file] = cf;
+	} else {
+		cf = it->second;
+	}
+	//
+	// get chromosome index
+	int chrIdx = 0;
+	ChrNameMap::const_iterator cit = chrNameMap.find(chr);
+	if (cit == chrNameMap.end()) {
+		try {
+			chrIdx = cf->getChromosomeId(chr);
+		} catch (...) {
+			chrIdx = cf->getChromosomeId("chr" + chr);
+		}
+		chrNameMap[chr] = chrIdx;
+	} else {
+		chrIdx = cit->second;
+	}
+	//
+	// get ...
+	std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
+	sqlite3_result_text(context, (char*)(res.c_str()), -1, SQLITE_TRANSIENT);
 }
 
 
@@ -204,8 +310,9 @@ PyMODINIT_FUNC init_vt_sqlite3_ext()
 #else
 	Py_InitModule3("_vt_sqlite3_ext", NULL, "Fake sqlite3 extension module");
 #endif
-    return NULL;
+    //return NULL;
 }
+
 
 
 /* SQLite invokes sqlite3_extension_init, which is defined later
@@ -229,6 +336,8 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "least_not_null", -1, SQLITE_ANY, 0, least_not_null_func, 0, 0);
 	sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
+	sqlite3_create_function(db, "ref_base", 3, SQLITE_ANY, 0, ref_base, 0, 0);
+	sqlite3_create_function(db, "ref_sequence", 4, SQLITE_ANY, 0, ref_sequence, 0, 0);
 	return 0;
 }
 
@@ -450,7 +559,7 @@ typedef uint16_t        u16;
 typedef int64_t         i64;
 
 static char *sqlite3StrDup( const char *z ) {
-    char *res = sqlite3_malloc( strlen(z)+1 );
+    char *res = (char *)sqlite3_malloc( strlen(z)+1 );
     return strcpy( res, z );
 }
 
@@ -932,8 +1041,8 @@ static void replicateFunc(sqlite3_context *context, int argc, sqlite3_value **ar
 
     nLen  = sqlite3_value_bytes(argv[0]);
     nTLen = nLen*iCount;
-    z=sqlite3_malloc(nTLen+1);
-    zo=sqlite3_malloc(nLen+1);
+    z=(unsigned char*)sqlite3_malloc(nTLen+1);
+    zo=(unsigned char*)sqlite3_malloc(nLen+1);
     if (!z || !zo){
       sqlite3_result_error_nomem(context);
       if (z) sqlite3_free(z);
@@ -1038,7 +1147,7 @@ static void padlFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
       }
       sqlite3_result_text(context, zo, -1, SQLITE_TRANSIENT);
     }else{
-      zo = sqlite3_malloc(strlen(zi)+ilen-zl+1);
+      zo = (char*)sqlite3_malloc(strlen(zi)+ilen-zl+1);
       if (!zo){
         sqlite3_result_error_nomem(context);
         return;
@@ -1093,7 +1202,7 @@ static void padrFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
       sqlite3_result_text(context, zo, -1, SQLITE_TRANSIENT);
     }else{
       zll = strlen(zi);
-      zo = sqlite3_malloc(zll+ilen-zl+1);
+      zo = (char*)sqlite3_malloc(zll+ilen-zl+1);
       if (!zo){
         sqlite3_result_error_nomem(context);
         return;
@@ -1148,7 +1257,7 @@ static void padcFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
       sqlite3_result_text(context, zo, -1, SQLITE_TRANSIENT);
     }else{
       zll = strlen(zi);
-      zo = sqlite3_malloc(zll+ilen-zl+1);
+      zo = (char*)sqlite3_malloc(zll+ilen-zl+1);
       if (!zo){
         sqlite3_result_error_nomem(context);
         return;
@@ -1195,7 +1304,7 @@ static void strfilterFunc(sqlite3_context *context, int argc, sqlite3_value **ar
     ** maybe I could allocate less, but that would imply 2 passes, rather waste 
     ** (possibly) some memory
     */
-    zo = sqlite3_malloc(strlen(zi1)+1); 
+    zo = (char *)sqlite3_malloc(strlen(zi1)+1); 
     if (!zo){
       sqlite3_result_error_nomem(context);
       return;
@@ -1334,7 +1443,7 @@ static void leftFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
 
   cc=zt-z;
 
-  rz = sqlite3_malloc(zt-z+1);
+  rz = (unsigned char *)sqlite3_malloc(zt-z+1);
   if (!rz){
     sqlite3_result_error_nomem(context);
     return;
@@ -1385,7 +1494,7 @@ static void rightFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
     sqliteNextChar(zt);
   }
 
-  rz = sqlite3_malloc(ze-zt+1);
+  rz = (char*)sqlite3_malloc(ze-zt+1);
   if (!rz){
     sqlite3_result_error_nomem(context);
     return;
@@ -1576,7 +1685,7 @@ static void reverseFunc(sqlite3_context *context, int argc, sqlite3_value **argv
   }
   z = (char *)sqlite3_value_text(argv[0]);
   l = strlen(z);
-  rz = sqlite3_malloc(l+1);
+  rz = (char *)sqlite3_malloc(l+1);
   if (!rz){
     sqlite3_result_error_nomem(context);
     return;
@@ -1641,7 +1750,7 @@ static void varianceStep(sqlite3_context *context, int argc, sqlite3_value **arg
   double x;
 
   assert( argc==1 );
-  p = sqlite3_aggregate_context(context, sizeof(*p));
+  p = (StdevCtx*)sqlite3_aggregate_context(context, sizeof(*p));
   /* only consider non-null values */
   if( SQLITE_NULL != sqlite3_value_numeric_type(argv[0]) ){
     p->cnt++;
@@ -1669,10 +1778,10 @@ static void modeStep(sqlite3_context *context, int argc, sqlite3_value **argv){
   if( type == SQLITE_NULL)
     return;
   
-  p = sqlite3_aggregate_context(context, sizeof(*p));
+  p = (ModeCtx*)sqlite3_aggregate_context(context, sizeof(*p));
 
   if( 0==(p->m) ){
-    p->m = calloc(1, sizeof(map));
+    p->m = (map*)calloc(1, sizeof(map));
     if( type==SQLITE_INTEGER ){
       /* map will be used for integers */
       *(p->m) = map_make(int_cmp);
@@ -1775,7 +1884,7 @@ static void medianIterate(void* e, i64 c, void* pp){
 */
 static void modeFinalize(sqlite3_context *context){
   ModeCtx *p;
-  p = sqlite3_aggregate_context(context, 0);
+  p = (ModeCtx *)sqlite3_aggregate_context(context, 0);
   if( p && p->m ){
     map_iterate(p->m, modeIterate, p);
     map_destroy(p->m);
@@ -1853,7 +1962,7 @@ static void upper_quartileFinalize(sqlite3_context *context){
 */
 static void stdevFinalize(sqlite3_context *context){
   StdevCtx *p;
-  p = sqlite3_aggregate_context(context, 0);
+  p = (StdevCtx *)sqlite3_aggregate_context(context, 0);
   if( p && p->cnt>1 ){
     sqlite3_result_double(context, sqrt(p->rS/(p->cnt-1)));
   }else{
@@ -1866,7 +1975,7 @@ static void stdevFinalize(sqlite3_context *context){
 */
 static void varianceFinalize(sqlite3_context *context){
   StdevCtx *p;
-  p = sqlite3_aggregate_context(context, 0);
+  p = (StdevCtx*)sqlite3_aggregate_context(context, 0);
   if( p && p->cnt>1 ){
     sqlite3_result_double(context, p->rS/(p->cnt-1));
   }else{

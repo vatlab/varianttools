@@ -544,8 +544,12 @@ setup(name = "variant_tools",
             include_dirs = ['sqlite', SQLITE_FOLDER.format(PYVERSION)],
         ),
         Extension('variant_tools._vt_sqlite3_ext',
-            sources = ['sqlite/vt_sqlite3_ext.c'] + SQLITE_GSL + LIB_STAT,
-            include_dirs = [".", 'sqlite', "source", "gsl"],
+            sources = ['sqlite/vt_sqlite3_ext.cpp'] + SQLITE_GSL + LIB_STAT,
+            include_dirs = [".", 'sqlite', "source", "gsl", "cgatools", "boost_1_49_0"],
+            libraries = ['z', 'bz2'] + \
+                ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            define_macros = SQLITE_DEFINES + [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
+                ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
         ),
         Extension('variant_tools.cplinkio',
             sources = LIB_PLINKIO,
@@ -563,3 +567,4 @@ setup(name = "variant_tools",
         ),
       ] + ASSOCIATION_MODULE   # association module is not available under windows
 )
+

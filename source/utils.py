@@ -1766,7 +1766,7 @@ class DatabaseEngine:
             # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
             # We may need to reconsider this though because some pragma applies to 
             # readonly databases (e.g. cache_size)
-            if readonly or not env.sqlite_pragma:
+            if readonly:
                 return
             if lock is not None:
                 lock.acquire()
@@ -2181,6 +2181,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(clause).readline)]
     res = []
     fields = []
+    has_ref_query = False
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2190,6 +2191,14 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         if alt_build and toval in ['chr', 'pos'] and not before_dot:
             toval = 'alt_' + toval
         #
+        if toval.lower() == 'ref_base':
+            # replace ref_base with __REFBASE__ to make sure it is not part
+            # of another work such as xx_ref_base
+            toval = '__REFBASE__'
+            has_ref_query = True
+        elif toval.lower() == 'ref_sequence':
+            toval = '__REFSEQ__'
+            has_ref_query = True
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             if before_dot:
                 # A.B, does not try to expand A
@@ -2217,7 +2226,19 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             # fasttrack for symbols or function names
             res.append((toktype, toval))
     # a quick fix for a.b parsed to a .b. :-(
-    return tokenize.untokenize(res).replace(' .', '.'), fields
+    #
+    query = tokenize.untokenize(res).replace(' .', '.')
+    # for function ref_base and ref_sequence, we need to add a parameter for
+    # reference genome file
+    if has_ref_query:
+        build = proj.alt_build if alt_build else proj.build
+        if build in ['hg18', 'build36']:
+            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
+        elif build in ['hg19', 'build37']:
+            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
+        query = re.sub(r'__REFBASE__\s*\(', ' ref_base("{}", '.format(crrFile), query)
+        query = re.sub(r'__REFSEQ__\s*\(', ' ref_sequence("{}", '.format(crrFile), query)
+    return query, fields
 
 def extractField(field):
     '''Extract pos from strings such as pos + 100'''
