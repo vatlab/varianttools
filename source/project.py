@@ -52,7 +52,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 
 
 # define a field type
-Field = namedtuple('Field', ['name', 'index', 'adj', 'type', 'comment'])
+Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
 # see http://varianttools.sourceforge.net/Calling/New for details
@@ -99,7 +99,7 @@ class AnnoDB:
         # read fields from DB
         self.fields = []
         cur = self.db.cursor()
-        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
+        cur.execute('SELECT name, field, "", "", type, comment from {}_field;'.format(self.name))
         for rec in cur:
             self.fields.append(Field(*rec))
             # FIXME: We should enforce comment for all fields.
@@ -407,7 +407,8 @@ class fileFMT:
                         if item.endswith('_comment'):
                             continue
                         if item not in ['field', 'adj', 'comment'] + defaults.keys():
-                            raise ValueError('Incorrect key {} in section {}. Only field, adj and comment are allowed.'.format(item, section))
+                            raise ValueError('Incorrect key {} in section {}. '
+                                'Only field, adj, and comment are allowed.'.format(item, section))
                     columns.append(
                         Column(index=int(section.split('_', 1)[1]),
                             field=parser.get(section, 'field', vars=defaults) if 'field' in items else '',
@@ -426,13 +427,14 @@ class fileFMT:
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['index', 'type', 'adj', 'comment'] + defaults.keys():
-                            raise ValueError('Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
+                        if item not in ['index', 'type', 'adj', 'fmt', 'comment'] + defaults.keys():
+                            raise ValueError('Incorrect key {} in section {}. Only index, type, adj, fmt, and comment are allowed.'.format(item, section))
                     fields.append(
                         Field(name=section,
                             index=parser.get(section, 'index', vars=defaults),
                             type=parser.get(section, 'type', vars=defaults),
                             adj=parser.get(section, 'adj', vars=defaults) if 'adj' in items else None,
+                            fmt=parser.get(section, 'fmt', vars=defaults) if 'fmt' in items else None,
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
                         )
                 except Exception as e:
@@ -526,7 +528,7 @@ class fileFMT:
                 # This is a special case that allows users to use expressions as field....
                 #
                 env.logger.warning('Undefined field {} in format {}.'.format(self.fields[i], filename))
-                self.fields[i] = Field(name=self.fields[i], index=None, adj=None, type=None, comment='')
+                self.fields[i] = Field(name=self.fields[i], index=None, adj=None, fmt=None, type=None, comment='')
             else:
                 self.fields[i] = fld[0]
         # other fields?
@@ -827,7 +829,7 @@ class AnnoDBWriter:
                 if self.build != eval(rec[1]):
                     raise ValueError('Existing database has different linking fields (existing: {}, required: {}).'.format(self.build, rec[1]))
         # get existing fields
-        cur.execute('SELECT name, field, "", type, comment from {}_field;'.format(self.name))
+        cur.execute('SELECT name, field, "", "", type, comment from {}_field;'.format(self.name))
         # cur_fields is made a class member to make others know what are available
         self.cur_fields = []
         for rec in cur:

@@ -711,7 +711,7 @@ rec_ref = '-'
 rec_alt = '-'
 
 class InfoFormatter:
-    def __init__(self, name, ignore='.'):
+    def __init__(self, name, ignore=''):
         '''Output value as $name=val'''
         self.name = name
         self.ignore = ignore

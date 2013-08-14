@@ -65,15 +65,6 @@ info_comment=Field for info status
 #
 # NOTE: if multiple records are collapsed, they are passed as tuples.
 # If no formatter is defined, the first value will be used in output.
-#
-fmt_GT=GenoFormatter(style='vcf')
-fmt_DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
-# if there are multiple alternative alleles, join them by ','
-#
-# not sure if we need to keep both JoinRecords and JoinFields
-fmt_alt=JoinRecords(',')
-fmt_raw_alt=JoinRecords(',')
-fmt_AA=InfoFormatter('AA')
 
 [col_1]
 field=vcf_variant(chr, pos, ref, alt, %(id)s)
@@ -81,7 +72,7 @@ comment=variants in vcf format
 
 [col_2]
 field=%(qual)s
-adj=ValueOfNull('0')
+adj=ValueOfNull('.')
 comment=quality
 
 [col_3]
@@ -136,6 +127,7 @@ comment=Reference allele, '-' for insertion.
 index=5
 adj=CheckSplit()
 type=VARCHAR(255)
+fmt=JoinRecords(',')
 comment=Alternative allele, '-' for deletion.
 
 [raw_ref]
@@ -147,6 +139,7 @@ comment=Reference allele, without remove common leading and ending nucleotide.
 index=5
 adj=CheckSplit()
 type=VARCHAR(255)
+fmt=JoinRecords(',')
 comment=Alternative allele, without remove common leading and ending nucleotide.
 
 [upstream]
@@ -178,6 +171,7 @@ comment=PASS if this position has passed all filters, i.e. a call is made at thi
 index=10:
 type=INTEGER
 adj=VcfGenotype(default=%(wildtype_code)s)
+fmt=GenoFormatter(style='vcf')
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
 
 [safe_GT]
@@ -207,65 +201,77 @@ comment=ancestral allele
 index=8
 type=INT
 adj=ExtractValue('AC=',';')
+fmt=InfoFormatter('AC')
 comment=allele count in genotypes, for each ALT allele, in the same order as listed
 
 [AF]
 index=8
 type=FLOAT
 adj=ExtractValue('AF=',';')
+fmt=InfoFormatter('AF')
 comment=allele frequency for each ALT allele in the same order as listed: use this when estimated from primary data, not called genotypes
 
 [AN]
 index=8
 type=INT
 adj=ExtractValue('AN=',';')
+fmt=InfoFormatter('AN')
 comment=total number of alleles in called genotypes
 
 [BQ]
 index=8
 type=INT
 adj=ExtractValue('BQ=',';')
+fmt=InfoFormatter('BQ')
 comment=RMS base quality at this position
 
 [DB]
 index=8
 type=INT
 adj=ExtractValue('DB=',';')
+fmt=InfoFormatter('DB')
 comment=dbSNP membership
 
 [DP]
 index=8
 adj=ExtractValue('DP=', ';')
+fmt=InfoFormatter('DP')
+fmt=InfoFormatter('DP')
 type=INTEGER
 comment=DP fields in INFO. Total depth of samples in a vcf file.
 
 [TI]
 index=8
 adj=ExtractValue('TI=', ';')
+fmt=InfoFormatter('TI')
 type=VARCHAR(255)
 comment=Transcript ID, recorded in Illumina produced VCF file
 
 [GI]
 index=8
 adj=ExtractValue('GI=', ';')
+fmt=InfoFormatter('GI')
 type=VARCHAR(255)
 comment=Gene ID, recorded in Illumina produced VCF file
 
 [EXON]
 index=8
 adj=ExtractFlag('EXON', ';')
+fmt=FlagFormatter('EXON')
 type=INTEGER
 comment=Exon region, recorded in Illumina produced VCF file
 
 [FC]
 index=8
 adj=ExtractValue('FC=', ';')
+fmt=InfoFormatter('FC')
 type=VARCHAR(255)
 comment=Functional Consequence, recorded in Illumina produced VCF file
 
 [BKPT]
 index=8
 adj=ExtractFlag('BKPT', ';')
+fmt=FlagFormatter('BKPT')
 type=INTEGER
 comment=Breakpoint, recorded in Illumina produced Indels.vcf file
 
@@ -273,54 +279,63 @@ comment=Breakpoint, recorded in Illumina produced Indels.vcf file
 [H2]
 index=8
 adj=ExtractValue('H2=', ';')
+fmt=InfoFormatter('H2')
 type=INTEGER
 comment=membership in hapmap2
 
 [H3] 
 index=8
 adj=ExtractValue('H3=', ';')
+fmt=InfoFormatter('H3')
 type=INTEGER
 comment=membership in hapmap3
 
 [MQ] 
 index=8
 adj=ExtractValue('MQ=', ';')
+fmt=InfoFormatter('MQ')
 type=FLOAT
 comment=RMS mapping quality, e.g. MQ=52
 
 [MQ0]
 index=8
 adj=ExtractValue('MQ0=', ';')
+fmt=InfoFormatter('MQ0')
 type=INTEGER
 comment=Number of MAPQ == 0 reads covering this record (Total Mapping Quality Zero Reads)
 
 [NS] 
 index=8
 adj=ExtractValue('NS=', ';')
+fmt=InfoFormatter('NS')
 type=INTEGER
 comment=Number of samples with data
 
 [SB] 
 index=8
 adj=ExtractValue('SB=', ';')
+fmt=InfoFormatter('SB')
 type=INTEGER
 comment=strand bias at this position
 
 [SOMATIC] 
 index=8
 adj=ExtractValue('SOMATIC=', ';')
+fmt=InfoFormatter('SOMATIC')
 type=INTEGER
 comment=indicates that the record is a somatic mutation, for cancer genomics
 
 [VALIDATED] 
 index=8
 adj=ExtractValue('VALIDATED=', ';')
+fmt=InfoFormatter('VALIDATED')
 type=INTEGER
 comment=validated by follow-up experiment
 
 [1000G] 
 index=8
 adj=ExtractValue('1000G=', ';')
+fmt=InfoFormatter('1000G')
 type=INTEGER
 comment=membership in 1000 Genomes
 
@@ -328,6 +343,7 @@ comment=membership in 1000 Genomes
 [ABHet]
 index=8
 adj=ExtractValue('ABHet=', ';')
+fmt=InfoFormatter('ABHet')
 type=FLOAT
 comment=Allele Balance for hets (ref/(ref+alt))
 
@@ -335,6 +351,7 @@ comment=Allele Balance for hets (ref/(ref+alt))
 [ABHom]
 index=8
 adj=ExtractValue('ABHom=', ';')
+fmt=InfoFormatter('ABHom')
 type=FLOAT
 comment=Allele Balance for homs (A/(A+O))
 
@@ -342,6 +359,7 @@ comment=Allele Balance for homs (A/(A+O))
 [BaseQRankSum]
 index=8
 adj=ExtractValue('BaseQRankSum=', ';')
+fmt=InfoFormatter('BaseQRankSum')
 type=FLOAT
 comment=Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities
 
@@ -349,6 +367,7 @@ comment=Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities
 [DS]
 index=8
 adj=ExtractFlag('DS', ';')
+fmt=FlagFormatter('DS')
 type=INTEGER
 comment=Were any of the samples downsampled?
 
@@ -357,6 +376,7 @@ comment=Were any of the samples downsampled?
 index=8
 type=FLOAT
 adj=ExtractValue('Dels=', ';')
+fmt=InfoFormatter('Dels')
 comment=Fraction of Reads Containing Spanning Deletions
 
 
@@ -364,6 +384,7 @@ comment=Fraction of Reads Containing Spanning Deletions
 index=8
 type=FLOAT
 adj=ExtractValue('FS=', ';')
+fmt=InfoFormatter('FS')
 comment=Phred-scaled p-value using Fisher's exact test to detect strand bias
 
 
@@ -371,6 +392,7 @@ comment=Phred-scaled p-value using Fisher's exact test to detect strand bias
 index=8
 type=FLOAT
 adj=ExtractValue('HaplotypeScore=', ';')
+fmt=InfoFormatter('HaplotypeScore')
 comment=Consistency of the site with at most two segregating haplotypes
 
 
@@ -378,6 +400,7 @@ comment=Consistency of the site with at most two segregating haplotypes
 index=8
 type=FLOAT
 adj=ExtractValue('InbreedingCoeff=', ';')
+fmt=InfoFormatter('InbreedingCoeff')
 comment=Inbreeding coefficient as estimated from the genotype likelihoods per-sample when compared against the Hardy-Weinberg expectation
 
 
@@ -385,6 +408,7 @@ comment=Inbreeding coefficient as estimated from the genotype likelihoods per-sa
 index=8
 type=INTEGER
 adj=ExtractValue('MLEAC=', ';')
+fmt=InfoFormatter('MLEAC')
 comment=Maximum likelihood expectation (MLE) for the allele counts (not necessarily the same as the AC), for each ALT allele, in the same order as listed
 
 
@@ -392,6 +416,7 @@ comment=Maximum likelihood expectation (MLE) for the allele counts (not necessar
 index=8
 type=FLOAT
 adj=ExtractValue('MLEAF=', ';')
+fmt=InfoFormatter('MLEAF')
 comment=Maximum likelihood expectation (MLE) for the allele frequency (not necessarily the same as the AF), for each ALT allele, in the same order as listed
 
 
@@ -399,6 +424,7 @@ comment=Maximum likelihood expectation (MLE) for the allele frequency (not neces
 index=8
 type=FLOAT
 adj=ExtractValue('MQRankSum=', ';')
+fmt=InfoFormatter('MQRankSum')
 comment=Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities
 
 
@@ -406,6 +432,7 @@ comment=Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualitie
 index=8
 type=FLOAT
 adj=ExtractValue('OND=', ';')
+fmt=InfoFormatter('OND')
 comment=Overall non-diploid ratio (alleles/(alleles+non-alleles))
 
 
@@ -413,6 +440,7 @@ comment=Overall non-diploid ratio (alleles/(alleles+non-alleles))
 index=8
 type=FLOAT
 adj=ExtractValue('QD=', ';')
+fmt=InfoFormatter('QD')
 comment=Variant Confidence/Quality by Depth
 
 
@@ -420,6 +448,7 @@ comment=Variant Confidence/Quality by Depth
 index=8
 type=INTEGER
 adj=ExtractValue('RPA=', ';')
+fmt=InfoFormatter('RPA')
 comment=Number of times tandem repeat unit is repeated, for each allele (including reference)
 
 
@@ -427,6 +456,7 @@ comment=Number of times tandem repeat unit is repeated, for each allele (includi
 index=8
 type=VARCHAR(255)
 adj=ExtractValue('RU=', ';')
+fmt=InfoFormatter('RU')
 comment=Tandem repeat unit (bases)
 
 
@@ -434,6 +464,7 @@ comment=Tandem repeat unit (bases)
 index=8
 type=FLOAT
 adj=ExtractValue('ReadPosRankSum=', ';')
+fmt=InfoFormatter('ReadPosRankSum')
 comment=Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias
 
 
@@ -441,6 +472,7 @@ comment=Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias
 index=8
 type=INTEGER
 adj=ExtractFlag('STR', ';')
+fmt=FlagFormatter('STR')
 comment=Variant is a short tandem repeat
 
 

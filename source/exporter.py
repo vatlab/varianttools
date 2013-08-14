@@ -497,7 +497,15 @@ class Exporter:
         formatters = []
         i = 0
         while i < len(indexes):
-            if fields[i].lower() in fmt_keys:
+            fld_fmt = [f.fmt for f in self.format.fields if f.name.lower() == fields[i].lower()]
+            if not fld_fmt:
+                fld_fmt = [f.fmt for f in self.format.other_fields if f.name.lower() == fields[i].lower()]
+            # if fmt is defined for the field
+            if fld_fmt and fld_fmt[0] is not None:
+                formatters.append((self.getAdjFunc(fld_fmt[0]), indexes[i]))
+                i += 1
+            # if fmt_ is defined in the [formatters] section (deprecated for single field)
+            elif fields[i].lower() in fmt_keys:
                 # use adj to handle value at index[i]
                 formatters.append((self.getAdjFunc(self.format.formatter[fields[i].lower()]), indexes[i]))
                 i += 1
