@@ -616,40 +616,10 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
             db.close()
 
     def dedup(self, status=None):
-        # checking if there are duplicated variant_ids in genotype tables
-        # we do not do it during data insertion because (potentially) many tables
-        # are handled simultenously, and keeping track of ids in each sample can
-        # take a lot of ram.
-        #
-        # if this is a temporary genotype, '/' should be in geno_db
-        inPlace = '/' not in self.geno_db
-        self.cur = []
-        for geno_db, db in zip(self.geno_db, self.db):
-            db.connect(geno_db, readonly=True)
-            self.cur.append(db.cursor())
-        #
-        duplicated_genotype = 0
-        for id in self.sample_ids:
-            cur = self.cur[self.dispatcher[id]]
-            cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
-                'FROM genotype_{}'.format(id))
-            nRec, nVar = cur.fetchone()
-            if nRec != nVar:
-                cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
-                    '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
-                    .format(id))
-                deleted_rows = [x[0] for x in cur.fetchall()]
-                if len(deleted_rows) != nRec - nVar:
-                    raise SystemError('Failed to identify duplicated variants from '
-                        'genotype table genotype_{}'.format(id))
-            else:
-                deleted_rows = []
-            #
-            status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, id, deleted_rows)
-        for db in self.db:
-            status.addCopyingItem(self.geno_db[self.dispatcher[id]], self.geno_status, None, None)
-            db.close()
-
+        # this part is done by a dedicated processor
+        for idx, db in enumerate(self.geno_db):
+            status.addDedupItem(db, self.geno_status,
+                [id  for id in self.sample_ids if self.dispatcher[id] == idx])
 
 class InPlaceGenotypeWriter(BaseGenotypeWriter):
     '''This class write genotypes to a genotype database, which does
@@ -821,6 +791,7 @@ class ImportStatus:
     def __init__(self):
         self.manager = Manager()
         self.tasks = self.manager.dict()
+        self.pending_dedup = self.manager.list()
         self.pending_copied = self.manager.dict()
         self.lock = Lock()
         self.total_sample_count = 0
@@ -869,6 +840,19 @@ class ImportStatus:
     def pendingImport(self):
         # return waiting (queued, to be imported) and ongoing import
         return sum([x == 0 for x in self.tasks.values()]), sum([x == 1 for x in self.tasks.values()])
+
+    def addDedupItem(self, geno_file, geno_status, IDs):
+        self.lock.acquire()
+        self.pending_dedup.append((geno_file, geno_status, IDs))
+        self.lock.release()
+
+    def itemToDedup(self):
+        ret = None
+        self.lock.acquire()
+        if self.pending_dedup:
+            ret = self.pending_dedup.pop(0)
+        self.lock.release()
+        return ret
 
     def addCopyingItem(self, geno_file, geno_status, ID, dup_rows):
         #
@@ -1010,12 +994,48 @@ class GenotypeImportWorker(Process):
                 self.geno_count.value = self.start_count + self.count[0] * len(self.sample_ids)
                 last_count = self.count[0]
         self.writer.commit_remaining()
-        # free some RAM
-        del self.variantIndex
 
     def _dedupData(self):
         self.writer.dedup(self.status)
         
+class DedupWorker(Process):
+    def __init__(self, status):
+        Process.__init__(self)
+        self.status = status
+
+    def run(self):
+        while True:
+            item = self.status.itemToDedup()
+            if item is None:
+                if self.status.all_done.value == 1:
+                    break
+                time.sleep(1)
+                continue
+            genotype_file, genotype_status, IDs = item
+            db = DatabaseEngine()
+            db.connect(genotype_file, readonly=True)
+            cur = db.cursor()
+            #
+            for id in IDs:
+                cur.execute('SELECT COUNT(variant_id), COUNT(DISTINCT variant_id) '
+                    'FROM genotype_{}'.format(id))
+                nRec, nVar = cur.fetchone()
+                if nRec != nVar:
+                    cur.execute('SELECT rowid from genotype_{0} WHERE rowid NOT IN '
+                        '(SELECT MAX(rowid) FROM genotype_{0} GROUP BY variant_id)'
+                        .format(id))
+                    deleted_rows = [x[0] for x in cur.fetchall()]
+                    if len(deleted_rows) != nRec - nVar:
+                        raise SystemError('Failed to identify duplicated variants from '
+                            'genotype table genotype_{}'.format(id))
+                else:
+                    deleted_rows = []
+                #
+                self.status.addCopyingItem(genotype_file, genotype_status, id, deleted_rows)
+            self.status.addCopyingItem(genotype_file, genotype_status, None, None)
+            db.close()
+
+
 class GenotypeCopier(Process):
     def __init__(self, main_genotype_file, genotype_info, copied_samples, status):
         '''copied_samples is a shared variable that should be increased with
@@ -1438,8 +1458,6 @@ class Importer:
         # stop writers
         if genotype_status != 0:
             writer.commit_remaining()
-            # free some RAM
-            del self.variantIndex
             writer.dedup()
         self.db.commit()
        
@@ -1604,6 +1622,12 @@ class Importer:
             self.genotype_info, sample_copy_count, status)
         copier.start()
         #
+        dedupier = []
+        for i in range(max(2, min(self.jobs, 4))):
+            d = DedupWorker(status)
+            d.start()
+            dedupier.append(d)
+        #
         # The logic of importer is complex here. Because an importer needs to know variantIndex to 
         # write genotype tables, and because importers starts after each file is read, an importer
         # created earlier (eg. from file 1) cannot be used to import genotype for file 2. This is
@@ -1740,6 +1764,7 @@ class Importer:
                 prog.done()
                 status.all_done.value = 1
                 copier.join()
+                [d.join() for d in dedupier]
                 break
             time.sleep(1)
         # final status line
