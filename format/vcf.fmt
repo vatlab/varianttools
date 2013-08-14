@@ -33,11 +33,6 @@ var_info=
 var_info_comment=Variant information fields to be imported. Please check the
     INFO column of your vcf file for available fields.
 
-phase_sep='/'
-phase_sep_comment=Seperator used to output genotype, / for unphased and | for
-    phased. This parameter is needed because 'vtools import' does not save phase
-    information for each genotype.
-
 wildtype_code=('0',)
 wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
@@ -78,6 +73,7 @@ fmt_DP=IfMulti(Formatter('DP={[0]}'), Formatter('DP={}'))
 # not sure if we need to keep both JoinRecords and JoinFields
 fmt_alt=JoinRecords(',')
 fmt_raw_alt=JoinRecords(',')
+fmt_AA=InfoFormatter('AA')
 
 [col_1]
 field=vcf_variant(chr, pos, ref, alt, %(id)s)
@@ -94,7 +90,7 @@ adj=ValueOfNull('PASS')
 comment=filter
 
 [col_4]
-field=%(info)s
+field=%(var_info)s
 adj=ValueOfNull('.'), JoinFields(';')
 comment=variant info
 
@@ -204,6 +200,7 @@ comment=Raw INFO column in the vcf file. This may be further splitted into vario
 index=8
 type=CHAR(1)
 adj=ExtractValue('AA=',';')
+fmt=InfoFormatter('AA')
 comment=ancestral allele
 
 [AC]

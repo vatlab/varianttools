@@ -710,6 +710,23 @@ class CSVFormatter:
 rec_ref = '-'
 rec_alt = '-'
 
+class InfoFormatter:
+    def __init__(self, name, ignore='.'):
+        '''Output value as $name=val'''
+        self.name = name
+        self.ignore = ignore
+    
+    def __call__(self, item):
+        return '' if item == self.ignore else '{}={}'.format(self.name, item)
+
+class FlagFormatter:
+    def __init__(self, name):
+        '''Output value as $name=val'''
+        self.name = name
+    
+    def __call__(self, item):
+        return self.name if item else ''
+
 class GenoFormatter:
     # representation for missing value is style dependent,
     # the default value None will cause each style to use its default value.

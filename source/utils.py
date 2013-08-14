@@ -2277,7 +2277,8 @@ def splitField(clause):
         cache.append(tokval)
     if cache:
         fields.append(''.join(cache))
-    return fields
+    # remove empty fields
+    return [x for x in fields if x]
 
 
 #
