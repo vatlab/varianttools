@@ -39,7 +39,8 @@ else:
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
-    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName
+    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
+    splitField
 
 from .preprocessor import * 
 
@@ -530,7 +531,7 @@ class Exporter:
             for i in range(len(self.samples)):
                 f.write('\t'.join([str(i), self.samples[i], '0', '0', '0', '-9']) + '\n')
         return True
-    
+
     def exportData(self):
         '''Export data in specified format'''
         if self.format.additional_exports:
@@ -549,7 +550,7 @@ class Exporter:
         var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
         geno_fields = []
         for col in self.format.columns:
-            col_fields = [x.strip() for x in col.field.split(',') if x] if col.field.strip() else []
+            col_fields = splitField(col.field)
             if 'GT' in col_fields:
                 for fld in col_fields:
                     if fld not in geno_fields:
@@ -584,7 +585,7 @@ class Exporter:
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
             # indexes to get values for each column
-            fields = [x.strip() for x in col.field.split(',') if x] if col.field else []
+            fields = splitField(col.field)
             if 'GT' in fields:
                 for id in self.IDs:
                     col_indexes = []

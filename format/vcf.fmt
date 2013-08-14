@@ -43,7 +43,7 @@ wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
     by default imported as GT=0. They will be discarded if you set this parameter
     to None.
 
-id=
+id="."
 id_comment=The field to output to the third (ID) column of the vcf file. You
     can use a id field (if you imported or updated it from a vcf file), another ID field
     (e.g. rsname) if available, or '' to output all missing values.
@@ -80,49 +80,30 @@ fmt_alt=JoinRecords(',')
 fmt_raw_alt=JoinRecords(',')
 
 [col_1]
-field=chr
-# remove fields with empty chromosome
-adj=ValueOfNull(None)
-comment=chromosome
+field=vcf_variant(chr, pos, ref, alt, %(id)s)
+comment=variants in vcf format
 
 [col_2]
-field=pos
-comment=position
-
-[col_3]
-field=%(id)s
-adj=ValueOfNull('.')
-comment=id
-
-[col_4]
-field=%(ref)s
-comment=reference allele
-
-[col_5]
-field=%(alt)s
-comment=alternative alleles
-
-[col_6]
 field=%(qual)s
 adj=ValueOfNull('0')
 comment=quality
 
-[col_7]
+[col_3]
 field=%(filter)s
 adj=ValueOfNull('PASS')
 comment=filter
 
-[col_8]
+[col_4]
 field=%(info)s
 adj=ValueOfNull('.'), JoinFields(';')
 comment=variant info
 
-[col_9]
+[col_5]
 field=
 adj=Constant("%(format_string)s")
 comment=genotype format
 
-[col_10]
+[col_6]
 field=%(geno)s,%(geno_info)s
 adj=JoinFields(':')
 comment=genotype

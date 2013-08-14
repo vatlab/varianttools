@@ -2247,9 +2247,38 @@ def extractField(field):
     tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(field).readline)]
     for i in range(len(tokens)):
         toktype, toval, _, _, _ = tokens[i]
-        if toktype == 1:
+        if toktype == token.NAME:
             return toval
     raise ValueError('Invalid field name: {}'.format(field))
+
+
+def splitField(clause):
+    '''split chr,alt into ['chr', 'alt'], but keep func(chr, pos) + 1 together.'''
+    if not clause.strip():
+        return []
+    if ',' not in clause:
+        return [clause]
+    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(clause).readline)]
+    fields = []
+    cache = []
+    level = 0
+    for i in range(len(tokens)):
+        toktype, tokval, _, _, _ = tokens[i]
+        if toktype == token.OP:
+            if tokval == '(':
+                level += 1
+            elif tokval == ')':
+                level -= 1
+            elif tokval == ',':
+                if level == 0:
+                    fields.append(''.join(cache))
+                    cache = []
+                    continue
+        cache.append(tokval)
+    if cache:
+        fields.append(''.join(cache))
+    return fields
+
 
 #
 # Utility function to calculate bins.
