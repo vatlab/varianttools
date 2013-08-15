@@ -859,7 +859,8 @@ class ProgressBar:
             perc = min(1, float(self.count) / self.totalCount)
             init_perc = min(1, float(self.init_count) / self.totalCount)
             time_left = (second_elapsed / (perc - init_perc) * (1 - perc)) if perc > init_perc else 0
-            msg[5] += ' in {}{}'.format('' if time_left < 86400 else '{} days '.format(int(time_left/86400)),
+            msg[5] += ' in {}{}'.format('' if time_left < 86400 else '{} day{} '
+                .format(int(time_left/86400), 's' if time_left > 172800 else ''),
                 time.strftime('%H:%M:%S', time.gmtime(time_left)))
         # percentage / progress
         if self.count > 0:
@@ -927,7 +928,8 @@ class ProgressBar:
         else:
             msg[3] = ' {:,}/\033[1;31m{:,}\033[0m'.format(self.finished + self.count, self.failed_count)
             m3Len = len(msg[3]) - 12
-        msg[5] += ' in {}{}'.format('' if second_elapsed < 86400 else '{} days '.format(int(second_elapsed/86400)),
+        msg[5] += ' in {}{}'.format('' if second_elapsed < 86400 else '{} day{} '
+            .format(int(second_elapsed/86400), 's' if second_elapsed > 172800 else ''),
                 time.strftime('%H:%M:%S', time.gmtime(second_elapsed)))
         # percentage / progress
         if self.totalCount:
@@ -1090,11 +1092,12 @@ class ResourceManager:
         for root, dirs, files in os.walk(resource_dir):
             filenames.extend([(os.path.join(root, x), os.path.getsize(os.path.join(root,x))) for x in files \
                 if not filters or all([y in os.path.relpath(os.path.join(root,x), resource_dir) for y in filters])])
-        prog = ProgressBar('Scanning {} files under {}'.format(len(filenames), resource_dir), sum([x[1] for x in filenames]))
+        prog = ProgressBar('Scanning {} files under {}'
+            .format(len(filenames), resource_dir), sum([min(x[1], 2**26) for x in filenames]))
         total_size = 0
         for filename, filesize in filenames:
             info = self.addResource(filename, resource_dir)
-            total_size += info[0]
+            total_size += min(info[0], 2**26)
             prog.update(total_size)
         prog.done()
     
@@ -1115,9 +1118,9 @@ class ResourceManager:
         if rel_path.startswith('.'):
             raise ValueError('Cannot add a resource that is not under the resoure directory {}'.format(resource_dir))
         filesize = os.path.getsize(filename)
-        md5 = calculateMD5(filename)
+        md5 = calculateMD5(filename, partial=True)
         refGenome = self.getRefGenome(filename)
-        comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ')
+        comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ').strip()
         self.manifest[rel_path] = (filesize, md5, refGenome, comment)
         return self.manifest[rel_path]
         
@@ -1252,13 +1255,14 @@ class ResourceManager:
                 rel_name = os.path.relpath(os.path.join(root, f), resource_dir)
                 if rel_name in self.manifest:
                     filenames.append((os.path.join(root, f), rel_name, os.path.getsize(os.path.join(root, f))))
-        prog = ProgressBar('Scanning {} files under {}'.format(len(filenames), resource_dir), sum([x[2] for x in filenames]))
+        prog = ProgressBar('Scanning {} files under {}'.format(len(filenames), resource_dir),
+            sum([min(x[2], 2**26) for x in filenames]))
         total_size = 0
         for filename, rel_name, filesize in filenames:
             # if file size are different, will be copied
-            if filesize == self.manifest[rel_name][0] and calculateMD5(filename) == self.manifest[rel_name][1]:
+            if filesize == self.manifest[rel_name][0] and calculateMD5(filename, partial=True) == self.manifest[rel_name][1]:
                 self.manifest.pop(rel_name)
-            total_size += filesize
+            total_size += min(filesize, 2**26)
             prog.update(total_size)
         prog.done()
 
@@ -1288,7 +1292,7 @@ class ResourceManager:
                 downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
                     os.path.join(env.local_resource, filename), True)
                 # check md5
-                if calculateMD5(dest_file) != fileprop[1]:
+                if calculateMD5(dest_file, partial=True) != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'
                         .format(filename))
                 added += 1
@@ -1313,13 +1317,19 @@ class ResourceManager:
                     os.path.join(env.local_resource, filename), False,
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
-                md5 = calculateMD5(os.path.join(env.local_resource, filename))
+                md5 = calculateMD5(os.path.join(env.local_resource, filename), partial=True)
                 if md5 != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
                 env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
+            # decompress .DB file because it might be outdated
+            if filename.endswith('.DB.gz'):
+                s = delayedAction(env.logger.info, 'Decompressing {}'.format(filename))
+                decompressGzFile(os.path.join(env.local_resource, filename),
+                    inplace=False, force=True)
+                del s
 
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
@@ -1335,6 +1345,7 @@ def decompressGzFile(filename, inplace=True, force=False):
     if filename.lower().endswith('.gz'):
         new_filename = filename[:-3]
         if os.path.isfile(new_filename) and not force:
+            env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
             return new_filename
         #
         try:
