@@ -91,11 +91,13 @@ class GroupStat(NullTest):
         # set fields according to parameter --stat
         if 'num_variants' in self.stat:
             self.fields.append(
-                Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group')
+                Field(name='num_variants', index=None, type='INT', adj=None,
+                    fmt=None, comment='number of variants in each group')
             )
         if 'sample_size' in self.stat:
             self.fields.append(
-                Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
+                Field(name='sample_size', index=None, type='INT', adj=None,
+                    fmt=None, comment='sample size')
             )
 
     def parseArgs(self, method_args):
@@ -148,17 +150,18 @@ class CaseCtrlBurdenTest(NullTest):
     '''Single covariate case/ctrl burden test on aggregated genotypes within an association testing group'''
     def __init__(self, ncovariates, *method_args):
         NullTest.__init__(self, *method_args)
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
-                        Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
-                        Field(name='total_mac', index=None, type='INT', adj=None, comment='total minor allele counts in a group (adjusted for MOI)'),
-                        Field(name='statistic', index=None, type='FLOAT', adj=None, comment='test statistic.'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        self.fields = [
+            Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='sample size'),
+            Field(name='num_variants', index=None, type='INT', adj=None, fmt=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
+            Field(name='total_mac', index=None, type='INT', adj=None, fmt=None, comment='total minor allele counts in a group (adjusted for MOI)'),
+            Field(name='statistic', index=None, type='FLOAT', adj=None, fmt=None, comment='test statistic.'),
+            Field(name='pvalue', index=None, type='FLOAT', adj=None, fmt=None, comment='p-value')]
         if ncovariates > 1:
             env.logger.warning("This association test cannot handle covariates. Input option '--covariates' will be ignored.")
         if self.permutations > 0:
             self.fields.extend([
-                    Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
-                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
+                    Field(name='std_error', index=None, type='FLOAT', adj=None, fmt=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
+                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, fmt=None, comment='number of permutations at which p-value is evaluated')
                     ])
         # specify the trait type for the AssociationManager to make sure the input phenotype is proper (binary coding)
         self.trait_type = 'disease'
@@ -394,25 +397,26 @@ class GLMBurdenTest(NullTest):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, *method_args)
         # set fields name for output database
-        self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size'),
-                        Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
-                        Field(name='total_mac', index=None, type='INT', adj=None, comment='total minor allele counts in a group (adjusted for MOI)'),
-                        Field(name='beta_x', index=None, type='FLOAT', adj=None, comment='test statistic. In the context of regression this is estimate of effect size for x'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='p-value')]
+        self.fields = [
+            Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='sample size'),
+            Field(name='num_variants', index=None, type='INT', adj=None, fmt=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
+            Field(name='total_mac', index=None, type='INT', adj=None, fmt=None, comment='total minor allele counts in a group (adjusted for MOI)'),
+            Field(name='beta_x', index=None, type='FLOAT', adj=None, fmt=None, comment='test statistic. In the context of regression this is estimate of effect size for x'),
+            Field(name='pvalue', index=None, type='FLOAT', adj=None, fmt=None, comment='p-value')]
         self.ncovariates = ncovariates
         if self.permutations == 0:
-            self.fields.append(Field(name='wald_x', index=None, type='FLOAT', adj=None, comment='Wald statistic for x (beta_x/SE(beta_x))'))
+            self.fields.append(Field(name='wald_x', index=None, type='FLOAT', adj=None, fmt=None, comment='Wald statistic for x (beta_x/SE(beta_x))'))
             for i in range(self.ncovariates):
-                self.fields.extend([Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='estimate of beta for covariate {}'.format(str(i+2))),
-                                    Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='p-value for covariate {}'.format(str(i+2))),
-                                    Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
+                self.fields.extend([Field(name='beta_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, fmt=None, comment='estimate of beta for covariate {}'.format(str(i+2))),
+                                    Field(name='beta_{}_pvalue'.format(str(i+2)), index=None, type='FLOAT', adj=None, fmt=None, comment='p-value for covariate {}'.format(str(i+2))),
+                                    Field(name='wald_{}'.format(str(i+2)), index=None, type='FLOAT', adj=None, fmt=None, comment='Wald statistic for covariate {}'.format(str(i+2)))])
         else:
             self.fields.extend([
-                    Field(name='std_error', index=None, type='FLOAT', adj=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
-                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, comment='number of permutations at which p-value is evaluated')
+                    Field(name='std_error', index=None, type='FLOAT', adj=None, fmt=None, comment='Empirical estimate of the standard deviation of statistic under the null'),
+                    Field(name='num_permutations', index=None, type='INTEGER', adj=None, fmt=None, comment='number of permutations at which p-value is evaluated')
                     ])
             if self.variable_thresholds:
-                self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, comment='The minor allele frequency at which the test statistic is maximized'))
+                self.fields.append(Field(name='MAF_threshold', index=None, type='FLOAT', adj=None, fmt=None, comment='The minor allele frequency at which the test statistic is maximized'))
         # check for weighting theme
         if self.permutations == 0 and self.weight in ['Browning', 'KBAC', 'RBT']:
             raise ValueError("Weighting theme {0} requires the use of permutation tests. Please specify number of permutations".format(self.weight))
@@ -1642,8 +1646,8 @@ class GroupWrite(ExternTest):
     def __init__(self, ncovariates, *method_args):
         ExternTest.__init__(self, *method_args)
         self.fields.extend([
-                Field(name='num_variants', index=None, type='INT', adj=None, comment='number of variants in each group'),
-                Field(name='sample_size', index=None, type='INT', adj=None, comment='sample size')
+                Field(name='num_variants', index=None, type='INT', adj=None, fmt=None, comment='number of variants in each group'),
+                Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='sample size')
                 ])
         if os.path.isdir(self.directory) and os.listdir(self.directory):
             raise ValueError("Cannot set output directory to a non-empty directory. Please specify another directory.")
@@ -1692,31 +1696,31 @@ class ScoreSeq(ExternTest):
         NullTest.__init__(self, *method_args)
         # set fields name for output database
         if self.MAFL is not None:
-            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='pvalue', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='SNV_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
-                        Field(name='SNV_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
-                        Field(name='SNV_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
+            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='Sample size'),
+                        Field(name='pvalue', index=None, type='FLOAT', adj=None, fmt=None, comment='asymptotic p-value'),
+                        Field(name='SNV_U', index=None, type='FLOAT', adj=None, fmt=None, comment='score statistic'),
+                        Field(name='SNV_V', index=None, type='FLOAT', adj=None, fmt=None, comment='variance of score statistic'),
+                        Field(name='SNV_Z', index=None, type='FLOAT', adj=None, fmt=None, comment='U/sqrt(V)')]
         else:
-            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, comment='Sample size'),
-                        Field(name='pvalue_T1', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='pvalue_T5', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='pvalue_Fp', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='pvalue_VT', index=None, type='FLOAT', adj=None, comment='asymptotic p-value'),
-                        Field(name='T1_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
-                        Field(name='T5_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
-                        Field(name='Fp_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
-                        Field(name='VT_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
-                        Field(name='EREC_R', index=None, type='FLOAT', adj=None, comment='resampling p-value'),
-                        Field(name='T1_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
-                        Field(name='T1_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
-                        Field(name='T1_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)'),
-                        Field(name='T5_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
-                        Field(name='T5_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
-                        Field(name='T5_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)'),
-                        Field(name='Fp_U', index=None, type='FLOAT', adj=None, comment='score statistic'),
-                        Field(name='Fp_V', index=None, type='FLOAT', adj=None, comment='variance of score statistic'),
-                        Field(name='Fp_Z', index=None, type='FLOAT', adj=None, comment='U/sqrt(V)')]
+            self.fields = [Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='Sample size'),
+                        Field(name='pvalue_T1', index=None, type='FLOAT', adj=None, fmt=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_T5', index=None, type='FLOAT', adj=None, fmt=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_Fp', index=None, type='FLOAT', adj=None, fmt=None, comment='asymptotic p-value'),
+                        Field(name='pvalue_VT', index=None, type='FLOAT', adj=None, fmt=None, comment='asymptotic p-value'),
+                        Field(name='T1_R', index=None, type='FLOAT', adj=None, fmt=None, comment='resampling p-value'),
+                        Field(name='T5_R', index=None, type='FLOAT', adj=None, fmt=None, comment='resampling p-value'),
+                        Field(name='Fp_R', index=None, type='FLOAT', adj=None, fmt=None, comment='resampling p-value'),
+                        Field(name='VT_R', index=None, type='FLOAT', adj=None, fmt=None, comment='resampling p-value'),
+                        Field(name='EREC_R', index=None, type='FLOAT', adj=None, fmt=None, comment='resampling p-value'),
+                        Field(name='T1_U', index=None, type='FLOAT', adj=None, fmt=None, comment='score statistic'),
+                        Field(name='T1_V', index=None, type='FLOAT', adj=None, fmt=None, comment='variance of score statistic'),
+                        Field(name='T1_Z', index=None, type='FLOAT', adj=None, fmt=None, comment='U/sqrt(V)'),
+                        Field(name='T5_U', index=None, type='FLOAT', adj=None, fmt=None, comment='score statistic'),
+                        Field(name='T5_V', index=None, type='FLOAT', adj=None, fmt=None, comment='variance of score statistic'),
+                        Field(name='T5_Z', index=None, type='FLOAT', adj=None, fmt=None, comment='U/sqrt(V)'),
+                        Field(name='Fp_U', index=None, type='FLOAT', adj=None, fmt=None, comment='score statistic'),
+                        Field(name='Fp_V', index=None, type='FLOAT', adj=None, fmt=None, comment='variance of score statistic'),
+                        Field(name='Fp_Z', index=None, type='FLOAT', adj=None, fmt=None, comment='U/sqrt(V)')]
         self.ncovariates = ncovariates
         if self.archive:
             self.curr_dir = os.getcwd()

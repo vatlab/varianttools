@@ -69,7 +69,7 @@ class TestExport(ProcessTestCase):
 
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP')
+        runCmd('vtools use dbSNP-hg19_137')
 
         #you can assin any word for the suboption of --format_string
         self.assertSucc('vtools export variant --format vcf --format_string GT')
@@ -147,7 +147,7 @@ class TestExport(ProcessTestCase):
         'Test command export with multiple sub-options'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP')
+        runCmd('vtools use dbSNP-hg19_137')
         
         # You can assign a file or give the file format using this export "vcf" command 
         self.assertSucc('vtools export variant --format vcf --pos pos --ref ref')
@@ -202,7 +202,7 @@ class TestExport(ProcessTestCase):
         'Test command export in annovar input format'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP')
+        runCmd('vtools use dbSNP-hg19_137')
         #the output format of 'ANNOVAR' is with one options: --comment_string
         self.assertSucc('vtools export variant --format ANNOVAR') 
         self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.func')
@@ -216,7 +216,7 @@ class TestExport(ProcessTestCase):
         #the output format of 'ANNOVAR_output' is with one options: --var_info. This format is not working right now.
         #runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         #runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        #runCmd('vtools use dbSNP')
+        #runCmd('vtools use dbSNP-hg19_137')
         #self.assertFail('vtools export variant --format ANNOVAR_output') 
         #self.assertSucc('vtools export variant --format ANNOVAR_output --var_info dbSNP.name')
 
@@ -227,7 +227,7 @@ class TestExport(ProcessTestCase):
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
         self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
-        runCmd('vtools use dbSNP')
+        runCmd('vtools use dbSNP-hg19_137')
         self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
 if __name__ == '__main__':

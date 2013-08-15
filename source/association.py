@@ -544,13 +544,13 @@ class ResultRecorder:
         self.fields = []
         self.group_fields = []
         for n,t in zip(params.group_names, params.group_types):
-            self.group_fields.append(Field(name=n, index=None, type=t, adj=None, comment=n))
+            self.group_fields.append(Field(name=n, index=None, type=t, adj=None, fmt=None, comment=n))
         self.fields.extend(self.group_fields)
         for test in params.tests:
             if test.name:
                 self.fields.extend([
                     Field(name='{}_{}'.format(x.name, test.name), index=None,
-                        type=x.type, adj=None, comment=x.comment) for x in test.fields])
+                        type=x.type, adj=None, fmt=None, comment=x.comment) for x in test.fields])
             else:
                 self.fields.extend(test.fields)
         for field in self.fields:

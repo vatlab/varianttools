@@ -217,7 +217,7 @@ class RuntimeEnvironments(object):
     #
     def _set_sqlite_pragma(self, pragma):
         # 'None' is for backward compatibility
-        if pragma is None or pragma == 'None':
+        if pragma in [None, 'None', '']:
             return
         try:
             p = pragma.split(',')

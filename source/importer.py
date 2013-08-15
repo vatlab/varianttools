@@ -372,6 +372,7 @@ class ReaderWorker(Process):
         encoding:   file encoding
         '''
         Process.__init__(self, name='FileReader')
+        self.daemon = True
         self.processor = processor
         self.input = input
         self.output = output
@@ -901,6 +902,7 @@ class GenotypeImportWorker(Process):
         status:      an ImportStatus object to monitor the progress
         '''
         Process.__init__(self, name='GenotypeImporter')
+        self.daemon=True
         self.variantIndex = variantIndex
         self.filelist = filelist
         self.encoding = encoding
@@ -1001,6 +1003,7 @@ class GenotypeImportWorker(Process):
 class DedupWorker(Process):
     def __init__(self, status):
         Process.__init__(self)
+        self.daemon=True
         self.status = status
 
     def run(self):
@@ -1042,6 +1045,7 @@ class GenotypeCopier(Process):
         each sample copy.
         '''
         Process.__init__(self)
+        self.daemon=True
         self.main_genotype_file = main_genotype_file
         self.genotype_info = genotype_info
         self.copied_samples = copied_samples
