@@ -409,6 +409,7 @@ LIB_CGATOOLS = [
    'cgatools/reference/GeneDataStore.cpp'
 ]
 
+# http://hgdownload.cse.ucsc.edu/admin/jksrc.zip
 LIB_UCSC_FILES = [
     'ucsc/lib/osunix.c',
     'ucsc/lib/errabort.c',
@@ -448,6 +449,7 @@ LIB_UCSC_FILES = [
     'ucsc/lib/cirTree.c',
     'ucsc/lib/bbiRead.c',
     'ucsc/lib/bigBed.c',
+    'ucsc/lib/bwgQuery.c',
 ]
     
 LIB_STAT = ['source/fisher2.c']

@@ -236,8 +236,12 @@ extern "C" {
 #include "hmmstats.h"
 }
 
-typedef std::map<std::string, struct bbiFile *> BigBedFileMap;
-BigBedFileMap bbFileMap;
+// filename : <type, pointer>
+typedef std::map<std::string, std::pair<int, struct bbiFile *> > trackFileMap;
+trackFileMap bbFileMap;
+
+#define BIGBED_FILE 1
+#define BIGWIG_FILE 2
 
 static void track(
                    sqlite3_context * context,
@@ -258,39 +262,69 @@ static void track(
 	int pos = sqlite3_value_int(argv[2]);
 
 	struct bbiFile * cf = NULL;
-	BigBedFileMap::const_iterator it = bbFileMap.find(bb_file);
+	int file_type = 0;
+	trackFileMap::const_iterator it = bbFileMap.find(bb_file);
 	if (it == bbFileMap.end()) {
-		cf = bigBedFileOpen((char *)bb_file.c_str());
-		bbFileMap[bb_file] = cf;
+		if (isBigWig((char *)bb_file.c_str())) {
+			cf = bigWigFileOpen((char *)bb_file.c_str());
+			file_type = BIGWIG_FILE;
+		} else {
+			cf = bigBedFileOpen((char *)bb_file.c_str());
+			file_type = BIGBED_FILE;
+		}
+		bbFileMap[bb_file] = std::make_pair(file_type, cf);
 	} else {
-		cf = it->second;
+		file_type = it->second.first;
+		cf = it->second.second;
 	}
 	//
 	// get all items in the location
 	struct lm * bbLm = lmInit(0);
-	struct bigBedInterval * ivList = NULL;
 	//
 	// try to use "chrX" first because the bb files usually use chr name,
 	char chromName[40];
 	strcpy(chromName, "chr");
 	strcat(chromName, chr);
-	ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 10, bbLm);
-	if (ivList == NULL) {
-		sqlite3_result_null(context);
-		return;
-	}
 
 	std::stringstream res;
-	struct bigBedInterval * iv;
-	bool first = true;
-	for (iv = ivList; iv != NULL; iv = iv->next) {
-		char * rest = iv->rest;
-		if (rest) {
+	if (file_type == BIGBED_FILE) {
+		struct bigBedInterval * ivList = NULL;
+		ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 0, bbLm);
+		if (ivList == NULL) {
+			sqlite3_result_null(context);
+			return;
+		}
+
+		struct bigBedInterval * iv;
+		bool first = true;
+		for (iv = ivList; iv != NULL; iv = iv->next) {
+			char * rest = iv->rest;
+			if (rest) {
+				if (first) {
+					res << rest;
+					first = false;
+				} else {
+					res << "|" << rest;
+				}
+			}
+		}
+	} else {
+		struct bbiInterval * ivList = NULL;
+		ivList = bigWigIntervalQuery(cf, chromName, pos - 1, pos, bbLm);
+		if (ivList == NULL) {
+			sqlite3_result_null(context);
+			return;
+		}
+
+		struct bbiInterval * iv;
+		bool first = true;
+		for (iv = ivList; iv != NULL; iv = iv->next) {
+			double val = iv->val;
 			if (first) {
-				res << rest;
+				res << val;
 				first = false;
 			} else {
-				res << "|" << rest;
+				res << "|" << val;
 			}
 		}
 	}

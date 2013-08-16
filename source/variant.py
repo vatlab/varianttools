@@ -51,7 +51,7 @@ def generalOutputArguments(parser):
             field names.'''),
     grp.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
-    grp.add_argument('--na', default='NA',
+    grp.add_argument('--na', default='.',
         help='Output string for missing value')
     grp.add_argument('-l', '--limit', metavar='N', type=int,
         help='''Limit output to the first N records.''')
