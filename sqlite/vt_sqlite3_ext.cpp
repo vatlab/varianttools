@@ -244,6 +244,82 @@ static void vcf_variant(
 }
 
 
+#include "common.h"
+#include "linefile.h"
+#include "hash.h"
+#include "options.h"
+#include "sqlNum.h"
+#include "bigBed.h"
+#include "asParse.h"
+#include "udc.h"
+#include "obscure.h"
+#include "localmem.h"
+#include "bigWig.h"
+#include "hmmstats.h"
+
+
+
+typedef std::map<std::string, struct bbiFile *> BigBedFileMap;
+BigBedFileMap bbFileMap;
+
+static void bigBed(
+                       sqlite3_context * context,
+                       int argc,
+                       sqlite3_value ** argv
+                       )
+{
+	if (argc < 3 || 
+	    sqlite3_value_type(argv[0]) == SQLITE_NULL || 
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL || 
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL)
+	{
+	      sqlite3_result_null(context);
+	  return;
+	}
+	
+	std::string bb_file = std::string((char *)sqlite3_value_text(argv[0]));
+	char * chr = (char*)sqlite3_value_text(argv[1]);
+	int pos = sqlite3_value_int(argv[2]);
+	
+	struct bbiFile * cf = NULL;
+	BigBedFileMap::const_iterator it = bbFileMap.find(bb_file);
+	if (it == bbFileMap.end()) {
+		cf = bigBedFileOpen((char*)bb_file.c_str());
+		bbFileMap[bb_file] = cf;
+	} else {
+		cf = it->second;
+	}
+	// 
+	// get all items in the location
+        struct lm * bbLm = lmInit(0);
+        struct bigBedInterval * ivList = NULL;
+	ivList = bigBedIntervalQuery(cf, chr, pos-1, pos + 1, 0, bbLm);
+	if (ivList == NULL) {
+      		sqlite3_result_null(context);
+	  	return;	
+	}
+		
+	std::stringstream res;
+	struct bigBedInterval * iv;
+	bool first = true;
+	for (iv = ivList; iv != NULL; iv = iv->next) {
+		char * rest = iv->rest;
+		if (rest) {
+			if (first) {
+				res << rest;
+				first = false;
+			} else {
+				res << "|" << rest;
+			}
+		}
+	}
+	lmCleanup(&bbLm);
+	sqlite3_result_text(context, (char*)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+}
+
+
+
+
 /*
 ** HWE exact test for a bi-allelic locus
 */
@@ -420,6 +496,7 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "ref_sequence", 4, SQLITE_ANY, 0, ref_sequence, 0, 0);
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
+	sqlite3_create_function(db, "bigBed", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
 	return 0;
 }
 
