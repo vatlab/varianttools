@@ -86,59 +86,24 @@ typedef std::map<std::string, int> ChrNameMap;
 RefGenomeFileMap refFileMap;
 ChrNameMap chrNameMap;
 
-static void ref_base(
-                     sqlite3_context * context,
-                     int argc,
-                     sqlite3_value ** argv
-                     )
-{
-	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
-	std::string chr = std::string((char *)sqlite3_value_text(argv[1]));
-	int pos = sqlite3_value_int(argv[2]);
-	//
-	// get reference genome file
-	cgatools::reference::CrrFile * cf = NULL;
-	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
-
-	if (it == refFileMap.end()) {
-		cf = new cgatools::reference::CrrFile(ref_file);
-		refFileMap[ref_file] = cf;
-	} else {
-		cf = it->second;
-	}
-	//
-	// get chromosome index
-	int chrIdx = 0;
-	ChrNameMap::const_iterator cit = chrNameMap.find(chr);
-	if (cit == chrNameMap.end()) {
-		try {
-			chrIdx = cf->getChromosomeId(chr);
-		} catch (...) {
-			chrIdx = cf->getChromosomeId("chr" + chr);
-		}
-		chrNameMap[chr] = chrIdx;
-	} else {
-		chrIdx = cit->second;
-	}
-	//
-	// get ...
-	char res[2];
-	res[0] = cf->getBase(cgatools::reference::Location(chrIdx, pos - 1));
-	res[1] = '\0';
-	sqlite3_result_text(context, (char *)res, -1, SQLITE_TRANSIENT);
-}
-
-
 static void ref_sequence(
                          sqlite3_context * context,
                          int argc,
                          sqlite3_value ** argv
                          )
 {
+	if (argc < 3 || argc > 4 ||
+	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL)
+	{
+		sqlite3_result_null(context);
+		return;
+	}
 	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
 	std::string chr = std::string((char *)sqlite3_value_text(argv[1]));
 	int start = sqlite3_value_int(argv[2]);
-	int end = sqlite3_value_int(argv[3]);
+	int end = argc == 4 ? sqlite3_value_int(argv[3]) : 0;
 	//
 	// get reference genome file
 	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
@@ -165,9 +130,17 @@ static void ref_sequence(
 		chrIdx = cit->second;
 	}
 	//
-	// get ...
-	std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
-	sqlite3_result_text(context, (char *)(res.c_str()), -1, SQLITE_TRANSIENT);
+	if (argc == 4) {
+		// sequence
+		std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
+		sqlite3_result_text(context, (char *)(res.c_str()), -1, SQLITE_TRANSIENT);
+	} else {
+		// single base
+		char res[2];
+		res[0] = cf->getBase(cgatools::reference::Location(chrIdx, start - 1));
+		res[1] = '\0';
+		sqlite3_result_text(context, (char *)res, -1, SQLITE_TRANSIENT);
+	}
 }
 
 
@@ -266,7 +239,7 @@ extern "C" {
 typedef std::map<std::string, struct bbiFile *> BigBedFileMap;
 BigBedFileMap bbFileMap;
 
-static void bigBed(
+static void track(
                    sqlite3_context * context,
                    int argc,
                    sqlite3_value ** argv
@@ -427,6 +400,14 @@ static void fisher_exact(
 // this is a fake function to make this .so file a loadable Python module
 // so that it can be imported and recogznied by pyinstaller. The library
 // is actually imported into sqlite using SELECT load_extension()
+
+// suppress two warnings
+#ifdef _GNU_SOURCE
+  #undef _GNU_SOURCE
+#endif
+#ifdef _REENTRANT
+  #undef _REENTRANT
+#endif
 #include <Python.h>
 #if PY_VERSION_HEX >= 0x03000000
 struct module_state
@@ -496,13 +477,11 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "least_not_null", -1, SQLITE_ANY, 0, least_not_null_func, 0, 0);
 	sqlite3_create_function(db, "HWE_exact", -1, SQLITE_ANY, 0, hwe_exact, 0, 0);
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
-	// ref_base(file, chr, pos)
-	sqlite3_create_function(db, "ref_base", 3, SQLITE_ANY, 0, ref_base, 0, 0);
 	// ref_sequence(file, chr, start, end)
-	sqlite3_create_function(db, "ref_sequence", 4, SQLITE_ANY, 0, ref_sequence, 0, 0);
+	sqlite3_create_function(db, "ref_sequence", -1, SQLITE_ANY, 0, ref_sequence, 0, 0);
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
-	sqlite3_create_function(db, "bigBed", -1, SQLITE_ANY, 0, bigBed, 0, 0);
+	sqlite3_create_function(db, "track", -1, SQLITE_ANY, 0, track, 0, 0);
 	return 0;
 }
 
