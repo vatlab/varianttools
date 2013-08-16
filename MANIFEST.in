@@ -122,6 +122,10 @@ prune boost_1_49_0/boost/variant
 prune boost_1_49_0/boost/wave
 prune boost_1_49_0/boost/xpressive
 #
+# ucsc tools
+recursive-include ucsc/lib *.h *.c
+recursive-include ucsc/inc *.h
+#
 # cgatools
 include cgatools/core.hpp
 recursive-include cgatools/util *.hpp *.cpp
