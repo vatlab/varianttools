@@ -248,6 +248,7 @@ static void vcf_variant(
 }
 
 
+extern "C" {
 #include "common.h"
 #include "linefile.h"
 #include "hash.h"
@@ -260,7 +261,7 @@ static void vcf_variant(
 #include "localmem.h"
 #include "bigWig.h"
 #include "hmmstats.h"
-
+}
 
 typedef std::map<std::string, struct bbiFile *> BigBedFileMap;
 BigBedFileMap bbFileMap;
@@ -295,7 +296,12 @@ static void bigBed(
 	// get all items in the location
 	struct lm * bbLm = lmInit(0);
 	struct bigBedInterval * ivList = NULL;
-	ivList = bigBedIntervalQuery(cf, chr, pos - 1, pos + 1, 0, bbLm);
+	//
+	// try to use "chrX" first because the bb files usually use chr name,
+	char chromName[40];
+	strcpy(chromName, "chr");
+	strcat(chromName, chr);
+	ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 10, bbLm);
 	if (ivList == NULL) {
 		sqlite3_result_null(context);
 		return;
@@ -496,7 +502,7 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "ref_sequence", 4, SQLITE_ANY, 0, ref_sequence, 0, 0);
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
-	sqlite3_create_function(db, "bigBed", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
+	sqlite3_create_function(db, "bigBed", -1, SQLITE_ANY, 0, bigBed, 0, 0);
 	return 0;
 }
 
