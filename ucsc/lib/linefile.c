@@ -233,7 +233,13 @@ if (tabix == NULL)
     freez(&tbiName);
     return NULL;
     }
-if ((tabix->idx = ti_index_load(tbiName)) == NULL)
+/** FIXED BY BO PENG
+ *  Perhaps the interface accepts filename.tbi before but the current
+ *  embedded tabix version automatically adds .tbi to the passed filename.
+ *  The consequence is that ti_index_load cannot find filename.tbi.tbi.
+ *  The patch passes fileOrUrl instead of tbiName.
+ */
+if ((tabix->idx = ti_index_load(fileOrUrl)) == NULL)
     {
     warn("Unable to load tabix index from \"%s\"", tbiName);
     ti_close(tabix);

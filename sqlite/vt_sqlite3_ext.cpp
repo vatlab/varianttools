@@ -226,13 +226,18 @@ extern "C" {
 #include "hash.h"
 #include "options.h"
 #include "sqlNum.h"
-#include "bigBed.h"
 #include "asParse.h"
 #include "udc.h"
 #include "obscure.h"
 #include "localmem.h"
-#include "bigWig.h"
 #include "hmmstats.h"
+#include "bigWig.h"
+#include "bigBed.h"
+// for tabix
+#include "bgzf.h"
+#include "tabix.h"
+#include "knetfile.h"
+// for vcf
 #include "vcf.h"
 }
 
@@ -494,7 +499,7 @@ static void track(
 			file_type = BIGWIG_FILE;
 		} else if (endsWith((char*)track_file.c_str(), ".vcf.gz")) { 
 			cf = (void *)vcfTabixFileMayOpen((char *)track_file.c_str(),
-				NULL, 0, 0,VCF_IGNORE_ERRS, 0);
+				NULL, 0, 0, VCF_IGNORE_ERRS, 0);
 			handler = vcfTabixTrack;
 			file_type = VCFTABIX_FILE;
 		} else {
