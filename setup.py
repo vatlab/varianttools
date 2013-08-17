@@ -460,7 +460,6 @@ LIB_UCSC_FILES = [
     'ucsc/tabix/index.c',
     'ucsc/tabix/bgzf.c',
     'ucsc/tabix/knetfile.c',
-    'ucsc/tabix/bgzip.c',
     'ucsc/tabix/kstring.c',
 ]
     
@@ -604,7 +603,9 @@ setup(name = "variant_tools",
             libraries = ['z', 'bz2'] + \
                 ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = SQLITE_DEFINES + [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
-                ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1')],
+                ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'),
+                ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFIL', None), 
+                ('BGZF_CACHE', None)],
         ),
         Extension('variant_tools.cplinkio',
             sources = LIB_PLINKIO,
