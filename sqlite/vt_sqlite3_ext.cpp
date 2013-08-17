@@ -233,14 +233,235 @@ extern "C" {
 #include "localmem.h"
 #include "bigWig.h"
 #include "hmmstats.h"
+#include "vcf.h"
 }
 
-// filename : <type, pointer>
-typedef std::map<std::string, std::pair<int, struct bbiFile *> > trackFileMap;
-trackFileMap bbFileMap;
+// filename : <type, pointer, handler>
+typedef void (*track_handler)(void *, char *, int, int, int, sqlite3_context *);
+
+struct TrackHandler {
+	void * file;
+	track_handler handler;
+	TrackHandler() : file(NULL), handler(NULL) {}
+	TrackHandler(void * f, track_handler h) : file(f), handler(h) {}
+};
+
+typedef std::map<std::string, struct TrackHandler> TrackFileMap;
+TrackFileMap trackFileMap;
 
 #define BIGBED_FILE 1
 #define BIGWIG_FILE 2
+#define VCFTABIX_FILE 3
+
+void bigBedTrack(void * track_file, char * chr, int pos, int res_type, int res_col, sqlite3_context * context)
+{
+	bbiFile * cf = (bbiFile*)track_file;
+	struct lm * bbLm = lmInit(0);
+	//
+	// try to use "chrX" first because the bb files usually use chr name,
+	char chromName[40];
+	strcpy(chromName, "chr");
+	strcat(chromName, chr);
+
+	struct bigBedInterval * ivList = NULL;
+	ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 0, bbLm);
+	if (ivList == NULL) {
+		sqlite3_result_null(context);
+	} else {
+		struct bigBedInterval * iv;
+
+		// if returnning typed-valued, only the first record will be considered
+		if (res_type == 0) {
+			if (res_col == 1)
+				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
+			else if (res_col == 2)
+				sqlite3_result_int(context, ivList->start);
+			else if (res_col == 3)
+				sqlite3_result_int(context, ivList->end);
+			else if (res_col > 3 && res_col <= cf->fieldCount) {
+				char * rest = iv->rest;
+				// skip a few \t
+				int i = 3;
+				char * pch = strtok(rest, "\t");
+				while (++i < res_col)
+					pch = strtok(NULL, "\t");
+				// text fields
+				if (res_col == 4 || res_col == 6 || res_col == 9 || res_col == 11 || res_col == 12) 
+					sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
+				else 
+					sqlite3_result_int(context, atoi(pch));
+			} else
+				sqlite3_result_null(context);
+		} else if (res_col >= 0 && res_col <= cf->fieldCount) {
+			std::stringstream res;
+			bool first = true;
+			for (iv = ivList; iv != NULL; iv = iv->next) {
+				if (!first)
+					res << "|";
+				else
+					first = false;
+				if (res_col == 0)
+					res << chromName << '\t' << iv->start << '\t' << iv->end << '\t' << iv->rest;
+				else if (res_col == 1)
+					res << chromName;
+				else if (res_col == 2)
+					res << iv->start;
+				else if (res_col == 3)
+					res << iv->end;
+				// 1, 2, 3 (chr, s, e) with 7 additional if fieldCount = 10
+				else {
+					char * rest = iv->rest;
+					// skip a few \t
+					int i = 3;
+					char * pch = strtok(rest, "\t");
+					while (++i < res_col)
+						pch = strtok(NULL, "\t");
+					res << pch;
+				}
+			}
+			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+		} else {
+			sqlite3_result_null(context);
+		}
+	}
+	lmCleanup(&bbLm);
+}
+
+static void bigWigTrack(void * track_file, char * chr, int pos, int res_type, int res_col, sqlite3_context * context)
+{
+	bbiFile * cf = (bbiFile *)track_file;
+	struct lm * bbLm = lmInit(0);
+	//
+	// try to use "chrX" first because the bb files usually use chr name,
+	char chromName[40];
+	strcpy(chromName, "chr");
+	strcat(chromName, chr);
+
+	struct bbiInterval * ivList = NULL;
+	ivList = bigWigIntervalQuery(cf, chromName, pos - 1, pos, bbLm);
+	if (ivList == NULL) {
+		sqlite3_result_null(context);
+	} else {
+		if (res_type == 0) {
+			if (res_col == 1)
+				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
+			else if (res_col == 2)
+				sqlite3_result_int(context, ivList->start);
+			else if (res_col == 3)
+				sqlite3_result_int(context, ivList->end);
+			else if (res_col > 4) 
+				sqlite3_result_double(context, ivList->val);
+			else
+				sqlite3_result_null(context);
+		} else if (res_col > 0 && res_col <=4 ) {
+			std::stringstream res;
+			struct bbiInterval * iv;
+			bool first = true;
+			double val = 0;
+			for (iv = ivList; iv != NULL; iv = iv->next) {
+				if (!first)
+					res << "|";
+				else
+					first = false;
+				//
+				if (res_col == 1)
+					res << chromName;
+				else if (res_col == 2)
+					res << iv->start;
+				else if (res_col == 3)
+					res << iv->end;
+				else if (res_col == 4)
+					res << iv->val;
+			}
+			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+		} else {
+			sqlite3_result_null(context);
+		}
+	}
+	lmCleanup(&bbLm);
+}
+
+
+static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_type, int res_col, sqlite3_context * context)
+{
+	struct vcfFile * cf = (struct vcfFile *)track_file;
+
+	// try to use "chrX" first because the vcf files usually use chr name,
+	char chromName[40];
+	strcpy(chromName, "chr");
+	strcat(chromName, chr);
+	
+	// clear record pool
+	vcfFileFlushRecords(cf);
+	// read records
+	int nRecord = vcfTabixBatchRead(cf, chromName, pos - 1, pos, VCF_IGNORE_ERRS, -1);
+	// get records
+	if (nRecord == 0)
+		sqlite3_result_null(context);
+	
+	struct vcfRecord *rec;
+    for (rec = cf->records;  rec != NULL;  rec = rec->next) {
+		if (res_type == 0) {
+			if (res_col == 1)
+				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
+			else if (res_col == 2)
+				sqlite3_result_int(context, rec->chromStart);
+			else if (res_col == 3)
+				sqlite3_result_text(context, rec->name, -1, SQLITE_TRANSIENT);
+			else if (res_col == 4)
+				sqlite3_result_text(context, rec->alleles[0], -1, SQLITE_TRANSIENT);
+			else if (res_col == 5) {
+				char alleles[255];
+				alleles[0] = '\0';
+				for (size_t i = 1 ; i < rec->alleleCount; ++i) 
+					strcat(alleles, rec->alleles[i]);
+				sqlite3_result_text(context, alleles, -1, SQLITE_TRANSIENT);
+			} else if (res_col == 6)
+				sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
+			else if (res_col == 7) {
+				char filter[255];
+				filter[0] = '\0';
+				for (size_t i = 0; i < rec->filterCount; ++i)
+					strcat(filter, rec->filters[i]);
+				sqlite3_result_text(context, filter, -1, SQLITE_TRANSIENT);
+			} else if (res_col == 8)
+				sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
+			else if (res_col == 9)
+				sqlite3_result_text(context, rec->format, -1, SQLITE_TRANSIENT);
+			else if (res_col >= 10 && res_col <= 10 + cf->genotypeCount) {
+				sqlite3_result_text(context, rec->genotypeUnparsedStrings[res_col - 10], -1, SQLITE_TRANSIENT);
+			} else
+				sqlite3_result_null(context);
+			break;
+		}
+		/* else if (res_col > 0 && res_col <=4 ) {
+			std::stringstream res;
+			struct bbiInterval * iv;
+			bool first = true;
+			double val = 0;
+			for (iv = ivList; iv != NULL; iv = iv->next) {
+				if (!first)
+					res << "|";
+				else
+					first = false;
+				//
+				if (res_col == 1)
+					res << chromName;
+				else if (res_col == 2)
+					res << iv->start;
+				else if (res_col == 3)
+					res << iv->end;
+				else if (res_col == 4)
+					res << iv->val;
+			}
+			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+		} else {
+			sqlite3_result_null(context);
+		}
+		*/
+	}
+}
+
 
 static void track(
                   sqlite3_context * context,
@@ -256,32 +477,44 @@ static void track(
 		return;
 	}
 
-
-	std::string bb_file = std::string((char *)sqlite3_value_text(argv[0]));
+	std::string track_file = std::string((char *)sqlite3_value_text(argv[0]));
 	char * chr = (char *)sqlite3_value_text(argv[1]);
 	int pos = sqlite3_value_int(argv[2]);
 
-	struct bbiFile * cf = NULL;
+	void * cf = NULL;
+	track_handler handler = NULL; 
 	int file_type = 0;
-	int res_type = 0;  // 0 for int, 1 for text
+	int res_type = 0; 
 	int res_col = 0; 
-	trackFileMap::const_iterator it = bbFileMap.find(bb_file);
-	if (it == bbFileMap.end()) {
-		if (isBigWig((char *)bb_file.c_str())) {
-			cf = bigWigFileOpen((char *)bb_file.c_str());
+	TrackFileMap::const_iterator it = trackFileMap.find(track_file);
+	if (it == trackFileMap.end()) {
+		if (isBigWig((char *)track_file.c_str())) {
+			cf = (void *)bigWigFileOpen((char *)track_file.c_str());
+			handler = bigWigTrack;
 			file_type = BIGWIG_FILE;
+		} else if (endsWith((char*)track_file.c_str(), ".vcf.gz")) { 
+			cf = (void *)vcfTabixFileMayOpen((char *)track_file.c_str(),
+				NULL, 0, 0,VCF_IGNORE_ERRS, 0);
+			handler = vcfTabixTrack;
+			file_type = VCFTABIX_FILE;
 		} else {
-			cf = bigBedFileOpen((char *)bb_file.c_str());
+			cf = (void*)bigBedFileOpen((char *)track_file.c_str());
+			handler = bigBedTrack;
 			file_type = BIGBED_FILE;
 		}
-		bbFileMap[bb_file] = std::make_pair(file_type, cf);
+		if (cf == NULL)
+			sqlite3_result_double(context, 0);	
+		trackFileMap[track_file] = TrackHandler(cf, handler);
 	} else {
-		file_type = it->second.first;
-		cf = it->second.second;
+		cf = it->second.file;
+		handler = it->second.handler;
 	}
 	if (file_type == BIGWIG_FILE) {
 		res_type = 0;
 		res_col = 4;
+	} else if (file_type == VCFTABIX_FILE) {
+		res_type = 1;
+		res_col = 8;
 	} else {
 		res_type = 1;
 		res_col = 0;
@@ -297,121 +530,8 @@ static void track(
 		}
 	}
 
-
-	//
-	struct lm * bbLm = lmInit(0);
-	//
-	// try to use "chrX" first because the bb files usually use chr name,
-	char chromName[40];
-	strcpy(chromName, "chr");
-	strcat(chromName, chr);
-
-	if (file_type == BIGBED_FILE) {
-		struct bigBedInterval * ivList = NULL;
-		ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 0, bbLm);
-		if (ivList == NULL) {
-			sqlite3_result_null(context);
-		} else {
-			struct bigBedInterval * iv;
-
-			// if returnning typed-valued, only the first record will be considered
-			if (res_type == 0) {
-				if (res_col == 1)
-					sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
-				else if (res_col == 2)
-					sqlite3_result_int(context, ivList->start);
-				else if (res_col == 3)
-					sqlite3_result_int(context, ivList->end);
-				else if (res_col > 3 && res_col <= cf->fieldCount) {
-					char * rest = iv->rest;
-					// skip a few \t
-					int i = 3;
-					char * pch = strtok(rest, "\t");
-					while (++i < res_col)
-						pch = strtok(NULL, "\t");
-					// text fields
-					if (res_col == 4 || res_col == 6 || res_col == 9 || res_col == 11 || res_col == 12) 
-						sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
-					else 
-						sqlite3_result_int(context, atoi(pch));
-				} else
-					sqlite3_result_null(context);
-			} else if (res_col >= 0 && res_col <= cf->fieldCount) {
-				std::stringstream res;
-				bool first = true;
-				for (iv = ivList; iv != NULL; iv = iv->next) {
-					if (!first)
-						res << "|";
-					else
-						first = false;
-					if (res_col == 0)
-						res << chromName << '\t' << iv->start << '\t' << iv->end << '\t' << iv->rest;
-					else if (res_col == 1)
-						res << chromName;
-					else if (res_col == 2)
-						res << iv->start;
-					else if (res_col == 3)
-						res << iv->end;
-					// 1, 2, 3 (chr, s, e) with 7 additional if fieldCount = 10
-					else {
-						char * rest = iv->rest;
-						// skip a few \t
-						int i = 3;
-						char * pch = strtok(rest, "\t");
-						while (++i < res_col)
-							pch = strtok(NULL, "\t");
-						res << pch;
-					}
-				}
-				sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-			} else {
-				sqlite3_result_null(context);
-			}
-		}
-	} else {
-		struct bbiInterval * ivList = NULL;
-		ivList = bigWigIntervalQuery(cf, chromName, pos - 1, pos, bbLm);
-		if (ivList == NULL) {
-			sqlite3_result_null(context);
-		} else {
-			if (res_type == 0) {
-				if (res_col == 1)
-					sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
-				else if (res_col == 2)
-					sqlite3_result_int(context, ivList->start + 1);
-				else if (res_col == 3)
-					sqlite3_result_int(context, ivList->end);
-				else if (res_col > 4) 
-					sqlite3_result_double(context, ivList->val);
-				else
-					sqlite3_result_null(context);
-			} else if (res_col > 0 && res_col <=4 ) {
-				std::stringstream res;
-				struct bbiInterval * iv;
-				bool first = true;
-				double val = 0;
-				for (iv = ivList; iv != NULL; iv = iv->next) {
-					if (!first)
-						res << "|";
-					else
-						first = false;
-					//
-					if (res_col == 1)
-						res << chromName;
-					else if (res_col == 2)
-						res << iv->start;
-					else if (res_col == 3)
-						res << iv->end;
-					else if (res_col == 4)
-						res << iv->val;
-				}
-				sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-			} else {
-				sqlite3_result_null(context);
-			}
-		}
-	}
-	lmCleanup(&bbLm);
+	// call the handler
+	(*handler)(cf, chr, pos, res_type, res_col, context);
 }
 
 
