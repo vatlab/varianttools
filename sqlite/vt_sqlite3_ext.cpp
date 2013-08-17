@@ -242,9 +242,10 @@ extern "C" {
 }
 
 // filename : <type, pointer, handler>
-typedef void (*track_handler)(void *, char *, int, int, int, sqlite3_context *);
+typedef void (* track_handler)(void *, char *, int, int, int, sqlite3_context *);
 
-struct TrackHandler {
+struct TrackHandler
+{
 	void * file;
 	track_handler handler;
 	TrackHandler() : file(NULL), handler(NULL) {}
@@ -254,17 +255,21 @@ struct TrackHandler {
 typedef std::map<std::string, struct TrackHandler> TrackFileMap;
 TrackFileMap trackFileMap;
 
+#define RESULT_TYPED  1
+#define RESULT_STRING 2
+
 #define BIGBED_FILE 1
 #define BIGWIG_FILE 2
 #define VCFTABIX_FILE 3
 
 void bigBedTrack(void * track_file, char * chr, int pos, int res_type, int res_col, sqlite3_context * context)
 {
-	bbiFile * cf = (bbiFile*)track_file;
+	bbiFile * cf = (bbiFile *)track_file;
 	struct lm * bbLm = lmInit(0);
 	//
 	// try to use "chrX" first because the bb files usually use chr name,
 	char chromName[40];
+
 	strcpy(chromName, "chr");
 	strcat(chromName, chr);
 
@@ -276,7 +281,7 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_type, int res_c
 		struct bigBedInterval * iv;
 
 		// if returnning typed-valued, only the first record will be considered
-		if (res_type == 0) {
+		if (res_type == RESULT_TYPED) {
 			if (res_col == 1)
 				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
 			else if (res_col == 2)
@@ -291,9 +296,9 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_type, int res_c
 				while (++i < res_col)
 					pch = strtok(NULL, "\t");
 				// text fields
-				if (res_col == 4 || res_col == 6 || res_col == 9 || res_col == 11 || res_col == 12) 
+				if (res_col == 4 || res_col == 6 || res_col == 9 || res_col == 11 || res_col == 12)
 					sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
-				else 
+				else
 					sqlite3_result_int(context, atoi(pch));
 			} else
 				sqlite3_result_null(context);
@@ -332,6 +337,7 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_type, int res_c
 	lmCleanup(&bbLm);
 }
 
+
 static void bigWigTrack(void * track_file, char * chr, int pos, int res_type, int res_col, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
@@ -339,6 +345,7 @@ static void bigWigTrack(void * track_file, char * chr, int pos, int res_type, in
 	//
 	// try to use "chrX" first because the bb files usually use chr name,
 	char chromName[40];
+
 	strcpy(chromName, "chr");
 	strcat(chromName, chr);
 
@@ -347,18 +354,18 @@ static void bigWigTrack(void * track_file, char * chr, int pos, int res_type, in
 	if (ivList == NULL) {
 		sqlite3_result_null(context);
 	} else {
-		if (res_type == 0) {
+		if (res_type == RESULT_TYPED) {
 			if (res_col == 1)
 				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
 			else if (res_col == 2)
 				sqlite3_result_int(context, ivList->start);
 			else if (res_col == 3)
 				sqlite3_result_int(context, ivList->end);
-			else if (res_col > 4) 
+			else if (res_col > 4)
 				sqlite3_result_double(context, ivList->val);
 			else
 				sqlite3_result_null(context);
-		} else if (res_col > 0 && res_col <=4 ) {
+		} else if (res_col > 0 && res_col <= 4) {
 			std::stringstream res;
 			struct bbiInterval * iv;
 			bool first = true;
@@ -393,77 +400,86 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_type, 
 
 	// try to use "chrX" first because the vcf files usually use chr name,
 	char chromName[40];
+
 	strcpy(chromName, "chr");
 	strcat(chromName, chr);
-	
+
 	// clear record pool
 	vcfFileFlushRecords(cf);
 	// read records
-	int nRecord = vcfTabixBatchRead(cf, chromName, pos - 1, pos, VCF_IGNORE_ERRS, -1);
+	int nRecord = vcfTabixBatchRead(cf, chr, pos - 1, pos, VCF_IGNORE_ERRS, -1);
 	// get records
 	if (nRecord == 0)
 		sqlite3_result_null(context);
-	
-	struct vcfRecord *rec;
-    for (rec = cf->records;  rec != NULL;  rec = rec->next) {
-		if (res_type == 0) {
+
+	struct vcfRecord * rec;
+	for (rec = cf->records; rec != NULL; rec = rec->next) {
+		if (res_type == RESULT_TYPED) {
 			if (res_col == 1)
+				// chrom
 				sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
 			else if (res_col == 2)
+				// pos
 				sqlite3_result_int(context, rec->chromStart);
 			else if (res_col == 3)
+				// name
 				sqlite3_result_text(context, rec->name, -1, SQLITE_TRANSIENT);
 			else if (res_col == 4)
+				// ref
 				sqlite3_result_text(context, rec->alleles[0], -1, SQLITE_TRANSIENT);
 			else if (res_col == 5) {
+				// alt
 				char alleles[255];
 				alleles[0] = '\0';
-				for (size_t i = 1 ; i < rec->alleleCount; ++i) 
+				for (size_t i = 1 ; i < rec->alleleCount; ++i)
 					strcat(alleles, rec->alleles[i]);
 				sqlite3_result_text(context, alleles, -1, SQLITE_TRANSIENT);
 			} else if (res_col == 6)
+				// qual
 				sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
 			else if (res_col == 7) {
+				// filter
 				char filter[255];
 				filter[0] = '\0';
 				for (size_t i = 0; i < rec->filterCount; ++i)
 					strcat(filter, rec->filters[i]);
 				sqlite3_result_text(context, filter, -1, SQLITE_TRANSIENT);
 			} else if (res_col == 8)
-				sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
+				// info
+				sqlite3_result_text(context, rec->unparsedInfoElements, -1, SQLITE_TRANSIENT);
 			else if (res_col == 9)
 				sqlite3_result_text(context, rec->format, -1, SQLITE_TRANSIENT);
-			else if (res_col >= 10 && res_col <= 10 + cf->genotypeCount) {
+			else if (res_col >= 10 && res_col < 10 + cf->genotypeCount) {
 				sqlite3_result_text(context, rec->genotypeUnparsedStrings[res_col - 10], -1, SQLITE_TRANSIENT);
 			} else
 				sqlite3_result_null(context);
 			break;
 		}
 		/* else if (res_col > 0 && res_col <=4 ) {
-			std::stringstream res;
-			struct bbiInterval * iv;
-			bool first = true;
-			double val = 0;
-			for (iv = ivList; iv != NULL; iv = iv->next) {
-				if (!first)
-					res << "|";
-				else
-					first = false;
-				//
-				if (res_col == 1)
-					res << chromName;
-				else if (res_col == 2)
-					res << iv->start;
-				else if (res_col == 3)
-					res << iv->end;
-				else if (res_col == 4)
-					res << iv->val;
-			}
-			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-		} else {
-			sqlite3_result_null(context);
-		}
-		*/
+		    std::stringstream res;
+		    struct bbiInterval * iv;
+		    bool first = true;
+		    double val = 0;
+		    for (iv = ivList; iv != NULL; iv = iv->next) {
+		        if (!first)
+		            res << "|";
+		        else
+		            first = false;
+		        //
+		        if (res_col == 1)
+		            res << chromName;
+		        else if (res_col == 2)
+		            res << iv->start;
+		        else if (res_col == 3)
+		            res << iv->end;
+		        else if (res_col == 4)
+		            res << iv->val;
+		    }
+		    sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+		   } else {
+		    sqlite3_result_null(context);
+		   }
+		 */
 	}
 }
 
@@ -478,7 +494,7 @@ static void track(
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[2]) == SQLITE_NULL) {
-		sqlite3_result_null(context);
+		sqlite3_result_error(context, "please specify at least filename, chr, pos", -1);
 		return;
 	}
 
@@ -487,41 +503,41 @@ static void track(
 	int pos = sqlite3_value_int(argv[2]);
 
 	void * cf = NULL;
-	track_handler handler = NULL; 
+	track_handler handler = NULL;
 	int file_type = 0;
-	int res_type = 0; 
-	int res_col = 0; 
+	int res_type = RESULT_TYPED;
+	int res_col = 0;
 	TrackFileMap::const_iterator it = trackFileMap.find(track_file);
 	if (it == trackFileMap.end()) {
 		if (isBigWig((char *)track_file.c_str())) {
 			cf = (void *)bigWigFileOpen((char *)track_file.c_str());
 			handler = bigWigTrack;
 			file_type = BIGWIG_FILE;
-		} else if (endsWith((char*)track_file.c_str(), ".vcf.gz")) { 
+		} else if (endsWith((char *)track_file.c_str(), ".vcf.gz")) {
 			cf = (void *)vcfTabixFileMayOpen((char *)track_file.c_str(),
 				NULL, 0, 0, VCF_IGNORE_ERRS, 0);
 			handler = vcfTabixTrack;
 			file_type = VCFTABIX_FILE;
 		} else {
-			cf = (void*)bigBedFileOpen((char *)track_file.c_str());
+			cf = (void *)bigBedFileOpen((char *)track_file.c_str());
 			handler = bigBedTrack;
 			file_type = BIGBED_FILE;
 		}
 		if (cf == NULL)
-			sqlite3_result_double(context, 0);	
+			sqlite3_result_error(context, "cannot open file", -1);
 		trackFileMap[track_file] = TrackHandler(cf, handler);
 	} else {
 		cf = it->second.file;
 		handler = it->second.handler;
 	}
 	if (file_type == BIGWIG_FILE) {
-		res_type = 0;
+		res_type = RESULT_TYPED;
 		res_col = 4;
 	} else if (file_type == VCFTABIX_FILE) {
-		res_type = 1;
+		res_type = RESULT_TYPED;
 		res_col = 8;
 	} else {
-		res_type = 1;
+		res_type = RESULT_STRING;
 		res_col = 0;
 	}
 
@@ -530,13 +546,13 @@ static void track(
 			res_col = sqlite3_value_int(argv[3]);
 			res_type = 0;
 		} else {
-			res_col = atoi((char*)(sqlite3_value_text(argv[3])));
+			res_col = atoi((char *)(sqlite3_value_text(argv[3])));
 			res_type = 1;
 		}
 	}
 
 	// call the handler
-	(*handler)(cf, chr, pos, res_type, res_col, context);
+	(* handler)(cf, chr, pos, res_type, res_col, context);
 }
 
 
@@ -890,8 +906,8 @@ int sqlite3_my_extension_init(
 ** Tree is not necessarily balanced. That would require something like red&black trees of AVL
 */
 
-typedef int (*cmp_func)(const void *, const void *);
-typedef void (*map_iterator)(void *, int64_t, void *);
+typedef int (* cmp_func)(const void *, const void *);
+typedef void (* map_iterator)(void *, int64_t, void *);
 
 typedef struct node
 {
@@ -966,30 +982,30 @@ static char * sqlite3StrDup(const char * z)
 */
 static const u8 xtra_utf8_bytes[256] = {
 	/* 0xxxxxxx */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	  0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 0, 0, 0, 0, 0,
 
 	/* 10wwwwww */
-	4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	  4, 4, 4, 4, 4, 4,
-	4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	  4, 4, 4, 4, 4, 4,
-	4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	  4, 4, 4, 4, 4, 4,
-	4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	  4, 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,	 4, 4, 4, 4, 4,
 
 	/* 110yyyyy */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	  1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	  1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	 1, 1, 1, 1, 1,
 
 	/* 1110zzzz */
-	2, 2, 2, 2, 2, 2, 2, 2, 2, 2,	  2, 2, 2, 2, 2, 2,
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,	 2, 2, 2, 2, 2,
 
 	/* 11110yyy */
-	3, 3, 3, 3, 3, 3, 3, 3, 4, 4,	  4, 4, 4, 4, 4, 4,
+	3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4,	 4, 4, 4, 4, 4,
 };
 
 
@@ -1099,7 +1115,7 @@ static int sqlite3Utf8CharLen(const char * z, int nByte)
 */
 /* LMH 2007-03-25 Changed to use errno and remove domain; no pre-checking for errors. */
 #define GEN_MATH_WRAP_DOUBLE_1(name, function) \
-    static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
+	static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
 		double rVal = 0.0, val; \
 		assert(argc == 1); \
 		switch (sqlite3_value_type(argv[0]) ) { \
@@ -2597,61 +2613,61 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xFunc)(sqlite3_context *, int, sqlite3_value **);
 	} aFuncs[] = {
 		/* math.h */
-		{ "acos",		1,		   0,				  SQLITE_UTF8, 0, acosFunc			},
-		{ "asin",		1,		   0,				  SQLITE_UTF8, 0, asinFunc			},
-		{ "atan",		1,		   0,				  SQLITE_UTF8, 0, atanFunc			},
-		{ "atn2",		2,		   0,				  SQLITE_UTF8, 0, atn2Func			},
+		{ "acos",		1,		   0,		  SQLITE_UTF8,				   0, acosFunc			},
+		{ "asin",		1,		   0,		  SQLITE_UTF8,				   0, asinFunc			},
+		{ "atan",		1,		   0,		  SQLITE_UTF8,				   0, atanFunc			},
+		{ "atn2",		2,		   0,		  SQLITE_UTF8,				   0, atn2Func			},
 		/* XXX alias */
-		{ "atan2",		2,		   0,				  SQLITE_UTF8, 0, atn2Func			},
-		{ "acosh",		1,		   0,				  SQLITE_UTF8, 0, acoshFunc			},
-		{ "asinh",		1,		   0,				  SQLITE_UTF8, 0, asinhFunc			},
-		{ "atanh",		1,		   0,				  SQLITE_UTF8, 0, atanhFunc			},
+		{ "atan2",		2,		   0,		  SQLITE_UTF8,				   0, atn2Func			},
+		{ "acosh",		1,		   0,		  SQLITE_UTF8,				   0, acoshFunc			},
+		{ "asinh",		1,		   0,		  SQLITE_UTF8,				   0, asinhFunc			},
+		{ "atanh",		1,		   0,		  SQLITE_UTF8,				   0, atanhFunc			},
 
-		{ "difference", 2,		   0,				  SQLITE_UTF8, 0, differenceFunc	},
-		{ "degrees",	1,		   0,				  SQLITE_UTF8, 0, rad2degFunc		},
-		{ "radians",	1,		   0,				  SQLITE_UTF8, 0, deg2radFunc		},
+		{ "difference", 2,		   0,		  SQLITE_UTF8,				   0, differenceFunc	},
+		{ "degrees",	1,		   0,		  SQLITE_UTF8,				   0, rad2degFunc		},
+		{ "radians",	1,		   0,		  SQLITE_UTF8,				   0, deg2radFunc		},
 
-		{ "cos",		1,		   0,				  SQLITE_UTF8, 0, cosFunc			},
-		{ "sin",		1,		   0,				  SQLITE_UTF8, 0, sinFunc			},
-		{ "tan",		1,		   0,				  SQLITE_UTF8, 0, tanFunc			},
-		{ "cot",		1,		   0,				  SQLITE_UTF8, 0, cotFunc			},
-		{ "cosh",		1,		   0,				  SQLITE_UTF8, 0, coshFunc			},
-		{ "sinh",		1,		   0,				  SQLITE_UTF8, 0, sinhFunc			},
-		{ "tanh",		1,		   0,				  SQLITE_UTF8, 0, tanhFunc			},
-		{ "coth",		1,		   0,				  SQLITE_UTF8, 0, cothFunc			},
+		{ "cos",		1,		   0,		  SQLITE_UTF8,				   0, cosFunc			},
+		{ "sin",		1,		   0,		  SQLITE_UTF8,				   0, sinFunc			},
+		{ "tan",		1,		   0,		  SQLITE_UTF8,				   0, tanFunc			},
+		{ "cot",		1,		   0,		  SQLITE_UTF8,				   0, cotFunc			},
+		{ "cosh",		1,		   0,		  SQLITE_UTF8,				   0, coshFunc			},
+		{ "sinh",		1,		   0,		  SQLITE_UTF8,				   0, sinhFunc			},
+		{ "tanh",		1,		   0,		  SQLITE_UTF8,				   0, tanhFunc			},
+		{ "coth",		1,		   0,		  SQLITE_UTF8,				   0, cothFunc			},
 
-		{ "exp",		1,		   0,				  SQLITE_UTF8, 0, expFunc			},
-		{ "log",		1,		   0,				  SQLITE_UTF8, 0, logFunc			},
-		{ "log10",		1,		   0,				  SQLITE_UTF8, 0, log10Func			},
-		{ "power",		2,		   0,				  SQLITE_UTF8, 0, powerFunc			},
-		{ "sign",		1,		   0,				  SQLITE_UTF8, 0, signFunc			},
-		{ "sqrt",		1,		   0,				  SQLITE_UTF8, 0, sqrtFunc			},
-		{ "square",		1,		   0,				  SQLITE_UTF8, 0, squareFunc		},
+		{ "exp",		1,		   0,		  SQLITE_UTF8,				   0, expFunc			},
+		{ "log",		1,		   0,		  SQLITE_UTF8,				   0, logFunc			},
+		{ "log10",		1,		   0,		  SQLITE_UTF8,				   0, log10Func			},
+		{ "power",		2,		   0,		  SQLITE_UTF8,				   0, powerFunc			},
+		{ "sign",		1,		   0,		  SQLITE_UTF8,				   0, signFunc			},
+		{ "sqrt",		1,		   0,		  SQLITE_UTF8,				   0, sqrtFunc			},
+		{ "square",		1,		   0,		  SQLITE_UTF8,				   0, squareFunc		},
 
-		{ "ceil",		1,		   0,				  SQLITE_UTF8, 0, ceilFunc			},
-		{ "floor",		1,		   0,				  SQLITE_UTF8, 0, floorFunc			},
+		{ "ceil",		1,		   0,		  SQLITE_UTF8,				   0, ceilFunc			},
+		{ "floor",		1,		   0,		  SQLITE_UTF8,				   0, floorFunc			},
 
-		{ "pi",			0,		   0,				  SQLITE_UTF8, 1, piFunc			},
+		{ "pi",			0,		   0,		  SQLITE_UTF8,				   1, piFunc			},
 
 
 		/* string */
-		{ "replicate",	2,		   0,				  SQLITE_UTF8, 0, replicateFunc		},
-		{ "charindex",	2,		   0,				  SQLITE_UTF8, 0, charindexFunc		},
-		{ "charindex",	3,		   0,				  SQLITE_UTF8, 0, charindexFunc		},
-		{ "leftstr",	2,		   0,				  SQLITE_UTF8, 0, leftFunc			},
-		{ "rightstr",	2,		   0,				  SQLITE_UTF8, 0, rightFunc			},
+		{ "replicate",	2,		   0,		  SQLITE_UTF8,				   0, replicateFunc		},
+		{ "charindex",	2,		   0,		  SQLITE_UTF8,				   0, charindexFunc		},
+		{ "charindex",	3,		   0,		  SQLITE_UTF8,				   0, charindexFunc		},
+		{ "leftstr",	2,		   0,		  SQLITE_UTF8,				   0, leftFunc			},
+		{ "rightstr",	2,		   0,		  SQLITE_UTF8,				   0, rightFunc			},
 #ifndef HAVE_TRIM
-		{ "ltrim",		1,		   0,				  SQLITE_UTF8, 0, ltrimFunc			},
-		{ "rtrim",		1,		   0,				  SQLITE_UTF8, 0, rtrimFunc			},
-		{ "trim",		1,		   0,				  SQLITE_UTF8, 0, trimFunc			},
-		{ "replace",	3,		   0,				  SQLITE_UTF8, 0, replaceFunc		},
+		{ "ltrim",		1,		   0,		  SQLITE_UTF8,				   0, ltrimFunc			},
+		{ "rtrim",		1,		   0,		  SQLITE_UTF8,				   0, rtrimFunc			},
+		{ "trim",		1,		   0,		  SQLITE_UTF8,				   0, trimFunc			},
+		{ "replace",	3,		   0,		  SQLITE_UTF8,				   0, replaceFunc		},
 #endif
-		{ "reverse",	1,		   0,				  SQLITE_UTF8, 0, reverseFunc		},
-		{ "proper",		1,		   0,				  SQLITE_UTF8, 0, properFunc		},
-		{ "padl",		2,		   0,				  SQLITE_UTF8, 0, padlFunc			},
-		{ "padr",		2,		   0,				  SQLITE_UTF8, 0, padrFunc			},
-		{ "padc",		2,		   0,				  SQLITE_UTF8, 0, padcFunc			},
-		{ "strfilter",	2,		   0,				  SQLITE_UTF8, 0, strfilterFunc		},
+		{ "reverse",	1,		   0,		  SQLITE_UTF8,				   0, reverseFunc		},
+		{ "proper",		1,		   0,		  SQLITE_UTF8,				   0, properFunc		},
+		{ "padl",		2,		   0,		  SQLITE_UTF8,				   0, padlFunc			},
+		{ "padr",		2,		   0,		  SQLITE_UTF8,				   0, padrFunc			},
+		{ "padc",		2,		   0,		  SQLITE_UTF8,				   0, padcFunc			},
+		{ "strfilter",	2,		   0,		  SQLITE_UTF8,				   0, strfilterFunc		},
 
 	};
 	/* Aggregate functions */
@@ -2664,12 +2680,12 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xStep)(sqlite3_context *, int, sqlite3_value **);
 		void (* xFinalize)(sqlite3_context *);
 	} aAggs[] = {
-		{ "stdev",			1,			 0,				0, varianceStep, stdevFinalize					 },
-		{ "variance",		1,			 0,				0, varianceStep, varianceFinalize				 },
-		{ "mode",			1,			 0,				0, modeStep,	 modeFinalize					 },
-		{ "median",			1,			 0,				0, modeStep,	 medianFinalize					 },
-		{ "lower_quartile", 1,			 0,				0, modeStep,	 lower_quartileFinalize			 },
-		{ "upper_quartile", 1,			 0,				0, modeStep,	 upper_quartileFinalize			 },
+		{ "stdev",			1,			 0,			  0,			 varianceStep, stdevFinalize					   },
+		{ "variance",		1,			 0,			  0,			 varianceStep, varianceFinalize					   },
+		{ "mode",			1,			 0,			  0,			 modeStep,	   modeFinalize						   },
+		{ "median",			1,			 0,			  0,			 modeStep,	   medianFinalize					   },
+		{ "lower_quartile", 1,			 0,			  0,			 modeStep,	   lower_quartileFinalize			   },
+		{ "upper_quartile", 1,			 0,			  0,			 modeStep,	   upper_quartileFinalize			   },
 	};
 	int i;
 

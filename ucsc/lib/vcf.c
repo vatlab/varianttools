@@ -668,6 +668,8 @@ record->name = vcfFilePooledStr(vcff, words[2]);
 parseRefAndAlt(vcff, record, words[3], words[4]);
 record->qual = vcfFilePooledStr(vcff, words[5]);
 parseFilterColumn(vcff, record, words[6]);
+// ADDED BY BO PENG to get whole INFO column
+record->unparsedInfoElements = vcfFilePooledStr(vcff, words[7]);
 parseInfoColumn(vcff, record, words[7]);
 if (vcff->genotypeCount > 0)
     {

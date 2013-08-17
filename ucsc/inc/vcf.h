@@ -80,6 +80,8 @@ struct vcfRecord
     char **filters;		// Code(s) described in header for failed filters (or PASS or .)
     int infoCount;		// Number of components of INFO column
     struct vcfInfoElement *infoElements;	// Array of INFO column components
+    // ADDED BY BO PENG, save raw INFO column
+    char *unparsedInfoElements;
     char *format;		// Optional column containing ordered list of genotype components
     char **genotypeUnparsedStrings;	// Temporary array of unparsed optional genotype columns
     struct vcfGenotype *genotypes;	// If built, array of parsed genotype components;
