@@ -494,13 +494,13 @@ static void track(
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[2]) == SQLITE_NULL) {
-		sqlite3_result_error(context, "please specify at least filename, chr, pos", -1);
+		sqlite3_result_error(context, "please specify at least filename", -1);
 		return;
 	}
 
-	std::string track_file = std::string((char *)sqlite3_value_text(argv[0]));
-	char * chr = (char *)sqlite3_value_text(argv[1]);
-	int pos = sqlite3_value_int(argv[2]);
+	std::string track_file = std::string((char *)sqlite3_value_text(argv[2]));
+	char * chr = (char *)sqlite3_value_text(argv[0]);
+	int pos = sqlite3_value_int(argv[1]);
 
 	void * cf = NULL;
 	track_handler handler = NULL;

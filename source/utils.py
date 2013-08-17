@@ -2197,6 +2197,8 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         'ref_sequence': '__REFSEQ__',
         'vcf_variant': '__VCFVARIANT__'
     }
+    has_track_query = False
+    track_tokens = {'track': '__TRACK__'}
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2207,8 +2209,11 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             toval = 'alt_' + toval
         #
         if toval.lower() in ref_tokens:
-            toval = ref_tokens[toval.lower()];
+            toval = ref_tokens[toval.lower()]
             has_ref_query = True
+        elif toval.lower() in track_tokens:
+            toval = track_tokens[toval.lower()]
+            has_track_query = True
         #
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             if before_dot:
@@ -2249,6 +2254,14 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
         for k,v in ref_tokens.items():
             query = re.sub(r'{}\s*\('.format(v), ' {}("{}", '.format(k, crrFile), query)
+    if has_track_query:
+        for k,v in track_tokens.items():
+            if alt_build:
+                query = re.sub(r'{}\s*\('.format(v), 
+                    ' {}({}, {}, '.format(k, "variant.alt_chr", "variant.alt_pos"), query)
+            else:
+                query = re.sub(r'{}\s*\('.format(v), 
+                    ' {}({}, {}, '.format(k, "variant.chr", "variant.pos"), query)
     return query, fields
 
 def extractField(field):
