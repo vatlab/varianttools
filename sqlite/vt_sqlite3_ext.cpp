@@ -256,9 +256,6 @@ static void track(
 		return;
 	}
 
-	int col = 0;
-	if (argc == 4)
-		col = sqlite3_value_int(argv[3]);
 
 	std::string bb_file = std::string((char *)sqlite3_value_text(argv[0]));
 	char * chr = (char *)sqlite3_value_text(argv[1]);
@@ -266,6 +263,8 @@ static void track(
 
 	struct bbiFile * cf = NULL;
 	int file_type = 0;
+	int res_type = 0;  // 0 for int, 1 for text
+	int res_col = 0; 
 	trackFileMap::const_iterator it = bbFileMap.find(bb_file);
 	if (it == bbFileMap.end()) {
 		if (isBigWig((char *)bb_file.c_str())) {
@@ -280,8 +279,26 @@ static void track(
 		file_type = it->second.first;
 		cf = it->second.second;
 	}
+	if (file_type == BIGWIG_FILE) {
+		res_type = 0;
+		res_col = 4;
+	} else {
+		res_type = 1;
+		res_col = 0;
+	}
+
+	if (argc == 4) {
+		if (sqlite3_value_type(argv[0]) == SQLITE_INTEGER) {
+			res_col = sqlite3_value_int(argv[3]);
+			res_type = 0;
+		} else {
+			res_col = atoi((char*)(sqlite3_value_text(argv[3])));
+			res_type = 1;
+		}
+	}
+
+
 	//
-	// get all items in the location
 	struct lm * bbLm = lmInit(0);
 	//
 	// try to use "chrX" first because the bb files usually use chr name,
@@ -289,69 +306,112 @@ static void track(
 	strcpy(chromName, "chr");
 	strcat(chromName, chr);
 
-	std::stringstream res;
 	if (file_type == BIGBED_FILE) {
 		struct bigBedInterval * ivList = NULL;
 		ivList = bigBedIntervalQuery(cf, chromName, pos - 1, pos, 0, bbLm);
 		if (ivList == NULL) {
 			sqlite3_result_null(context);
-			return;
-		}
+		} else {
+			struct bigBedInterval * iv;
 
-		struct bigBedInterval * iv;
-		bool first = true;
-		for (iv = ivList; iv != NULL; iv = iv->next) {
-			if (!first)
-				res << "|";
-			else
-				first = false;
-			if (col == 1)
-				res << chromName;
-			else if (col == 2)
-				res << iv->start;
-			else if (col == 3)
-				res << iv->end;
-			// 1, 2, 3 (chr, s, e) with 7 additional if fieldCount = 10
-			else if (col > 3 && col <= cf->fieldCount) {
-				char * rest = iv->rest;
-				// skip a few \t
-				int i = 3;
-				char * pch = strtok(rest, "\t");
-				while (++i < col)
-					pch = strtok(NULL, "\t");
-				res << pch;
-			} else
-				res << iv->rest;
+			// if returnning typed-valued, only the first record will be considered
+			if (res_type == 0) {
+				if (res_col == 1)
+					sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
+				else if (res_col == 2)
+					sqlite3_result_int(context, ivList->start);
+				else if (res_col == 3)
+					sqlite3_result_int(context, ivList->end);
+				else if (res_col > 3 && res_col <= cf->fieldCount) {
+					char * rest = iv->rest;
+					// skip a few \t
+					int i = 3;
+					char * pch = strtok(rest, "\t");
+					while (++i < res_col)
+						pch = strtok(NULL, "\t");
+					// text fields
+					if (res_col == 4 || res_col == 6 || res_col == 9 || res_col == 11 || res_col == 12) 
+						sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
+					else 
+						sqlite3_result_int(context, atoi(pch));
+				} else
+					sqlite3_result_null(context);
+			} else if (res_col >= 0 && res_col <= cf->fieldCount) {
+				std::stringstream res;
+				bool first = true;
+				for (iv = ivList; iv != NULL; iv = iv->next) {
+					if (!first)
+						res << "|";
+					else
+						first = false;
+					if (res_col == 0)
+						res << chromName << '\t' << iv->start << '\t' << iv->end << '\t' << iv->rest;
+					else if (res_col == 1)
+						res << chromName;
+					else if (res_col == 2)
+						res << iv->start;
+					else if (res_col == 3)
+						res << iv->end;
+					// 1, 2, 3 (chr, s, e) with 7 additional if fieldCount = 10
+					else {
+						char * rest = iv->rest;
+						// skip a few \t
+						int i = 3;
+						char * pch = strtok(rest, "\t");
+						while (++i < res_col)
+							pch = strtok(NULL, "\t");
+						res << pch;
+					}
+				}
+				sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+			} else {
+				sqlite3_result_null(context);
+			}
 		}
 	} else {
 		struct bbiInterval * ivList = NULL;
 		ivList = bigWigIntervalQuery(cf, chromName, pos - 1, pos, bbLm);
 		if (ivList == NULL) {
 			sqlite3_result_null(context);
-			return;
-		}
-
-		struct bbiInterval * iv;
-		bool first = true;
-		double val = 0;
-		for (iv = ivList; iv != NULL; iv = iv->next) {
-			if (!first)
-				res << "|";
-			else
-				first = false;
-			//
-			if (col == 1)
-				res << chromName;
-			else if (col == 2)
-				res << iv->start;
-			else if (col == 3)
-				res << iv->end;
-			else
-				res << iv->val;
+		} else {
+			if (res_type == 0) {
+				if (res_col == 1)
+					sqlite3_result_text(context, chromName, -1, SQLITE_TRANSIENT);
+				else if (res_col == 2)
+					sqlite3_result_int(context, ivList->start + 1);
+				else if (res_col == 3)
+					sqlite3_result_int(context, ivList->end);
+				else if (res_col > 4) 
+					sqlite3_result_double(context, ivList->val);
+				else
+					sqlite3_result_null(context);
+			} else if (res_col > 0 && res_col <=4 ) {
+				std::stringstream res;
+				struct bbiInterval * iv;
+				bool first = true;
+				double val = 0;
+				for (iv = ivList; iv != NULL; iv = iv->next) {
+					if (!first)
+						res << "|";
+					else
+						first = false;
+					//
+					if (res_col == 1)
+						res << chromName;
+					else if (res_col == 2)
+						res << iv->start;
+					else if (res_col == 3)
+						res << iv->end;
+					else if (res_col == 4)
+						res << iv->val;
+				}
+				sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+			} else {
+				sqlite3_result_null(context);
+			}
 		}
 	}
 	lmCleanup(&bbLm);
-	sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 }
 
 
