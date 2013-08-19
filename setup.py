@@ -62,6 +62,8 @@ WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
 WRAPPER_PY_FILE = 'source/assoTests_{}.py'
 CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
 CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
+UCSCTOOLS_WRAPPER_CPP_FILE = 'source/ucsctools_wrap_{}.cpp'
+UCSCTOOLS_WRAPPER_PY_FILE = 'source/ucsctools_{}.py'
 SQLITE_PY_FILE = 'source/vt_sqlite3_{}.py'
 
 
@@ -520,7 +522,8 @@ if VTOOLS_VERSION.endswith('svn'):
 # files away.
 #
 for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
-    CGATOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
+    CGATOOLS_WRAPPER_PY_FILE, UCSCTOOLS_WRAPPER_CPP_FILE,
+    UCSCTOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
     if sys.version_info.major == 2:
         filename1 = filename.format('py2')
         filename2 = filename.format('py3')
@@ -606,6 +609,13 @@ setup(name = "variant_tools",
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'),
                 ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None), 
                 ('BGZF_CACHE', None)],
+        ),
+        Extension('variant_tools._ucsctools',
+            sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_UCSC_FILES,
+            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix'],
+            libraries = ['z', 'bz2'],
+            define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'),
+                ('_USE_KNETFILE', None), ('BGZF_CACHE', None)]
         ),
         Extension('variant_tools.cplinkio',
             sources = LIB_PLINKIO,

@@ -45,6 +45,7 @@ include source/preprocessor.py
 include source/meta.py
 include source/assoTests.i
 include source/cgatools.i
+include source/ucsctools.i
 include source/swigpyrun.h
 include source/assoTests.h
 include source/assoData.h

@@ -41,6 +41,11 @@ import time
 import re
 import tarfile
 import urllib
+if sys.version_info.major == 2:
+    from ucsctools_py2 import showTrack
+else:
+    from ucsctools_py3 import showTrack
+
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
@@ -3671,8 +3676,9 @@ def remove(args):
 def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
-        'annotation', 'formats', 'format', 'tests', 'test', 'runtime_options',
-        'runtime_option', 'snapshot', 'snapshots', 'pipeline', 'pipelines'],
+        'annotation', 'track', 'formats', 'format', 'tests', 'test', 
+        'runtime_options', 'runtime_option', 'snapshot', 'snapshots', 
+        'pipeline', 'pipelines'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3684,14 +3690,16 @@ def showArguments(parser):
             'fields' for fields from variant tables and all used annotation
             databases, 'annotations' for a list of all available annotation
             databases, 'annotation ANN' for details about annotation database ANN,
-            'formats' for all supported import and export formats, 'format FMT' for
-            details of format FMT, 'tests' for a list of all association tests, and
-            'test TST' for details of an association test TST, 'runtime_options'
-            for a list of runtime options and their descriptions, 'runtime_option
-            OPT' for value of specified runtime option OPT, 'snapshot' for a
-            particular snapshot by name or filename, 'snapshots' for a list of
-            publicly available snapshots, and snapshots of the current project
-            saved by command 'vtools admin --save_snapshots', 'pipeline PIPELINE'
+            'track' for information of a track file in tabixed vcf, bigWig, or
+            bigBed format, 'formats' for all supported import and export formats, 
+            'format FMT' for details of format FMT, 'tests' for a list of all 
+            association tests, and 'test TST' for details of an association test 
+            TST, 'runtime_options' for a list of runtime options and their 
+            descriptions, 'runtime_option OPT' for value of specified runtime 
+            option OPT, 'snapshot' for a particular snapshot by name or
+            filename, 'snapshots' for a list of publicly available snapshots,
+            and snapshots of the current project saved by command 
+            'vtools admin --save_snapshots', 'pipeline PIPELINE'
             for details of a particular align and variant calling pipeline, and
             'pipelines' for a list of available pipelines. The default parameter
             of this command is 'project'.''')
@@ -3874,6 +3882,13 @@ def show(args):
                         displayed += 1
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
+            elif args.type == 'track':
+                if not args.items:
+                    raise ValueError('Please provide a track file in tabixed vcf, '
+                        'bigWig, or bigBed format')
+                elif len(args.items) > 1:
+                    raise ValueError('Only one track file is allowed.')
+                showTrack(args.items[0])
             elif args.type == 'formats':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'
