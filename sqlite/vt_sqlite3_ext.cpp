@@ -390,7 +390,7 @@ static void bigWigTrack(void * track_file, char * chr, int pos, int res_column, 
 				sqlite3_result_int(context, ivList->start);
 			else if (res_column == 3)
 				sqlite3_result_int(context, ivList->end);
-			else if (res_column > 4)
+			else if (res_column == 4)
 				sqlite3_result_double(context, ivList->val);
 		} else {
 			std::stringstream res;
