@@ -490,7 +490,7 @@ VTOOLS_FILES = ['source.__init__',
 #
 # Generate wrapper files (only in development mode)
 #
-if VTOOLS_VERSION.endswith('svn'):
+if 'svn' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
     import subprocess
     #
     try:
@@ -515,6 +515,13 @@ if VTOOLS_VERSION.endswith('svn'):
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
+        #
+        if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))):
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/ucsctools.i']), shell=True)
+            if ret != 0:
+                sys.exit('Failed to generate wrapper file for ucsctools.')
+            os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
+# 
 # 
 # Although wrapper files for another version of python are not used, they
 # will be installed due to a bug of setuptools. This will cause trouble

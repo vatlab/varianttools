@@ -28,6 +28,7 @@
 %module ucsctools
 
 %{
+extern "C" {
 #include "common.h"
 #include "linefile.h"
 #include "hash.h"
@@ -44,6 +45,7 @@
 #include "tabix.h"
 #include "knetfile.h"
 #include "vcf.h"
+}
 %}
 
 %init
@@ -54,24 +56,9 @@
 
 %exception
 {
+    try
     {
         $function
-    }
-    catch(vtools::IndexError e)
-    {
-        SWIG_exception(SWIG_IndexError, e.message());
-    }
-    catch(vtools::ValueError e)
-    {
-        SWIG_exception(SWIG_ValueError, e.message());
-    }
-    catch(vtools::SystemError e)
-    {
-        SWIG_exception(SWIG_SystemError, e.message());
-    }
-    catch(vtools::RuntimeError e)
-    {
-        SWIG_exception(SWIG_RuntimeError, e.message());
     }
     catch(...)
     {
@@ -83,102 +70,120 @@
 %include "std_string.i"
 
 %inline %{
-void showTrack(std::string & track_file)
+void showTrack(const std::string & track_file)
 {
-	if (endsWith((char *)track_file.c_str(), ".vcf.gz")) {
-        fprintf(stdout, "vcf format");
-    } else if (isBigWig((char *)track_file.c_str())) {
-        fprintf(stdout, "bigWig format");
-    } else {
-        fprintf(stdout, "bigBed format");
+    char buf[255];
+    if (endsWith((char *)track_file.c_str(), ".vcf.gz")) {
+        vcfFile * vcff = vcfTabixFileMayOpen((char *)track_file.c_str(),
+             NULL, 0, 0, VCF_IGNORE_ERRS, 1);
+        if (vcff == NULL)
+             return;
+        
+        printf("%-23s %d\n\n", "Number of columns:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
+        printf("Available columns (with default type VARCHAR):\n");
+        printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
+        printf("%-23s %s\n", "1", "chromosome");
+        printf("%-23s %s\n", "2 (INTEGER)", "position (1-based)");
+        printf("%-23s %s\n", "3", "name of variant");
+        printf("%-23s %s\n", "4", "reference allele");
+        printf("%-23s %s\n", "5", "alternative alleles");
+        printf("%-23s %s\n", "6", "qual");
+        printf("%-23s %s\n", "7", "filter");
+        printf("%-23s %s\n", "8 (default)", "variant info fields");
+        printf("%-23s %s\n", "9", "genotype format");
+        //
+        for (size_t i = 0; i < vcff->genotypeCount; ++i)
+            printf("%-23lu %s %s\n", 10 + i, "genotype for sample", vcff->genotypeIds[i]);
+        //
+        printf("%-23s %s\n", "'chr'", "chromosome");
+        printf("%-23s %s\n", "'chrom'", "chromosome");
+        printf("%-23s %s\n", "'pos'", "position (1-based)");
+        printf("%-23s %s\n", "'name'", "name of variant");
+        printf("%-23s %s\n", "'ref'", "reference allele");
+        printf("%-23s %s\n", "'alt'", "alternative alleles");
+        printf("%-23s %s\n", "'qual'", "qual");
+        printf("%-23s %s\n", "'filter'", "filter");
+        printf("%-23s %s\n", "'info'", "variant info fields");
+        //
+        struct vcfInfoDef * def = NULL;
+        for (def = vcff->infoDefs; def != NULL; def = def->next) {
+            sprintf(buf, "'info.%s'", def->key);
+            printf("%-23s %s\n", buf, def->description);
+        }
+        printf("%-23s %s\n", "'format'", "genotype format");
+        for (size_t i = 0; i < vcff->genotypeCount; ++i) {
+            sprintf(buf, "'%s'",  vcff->genotypeIds[i]);
+            printf("%-23s %s%s\n", buf, "genotype for sample ",
+                vcff->genotypeIds[i]);
+            // for all format fields
+            struct vcfInfoDef * def = NULL;
+            for (def = vcff->gtFormatDefs; def != NULL; def = def->next) {
+                sprintf(buf, "'%s.%s'", vcff->genotypeIds[i], def->key);
+                printf("%-23s %s for sample %s\n", buf, def->description, vcff->genotypeIds[i]);
+            }
+        }
+     } else if (isBigWig((char *)track_file.c_str())) {
+        printf("%-23s %d\n\n", "Number of columns:", 4);
+        printf("Available columns (with default type VARCHAR):\n");
+        printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
+        printf("%-23s %s\n", "1", "chromosome");
+        printf("%-23s %s\n", "2 (INTEGER)", "start position (0-based)");
+        printf("%-23s %s\n", "3 (INTEGER)", "end position (1-based)");
+        printf("%-23s %s\n", "4", "value");
+        printf("%-23s %s\n", "'chr' ('chrom')", "chromosome");
+        printf("%-23s %s\n", "'start' ('chromStart')", "start position (0-based)");
+        printf("%-23s %s\n", "'end' ('chromEnd')", "end position (1-based)");
+        printf("%-23s %s\n", "'value'", "value");
+     } else {
+        bbiFile * bbf = bigBedFileOpen((char *)track_file.c_str());
+        if (bbf == NULL)
+            return;
+        printf("%-23s %d\n\n", "Number of columns:", bbf->fieldCount);
+        printf("%-23s %s\n", "0 (INTEGER, default)", "1 if matched");
+        printf("%-23s %s\n", "1", "chromosome");
+        printf("%-23s %s\n", "2 (INTEGER)", "start position (0-based)");
+        printf("%-23s %s\n", "3 (INTEGER)", "end position (1-based)");
+        if (bbf->fieldCount > 3)
+            printf("%-23s %s\n", "4", "name");
+        if (bbf->fieldCount > 4)
+            printf("%-23s %s\n", "5", "score");
+        if (bbf->fieldCount > 5)
+            printf("%-23s %s\n", "6", "strand");
+        if (bbf->fieldCount > 6)
+            printf("%-23s %s\n", "7", "thickStart");
+        if (bbf->fieldCount > 7)
+            printf("%-23s %s\n", "8", "thickEnd");
+        if (bbf->fieldCount > 8)
+            printf("%-23s %s\n", "9", "itemRgb");
+        if (bbf->fieldCount > 9)
+            printf("%-23s %s\n", "10", "blockCount");
+        if (bbf->fieldCount > 10)
+            printf("%-23s %s\n", "11", "blockSize");
+        if (bbf->fieldCount > 11)
+            printf("%-23s %s\n", "12", "blockStarts");
+        //
+        printf("%-23s %s\n", "'chr' ('chrom')", "chromosome");
+        printf("%-23s %s\n", "'start' ('chromStart')", "start position (0-based)");
+        printf("%-23s %s\n", "'end' ('chromEnd')", "end position (1-based)");
+        if (bbf->fieldCount > 3)
+            printf("%-23s %s\n", "'name'", "name");
+        if (bbf->fieldCount > 4)
+            printf("%-23s %s\n", "'score'", "score");
+        if (bbf->fieldCount > 5)
+            printf("%-23s %s\n", "'strand'", "strand");
+        if (bbf->fieldCount > 6)
+            printf("%-23s %s\n", "'thickStart'", "thickStart");
+        if (bbf->fieldCount > 7)
+            printf("%-23s %s\n", "'thickEnd'", "thickEnd");
+        if (bbf->fieldCount > 8)
+            printf("%-23s %s\n", "'itemRgb'", "itemRgb");
+        if (bbf->fieldCount > 9)
+            printf("%-23s %s\n", "'blockCount'", "blockCount");
+        if (bbf->fieldCount > 10)
+            printf("%-23s %s\n", "'blockSize'", "blockSize");
+        if (bbf->fieldCount > 11)
+            printf("%-23s %s\n", "'blockStarts'", "blockStarts");
     }
-//         info.file_type = VCFTABIX_FILE;
-//         info.file = (void *)vcfTabixFileMayOpen((char *)track_file.c_str(),
-//             NULL, 0, 0, VCF_IGNORE_ERRS, 1);
-//         if (info.file == NULL) {
-//             sqlite3_result_error(context, "cannot open file", -1);
-//             return;
-//         }
-//         info.handler = vcfTabixTrack;
-//         info.default_col = 8;
-//         //
-//         info.name_map["chr"] = 1;
-//         info.name_map["chrom"] = 1;
-//         info.name_map["pos"] = 2;
-//         info.name_map["name"] = 3;
-//         info.name_map["ref"] = 4;
-//         info.name_map["alt"] = 5;
-//         info.name_map["qual"] = 6;
-//         info.name_map["filter"] = 7;
-//         info.name_map["info"] = 8;
-//         info.name_map["format"] = 9;
-//         // info fields
-//         struct vcfFile * vcff = (struct vcfFile *)info.file;
-//         struct vcfInfoDef * def = NULL;
-//         for (def = vcff->infoDefs; def != NULL; def = def->next)
-//             info.name_map[std::string("info.") + def->key] = 8;
-//         // sample
-//         for (size_t i = 0; i < vcff->genotypeCount; ++i) {
-//             info.name_map[vcff->genotypeIds[i]] = 10 + i;
-//             // sample genotype field
-//             struct vcfInfoDef * def = NULL;
-//             for (def = vcff->gtFormatDefs; def != NULL; def = def->next)
-//                 info.name_map[std::string(vcff->genotypeIds[i]) + std::string(".") + def->key] = 10 + i;
-//         }
-//         // get the first record
-//         info.with_leading_chr = false;
-//         struct vcfRecord * rec = vcff->records;
-//         if (rec != NULL) {
-//             if (strncmp(rec->chrom, "chr", 3) == 0)
-//                 info.with_leading_chr = true;
-//         }
-//     } else if (isBigWig((char *)track_file.c_str())) {
-//         info.file_type = BIGWIG_FILE;
-//         info.file = (void *)bigWigFileOpen((char *)track_file.c_str());
-//         if (info.file == NULL)
-//             sqlite3_result_error(context, "cannot open file", -1);
-//         info.handler = bigWigTrack;
-//         info.default_col = 4;
-//         //
-//         info.name_map["chr"] = 1;
-//         info.name_map["chrom"] = 1;
-//         info.name_map["start"] = 2;
-//         info.name_map["chromStart"] = 2;
-//         info.name_map["end"] = 3;
-//         info.name_map["chromEnd"] = 3;
-//         info.name_map["value"] = 4;
-//         //
-//         // here we assume that we need to add "chr" to all bigWig files
-//         info.with_leading_chr = true;
-//     } else {
-//         info.file_type = BIGBED_FILE;
-//         info.file = (void *)bigBedFileOpen((char *)track_file.c_str());
-//         if (info.file == NULL) {
-//             sqlite3_result_error(context, "cannot open file", -1);
-//             return;
-//         }
-//         info.handler = bigBedTrack;
-//         info.default_col = 0;
-//         //
-//         info.name_map["chr"] = 1;
-//         info.name_map["chrom"] = 1;
-//         info.name_map["start"] = 2;
-//         info.name_map["chromStart"] = 2;
-//         info.name_map["end"] = 3;
-//         info.name_map["chromEnd"] = 3;
-//         info.name_map["name"] = 4;
-//         info.name_map["score"] = 5;
-//         info.name_map["strand"] = 6;
-//         info.name_map["thickStart"] = 7;
-//         info.name_map["thickEnd"] = 8;
-//         info.name_map["itemRgb"] = 9;
-//         info.name_map["blockCount"] = 10;
-//         info.name_map["blockSizes"] = 11;
-//         info.name_map["blockStarts"] = 12;
-//         //
-//         // here we assume that we need to add "chr" to all bigWig files
-//         info.with_leading_chr = true;
-//    }
 }
 %} 
 
