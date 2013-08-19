@@ -135,21 +135,22 @@ void showTrack(const std::string & track_file)
                 printf("%-23s %s for sample %s\n", buf, def->description, vcff->genotypeIds[i]);
             }
         }
+        vcfFileFree(&vcff);
      } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
             return;
         printf("%-23s %d\n", "Version:", bwf->version);
-        printf("%-23s %lu\n", "Primary data size",
+        printf("%-23s %llu\n", "Primary data size",
             bwf->unzoomedIndexOffset - bwf->unzoomedDataOffset);
-        printf("%-23s %lu\n", "Zoom levels:", bwf->zoomLevels);
+        printf("%-23s %d\n", "Zoom levels:", bwf->zoomLevels);
         struct bbiChromInfo *chrom, *chromList = bbiChromList(bwf);
-        printf("%-23s %lu\n", "Chrom count:", slCount(chromList));
+        printf("%-23s %d\n", "Chrom count:", slCount(chromList));
         printf("%-23s\n", "Chrom size:", slCount(chromList));
         for (chrom=chromList; chrom != NULL; chrom = chrom->next)
-        	printf("    %-19s %lu\n", chrom->name, chrom->size);
+        	printf("    %-19s %u\n", chrom->name, chrom->size);
         struct bbiSummaryElement sum = bbiTotalSummary(bwf);
-        printf("%-23s %d\n", "Bases covered:", sum.validCount);
+        printf("%-23s %llu\n", "Bases covered:", sum.validCount);
         printf("%-23s %f\n", "Mean:", sum.sumData/sum.validCount);
         printf("%-23s %f\n", "Min:", sum.minVal);
         printf("%-23s %f\n", "Max:", sum.maxVal);
@@ -169,17 +170,17 @@ void showTrack(const std::string & track_file)
             return;
 
         printf("%-23s %d\n", "Version:", bbi->version);
-        printf("%-23s %lu\n", "Item count:", bigBedItemCount(bbi));
-        printf("%-23s %lu\n", "Primary data size:",
+        printf("%-23s %llu\n", "Item count:", bigBedItemCount(bbi));
+        printf("%-23s %llu\n", "Primary data size:",
             bbi->unzoomedIndexOffset - bbi->unzoomedDataOffset);
         struct bbiChromInfo *chrom, *chromList = bbiChromList(bbi);
         printf("%-23s %d\n", "Zoom levels:", bbi->zoomLevels);
         printf("%-23s %d\n", "Chrom count:", slCount(chromList));
         printf("%-23s\n", "Chrom size:", slCount(chromList));
         for (chrom=chromList; chrom != NULL; chrom = chrom->next)
-        	printf("    %-19s %lu\n", chrom->name, chrom->size);
+        	printf("    %-19s %u\n", chrom->name, chrom->size);
         struct bbiSummaryElement sum = bbiTotalSummary(bbi);
-        printf("%-23s %lu\n", "Bases covered", sum.validCount);
+        printf("%-23s %llu\n", "Bases covered", sum.validCount);
         printf("%-23s %f\n", "Mean depth:", sum.sumData/sum.validCount);
         printf("%-23s %f\n", "Min depth:", sum.minVal);
         printf("%-23s %f\n", "Max depth:", sum.maxVal);
