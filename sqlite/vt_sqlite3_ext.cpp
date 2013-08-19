@@ -297,10 +297,27 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * 
 	} else
 		chrName = chr;
 	//
+	//
 	struct bigBedInterval * ivList = bigBedIntervalQuery(cf, chrName, pos - 1, pos, 0, bbLm);
 	if (ivList == NULL) {
 		sqlite3_result_null(context);
 	} else {
+		int res_type = 0; // varchar
+		size_t i = 1;
+		struct asColumn *col;
+		struct asObject *as = bigBedAs(cf);
+		for (col = as->columnList; col != NULL; col = col->next, ++i)
+		{
+			struct asTypeInfo * ltype = col->lowType;
+			if (i == res_column) {
+				if (asTypesIsInt(ltype->type))
+					res_type = 1;  // INTEGER
+				else if (asTypesIsFloating(ltype->type))
+					res_type = 2; // FLOAT
+				break;
+			}
+		}
+
 		// if returnning typed-valued, only the first record will be considered
 		if (res_column > cf->fieldCount)
 			sqlite3_result_null(context);
@@ -322,10 +339,12 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * 
 				while (++i < res_column)
 					pch = strtok(NULL, "\t");
 				// text fields
-				if (res_column == 4 || res_column == 6 || res_column == 9 || res_column == 11 || res_column == 12)
+				if (res_type == 0)
 					sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
-				else
+				else if (res_type == 1)
 					sqlite3_result_int(context, atoi(pch));
+				else
+					sqlite3_result_double(context, atof(pch));
 			} else
 				sqlite3_result_null(context);
 		} else {
@@ -687,11 +706,8 @@ static void track(
 			info.handler = bigWigTrack;
 			info.default_col = 4;
 			//
-			info.name_map["chr"] = 1;
 			info.name_map["chrom"] = 1;
-			info.name_map["start"] = 2;
 			info.name_map["chromStart"] = 2;
-			info.name_map["end"] = 3;
 			info.name_map["chromEnd"] = 3;
 			info.name_map["value"] = 4;
 			//
@@ -706,22 +722,19 @@ static void track(
 			}
 			info.handler = bigBedTrack;
 			info.default_col = 0;
-			//
-			info.name_map["chr"] = 1;
-			info.name_map["chrom"] = 1;
-			info.name_map["start"] = 2;
-			info.name_map["chromStart"] = 2;
-			info.name_map["end"] = 3;
-			info.name_map["chromEnd"] = 3;
-			info.name_map["name"] = 4;
-			info.name_map["score"] = 5;
-			info.name_map["strand"] = 6;
-			info.name_map["thickStart"] = 7;
-			info.name_map["thickEnd"] = 8;
-			info.name_map["itemRgb"] = 9;
-			info.name_map["blockCount"] = 10;
-			info.name_map["blockSizes"] = 11;
-			info.name_map["blockStarts"] = 12;
+			
+			struct asObject *as = bigBedAs((bbiFile*)info.file_type);
+			if (as != NULL)
+			{
+				size_t i = 1;
+				struct asColumn *col;
+				for (col = as->columnList; col != NULL; col = col->next, ++i)
+				{
+					struct asTypeInfo * ltype = col->lowType;
+					char * typestring = "";
+					info.name_map[col->name] = i;
+				}
+			}
 			//
 			// here we assume that we need to add "chr" to all bigWig files
 			info.with_leading_chr = true;

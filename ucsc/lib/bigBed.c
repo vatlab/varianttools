@@ -478,169 +478,169 @@ bbiCachedChromLookup(bbi, interval->chromId, lastChromId, chromBuf, chromBufSize
 return bigBedIntervalToRow(interval, chromBuf, startBuf, endBuf, row, rowSize);
 }
 
-// char *bigBedAutoSqlText(struct bbiFile *bbi)
-// /* Get autoSql text if any associated with file.  Do a freeMem of this when done. */
-// {
-// if (bbi->asOffset == 0)
-//     return NULL;
-// struct udcFile *f = bbi->udc;
-// udcSeek(f, bbi->asOffset);
-// return udcReadStringAndZero(f);
-// }
-// 
-// struct asObject *bigBedAs(struct bbiFile *bbi)
-// /* Get autoSql object definition if any associated with file. */
-// {
-// if (bbi->asOffset == 0)
-//     return NULL;
-// char *asText = bigBedAutoSqlText(bbi);
-// struct asObject *as = asParseText(asText);
-// freeMem(asText);
-// return as;
-// }
-// 
-// struct asObject *bigBedAsOrDefault(struct bbiFile *bbi)
-// // Get asObject associated with bigBed - if none exists in file make it up from field counts.
-// {
-// struct asObject *as = bigBedAs(bbi);
-// if (as == NULL)
-//     as = asParseText(bedAsDef(bbi->definedFieldCount, bbi->fieldCount));
-// return as;
-// }
-// 
-// struct asObject *bigBedFileAsObjOrDefault(char *fileName)
-// // Get asObject associated with bigBed file, or the default.
-// {
-// struct bbiFile *bbi = bigBedFileOpen(fileName);
-// if (bbi)
-//     {
-//     struct asObject *as = bigBedAsOrDefault(bbi);
-//     bbiFileClose(&bbi);
-//     return as;
-//     }
-// return NULL;
-// }
-// 
-// bits64 bigBedItemCount(struct bbiFile *bbi)
-// /* Return total items in file. */
-// {
-// udcSeek(bbi->udc, bbi->unzoomedDataOffset);
-// return udcReadBits64(bbi->udc, bbi->isSwapped);
-// }
-// 
-// struct slName *bigBedListExtraIndexes(struct bbiFile *bbi)
-// /* Return list of names of extra indexes beyond primary chrom:start-end one" */
-// {
-// struct udcFile *udc = bbi->udc;
-// boolean isSwapped = bbi->isSwapped;
-// 
-// /* See if we have any extra indexes, and if so seek to there. */
-// bits64 offset = bbi->extraIndexListOffset;
-// if (offset == 0)
-//    return NULL;
-// udcSeek(udc, offset);
-// 
-// /* Construct list of field that are being indexed.  List is list of 
-//  * field numbers within asObj. */
-// int i;
-// struct slInt *intList = NULL, *intEl;
-// for (i=0; i<bbi->extraIndexCount; ++i)
-//     {
-//     bits16 type,fieldCount;
-//     type = udcReadBits16(udc, isSwapped);
-//     fieldCount = udcReadBits16(udc, isSwapped);
-//     udcSeekCur(udc, sizeof(bits64));  // skip over fileOffset
-//     udcSeekCur(udc, 4);    // skip over reserved bits
-//     if (fieldCount == 1)
-//         {
-// 	bits16 fieldId = udcReadBits16(udc, isSwapped);
-// 	udcSeekCur(udc, 2);    // skip over reserved bits
-// 	intEl = slIntNew(fieldId);
-// 	slAddHead(&intList, intEl);
-// 	}
-//     else
-//         {
-// 	warn("Not yet understanding indexes on multiple fields at once.");
-// 	internalErr();
-// 	}
-//     }
-// 
-// /* Now have to make an asObject to find out name that corresponds to this field. */
-// struct asObject *as = bigBedAsOrDefault(bbi);
-// 
-// /* Make list of field names out of list of field numbers */
-// struct slName *nameList = NULL;
-// for (intEl = intList; intEl != NULL; intEl = intEl->next)
-//     {
-//     struct asColumn *col = slElementFromIx(as->columnList, intEl->val);
-//     if (col == NULL)
-// 	{
-//         warn("Inconsistent bigBed file %s", bbi->fileName);
-// 	internalErr();
-// 	}
-//     slNameAddHead(&nameList, col->name);
-//     }
-// 
-// asObjectFree(&as);
-// return nameList;
-// }
-// 
-// struct bptFile *bigBedOpenExtraIndex(struct bbiFile *bbi, char *fieldName, int *retFieldIx)
+char *bigBedAutoSqlText(struct bbiFile *bbi)
+/* Get autoSql text if any associated with file.  Do a freeMem of this when done. */
+{
+if (bbi->asOffset == 0)
+    return NULL;
+struct udcFile *f = bbi->udc;
+udcSeek(f, bbi->asOffset);
+return udcReadStringAndZero(f);
+}
+
+struct asObject *bigBedAs(struct bbiFile *bbi)
+/* Get autoSql object definition if any associated with file. */
+{
+if (bbi->asOffset == 0)
+    return NULL;
+char *asText = bigBedAutoSqlText(bbi);
+struct asObject *as = asParseText(asText);
+freeMem(asText);
+return as;
+}
+
+struct asObject *bigBedAsOrDefault(struct bbiFile *bbi)
+// Get asObject associated with bigBed - if none exists in file make it up from field counts.
+{
+struct asObject *as = bigBedAs(bbi);
+if (as == NULL)
+    as = asParseText(bedAsDef(bbi->definedFieldCount, bbi->fieldCount));
+return as;
+}
+
+struct asObject *bigBedFileAsObjOrDefault(char *fileName)
+// Get asObject associated with bigBed file, or the default.
+{
+struct bbiFile *bbi = bigBedFileOpen(fileName);
+if (bbi)
+    {
+    struct asObject *as = bigBedAsOrDefault(bbi);
+    bbiFileClose(&bbi);
+    return as;
+    }
+return NULL;
+}
+
+bits64 bigBedItemCount(struct bbiFile *bbi)
+/* Return total items in file. */
+{
+udcSeek(bbi->udc, bbi->unzoomedDataOffset);
+return udcReadBits64(bbi->udc, bbi->isSwapped);
+}
+
+struct slName *bigBedListExtraIndexes(struct bbiFile *bbi)
+/* Return list of names of extra indexes beyond primary chrom:start-end one" */
+{
+struct udcFile *udc = bbi->udc;
+boolean isSwapped = bbi->isSwapped;
+
+/* See if we have any extra indexes, and if so seek to there. */
+bits64 offset = bbi->extraIndexListOffset;
+if (offset == 0)
+   return NULL;
+udcSeek(udc, offset);
+
+/* Construct list of field that are being indexed.  List is list of 
+ * field numbers within asObj. */
+int i;
+struct slInt *intList = NULL, *intEl;
+for (i=0; i<bbi->extraIndexCount; ++i)
+    {
+    bits16 type,fieldCount;
+    type = udcReadBits16(udc, isSwapped);
+    fieldCount = udcReadBits16(udc, isSwapped);
+    udcSeekCur(udc, sizeof(bits64));  // skip over fileOffset
+    udcSeekCur(udc, 4);    // skip over reserved bits
+    if (fieldCount == 1)
+        {
+	bits16 fieldId = udcReadBits16(udc, isSwapped);
+	udcSeekCur(udc, 2);    // skip over reserved bits
+	intEl = slIntNew(fieldId);
+	slAddHead(&intList, intEl);
+	}
+    else
+        {
+	warn("Not yet understanding indexes on multiple fields at once.");
+	internalErr();
+	}
+    }
+
+/* Now have to make an asObject to find out name that corresponds to this field. */
+struct asObject *as = bigBedAsOrDefault(bbi);
+
+/* Make list of field names out of list of field numbers */
+struct slName *nameList = NULL;
+for (intEl = intList; intEl != NULL; intEl = intEl->next)
+    {
+    struct asColumn *col = slElementFromIx(as->columnList, intEl->val);
+    if (col == NULL)
+	{
+        warn("Inconsistent bigBed file %s", bbi->fileName);
+	internalErr();
+	}
+    slNameAddHead(&nameList, col->name);
+    }
+
+asObjectFree(&as);
+return nameList;
+}
+
+struct bptFile *bigBedOpenExtraIndex(struct bbiFile *bbi, char *fieldName, int *retFieldIx)
 /* Return index associated with fieldName.  Aborts if no such index.  Optionally return
  * index in a row of this field. */
-// {
-// struct udcFile *udc = bbi->udc;
-// boolean isSwapped = bbi->isSwapped;
-// struct asObject *as = bigBedAsOrDefault(bbi);
-// struct asColumn *col = asColumnFind(as, fieldName);
-// if (col == NULL)
-    // errAbort("No field %s in %s", fieldName, bbi->fileName);
-// int colIx = slIxFromElement(as->columnList, col);
-// if (retFieldIx != NULL)
-   // *retFieldIx = colIx;
-// asObjectFree(&as);
-// 
-// /* See if we have any extra indexes, and if so seek to there. */
-// bits64 offset = bbi->extraIndexListOffset;
-// if (offset == 0)
-   // errAbort("%s has no indexes", bbi->fileName);
-// udcSeek(udc, offset);
-// 
-// /* Go through each extra index and see if it's a match */
-// int i;
-// for (i=0; i<bbi->extraIndexCount; ++i)
-    // {
-    // bits16 type = udcReadBits16(udc, isSwapped);
-    // bits16 fieldCount = udcReadBits16(udc, isSwapped);
-    // bits64 fileOffset = udcReadBits64(udc, isSwapped);
-    // udcSeekCur(udc, 4);    // skip over reserved bits
-// 
-    // if (type != 0)
-        // {
-	// warn("Don't understand type %d", type);
-	// internalErr();
-	// }
-    // if (fieldCount == 1)
-        // {
-	// bits16 fieldId = udcReadBits16(udc, isSwapped);
-	// udcSeekCur(udc, 2);    // skip over reserved bits
-	// if (fieldId == colIx)
-	    // {
-	    // udcSeek(udc, fileOffset);
-	    // struct bptFile *bpt = bptFileAttach(bbi->fileName, udc);
-	    // return bpt;
-	    // }
-	// }
-    // else
-        // {
-	// warn("Not yet understanding indexes on multiple fields at once.");
-	// internalErr();
-	// }
-    // }
-// 
-// errAbort("%s is not indexed in %s", fieldName, bbi->fileName);
-// return NULL;
-// }
+{
+struct udcFile *udc = bbi->udc;
+boolean isSwapped = bbi->isSwapped;
+struct asObject *as = bigBedAsOrDefault(bbi);
+struct asColumn *col = asColumnFind(as, fieldName);
+if (col == NULL)
+    errAbort("No field %s in %s", fieldName, bbi->fileName);
+int colIx = slIxFromElement(as->columnList, col);
+if (retFieldIx != NULL)
+   *retFieldIx = colIx;
+asObjectFree(&as);
+
+/* See if we have any extra indexes, and if so seek to there. */
+bits64 offset = bbi->extraIndexListOffset;
+if (offset == 0)
+   errAbort("%s has no indexes", bbi->fileName);
+udcSeek(udc, offset);
+
+/* Go through each extra index and see if it's a match */
+int i;
+for (i=0; i<bbi->extraIndexCount; ++i)
+{
+bits16 type = udcReadBits16(udc, isSwapped);
+bits16 fieldCount = udcReadBits16(udc, isSwapped);
+bits64 fileOffset = udcReadBits64(udc, isSwapped);
+udcSeekCur(udc, 4);    // skip over reserved bits
+
+if (type != 0)
+{
+warn("Don't understand type %d", type);
+internalErr();
+}
+if (fieldCount == 1)
+{
+bits16 fieldId = udcReadBits16(udc, isSwapped);
+udcSeekCur(udc, 2);    // skip over reserved bits
+if (fieldId == colIx)
+{
+udcSeek(udc, fileOffset);
+struct bptFile *bpt = bptFileAttach(bbi->fileName, udc);
+return bpt;
+}
+}
+else
+{
+warn("Not yet understanding indexes on multiple fields at once.");
+internalErr();
+}
+}
+
+errAbort("%s is not indexed in %s", fieldName, bbi->fileName);
+return NULL;
+}
 
 
 
