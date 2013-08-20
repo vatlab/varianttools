@@ -245,7 +245,7 @@ extern "C" {
 
 // filename : <type, pointer, handler>
 struct TrackInfo;
-typedef void (*track_handler)(void *, char *, int, int, char *, TrackInfo *, sqlite3_context *);
+typedef void (*track_handler)(void *, char *, int, bool, int, char *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -272,8 +272,6 @@ struct TrackInfo
 		for (; it != it_end; ++it)
 			fprintf(stderr, "%s : %d \n", it->first.c_str(), it->second);
 	}
-
-
 };
 
 typedef std::map<std::string, struct TrackInfo> TrackFileMap;
@@ -284,7 +282,8 @@ TrackFileMap trackFileMap;
 #define BIGWIG_FILE 2
 #define VCFTABIX_FILE 3
 
-void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
+	char * res_name, TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
 	struct lm * bbLm = lmInit(0);
@@ -308,16 +307,16 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * 
 		// if returnning typed-valued, only the first record will be considered
 		if (res_column > cf->fieldCount)
 			sqlite3_result_null(context);
-		else if (res_name == NULL) {
+		else if (!res_all) {
 			if (res_column == 0)
 				// return matched or not
 				sqlite3_result_int(context, 1);
 			else if (res_column == 1)
 				sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
 			else if (res_column == 2)
-				sqlite3_result_int(context, ivList->start);
+				sqlite3_result_int64(context, ivList->start);
 			else if (res_column == 3)
-				sqlite3_result_int(context, ivList->end);
+				sqlite3_result_int64(context, ivList->end);
 			else if (res_column > 3 && res_column <= cf->fieldCount) {
 				int res_type = 0; // varchar
 				size_t i = 1;
@@ -344,7 +343,7 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * 
 				if (res_type == 0)
 					sqlite3_result_text(context, pch, -1, SQLITE_TRANSIENT);
 				else if (res_type == 1)
-					sqlite3_result_int(context, atoi(pch));
+					sqlite3_result_int64(context, atoi(pch));
 				else
 					sqlite3_result_double(context, atof(pch));
 			} else
@@ -382,7 +381,8 @@ void bigBedTrack(void * track_file, char * chr, int pos, int res_column, char * 
 }
 
 
-static void bigWigTrack(void * track_file, char * chr, int pos, int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+static void bigWigTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
+	char * res_name, TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
 	struct lm * bbLm = lmInit(0);
@@ -404,13 +404,13 @@ static void bigWigTrack(void * track_file, char * chr, int pos, int res_column, 
 	} else {
 		if (res_column > 4)
 			sqlite3_result_null(context);
-		else if (res_name == NULL) {
+		else if (!res_all) {
 			if (res_column == 1)
 				sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
 			else if (res_column == 2)
-				sqlite3_result_int(context, ivList->start);
+				sqlite3_result_int64(context, ivList->start);
 			else if (res_column == 3)
-				sqlite3_result_int(context, ivList->end);
+				sqlite3_result_int64(context, ivList->end);
 			else if (res_column == 4)
 				sqlite3_result_double(context, ivList->val);
 		} else {
@@ -440,7 +440,8 @@ static void bigWigTrack(void * track_file, char * chr, int pos, int res_column, 
 }
 
 
-static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all, 
+	int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
 {
 	struct vcfFile * cf = (struct vcfFile *)track_file;
 
@@ -462,54 +463,140 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 	// first case, no result
 	if (nRecord == 0) {
 		sqlite3_result_null(context);
-	} else if (res_name == NULL) {
+	} else if (!res_all) {
 		struct vcfRecord * rec = cf->records;
-		if (res_name == NULL) {
-			if (res_column == 1)
-				// chrom
-				sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
-			else if (res_column == 2)
-				// pos
-				sqlite3_result_int(context, rec->chromStart);
-			else if (res_column == 3)
-				// name
-				sqlite3_result_text(context, rec->name, -1, SQLITE_TRANSIENT);
-			else if (res_column == 4)
-				// ref
-				sqlite3_result_text(context, rec->alleles[0], -1, SQLITE_TRANSIENT);
-			else if (res_column == 5) {
-				// alt
-				char alleles[255];
-				alleles[0] = '\0';
-				for (size_t i = 1 ; i < rec->alleleCount; ++i) {
-					if (i > 1)
-						strcat(alleles, ",");
-					strcat(alleles, rec->alleles[i]);
-				}
-				sqlite3_result_text(context, alleles, -1, SQLITE_TRANSIENT);
-			} else if (res_column == 6)
-				// qual
-				sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
-			else if (res_column == 7) {
-				// filter
-				char filter[255];
-				filter[0] = '\0';
-				for (size_t i = 0; i < rec->filterCount; ++i) {
-					if (i > 0)
-						strcat(filter, ",");
-					strcat(filter, rec->filters[i]);
-				}
-				sqlite3_result_text(context, filter, -1, SQLITE_TRANSIENT);
-			} else if (res_column == 8)
-				// info
+		if (res_column == 1)
+			// chrom
+			sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
+		else if (res_column == 2)
+			// pos
+			sqlite3_result_int(context, rec->chromStart);
+		else if (res_column == 3)
+			// name
+			sqlite3_result_text(context, rec->name, -1, SQLITE_TRANSIENT);
+		else if (res_column == 4)
+			// ref
+			sqlite3_result_text(context, rec->alleles[0], -1, SQLITE_TRANSIENT);
+		else if (res_column == 5) {
+			// alt
+			char alleles[255];
+			alleles[0] = '\0';
+			for (size_t i = 1 ; i < rec->alleleCount; ++i) {
+				if (i > 1)
+					strcat(alleles, ",");
+				strcat(alleles, rec->alleles[i]);
+			}
+			sqlite3_result_text(context, alleles, -1, SQLITE_TRANSIENT);
+		} else if (res_column == 6)
+			// qual
+			sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
+		else if (res_column == 7) {
+			// filter
+			char filter[255];
+			filter[0] = '\0';
+			for (size_t i = 0; i < rec->filterCount; ++i) {
+				if (i > 0)
+					strcat(filter, ",");
+				strcat(filter, rec->filters[i]);
+			}
+			sqlite3_result_text(context, filter, -1, SQLITE_TRANSIENT);
+		} else if (res_column == 8) {
+			// info
+			char * p = res_name;
+			if (p != NULL)
+				while (*p != '\0' && *p != '.') ++p;
+			if (p == NULL || *p == '\0') // if no dot
 				sqlite3_result_text(context, rec->unparsedInfoElements, -1, SQLITE_TRANSIENT);
-			else if (res_column == 9)
-				sqlite3_result_text(context, rec->format, -1, SQLITE_TRANSIENT);
-			else if (res_column >= 10 && res_column < 10 + cf->genotypeCount) {
+			else {
+				// p points to the name of info
+				++p; 
+				vcfInfoDef * el = vcfInfoDefForKey(cf, p);
+				bool isFlag = el->type == vcfInfoFlag;
+
+				int l = strlen(p);
+				// scan INFO and find index of p
+				char * info = rec->unparsedInfoElements;
+				bool found = false;
+				char * q = info;
+				for (; *q != '\0'; ) {
+					// find it
+					if (strncmp(q, p, l) == 0 && (*(q + l) == ';' || *(q + l) == '\0' || *(q + l) == '=')) {
+						found = true;
+						if (!isFlag) {
+							q += l + 1;
+							char * r = q + 1;
+							while (*r != ';' && *r != '\0') ++r;
+							*r = '\0';
+							break;
+						}
+					} else {
+						while (*q != ';' && *q != '\0') ++q;
+						if (*q != '\0')
+							++q;
+					}
+				}
+				if (isFlag)
+					sqlite3_result_int64(context, found ? 1 : 0);
+				else if (el->type == vcfInfoInteger)
+					sqlite3_result_int64(context, atoi(q));
+				else if (el->type == vcfInfoFloat)
+					sqlite3_result_int64(context, atof(q));
+				else
+					sqlite3_result_text(context, q, -1, SQLITE_TRANSIENT);
+			}
+		} else if (res_column == 9)
+			sqlite3_result_text(context, rec->format, -1, SQLITE_TRANSIENT);
+		else if (res_column >= 10 && res_column < 10 + cf->genotypeCount) {
+			// if there is no '.' in the name
+			char * p = res_name;
+			if (p != NULL)
+				while (*p != '\0' && *p != '.') ++p;
+			if (p == NULL || *p == '\0') // if no dot
 				sqlite3_result_text(context, rec->genotypeUnparsedStrings[res_column - 10], -1, SQLITE_TRANSIENT);
-			} else
-				sqlite3_result_null(context);
-		}
+			else {
+				// p point to the name of FMT
+				++p;
+				vcfInfoDef * el = vcfInfoDefForGtKey(cf, p);
+				// length of the format string
+				int l = strlen(p);
+				// scan FORMAT and find index of p
+				char * fmt = rec->format;
+				int idx = 0;
+				bool found = false;
+				for (char * q = fmt; *q != '\0'; ) {
+					// find it
+					if (strncmp(q, p, l) == 0 && (*(q + l) == '\0' || *(q + l) == ':')) {
+						found = true;
+						break;
+					} else {
+						idx += 1;
+						while (*q != ':' && *q != '\0') ++q;
+						if (*q != '\0')
+							++q;
+					}
+				}
+				if (found) {
+					// find the idx-th piece in genotype string
+					char * geno = rec->genotypeUnparsedStrings[res_column - 10];
+					char * p = geno;
+					for (size_t i = 0; i < idx; ++i, ++p)
+						while (*p != ':' && *p != '\0')
+							++p;
+					char * q = p;
+					while (*q != ':' && *q != '\0') ++q;
+					*q = '\0';
+					if (el->type == vcfInfoFlag)
+						sqlite3_result_int64(context, p != q ? 1 : 0);
+					else if (el->type == vcfInfoInteger)
+						sqlite3_result_int64(context, atoi(p));
+					else if (el->type == vcfInfoFloat)
+						sqlite3_result_int64(context, atof(p));
+					else
+						sqlite3_result_text(context, p, -1, SQLITE_TRANSIENT);
+				}
+			}
+		} else
+			sqlite3_result_null(context);
 	} else {
 		// third case
 		std::stringstream res;
@@ -551,8 +638,9 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 				}
 			} else if (res_column == 8) {
 				char * p = res_name;
-				while (*p != '\0' && *p != '.') ++p;
-				if (*p == '\0') // if no dot
+				if (p != NULL)
+					while (*p != '\0' && *p != '.') ++p;
+				if (p == NULL || *p == '\0') // if no dot
 					res << rec->unparsedInfoElements;
 				else {
 					// p point to the name of info
@@ -561,7 +649,6 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 					// we should have definiton for all keys
 					bool isFlag = el->type == vcfInfoFlag;
 
-					// length of the format string
 					int l = strlen(p);
 					// scan INFO and find index of p
 					char * info = rec->unparsedInfoElements;
@@ -592,8 +679,9 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 			else if (res_column >= 10 && res_column < 10 + cf->genotypeCount) {
 				// if there is no '.' in the name
 				char * p = res_name;
-				while (*p != '\0' && *p != '.') ++p;
-				if (*p == '\0') // if no dot
+				if (p != NULL)
+					while (*p != '\0' && *p != '.') ++p;
+				if (p == NULL || *p == '\0') // if no dot
 					res << rec->genotypeUnparsedStrings[res_column - 10];
 				else {
 					// p point to the name of FMT
@@ -635,8 +723,11 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 	}
 }
 
-static void bamTrack(void * track_file, char * chr, int pos, int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+// calculate depth
+static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
+	char * res_name, TrackInfo * info, sqlite3_context * context)
 {
+	
 }
 
 static void track(
@@ -765,6 +856,7 @@ static void track(
 	}
 	int res_column = info.default_col;
 	char * res_name = NULL;
+	bool res_all = false;
 	if (argc == 4) {
 		if (sqlite3_value_type(argv[3]) == SQLITE_INTEGER) {
 			res_column = sqlite3_value_int(argv[3]);
@@ -779,9 +871,17 @@ static void track(
 			res_column = it->second;
 		}
 	}
+	if (argc == 5) {
+		if (sqlite3_value_type(argv[4]) == SQLITE_INTEGER)
+			res_all = sqlite3_value_int(argv[4]);
+		else {
+			sqlite3_result_error(context, "wrong datatype for the last parameter. 0 or 1 (all records) is expected.", -1);
+			return;
+		}
+	}
 
 	// call the handler
-	(*info.handler)(info.file, chr, pos, res_column, res_name, &info, context);
+	(*info.handler)(info.file, chr, pos, res_all, res_column, res_name, &info, context);
 }
 
 
