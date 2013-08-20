@@ -253,6 +253,8 @@ struct TrackInfo
 	int file_type;
 	// pointer to opened file
 	void * file;
+	// pointer to index file, if any
+	void * index_file;
 	// function to handle stuff
 	track_handler handler;
 	// default return column for the file type
@@ -261,6 +263,11 @@ struct TrackInfo
 	std::map<std::string, int> name_map;
 	// if the chromosome has leading "chr"
 	bool with_leading_chr;
+
+	TrackInfo(): file_type(0), file(NULL), index_file(NULL),
+		handler(NULL), default_col(0), name_map(), with_leading_chr(false)
+	{
+	}
 
 	//
 	void print()
@@ -723,13 +730,55 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 	}
 }
 
+typedef struct {
+	int beg, end;
+	samfile_t *in;
+} tmpstruct_t;
+
+
+static int fetch_func(const bam1_t *b, void *data)
+{
+	bam_plbuf_t *buf = (bam_plbuf_t*)data;
+	bam_plbuf_push(b, buf);
+	return 0;
+}
+
+// callback for bam_plbuf_init()
+static int pileup_func(uint32_t tid, uint32_t pos, int n, const bam_pileup1_t *pl, void *data)
+{
+	tmpstruct_t *tmp = (tmpstruct_t*)data;
+	if ((int)pos >= tmp->beg && (int)pos < tmp->end)
+		printf("%s\t%d\t%d\n", tmp->in->header->target_name[tid], pos + 1, n);
+	return 0;
+}
+
 // calculate depth
 static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
 	char * res_name, TrackInfo * info, sqlite3_context * context)
 {
-	
+	samfile_t * sf = (samfile_t *)track_file;
+	bam_index_t * idx = (bam_index_t *)info->index_file;
+	//
+	int tid = 0;
+	if (info->with_leading_chr) {
+		char chrName[255];
+		strcpy(chrName, "chr");
+		strcat(chrName, chr);
+		tid = bam_get_tid(sf->header, chrName);
+	} else {
+		tid = bam_get_tid(sf->header, chr);
+	}
+	tmpstruct_t tmp;
+	bam_plbuf_t * buf = bam_plbuf_init(pileup_func, &tmp);
+	// both start and end should be zero based.
+	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
+		buf, fetch_func);
+	bam_plbuf_push(0, buf); // finalize pileup
 }
 
+extern "C" {
+extern void bam_init_header_hash(bam_header_t*);
+}
 static void track(
                   sqlite3_context * context,
                   int argc,
@@ -804,6 +853,12 @@ static void track(
 				sqlite3_result_error(context, "cannot open file", -1);
 				return;
 			}
+			bam_init_header_hash(((samfile_t *)info.file)->header);
+			info.index_file = bam_index_load(filename);
+			if (info.index_file == NULL) {
+				sqlite3_result_error(context, "cannot open file", -1);
+				return;
+			}
 			info.handler = bamTrack;
 			info.default_col = 0;
 			// info fields
@@ -852,7 +907,7 @@ static void track(
 			info.with_leading_chr = startsWith("chr", chrom->name);
 		}
 		trackFileMap[track_file] = info;
-		//info.print();
+		// info.print();
 	}
 	int res_column = info.default_col;
 	char * res_name = NULL;

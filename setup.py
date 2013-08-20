@@ -472,7 +472,10 @@ LIB_UCSC_FILES = [
     'ucsc/tabix/bgzf.c',
     'ucsc/tabix/knetfile.c',
     'ucsc/tabix/kstring.c',
-    
+    'ucsc/samtools/bam.c',
+    'ucsc/samtools/bam_import.c',
+    'ucsc/samtools/sam_header.c',
+    'ucsc/samtools/bam_aux.c',
 ]
     
 LIB_STAT = ['source/fisher2.c']
