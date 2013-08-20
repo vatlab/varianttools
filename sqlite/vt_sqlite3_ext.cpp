@@ -730,27 +730,22 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 	}
 }
 
-typedef struct {
-	int beg, end;
-	samfile_t *in;
-} tmpstruct_t;
+struct BAM_stat {
+	size_t counter;
+	// reserved for other statistics
 
+	BAM_stat() : counter(0)
+	{
+	}
+};
 
 static int fetch_func(const bam1_t *b, void *data)
 {
-	bam_plbuf_t *buf = (bam_plbuf_t*)data;
-	bam_plbuf_push(b, buf);
+	BAM_stat * buf = (BAM_stat *)data;
+	buf->counter += 1;
 	return 0;
 }
 
-// callback for bam_plbuf_init()
-static int pileup_func(uint32_t tid, uint32_t pos, int n, const bam_pileup1_t *pl, void *data)
-{
-	tmpstruct_t *tmp = (tmpstruct_t*)data;
-	if ((int)pos >= tmp->beg && (int)pos < tmp->end)
-		printf("%s\t%d\t%d\n", tmp->in->header->target_name[tid], pos + 1, n);
-	return 0;
-}
 
 // calculate depth
 static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
@@ -760,6 +755,8 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 	bam_index_t * idx = (bam_index_t *)info->index_file;
 	//
 	int tid = 0;
+	//
+	// we can cache this piece of code in the info structure (as chrom map)
 	if (info->with_leading_chr) {
 		char chrName[255];
 		strcpy(chrName, "chr");
@@ -768,12 +765,11 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 	} else {
 		tid = bam_get_tid(sf->header, chr);
 	}
-	tmpstruct_t tmp;
-	bam_plbuf_t * buf = bam_plbuf_init(pileup_func, &tmp);
+	BAM_stat buf;
 	// both start and end should be zero based.
 	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
-		buf, fetch_func);
-	bam_plbuf_push(0, buf); // finalize pileup
+		&buf, fetch_func);
+	sqlite3_result_int64(context, buf.counter);
 }
 
 extern "C" {
