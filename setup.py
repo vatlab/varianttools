@@ -464,11 +464,15 @@ LIB_UCSC_FILES = [
     'ucsc/lib/bigBed.c',
     'ucsc/lib/bwgQuery.c',
     'ucsc/lib/vcf.c',
+    'ucsc/lib/bamFile.c',
+    'ucsc/lib/htmshell.c',
+    'ucsc/lib/filePath.c',
     'ucsc/tabix/bedidx.c',
     'ucsc/tabix/index.c',
     'ucsc/tabix/bgzf.c',
     'ucsc/tabix/knetfile.c',
     'ucsc/tabix/kstring.c',
+    
 ]
     
 LIB_STAT = ['source/fisher2.c']
@@ -615,17 +619,18 @@ setup(name = "variant_tools",
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             sources = ['sqlite/vt_sqlite3_ext.cpp'] + SQLITE_GSL + LIB_STAT + LIB_UCSC_FILES,
-            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'sqlite', "source", "gsl", "cgatools", "boost_1_49_0"],
+            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools', 
+                'sqlite', "source", "gsl", "cgatools", "boost_1_49_0"],
             libraries = ['z', 'bz2'] + \
                 ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = SQLITE_DEFINES + [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
-                ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'),
+                ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'), ('USE_BAM', '1'),
                 ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None), 
                 ('BGZF_CACHE', None)],
         ),
         Extension('variant_tools._ucsctools',
             sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_UCSC_FILES,
-            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix'],
+            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
             libraries = ['z', 'bz2'],
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)]

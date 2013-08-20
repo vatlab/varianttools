@@ -118,7 +118,8 @@ void htmlBadVar(char *varName);
 void htmlImage(char *fileName, int width, int height);
 /* Display centered image file. */
 
-jmp_buf htmlRecover;  /* Error recovery jump. Exposed for cart's use. */
+// extern added by BO PENG because htmlRecoer causes duplicated symbol in several files
+extern jmp_buf htmlRecover;  /* Error recovery jump. Exposed for cart's use. */
 
 void htmlVaWarn(char *format, va_list args);
 /* Write an error message.  (Generally you just call warn() or errAbort().

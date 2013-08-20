@@ -239,6 +239,8 @@ extern "C" {
 #include "knetfile.h"
 // for vcf
 #include "vcf.h"
+// for bam file
+#include "bamFile.h"
 }
 
 // filename : <type, pointer, handler>
@@ -277,6 +279,7 @@ struct TrackInfo
 typedef std::map<std::string, struct TrackInfo> TrackFileMap;
 TrackFileMap trackFileMap;
 
+#define BAM_FILE 0
 #define BIGBED_FILE 1
 #define BIGWIG_FILE 2
 #define VCFTABIX_FILE 3
@@ -632,6 +635,9 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, int res_column
 	}
 }
 
+static void bamTrack(void * track_file, char * chr, int pos, int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+{
+}
 
 static void track(
                   sqlite3_context * context,
@@ -695,6 +701,27 @@ static void track(
 			struct vcfRecord * rec = vcff->records;
 			if (rec != NULL) {
 				if (strncmp(rec->chrom, "chr", 3) == 0)
+					info.with_leading_chr = true;
+			}
+		} else if (endsWith((char *)track_file.c_str(), ".bam")) {
+			info.file_type = BAM_FILE;
+			if (!bamFileExists((char *)track_file.c_str()))
+				sqlite3_result_error(context, "bam file or its index does not exist", -1);
+			char * filename;
+			info.file = (void *)bamOpen((char *)track_file.c_str(), &filename);
+			if (info.file == NULL) {
+				sqlite3_result_error(context, "cannot open file", -1);
+				return;
+			}
+			info.handler = bamTrack;
+			info.default_col = 0;
+			// info fields
+			//info.with_leading_chr = false;
+			//bamChromList
+
+			struct bamChromInfo * cl = bamChromList((samfile_t *)info.file);
+			if (cl != NULL) {
+				if (strncmp(cl->name, "chr", 3) == 0)
 					info.with_leading_chr = true;
 			}
 		} else if (isBigWig((char *)track_file.c_str())) {
