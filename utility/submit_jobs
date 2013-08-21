@@ -278,9 +278,8 @@ notification_email (optional): an email address to which major events such as
     while True:
         running, submitted, pending = jobs.submit()
         if not args.wait:
-            if pending == 0:
-                print('All jobs have been submitted successfully')
-                break
+            print('All jobs have been submitted successfully')
+            break
         elif running + submitted + pending == 0:
             mailer.sendmail('All jobs have been completed')
             print('All jobs have been completed successfully')
