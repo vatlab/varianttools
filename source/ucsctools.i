@@ -111,7 +111,7 @@ void showTrack(const std::string & track_file)
             tok = strtok(NULL, "\n");
         }
         printf("\n");
-        printf("Available columns (with type VARCHAR if unspecified or all=1):\n");
+        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
         printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
         printf("%-23s %s\n", "chr (1, chrom)", "chromosome");
         printf("%-23s %s\n", "pos (2, INTEGER)", "position (1-based)");
@@ -184,6 +184,17 @@ void showTrack(const std::string & track_file)
                 putchar('\n');
         }
         */
+        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
+        printf("%-23s %s\n", "0 (INTEGER)", "1 if depth is over 0, NULL otherwise");
+        printf("%-23s %s\n", "coverage (INTEGER)", "Number of reads that cover the starting position of the variant");
+        printf("%-23s %s\n", "calls", "nucleotide of the reads at the variant location");
+        printf("%-23s %s\n", "reads?start=0&width=5", "nucleotide sequence around the variant location");
+        printf("%-23s %s\n", "qual", "A list of phred base quality of reads at the location");
+        printf("%-23s %s\n", "avg_qual (FLOAT)", "Average qual score of all reads");
+        printf("%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
+        printf("%-23s %s\n", "avg_mapq (FLOAT)", "Average mapq score of all reads");
+        printf("\nParameters min_qual and min_mapq can be used to limit the reads to the \n"
+            "ones with mapq and qual scores that exceed the specified value.\n");
     } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
@@ -205,7 +216,7 @@ void showTrack(const std::string & track_file)
         printf("%-23s %f\n", "std:",
             calcStdFromSums(sum.sumData, sum.sumSquares, sum.validCount));
         printf("%-23s %d\n\n", "Number of fields:", 4);
-        printf("Available columns (with type VARCHAR if unspecified or all=1):\n");
+        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
         printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
         printf("%-23s %s\n", "chrom (1)", "chromosome");
         printf("%-23s %s\n", "chromStart (2, INTEGER)", "start position (0-based)");
@@ -234,7 +245,7 @@ void showTrack(const std::string & track_file)
         printf("%-23s %f\n", "Max depth:", sum.maxVal);
         printf("%-23s %f\n", "Std of depth:", calcStdFromSums(sum.sumData, sum.sumSquares, sum.validCount));
         printf("%-23s %d\n\n", "Number of fields:", bbi->fieldCount);
-        printf("Available columns (with type VARCHAR if unspecified or all=1):\n");
+        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
         struct asObject *as = bigBedAs(bbi);
         if (as != NULL)
         {

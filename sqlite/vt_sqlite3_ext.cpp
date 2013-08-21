@@ -243,9 +243,17 @@ extern "C" {
 #include "bamFile.h"
 }
 
-// filename : <type, pointer, handler>
+
+struct FieldInfo
+{
+	bool all;
+	int column;
+	std::string name;
+	std::string query;
+};
+
 struct TrackInfo;
-typedef void (*track_handler)(void *, char *, int, bool, int, char *, TrackInfo *, sqlite3_context *);
+typedef void (*track_handler)(void *, char *, int, FieldInfo *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -292,8 +300,8 @@ TrackFileMap trackFileMap;
 #define BIGWIG_FILE 2
 #define VCFTABIX_FILE 3
 
-void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
-                 char * res_name, TrackInfo * info, sqlite3_context * context)
+void bigBedTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+                 TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
 	struct lm * bbLm = lmInit(0);
@@ -315,26 +323,26 @@ void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_c
 		sqlite3_result_null(context);
 	} else {
 		// if returnning typed-valued, only the first record will be considered
-		if (res_column > cf->fieldCount)
+		if (fi->column > cf->fieldCount)
 			sqlite3_result_null(context);
-		else if (!res_all) {
-			if (res_column == 0)
+		else if (!fi->all) {
+			if (fi->column == 0)
 				// return matched or not
 				sqlite3_result_int(context, 1);
-			else if (res_column == 1)
+			else if (fi->column == 1)
 				sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
-			else if (res_column == 2)
+			else if (fi->column == 2)
 				sqlite3_result_int64(context, ivList->start);
-			else if (res_column == 3)
+			else if (fi->column == 3)
 				sqlite3_result_int64(context, ivList->end);
-			else if (res_column > 3 && res_column <= cf->fieldCount) {
+			else if (fi->column > 3 && fi->column <= cf->fieldCount) {
 				int res_type = 0; // varchar
 				size_t i = 1;
 				struct asColumn * col;
 				struct asObject * as = bigBedAs(cf);
 				for (col = as->columnList; col != NULL; col = col->next, ++i) {
 					struct asTypeInfo * ltype = col->lowType;
-					if (i == res_column) {
+					if (i == fi->column) {
 						if (asTypesIsInt(ltype->type))
 							res_type = 1;   // INTEGER
 						else if (asTypesIsFloating(ltype->type))
@@ -347,7 +355,7 @@ void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_c
 				// skip a few \t
 				i = 3;
 				char * pch = strtok(rest, "\t");
-				while (++i < res_column)
+				while (++i < fi->column)
 					pch = strtok(NULL, "\t");
 				// text fields
 				if (res_type == 0)
@@ -368,18 +376,18 @@ void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_c
 				else
 					first = false;
 				//
-				if (res_column == 1)
+				if (fi->column == 1)
 					res << chrName;
-				else if (res_column == 2)
+				else if (fi->column == 2)
 					res << iv->start;
-				else if (res_column == 3)
+				else if (fi->column == 3)
 					res << iv->end;
-				else if (res_column > 3 && res_column <= cf->fieldCount) {
+				else if (fi->column > 3 && fi->column <= cf->fieldCount) {
 					char * rest = ivList->rest;
 					// skip a few \t
 					int i = 3;
 					char * pch = strtok(rest, "\t");
-					while (++i < res_column)
+					while (++i < fi->column)
 						pch = strtok(NULL, "\t");
 					res << pch;
 				}
@@ -391,8 +399,8 @@ void bigBedTrack(void * track_file, char * chr, int pos, bool res_all, int res_c
 }
 
 
-static void bigWigTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
-                        char * res_name, TrackInfo * info, sqlite3_context * context)
+static void bigWigTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+                        TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
 	struct lm * bbLm = lmInit(0);
@@ -412,16 +420,16 @@ static void bigWigTrack(void * track_file, char * chr, int pos, bool res_all, in
 	if (ivList == NULL) {
 		sqlite3_result_null(context);
 	} else {
-		if (res_column > 4)
+		if (fi->column > 4)
 			sqlite3_result_null(context);
-		else if (!res_all) {
-			if (res_column == 1)
+		else if (!fi->all) {
+			if (fi->column == 1)
 				sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
-			else if (res_column == 2)
+			else if (fi->column == 2)
 				sqlite3_result_int64(context, ivList->start);
-			else if (res_column == 3)
+			else if (fi->column == 3)
 				sqlite3_result_int64(context, ivList->end);
-			else if (res_column == 4)
+			else if (fi->column == 4)
 				sqlite3_result_double(context, ivList->val);
 		} else {
 			std::stringstream res;
@@ -434,13 +442,13 @@ static void bigWigTrack(void * track_file, char * chr, int pos, bool res_all, in
 				else
 					first = false;
 				//
-				if (res_column == 1)
+				if (fi->column == 1)
 					res << chrName;
-				else if (res_column == 2)
+				else if (fi->column == 2)
 					res << iv->start;
-				else if (res_column == 3)
+				else if (fi->column == 3)
 					res << iv->end;
-				else if (res_column == 4)
+				else if (fi->column == 4)
 					res << iv->val;
 			}
 			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
@@ -450,8 +458,8 @@ static void bigWigTrack(void * track_file, char * chr, int pos, bool res_all, in
 }
 
 
-static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
-                          int res_column, char * res_name, TrackInfo * info, sqlite3_context * context)
+static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+                          TrackInfo * info, sqlite3_context * context)
 {
 	struct vcfFile * cf = (struct vcfFile *)track_file;
 
@@ -473,21 +481,21 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 	// first case, no result
 	if (nRecord == 0) {
 		sqlite3_result_null(context);
-	} else if (!res_all) {
+	} else if (!fi->all) {
 		struct vcfRecord * rec = cf->records;
-		if (res_column == 1)
+		if (fi->column == 1)
 			// chrom
 			sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
-		else if (res_column == 2)
+		else if (fi->column == 2)
 			// pos
 			sqlite3_result_int(context, rec->chromStart);
-		else if (res_column == 3)
+		else if (fi->column == 3)
 			// name
 			sqlite3_result_text(context, rec->name, -1, SQLITE_TRANSIENT);
-		else if (res_column == 4)
+		else if (fi->column == 4)
 			// ref
 			sqlite3_result_text(context, rec->alleles[0], -1, SQLITE_TRANSIENT);
-		else if (res_column == 5) {
+		else if (fi->column == 5) {
 			// alt
 			char alleles[255];
 			alleles[0] = '\0';
@@ -497,10 +505,10 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 				strcat(alleles, rec->alleles[i]);
 			}
 			sqlite3_result_text(context, alleles, -1, SQLITE_TRANSIENT);
-		} else if (res_column == 6)
+		} else if (fi->column == 6)
 			// qual
 			sqlite3_result_text(context, rec->qual, -1, SQLITE_TRANSIENT);
-		else if (res_column == 7) {
+		else if (fi->column == 7) {
 			// filter
 			char filter[255];
 			filter[0] = '\0';
@@ -510,9 +518,9 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 				strcat(filter, rec->filters[i]);
 			}
 			sqlite3_result_text(context, filter, -1, SQLITE_TRANSIENT);
-		} else if (res_column == 8) {
+		} else if (fi->column == 8) {
 			// info
-			char * p = res_name;
+			const char * p = fi->name.c_str();
 			if (p != NULL)
 				while (*p != '\0' && *p != '.') ++p;
 			if (p == NULL || *p == '\0') // if no dot
@@ -554,15 +562,15 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 				else
 					sqlite3_result_text(context, q, -1, SQLITE_TRANSIENT);
 			}
-		} else if (res_column == 9)
+		} else if (fi->column == 9)
 			sqlite3_result_text(context, rec->format, -1, SQLITE_TRANSIENT);
-		else if (res_column >= 10 && res_column < 10 + cf->genotypeCount) {
+		else if (fi->column >= 10 && fi->column < 10 + cf->genotypeCount) {
 			// if there is no '.' in the name
-			char * p = res_name;
+			const char * p = fi->name.c_str();
 			if (p != NULL)
 				while (*p != '\0' && *p != '.') ++p;
 			if (p == NULL || *p == '\0') // if no dot
-				sqlite3_result_text(context, rec->genotypeUnparsedStrings[res_column - 10], -1, SQLITE_TRANSIENT);
+				sqlite3_result_text(context, rec->genotypeUnparsedStrings[fi->column - 10], -1, SQLITE_TRANSIENT);
 			else {
 				// p point to the name of FMT
 				++p;
@@ -587,7 +595,7 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 				}
 				if (found) {
 					// find the idx-th piece in genotype string
-					char * geno = rec->genotypeUnparsedStrings[res_column - 10];
+					char * geno = rec->genotypeUnparsedStrings[fi->column - 10];
 					char * p = geno;
 					for (size_t i = 0; i < idx; ++i, ++p)
 						while (*p != ':' && *p != '\0')
@@ -617,37 +625,37 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 				res << '|';
 			else
 				first = false;
-			if (res_column == 1)
+			if (fi->column == 1)
 				// chrom
 				res << chrName;
-			else if (res_column == 2)
+			else if (fi->column == 2)
 				// pos
 				res << rec->chromStart;
-			else if (res_column == 3)
+			else if (fi->column == 3)
 				// name
 				res << rec->name;
-			else if (res_column == 4)
+			else if (fi->column == 4)
 				// ref
 				res << rec->alleles[0];
-			else if (res_column == 5) {
+			else if (fi->column == 5) {
 				// alt
 				for (size_t i = 1 ; i < rec->alleleCount; ++i) {
 					if (i > 1)
 						res << ',';
 					res << rec->alleles[i];
 				}
-			} else if (res_column == 6)
+			} else if (fi->column == 6)
 				// qual
 				res << rec->qual;
-			else if (res_column == 7) {
+			else if (fi->column == 7) {
 				// filter
 				for (size_t i = 0; i < rec->filterCount; ++i) {
 					if (i > 0)
 						res << ',';
 					res << rec->filters[i];
 				}
-			} else if (res_column == 8) {
-				char * p = res_name;
+			} else if (fi->column == 8) {
+				const char * p = fi->name.c_str();
 				if (p != NULL)
 					while (*p != '\0' && *p != '.') ++p;
 				if (p == NULL || *p == '\0') // if no dot
@@ -684,15 +692,15 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 					if (isFlag)
 						res << (found ? 1 : 0);
 				}
-			} else if (res_column == 9)
+			} else if (fi->column == 9)
 				res << rec->format;
-			else if (res_column >= 10 && res_column < 10 + cf->genotypeCount) {
+			else if (fi->column >= 10 && fi->column < 10 + cf->genotypeCount) {
 				// if there is no '.' in the name
-				char * p = res_name;
+				const char * p = fi->name.c_str();
 				if (p != NULL)
 					while (*p != '\0' && *p != '.') ++p;
 				if (p == NULL || *p == '\0') // if no dot
-					res << rec->genotypeUnparsedStrings[res_column - 10];
+					res << rec->genotypeUnparsedStrings[fi->column - 10];
 				else {
 					// p point to the name of FMT
 					++p;
@@ -716,7 +724,7 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 					}
 					if (found) {
 						// find the idx-th piece in genotype string
-						char * geno = rec->genotypeUnparsedStrings[res_column - 10];
+						char * geno = rec->genotypeUnparsedStrings[fi->column - 10];
 						char * p = geno;
 						for (size_t i = 0; i < idx; ++i, ++p)
 							while (*p != ':' && *p != '\0')
@@ -736,27 +744,31 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 
 struct BAM_stat
 {
+	//
 	size_t start;   // zero based start position
 	size_t counter;
 	std::string calls;
 	std::vector<int> qual;
 	std::vector<int> map_qual;
-	// reserved for other statistics
+	// condition
+	size_t shift;
+	size_t width;
+	int min_qual;
+	int min_mapq;
 
-	BAM_stat(size_t pos) : start(pos), counter(0), calls(), qual()
+	BAM_stat(size_t pos) :
+		start(pos), counter(0), calls(), qual(), map_qual(),
+		shift(0), width(1), min_qual(0), min_mapq()
 	{
 	}
-
-
 };
 
 static int fetch_func(const bam1_t * b, void * data)
 {
 	BAM_stat * buf = (BAM_stat *)data;
 
-	if (b->core.n_cigar == 0)
+	if (b->core.n_cigar == 0 || b->core.qual < buf->min_mapq)
 		return 0;
-	buf->counter += 1;
 	// get qpos
 	uint32_t pos = b->core.pos;
 	uint32_t qpos = 0;
@@ -773,38 +785,51 @@ static int fetch_func(const bam1_t * b, void * data)
 			//for (i == pos; i < pos + l; ++i)
 			qpos += l;
 			pos += l;
-		}              else if (op == BAM_CINS)
+		} else if (op == BAM_CINS)
 			qpos += l;
-
 		else if (op == BAM_CDEL || op == BAM_CREF_SKIP)
 			pos += l;
 	}
 
-	switch (bam1_seqi(bam1_seq(b), qpos)) {
-	case 1:
-		buf->calls += 'A';
-		break;
-	case 2:
-		buf->calls += 'C';
-		break;
-	case 4:
-		buf->calls += 'G';
-		break;
-	case 8:
-		buf->calls += 'T';
-		break;
-	default:
-		buf->calls += 'N';
-	}
-	buf->qual.push_back(bam1_qual(b)[qpos]);
+	int qual = bam1_qual(b)[qpos];
+	if (qual < buf->min_qual)
+		return 0;
+	buf->counter += 1;
+	buf->qual.push_back(qual);
 	buf->map_qual.push_back(b->core.qual);
+	//
+	if (buf->width > 1 && !buf->calls.empty())
+		buf->calls += '|';
+	for (int i = 0; i < buf->width; ++i) {
+		int call = (qpos + i + buf->shift < b->core.l_qseq && qpos + i + buf->shift >= 0) 
+			? bam1_seqi(bam1_seq(b), qpos + buf->shift + i) : 0;
+		switch (call) {
+		case 1:
+			buf->calls += 'A';
+			break;
+		case 2:
+			buf->calls += 'C';
+			break;
+		case 4:
+			buf->calls += 'G';
+			break;
+		case 8:
+			buf->calls += 'T';
+			break;
+		case 16:
+			buf->calls += 'N';
+			break;
+		default:
+			buf->calls += '_';
+		}
+	}
 	return 0;
 }
 
 
 // calculate depth
-static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int res_column,
-                     char * res_name, TrackInfo * info, sqlite3_context * context)
+static void bamTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+                     TrackInfo * info, sqlite3_context * context)
 {
 	samfile_t * sf = (samfile_t *)track_file;
 	bam_index_t * idx = (bam_index_t *)info->index_file;
@@ -822,12 +847,37 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 		tid = bam_get_tid(sf->header, chr);
 	}
 	BAM_stat buf(pos - 1);
+	// set parameters
+	if (fi->name == "reads")
+		buf.width = 5;
+	if (!fi->query.empty()) {
+		char * query = strdup(fi->query.c_str());
+		char * pch = strtok(query, "&");
+		while (pch != NULL) {
+			if (strncmp(pch, "min_qual=", 9) == 0)
+				buf.min_qual = atoi(pch + 9);
+			else if (strncmp(pch, "min_mapq=", 9) == 0)
+				buf.min_mapq = atoi(pch + 9);
+			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads")
+				buf.width = atoi(pch + 6);
+			else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads")
+				buf.shift = atoi(pch + 6);
+			// process argument
+			pch = strtok(NULL, "&");
+		}
+		free(query);
+	}
 	// both start and end should be zero based.
 	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
 		&buf, fetch_func);
-	if (res_name == NULL || strcmp(res_name, "coverage") == 0)
-		sqlite3_result_int64(context, buf.counter);
-	else if (strcmp(res_name, "qual") == 0) {
+	if (fi->name.empty() || fi->name == "coverage") {
+		if (fi->all) {
+			char tmp[48];
+			sprintf(tmp, "%lu", buf.counter);
+			sqlite3_result_text(context, tmp, -1, SQLITE_TRANSIENT);
+		} else
+			sqlite3_result_int64(context, buf.counter);
+	} else if (fi->name == "qual") {
 		std::stringstream res;
 		std::vector<int>::iterator it = buf.qual.begin();
 		std::vector<int>::iterator it_end = buf.qual.end();
@@ -840,7 +890,20 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 			res << *it;
 		}
 		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-	} else if (strcmp(res_name, "mapq") == 0) {
+	} else if (fi->name == "avg_qual") {
+		double res = 0;
+		std::vector<int>::iterator it = buf.qual.begin();
+		std::vector<int>::iterator it_end = buf.qual.end();
+		for (; it != it_end; ++it)
+			res += *it;
+		res = buf.qual.size() == 0 ? 0 : res / buf.qual.size();
+		if (fi->all) {
+			char tmp[48];
+			sprintf(tmp, "%f", res);
+			sqlite3_result_text(context, tmp, -1, SQLITE_TRANSIENT);
+		} else
+			sqlite3_result_double(context, res);
+	} else if (fi->name == "mapq") {
 		std::stringstream res;
 		std::vector<int>::iterator it = buf.map_qual.begin();
 		std::vector<int>::iterator it_end = buf.map_qual.end();
@@ -853,8 +916,22 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 			res << *it;
 		}
 		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-	} else
+	} else if (fi->name == "avg_mapq") {
+		double res = 0;
+		std::vector<int>::iterator it = buf.map_qual.begin();
+		std::vector<int>::iterator it_end = buf.map_qual.end();
+		for (; it != it_end; ++it)
+			res += *it;
+		res = buf.map_qual.size() == 0 ? 0 : res / buf.map_qual.size();
+		if (fi->all) {
+			char tmp[48];
+			sprintf(tmp, "%f", res);
+			sqlite3_result_text(context, tmp, -1, SQLITE_TRANSIENT);
+		} else
+			sqlite3_result_double(context, res);
+	} else // if (strcmp(fi->name, "calls") == 0) || reads
 		sqlite3_result_text(context, (char *)(buf.calls.c_str()), -1, SQLITE_TRANSIENT);
+
 }
 
 
@@ -948,9 +1025,12 @@ static void track(
 			//info.with_leading_chr = false;
 			//bamChromList
 			info.name_map["coverage"] = 1;
+			info.name_map["calls"] = 1;
+			info.name_map["reads"] = 1;
 			info.name_map["qual"] = 1;
 			info.name_map["mapq"] = 1;
-			info.name_map["calls"] = 1;
+			info.name_map["avg_qual"] = 1;
+			info.name_map["avg_mapq"] = 1;
 
 			struct bamChromInfo * cl = bamChromList((samfile_t *)info.file);
 			if (cl != NULL) {
@@ -996,26 +1076,39 @@ static void track(
 		trackFileMap[track_file] = info;
 		// info.print();
 	}
-	int res_column = info.default_col;
-	char * res_name = NULL;
-	bool res_all = false;
-	if (argc == 4) {
+	FieldInfo fi;
+	fi.column = info.default_col;
+	fi.name = "";
+	fi.all = false;
+	if (argc >= 4) {
 		if (sqlite3_value_type(argv[3]) == SQLITE_INTEGER) {
-			res_column = sqlite3_value_int(argv[3]);
-			res_name = NULL;
+			fi.column = sqlite3_value_int(argv[3]);
+			fi.name = "";
 		} else {
-			res_name = (char *)(sqlite3_value_text(argv[3]));
-			std::map<std::string, int>::iterator it = info.name_map.find(res_name);
+			char * name = (char *)(sqlite3_value_text(argv[3]));
+			char * p = name;
+			while (*p != '?' && *p != '\0')
+				++p;
+			if (*p == '?') {
+				// terminate
+				*p = '\0';
+				fi.name = std::string(name);
+				fi.query = std::string(p + 1);
+				// replace ? to avoid disrupting the string
+				*p = '?';
+			} else
+				fi.name = std::string(name);
+			std::map<std::string, int>::iterator it = info.name_map.find(fi.name);
 			if (it == info.name_map.end()) {
 				sqlite3_result_error(context, "Unrecognized col name", -1);
 				return;
 			}
-			res_column = it->second;
+			fi.column = it->second;
 		}
 	}
-	if (argc == 5) {
+	if (argc >= 5) {
 		if (sqlite3_value_type(argv[4]) == SQLITE_INTEGER)
-			res_all = sqlite3_value_int(argv[4]);
+			fi.all = sqlite3_value_int(argv[4]);
 		else {
 			sqlite3_result_error(context, "wrong datatype for the last parameter. 0 or 1 (all records) is expected.", -1);
 			return;
@@ -1023,7 +1116,7 @@ static void track(
 	}
 
 	// call the handler
-	(*info.handler)(info.file, chr, pos, res_all, res_column, res_name, &info, context);
+	(*info.handler)(info.file, chr, pos, &fi, &info, context);
 }
 
 
@@ -3084,61 +3177,61 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xFunc)(sqlite3_context *, int, sqlite3_value **);
 	} aFuncs[] = {
 		/* math.h */
-		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc													},
-		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc													},
-		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc													},
-		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
+		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc							},
+		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc							},
+		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc							},
+		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func							},
 		/* XXX alias */
-		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
-		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc													},
-		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc													},
-		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc													},
+		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func							},
+		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc							},
+		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc							},
+		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc							},
 
-		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc											},
-		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc												},
-		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc												},
+		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc					},
+		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc						},
+		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc						},
 
-		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc													},
-		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc													},
-		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc													},
-		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc													},
-		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc													},
-		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc													},
-		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc													},
-		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc													},
+		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc							},
+		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc							},
+		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc							},
+		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc							},
+		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc							},
+		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc							},
+		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc							},
+		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc							},
 
-		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc													},
-		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc													},
-		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func													},
-		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc													},
-		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc													},
-		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc													},
-		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc												},
+		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc							},
+		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc							},
+		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func							},
+		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc							},
+		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc							},
+		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc							},
+		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc						},
 
-		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc													},
-		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc													},
+		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc							},
+		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc							},
 
-		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc													},
+		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc							},
 
 
 		/* string */
-		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc												},
-		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
-		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
-		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc													},
-		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc													},
+		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc						},
+		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc						},
+		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc						},
+		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc							},
+		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc							},
 #ifndef HAVE_TRIM
-		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc													},
-		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc													},
-		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc													},
-		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc												},
+		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc							},
+		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc							},
+		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc							},
+		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc						},
 #endif
-		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc												},
-		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc												},
-		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc													},
-		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc													},
-		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc													},
-		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc												},
+		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc						},
+		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc						},
+		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc							},
+		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc							},
+		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc							},
+		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc						},
 
 	};
 	/* Aggregate functions */
@@ -3151,12 +3244,12 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xStep)(sqlite3_context *, int, sqlite3_value **);
 		void (* xFinalize)(sqlite3_context *);
 	} aAggs[] = {
-		{ "stdev",			1,			 0,			  0,		   varianceStep,		   stdevFinalize																					 },
-		{ "variance",		1,			 0,			  0,		   varianceStep,		   varianceFinalize																					 },
-		{ "mode",			1,			 0,			  0,		   modeStep,			   modeFinalize																						 },
-		{ "median",			1,			 0,			  0,		   modeStep,			   medianFinalize																					 },
-		{ "lower_quartile", 1,			 0,			  0,		   modeStep,			   lower_quartileFinalize																			 },
-		{ "upper_quartile", 1,			 0,			  0,		   modeStep,			   upper_quartileFinalize																			 },
+		{ "stdev",			1,			 0,			  0,		   varianceStep,		   stdevFinalize																																						   },
+		{ "variance",		1,			 0,			  0,		   varianceStep,		   varianceFinalize																																						   },
+		{ "mode",			1,			 0,			  0,		   modeStep,			   modeFinalize																																							   },
+		{ "median",			1,			 0,			  0,		   modeStep,			   medianFinalize																																						   },
+		{ "lower_quartile", 1,			 0,			  0,		   modeStep,			   lower_quartileFinalize																																				   },
+		{ "upper_quartile", 1,			 0,			  0,		   modeStep,			   upper_quartileFinalize																																				   },
 	};
 	int i;
 
