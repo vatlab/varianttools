@@ -731,10 +731,14 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, bool res_all,
 }
 
 struct BAM_stat {
+	size_t start;   // zero based start position
 	size_t counter;
+	std::string calls;
+	std::vector<int> qual;
+	std::vector<int> map_qual;
 	// reserved for other statistics
 
-	BAM_stat() : counter(0)
+	BAM_stat(size_t pos) : start(pos), counter(0), calls(), qual()
 	{
 	}
 };
@@ -743,6 +747,25 @@ static int fetch_func(const bam1_t *b, void *data)
 {
 	BAM_stat * buf = (BAM_stat *)data;
 	buf->counter += 1;
+        // fprintf(stderr, "START %d POS %d  %d\n", buf->start, b->core.pos);
+	switch (bam1_seqi(bam1_seq(b), buf->start - b->core.pos)) {
+	case 1:
+		buf->calls += 'A';
+		break;
+	case 2:
+		buf->calls += 'C';
+		break;
+	case 4:
+		buf->calls += 'G';
+		break;
+	case 8:
+		buf->calls += 'T';
+		break;
+	default:
+		buf->calls += 'N';
+	}
+	buf->qual.push_back(0); //bam1_qual(b));
+        buf->map_qual.push_back(b->core.qual);
 	return 0;
 }
 
@@ -765,11 +788,40 @@ static void bamTrack(void * track_file, char * chr, int pos, bool res_all, int r
 	} else {
 		tid = bam_get_tid(sf->header, chr);
 	}
-	BAM_stat buf;
+	BAM_stat buf(pos - 1);
 	// both start and end should be zero based.
 	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
 		&buf, fetch_func);
-	sqlite3_result_int64(context, buf.counter);
+	if (res_name == NULL || strcmp(res_name, "coverage") == 0)
+		sqlite3_result_int64(context, buf.counter);
+	else if (strcmp(res_name, "qual") == 0) {
+		std::stringstream res;
+		std::vector<int>::iterator it = buf.qual.begin();
+		std::vector<int>::iterator it_end = buf.qual.end();
+		bool first = true;
+		for (; it != it_end; ++it) {
+			if (first)
+				first = false;
+			else
+				res << ",";
+			res << *it;
+		}
+		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+	} else if (strcmp(res_name, "mapq") == 0) {
+		std::stringstream res;
+		std::vector<int>::iterator it = buf.map_qual.begin();
+		std::vector<int>::iterator it_end = buf.map_qual.end();
+		bool first = true;
+		for (; it != it_end; ++it) {
+			if (first)
+				first = false;
+			else
+				res << ",";
+			res << *it;
+		}
+		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+	} else
+		sqlite3_result_text(context, (char *)(buf.calls.c_str()), -1, SQLITE_TRANSIENT);
 }
 
 extern "C" {
@@ -860,6 +912,10 @@ static void track(
 			// info fields
 			//info.with_leading_chr = false;
 			//bamChromList
+			info.name_map["coverage"] = 1;
+			info.name_map["qual"] = 1;
+			info.name_map["mapq"] = 1;
+			info.name_map["calls"] = 1;
 
 			struct bamChromInfo * cl = bamChromList((samfile_t *)info.file);
 			if (cl != NULL) {
