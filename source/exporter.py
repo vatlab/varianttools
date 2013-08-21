@@ -788,7 +788,7 @@ class Exporter:
             output.close()
         prog.done()
         env.logger.info('{} lines are exported from variant table {} {}'
-            .format(count, self.table, '' if failed_count == 0 else \
+            .format(count, encodeTableName(self.table), '' if failed_count == 0 else \
                 'with {} failed records'.format(failed_count)))
 
 
@@ -801,10 +801,10 @@ def exportArguments(parser):
     parser.add_argument('table', help='''A variant table whose variants will be exported.
         If parameter --samples is specified, only variants belong to one or more of the
         samples will be exported.''')
-    parser.add_argument('filename', nargs='?', help='''(deprecated) Name of output file.
-        Output will be written to the standard output if this parameter is left unspecified.
-        This parameter is deprecated and might be removed in a future version of
-        variant tools.''')
+    parser.add_argument('filename', nargs='?', help='''Deprecated, use --output instead.''')
+    parser.add_argument('-o', '--output', nargs='?', help='''Name of output file.
+        Output will be written to the standard output if this parameter is left
+        unspecified.''')
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Samples that will be exported, specified by conditions such as 'aff=1'
             and 'filename like "MG%%"'. Multiple samples could be exported to a
@@ -837,7 +837,13 @@ def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
-            exporter = Exporter(proj=proj, table=args.table, filename=args.filename,
+            if args.filename and args.output:
+                raise ValueError('Specifying output filename without --output is depredated.')
+            elif args.filename:
+                output = args.filename
+            else:
+                output = args.output
+            exporter = Exporter(proj=proj, table=args.table, filename=output,
                 samples=' AND '.join(['({})'.format(x) for x in args.samples]),
                 format=args.format, build=args.build, header=args.header,  
                 jobs=args.jobs, fmt_args=args.unknown_args)
