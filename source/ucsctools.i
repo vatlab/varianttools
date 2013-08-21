@@ -41,10 +41,14 @@ extern "C" {
 #include "hmmstats.h"
 #include "bigWig.h"
 #include "bigBed.h"
+// for tabix
 #include "bgzf.h"
 #include "tabix.h"
 #include "knetfile.h"
+// for vcf
 #include "vcf.h"
+// for bam file
+#include "bamFile.h"
 }
 %}
 
@@ -150,7 +154,37 @@ void showTrack(const std::string & track_file)
             }
         }
         vcfFileFree(&vcff);
-     } else if (isBigWig((char *)track_file.c_str())) {
+     } else if (endsWith((char *)track_file.c_str(), ".bam")) {
+        if (!bamFileExists((char *)track_file.c_str()))
+            return;
+        char * filename;
+        samfile_t * bamf = bamOpen((char *)track_file.c_str(), &filename);
+        if (bamf == NULL)
+            return;
+        // bam_init_header_hash(((samfile_t *)bamf)->header);
+        bam_index_t * idx = bam_index_load(filename);
+        if (idx == NULL)
+            return;
+        struct bamChromInfo * chrom = bamChromList(bamf);
+        printf("%-23s\n%s\n", "Header:", bamf->header->text);
+        printf("%-23s %d\n", "Chrom size:", slCount(chrom));
+        for (; chrom != NULL; chrom = chrom->next) {
+        	printf("    %-19s %u\n", chrom->name, chrom->size);
+        }
+        /* the following piece of code can get number of mapped and unmapped reads
+         * if we can include proper header file for khint_t etc
+        size_t i;
+        for (i = 0; i < idx->n; ++i) {
+                khint_t k;
+                khash_t(i) *h = idx->index[i];
+                k = kh_get(i, h, BAM_MAX_BIN);
+                if (k != kh_end(h))
+                        printf("\t%llu\t%llu", (long long)kh_val(h, k).list[1].u, (long long)kh_val(h, k).list[1].v);
+                else printf("\t0\t0");
+                putchar('\n');
+        }
+        */
+    } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
             return;

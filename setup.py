@@ -641,7 +641,7 @@ setup(name = "variant_tools",
             sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_UCSC_FILES,
             include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
             libraries = ['z', 'bz2'],
-            define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'),
+            define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)]
         ),
         Extension('variant_tools.cplinkio',
