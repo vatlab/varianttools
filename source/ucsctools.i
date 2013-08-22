@@ -124,14 +124,14 @@ void showTrack(const std::string & track_file)
         //
         struct vcfInfoDef * def = NULL;
         for (def = vcff->infoDefs; def != NULL; def = def->next) {
-            char * typestring = "";
+            std::string typestring = "";
             if (def->type == vcfInfoFlag)
                 typestring = " (INTEGER, flag)";
             else if (def->type == vcfInfoInteger)
                 typestring = " (INTEGER)";
             else if (def->type == vcfInfoFloat)
                 typestring = " (FLOAT)";
-            sprintf(buf, "info.%s%s", def->key, typestring);
+            sprintf(buf, "info.%s%s", def->key, typestring.c_str());
             printf("%-23s %s\n", buf, def->description);
         }
         printf("%-23s %s\n", "format (9)", "genotype format");
@@ -142,14 +142,14 @@ void showTrack(const std::string & track_file)
             // for all format fields
             struct vcfInfoDef * def = NULL;
             for (def = vcff->gtFormatDefs; def != NULL; def = def->next) {
-                char * typestring = "";
+                std::string typestring = "";
                 if (def->type == vcfInfoFlag)
                     typestring = " (INTEGER, flag)";
                 else if (def->type == vcfInfoInteger)
                     typestring = " (INTEGER)";
                 else if (def->type == vcfInfoFloat)
                 typestring = " (FLOAT)";
-                sprintf(buf, "%s.%s%s", vcff->genotypeIds[i], def->key, typestring);
+                sprintf(buf, "%s.%s%s", vcff->genotypeIds[i], def->key, typestring.c_str());
                 printf("%-23s %s for sample %s\n", buf, def->description, vcff->genotypeIds[i]);
             }
         }
@@ -254,12 +254,12 @@ void showTrack(const std::string & track_file)
             for (col = as->columnList; col != NULL; col = col->next, ++i)
             {
                 struct asTypeInfo * ltype = col->lowType;
-                char * typestring = "";
+                std::string typestring = "";
                 if (asTypesIsInt(ltype->type))
                     typestring = ", INTEGER";
                 else if (asTypesIsFloating(ltype->type))
                     typestring = ", FLOAT";
-                sprintf(buf, "%s (%lu%s)",  col->name, i, typestring);
+                sprintf(buf, "%s (%lu%s)",  col->name, i, typestring.c_str());
                 printf("%-23s %s\n", buf, wrap(col->comment, strlen(buf)).c_str());
             }
         }
