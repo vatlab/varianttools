@@ -2253,7 +2253,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         elif build in ['hg19', 'build37']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
         for k,v in ref_tokens.items():
-            query = re.sub(r'{}\s*\('.format(v), ' {}("{}", '.format(k, crrFile), query)
+            query = re.sub(r'{}\s*\('.format(v), " {}('{}', ".format(k, crrFile), query)
     if has_track_query:
         for k,v in track_tokens.items():
             if alt_build:

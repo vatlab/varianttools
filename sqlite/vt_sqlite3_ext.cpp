@@ -96,11 +96,21 @@ static void ref_sequence(
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[2]) == SQLITE_NULL) {
-		sqlite3_result_null(context);
+		sqlite3_result_error(context, "Wrong number of parameters.", -1);
 		return;
 	}
+	// auto passed, should be string
 	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
+	// need to check type
+	if (sqlite3_value_type(argv[1]) != SQLITE_TEXT) {
+		sqlite3_result_error(context, "A chromosome name is expected.", -1);
+		return;
+	}
 	std::string chr = std::string((char *)sqlite3_value_text(argv[1]));
+	if (sqlite3_value_type(argv[2]) != SQLITE_INTEGER) {
+		sqlite3_result_error(context, "A 1-based position of integer type is expected.", -1);
+		return;
+	}
 	int start = sqlite3_value_int(argv[2]);
 	int end = argc == 4 ? sqlite3_value_int(argv[3]) : 0;
 	//
