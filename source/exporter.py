@@ -30,6 +30,7 @@ import gzip
 import re
 import time
 import datetime
+from argparse import SUPPRESS
 from multiprocessing import Process, Pipe, Lock
 if sys.version_info.major == 2:
     from itertools import izip, repeat
@@ -801,7 +802,7 @@ def exportArguments(parser):
     parser.add_argument('table', help='''A variant table whose variants will be exported.
         If parameter --samples is specified, only variants belong to one or more of the
         samples will be exported.''')
-    parser.add_argument('filename', nargs='?', help='''Deprecated, use --output instead.''')
+    parser.add_argument('filename', nargs='?', help=SUPPRESS)
     parser.add_argument('-o', '--output', nargs='?', help='''Name of output file.
         Output will be written to the standard output if this parameter is left
         unspecified.''')
@@ -837,13 +838,9 @@ def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             proj.db.attach(proj.name + '_genotype')
-            if args.filename and args.output:
-                raise ValueError('Specifying output filename without --output is depredated.')
-            elif args.filename:
-                output = args.filename
-            else:
-                output = args.output
-            exporter = Exporter(proj=proj, table=args.table, filename=output,
+            if args.filename:
+                raise ValueError('Specifying output filename without --output is deprecated.')
+            exporter = Exporter(proj=proj, table=args.table, filename=args.output,
                 samples=' AND '.join(['({})'.format(x) for x in args.samples]),
                 format=args.format, build=args.build, header=args.header,  
                 jobs=args.jobs, fmt_args=args.unknown_args)

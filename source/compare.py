@@ -26,20 +26,13 @@
 
 import sys
 import re
+from argparse import SUPPRESS
 from .project import Project
 from .utils import ProgressBar, env, encodeTableName, decodeTableName
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='+', help='''variant tables to compare. Wildcard
         characters * and ? can be used to specify multiple tables.''')
-    parser.add_argument('--A_diff_B', metavar= 'TABLE',
-        help='''deprecated, use --difference instead.''')
-    parser.add_argument('--B_diff_A', metavar= 'TABLE',
-        help='''deprecated, use --difference instead.''')
-    parser.add_argument('--A_and_B', metavar= 'TABLE',
-        help='''deprecated, use --intersect instead.''')
-    parser.add_argument('--A_or_B', metavar= 'TABLE',
-        help='''deprecated, use --union instead.''')
     parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name
              is specified. An optional message can be added to describe the table.''')
@@ -50,30 +43,29 @@ def compareArguments(parser):
         help='''Save variants in the first, but not in the others (T1 - T2 - T3...) to TABLE
               if a name is specified. An optional message can be added to describe the table.''')
     parser.add_argument('-c', '--count', action='store_true',
-        help='''Output number of variants for specified option (e.g. --union -c).''')
+        help='''Output number of variants for specified option (e.g. --union -c). If no
+              comparison option is specified, print out number of variants that are
+              in only one table, in both tables, and in one of the tables.''')
+    parser.add_argument('--A_diff_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--B_diff_A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--A_and_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--A_or_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
 
 
-def compareTwoTables(proj, args):
-    # this is the old version of vtools compare, kept for compatibility reasons
-    #
-    # We can use a direct query to get diff/union/intersection of tables but we cannot
-    # display a progress bar during query. We therefore only use that faster method (3m38s
-    # instead of 2m33s) in the case of -v0.
-    direct_query = env.verbosity is not None and env.verbosity.startswith('0')
+def printDifference(proj, args):
     cur = proj.db.cursor()
     variant_A = set()
     variant_B = set()
     if len(args.tables) > 2:
         env.logger.warning('Only the first two specified tables will be compared for option --count.')
-    if args.count or not direct_query:
-        # read variants in tables[0]
-        env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
-        cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[0])))
-        variant_A = set([x[0] for x in cur.fetchall()])
-        # read variants in tables[1]
-        env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[1]), exact=False), args.tables[1]))
-        cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[1])))
-        variant_B = set([x[0] for x in cur.fetchall()])
+    # read variants in tables[0]
+    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
+    cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[0])))
+    variant_A = set([x[0] for x in cur.fetchall()])
+    # read variants in tables[1]
+    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[1]), exact=False), args.tables[1]))
+    cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[1])))
+    variant_B = set([x[0] for x in cur.fetchall()])
     #
     if args.count:
         env.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
@@ -82,41 +74,6 @@ def compareTwoTables(proj, args):
             len(variant_A & variant_B),
             len(variant_A | variant_B)
             ))
-    #
-    for var, opt, table, tables_A, table_B in [
-            (set() if args.A_diff_B is None else variant_A - variant_B, 'EXCEPT', args.A_diff_B, args.tables[0], args.tables[1]), 
-            (set() if args.B_diff_A is None else variant_B - variant_A, 'EXCEPT', args.B_diff_A, args.tables[1], args.tables[0]), 
-            (set() if args.A_and_B is None else variant_A & variant_B, 'INTERSECT', args.A_and_B, args.tables[0], args.tables[1]), 
-            (set() if args.A_or_B is None else variant_A | variant_B, 'UNION', args.A_or_B, args.tables[0], args.tables[1])]:
-        if table is None:
-            continue
-        if table == 'variant':
-            raise ValueError('Cannot overwrite the master variant table')
-        if '*' in table or '?' in table:
-            env.logger.warning('Use of wildcard character * or ? in table names is not recommended because such names can be expanded to include other tables in some commands.')
-        if proj.db.hasTable(encodeTableName(table)):
-            new_table = proj.db.backupTable(encodeTableName(table))
-            env.logger.warning('Existing table {} is renamed to {}.'.format(table, decodeTableName(new_table)))
-        proj.createVariantTable(encodeTableName(table))
-        if direct_query:
-            #proj.db.startProgress('Creating table {}'.format(table))
-            cur = proj.db.cursor()
-            query = 'INSERT INTO {table} SELECT variant_id FROM {table_A} {opt} SELECT variant_id FROM {table_B}'.format(opt=opt, table=encodeTableName(table),
-                table_A=encodeTableName(table_A), table_B=encodeTableName(table_B))
-            env.logger.debug(query)
-            cur.execute(query)
-            #proj.db.stopProgress()
-        else:
-            prog = ProgressBar('Writing to ' + table, len(var))
-            query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)
-            # sort var so that variant_id will be in order, which might
-            # improve database performance
-            for count,id in enumerate(sorted(var)):
-                cur.execute(query, (id,))
-                if count % 10000 == 0:
-                    prog.update(count)
-            prog.done()       
-        proj.db.commit()
 
 def compareMultipleTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
@@ -225,15 +182,13 @@ def compare(args):
             args.tables = tables
             if len(args.tables) == 1:
                 raise ValueError('Please specify at least two tables to compare.')
-            # this is the old behavior
+            # 
+            if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
+                raise ValueError('Options B_diff_A, A_diff_B, A_and_B and A_or_B are deprecated.')
             if args.intersection is not None or args.union is not None or args.difference is not None:
-                if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
-                    raise ValueError('Cannot mix deprecated and new parameters.')
                 compareMultipleTables(proj, args)
-            elif args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
-                compareTwoTables(proj, args)
             elif args.count:
-                compareTwoTables(proj, args)
+                printDifference(proj, args)
             else:
                 env.logger.warning('No action parameter is specified. Nothing to do.')
                 return
