@@ -125,6 +125,7 @@ prune boost_1_49_0/boost/xpressive
 #
 # ucsc tools
 recursive-include ucsc/tabix *.h *.c
+recursive-include ucsc/samtools *.h *.c
 recursive-include ucsc/lib *.h *.c
 recursive-include ucsc/inc *.h
 #
