@@ -112,8 +112,17 @@ static void ref_sequence(
 		return;
 	}
 	int start = sqlite3_value_int(argv[2]);
-	int end = argc == 4 ? sqlite3_value_int(argv[3]) : 0;
-	//
+	int end = 0;
+	
+	if (argc == 4) {
+		end = sqlite3_value_int(argv[3]);
+
+		if (start > end) {
+			sqlite3_result_error(context, "incorrect chromosomal range", -1);
+			return;
+		}
+	}
+		
 	// get reference genome file
 	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
 	cgatools::reference::CrrFile * cf = NULL;
