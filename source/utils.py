@@ -103,7 +103,7 @@ class RuntimeEnvironments(object):
             'verbosity': ('1', 'Default verbosity level (to the standard output) of the project. '
                 'This option can be set during vtools init where the verbosity level set by option'
                 ' --verbosity will be set as the project default.'),
-            'check_update': (True, 'Automatically check update of variant tools and resources.'),
+            # 'check_update': (True, 'Automatically check update of variant tools and resources.'),
             'sqlite_pragma': ('', 'pragmas for sqlite database that can be used to optimize the '
                 'performance of database operations.'),
             'import_num_of_readers': (2, 'variant tools by default uses two processes to read from '
@@ -145,7 +145,7 @@ class RuntimeEnvironments(object):
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
-        self._check_update = self.persistent_options['check_update'][0]
+        # self._check_update = self.persistent_options['check_update'][0]
         # default sqlite pragma
         self._sqlite_pragma = self.persistent_options['sqlite_pragma'][0]
         # number of processes used for reader under multi-processing mode
@@ -189,13 +189,13 @@ class RuntimeEnvironments(object):
     # 
     # attribute check_update
     #
-    def _set_check_update(self, v):
-        if v in ['1', True, 'T', 'True', 'Y', 'Yes']:
-            self._check_update = True
-        else:
-            self._check_update = False
+    #def _set_check_update(self, v):
+    #    if v in ['1', True, 'T', 'True', 'Y', 'Yes']:
+    #        self._check_update = True
+    #    else:
+    #        self._check_update = False
     #
-    check_update = property(lambda self: self._check_update, _set_check_update)
+    #check_update = property(lambda self: self._check_update, _set_check_update)
     #
     # attribute logfile_verbosity
     #
