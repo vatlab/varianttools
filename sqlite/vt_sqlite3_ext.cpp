@@ -1100,7 +1100,11 @@ static void track(
 				fi.name = std::string(name);
 			std::map<std::string, int>::iterator it = info.name_map.find(fi.name);
 			if (it == info.name_map.end()) {
-				sqlite3_result_error(context, "Unrecognized col name", -1);
+			    char buf[400];
+				sprintf(buf, "Unrecognized col name '%s', please check available field with command 'vtools show track %s'."
+					" You might also have used double quote (\") instead of single quote (') for string literal.",
+					fi.name.c_str(), track_file.c_str());
+				sqlite3_result_error(context, buf, -1);
 				return;
 			}
 			fi.column = it->second;
