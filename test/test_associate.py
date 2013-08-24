@@ -67,7 +67,7 @@ class TestAsso(ProcessTestCase):
         self.assertSucc('vtools associate -h')
         self.assertSucc('vtools associate variant filename --method LinRegBurden -h')
         self.assertSucc('vtools associate variant phen2 -m "LinRegBurden"')
-        self.assertSucc('vtools associate variant phen2 -m "LinRegBurden" -g chr')
+        self.assertSucc('vtools associate variant phen2 -m "LinRegBurden" -g chr --to_db utest --force')
         # regression methods
         self.assertSucc('vtools associate variant phen2 --covariate phen1 -m "LinRegBurden --alternative 2"')
         self.assertSucc('vtools associate variant phen2 --covariate phen1 phen3 -m "LinRegBurden" -g chr')
@@ -118,6 +118,14 @@ class TestAsso(ProcessTestCase):
         dir = os.getcwd()
         zip.extractall(dir)
         self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
+
+    def testRext(self):
+        'Test R extensions'
+        #
+        zip = ZipFile('proj/assoproj.zip')
+        dir = os.getcwd()
+        zip.extractall(dir)
+        self.assertSucc('vtools associate variant phen1 -m "SKAT --name SKAT disease -k IBS" -g chr')
 
 if __name__ == '__main__':
     unittest.main()

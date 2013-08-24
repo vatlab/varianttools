@@ -415,7 +415,8 @@ class RTest(ExternTest):
         # remember to replace dot by underscore in field names
         self.outconf = RConfig(self.Rscript).getvars()
         if not self.outconf:
-            self.fields.append(Field(name='name', index=None, type="VARCHAR(255)", adj=None, comment=''))
+            self.fields.append(Field(name='name', index=None, type="VARCHAR(255)",
+                                     adj=None, fmt=None, comment=''))
             self.outvars = []
             return
         #
@@ -444,6 +445,7 @@ class RTest(ExternTest):
                                  index=None,
                                  type='{0}'.format(tp),
                                  adj=None,
+                                 fmt=None,
                                  comment='{0}'.format(comment)))
         self.outvars = [(x, y) for x, y in zip(flds, tps)]
         return
@@ -584,8 +586,8 @@ class RTest(ExternTest):
                 return str
         #
         @timectrl(tmout, 'time expired')
-        def timed_command(cmd, instream = None, msg = '', upon_succ=None):
-            return runCommand(cmd, instream, msg, upon_succ)
+        def timed_command(cmd, instream = None, msg = ''):
+            return runCommand(cmd, instream, msg)
         # 
         self.loadData()
         # write data and R script to log file for this group

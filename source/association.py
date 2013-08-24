@@ -379,7 +379,7 @@ class AssociationTestManager:
         #  variant_id
         #  groups (e.g. chr, pos)
         #  variant_info
-        add_chrpos = True if (self.num_extern_tests > 0 and sorted(group_by) != ['variant.chr', 'variant.pos']) else False 
+        add_chrpos = True if (self.num_extern_tests > 0 and len([x for x in group_by if x in ['variant.chr', 'variant.pos', 'chr', 'pos']]) == 0) else False 
         create_query = '''
             CREATE TABLE __asso_tmp (
               variant_id INT NOT NULL, _ignored INT, 
