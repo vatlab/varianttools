@@ -3848,7 +3848,10 @@ def show(args):
                 elif len(args.items) > 1:
                     raise ValueError('Only one annotation database is allowed.')
                 try:
-                    annoDB = [x for x in proj.annoDB if x.name.lower() == args.items[0].lower()][0]
+                    dbName = args.items[0].lower()
+                    if dbName.endswith('.db'):
+                        dbName = dbName[:-3]
+                    annoDB = [x for x in proj.annoDB if x.name.lower() == dbName][0]
                 except Exception as e:
                     raise IndexError('Database {} is not currently used in the project.'
                         .format(args.items[0]))
