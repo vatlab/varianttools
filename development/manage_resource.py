@@ -28,7 +28,7 @@ import os
 import sys
 import argparse
 import time
-from variant_tools.utils import ResourceManager, env
+from variant_tools.utils import ResourceManager, env, calculateMD5
 import base64
 from ftplib import FTP
 
@@ -175,6 +175,14 @@ if __name__ == '__main__':
         # get information about file
         for filename in args.upload:
             rel_path = os.path.relpath(filename, resource_dir)
+            if rel_path in manager.manifest:
+                filesize = os.path.getsize(filename)
+                md5 = calculateMD5(filename, partial=True)
+                refGenome = manager.getRefGenome(filename)
+                comment = manager.getComment(filename).replace('\n', ' ').replace('\t', ' ').strip() 
+                if (filesize, md5, refGenome, comment) == manager.manifest[rel_path]:
+                    env.logger.info('Ignoring identical file {}'.format(rel_path))
+                    continue
             manager.addResource(filename)
             uploadFile(filename, rel_path, username, password)
         manager.writeManifest('MANIFEST.tmp')
