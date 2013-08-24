@@ -92,6 +92,8 @@ def generateSWIGWrappers():
         '-w-509', '-outdir', 'source']
     WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
     WRAPPER_PY_FILE = 'source/assoTests_{}.py'
+    UCSCTOOLS_WRAPPER_CPP_FILE = 'source/ucsctools_wrap_{}.cpp'
+    UCSCTOOLS_WRAPPER_PY_FILE = 'source/ucsctools_{}.py'
     CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
     CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
     SQLITE_FOLDER = 'sqlite/{}'
@@ -119,6 +121,12 @@ def generateSWIGWrappers():
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(ver))
+            #
+            print('Generating {} wrapper files for module ucsctools ...'.format(ver))
+            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(ver), 'source/ucsctools.i'], shell=False, stdout=fnull)
+            if ret != 0:
+                sys.exit('Failed to generate wrapper file for ucsctools.')
+            os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(ver))
              
 
 def buildVariantTools(extra_args):
