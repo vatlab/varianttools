@@ -66,6 +66,10 @@ include source/cgatools_py2.py
 include source/cgatools_py3.py
 include source/cgatools_wrap_py2.cpp
 include source/cgatools_wrap_py3.cpp
+include source/ucsctools_py2.py
+include source/ucsctools_py3.py
+include source/ucsctools_wrap_py2.cpp
+include source/ucsctools_wrap_py3.cpp
 include source/vt_sqlite3_py2.py
 include source/vt_sqlite3_py3.py
 #
