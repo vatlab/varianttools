@@ -1071,7 +1071,7 @@ static void track(
 			//
 			struct bbiChromInfo * chrom = bbiChromList((bbiFile *)info.file);
 			info.with_leading_chr = startsWith("chr", chrom->name);
-		} else {
+		} else if (bigBedFileCheckSigs((char *)track_file.c_str())) {
 			info.file_type = BIGBED_FILE;
 			info.file = (void *)bigBedFileOpen((char *)track_file.c_str());
 			if (info.file == NULL) {
@@ -1091,6 +1091,11 @@ static void track(
 			//
 			struct bbiChromInfo * chrom = bbiChromList((bbiFile *)info.file);
 			info.with_leading_chr = startsWith("chr", chrom->name);
+		} else {
+			sqlite3_result_error(context, "Unknown track file type. Only local or remote tabix-indexed "
+				" vcf files with extension .vcf.gz, indexed BAM files, bigWig and bigBed files are "
+				"supported.", -1);
+			return;
 		}
 		trackFileMap[track_file] = info;
 		// info.print();

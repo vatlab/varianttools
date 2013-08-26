@@ -223,7 +223,7 @@ void showTrack(const std::string & track_file)
         printf("%-23s %s\n", "chromEnd (3, INTEGER)", "end position (1-based)");
         printf("%-23s %s\n", "value (4, FLOAT)", "value");
         bbiFileClose(&bwf);
-     } else {
+     } else if (bigBedFileCheckSigs((char *)track_file.c_str())) {
         bbiFile * bbi = bigBedFileOpen((char *)track_file.c_str());
         if (bbi == NULL)
             return;
@@ -264,7 +264,12 @@ void showTrack(const std::string & track_file)
             }
         }
         bbiFileClose(&bbi);
-    }
+    } else {
+		sqlite3_result_error(context, "Unknown track file type. Only local or remote tabix-indexed "
+			" vcf files with extension .vcf.gz, indexed BAM files, bigWig and bigBed files are "
+			"supported.", -1);
+		return;
+	}
 }
 %} 
 
