@@ -789,7 +789,7 @@ class Exporter:
             output.close()
         prog.done()
         env.logger.info('{} lines are exported from variant table {} {}'
-            .format(count, encodeTableName(self.table), '' if failed_count == 0 else \
+            .format(count, decodeTableName(self.table), '' if failed_count == 0 else \
                 'with {} failed records'.format(failed_count)))
 
 
