@@ -108,7 +108,7 @@ class MetaAnalysis:
         linker = [(x, 'INTEGER') if x.endswith('pos') else (x, 'VARCHAR(20)') for x in linker]
         fields = [(x, 'FLOAT') if not x.startswith('sample_size') else (x, 'INTEGER') for x in fields]
         for item in linker + fields:
-            self.fields.append(Field(name=item[0], index=None, type=item[1], adj=None, comment=''))
+            self.fields.append(Field(name=item[0], index=None, type=item[1], adj=None, fmt=None, comment=''))
         env.sqlite_pragma = 'synchronous=OFF,journal_mode=MEMORY'
         self.writer = AnnoDBWriter(
                 db_name, self.fields,
