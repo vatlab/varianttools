@@ -100,12 +100,12 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
                             'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
         out = output2list('vtools output variant maxGQv minGQv meanGQv')
-        self.assertEqual(out[0], 'NA\tNA\tNA')
+        self.assertEqual(out[0], '.\t.\t.')
         self.assertTrue(out[3].startswith('100\t15\t69.3333'))
         self.assertTrue(out[4].startswith('6\t3\t4.0'))
         self.assertTrue(out[5].startswith('4\t3\t3.33333'))
         self.assertSucc('vtools update variant --from_stat "total_dp=sum(GD)"')
-        self.assertEqual(output2list('vtools output variant total_dp'), ['NA', 'NA', 'NA', '60', '7', '4'])
+        self.assertEqual(output2list('vtools output variant total_dp'), ['.', '.', '.', '60', '7', '4'])
         # ffilter out variants having GQ less than 4,
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')

@@ -117,7 +117,7 @@ class TestExport(ProcessTestCase):
         'Test command export in vcf format'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # test basic vcf output
-        self.assertSucc('vtools export variant my.vcf')
+        self.assertSucc('vtools export variant --output my.vcf')
         variants = output2list('vtools output variant chr pos ref alt')
         with open('my.vcf') as infile:
             exported = infile.readlines()
@@ -134,7 +134,6 @@ class TestExport(ProcessTestCase):
             # test output with samples
             # FIXME phase information is not properly handled
             self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT')
-            self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT --phase_sep "|"')
             self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --var_info id filter info --geno_info DP_geno')
             self.assertSucc('vtools export variant --format vcf --id id --filter filter --info info')
             self.assertSucc('vtools export variant --format vcf --id id --filter filter --info info --geno_info DP_geno --samples 1 --format_string GT:DP')
@@ -154,7 +153,7 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format vcf --pos pos --ref ref --alt alt')
         self.assertFail('vtools export variant --header CHROM POS ID REF ALT QUAL FILTER INFO')
         self.assertSucc('vtools export variant --format vcf --header CHROM POS ID REF ALT QUAL FILTER INFO')
-        self.assertSucc('vtools export variant my.vcf --header CHROM POS ID REF ALT QUAL FILTER INFO')
+        self.assertSucc('vtools export variant -o  my.vcf --header CHROM POS ID REF ALT QUAL FILTER INFO')
 
         #if you assign the postion to the annotation database
         #the default is output the chr, pos, ref and alt from the variant table
@@ -163,7 +162,7 @@ class TestExport(ProcessTestCase):
         #those tests are passed. Please check the fields you want to assign to each suboption, otherwise the output will be messy.
         self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref ref')
         self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref dbSNP.refUCSC --alt dbSNP.alt ')
-        self.assertSucc('vtools export variant my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func')
+        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func')
         self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func --samples 1 --format_string GT:DP')
 
         #output in alternative reference genome
@@ -192,11 +191,11 @@ class TestExport(ProcessTestCase):
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
         self.assertSucc('vtools update variant --from_file vcf/SAMP3_complex_variants.vcf --var_info raw_pos raw_ref raw_alt') 
         self.assertSucc('vtools output variant chr pos ref alt raw_pos raw_ref raw_alt')
-        self.assertSucc('vtools export variant indel.vcf --pos raw_pos --ref raw_ref --alt raw_alt')
+        self.assertSucc('vtools export variant -o indel.vcf --pos raw_pos --ref raw_ref --alt raw_alt')
         #export indel to the alternative genome
         runCmd('vtools liftover hg19')
         self.assertSucc('vtools update variant --from_file vcf/SAMP3_complex_variants.vcf --var_info upstream')
-        self.assertSucc('vtools export variant indel.vcf --pos \'pos-length(upstream)\' --ref raw_ref --alt raw_alt  --build hg19')
+        self.assertSucc('vtools export variant -o indel.vcf --pos \'pos-length(upstream)\' --ref raw_ref --alt raw_alt  --build hg19')
 
     def testExportANNOVAR(self):
         'Test command export in annovar input format'
