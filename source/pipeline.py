@@ -1055,7 +1055,7 @@ class Pipeline:
                     try:
                         FUNC = eval('lambda {}'.format(piece[2:-1]))
                     except Exception as e:
-                        env.logger.warning('Failed to intepret {} as a pipeline variable: {}'
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
                             .format(piece, e))
                         continue
                     KEY = KEY.split(':', 1)[0].strip()
@@ -1068,7 +1068,7 @@ class Pipeline:
                             if KEY in VARS:
                                 VAL = VARS[KEY]
                             else:
-                                env.logger.warning('Failed to intepret {} as a pipeline variable: key "{}" not found'
+                                env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                                     .format(piece, KEY))
                                 continue
                             pieces[idx] = self.var_expr(FUNC(VAL))
@@ -1081,12 +1081,12 @@ class Pipeline:
                                 if KEY in VARS:
                                     VAL.append(VARS[KEY])
                                 else:
-                                    env.logger.warning('Failed to intepret {} as a pipeline variable: key "{}" not found'
+                                    env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                                         .format(piece, KEY))
                                     continue
                             pieces[idx] = self.var_expr(FUNC(*VAL))
                     except Exception as e:
-                        env.logger.warning('Failed to intepret {} as a pipeline variable: {}'
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
                             .format(piece, e))
                         continue
                 else:
@@ -1094,7 +1094,7 @@ class Pipeline:
                     if KEY in VARS:
                         pieces[idx] = self.var_expr(VARS[KEY])
                     else:
-                        env.logger.warning('Failed to intepret {} as a pipeline variable: key "{}" not found'
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                             .format(piece, KEY))
                         continue
         # now, join the pieces together, but remove all newlines
