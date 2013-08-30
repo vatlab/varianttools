@@ -35,17 +35,31 @@ def compareArguments(parser):
         characters * and ? can be used to specify multiple tables.''')
     parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name
-             is specified. An optional message can be added to describe the table.''')
+             is specified. An optional message can be added to describe the table. This
+             option produces identical results for all comparison types.''')
     parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', 
         help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name
-             is specified. An optional message can be added to describe the table.''')
-    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*', 
+             is specified. An optional message can be added to describe the table. For
+             site and genotype comparisions, this option yields variants that share
+             location or genotypes across variant tables.''')
+    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*',
         help='''Save variants in the first, but not in the others (T1 - T2 - T3...) to TABLE
-              if a name is specified. An optional message can be added to describe the table.''')
+            if a name is specified. An optional message can be added to describe the table.
+            For site and genotype comparisons, this option yields variants with site or
+            genotype at the first table but not others.''')
     parser.add_argument('-c', '--count', action='store_true',
-        help='''Output number of variants for specified option (e.g. --union -c). If no
-              comparison option is specified, print out number of variants that are
-              in only one table, in both tables, and in one of the tables.''')
+        help='''Output number of variants for specified option (e.g. --union -c),
+            which might differ for different types of comparison.''')
+    parser.add_argument('--type', choices=['variant', 'site', 'genotype'],
+        default='variant', help='''Compare variants (chr, pos, ref, alt), site 
+            (chr, pos), or genotype (chr, pos, ref, alt, GT for a sample) for
+            all operations, although the results are always variants (at resulting
+            sites or with resulting genotypes). The default comparison type is
+            variant, or genotype if option --samples is specified.''')
+    parser.add_argument('--samples', nargs='*',
+        help='''A list of sample names corresponding to the variant tables to
+            compare. An error will be raised if a sample name matches multiple
+            samples.''')
     parser.add_argument('--A_diff_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
     parser.add_argument('--B_diff_A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
     parser.add_argument('--A_and_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
