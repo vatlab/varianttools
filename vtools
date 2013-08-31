@@ -156,8 +156,9 @@ if __name__ == '__main__':
     #
     # command compare
     parser = subparsers.add_parser('compare',
-        help='''Compare two variant tables, count or output 
-            intersect and difference to other tables''')
+        help='''Compare sites, variants, or genotypes of variants in two or more
+            variant tables, count or output union, intersect or difference to
+            another variant table''')
     compare.compareArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=compare.compare)

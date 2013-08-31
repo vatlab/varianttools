@@ -32,41 +32,51 @@ from .utils import ProgressBar, env, encodeTableName, decodeTableName
 from collections import defaultdict
 
 def compareArguments(parser):
-    parser.add_argument('tables', nargs='+', help='''variant tables to compare. Wildcard
-        characters * and ? can be used to specify multiple tables. A table name
-        will be automatically repeated for the comparison of genotype of
-        multiple samples.''')
+    parser.add_argument('tables', nargs='+',
+        help='''variant tables to compare. Wildcard characters * and ? can be 
+            used to specify multiple tables. A table name will be automatically
+            repeated for the comparison of genotype of multiple samples if only
+            one table is specified.''')
     parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
-        help='''Save variants in any of the tables (T1 | T2 | T3 ...) to TABLE if a name
-             is specified. An optional message can be added to describe the table. This
-             option produces identical results for site and variant comparisons but
-             might produce less variants because of missing genotypes of samples.''')
+        help='''Save variants with TYPE in the TYPE of any of the tables (T1 |
+            T2 | T3 ...) to TABLE if a name is specified. An optional message
+            can be added to describe the table. ''')
     parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', 
-        help='''Save variants in all the tables (T1 & T2 & T3 ...) to TABLE if a name
-             is specified. An optional message can be added to describe the table. For
-             site and genotype comparisions, this option yields variants that share
-             location or genotypes across variant tables.''')
+        help='''Save variants with TYPE in the TYPE of all the tables (T1 & T2 
+            & T3 ...) to TABLE if a name is specified. An optional message can 
+            be added to describe the table.''')
     parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*',
-        help='''Save variants in the first, but not in the others (T1 - T2 - T3...) to TABLE
-            if a name is specified. An optional message can be added to describe the table.
-            For site and genotype comparisons, this option yields variants with site or
-            genotype at the first table but not others.''')
+        help='''Save variants with TYPE in the TYPE of the first, but not in the
+            TYPE of others (T1 - T2 - T3...) to TABLE if a name is specified.
+            An optional message can be added to describe the table.''')
     parser.add_argument('-c', '--count', action='store_true',
-        help='''Output number of variants for specified option (e.g. --union -c),
-            which might differ for different types of comparison.''')
+        help='''Output the number of variants for specified option (e.g. --union
+            -c) without writing the variants to a table.''')
     parser.add_argument('--type', choices=['variant', 'site', 'genotype'],
-        default='variant', help='''Compare variants (chr, pos, ref, alt), site 
-            (chr, pos), or genotype (chr, pos, ref, alt, GT for a sample) for
-            all operations, although the results are always variants in both
-            sets that match specified condition (e.g. share sites or genotypes)
-            The results of genotype comparisons are affected by runtime option
-            treat_missing_as_wildtype because an item (chr, pos, ref, alt, NULL)
-            will be excluded if treat_missing_as_wildtype is set to false (default),
-            and as (chr, pos, ref, alt, 0) otherwise. The default comparison type
-            is variant, or genotype if option --samples is specified.''')
+        help='''Compare variants (chr, pos, ref, alt), site (chr, pos), or
+            or genotype (chr, pos, ref, alt, GT for a specified sample) of 
+            variants. The results are variants from all input tables that match
+            specified condition. The default comparison TYPE compares variants
+            in input variant tables. For the comparison of sites, the position
+            of all variants are collected and compared, and variants (in all tables)
+            with site in resulting set of sites are returned. For the comparison
+            of genotypes, the genotypes of specified samples for all variants
+            (see option --samples) are collected and compared, and variants
+            with genotype in resulting set of genotypes are returned. The results
+            of genotype comparisons are affected by runtime option 
+            treat_missing_as_wildtype because items with missing genotype (chr,
+            pos, ref, alt, NULL) are excluded if treat_missing_as_wildtype is 
+            false (default), and are treated as (chr, pos, ref, alt, 0) otherwise.
+            Because of the way variants are generated, intersection operations 
+            of site comparison might produce more variants than the first table
+            (because distinct variants from other tables might returned if they
+            share locations with variants in the first table), and union
+            operation of genotype comparison might produce fewer variants (because
+            of missing genotypes). The default comparison type is variant, or 
+            genotype if option --samples is specified.''')
     parser.add_argument('--samples', nargs='*',
         help='''A list of sample names corresponding to the variant tables to
-            compare. An error will be raised if a sample name matches multiple
+            compare. An error will be raised if a sample name matches no or multiple
             samples or if a sample does not have any genotype.''')
     parser.add_argument('--A_diff_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
     parser.add_argument('--B_diff_A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
@@ -74,71 +84,99 @@ def compareArguments(parser):
     parser.add_argument('--A_or_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
 
 
-def printDifference(proj, args):
+def countVariantDifference(proj, args):
     cur = proj.db.cursor()
-    variant_A = set()
-    variant_B = set()
+    variants = []
     if len(args.tables) > 2:
         env.logger.warning('Only the first two specified tables will be compared for option --count.')
-    # read variants in tables[0]
-    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
-    cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[0])))
-    variant_A = set([x[0] for x in cur.fetchall()])
-    # read variants in tables[1]
-    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[1]), exact=False), args.tables[1]))
-    cur.execute('SELECT variant_id from {};'.format(encodeTableName(args.tables[1])))
-    variant_B = set([x[0] for x in cur.fetchall()])
+    for table in args.tables[:2]:
+        # read variants in tables[0]
+        env.logger.info('Reading approximately {:,} variants in {}...'
+            .format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
+        cur.execute('SELECT variant_id from {};'.format(encodeTableName(table)))
+        variants.append(set([x[0] for x in cur.fetchall()]))
     #
-    env.logger.info('Output number of variants in A but not B, B but not A, A and B, and A or B')
-    print('{}\t{}\t{}\t{}'.format(len(variant_A - variant_B), 
-        len(variant_B - variant_A),
-        len(variant_A & variant_B),
-        len(variant_A | variant_B)
+    env.logger.info('Number of variants in A but not B, B but not A, A and B, and A or B')
+    print('{}\t{}\t{}\t{}'.format(
+        len(variants[0] - variants[1]), 
+        len(variants[1] - variants[0]),
+        len(variants[0] & variants[1]),
+        len(variants[0] | variants[1])
         ))
 
-def printSiteDifference(proj, args):
+def countSiteDifference(proj, args):
     cur = proj.db.cursor()
-    variant_A = defaultdict(set)
-    variant_B = defaultdict(set)
     if len(args.tables) > 2:
         env.logger.warning('Only the first two specified tables will be compared for option --count.')
-    # read variants in tables[0]
-    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[0]), exact=False), args.tables[0]))
-    if args.tables[0] == 'variant':
-        cur.execute('SELECT variant_id, chr, pos FROM {};'.format(encodeTableName(args.tables[0])))
-    else:
-        cur.execute('SELECT {0}.variant_id, variant.chr, variant.pos '
-            'FROM {0} LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id'
-            .format(encodeTableName(args.tables[0])))
-    all_variants = set()
-    for id, chr, pos in cur:
-        variant_A[(chr, pos)].add(id)
-        all_variants.add(id)
-    # read variants in tables[1]
-    env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(args.tables[1]), exact=False), args.tables[1]))
-    if args.tables[0] == 'variant':
-        cur.execute('SELECT chr, pos FROM {};'.format(encodeTableName(args.tables[1])))
-    else:
-        cur.execute('SELECT {0}.variant_id, variant.chr, variant.pos '
-            'FROM {0} LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id'
-            .format(encodeTableName(args.tables[1])))
-    for id, chr, pos in cur:
-        variant_B[(chr, pos)].add(id)
-        all_variants.add(id)
     #
-    env.logger.info('Output number of variants in both tables with locations in A only, B only, in both A and B, and in either A or B')
+    all_variants = set()
+    sites = []
+    for table in args.tables:
+        s = defaultdict(set)
+        env.logger.info('Reading locations of approximately {:,} variants in {}...'
+            .format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
+        if table == 'variant':
+            cur.execute('SELECT variant_id, chr, pos FROM {};'.format(encodeTableName(table)))
+        else:
+            cur.execute('SELECT {0}.variant_id, variant.chr, variant.pos '
+                'FROM {0} LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id'
+                .format(encodeTableName(table)))
+        for id, chr, pos in cur:
+            s[(chr, pos)].add(id)
+            all_variants.add(id)
+        env.logger.debug('There are {} unique sites in table {}'
+            .format(len(s), table))
+        sites.append(s)
+    #
+    env.logger.info('Number of variants in both tables with locations in '
+        'A only, B only, in A and B, and in A or B')
     print('{}\t{}\t{}\t{}'.format(
         # variants in A, with location not in B
-        sum([len(y) for x,y in variant_A.items() if x not in variant_B]),
+        sum([len(y) for x,y in sites[0].items() if x not in sites[1]]),
         # variants in B, with location not in A
-        sum([len(y) for x,y in variant_B.items() if x not in variant_A]),
+        sum([len(y) for x,y in sites[1].items() if x not in sites[0]]),
         # variants with location in both A & B
-        sum([len(y | variant_B[x]) for x,y in variant_A.items() if x in variant_B]),
+        sum([len(y | sites[1][x]) for x,y in sites[0].items() if x in sites[1]]),
         # variants with location in either A or B
         len(all_variants)
     ))
 
-def compareMultipleTables(proj, args):
+
+def countGenotypeDifference(proj, args):
+    cur = proj.db.cursor()
+    geno = []
+    NULL_to_0 = env.treat_missing_as_wildtype
+    if len(args.tables) > 2:
+        env.logger.warning('Only the first two specified tables will be compared for option --count.')
+    # read variants in tables[0]
+    for table, sample_name, sample_ID in zip(args.tables, args.samples, args.sample_IDs):
+        g = set()
+        env.logger.info('Reading genotype of sample {} of approximately {:,} variants in {}...'
+            .format(sample_name, proj.db.numOfRows(encodeTableName(table),
+                exact=False), table))
+        cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+            '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                .format(encodeTableName(table), proj.name, sample_ID))
+        for id, GT in cur:
+            if GT is None:
+                if NULL_to_0:
+                    g.add((id, 0))
+            else:
+                g.add((id, GT))
+        geno.append(g)
+        env.logger.debug('There are {} genotypes with variants in table {} in sample {}'
+            .format(len(g), table, sample_name))
+    #
+    env.logger.info('Number of genotypes in A only, B only, in A and B, and in A or B')
+    print('{}\t{}\t{}\t{}'.format(
+        len(set([x[0] for x in (geno[0] - geno[1])])),
+        len(set([x[0] for x in (geno[1] - geno[0])])),
+        len(set([x[0] for x in (geno[0] & geno[1])])),
+        len(set([x[0] for x in (geno[0] | geno[1])]))
+    ))
+
+
+def compareTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
     # display a progress bar during query. We therefore only use that faster method (3m38s
     # instead of 2m33s) in the case of -v0.
@@ -151,38 +189,115 @@ def compareMultipleTables(proj, args):
     if not args.count and (args.difference == [] or args.union == [] or args.intersection == []):
         raise ValueError('Please specify either a table to output variants, or --count')
     #
-    cur = proj.db.cursor()
-    variants = []
-    for table in args.tables:
-        # read variants in tables[0]
-        env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
-        cur.execute('SELECT variant_id from {};'.format(encodeTableName(table)))
-        variants.append(set([x[0] for x in cur.fetchall()]))
-    #
     var_diff = set()
     var_union = set()
     var_intersect = set()
-    if args.difference is not None:
-        var_diff = variants[0]
-        for var in variants[1:]:
-           var_diff = var_diff - var 
-    if args.union is not None:
-        var_union = variants[0]
-        for var in variants[1:]:
-           var_union = var_union | var 
-    if args.intersection is not None:
-        var_intersect = variants[0]
-        for var in variants[1:]:
-           var_intersect = var_intersect & var 
-
-    # count
-    if args.count:
+    cur = proj.db.cursor()
+    if args.type in [None, 'variant']:
+        variants = []
+        for table in args.tables:
+            # read variants in tables[0]
+            env.logger.info('Reading {:,} variants in {}...'.format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
+            cur.execute('SELECT variant_id from {};'.format(encodeTableName(table)))
+            variants.append(set([x[0] for x in cur.fetchall()]))
+        #
         if args.difference is not None:
-            print(len(var_diff))
-        elif args.union is not None:
-            print(len(var_union))
-        elif args.intersection is not None:
-            print(len(var_intersect))
+            var_diff = variants[0]
+            for var in variants[1:]:
+               var_diff -= var 
+        if args.union is not None:
+            var_union = variants[0]
+            for var in variants[1:]:
+               var_union |=  var 
+        if args.intersection is not None:
+            var_intersect = variants[0]
+            for var in variants[1:]:
+               var_intersect &= var 
+    elif args.type == 'site':
+        sites = []
+        record_site = args.intersection is not None or args.difference is not None
+        record_all = args.union is not None
+        for table in args.tables:
+            # read sites in tables[0]
+            env.logger.info('Reading locations of approximately {:,} sites in {}...'
+                .format(proj.db.numOfRows(encodeTableName(table), exact=False), table))
+            if table == 'variant':
+                cur.execute('SELECT variant_id, chr, pos FROM {};'.format(encodeTableName(table)))
+            else:
+                cur.execute('SELECT {0}.variant_id, variant.chr, variant.pos '
+                    'FROM {0} LEFT OUTER JOIN variant ON {0}.variant_id = variant.variant_id'
+                .format(encodeTableName(table)))
+            #
+            v = defaultdict(set)
+            for id, chr, pos in cur:
+                if record_site:
+                    v[(chr, pos)].add(id)
+                if record_all:
+                    var_union.add(id)
+            if record_site:
+                sites.append(v)
+                env.logger.debug('There are {} unique sites in table {}'
+                    .format(len(v), table))
+        #
+        if args.difference is not None:
+            site_diff = set(sites[0].keys())
+            for var in sites[1:]:
+               site_diff -= set(var.keys())
+            env.logger.debug('There are {} unique sites in table {} only'
+                .format(len(site_diff), args.tables[0]))
+            for k in site_diff:
+                var_diff |= sites[0][k]
+        if args.intersection is not None:
+            site_intersect = set(sites[0].keys())
+            for var in sites[1:]:
+               site_intersect &= set(var.keys())
+            env.logger.debug('There are {} unique sites in all tables'
+                .format(len(site_intersect)))
+            for k in site_intersect:
+                for var in sites:
+                    var_intersect |= var[k]
+    else:
+        # genotype
+        geno = []
+        NULL_to_0 = env.treat_missing_as_wildtype
+        for table, sample, id in zip(args.tables, args.samples, args.sample_IDs):
+            # read geno in tables[0]
+            env.logger.info('Reading genotypes of sample {} of approximately {:,} geno in {}...'
+                .format(sample, proj.db.numOfRows(encodeTableName(table), exact=False), table))
+            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                    .format(encodeTableName(table), proj.name, id))
+            #
+            v = set()
+            for id, GT in cur:
+                if GT is None:
+                    if NULL_to_0:
+                        v.add((id, 0))
+                else:
+                    v.add((id, GT))
+            geno.append(v)
+        #
+        if args.difference is not None:
+            geno_diff = geno[0]
+            for g in geno[1:]:
+               geno_diff -= g
+            env.logger.debug('There are {} genotypes in table {} only'
+                .format(len(geno_diff), args.tables[0]))
+            var_diff = set([x[0] for x in geno_diff])
+        if args.union is not None:
+            geno_union = geno[0]
+            for g in geno[1:]:
+               geno_union |= g 
+            env.logger.debug('There are a total of {} genotypes'
+                .format(len(geno_union)))
+            var_union = set([x[0] for x in geno_union])
+        if args.intersection is not None:
+            geno_intersect = geno[0]
+            for g in geno[1:]:
+               geno_intersect &= g
+            env.logger.debug('There are {} unique genotypes in all tables'
+                .format(len(geno_intersect)))
+            var_intersect = set([x[0] for x in geno_intersect])
     #
     for var, table_with_desc in [
             (var_intersect, args.intersection),
@@ -217,6 +332,16 @@ def compareMultipleTables(proj, args):
         proj.describeTable(encodeTableName(table), desc, True, True)
         prog.done()       
         proj.db.commit()
+    # count
+    if args.count:
+        if args.difference is not None:
+            print(len(var_diff))
+        elif args.union is not None:
+            print(len(var_union))
+        elif args.intersection is not None:
+            print(len(var_intersect))
+
+    
 
 def compare(args):
     try:
@@ -246,6 +371,8 @@ def compare(args):
             #
             # type of comparison
             if args.samples:
+                if args.type is not None and args.type != 'genotype':
+                    raise ValueError('Cannot specify samples for non-genotype comparisons.')
                 args.type = 'genotype'
                 if len(args.samples) == 1:
                     raise ValueError('Please specify more than one sample to be compared.')
@@ -257,27 +384,31 @@ def compare(args):
                 # check sample names
                 proj.db.attach(proj.name + '_genotype')
                 args.sample_IDs = []
-                for name in args.tables:
+                for name in args.samples:
                     IDs = proj.selectSampleByPhenotype("sample_name = '{}'".format(name))
                     if len(IDs) == 0:
                         raise ValueError("No sample with name '{}' is identified.".format(name))
                     elif len(IDs) > 1:
                         raise ValueError("More than one sample with name '{}' is identified.".format(name))
+                    if not 'GT' in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, IDs[0])):
+                        raise ValueError('Sample {} does not have any genotype.'.format(name))
                     args.sample_IDs.append(IDs[0])
+            elif args.type == 'genotype':
+                raise ValueError('Please specify samples to be compared for genotype comparison.')
             if len(args.tables) == 1:
                 raise ValueError('Please specify at least two tables to compare.')
             # 
             if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
                 raise ValueError('Options B_diff_A, A_diff_B, A_and_B and A_or_B are deprecated.')
             if args.intersection is not None or args.union is not None or args.difference is not None:
-                compareMultipleTables(proj, args)
+                compareTables(proj, args)
             elif args.count:
-                if args.type == 'variant':
-                    printDifference(proj, args)
+                if args.type in [None, 'variant']:
+                    countVariantDifference(proj, args)
                 elif args.type == 'site':
-                    printSiteDifference(proj, args)
+                    countSiteDifference(proj, args)
                 elif args.type == 'genotype':
-                    printGenotypeDifference(proj, args)
+                    countGenotypeDifference(proj, args)
             else:
                 env.logger.warning('No action parameter is specified. Nothing to do.')
                 return
