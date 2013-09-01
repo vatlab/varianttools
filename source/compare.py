@@ -52,9 +52,9 @@ def compareArguments(parser):
     parser.add_argument('-c', '--count', action='store_true',
         help='''Output the number of variants for specified option (e.g. --union
             -c) without writing the variants to a table.''')
-    parser.add_argument('--type', choices=['variant', 'site', 'genotype'],
+    parser.add_argument('--mode', choices=['variant', 'site', 'genotype'],
         help='''Compare variants (chr, pos, ref, alt), site (chr, pos), or
-            or genotype (chr, pos, ref, alt, GT for a specified sample) of 
+            genotype (chr, pos, ref, alt, GT for a specified sample) of 
             variants. The results are variants from all input tables that match
             specified condition. The default comparison TYPE compares variants
             in input variant tables. For the comparison of sites, the position
@@ -193,7 +193,7 @@ def compareTables(proj, args):
     var_union = set()
     var_intersect = set()
     cur = proj.db.cursor()
-    if args.type in [None, 'variant']:
+    if args.mode in [None, 'variant']:
         variants = []
         for table in args.tables:
             # read variants in tables[0]
@@ -213,7 +213,7 @@ def compareTables(proj, args):
             var_intersect = variants[0]
             for var in variants[1:]:
                var_intersect &= var 
-    elif args.type == 'site':
+    elif args.mode == 'site':
         sites = []
         record_site = args.intersection is not None or args.difference is not None
         record_all = args.union is not None
@@ -371,9 +371,9 @@ def compare(args):
             #
             # type of comparison
             if args.samples:
-                if args.type is not None and args.type != 'genotype':
+                if args.mode is not None and args.mode != 'genotype':
                     raise ValueError('Cannot specify samples for non-genotype comparisons.')
-                args.type = 'genotype'
+                args.mode = 'genotype'
                 if len(args.samples) == 1:
                     raise ValueError('Please specify more than one sample to be compared.')
                 if len(args.tables) == 1:
@@ -393,7 +393,7 @@ def compare(args):
                     if not 'GT' in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, IDs[0])):
                         raise ValueError('Sample {} does not have any genotype.'.format(name))
                     args.sample_IDs.append(IDs[0])
-            elif args.type == 'genotype':
+            elif args.mode == 'genotype':
                 raise ValueError('Please specify samples to be compared for genotype comparison.')
             if len(args.tables) == 1:
                 raise ValueError('Please specify at least two tables to compare.')
@@ -403,11 +403,11 @@ def compare(args):
             if args.intersection is not None or args.union is not None or args.difference is not None:
                 compareTables(proj, args)
             elif args.count:
-                if args.type in [None, 'variant']:
+                if args.mode in [None, 'variant']:
                     countVariantDifference(proj, args)
-                elif args.type == 'site':
+                elif args.mode == 'site':
                     countSiteDifference(proj, args)
-                elif args.type == 'genotype':
+                elif args.mode == 'genotype':
                     countGenotypeDifference(proj, args)
             else:
                 env.logger.warning('No action parameter is specified. Nothing to do.')

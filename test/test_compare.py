@@ -34,6 +34,7 @@ class TestCompare(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(10)
+
     def removeProj(self):
         runCmd('vtools remove project')
         
@@ -72,6 +73,34 @@ class TestCompare(ProcessTestCase):
         # handling of wildcard names
         self.assertSucc('vtools compare \'ns*\' --union u')
         self.assertTrue('u' in outputOfCmd('vtools show tables'))
+
+    def testSimpleProj(self):
+        'Test compare by site'
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/compare.vcf --build hg18')
+        runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
+        runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
+        runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
+        runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
+        # variant
+        self.assertOutput('vtools compare T1 T2 -c', '1\t2\t1\t4\n')
+        self.assertOutput('vtools compare T1 T2 --difference -c', '1\n')
+        self.assertOutput('vtools compare T2 T1 --difference -c', '2\n')
+        self.assertOutput('vtools compare T1 T2 --intersection -c', '1\n')
+        self.assertOutput('vtools compare T1 T2 --union -c', '4\n')
+        # sample
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 -c', '1\t1\t1\t3\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference -c', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference -c', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection -c', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union -c', '3\n')
+        # site
+        self.assertOutput('vtools compare T1 T2 --mode site -c', '0\t1\t3\t4\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --difference -c', '0\n')
+        self.assertOutput('vtools compare T2 T1 --mode site --difference -c', '1\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --intersection -c', '3\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --union -c', '4\n')
+
 
 
 if __name__ == '__main__':
