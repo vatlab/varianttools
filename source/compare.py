@@ -154,9 +154,13 @@ def countGenotypeDifference(proj, args):
         env.logger.info('Reading genotype of sample {} of approximately {:,} variants in {}...'
             .format(sample_name, proj.db.numOfRows(encodeTableName(table),
                 exact=False), table))
-        cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-            '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                .format(encodeTableName(table), proj.name, sample_ID))
+        if table == 'variant':
+            cur.execute('SELECT variant_id, GT FROM {0}_genotype.genotype_{1}'
+                    .format(proj.name, sample_ID))
+        else:
+            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                    .format(encodeTableName(table), proj.name, sample_ID))
         for id, GT in cur:
             if GT is None:
                 if NULL_to_0:
@@ -264,9 +268,13 @@ def compareTables(proj, args):
             # read geno in tables[0]
             env.logger.info('Reading genotypes of sample {} of approximately {:,} geno in {}...'
                 .format(sample, proj.db.numOfRows(encodeTableName(table), exact=False), table))
-            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                    .format(encodeTableName(table), proj.name, id))
+            if table == 'variant':
+                cur.execute('SELECT variant_id, GT FROM {0}_genotype.genotype_{1}'
+                        .format(proj.name, id))
+            else:
+                cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+                    '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                        .format(encodeTableName(table), proj.name, id))
             #
             v = set()
             for id, GT in cur:
