@@ -767,7 +767,8 @@ if __name__ == '__main__':
     #
     # command discordance_rate
     parser = subparsers.add_parser('discordance_rate',
-        help='''Report discordance rate, namely the number of genotype calls that differ
+        help='''Calculate discordance rate between pairs of samples''',
+        description='''Report discordance rate, namely the number of genotype calls that differ
             between a pair of samples divided by the total number of SNPs for which both
             calls are non-missing, between pairs of samples. The statistics can be
             calculated for all samples or selected samples specified by parameter --samples.

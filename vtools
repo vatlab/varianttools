@@ -72,7 +72,6 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('init', help='''Create a new project, or a
         subproject from an existing parent project, or merge several existing
         projects into one''',
-        # FIXME: we should add descriptions to other commands as well.
         description='''Create a new project in the current directory. This
         command will fail if another project already exists in this directory,
         unless option '--force' is used to remove the existing project.''')
@@ -99,7 +98,10 @@ if __name__ == '__main__':
     parser.set_defaults(func=phenotype.phenotype)
     #
     # command show
-    parser = subparsers.add_parser('show', help='Display content of a project')
+    parser = subparsers.add_parser('show', help='Display content of a project',
+        description='''Output information of all system and project related items
+            such as variant tables, samples, phenotypes, annotation databases 
+            and fields.''')
     project.showArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.show)
@@ -118,7 +120,9 @@ if __name__ == '__main__':
     #
     # command use
     parser = subparsers.add_parser('use',
-        help='Prepare (download or import if necessary) and use an annotation database')
+        help='Prepare (download or import if necessary) and use an annotation database',
+        description='''Link an annotation database to the project, download it
+            from the variant tools website or build it from source if needed.''')
     annotation.useArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=annotation.use)
@@ -139,7 +143,10 @@ if __name__ == '__main__':
     #
     # command select
     parser = subparsers.add_parser('select',
-        help='''Output or save select variants that match specified conditions''')
+        help='''Output or save select variants that match specified conditions''',
+        description='''Select variants according to properties (variant and
+            annotation fields) and membership (samples) of variant. The result
+            can be counted, outputted, or saved to a variant table.''')
     variant.selectArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -148,7 +155,10 @@ if __name__ == '__main__':
     # command exclude
     parser = subparsers.add_parser('exclude',
         help='''Output or save variants after excluding variants that match
-            specified conditions''')
+            specified conditions''',
+        description='''Exclude variants according to properties (variant and
+            annotation fields) and membership (samples) of variant. The result
+            can be counted, outputted, or saved to a variant table.''')
     variant.excludeArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -157,15 +167,21 @@ if __name__ == '__main__':
     # command compare
     parser = subparsers.add_parser('compare',
         help='''Compare sites, variants, or genotypes of variants in two or more
-            variant tables, count or output union, intersect or difference to
-            another variant table''')
+            variant tables''',
+        description='''Get the difference, intersection and union of two or more
+            variant tables, according to sites, variants, or genotypes of 
+            associated samples of these variants. Resulting variants can be
+            counted or write to other variant tables.''')
     compare.compareArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=compare.compare)
     #
     # command output
     parser = subparsers.add_parser('output',
-        help='Output variants in tab or comma separated format')
+        help='Output variants in tab or comma separated format',
+        description='''Output variants, variant info fields, annotation fields
+            and expressions that involve these fields in a tab or comma separated
+            format.''')
     variant.outputArguments(parser)
     variant.generalOutputArguments(parser)
     addCommonArgs(parser)
@@ -173,14 +189,18 @@ if __name__ == '__main__':
     #
     # command export
     parser = subparsers.add_parser('export',
-        help='Export samples (variants and genotypes) in specified format')
+        help='Export samples (variants and genotypes) in specified format',
+        description='''Export variants and genotypes in text, vcf and other
+            formats.''')
     exporter.exportArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=exporter.export)
     #
     # command remove
     parser = subparsers.add_parser('remove', help='''Remove project or its
-        contents such as variant tables, fields, and annotation databases.''')
+        contents such as variant tables, fields, and annotation databases.''',
+        description='''Remove from the current project various items such as
+            variants genotypes, and annotation fields.''')
     project.removeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=project.remove)
