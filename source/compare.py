@@ -67,13 +67,8 @@ def compareArguments(parser):
             treat_missing_as_wildtype because items with missing genotype (chr,
             pos, ref, alt, NULL) are excluded if treat_missing_as_wildtype is 
             false (default), and are treated as (chr, pos, ref, alt, 0) otherwise.
-            Because of the way variants are generated, intersection operations 
-            of site comparison might produce more variants than the first table
-            (because distinct variants from other tables might returned if they
-            share locations with variants in the first table), and union
-            operation of genotype comparison might produce fewer variants (because
-            of missing genotypes). The default comparison type is variant, or 
-            genotype if option --samples is specified.''')
+            The default comparison type is variant, or genotype if option
+            --samples is specified.''')
     parser.add_argument('--samples', nargs='*',
         help='''A list of sample names corresponding to the variant tables to
             compare. An error will be raised if a sample name matches no or multiple
@@ -128,15 +123,25 @@ def countSiteDifference(proj, args):
             .format(len(s), table))
         sites.append(s)
     #
+    env.logger.info('Number of sites in A only, B only, in A and B, and in A or B')
+    site0 = set(sites[0].keys())
+    site1 = set(sites[1].keys())
+    site_counts = '{}\t{}\t{}\t{}'.format(
+        len(site0 - site1), 
+        len(site1 - site0),
+        len(site0 & site1),
+        len(site0 | site1)
+    )
+    env.logger.info(site_counts)
     env.logger.info('Number of variants in both tables with locations in '
         'A only, B only, in A and B, and in A or B')
     print('{}\t{}\t{}\t{}'.format(
         # variants in A, with location not in B
-        sum([len(y) for x,y in sites[0].items() if x not in sites[1]]),
+        sum([len(sites[0][x]) for x in site0 - site1]),
         # variants in B, with location not in A
-        sum([len(y) for x,y in sites[1].items() if x not in sites[0]]),
+        sum([len(sites[1][x]) for x in site1 - site0]),
         # variants with location in both A & B
-        sum([len(y | sites[1][x]) for x,y in sites[0].items() if x in sites[1]]),
+        sum([len(sites[0][x] | sites[1][x]) for x in site0 & site1]),
         # variants with location in either A or B
         len(all_variants)
     ))
@@ -154,13 +159,9 @@ def countGenotypeDifference(proj, args):
         env.logger.info('Reading genotype of sample {} of approximately {:,} variants in {}...'
             .format(sample_name, proj.db.numOfRows(encodeTableName(table),
                 exact=False), table))
-        if table == 'variant':
-            cur.execute('SELECT variant_id, GT FROM {0}_genotype.genotype_{1}'
-                    .format(proj.name, sample_ID))
-        else:
-            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                    .format(encodeTableName(table), proj.name, sample_ID))
+        cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+            '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                .format(encodeTableName(table), proj.name, sample_ID))
         for id, GT in cur:
             if GT is None:
                 if NULL_to_0:
@@ -172,6 +173,14 @@ def countGenotypeDifference(proj, args):
             .format(len(g), table, sample_name))
     #
     env.logger.info('Number of genotypes in A only, B only, in A and B, and in A or B')
+    geno_counts = '{}\t{}\t{}\t{}'.format(
+        len(geno[0] - geno[1]),
+        len(geno[1] - geno[0]),
+        len(geno[0] & geno[1]),
+        len(geno[0] | geno[1])
+    )
+    env.logger.info(geno_counts)
+    env.logger.info('Number of variants with genotypes in A only, B only, in A and B, and in A or B')
     print('{}\t{}\t{}\t{}'.format(
         len(set([x[0] for x in (geno[0] - geno[1])])),
         len(set([x[0] for x in (geno[1] - geno[0])])),
@@ -219,7 +228,6 @@ def compareTables(proj, args):
                var_intersect &= var 
     elif args.mode == 'site':
         sites = []
-        record_site = args.intersection is not None or args.difference is not None
         record_all = args.union is not None
         for table in args.tables:
             # read sites in tables[0]
@@ -234,28 +242,33 @@ def compareTables(proj, args):
             #
             v = defaultdict(set)
             for id, chr, pos in cur:
-                if record_site:
-                    v[(chr, pos)].add(id)
+                v[(chr, pos)].add(id)
                 if record_all:
                     var_union.add(id)
-            if record_site:
-                sites.append(v)
-                env.logger.debug('There are {} unique sites in table {}'
-                    .format(len(v), table))
+            sites.append(v)
+            env.logger.debug('There are {} unique sites in table {}'
+                .format(len(v), table))
         #
         if args.difference is not None:
             site_diff = set(sites[0].keys())
             for var in sites[1:]:
                site_diff -= set(var.keys())
-            env.logger.debug('There are {} unique sites in table {} only'
-                .format(len(site_diff), args.tables[0]))
+            env.logger.info('Unique sites in sample {} only: {}'
+                .format(args.samples[0], len(site_diff)))
             for k in site_diff:
                 var_diff |= sites[0][k]
+        if args.union is not None:
+            site_union = set()
+            for var in sites:
+                site_union |= set(var.keys())
+            env.logger.info('Sites in any of the samples: {}'
+                .format(len(site_union)))
+            # var_union is collected directly
         if args.intersection is not None:
             site_intersect = set(sites[0].keys())
             for var in sites[1:]:
                site_intersect &= set(var.keys())
-            env.logger.debug('There are {} unique sites in all tables'
+            env.logger.info('Sites in all samples: {}'
                 .format(len(site_intersect)))
             for k in site_intersect:
                 for var in sites:
@@ -268,13 +281,9 @@ def compareTables(proj, args):
             # read geno in tables[0]
             env.logger.info('Reading genotypes of sample {} of approximately {:,} geno in {}...'
                 .format(sample, proj.db.numOfRows(encodeTableName(table), exact=False), table))
-            if table == 'variant':
-                cur.execute('SELECT variant_id, GT FROM {0}_genotype.genotype_{1}'
-                        .format(proj.name, id))
-            else:
-                cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-                    '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                        .format(encodeTableName(table), proj.name, id))
+            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                    .format(encodeTableName(table), proj.name, id))
             #
             v = set()
             for id, GT in cur:
@@ -289,21 +298,21 @@ def compareTables(proj, args):
             geno_diff = geno[0]
             for g in geno[1:]:
                geno_diff -= g
-            env.logger.debug('There are {} genotypes in table {} only'
-                .format(len(geno_diff), args.tables[0]))
+            env.logger.info('Genotypes in sample {} only: {} '
+                .format(args.samples[0], len(geno_diff)))
             var_diff = set([x[0] for x in geno_diff])
         if args.union is not None:
             geno_union = geno[0]
             for g in geno[1:]:
                geno_union |= g 
-            env.logger.debug('There are a total of {} genotypes'
+            env.logger.info('Genotypes in any of the samples: {}'
                 .format(len(geno_union)))
             var_union = set([x[0] for x in geno_union])
         if args.intersection is not None:
             geno_intersect = geno[0]
             for g in geno[1:]:
                geno_intersect &= g
-            env.logger.debug('There are {} unique genotypes in all tables'
+            env.logger.info('Genotypes in all samples: {}'
                 .format(len(geno_intersect)))
             var_intersect = set([x[0] for x in geno_intersect])
     #
