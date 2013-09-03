@@ -38,20 +38,18 @@ def compareArguments(parser):
             repeated for the comparison of genotype of multiple samples if only
             one table is specified.''')
     parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
-        help='''Save variants with TYPE in the TYPE of any of the tables (T1 |
-            T2 | T3 ...) to TABLE if a name is specified. An optional message
-            can be added to describe the table. ''')
+        help='''Print the number (default) or save variants with TYPE in the
+            TYPE of any of the tables (T1 | T2 | T3 ...) to TABLE if a name is
+            specified. An optional message can be added to describe the table. ''')
     parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', 
-        help='''Save variants with TYPE in the TYPE of all the tables (T1 & T2 
-            & T3 ...) to TABLE if a name is specified. An optional message can 
-            be added to describe the table.''')
-    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*',
-        help='''Save variants with TYPE in the TYPE of the first, but not in the
-            TYPE of others (T1 - T2 - T3...) to TABLE if a name is specified.
+        help='''Print the number (default) or save variants with TYPE in the TYPE
+            of all the tables (T1 & T2 & T3 ...) to TABLE if a name is specified.
             An optional message can be added to describe the table.''')
-    parser.add_argument('-c', '--count', action='store_true',
-        help='''Output the number of variants for specified option (e.g. --union
-            -c) without writing the variants to a table.''')
+    parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*',
+        help='''Print the number (default) or save variants with TYPE in the TYPE
+            of the first, but not in the TYPE of others (T1 - T2 - T3...) to TABLE
+            if a name is specified. An optional message can be added to describe 
+            the table.''')
     parser.add_argument('--mode', choices=['variant', 'site', 'genotype'],
         help='''Compare variants (chr, pos, ref, alt), site (chr, pos), or
             genotype (chr, pos, ref, alt, GT for a specified sample) of 
@@ -73,6 +71,8 @@ def compareArguments(parser):
         help='''A list of sample names corresponding to the variant tables to
             compare. An error will be raised if a sample name matches no or multiple
             samples or if a sample does not have any genotype.''')
+    parser.add_argument('-c', '--count', action='store_true',
+        help=SUPPRESS)
     parser.add_argument('--A_diff_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
     parser.add_argument('--B_diff_A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
     parser.add_argument('--A_and_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
@@ -193,15 +193,10 @@ def compareTables(proj, args):
     # We can use a direct query to get diff/union/intersection of tables but we cannot
     # display a progress bar during query. We therefore only use that faster method (3m38s
     # instead of 2m33s) in the case of -v0.
-    if args.count and sum([args.difference is not None, args.union is not None, args.intersection is not None]) > 1:
-        raise ValueError('Argument --count can be used only with one operation.')
     # args.difference is
     #    None  for --difference
     #    value for --difference value
     #    ''    for not specified
-    if not args.count and (args.difference == [] or args.union == [] or args.intersection == []):
-        raise ValueError('Please specify either a table to output variants, or --count')
-    #
     var_diff = set()
     var_union = set()
     var_intersect = set()
@@ -246,29 +241,29 @@ def compareTables(proj, args):
                 if record_all:
                     var_union.add(id)
             sites.append(v)
-            env.logger.debug('There are {} unique sites in table {}'
-                .format(len(v), table))
+            env.logger.info('Unique sites in table {}: {}'
+                .format(table, len(v)))
         #
         if args.difference is not None:
             site_diff = set(sites[0].keys())
             for var in sites[1:]:
                site_diff -= set(var.keys())
-            env.logger.info('Unique sites in sample {} only: {}'
-                .format(args.samples[0], len(site_diff)))
+            env.logger.info('Unique sites in table {} only: {}'
+                .format(args.tables[0], len(site_diff)))
             for k in site_diff:
                 var_diff |= sites[0][k]
         if args.union is not None:
             site_union = set()
             for var in sites:
                 site_union |= set(var.keys())
-            env.logger.info('Sites in any of the samples: {}'
+            env.logger.info('Sites in any of the tables: {}'
                 .format(len(site_union)))
             # var_union is collected directly
         if args.intersection is not None:
             site_intersect = set(sites[0].keys())
             for var in sites[1:]:
                site_intersect &= set(var.keys())
-            env.logger.info('Sites in all samples: {}'
+            env.logger.info('Sites in all tables: {}'
                 .format(len(site_intersect)))
             for k in site_intersect:
                 for var in sites:
@@ -349,14 +344,13 @@ def compareTables(proj, args):
         proj.describeTable(encodeTableName(table), desc, True, True)
         prog.done()       
         proj.db.commit()
-    # count
-    if args.count:
-        if args.difference is not None:
-            print(len(var_diff))
-        elif args.union is not None:
-            print(len(var_union))
-        elif args.intersection is not None:
-            print(len(var_intersect))
+    # count by default
+    if args.difference is not None:
+        print(len(var_diff))
+    if args.union is not None:
+        print(len(var_union))
+    if args.intersection is not None:
+        print(len(var_intersect))
 
     
 
@@ -419,16 +413,13 @@ def compare(args):
                 raise ValueError('Options B_diff_A, A_diff_B, A_and_B and A_or_B are deprecated.')
             if args.intersection is not None or args.union is not None or args.difference is not None:
                 compareTables(proj, args)
-            elif args.count:
+            else:
                 if args.mode in [None, 'variant']:
                     countVariantDifference(proj, args)
                 elif args.mode == 'site':
                     countSiteDifference(proj, args)
                 elif args.mode == 'genotype':
                     countGenotypeDifference(proj, args)
-            else:
-                env.logger.warning('No action parameter is specified. Nothing to do.')
-                return
     except Exception as e:
         env.logger.error(e)
         sys.exit(1) 
