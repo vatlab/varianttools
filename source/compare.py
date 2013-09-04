@@ -26,6 +26,7 @@
 
 import sys
 import re
+import copy
 from argparse import SUPPRESS
 from .project import Project
 from .utils import ProgressBar, env, encodeTableName, decodeTableName
@@ -210,15 +211,15 @@ def compareTables(proj, args):
             variants.append(set([x[0] for x in cur.fetchall()]))
         #
         if args.difference is not None:
-            var_diff = variants[0]
+            var_diff = copy.copy(variants[0])
             for var in variants[1:]:
                var_diff -= var 
         if args.union is not None:
-            var_union = variants[0]
+            var_union = copy.copy(variants[0])
             for var in variants[1:]:
                var_union |=  var 
         if args.intersection is not None:
-            var_intersect = variants[0]
+            var_intersect = copy.copy(variants[0])
             for var in variants[1:]:
                var_intersect &= var 
     elif args.mode == 'site':
