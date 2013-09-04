@@ -174,6 +174,9 @@ if __name__ == '__main__':
         resource_dir = os.path.expanduser('~/.variant_tools')
         # get information about file
         for filename in args.upload:
+            if filename.endswith('.DB'):
+                env.logger.info('Ignore uncompressed database file {}'.format(filename))
+                continue
             rel_path = os.path.relpath(filename, resource_dir)
             if rel_path in manager.manifest:
                 filesize = os.path.getsize(filename)
