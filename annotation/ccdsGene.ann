@@ -9,10 +9,10 @@ hg19=chr, cdsStart, cdsEnd
 
 [data sources]
 anno_type=range
-description=CCDS Genes
-version=hg19_20111206
+description=High-confidence human gene annotations from the Consensus Coding Sequence (CCDS) project.
+version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-hg19_20111206.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene-hg19_20130904.DB.gz
 source_type=txt
 
 [name]

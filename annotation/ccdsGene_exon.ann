@@ -10,10 +10,10 @@ hg19=chr, exon_start, exon_end
 
 [data sources]
 anno_type=range
-description=CCDS exons
-version=hg19_20111206
+description=High-confidence human gene annotations from the Consensus Coding Sequence (CCDS) project. This database contains all exon regions of the CCDS genes.
+version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_exon-hg19_20111206.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/ccdsGene_exon-hg19_20130904.DB.gz
 source_type=txt
 
 [name]
