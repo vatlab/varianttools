@@ -470,8 +470,8 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         --genotype_likelihoods_model BOTH 
-        -o ${AUXILIARY_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}",
-    output="${AUXILIARY_DIR}/${INPUT: INPUT[0][:-4] + '_raw.vcf'}")
+        -o ${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0])[:-4] + '_raw.vcf'}",
+    output="${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0])[:-4] + '_raw.vcf'}")
 # make sure the input is a bam file
 input_emitter=EmitInput(select='.bam')
 comment=Use unified genotyper to get raw variants
@@ -480,7 +480,7 @@ comment=Use unified genotyper to get raw variants
 [call_200]
 action=RunCommand(cmd="%(java)s %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
-        -I ${INPUT} 
+        --input ${INPUT} 
         -T VariantRecalibrator
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         %(opt_gatk_variantrecalibrator)s
@@ -492,7 +492,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
         -rscriptFile ${INPUT: INPUT[0][:-4] + '.SNPs.R'}
-        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'}",
+        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'",
     output=["${INPUT: INPUT[0][:-4] + '.SNPs.recal'}",
         "${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}",
         "${INPUT: INPUT[0][:-4] + '.SNPs.R'}",
@@ -504,7 +504,7 @@ comment=Recalibrate SNPs
 input=${OUTPUT100}
 action=RunCommand(cmd="%(java)s %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
-        -I ${INPUT} 
+        --input ${INPUT} 
         -T VariantRecalibrator
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         %(opt_gatk_variantrecalibrator)s
@@ -517,7 +517,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
         -rscriptFile ${INPUT: INPUT[0][:-4] + '.INDELs.R'}
-        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'}",
+        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'",
     output=["${INPUT: INPUT[0][:-4] + '.INDELs.recal'}",
         "${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}",
         "${INPUT: INPUT[0][:-4] + '.INDELs.R'}",
