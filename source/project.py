@@ -2033,7 +2033,8 @@ class Project:
                 for idx, id in enumerate(ids):
                     self.db.renameTable('{}_genotype.genotype_{}'.format(self.name, id),
                         '__genotype_{}'.format(id))
-                self.db.renameTable(new_table, 'genotype_{}'.format(ids[0]))
+                self.db.renameTable('{}_genotype._tmp_{}'.format(self.name, ids[0]),
+                    'genotype_{}'.format(ids[0]))
         # finally, remove filenames that are associated with no sample. The individual files can then
         # be imported again, which I am not sure is good or bad
         self.db.execute('DELETE FROM filename WHERE filename.file_id NOT IN (SELECT file_id FROM sample)')
