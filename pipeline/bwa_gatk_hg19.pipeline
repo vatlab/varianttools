@@ -492,7 +492,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
         -rscriptFile ${INPUT: INPUT[0][:-4] + '.SNPs.R'}
-        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'",
+        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'}",
     output=["${INPUT: INPUT[0][:-4] + '.SNPs.recal'}",
         "${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}",
         "${INPUT: INPUT[0][:-4] + '.SNPs.R'}",
@@ -517,7 +517,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
         -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
         -rscriptFile ${INPUT: INPUT[0][:-4] + '.INDELs.R'}
-        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'",
+        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'}",
     output=["${INPUT: INPUT[0][:-4] + '.INDELs.recal'}",
         "${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}",
         "${INPUT: INPUT[0][:-4] + '.INDELs.R'}",
