@@ -41,6 +41,7 @@ import time
 import re
 import csv
 import platform
+import logging
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
@@ -1115,6 +1116,13 @@ class Pipeline:
                     '{}. Available pipelines are: {}'.format(pname,
                     self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
         psteps = self.pipeline.pipelines[pname]
+        # if there is a output file, write log to .log
+        if output_files:
+            logfile = output_files[0] + '.log'
+            ch = logging.FileHandler(logfile.lstrip('>'), mode = 'a')
+            ch.setLevel(logging.DEBUG)
+            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
+            env.logger.addHandler(ch)
         #
         global max_running_jobs 
         max_running_jobs = jobs
