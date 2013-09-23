@@ -1234,7 +1234,7 @@ class Project:
         self.build = self.loadProperty('build')
         self.alt_build = self.loadProperty('alt_build')
         self.annoDB = []
-        for db in eval(self.loadProperty('annoDB', '[]')):
+        for db in eval(self.loadProperty('annoDB', '[]').replace('${local_resource}', env._local_resource)):
             try:
                 # remove path, remove version string, and suffix
                 db_name = os.path.split(db)[-1].split('-')[0]
@@ -1371,7 +1371,7 @@ class Project:
             i = [x.name for x in self.annoDB].index(db.name)
             self.annoDB.append(db)
             self.annoDB.pop(i)
-        self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in self.annoDB]))
+        self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}') for x in self.annoDB]))
         # an annotation database might be re-used with a different linked_field
         self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
         self.saveProperty('{}_anno_type'.format(db.name), str(db.anno_type))
@@ -3639,7 +3639,8 @@ def remove(args):
                             break
                     if not removed:
                         env.logger.warning('Cannot remove annotation database {} from the project'.format(item))
-                proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename) for x in proj.annoDB]))
+                # use the un-expanded version of _local_resource to allow continued use of '~'
+                proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}') for x in proj.annoDB]))
             elif args.type == 'variants':
                 if len(args.items) == 0:
                     raise ValueError('Please specify variant tables that contain variants to be removed')
