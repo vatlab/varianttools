@@ -527,7 +527,7 @@ comment=Recalibrate INDELs
 [call_300]
 input=${OUTPUT100}
 action=RunCommand(cmd="%(java)s %(opt_java)s
-        -jar GenomeAnalysisTK.jar 
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T ApplyRecalibration
         %(opt_gatk_applyrecalibration)s
         %(opt_gatk_applyrecalibration_SNV)s
@@ -543,7 +543,7 @@ comment=Apply SNV recalibration
 [call_310]
 # use input from last step (.recal.SNPs.vcf)
 action=RunCommand(cmd="%(java)s %(opt_java)s
-        -jar GenomeAnalysisTK.jar 
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T ApplyRecalibration
         %(opt_gatk_applyrecalibration)s
         %(opt_gatk_applyrecalibration_INDEL)s
