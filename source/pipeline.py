@@ -679,6 +679,16 @@ class RunCommand:
     def __call__(self, ifiles):
         # substitute cmd by input_files and output_files
         if self.output:
+            for ofile in self.output:
+                nfile = os.path.normpath(os.path.expanduser(ofile))
+                under_resource = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.local_resource))).startswith('../')
+                under_cache = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.cache_dir))).startswith('../')
+                under_temp = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.temp_dir))).startswith('../')
+                under_proj = not os.path.relpath(nfile, os.path.realpath('.')).startswith('../')
+                if not (under_resource or under_cache or under_temp or under_proj):
+                    raise RuntimeError('Unable to write to output file ({}) because '
+                        'output file of a pipeline can can be under project, resource, '
+                        'temporary or cache directories.'.format(ofile))
             lock_file = self.output[0] + '.lck'
             if os.path.isfile(lock_file):
                 if self.locking == 'wait':
