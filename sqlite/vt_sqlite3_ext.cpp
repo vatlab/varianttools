@@ -69,6 +69,7 @@ static void least_not_null_func(
 
 #include "cgatools/reference/ChromosomeIdField.hpp"
 #include "cgatools/reference/CompactDnaSequence.hpp"
+#include "cgatools/util/Exception.hpp"
 #include "cgatools/reference/CrrFile.hpp"
 #include "cgatools/reference/CrrFileWriter.hpp"
 #include "cgatools/reference/GeneDataStore.hpp"
@@ -79,6 +80,7 @@ static void least_not_null_func(
 #include <vector>
 #include <utility>
 #include <sstream>
+#include <exception>
 
 typedef std::map<std::string, cgatools::reference::CrrFile *> RefGenomeFileMap;
 typedef std::map<std::string, int> ChrNameMap;
@@ -139,25 +141,44 @@ static void ref_sequence(
 	ChrNameMap::const_iterator cit = chrNameMap.find(chr);
 	if (cit == chrNameMap.end()) {
 		try {
-			chrIdx = cf->getChromosomeId(chr);
-		} catch (...) {
-			chrIdx = cf->getChromosomeId("chr" + chr);
+			// cgatools' chromosome names have leading chr
+			// we add chr to 1, 2, 3, ... etc but not to other
+			// names. There might be a problem here.
+			if (chr.size() <= 2)
+				chrIdx = cf->getChromosomeId("chr" + chr);
+			else
+				chrIdx = cf->getChromosomeId(chr);
+			chrNameMap[chr] = chrIdx;
+		} catch (cgatools::util::Exception & e) {
+			// unrecognized chromosome	
+			//sqlite3_result_error(context, e.what(), -1);
+			sqlite3_result_null(context);
+			return;
 		}
-		chrNameMap[chr] = chrIdx;
 	} else {
 		chrIdx = cit->second;
 	}
 	//
 	if (argc == 4) {
 		// sequence
-		std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
-		sqlite3_result_text(context, (char *)(res.c_str()), -1, SQLITE_TRANSIENT);
+		try {
+			std::string res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
+			sqlite3_result_text(context, (char *)(res.c_str()), -1, SQLITE_TRANSIENT);
+		} catch (cgatools::util::Exception & e) {
+			// position out of range
+			sqlite3_result_null(context);
+		}
 	} else {
 		// single base
-		char res[2];
-		res[0] = cf->getBase(cgatools::reference::Location(chrIdx, start - 1));
-		res[1] = '\0';
-		sqlite3_result_text(context, (char *)res, -1, SQLITE_TRANSIENT);
+		try {
+			char res[2];
+			res[0] = cf->getBase(cgatools::reference::Location(chrIdx, start - 1));
+			res[1] = '\0';
+			sqlite3_result_text(context, (char *)res, -1, SQLITE_TRANSIENT);
+		} catch (cgatools::util::Exception & e) {
+			// position out of range
+			sqlite3_result_null(context);
+		}
 	}
 }
 
