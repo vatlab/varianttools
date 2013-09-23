@@ -882,9 +882,9 @@ class ProgressBar:
             msg[1] = ' {:5.1f}%'.format(perc * 100)
             width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4]) - len(msg[5])
             if width > 5:
-                front = int((perc - failed_perc) * (width - 5))
-                failed_front = int(failed_perc * (width - 5))
-                back = width - 5 - front - failed_front
+                front = int((perc - failed_perc) * (width - 4))
+                failed_front = int(failed_perc * (width - 4))
+                back = width - 4 - front - failed_front
                 if failed_front == 0:
                     msg[2] = ' [{}>{}]'.format('=' * front, ' ' * back)
                 else:
