@@ -158,13 +158,13 @@ type=FLOAT NULL
 adj=Nullify('.')
 comment=SIFT score, If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)"; otherwise it is predicted as "T(olerated)".
 
-[Polyphen2_HDIV_score]
+[Polyphen2_HDIV_score_max]
 index=23
 type=FLOAT NULL
-adj=lambda x: None if x == '.' else min([float(z) for z in x.split(';')])
-comment=The minimum value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. Use Polyphen2_HDIV_score_all to get a list of all scores.
+adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
+comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. Use Polyphen2_HDIV_score to get a list of all scores.
 
-[Polyphen2_HDIV_score_all]
+[Polyphen2_HDIV_score]
 index=23
 type=VARCHAR(255)
 adj=Nullify('.')
@@ -176,13 +176,13 @@ type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";". Because the availability of multiple values, use expression such as 'D' in Polyphen2_HDIV_pred instead of 'D' = Polyphen2_HDIV_pred to filter variants that are probably damaging.
 
-[Polyphen2_HVAR_score]
+[Polyphen2_HVAR_score_max]
 index=25
 type=FLOAT NULL
-adj=lambda x: None if x == '.' else min([float(z) for z in x.split(';')])
-comment=The minimum value of all Polyphen2 score based on HumVar, i.e. hvar_prob. Use Polyphen2_HVAR_score_all to get a list of all scores.
+adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
+comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob. Use Polyphen2_HVAR_score_all to get a list of all scores.
 
-[Polyphen2_HVAR_score_all]
+[Polyphen2_HVAR_score]
 index=25
 type=VARCHAR(255) NULL
 adj=Nullify('.')
