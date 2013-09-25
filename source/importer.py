@@ -100,10 +100,10 @@ class LineProcessor:
             # self.maxInputCol is n, we need to have n+1 fields to guarantee that
             # the piece n is a properly split one
             if type(tokens) is not list:
-                tokens = [x.strip() for x in tokens.split(self.delimiter, self.maxInputCol)][:self.maxInputCol]
+                tokens = [x.strip() for x in tokens.rstrip().split(self.delimiter, self.maxInputCol)][:self.maxInputCol]
         else:
             if type(tokens) is not list:
-                tokens = [x.strip() for x in tokens.split(self.delimiter)]
+                tokens = [x.strip() for x in tokens.rstrip().split(self.delimiter)]
             self.nColumns = len(tokens)
             cIdx = 0             # column index
             num_sample = -1      # number of samples ...
@@ -1362,6 +1362,8 @@ class Importer:
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
+                    env.logger.error(numSample)
+                    env.logger.error(names)
                     if not names:
                         if numSample == 1:
                             env.logger.debug('Missing sample name (name None is used)'.format(numSample))

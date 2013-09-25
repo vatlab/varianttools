@@ -161,26 +161,38 @@ comment=SIFT score, If a score is smaller than 0.05 the corresponding NS is pred
 [Polyphen2_HDIV_score]
 index=23
 type=FLOAT NULL
+adj=lambda x: None if x == '.' else min([float(z) for z in x.split(';')])
+comment=The minimum value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. Use Polyphen2_HDIV_score_all to get a list of all scores.
+
+[Polyphen2_HDIV_score_all]
+index=23
+type=VARCHAR(255)
 adj=Nullify('.')
 comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.957,1]; "possibly damaging" if it is in [0.453,0.956]; "benign" if it is in [0,0.452]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
 
 [Polyphen2_HDIV_pred]
 index=24
-type=CHAR(8) NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";".
+comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";". Because the availability of multiple values, use expression such as 'D' in Polyphen2_HDIV_pred instead of 'D' = Polyphen2_HDIV_pred to filter variants that are probably damaging.
 
 [Polyphen2_HVAR_score]
 index=25
 type=FLOAT NULL
+adj=lambda x: None if x == '.' else min([float(z) for z in x.split(';')])
+comment=The minimum value of all Polyphen2 score based on HumVar, i.e. hvar_prob. Use Polyphen2_HVAR_score_all to get a list of all scores.
+
+[Polyphen2_HVAR_score_all]
+index=25
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=Polyphen2 score based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.909,1]; "possibly damaging" if it is in [0.447,0.908]; "benign" if it is in [0,0.446]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
 
 [Polyphen2_HVAR_pred]
 index=26
-type=CHAR(8) NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";".
+comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";". Because the availability of multiple values, use expression such as 'D' in Polyphen2_HVAR_pred instead of 'D' = Polyphen2_HVAR_pred to filter variants that are probably damaging.
 
 [LRT_score]
 index=27
