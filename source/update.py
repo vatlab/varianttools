@@ -37,7 +37,7 @@ import math
 from .project import AnnoDB, Project, Field, AnnoDBWriter, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
-    consolidateFieldName, env
+    consolidateFieldName, env, encodeTableName, decodeTableName
 from .importer import *
 
 #
@@ -98,7 +98,7 @@ class Updater:
         #
         self.jobs = max(1, jobs)
         if not proj.isVariantTable(table):
-            raise ValueError('Variant table {} does not exist.'.format(table))
+            raise ValueError('Variant table {} does not exist.'.format(decodeTableName(table)))
         # we cannot guess build information from txt files
         if build is None and self.proj.build is None:
             raise ValueError('Please specify the reference genome of the input data.')
@@ -478,7 +478,7 @@ def setFieldValue(proj, table, items, build):
         query = 'UPDATE {} SET {} WHERE variant_id={};'.format(table,
             ','.join(['{}={}'.format(x, proj.db.PH) for x in new_fields]), proj.db.PH)
         env.logger.debug('Using query {}'.format(query))
-        prog = ProgressBar('Updating {}'.format(table), len(results))
+        prog = ProgressBar('Updating {}'.format(decodeTableName(table)), len(results))
         # this particular query will return a bunch of bogus NULL values for range-based databases,
         # which needs to be filtered out.
         update_status = {}
@@ -536,7 +536,7 @@ def setFieldValue(proj, table, items, build):
 def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     '''Count sample allele count etc for specified sample and variant table'''
     if not proj.isVariantTable(variant_table):
-        raise ValueError('"Variant table {} does not exist.'.format(variant_table))
+        raise ValueError('"Variant table {} does not exist.'.format(decodeTableName(variant_table)))
     #
     #
     # NOTE: this function could be implemented using one or more query more
@@ -781,7 +781,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             if defaultValue == 0:
                 proj.db.execute ('UPDATE {} SET {} = 0'.format('variant', field))              
     #
-    prog = ProgressBar('Updating {}'.format(variant_table), len(variants))
+    prog = ProgressBar('Updating {}'.format(decodeTableName(variant_table)), len(variants))
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
     warning = False
@@ -926,7 +926,7 @@ def update(args):
                     'and --from_stat for command vtools upate')
             if args.from_file:
                 proj.db.attach(proj.name + '_genotype')
-                updater = Updater(proj=proj, table=args.table, files=args.from_file,
+                updater = Updater(proj=proj, table=encodeTableName(args.table), files=args.from_file,
                     build=args.build, format=args.format, jobs=args.jobs, 
                     sample_name=args.sample_name, fmt_args=args.unknown_args)
                 updater.update()
@@ -936,13 +936,13 @@ def update(args):
                         field, expr = [x.strip() for x in item.split('=', 1)]
                     except Exception as e:
                         raise ValueError('Invalid parameter {}, which should have format field=expr_of_field: {}'.format(item, e))
-                setFieldValue(proj, args.table, args.set, proj.build)
+                setFieldValue(proj, encodeTableName(args.table), args.set, proj.build)
                 #, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.from_stat:
                 proj.db.attach(proj.name + '_genotype')
-                variant_table = args.table if args.table else 'variant'
+                variant_table = encodeTableName(args.table) if args.table else 'variant'
                 if not proj.db.hasTable(variant_table):
-                    raise ValueError('Variant table {} does not exist'.format(variant_table))
+                    raise ValueError('Variant table {} does not exist'.format(decodeTableName(variant_table)))
                 IDs = None
                 if args.samples:
                     IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))

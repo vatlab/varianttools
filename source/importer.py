@@ -1362,8 +1362,6 @@ class Importer:
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
-                    env.logger.error(numSample)
-                    env.logger.error(names)
                     if not names:
                         if numSample == 1:
                             env.logger.debug('Missing sample name (name None is used)'.format(numSample))
