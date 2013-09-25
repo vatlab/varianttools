@@ -542,6 +542,7 @@ comment=Apply SNP recalibration
 
 [call_310]
 # use input from last step (.recal.SNPs.vcf)
+# need to use files such as .INDELs.recal, .INDELs.tranches
 action=RunCommand(cmd="%(java)s %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar 
         -T ApplyRecalibration
@@ -550,8 +551,8 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         --input ${INPUT}
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         -mode INDEL
-        -recalFile ${INPUT: INPUT[0][:-9] + '.INDELs.recal'}
-        -tranchesFile ${INPUT: INPUT[0][:-9] + '.INDELs.tranches'}
+        -recalFile ${INPUT: INPUT[0][:-15] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-15] + '.INDELs.tranches'}
         -o ${CMD_OUTPUT}",
     output="${CMD_OUTPUT}")
 comment=Apply INDEL recalibration
