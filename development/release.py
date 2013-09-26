@@ -69,7 +69,7 @@ def modifyVersion(version):
 
 def setupEnvironment(version):
     #
-    if version.endswith('svn') or 'rc' in version:
+    if 'svn' in version or 'rc' in version:
         print('WARNING: You are releasing a subversion version of variant tools.')
         print('To make a formal release, you will need to change version string in source/__init__.py')
     #

@@ -140,6 +140,9 @@ class AnnoDB:
                 else:
                     self.anno_type = anno_type
             elif rec[0] == 'build':
+                # raw values used for description only
+                self.raw_refGenomes = eval(rec[1])
+                # refGenome that fits this project
                 self.refGenomes = eval(rec[1])
                 if linked_fields is not None:
                     for key in self.refGenomes.keys():
@@ -276,10 +279,10 @@ class AnnoDB:
             elif self.anno_type == 'field':
                 print('{:<23} {:,}'.format('Distinct entries:', count))
         #
-        for key in self.refGenomes:
+        for key in self.raw_refGenomes:
             print('{:<23} {}'.format(
                 '{} {}:'.format('Reference genome', key), 
-                ', '.join(self.refGenomes[key])))
+                ', '.join(self.raw_refGenomes[key])))
         for field in self.fields:
             if not verbose:
                 print('\n'.join(textwrap.wrap(
