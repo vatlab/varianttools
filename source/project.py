@@ -1118,30 +1118,11 @@ class Project:
             env.temp_dir = None
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         #
-        # check a lock file
-        lock_file = self.proj_file + '.lck'
-        while True:
-            if os.path.isfile(lock_file):
-                env.logger.warning('Project {} is being opened by another process. Remove '
-                    '{} if this is not the case.'.format(self.name, lock_file))
-                time.sleep(10)
-            else:
-                break
-        # create a lock file
-        env.lock(lock_file)
-        signal.signal(signal.SIGINT, unlock_proj)
-        signal.signal(signal.SIGTERM, unlock_proj)
-        try:
-            if new: 
-                self.create(build=build, **kwargs)
-                self.checkUpdate()
-            else:
-                self.open(verify)
-        finally:
-            try:
-                env.unlock(lock_file)
-            except:
-                pass
+        if new: 
+            self.create(build=build, **kwargs)
+            self.checkUpdate()
+        else:
+            self.open(verify)
 
     def create(self, build, **kwargs):
         '''Create a new project'''
@@ -1265,11 +1246,21 @@ class Project:
                     .format(self.version, self.revision))
             elif proj_rev < vtools_rev:
                 # upgrade project
-                self.upgrade(proj_rev)
+                try:
+                    self.upgrade(proj_rev)
+                except Exception as e:
+                    env.logger.warning('Skip upgrading project: {}'.format(e))
         if verify:
-            self.checkIntegrity()
+            try:
+                self.checkIntegrity()
+            except Exception as e:
+                env.logger.warning('Skip checking integrity of project: {}'.format(e))
         # 
-        self.analyze()
+        try:
+            self.analyze()
+        except Exception as e:
+            env.logger.warning('Skip analyzing project: {}'.format(e))
+        
 
     def checkIntegrity(self):
         '''Check if the project is ok...(and try to fix it if possible)'''
@@ -1338,6 +1329,9 @@ class Project:
         cur = self.db.cursor()
         s = delayedAction(env.logger.info, 'Analyzing project')
         for tbl in tables:
+            # do not analyze these small tables
+            if tbl in ['sample', 'filename', 'project']:
+                continue
             analyzed = True
             if not force:
                 # try to figure out if the table has been analyzed

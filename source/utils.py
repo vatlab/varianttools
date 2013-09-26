@@ -1779,58 +1779,69 @@ class DatabaseEngine:
             # readonly databases (e.g. cache_size)
             if readonly:
                 return
+            # this lock prevents multi process of the same vtools instance, but
+            # not for multiple vtools intances...
             if lock is not None:
                 lock.acquire()
-            cur = self.database.cursor()
-            for pragma in env.sqlite_pragma:
-                # if a pragma is only applicable to certain database, check its name
-                if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
-                    continue
-                # No error message will be produced for wrong pragma
-                # but we may have syntax error.
+            while True:
                 try:
-                    cur.execute('PRAGMA {}'.format(pragma))
+                    self.load_extension()
+                    break
                 except Exception as e:
-                    # I cannot raise an error because uers need to open the project to reset this value.
-                    sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas: {}\n'.format(pragma, e))
-                #
-                self.database.commit()
-            # trying to load extension
-            loaded = False
-            for path in sys.path:
-                ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
-                if ext:
-                    cur = self.database.cursor()
-                    try:
-                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
-                    except Exception as e:
-                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
-                    loaded = True
-                    break
-                ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
-                if ext:
-                    cur = self.database.cursor()
-                    try:
-                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
-                    except Exception as e:
-                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
-                    loaded = True
-                    break
-                #
-                # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
-                ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext.*'))
-                if ext:
-                    cur = self.database.cursor()
-                    try:
-                        cur.execute('SELECT load_extension("{}");'.format(ext[0]))
-                    except Exception as e:
-                        raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
-                    loaded = True
-                    break
-            if not loaded:
-                env.logger.warning('Failed to load sqlite extension module. No extended SQL functions can be used.')
+                    env.logger.warning('Retrying to open database: {}'.format(e))
+                    sleep(10)
             if lock is not None:
                 lock.release()
+    
+    def load_extension(self):
+        cur = self.database.cursor()
+        for pragma in env.sqlite_pragma:
+            # if a pragma is only applicable to certain database, check its name
+            if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
+                continue
+            # No error message will be produced for wrong pragma
+            # but we may have syntax error.
+            try:
+                cur.execute('PRAGMA {}'.format(pragma))
+            except Exception as e:
+                # I cannot raise an error because uers need to open the project to reset this value.
+                sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas: {}\n'.format(pragma, e))
+            #
+            self.database.commit()
+        # trying to load extension
+        loaded = False
+        for path in sys.path:
+            ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
+            if ext:
+                cur = self.database.cursor()
+                try:
+                    cur.execute('SELECT load_extension("{}");'.format(ext[0]))
+                except Exception as e:
+                    raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                loaded = True
+                break
+            ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
+            if ext:
+                cur = self.database.cursor()
+                try:
+                    cur.execute('SELECT load_extension("{}");'.format(ext[0]))
+                except Exception as e:
+                    raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                loaded = True
+                break
+            #
+            # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
+            ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext.*'))
+            if ext:
+                cur = self.database.cursor()
+                try:
+                    cur.execute('SELECT load_extension("{}");'.format(ext[0]))
+                except Exception as e:
+                    raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
+                loaded = True
+                break
+        if not loaded:
+            env.logger.warning('Failed to load sqlite extension module. No extended SQL functions can be used.')
 
 
     def close(self):
