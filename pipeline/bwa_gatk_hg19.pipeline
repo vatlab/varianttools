@@ -16,8 +16,10 @@ align_description=Align raw reads from input files using bwa, gatk, and picard.
   generates a calibrated bam file (--output), and its reduced version if an
   additional output file is specified.
 
-call_description=Call and validate variants (SNPs and Indels) from a input bam
-  file. This pipeline accepts a bam file as input and a vcf file as output.
+call_description=Call and validate variants (SNPs and Indels) from one or more
+  input bam files. This pipeline accepts one or more bam files as input and a
+  vcf file as output. If multiple input files are specified, multi-sample variant
+  calling will be performed.
 
 # resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_hg19
 RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk23_hg19
@@ -466,7 +468,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -jar %(gatk_path)s/GenomeAnalysisTK.jar
         -T UnifiedGenotyper 
         %(opt_gatk_unifiedgenotyper)s 
-        -I ${INPUT} 
+        ${INPUT: ' '.join(['-I ' + x for x in INPUT])} 
         -R ${RESOURCE_DIR}/ucsc.hg19.fasta
         --dbsnp ${RESOURCE_DIR}/dbsnp_137.hg19.vcf
         --genotype_likelihoods_model BOTH 
