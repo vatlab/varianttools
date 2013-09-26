@@ -34,13 +34,13 @@ source_pattern=dbNSFP2.0_gene
 
 [Gene_name]
 index=1
-type=VARCHAR(255)
+type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment= Gene symbol from HGNC
 
 [Ensembl_gene]
 index=2
-type=VARCHAR(255)
+type=VARCHAR(255)  COLLATE NOCASE
 adj=Nullify('.')
 comment= Ensembl gene id (from HGNC)
 
@@ -52,13 +52,13 @@ comment= Chromosome number (from HGNC)
 
 [Gene_old_names]
 index=4
-type=VARCHAR(255)
+type=VARCHAR(255)  COLLATE NOCASE
 adj=Nullify('.')
 comment= Old gene sybmol (from HGNC)
 
 [Gene_other_names]
 index=5
-type=VARCHAR(255)
+type=VARCHAR(255)  COLLATE NOCASE
 adj=Nullify('.')
 comment= Other gene names (from HGNC)
 
@@ -70,43 +70,43 @@ comment= Uniprot acc number (from HGNC and Uniprot)
 
 [Uniprot_id]
 index=7
-type=VARCHAR(255)
+type=VARCHAR(255)  COLLATE NOCASE
 adj=Nullify('.')
 comment= Uniprot id (from HGNC and Uniprot)
 
 [Entrez_gene_id]
 index=8
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= Entrez gene id (from HGNC)
 
 [CCDS_id]
 index=9
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= CCDS id (from HGNC)
 
 [Refseq_id]
 index=10
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= Refseq gene id (from HGNC)
 
 [ucsc_id]
 index=11
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= UCSC gene id (from HGNC)
 
 [MIM_id]
 index=12
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= MIM gene id (from HGNC)
 
 [Gene_full_name]
 index=13
-type=VARCHAR(255)
+type=VARCHAR(255)   COLLATE NOCASE
 adj=Nullify('.')
 comment= Gene full name (from HGNC)
 
