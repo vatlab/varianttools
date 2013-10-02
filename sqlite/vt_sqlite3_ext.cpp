@@ -585,8 +585,8 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi
 							char * r = q + 1;
 							while (*r != ';' && *r != '\0') ++r;
 							*r = '\0';
-							break;
 						}
+						break;
 					} else {
 						while (*q != ';' && *q != '\0') ++q;
 						if (*q != '\0')
@@ -721,8 +721,8 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi
 								while (*r != ';' && *r != '\0') ++r;
 								*r = '\0';
 								res << q;
-								break;
 							}
+							break;
 						} else {
 							while (*q != ';' && *q != '\0') ++q;
 							if (*q != '\0')
