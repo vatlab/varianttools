@@ -146,23 +146,52 @@ class EmitInput:
                 raise ValueError('Failed to pair input filenames: {} is not paired'
                     'with any other names.'.format(', '.join(unpaired)))
             uniquely_paired = [x for x in selected if sum([x in y for y in all_pairs]) == 1]
-            # pairs are now the uniquely paired
-            pairs = [x for x in all_pairs if x[0] in uniquely_paired or x[1] in uniquely_paired]
-            if not uniquely_paired:
-                raise ValueError('Failed to pair input filenames: all names '
-                    'match multiple names.')
-            if len(pairs) != all_pairs:
-                # find the differentiating index of existing pairs
-                diff_at = set([[i != j for i,j in zip(x[0],x[1])].index(True) for x in pairs])
-                # use the diff_at locations to screen the rest of the pairs
-                pairs.extend([x for x in all_pairs if x not in pairs and self._is_paired(x[0], x[1], diff_at)])
+            # if some filenames are uniquely paired, we can use them to identify
+            # index locations.
+            if uniquely_paired:
+                pairs = [x for x in all_pairs if x[0] in uniquely_paired or x[1] in uniquely_paired]
+                if len(pairs) != all_pairs:
+                    # find the differentiating index of existing pairs
+                    diff_at = set([[i != j for i,j in zip(x[0],x[1])].index(True) for x in pairs])
+                    # use the diff_at locations to screen the rest of the pairs
+                    pairs.extend([x for x in all_pairs if x not in pairs and self._is_paired(x[0], x[1], diff_at)])
+                    #
+                    if len(pairs) * 2 != len(selected):
+                        unpaired = [x for x in selected if not any([x in y for y in pairs])]
+                        raise ValueError('Failed to pair input files because they '
+                            'match multiple filenames: {}'.format(', '.join(unpaired)))
+                return sorted(pairs), unselected
+            else:
+                # all filenames match to multiple names, so we try to get all
+                # differentiating indexes and see if one of them can pair filenames
+                # perfectly. We start from the end because we assume that _1 _2
+                # are close to the end of filenames.
                 #
-                if len(pairs) * 2 != len(selected):
-                    unpaired = [x for x in selected if not any([x in y for y in pairs])]
-                    raise ValueError('Failed to pair input files because they '
-                        'match multiple filenames: {}'.format(', '.join(unpaired)))
-            return sorted(pairs), unselected
-
+                diff_at = set([[i != j for i,j in zip(x[0],x[1])].index(True) for x in all_pairs])
+                acceptable_diff_at = []
+                for d in diff_at:
+                    # try to pair all names at this location.
+                    pairs = [x for x in all_pairs if self._is_paired(x[0], x[1], [d])]
+                    if len(pairs) * 2 != len(selected):
+                        continue
+                    # all filename should appear once and only once
+                    if not all([sum([x in y for y in pairs]) == 1 for x in selected]):
+                        continue
+                    acceptable_diff_at.append(d)
+                # fortunately, only one perfect pairing is found
+                if len(acceptable_diff_at) == 1:
+                    pairs = [x for x in all_pairs if self._is_paired(x[0], x[1], acceptable_diff_at)]
+                    return sorted(pairs), unselected
+                elif len(acceptable_diff_at) > 1:
+                    env.logger.warning('There are {} ways to match all filenames '
+                        'perfectly. The one using a latter differentiating index '
+                        'is used.'.format(len(acceptable_diff_at)))
+                    diff_at = sorted(list(acceptable_diff_at))[-1]
+                    pairs = [x for x in all_pairs if self._is_paired(x[0], x[1], [diff_at])]
+                    return sorted(pairs), unselected
+                else:
+                    raise ValueError('All filenames match multiple names but no differentiating '
+                        'index can pair filenames perfectly.') 
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,

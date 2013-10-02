@@ -3426,7 +3426,7 @@ project_format_history = [
 
 def initArguments(parser):
     parser.add_argument('project',
-        help='''Name of a new project. This will create a new file $project.proj under
+        help='''Name of a new project. This will create a new .proj file under
             the current directory. Only one project is allowed in a directory.''')
     parent = parser.add_argument_group('Derive from a parent project')
     parser.add_argument('-f', '--force', action='store_true',
