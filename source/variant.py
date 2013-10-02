@@ -149,7 +149,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
                 order_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
                     order_clause, flags=re.IGNORECASE)
         # order and where clauses are used inside the query in the new from_clause
-        query = 'SELECT {} {} {} {};'.format(select_clause, from_clause,
+        query = 'SELECT {} {} {} {} {};'.format(select_clause, from_clause,
             group_clause, order_clause, limit_clause)
     env.logger.debug('Running query {}'.format(query))
     # if output to a file
