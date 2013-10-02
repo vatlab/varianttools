@@ -256,7 +256,7 @@ input=${OUTPUT101}
 # read group is guessed from input and output file names
 action=GuessReadGroup(bamfile="${CMD_OUTPUT}",
     rgfile="${INPUT: INPUT[0] + '.RG'}")
-input_emitter=EmitInput(group_by='paired', select='fastq')
+input_emitter=EmitInput(group_by='paired', select='fastq', pass_unselected=False)
 comment=Determine (guess) a read group tag and write to a .RG file.
 
 [align_301]
@@ -270,7 +270,7 @@ action=RunCommand(cmd=r"%(bwa)s sampe %(opt_bwa_sampe)s
         ${INPUT: INPUT[0]} ${INPUT: INPUT[1]} > ${INPUT: INPUT[0] + '.sam'}",
     output="${INPUT: INPUT[0] + '.sam'}",
 	max_jobs=10)
-input_emitter=EmitInput(group_by='paired', select='fastq')
+input_emitter=EmitInput(group_by='paired', select='fastq', pass_unselected=False)
 comment=Running bwa sampe for paired end reads, using read group tag saved
     in a .RG file
 
