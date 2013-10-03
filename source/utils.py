@@ -1055,7 +1055,7 @@ class ProgressBar:
             msg[1] = ' 100%'
             width = self.term_width - len(msg[0]) - len(msg[1]) - m3Len - len(msg[4]) - len(msg[5])
             if width > 4:
-                front = int(width - 4)
+                front = int(width - 3)
                 if self.count:
                     failed_front = int(float(self.failed_count)/self.count*front)
                 else:
