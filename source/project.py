@@ -3783,15 +3783,15 @@ def show(args):
                     fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1: 25})
-                prt.feed(['sample_name', 'filename'] + fields[3:])
+                prt.write(['sample_name', 'filename'] + fields[3:])
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id {} ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields[3:]]),
                     ' '.join(['AND ({})'.format(x) for x in args.items]),
                     limit_clause))
                 for rec in cur:
-                    prt.feed(rec)
-                print(prt.text())
+                    prt.write(rec)
+                prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -3817,14 +3817,14 @@ def show(args):
                     fields = found
                 # headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter()
-                prt.feed(['sample_name'] + fields)
+                prt.write(['sample_name'] + fields)
                 cur.execute('SELECT sample_name {} FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields]),
                     limit_clause))
                 for rec in cur:
-                    prt.feed(rec)
-                print(prt.text())
+                    prt.write(rec)
+                prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -3938,7 +3938,7 @@ def show(args):
                         env.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1:25})
-                prt.feed(['sample_name', 'filename', 'num_genotypes', 'sample_genotype_fields'])
+                prt.write(['sample_name', 'filename', 'num_genotypes', 'sample_genotype_fields'])
                 cur.execute('SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
                 for rec in records:
@@ -3954,8 +3954,8 @@ def show(args):
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
-                    prt.feed([rec[1], rec[2], numGenotypes, sampleGenotypeFields])
-                print(prt.text())
+                    prt.write([rec[1], rec[2], numGenotypes, sampleGenotypeFields])
+                prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))

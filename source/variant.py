@@ -30,7 +30,8 @@ import tempfile
 import subprocess
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
-    delayedAction, encodeTableName, decodeTableName, env, validFieldName
+    delayedAction, encodeTableName, decodeTableName, env, validFieldName, \
+    PrettyPrinter
 from .phenotype import Sample
 
 
@@ -49,8 +50,10 @@ def generalOutputArguments(parser):
             multi-line headers (e.g. cat myheader | vtools export --header -). If this
             parameter is given without parameter, a default header will be derived from
             field names.'''),
-    grp.add_argument('-d', '--delimiter', default='\t',
-        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
+    grp.add_argument('-d', '--delimiter', default=None,
+        help='''Delimiter use to separate columns of output. The default output uses
+            multiple spaces to align columns of output. Use '-d,' for csv output, or
+            -d'\t' for tab-delimited output.''')
     grp.add_argument('--na', default='.',
         help='Output string for missing value')
     grp.add_argument('-l', '--limit', metavar='N', type=int,
@@ -155,21 +158,21 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     # if output to a file
     cur = proj.db.cursor()
     cur.execute(query)
+    prt = PrettyPrinter(delimiter=args.delimiter)
     if args.header is not None:
         if len(args.header) == 0:
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
-            sys.stdout.write(args.delimiter.join([validFieldName(x) for x in output_fields]) + '\n')
+            prt.write([validFieldName(x) for x in output_fields])
         elif args.header == ['-']:
-            #env.logger.info('Reading header from standard input')
-            sys.stdout.write(sys.stdin.read().rstrip() + '\n')
+            print(sys.stdin.read().rstrip())
         else:
             # other wise, use the user-provided header
             if len(args.header) != len(output_fields):
                 env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
-            sys.stdout.write(args.delimiter.join(args.header) + '\n')
+            prt.write(args.header)
     for rec in cur:
-        line = args.delimiter.join([args.na if x is None else str(x) for x in rec]) + '\n'
-        sys.stdout.write(line)
+        prt.write([args.na if x is None else str(x) for x in rec])
+    prt.write_rest()
 
 def output(args):
     try:

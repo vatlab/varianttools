@@ -607,19 +607,51 @@ def lineCount(filename, encoding='UTF-8'):
         return int(lineCount * (totalSize / 99000.))
 
 class PrettyPrinter:
-    def __init__(self, field_sep=' '*2, max_width={}):
-        self.field_sep = field_sep
+    def __init__(self, delimiter=None, max_width={}, cache_size=1000):
+        ''' delimiter: use specified field to separate fields
+            max_width: a dictionary of {col: max_width} to change long
+                text to START...END
+            cache: only use the first cache lines to get column width
+        '''
         self.width = []
         self.rows = []
-        self.limits = max_width
+        self.max_width = max_width
+        self.cache_size = cache_size
+        # if a delimiter is specified, use it
+        if delimiter is not None:
+            self.delimiter = '\t' if delimiter in [r'\t', 'TAB'] else delimiter
+            self.write = self.direct_print
+            self.write_rest = self.direct_print_rest
+        elif max_width:
+            self.delimiter = '  '
+            self.write = self.cached_trim_print
+            self.write_rest = self.cached_trim_print_rest
+        else:
+            self.delimiter = '  '
+            self.write = self.cached_print
+            self.write_rest = self.cached_print_rest
 
-    def feed(self, data):
+    #
+    # MODE 1: direct print
+    #
+    def direct_print(self, data):
+        '''print data directly using specified delimiter'''
+        print(self.delimiter.join([str(x) for x in data]))
+
+    def direct_print_rest(self):
+        '''No cache so do nothing'''
+        pass
+
+    #
+    # MODE 2: cached, trimmed print
+    #
+    def cached_trim_print(self, data):
+        '''Use cache, figure out column width'''
         trimmed = {}
-        for c,m in self.limits.items():
+        for c,m in self.max_width.items():
             if len(str(data[c])) > m:
                 txt = str(data[c])
                 txt = txt[: m // 3] + '...' + txt[ - (m - m // 3 - 3):]
-                print((txt))
                 trimmed[c] = txt
         if trimmed:
             trimmed_data = [x for x in data]
@@ -633,13 +665,65 @@ class PrettyPrinter:
             self.width = [len(str(x)) for x in trimmed_data]
         else:
             self.width = [max(y, len(str(x))) for y,x in zip(self.width, trimmed_data)]
+        # cache size exceeds, use collected width and stop checking
+        if len(self.rows) > self.cache_size:
+            self.cached_trim_print_rest()
+            # change print mode
+            self.write = self.uncached_trim_print
 
-    def text(self):
-        return('\n'.join([
-            self.field_sep.join(
+    def cached_trim_print_rest(self):
+        '''Print and clear cache'''
+        # print everything in cache
+        print('\n'.join([
+            self.delimiter.join(
                 [str(col).ljust(width) for col, width in zip(row, self.width)])
             for row in self.rows]))
+        # clear cache
+        self.rows = []
+
+    def uncached_trim_print(self, data):
+        trimmed = {}
+        for c,m in self.max_width.items():
+            if len(str(data[c])) > m:
+                txt = str(data[c])
+                txt = txt[: m // 3] + '...' + txt[ - (m - m // 3 - 3):]
+                trimmed[c] = txt
+        if trimmed:
+            trimmed_data = [x for x in data]
+            for c,txt in trimmed.items():
+                trimmed_data[c] = txt
+        else:
+            trimmed_data = data
+        #
+        print(self.delimiter.join(
+            [str(col).ljust(width) for col, width in zip(trimmed_data, self.width)]))
+
+    #
+    # MODE 3: cached, untrimmed print
+    # 
+    def cached_print(self, data):
+        self.rows.append(data)
+        if not self.width:
+            self.width = [len(str(x)) for x in data]
+        else:
+            self.width = [max(y, len(str(x))) for y,x in zip(self.width, data)]
+        # cache size exceeds, use collected width and stop checking
+        if len(self.rows) > self.cache_size:
+            self.cached_print_rest()
+            # change print mode
+            self.write = self.uncached_trim_print
+
+    def cached_print_rest(self):
+        print('\n'.join([
+            self.delimiter.join(
+                [str(col).ljust(width) for col, width in zip(row, self.width)])
+            for row in self.rows]))
+        self.rows = []
     
+    def uncached_print(self, data):
+        print(self.delimiter.join(
+            [str(col).ljust(width) for col, width in zip(data, self.width)]))
+
 
 def hasCommand(cmd):
     try:
