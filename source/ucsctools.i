@@ -102,7 +102,7 @@ void showTrack(const std::string & track_file)
         
         printf("%-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
         printf("%-23s %d\n\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
-        printf("Header: (exclude INFO and FORMAT lines)\n");
+        printf("Header: (excluding INFO and FORMAT lines)\n");
         char *tok = strtok(vcff->headerString, "\n");
         while (tok != NULL) {
             if ( !(startsWith("##INFO", (char *)tok) || startsWith("##fileformat", (char *)tok)

@@ -744,8 +744,10 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
         if id_idx % prog_step == 0:
             prog.update(id_idx + 1)
     prog.done()
-    if len(variants) == 0:
-        raise ValueError('No variant is updated')
+    #
+    # even if no variant is updated, we need set count 0 to fields.
+    #if len(variants) == 0:
+    #    raise ValueError('No variant is updated')
     #
     headers = [x.lower() for x in proj.db.getHeaders('variant')]
     table_attributes = [(alt, 'INT'), (hom, 'INT'),
@@ -785,6 +787,7 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
     warning = False
+    count = 0
     for count,id in enumerate(variants):
         value = variants[id]
         res = []
