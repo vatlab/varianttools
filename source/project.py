@@ -53,7 +53,8 @@ from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
     VTOOLS_CITATION, VTOOLS_REVISION, VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
-    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName
+    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
+    PrettyPrinter
 
 
 # define a field type
@@ -3781,17 +3782,16 @@ def show(args):
                 if args.verbosity == '0':
                     fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
-                print('sample_name\tfilename{}'.format(''.join(['\t'+x for x in fields[3:]])))
+                prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1: 25})
+                prt.feed(['sample_name', 'filename'] + fields[3:])
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id {} ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields[3:]]),
                     ' '.join(['AND ({})'.format(x) for x in args.items]),
                     limit_clause))
                 for rec in cur:
-                    if args.verbosity != '2' and len(rec[1]) > 25:
-                        rec = list(rec)
-                        rec[1] = rec[1][:8] + '...' + rec[1][-14:]
-                    print('\t'.join(['{}'.format(x) for x in rec]))
+                    prt.feed(rec)
+                print(prt.text())
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -3816,13 +3816,15 @@ def show(args):
                             .format(', '.join(unfound)))
                     fields = found
                 # headers are ID, file, sample, FIELDS
-                print('sample_name{}'.format(''.join(['\t'+x for x in fields])))
+                prt = PrettyPrinter()
+                prt.feed(['sample_name'] + fields)
                 cur.execute('SELECT sample_name {} FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields]),
                     limit_clause))
                 for rec in cur:
-                    print('\t'.join(['{}'.format(x) for x in rec]))
+                    prt.feed(rec)
+                print(prt.text())
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -3935,7 +3937,8 @@ def show(args):
                     if not proj.db.hasDatabase(proj.name + '_genotype'):
                         env.logger.debug('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
-                print('sample_name\tfilename\tnum_genotypes\tsample_genotype_fields')
+                prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1:25})
+                prt.feed(['sample_name', 'filename', 'num_genotypes', 'sample_genotype_fields'])
                 cur.execute('SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
                 for rec in records:
@@ -3951,7 +3954,8 @@ def show(args):
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
-                    print('{}\t{}\t{}'.format(sampleFields, numGenotypes, sampleGenotypeFields))
+                    prt.feed([rec[1], rec[2], numGenotypes, sampleGenotypeFields])
+                print(prt.text())
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))

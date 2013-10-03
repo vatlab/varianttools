@@ -606,6 +606,40 @@ def lineCount(filename, encoding='UTF-8'):
         input.close()
         return int(lineCount * (totalSize / 99000.))
 
+class PrettyPrinter:
+    def __init__(self, field_sep=' '*2, max_width={}):
+        self.field_sep = field_sep
+        self.width = []
+        self.rows = []
+        self.limits = max_width
+
+    def feed(self, data):
+        trimmed = {}
+        for c,m in self.limits.items():
+            if len(str(data[c])) > m:
+                txt = str(data[c])
+                txt = txt[: m // 3] + '...' + txt[ - (m - m // 3 - 3):]
+                print((txt))
+                trimmed[c] = txt
+        if trimmed:
+            trimmed_data = [x for x in data]
+            for c,txt in trimmed.items():
+                trimmed_data[c] = txt
+        else:
+            trimmed_data = data
+        #
+        self.rows.append(trimmed_data)
+        if not self.width:
+            self.width = [len(str(x)) for x in trimmed_data]
+        else:
+            self.width = [max(y, len(str(x))) for y,x in zip(self.width, trimmed_data)]
+
+    def text(self):
+        return('\n'.join([
+            self.field_sep.join(
+                [str(col).ljust(width) for col, width in zip(row, self.width)])
+            for row in self.rows]))
+    
 
 def hasCommand(cmd):
     try:
