@@ -2322,7 +2322,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     res = []
     fields = []
     has_ref_query = False
-    ref_tokens = {'ref_base': '__REFBASE__',
+    ref_tokens = {
         'ref_sequence': '__REFSEQ__',
         'vcf_variant': '__VCFVARIANT__'
     }
@@ -2387,10 +2387,10 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         for k,v in track_tokens.items():
             if alt_build:
                 query = re.sub(r'{}\s*\('.format(v), 
-                    ' {}({}, {}, '.format(k, "variant.alt_chr", "variant.alt_pos"), query)
+                    ' {}({}, {}, {}, {}, '.format(k, "variant.alt_chr", "variant.alt_pos", "variant.ref", "variant.alt"), query)
             else:
                 query = re.sub(r'{}\s*\('.format(v), 
-                    ' {}({}, {}, '.format(k, "variant.chr", "variant.pos"), query)
+                    ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
     return query, fields
 
 def extractField(field):

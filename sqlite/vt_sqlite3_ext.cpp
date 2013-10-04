@@ -293,7 +293,7 @@ struct FieldInfo
 };
 
 struct TrackInfo;
-typedef void (*track_handler)(void *, char *, int, FieldInfo *, TrackInfo *, sqlite3_context *);
+typedef void (*track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -340,7 +340,7 @@ TrackFileMap trackFileMap;
 #define BIGWIG_FILE 2
 #define VCFTABIX_FILE 3
 
-void bigBedTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+void bigBedTrack(void * track_file, char * chr, int pos, char *, char *, FieldInfo * fi,
                  TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
@@ -439,7 +439,7 @@ void bigBedTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
 }
 
 
-static void bigWigTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+static void bigWigTrack(void * track_file, char * chr, int pos, char *, char *, FieldInfo * fi,
                         TrackInfo * info, sqlite3_context * context)
 {
 	bbiFile * cf = (bbiFile *)track_file;
@@ -498,7 +498,45 @@ static void bigWigTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
 }
 
 
-static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+bool vcf_match(char * ref, char * alt, int count, char ** alleles)
+{
+	if (*ref == '-') {
+		// insertion
+		int leading = strlen(alleles[0]);
+		for (size_t i = 1; i < count; ++i)
+			if (strlen(alleles[i]) > leading && strcmp(alt, alleles[i] + leading) == 0)
+				return true;
+		return false;
+	} else if (*alt == '-') {
+		int reflen = strlen(alleles[0]);
+		// deletion
+		for (size_t i = 1; i < count; ++i)
+			if (strlen(alleles[i]) < reflen && strcmp(ref, alleles[0] + strlen(alleles[i])) == 0)
+				return true;
+		return false;
+	} else if (strlen(ref) == 1 && strlen(alt) == 1) {
+		// regular SNVs
+		if (strcmp(ref, alleles[0]) != 0)
+			return false;
+		for (size_t i = 1; i < count; ++i)
+			if (strcmp(alt, alleles[i]) == 0)
+				return true;
+		return false;
+	} else {
+		// complex variants
+		for (size_t i = 1; i < count; ++i) {
+			// find common leading
+			char * p = alleles[0];
+			char * q = alleles[i];
+			for (; *p != '\0' && *q != '\0' && *p == *q; ++p, ++q);
+			if (strcmp(ref, p) == 0 && strcmp(alt, q) == 0)
+				return true;
+		}
+		return false;
+	}
+}
+
+static void vcfTabixTrack(void * track_file, char * chr, int pos, char * ref, char * alt, FieldInfo * fi,
                           TrackInfo * info, sqlite3_context * context)
 {
 	struct vcfFile * cf = (struct vcfFile *)track_file;
@@ -517,12 +555,34 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi
 	// clear record pool
 	vcfFileFlushRecords(cf);
 	// read records
-	int nRecord = vcfTabixBatchRead(cf, chrName, pos - 1, pos, VCF_IGNORE_ERRS, -1);
+	//
+	// adjust pos for indels
+	int nRecord = 0;
+	if (*ref == '-' || *alt == '-') {
+		// for insertion, pos, -, aaa
+		// it should be   pos - 1 , X, Xaaa
+		// in vcf file
+		nRecord = vcfTabixBatchRead(cf, chrName, pos - 2, pos - 1, VCF_IGNORE_ERRS, -1);
+	} else {
+		nRecord = vcfTabixBatchRead(cf, chrName, pos - 1, pos, VCF_IGNORE_ERRS, -1);
+	}
 	// first case, no result
 	if (nRecord == 0) {
 		sqlite3_result_null(context);
 	} else if (!fi->all) {
-		struct vcfRecord * rec = cf->records;
+		struct vcfRecord * rec = NULL;
+		bool match = false;
+		for (rec = cf->records; rec != NULL; rec = rec->next) {
+			if (vcf_match(ref, alt, rec->alleleCount, rec->alleles)) {
+				match = true;
+				break;
+			}
+		}
+		if (!match) {
+			sqlite3_result_null(context);
+			return;
+		}
+
 		if (fi->column == 1)
 			// chrom
 			sqlite3_result_text(context, chrName, -1, SQLITE_TRANSIENT);
@@ -661,6 +721,8 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, FieldInfo * fi
 		struct vcfRecord * rec = NULL;
 		bool first = true;
 		for (rec = cf->records; rec != NULL; rec = rec->next) {
+			if (!vcf_match(ref, alt, rec->alleleCount, rec->alleles))
+				continue;
 			if (!first)
 				res << '|';
 			else
@@ -868,7 +930,7 @@ static int fetch_func(const bam1_t * b, void * data)
 
 
 // calculate depth
-static void bamTrack(void * track_file, char * chr, int pos, FieldInfo * fi,
+static void bamTrack(void * track_file, char * chr, int pos, char *, char *, FieldInfo * fi,
                      TrackInfo * info, sqlite3_context * context)
 {
 	samfile_t * sf = (samfile_t *)track_file;
@@ -985,17 +1047,21 @@ static void track(
                   sqlite3_value ** argv
                   )
 {
-	if (argc < 3 ||
+	if (argc < 5 ||
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
 	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[2]) == SQLITE_NULL) {
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[3]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[4]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please specify at least filename", -1);
 		return;
 	}
 
-	std::string track_file = std::string((char *)sqlite3_value_text(argv[2]));
+	std::string track_file = std::string((char *)sqlite3_value_text(argv[4]));
 	char * chr = (char *)sqlite3_value_text(argv[0]);
 	int pos = sqlite3_value_int(argv[1]);
+	char * ref = (char *)sqlite3_value_text(argv[2]);
+	char * alt = (char *)sqlite3_value_text(argv[3]);
 
 	TrackFileMap::const_iterator it = trackFileMap.find(track_file);
 	TrackInfo info;
@@ -1126,11 +1192,11 @@ static void track(
 	fi.name = "";
 	fi.all = false;
 	if (argc >= 4) {
-		if (sqlite3_value_type(argv[3]) == SQLITE_INTEGER) {
-			fi.column = sqlite3_value_int(argv[3]);
+		if (sqlite3_value_type(argv[5]) == SQLITE_INTEGER) {
+			fi.column = sqlite3_value_int(argv[5]);
 			fi.name = "";
 		} else {
-			char * name = (char *)(sqlite3_value_text(argv[3]));
+			char * name = (char *)(sqlite3_value_text(argv[5]));
 			char * p = name;
 			while (*p != '?' && *p != '\0')
 				++p;
@@ -1156,8 +1222,8 @@ static void track(
 		}
 	}
 	if (argc >= 5) {
-		if (sqlite3_value_type(argv[4]) == SQLITE_INTEGER)
-			fi.all = sqlite3_value_int(argv[4]);
+		if (sqlite3_value_type(argv[6]) == SQLITE_INTEGER)
+			fi.all = sqlite3_value_int(argv[6]);
 		else {
 			sqlite3_result_error(context, "wrong datatype for the last parameter. 0 or 1 (all records) is expected.", -1);
 			return;
@@ -1165,7 +1231,7 @@ static void track(
 	}
 
 	// call the handler
-	(*info.handler)(info.file, chr, pos, &fi, &info, context);
+	(*info.handler)(info.file, chr, pos, ref, alt, &fi, &info, context);
 }
 
 
