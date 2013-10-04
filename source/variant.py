@@ -53,7 +53,7 @@ def generalOutputArguments(parser):
     grp.add_argument('-d', '--delimiter', default=None,
         help='''Delimiter use to separate columns of output. The default output uses
             multiple spaces to align columns of output. Use '-d,' for csv output, or
-            -d'\t' for tab-delimited output.''')
+            -d'\\t' for tab-delimited output.''')
     grp.add_argument('--na', default='.',
         help='Output string for missing value')
     grp.add_argument('-l', '--limit', metavar='N', type=int,

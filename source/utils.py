@@ -619,7 +619,7 @@ class PrettyPrinter:
         self.cache_size = cache_size
         # if a delimiter is specified, use it
         if delimiter is not None:
-            self.delimiter = '\t' if delimiter in [r'\t', 'TAB'] else delimiter
+            self.delimiter = delimiter.replace(r'\t', '\t')
             self.write = self.direct_print
             self.write_rest = self.direct_print_rest
         elif max_width:
