@@ -436,6 +436,7 @@ class EncodeGenotype:
     def __call__(self, item):
         return self.map[item]
         
+
 class Nullify:
     '''Change specified input value to NULL '''
     def __init__(self, val):
@@ -685,6 +686,73 @@ class Formatter:
         except:
             return str(item)
 
+class PlainFormatter:
+    def __init__(self, mode='vcf'):
+        self.mode = mode
+    
+    def mergeVariants(self, item):
+        #
+        # This is UGLY code but it is not my fault, it is the vcf format's fault. :-( 
+        #
+        # this is a special case for vcf. It is better to assign a special
+        # adjuster but I put it here for backward compatibility of the .vcf
+        # file.
+        #
+        # case 1:  X  10000  A  C
+        #          X  10000  A  T
+        #
+        # merge to: X  10000  A  C,T
+        #
+        # case 2:  X  10000 TAC T  (from X  10001 AC -)
+        #          X  10001 A  T
+        #
+        # merge to: X 10000 TAC  T,TT
+        #
+        # join each subitems
+        uniq = [[x] for x in item[0].split('\t')]
+        for x in item[1:]:
+            for idx,y in enumerate(x.split('\t')):
+                if idx >= len(uniq):
+                    uniq.append([y])
+                elif y and y not in uniq[idx]:
+                    uniq[idx].append(y)
+        # we can only handle case 2 with 2 items
+        if len(uniq[1]) == 1 or len(uniq) != 5 or len(item) != 2 or len(uniq[0]) != 1 or len(uniq[3]) == 1:
+            return '\t'.join([','.join(x) for x in uniq])
+        else:
+            # we have same chromosome, two position, two items, two ref, length 5
+            try:
+                min_pos = min([int(x) for x in uniq[1]])
+                min_item = 0 if int(uniq[1][0]) == min_pos else 1
+                ref = uniq[3][min_item]
+                alt0 = item[0].split('\t')[4]
+                alt1 = item[1].split('\t')[4]
+                return '\t'.join([uniq[0][0], # chromosome shared
+                        uniq[1][min_item],        # minimal pos
+                        uniq[2][0],
+                        ref,        # longer ref
+                        #  X  10000 TAC T  
+                        #  X  10001 A  T
+                        (alt0 + ',' + ref[:int(uniq[1][1]) - min_pos] + alt1) if min_item == 0 \
+                        else (ref[:int(uniq[1][0]) - min_pos] + alt0 + ',' + alt1)])
+            except:
+                return '\t'.join([','.join(x) for x in uniq])
+
+    def __call__(self, item):
+        if type(item) == tuple:
+            if '\t' in item[0]:
+                return self.mergeVariants(item)
+            else:
+                # join unique ones
+                uniq = [item[0]]
+                for x in item[1:]:
+                    if x and x not in uniq:
+                        uniq.append(x)
+                return ','.join([str(x) for x in uniq])
+        else:
+            return str(item)
+
+
 class CSVFormatter:
     def __init__(self):
         pass
@@ -698,6 +766,13 @@ class CSVFormatter:
             # quote all strings, because sometimes excel will treat them differently.
             else:
                 return '"' + item + '"'
+        elif type(item) == tuple:
+            val = ','.join([str(x) for x in item])
+            if '"' in val:
+                return '"' + val.replace('"', '""') + '"'
+            if ',' in val or '\n' in val:
+                return '"' + val + '"'
+            return val
         else:
             # not string...
             val = str(item)

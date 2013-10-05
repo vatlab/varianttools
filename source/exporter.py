@@ -589,7 +589,7 @@ class Exporter:
         formatters = [] # formatters that will be used to produce strings from values
         col_adj = []        # adjust functions to combine values to one column.
 
-        default_formatter = str if '*' not in self.format.formatter.keys() else self.getAdjFunc(self.format.formatter['*'])
+        default_formatter = PlainFormatter().__call__ if '*' not in self.format.formatter.keys() else self.getAdjFunc(self.format.formatter['*'])
         #
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
@@ -692,7 +692,7 @@ class Exporter:
                 if multi_records:
                     try:
                         fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
-                            if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col][0])) for fmt, col in formatters]
+                            if fmt else ('' if (col is None or rec[col][0] is None) else default_formatter(rec[col])) for fmt, col in formatters]
                     except:
                         for fmt, col in formatters:
                             try:
@@ -747,7 +747,7 @@ class Exporter:
                         fields = [fmt(None if col is None else (rec[col] \
                             if type(col) is int else [rec[x] for x in col])) \
                             if fmt else ('' if (col is None or rec[col][0] is None)\
-                            else default_formatter(rec[col][0])) for fmt, col in formatters]
+                            else default_formatter(rec[col])) for fmt, col in formatters]
                     except:
                         for fmt, col in formatters:
                             try:
