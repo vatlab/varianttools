@@ -106,19 +106,19 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format vcf --geno')
 
         #--phase_sep should be used with --samples, otherwise useless 
-        self.assertSucc('vtools export variant --format vcf --format_string GT --phase_sep "|"')
-        self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT --phase_sep "|"')
+        self.assertSucc('vtools export variant --format vcf --format_string GT ')
+        self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT ')
 
         #I think --wildtype_code did not work in this way
         self.assertSucc('vtools export variant --format vcf --wildtype_code 0')
-        self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT --phase_sep "|" --wildtype_code 1')
+        self.assertSucc('vtools export variant --format vcf --samples 1 --format_string GT --wildtype_code 1')
    
     def testExportVcfSnv(self):
         'Test command export in vcf format'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # test basic vcf output
         self.assertSucc('vtools export variant --output my.vcf')
-        variants = output2list('vtools output variant chr pos ref alt')
+        variants = output2list('vtools output variant chr pos ref alt -d"\t"')
         with open('my.vcf') as infile:
             exported = infile.readlines()
             exported = ['\t'.join([x.split('\t')[0], x.split('\t')[1], x.split('\t')[3], x.split('\t')[4]]) for x in exported]

@@ -44,7 +44,7 @@ class TestCompare(ProcessTestCase):
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 -c'), ['0\t0\t6\t6'])
+        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection')
         self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection unique')
@@ -61,7 +61,7 @@ class TestCompare(ProcessTestCase):
         self.assertSucc('vtools compare ns d_plekhn1 --difference BdiffA')
         self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
         # use both options in one command should be allowed
-        self.assertSucc('vtools compare d_plekhn1 plekhn1 -c --union A_OR_B')
+        self.assertSucc('vtools compare d_plekhn1 plekhn1  --union A_OR_B')
         #
         # handling of non-alphanum names
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --union "KK@"')
@@ -83,23 +83,23 @@ class TestCompare(ProcessTestCase):
         runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
         runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
         # variant
-        self.assertOutput('vtools compare T1 T2 -c', '1\t2\t1\t4\n')
-        self.assertOutput('vtools compare T1 T2 --difference -c', '1\n')
-        self.assertOutput('vtools compare T2 T1 --difference -c', '2\n')
-        self.assertOutput('vtools compare T1 T2 --intersection -c', '1\n')
-        self.assertOutput('vtools compare T1 T2 --union -c', '4\n')
+        self.assertOutput('vtools compare T1 T2 ', '1\t2\t1\t4\n')
+        self.assertOutput('vtools compare T1 T2 --difference', '1\n')
+        self.assertOutput('vtools compare T2 T1 --difference', '2\n')
+        self.assertOutput('vtools compare T1 T2 --intersection', '1\n')
+        self.assertOutput('vtools compare T1 T2 --union', '4\n')
         # sample
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 -c', '1\t1\t1\t3\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference -c', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference -c', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection -c', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union -c', '3\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 ', '1\t1\t1\t3\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference ', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference ', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection ', '1\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union', '3\n')
         # site
-        self.assertOutput('vtools compare T1 T2 --mode site -c', '0\t1\t3\t4\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --difference -c', '0\n')
-        self.assertOutput('vtools compare T2 T1 --mode site --difference -c', '1\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --intersection -c', '3\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --union -c', '4\n')
+        self.assertOutput('vtools compare T1 T2 --mode site ', '0\t1\t3\t4\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --difference ', '0\n')
+        self.assertOutput('vtools compare T2 T1 --mode site --difference ', '1\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --intersection ', '3\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --union ', '4\n')
 
 
 
