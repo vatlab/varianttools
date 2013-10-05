@@ -45,7 +45,7 @@ class TestOutput(ProcessTestCase):
         self.assertFail('vtools output variant non_existing_field')
         self.assertSucc('vtools output variant chr pos ref alt')
         runCmd('vtools liftover hg19')
-        out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt')
+        out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt -d"\t"')
         out2 = outputOfCmd('cat txt/input.tsv')
         self.assertEqual(out1, out2)
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
