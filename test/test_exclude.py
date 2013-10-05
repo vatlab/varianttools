@@ -64,7 +64,7 @@ class TestExclude(ProcessTestCase):
         runCmd('vtools use dbSNP-hg19_137')
         self.assertSucc('vtools exclude variant "dbSNP.locType=\'exact\'" -t no_exact')
         self.assertSucc('vtools output no_exact variant_id chr pos ref alt')
-        out1 = output2list('vtools output no_exact variant_id chr pos ref alt')
+        out1 = output2list('vtools output no_exact variant_id chr pos ref alt -d"\t"')
         self.assertSucc('vtools update variant --set locType=dbSNP.locType')
         self.assertSucc('vtools execute "select variant_id, chr, pos, ref, alt from variant where locType is not \'exact\'"')
         out2 = output2list('vtools execute "select variant_id, chr, pos, ref, alt from variant where locType is not \'exact\'"')

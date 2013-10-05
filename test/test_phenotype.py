@@ -106,18 +106,17 @@ class TestPhenotype(ProcessTestCase):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
-        out3 = output2list('vtools show samples -l -1')
+        out3 = output2list('vtools show samples', True)
         #the output format was changed, so we reorganize the output and compare
         ori_file2 = open('phenotype/pheno_filename.txt', 'r')
-        new_file2 = open('new_file2','w')
+        prt = PrettyPrinter('new_file2')
         for line in ori_file2:
             c1,c2,c3,c4,c5 = line.split('\t')
-            line = '\t'.join([c2,c1,c3,c4,c5])
-            new_file2.write(line)
+            prt.cache([c2,c1,c3,c4,c5])
         ori_file2.close()
-        new_file2.close()
+        prt.write()
         with open('new_file2') as inputfile:
-            out4 = ['\t'.join((x.split('\t')[:3])) for x in inputfile] 
+            out4 = ['\t'.join((x.split()[:3])) for x in inputfile] 
         self.assertEqual(out3, out4)
         os.remove('new_file2')
         

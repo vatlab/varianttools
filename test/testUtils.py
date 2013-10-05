@@ -67,7 +67,7 @@ class ProcessTestCase(unittest.TestCase):
 
     def tearDown(self):
         'Clear any existing project'
-        runCmd('vtools remove project')
+        #runCmd('vtools remove project')
 
 # compare if the command output is what we want
     def assertOutput(self, cmd, output=None, numOfLines=0, file=None, skip=None):
@@ -140,7 +140,7 @@ def outputOfCmd(cmd):
             env=test_env).decode()
         
 
-def output2list(cmd, space2tab=True):
+def output2list(cmd, space2tab=False):
     txt = list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
     if space2tab:
         txt = ['\t'.join(t.split())  for t in txt]
