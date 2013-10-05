@@ -130,7 +130,12 @@ static void ref_sequence(
 	cgatools::reference::CrrFile * cf = NULL;
 
 	if (it == refFileMap.end()) {
-		cf = new cgatools::reference::CrrFile(ref_file);
+		try {
+			cf = new cgatools::reference::CrrFile(ref_file);
+		} catch (cgatools::util::Exception & e) {
+			sqlite3_result_error(context, e.what(), -1);
+			return;
+		}
 		refFileMap[ref_file] = cf;
 	} else {
 		cf = it->second;
@@ -223,7 +228,13 @@ static void vcf_variant(
 		cgatools::reference::CrrFile * cf = NULL;
 		RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
 		if (it == refFileMap.end()) {
-			cf = new cgatools::reference::CrrFile(ref_file);
+			try {
+				cf = new cgatools::reference::CrrFile(ref_file);
+			} catch (cgatools::util::Exception & e) {
+				sqlite3_result_error(context, e.what(), -1);
+				return;
+			}
+
 			refFileMap[ref_file] = cf;
 		} else {
 			cf = it->second;
@@ -231,30 +242,53 @@ static void vcf_variant(
 		//
 		// get chromosome index
 		int chrIdx = 0;
+		int succ = true;
 		ChrNameMap::const_iterator cit = chrNameMap.find(chr);
 		if (cit == chrNameMap.end()) {
 			try {
-				chrIdx = cf->getChromosomeId(chr);
-			} catch (...) {
-				chrIdx = cf->getChromosomeId("chr" + chr);
+				// cgatools' chromosome names have leading chr
+				// we add chr to 1, 2, 3, ... etc but not to other
+				// names. There might be a problem here.
+				if (chr.size() <= 2)
+					chrIdx = cf->getChromosomeId("chr" + chr);
+				else
+					chrIdx = cf->getChromosomeId(chr);
+				chrNameMap[chr] = chrIdx;
+			} catch (cgatools::util::Exception & e) {
+				// unrecognized chromosome	
+				//sqlite3_result_error(context, e.what(), -1);
+				succ = false;
 			}
-			chrNameMap[chr] = chrIdx;
 		} else {
 			chrIdx = cit->second;
 		}
 
-		char pad = cf->getBase(cgatools::reference::Location(chrIdx, pos - 2));
-		// 10 - A
-		// 9  G GA
-		res << chr << '\t' << (pos - 1) << '\t';
-		if (argc == 6)
-			res << name << '\t';
-		if (ref == "-")
-			res << pad << '\t' << pad << alt;
-		else
-			// 10 A -
-			// 9 GA G
-			res << pad << ref << '\t' << pad;
+		if (succ) {
+			try {
+				char pad = cf->getBase(cgatools::reference::Location(chrIdx, pos - 2));
+
+				// 10 - A
+				// 9  G GA
+				res << chr << '\t' << (pos - 1) << '\t';
+				if (argc == 6)
+					res << name << '\t';
+				if (ref == "-")
+					res << pad << '\t' << pad << alt;
+				else
+					// 10 A -
+					// 9 GA G
+					res << pad << ref << '\t' << pad;
+			} catch (cgatools::util::Exception & e) {
+				// position out of range
+				succ = false;
+			}
+		}
+		if (! succ) {
+			res << chr << '\t' << pos << '\t';
+			if (argc == 6)
+				res << name << '\t';
+			res << ref << '\t' << alt;
+		}
 	}
 	sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 }
