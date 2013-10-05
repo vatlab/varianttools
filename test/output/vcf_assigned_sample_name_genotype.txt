@@ -1,4 +1,4 @@
-sample_name	filename	num_genotypes	sample_genotype_fields
-samp_vcf1	vcf/SAMP1.vcf	289	GT
-samp_vcf2	vcf/SAMP2.vcf	288	GT
-samp_vcf3	vcf/SAMP...x_variants.vcf	137	
+sample_name  filename                   num_genotypes  sample_genotype_fields
+samp_vcf1    vcf/SAMP1.vcf              289            GT                    
+samp_vcf2    vcf/SAMP2.vcf              288            GT                    
+samp_vcf3    vcf/SAMP...x_variants.vcf  137                                  

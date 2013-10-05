@@ -34,6 +34,30 @@ import sys
 test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']]),
    'PYTHONPATH': os.environ.get('PYTHONPATH', '')}
 
+class PrettyPrinter:
+    def __init__(self, out):
+        ''' delimiter: use specified field to separate fields
+            cache: only use the first cache lines to get column width
+        '''
+        self.width = []
+        self.rows = []
+        self.out = out
+
+    def cache(self, d):
+        data = [x.strip() for x in d]
+        self.rows.append(data)
+        if not self.width:
+            self.width = [len(str(x)) for x in data]
+        else:
+            self.width = [max(y, len(str(x))) for y,x in zip(self.width, data)]
+
+    def write(self):
+        with open(self.out, 'w') as o:
+            o.write('\n'.join([
+            '  '.join(
+                [str(col).ljust(width) for col, width in zip(row, self.width)])
+            for row in self.rows]) + '\n')
+
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
 # used to be empty; force delete
@@ -116,13 +140,17 @@ def outputOfCmd(cmd):
             env=test_env).decode()
         
 
-def output2list(cmd):
-    return list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
+def output2list(cmd, space2tab=True):
+    txt = list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
+    if space2tab:
+        txt = ['\t'.join(t.split())  for t in txt]
+    return txt
         
-def runCmd(cmd):
-    cmd = shlex.split(cmd)
+def runCmd(cmd, shell=False):
+    if not shell:
+        cmd = shlex.split(cmd)
     with open('run_tests.log', 'a') as fnull:
-        subprocess.call(cmd, stdout=fnull, stderr=fnull,
+        subprocess.call(cmd, stdout=fnull, stderr=fnull, shell=shell,
             env=test_env)
 
 def numOfSample():

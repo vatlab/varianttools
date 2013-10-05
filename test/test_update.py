@@ -67,7 +67,7 @@ class TestUpdate(ProcessTestCase):
         #you could not use another file which is not loaded into the project to update the current variant table 
         self.assertFail('vtools update variant --from_file vcf/SAMP4_complex_variants.vcf --geno_info DP_geno')
         self.assertEqual(outputOfCmd('vtools select variant "mut_type_dbSNP is not null" -c'), '175\n')
-        self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
+        self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation -d'\t'", "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
         
     def testSampleStat(self):
         'Test command vtools update'
@@ -99,17 +99,17 @@ class TestUpdate(ProcessTestCase):
         self.assertFail('vtools update variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
         self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
                             'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
-        out = output2list('vtools output variant maxGQv minGQv meanGQv')
+        out = output2list('vtools output variant maxGQv minGQv meanGQv -d"\t"')
         self.assertEqual(out[0], '.\t.\t.')
         self.assertTrue(out[3].startswith('100\t15\t69.3333'))
         self.assertTrue(out[4].startswith('6\t3\t4.0'))
         self.assertTrue(out[5].startswith('4\t3\t3.33333'))
         self.assertSucc('vtools update variant --from_stat "total_dp=sum(GD)"')
-        self.assertEqual(output2list('vtools output variant total_dp'), ['.', '.', '.', '60', '7', '4'])
+        self.assertEqual(output2list('vtools output variant total_dp -d"\t"'), ['.', '.', '.', '60', '7', '4'])
         # ffilter out variants having GQ less than 4,
         # then for each remining variant count the total number of alt genotypes across all samples
         self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
-        self.assertEqual(output2list('vtools output variant gq_ge_4'), ['0', '0', '0', '0', '3', '1'])
+        self.assertEqual(output2list('vtools output variant gq_ge_4 -d"\t"'), ['0', '0', '0', '0', '3', '1'])
         #
         self.assertSucc('vtools update variant --from_stat "missing=#(missing)" "wt=#(wtGT)" "mut=#(mutGT)" "total=#(GT)"')
         self.assertSucc('vtools update variant --set "res=total-wt-hom-het-other"')
@@ -141,7 +141,7 @@ class TestUpdate(ProcessTestCase):
         runCmd('vtools import txt/variants.txt --format basic --build hg19')
         runCmd('vtools use refGene')
         runCmd('vtools update variant --set "gname=refGene.name2"')
-        lines = output2list('vtools output variant chr pos ref alt gname refGene.name2')
+        lines = output2list('vtools output variant chr pos ref alt gname refGene.name2 -d"\t"')
         # does not count duplicate lines
         line_count = len(set(lines))
         for line in lines:

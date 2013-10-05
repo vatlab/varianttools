@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, output2list
+from testUtils import ProcessTestCase, runCmd, numOfSample, initTest, output2list, PrettyPrinter
 
 class TestPhenotype(ProcessTestCase):
     def setUp(self):
@@ -47,15 +47,14 @@ class TestPhenotype(ProcessTestCase):
         out1 = output2list('vtools show samples -l -1')
         #the output format was changed, so we reorganize the output and compare
         ori_file = open('phenotype/phenotype.txt', 'r')
-        new_file = open('new_file','w')
-        new_file.write(ori_file.readline().replace('sample_name', 'sample_name\tfilename'))
+        prt = PrettyPrinter('new_file')
+        prt.cache(ori_file.readline().replace('sample_name', 'sample_name\tfilename').split('\t'))
         for line in ori_file:
             c1,c2,c3,c4 = line.split('\t')
-            line = '\t'.join([c1,'vcf/CEU.vcf.gz', c2,c3,c4])
-            new_file.write(line)
+            prt.cache([c1, 'vcf/CEU.vcf.gz', c2, c3, c4])
         ori_file.close()
-        new_file.close()
-        self.assertOutput('vtools show samples -l -1','', 10, 'new_file')
+        prt.write()
+        self.assertOutput('vtools show samples','', 10, 'new_file')
         os.remove('new_file')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
@@ -65,7 +64,7 @@ class TestPhenotype(ProcessTestCase):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
-        out3 = output2list('vtools show samples -l -1')
+        out3 = output2list('vtools show samples', space2tab=True)
         #the output format was changed, so we reorganize the output and compare
         ori_file2 = open('phenotype/phenotype.txt', 'r')
         new_file2 = open('new_file2','w')
@@ -90,14 +89,14 @@ class TestPhenotype(ProcessTestCase):
         out1 = output2list('vtools show samples -l -1')
         #the output format was changed, so we reorganize the output and compare
         ori_file = open('phenotype/pheno_filename.txt', 'r')
-        new_file = open('new_file','w')
+        prt = PrettyPrinter('new_file')
+        ori_file = open('phenotype/pheno_filename.txt', 'r')
         for line in ori_file:
-            c1,c2,c3,c4,c5 = line.split('\t')
-            line = '\t'.join([c2,c1,c3,c4,c5])
-            new_file.write(line)
+            c1,c2,c3,c4,c5 = line.strip().split('\t')
+            prt.cache([c2, c1, c3, c4, c5])
         ori_file.close()
-        new_file.close()
-        self.assertOutput('vtools show samples -l -1','', 0, 'new_file')
+        prt.write()
+        self.assertOutput('vtools show samples','', 0, 'new_file')
         os.remove('new_file')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
         self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')

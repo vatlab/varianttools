@@ -57,7 +57,7 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfVariant(), 338)
         self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos ref not_defined_field --force')
         self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos --force')
-        variants = [x.split() for x in output2list('vtools output variant chr pos ref alt')]
+        variants = [x.split() for x in output2list('vtools output variant chr pos ref alt -d"\t"')]
         with open('txt/input.tsv') as inputfile:
             input = [x.split() for x in inputfile.readlines()]
         input = [x[:2] + x[3:] for x in input]
@@ -71,7 +71,7 @@ class TestImport(ProcessTestCase):
         # use an empty var_info option. The program should not import any var_info for now
         # the following 2 commands are commented out due to running time: very slow to remove the existing sample tables
         #self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --var_info --build hg18')
-        #self.assertFail('vtools output variant chr pos snp_id genet_dist')
+        #self.assertFail('vtools output variant chr pos snp_id genet_dist -d"\t"')
         # force re-import the variants using the default info fields now: snp_id and genet_dist are imported 
         self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --build hg18 --force')
         nsamples = numOfSample()
@@ -83,7 +83,7 @@ class TestImport(ProcessTestCase):
         # get samplenames
         samplenames = getSamplenames()
         head = ['#chr','rs','distance','pos','ref','alt'] + samplenames
-        variants = [x.split() for x in output2list('vtools output variant chr snp_id genet_dist pos ref alt')]
+        variants = [x.split() for x in output2list('vtools output variant chr snp_id genet_dist pos ref alt -d"\t"')]
         with open('txt/genotypes.txt') as inputfile:
             input = [x.split() for x in inputfile.readlines()]
         # test --sample_names
@@ -399,7 +399,7 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfSample(), 501)
         self.assertEqual(numOfVariant(),5)
         self.maxDiff = None
-        self.assertOutput('vtools show genotypes -l -1', '',  0, 'output/vcf_multiple_samples_genotypes.txt')
+        self.assertOutput('vtools show genotypes', '',  0, 'output/vcf_multiple_samples_genotypes.txt')
        
     def testSampleName_multiple_assign(self):
         #Testing multiple samples in ONE vcf file with --sample_name option
@@ -434,7 +434,9 @@ class TestImport(ProcessTestCase):
             input = [x.split(',') for x in inputfile.readlines()]
         input = [x[:4] for x in input]
         self.assertEqual(variants, input) 
-        self.assertOutput('vtools show genotypes', '''sample_name	filename	num_genotypes	sample_genotype_fields\nsamp_csv	txt/CGA.tsv.bz2	95	GT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF\n''')
+        self.assertOutput('vtools show genotypes', '''sample_name  filename         num_genotypes  sample_genotype_fields                                                        
+samp_csv     txt/CGA.tsv.bz2  95             GT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF
+''')
 
     def testMultiSamples_1(self):
         #the files are coming from one custmer
@@ -446,7 +448,11 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfSample(), 3)
         self.maxDiff=None
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     6\n''', skip=3)
-        self.assertOutput('vtools show samples', '''sample_name	filename\nSMP1	txt/sample_chr22.txt\nSMP2	txt/sample_chr22.txt\nSMP3	txt/sample_chr22.txt\n''') 
+        self.assertOutput('vtools show samples', '''sample_name  filename            
+SMP1         txt/sample_chr22.txt
+SMP2         txt/sample_chr22.txt
+SMP3         txt/sample_chr22.txt
+''') 
 
     def testMultiSamples_2(self):
         #the files are coming from one custmer
@@ -455,7 +461,11 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     9\n''', skip=3)
-        self.assertOutput('vtools show samples', '''sample_name	filename\nSMP1	txt/sample_1_chr22.txt\nSMP2	txt/sample_1_chr22.txt\nSMP3	txt/sample_1_chr22.txt\n''') 
+        self.assertOutput('vtools show samples', '''sample_name  filename              
+SMP1         txt/sample_1_chr22.txt
+SMP2         txt/sample_1_chr22.txt
+SMP3         txt/sample_1_chr22.txt
+''') 
      
 
 if __name__ == '__main__':

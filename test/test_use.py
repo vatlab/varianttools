@@ -101,7 +101,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools use evs')
         self.assertSucc('vtools show annotation evs')
         self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
-        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM', '', 0,'output/evsVariantTest.txt')
+        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', '', 0,'output/evsVariantTest.txt')
 
     def testNSFP(self):
         'Test variants in dbNSFP'
