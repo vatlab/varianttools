@@ -232,5 +232,10 @@ class TestExport(ProcessTestCase):
         runCmd('vtools use dbSNP-hg19_137')
         self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
+    def testTpedMissingGen(self):
+        'Test command export in tped format with missing genotype data'
+        runCmd('vtools import vcf/missing_gen.vcf --build hg19')
+        self.assertOutput('vtools export variant --format tped --samples 1','', 0, 'output/missing_gen.tped') 
+
 if __name__ == '__main__':
     unittest.main()
