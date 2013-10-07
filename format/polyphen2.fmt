@@ -10,6 +10,7 @@ description=To be used to export variants in a format that is acceptable by the 
 	by this server.
 variant=chr,pos,ref,alt
 variant_info=prediction,pph2_class,pph2_prob
+delimiter=None
 export_by=chr,pos,ref,alt
 sort_output_by=chr,pos
 
@@ -25,25 +26,25 @@ comment=ref/alt
 
 # o_acc               	 o_pos	o_aa1	o_aa2	rsid      	acc       	   pos	aa1	aa2	nt1	nt2	        prediction	            based_on	    effect	        pph2_class	 pph2_prob	  pph2_FPR	  pph2_TPR	  pph2_FDR	    site	  region	    PHAT	dScore	Score1	Score2	MSAv	  Nobs	 Nstruct	 Nfilt	PDB_id	PDB_pos	PDB_ch	 ident	length	NormASA	SecStr	MapReg	  dVol	 dProp	B-fact	 H-bonds	 AveNHet	 MinDHet	 AveNInt	 MinDInt	 AveNSit	 MinDSit	Transv	CodPos	CpG	 MinDJxn	     PfamHit	  IdPmax	  IdPSNP	  IdQmin
 [chr]
-index=56
+index=57
 type=VARCHAR(255)
 adj=ExtractField(1, '|'), ExtractField(1, ':'), RemoveLeading('# chr')
 comment=chromosome extracted from comment
 
 [pos]
-index=56
+index=57
 type=INT
 adj=ExtractField(1, '|'), ExtractField(2, ':')
 comment=position extracted from comment
 
 [ref]
-index=56
+index=57
 type=VARCHAR(255)
 adj=ExtractField(2, '|'), lambda x: x[0]
 comment=reference allele extracted from comment
 
 [alt]
-index=56
+index=57
 type=VARCHAR(255)
 adj=ExtractField(2, '|'), lambda x: x[1]
 comment=alt allele extracted from comment
