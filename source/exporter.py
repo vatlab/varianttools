@@ -652,7 +652,7 @@ class Exporter:
             header = header.replace('%(command)s',
                 env.command_line)
             print >> output, header.rstrip()
-        global rec_ref, rec_alt
+        global rec_alleles
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False
             try:
@@ -667,20 +667,20 @@ class Exporter:
                             rec_stack.append(raw_rec)
                         continue
                     elif len(rec_stack) == 1:
-                        rec_ref = rec_stack[0][0]
-                        rec_alt = rec_stack[0][1]
+                        rec_alleles[0] = rec_stack[0][0]
+                        rec_alleles[1] = rec_stack[0][1]
                         rec = rec_stack[0][2:]
                         rec_stack = [raw_rec]
                     else:
                         n = len(rec_stack)
-                        rec_ref = [rec_stack[i][0] for i in range(n)]
-                        rec_alt = [rec_stack[i][1] for i in range(n)]
+                        rec_alleles[0] = [rec_stack[i][0] for i in range(n)]
+                        rec_alleles[1] = [rec_stack[i][1] for i in range(n)]
                         rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(2, len(raw_rec))]
                         multi_records = True
                         rec_stack = [raw_rec]
                 else:
-                    rec_ref = raw_rec[0]
-                    rec_alt = raw_rec[1]
+                    rec_alleles[0] = raw_rec[0]
+                    rec_alleles[1] = raw_rec[1]
                     rec = raw_rec[2:]
                 # step one: apply formatters 
                 # if there is no fmt, the item must be either empty or a single item
@@ -734,12 +734,12 @@ class Exporter:
                 n = len(rec_stack)
                 multi_records = n > 1
                 if n == 1:
-                    rec_ref = rec_stack[0][0]
-                    rec_alt = rec_stack[0][1]
+                    rec_alleles[0] = rec_stack[0][0]
+                    rec_alleles[1] = rec_stack[0][1]
                     rec = rec_stack[0][2:]
                 else:
-                    rec_ref = [rec_stack[i][0] for i in range(n)]
-                    rec_alt = [rec_stack[i][1] for i in range(n)]
+                    rec_alleles[0] = [rec_stack[i][0] for i in range(n)]
+                    rec_alleles[1] = [rec_stack[i][1] for i in range(n)]
                     rec = [tuple([rec_stack[i][x] for i in range(n)]) for x in range(2, len(raw_rec))]
                 # step one: apply formatters
                 if multi_records:

@@ -782,8 +782,7 @@ class CSVFormatter:
                 return '"' + val + '"'
             return val
 
-rec_ref = '-'
-rec_alt = '-'
+rec_alleles = ['-', '-']
 
 class InfoFormatter:
     def __init__(self, name, ignore=''):
@@ -942,11 +941,11 @@ class GenoFormatter:
             raise ValueError('Only genotype and numeric styles are allowed')
 
     def fmt_genotype(self, item):
-        global rec_ref, rec_alt
+        global rec_alleles
         if type(item) == int:
             # single genotype case
-            ref = self.null if rec_ref == '-' else rec_ref
-            alt = self.null if rec_alt == '-' else rec_alt
+            ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]
+            alt = self.null if rec_alleles[1] == '-' else rec_alleles[1]
             #
             # 0, 1, 2, -1
             if item == 0:
@@ -960,11 +959,11 @@ class GenoFormatter:
         elif type(item) == tuple:
             # Two aleternative alleles
             if item == (-1, -1):
-                return (self.null if rec_alt[0] == '-' else rec_alt[0]) + self.sep + (self.null if rec_alt[1] == '-' else rec_alt[1])
+                return (self.null if rec_alleles[1][0] == '-' else rec_alleles[1][0]) + self.sep + (self.null if rec_alleles[1][1] == '-' else rec_alleles[1][1])
             elif len(item) > 1 and item.count(item[0]) == len(item):
                 # assume duplicate entry caused by annotation database
-                ref = self.null if rec_ref[0] == '-' else rec_ref[0]
-                alt = self.null if rec_alt[0] == '-' else rec_alt[0]
+                ref = self.null if rec_alleles[0][0] == '-' else rec_alleles[0][0]
+                alt = self.null if rec_alleles[1][0] == '-' else rec_alleles[1][0]
                 if item[0] == 1:
                     return ref + self.sep + alt
                 elif item[0] == 2:
@@ -976,18 +975,18 @@ class GenoFormatter:
             elif all([x is None for x in item]):
                 return self.missing + self.sep + self.missing
             else:
-                raise ValueError('Failed to export genotype {} with ref {} and alt {}'.format(item, rec_ref, rec_alt))
+                raise ValueError('Failed to export genotype {} with ref {} and alt {}'.format(item, rec_alleles[0], rec_alleles[1]))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
             raise ValueError('Failed to export genotype {}'.format(item))
 
     def fmt_plink(self, item):
-        global rec_ref, rec_alt
+        global rec_alleles
         if type(item) == int:
             # single genotype case
-            ref = self.null if rec_ref == '-' else rec_ref
-            alt = self.null if rec_alt == '-' else rec_alt
+            ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]
+            alt = self.null if rec_alleles[1] == '-' else rec_alleles[1]
             #
             # 0, 1, 2, -1
             if item == 0:
@@ -1021,7 +1020,7 @@ class GenoFormatter:
         try:
             return self.vcf_map[item]
         except:
-            raise ValueError('Failed to export genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_ref, rec_alt))
+            raise ValueError('Failed to export genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_alleles[0], rec_alleles[1]))
 
 class Constant:
     def __init__(self, val=''):
