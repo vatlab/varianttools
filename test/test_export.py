@@ -224,8 +224,11 @@ class TestExport(ProcessTestCase):
         #the output format of 'tped' is with two options: --name and --style
         #vtools export variant --format tped -- to query
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
+        runCmd('vtools select variant "pos = 533" -t tmp')
         self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
         self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
+        self.assertOutput('vtools export tmp --format tped --samples "sample_name like \'NA069%\'"', 
+                          '1	.	.	533	G	G	G	G	G	G', 1)
         runCmd('vtools use dbSNP-hg19_137')
         self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
