@@ -1089,6 +1089,9 @@ static void track(
 	    sqlite3_value_type(argv[4]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please specify at least filename", -1);
 		return;
+	} else if (argc > 7) {
+		sqlite3_result_error(context, "track function accept at most 3 parameters", -1);
+		return;
 	}
 
 	std::string track_file = std::string((char *)sqlite3_value_text(argv[4]));
@@ -1225,7 +1228,7 @@ static void track(
 	fi.column = info.default_col;
 	fi.name = "";
 	fi.all = false;
-	if (argc >= 4) {
+	if (argc >= 6) {
 		if (sqlite3_value_type(argv[5]) == SQLITE_INTEGER) {
 			fi.column = sqlite3_value_int(argv[5]);
 			fi.name = "";
@@ -1255,7 +1258,7 @@ static void track(
 			fi.column = it->second;
 		}
 	}
-	if (argc >= 5) {
+	if (argc >= 7) {
 		if (sqlite3_value_type(argv[6]) == SQLITE_INTEGER)
 			fi.all = sqlite3_value_int(argv[6]);
 		else {
