@@ -3388,7 +3388,7 @@ def replace_null_sample_name(proj):
     db = DatabaseEngine()
     db.connect('{}.proj'.format(proj.name))
     cur = db.cursor()
-    cur.execute('UPDATE sample SET sample_name = '' WHERE sample_name IS NULL;');
+    cur.execute("UPDATE sample SET sample_name = '' WHERE sample_name IS NULL;");
     db.commit()
     db.close()
 
@@ -3802,7 +3802,7 @@ def show(args):
                     limit_clause))
                 for rec in cur:
                     # print '' in place of empty string
-                    prt.write(["''" if x == '' else str(x) for x in rec])
+                    prt.write([str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3836,7 +3836,7 @@ def show(args):
                     limit_clause))
                 for rec in cur:
                     # print '' in place of empty string
-                    prt.write(["''" if x == '' else str(x) for x in rec])
+                    prt.write([str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3962,7 +3962,7 @@ def show(args):
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
-                    prt.write(["''" if rec[1] == '' else rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
+                    prt.write([rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
