@@ -1829,7 +1829,7 @@ class Project:
                     'sample.file_id = filename.file_id {});'
                     .format(self.db.PH, where_clause), (name1, ))
                 env.logger.info('{} samples with names {} are renamed to {}'
-                    .format(cur.rowcount, ', '.join(sorted(set(names))), name1))
+                    .format(cur.rowcount, ', '.join([str(x) for x in sorted(set(names))]), name1))
             else:
                 for oldname in sorted(set(names)):
                     newname = oldname.replace(name1, name2, 1)

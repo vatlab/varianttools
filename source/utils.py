@@ -676,7 +676,7 @@ class PrettyPrinter:
         # print everything in cache
         print('\n'.join([
             self.delimiter.join(
-                [str(col).ljust(width) for col, width in zip(row, self.width)])
+                [('.' if col is None else str(col)).ljust(width) for col, width in zip(row, self.width)])
             for row in self.rows]))
         # clear cache
         self.rows = []
@@ -696,7 +696,7 @@ class PrettyPrinter:
             trimmed_data = data
         #
         print(self.delimiter.join(
-            [str(col).ljust(width) for col, width in zip(trimmed_data, self.width)]))
+            [('.' if col is None else str(col)).ljust(width) for col, width in zip(trimmed_data, self.width)]))
 
     #
     # MODE 3: cached, untrimmed print
