@@ -1310,7 +1310,7 @@ class Importer:
         #
         for samplename in sampleNames:
             cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                (filenameID, samplename))
+                (filenameID, '' if samplename is None else samplename))
             sid = cur.lastrowid
             sample_ids.append(sid)
         del s
@@ -1366,7 +1366,7 @@ class Importer:
                         if numSample == 1:
                             env.logger.debug('Missing sample name (name None is used)'.format(numSample))
                             self.sample_in_file = [None]
-                            return (self.recordFileAndSample(input_filename, [None]), 2)
+                            return (self.recordFileAndSample(input_filename, ['']), 2)
                         elif numSample == 0:
                             env.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
                             self.sample_in_file = []
