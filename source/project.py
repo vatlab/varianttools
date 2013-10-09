@@ -1157,7 +1157,7 @@ class Project:
             else:
                 self.db.connect(self.name)
         #
-        self.creation_date = time.strftime('%a, %d %b %Y %H:%M', time.gmtime())
+        self.creation_date = time.asctime()
         self.build = build
         self.alt_build = None
         # no meta information for now
@@ -1611,7 +1611,7 @@ class Project:
         to create the table can also be saved.'''
         self.saveProperty('__desc_of_{}'.format(table), message)
         if save_date:
-            self.saveProperty('__date_of_{}'.format(table), time.strftime('%b%d', time.gmtime()))
+            self.saveProperty('__date_of_{}'.format(table), time.strftime('%b%d', time.localtime()))
         if save_cmd:
             self.saveProperty('__cmd_of_{}'.format(table), env.command_line)
 
@@ -2129,7 +2129,7 @@ class Project:
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
                 readme.write('Name: {}\n'.format(name))
-                readme.write('Date: {}\n'.format(time.strftime('%b%d %H:%M:%S', time.gmtime())))
+                readme.write('Date: {}\n'.format(time.asctime())
                 readme.write('Info: {}\n'.format(message))
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
