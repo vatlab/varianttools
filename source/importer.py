@@ -1812,7 +1812,7 @@ def importVariantsArguments(parser):
             If sample names are specified for input files without genotype, samples
             will be created without genotype. If sample names cannot be determined from
             input file and their is no ambiguity (only one sample is imported), a sample
-            with NULL sample name will be created.''')
+            with empty sample name will be created.''')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Import files even if the files have been imported before. This option
             can be used to import from updated file or continue disrupted import, but will

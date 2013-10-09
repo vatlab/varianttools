@@ -167,7 +167,8 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(), 30)
-        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'None\n')
+        # empty sample name
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), '\n')
         # test the MapValue() in the fmt file
         self.assertEqual(getGenotypes(num=1)[0], ['2', '1', '2', '1', '1', '1', '1', '1', '1', '1', '1', '1', \
                                            '1', '2', '1', '1', '1', '1', '1', '2', '1', '1', '2', '1', '1', '1', \
