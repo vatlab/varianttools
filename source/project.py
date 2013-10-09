@@ -2129,7 +2129,7 @@ class Project:
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
                 readme.write('Name: {}\n'.format(name))
-                readme.write('Date: {}\n'.format(time.asctime())
+                readme.write('Date: {}\n'.format(time.asctime()))
                 readme.write('Info: {}\n'.format(message))
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
