@@ -1157,6 +1157,7 @@ class Project:
             else:
                 self.db.connect(self.name)
         #
+        self.creation_date = time.strftime('%a, %d %b %Y %H:%M', time.gmtime())
         self.build = build
         self.alt_build = None
         # no meta information for now
@@ -1173,6 +1174,7 @@ class Project:
         self.saveProperty('batch', kwargs.get('batch', 10000))
         self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
+        self.saveProperty('creation_date', self.creation_date)
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)
         self.saveProperty('annoDB', str(self.annoDB))
@@ -1218,6 +1220,7 @@ class Project:
         self.revision = self.loadProperty('revision', '0')
         self.build = self.loadProperty('build')
         self.alt_build = self.loadProperty('alt_build')
+        self.creation_date = self.loadProperty('creation_date', '')
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]').replace('${local_resource}', env._local_resource)):
             try:
@@ -2091,6 +2094,8 @@ class Project:
         '''
         # FIXME: more summary
         info =  'Project name:                {}\n'.format(self.name)
+        if self.creation_date:
+            info +=  'Created on:                  {}\n'.format(self.creation_date)
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
         #info += 'Database engine:             {}\n'.format(self.db.engine)
