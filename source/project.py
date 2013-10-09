@@ -3383,6 +3383,16 @@ class ProjectsMerger:
 #
 # PROJECT UPGRADE TREE
 #
+def replace_null_sample_name(proj):
+    # replace all null sample name with empty string
+    db = DatabaseEngine()
+    db.connect('{}.proj'.format(proj.name))
+    cur = db.cursor()
+    cur.execute('UPDATE sample SET sample_name = '' WHERE sample_name IS NULL;');
+    db.commit()
+    db.close()
+
+
 def remove_duplicate_genotype(proj):
     #
     # remove all uplicate genotypes from sample tables
@@ -3417,6 +3427,7 @@ def remove_duplicate_genotype(proj):
 project_format_history = [
     # version (for documentation purpose only), revision, upgrade function
     ['1.0.7', 1915, remove_duplicate_genotype],
+    ['2.0.1', 2307, replace_null_sample_name],
 ]
 
 #
@@ -3790,7 +3801,8 @@ def show(args):
                     ' '.join(['AND ({})'.format(x) for x in args.items]),
                     limit_clause))
                 for rec in cur:
-                    prt.write(rec)
+                    # print '' in place of empty string
+                    prt.write(["''" if x == '' else str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3823,7 +3835,8 @@ def show(args):
                     .format(' '.join([','+x for x in fields]),
                     limit_clause))
                 for rec in cur:
-                    prt.write(rec)
+                    # print '' in place of empty string
+                    prt.write(["''" if x == '' else str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3942,11 +3955,6 @@ def show(args):
                 cur.execute('SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
                 for rec in records:
-                    # sample fields
-                    if args.verbosity != '2' and len(rec[2]) > 25:
-                        sampleFields = '{}\t{}...{}'.format(rec[1], rec[2][:8], rec[2][-14:])
-                    else:
-                        sampleFields = '{}\t{}'.format(rec[1], rec[2])
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
                     cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, sampleId))
@@ -3954,7 +3962,7 @@ def show(args):
                     # get fields for each genotype table
                     sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
                     sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
-                    prt.write([rec[1], rec[2], numGenotypes, sampleGenotypeFields])
+                    prt.write(["''" if rec[1] == '' else rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
