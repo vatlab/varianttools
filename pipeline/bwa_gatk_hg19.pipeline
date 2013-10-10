@@ -174,11 +174,11 @@ comment=Check existence of commands bwa, samtools and java
 
 [align_11]
 action=CheckOutput('%(bwa)s', 'Version: 0.7.*', %(strict_prog_version)s)
-comment=Check if the version of bwa. Version is 0.7.4 is recommended
+comment=Check the version of bwa. Version is 0.7.4 is recommended
 
 [align_12]
 action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.82', %(strict_prog_version)s)
-comment=Check if the version of picard. Version is 1.82 is recommended.
+comment=Check the version of picard. Version is 1.82 is recommended.
 
 [align_13]
 action=CheckOutput('%(java)s -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^2.4', %(strict_prog_version)s)
