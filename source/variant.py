@@ -51,9 +51,10 @@ def generalOutputArguments(parser):
             parameter is given without parameter, a default header will be derived from
             field names.'''),
     grp.add_argument('-d', '--delimiter', default=None,
-        help='''Delimiter use to separate columns of output. The default output uses
-            multiple spaces to align columns of output. Use '-d,' for csv output, or
-            -d'\\t' for tab-delimited output.''')
+        help='''Delimiter use to separate columns of output. The default output 
+            uses tabs to delimit columns padded to the same width by spaces. You
+            can use '-d,' for csv output, or -d'\\t' for unpadded tab-delimited
+            output.''')
     grp.add_argument('--na', default='.',
         help='Output string for missing value')
     grp.add_argument('-l', '--limit', metavar='N', type=int,

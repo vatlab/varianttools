@@ -114,10 +114,6 @@ def associateArguments(parser):
         help='''Name of a database to which results from association tests will
             be written. Groups with existing results in the database will be
             ignored unless parameter --force is used.''')
-    output.add_argument('-d', '--delimiter', default=None,
-        help='''Delimiter use to separate columns of output. The default output uses
-            multiple spaces to align columns of output. Use '-d,' for csv output, or
-            -d'\\t' for tab-delimited output.''')
     output.add_argument('-f', '--force', action='store_true',
         help='''Analyze all groups including those that have recorded results in
             the result database.''')
@@ -540,7 +536,7 @@ class GenotypeLoader(Process):
             shelf.close()
 
 class ResultRecorder:
-    def __init__(self, params, db_name=None, delimiter=None, update_existing=False):
+    def __init__(self, params, db_name=None, update_existing=False):
         self.succ_count = 0
         self.failed_count = 0
         #
@@ -564,7 +560,7 @@ class ResultRecorder:
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
         print('\t'.join([x.name for x in self.fields]))
         #
-        self.printer = PrettyPrinter(delimiter=delimiter)
+        self.printer = PrettyPrinter(delimiter=None)
         self.writer = None
         if db_name:
             db_name = db_name if not db_name.lower().endswith('.db') else db_name[:-3]
@@ -954,7 +950,7 @@ def associate(args):
                 env.logger.info('No data to analyze.')
                 sys.exit(0)
             # define results here but it might fail if args.to_db is not writable
-            results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
+            results = ResultRecorder(asso, args.to_db, args.force)
             # determine if some results are already exist
             #
             # if write to a db and

@@ -623,11 +623,11 @@ class PrettyPrinter:
             self.write = self.direct_print
             self.write_rest = self.direct_print_rest
         elif max_width:
-            self.delimiter = '  '
+            self.delimiter = '\t'
             self.write = self.cached_trim_print
             self.write_rest = self.cached_trim_print_rest
         else:
-            self.delimiter = '  '
+            self.delimiter = '\t'
             self.write = self.cached_print
             self.write_rest = self.cached_print_rest
 
