@@ -985,7 +985,7 @@ class ProgressBar:
             else:
                 # display failed count in red
                 msg[3] = ' {:,}/\033[1;31m{:,}\033[0m'.format(int(self.count), int(self.failed_count))
-                m3Len = len(msg[3]) - 12  # the color strings should not be counted as length of message
+                m3Len = len(msg[3]) - 11  # the color strings should not be counted as length of message
         else:
             msg[3] = ' '
             m3Len = 1
@@ -1041,7 +1041,7 @@ class ProgressBar:
             m3Len = len(msg[3])
         else:
             msg[3] = ' {:,}/\033[1;31m{:,}\033[0m'.format(self.finished + self.count, self.failed_count)
-            m3Len = len(msg[3]) - 12
+            m3Len = len(msg[3]) - 11
         msg[5] += ' in {}{}'.format('' if second_elapsed < 86400 else '{} day{} '
             .format(int(second_elapsed/86400), 's' if second_elapsed > 172800 else ''),
                 time.strftime('%H:%M:%S', time.gmtime(second_elapsed)))
