@@ -28,7 +28,7 @@ import sys, os
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome, env, OS_ENV
+from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter
 from variant_tools.plot_association import PlotAssociationOpt, plotAssociation
 #
 # These functions are utility functions used by all reports
@@ -162,8 +162,9 @@ def transRatioArguments(parser):
 
 def transRatio(args):
     #
+    prt = PrettyPrinter()
     if args.group_by:
-        print('{}\tnum_of_transition\tnum_of_transversion\tratio'.format('\t'.join(args.group_by)))
+        prt.write(args.group_by + ['num_of_transition', 'num_of_transversion', 'ratio'])
         transition = getoutput(['vtools', 'select', args.table, 
             "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))", 
             '--output'] + args.group_by + ['sum({})'.format(args.num_field), '-d', '\t', '--group_by'] + args.group_by)
@@ -184,11 +185,11 @@ def transRatio(args):
                 values[g] = ['0', v]
         keys = list(values.keys())
         keys.sort()
-        for k in keys:
-            print('{}\t{:,}\t{:,}\t{:.5f}'.format(k, int(values[k][0]), int(values[k][1]),
-                int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0))
+        for k in sorted(keys):
+            prt.write([k, '{:,}'.format(int(values[k][0])), '{:,}'.format(int(values[k][1])),
+                '{:.5f}'.format(int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0)])
     else:
-        print('num_of_transition\tnum_of_transversion\tratio')
+        prt.write(['num_of_transition', 'num_of_transversion', 'ratio'])
         transition = int(getoutput(['vtools', 'select', args.table, 
             "(ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C')",
             '--output', 'sum({})'.format(args.num_field)]))
@@ -197,8 +198,9 @@ def transRatio(args):
             "(ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
             "(ref='C' AND alt='G') OR (ref='G' AND alt='C')",
             '--output', 'sum({})'.format(args.num_field)]))
-        print('{}\t{}\t{:.5f}'.format(transition, transversion, 
-            transition / float(transversion) if transversion != 0 else 0))
+        prt.write(['{:,}'.format(transition), '{:,}'.format(transversion), 
+            '{:.5f}'.format(transition / float(transversion) if transversion != 0 else 0)])
+    prt.write_rest()
     
 #
 # Command avg_depth
