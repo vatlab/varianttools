@@ -209,7 +209,6 @@ class AnnoDB:
             else:
                 # from an annotation database
                 try:
-                    # FIXME: this syntax is only valid for sqlite3, we will need to fix it for the mysql engine
                     cur.execute('CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(table, field))
                 except Exception as e:
                     env.logger.debug(e)
@@ -1018,40 +1017,15 @@ class Project:
       These tables are stored in a separate database $name_genotype in order to
       keep the project database small.
 
-    If there are meta information for sample, and or genotype, the following
-    table will be created and used.
-
-
-    1. Table "variant_meta" is used to store meta information for each variant.
-       It has the same length as the "variant" table. The meta information includes
-       INFO and FORMAT fields specified in the vcf files, rsname and other
-       information stored in bed files.
-
-            ID:         variant ID
-            INFO1:      ..
-            INFO2:      ..
-            ...
-
-
-    2. Table "sample_meta" stores additional information for each sample. For VCF
-       files, a field vcf_meta is used to store all meta information. Future
-       extension will allow the input of phenotype information (e.g. case
-       control status).
-
-            ID:          sample id
-            vcf_meta:    basically header lines of the vcf file
-            INFO1:       ..
-            INFO2:       ..
-
     '''
     # the following make Project a singleton class
     _instance = None
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls):
         if not cls._instance:
             # *args, **kwargs are not passed to avoid
             # DeprecationWarning: object.__new__() takes no parameters
             # cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs) 
-            cls._instance = super(Project, cls).__new__(cls) #, *args, **kwargs)
+            cls._instance = super(Project, cls).__new__(cls)
         return cls._instance
 
     def __init__(self, name=None, build=None, new=False, verbosity=None, 
@@ -1132,30 +1106,8 @@ class Project:
         env.logger.info(VTOOLS_CITATION)
         env.logger.info(VTOOLS_CONTACT)
         env.logger.info('Creating a new project {}'.format(self.name))
-        self.db = DatabaseEngine(engine='sqlite3', batch=kwargs.get('batch', 10000))
+        self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
-        #
-        engine = kwargs.get('engine', 'sqlite3')
-        if engine == 'mysql':
-            # project information table
-            self.createProjectTable()
-            self.saveProperty('version', self.version)
-            self.saveProperty('revision', self.revision)
-            self.saveProperty('engine', engine)
-            self.saveProperty('host', kwargs.get('host'))
-            self.saveProperty('user', kwargs.get('user'))
-            # FIXME: I am saving passwd as clear text here...
-            self.saveProperty('passwd', kwargs.get('passwd'))
-            self.saveProperty('batch', kwargs.get('batch', 10000))
-            self.saveProperty('__option_verbosity', env.verbosity)
-            # turn to the real online engine
-            env.logger.debug('Connecting to mysql server')
-            self.db.commit()
-            self.db = DatabaseEngine(**kwargs)
-            if self.db.hasDatabase(self.name):
-                raise ValueError('A mysql database named {} already exists. Please remove it from the mysql database before continuing.'.format(self.name))
-            else:
-                self.db.connect(self.name)
         #
         self.creation_date = time.asctime()
         self.build = build
@@ -1168,7 +1120,6 @@ class Project:
         # Initialize the core tables
         env.logger.debug('Creating core tables')
         self.createProjectTable()
-        self.saveProperty('engine', engine)
         self.saveProperty('version', self.version)
         self.saveProperty('revision', self.revision)
         self.saveProperty('batch', kwargs.get('batch', 10000))
@@ -1196,20 +1147,13 @@ class Project:
         self.batch = 10000 if self.batch is None else int(self.batch)
         #
         # get connection parameters
-        if self.loadProperty('engine') == 'mysql':
-            self.db = DatabaseEngine(engine='mysql',
-                host=self.loadProperty('host'),
-                user=self.loadProperty('user'),
-                passwd=self.loadProperty('passwd'))
-            self.db.connect(self.name)
-        else: 
-            # pragma, set to None if the key does not exist. In this case
-            # the system default will be used.
-            env.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
-            # pass things like batch ... and re-connect
-            # env['sqlite_pragma'] will be used 
-            self.db = DatabaseEngine(engine='sqlite3', batch=self.batch)
-            self.db.connect(self.proj_file)
+        # pragma, set to None if the key does not exist. In this case
+        # the system default will be used.
+        env.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
+        # pass things like batch ... and re-connect
+        # env['sqlite_pragma'] will be used 
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         # loading other options if they have been set
         env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         env.local_resource = self.loadProperty('__option_local_resource', None)
@@ -1326,8 +1270,6 @@ class Project:
     def analyze(self, force=False):
         '''Automatically analyze project to make sure queries are executed optimally.
         '''
-        if self.db.engine != 'sqlite3':
-            return
         cur = self.db.cursor()
         tables = self.db.tables()
         cur = self.db.cursor()
@@ -1431,9 +1373,6 @@ class Project:
     def remove(self):
         '''Remove the current project'''
         # step 1: remove database
-        if self.db.engine == 'mysql':
-             env.logger.info('Removing database {}'.format(self.name))
-             self.db.removeDatabase(self.name)
         # step 2: remove genotype
         if self.db.hasDatabase(self.name + '_genotype'):
             env.logger.info('Removing database {}_genotype'.format(self.name))
@@ -1478,7 +1417,6 @@ class Project:
     # Functions to create core and optional tables.
     #
     def createProjectTable(self):
-        env.logger.debug('Creating table project')
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE project (
@@ -1487,7 +1425,6 @@ class Project:
             )''')
 
     def createFilenameTable(self):
-        env.logger.debug('Creating table filename')
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE filename (
@@ -1503,8 +1440,6 @@ class Project:
 
     def createMasterVariantTable(self, fields=[]):
         '''Create a variant table with name. Fail if a table already exists.'''
-        env.logger.debug('Creating table variant')
-        #
         # ref and alt are 'VARCHAR' to support indels. sqlite database ignores VARCHAR length
         # so it can support really long indels. MySQL will have trouble handling indels that
         # are longer than 255 bp.
@@ -1576,11 +1511,8 @@ class Project:
     def dropIndexOnMasterVariantTable(self):
         # before bulk inputting data, it is recommended to drop index.
         #
-        # NOTE: for mysql, it might be better to use alt index disable/rebuild
-        #
         s = delayedAction(env.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
         try:
-            # drop index has different syntax for mysql/sqlite3.
             if self.db.hasIndex('variant_index'):
                 self.db.dropIndex('variant_index', 'variant')
         except Exception as e:
@@ -1600,7 +1532,6 @@ class Project:
         '''
         if table == 'variant':
             raise ValueError('This function cannot be used to create a master variant table')
-        env.logger.debug('Creating table {}'.format(table))
         self.db.execute('''CREATE {0} TABLE {1} (
                 variant_id INTEGER PRIMARY KEY
             );'''.format('TEMPORARY' if temporary else '', table))
@@ -1624,7 +1555,6 @@ class Project:
     def createSampleTableIfNeeded(self, fields=[], table='sample'):
         if self.db.hasTable(table):
             return
-        env.logger.debug('Creating table {}'.format(table))
         cur = self.db.cursor()
         query = '''\
             CREATE TABLE IF NOT EXISTS {0} (
@@ -1669,44 +1599,6 @@ class Project:
             # key might already exists
             #env.logger.debug(e)
             #pass
-
-    def createVariantMetaTableIfNeeded(self):
-        if self.variant_meta is None:
-            env.logger.warning('Tried to create a variant meta table without valid meta fields')
-            return
-        if self.db.hasTable('variant_meta'):
-            return
-        env.logger.debug('Creating table variant_meta')
-        cur = self.db.cursor()
-        query = '''\
-            CREATE TABLE IF NOT EXISTS variant_meta (
-                variant_id INTEGER PRIMARY KEY {0},
-                bin INTEGER NULL'''.format(self.db.AI)
-        if self.alt_build is not None:
-            query += ''',
-            chr VARCHAR(20) NULL,
-            pos INT NULL'''
-        # FIXME: handle this
-        if self.variant_meta is not None:
-            pass
-        #
-        query += ');'
-        cur.execute(query)
-
-    def createSampleMetaTableIfNeeded(self):
-        if self.sample_meta is None:
-            env.logger.warning('Tried to create a sample meta table without valid meta fields')
-            return
-        if self.db.hasTable('sample_meta'):
-            return
-        env.logger.debug('Creating table sample_meta')
-        cur = self.db.cursor()
-        cur.execute('''\
-            CREATE TABLE IF NOT EXISTS sample_meta (
-                ID INTEGER PRIMARY KEY {0},
-                vcf_meta BLOB NULL
-            );'''.format(self.db.AI))
-
 
     #
     # Project management
@@ -2098,7 +1990,6 @@ class Project:
             info +=  'Created on:                  {}\n'.format(self.creation_date)
         info += 'Primary reference genome:    {}\n'.format(self.build)
         info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
-        #info += 'Database engine:             {}\n'.format(self.db.engine)
         #
         # list all runtime options as (name, val) pairs
         opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options]
@@ -3440,7 +3331,6 @@ project_format_history = [
 # Functions provided by this script
 #
 #
-
 def initArguments(parser):
     parser.add_argument('project',
         help='''Name of a new project. This will create a new .proj file under
@@ -3467,26 +3357,6 @@ def initArguments(parser):
             variant tables from multiple samples will be merged. Samples from the
             children projects will be copied even if they were identical samples
             imported from the same source files.''')
-    #sub.add_argument('--sort', action='store_true',
-    #    help='''Sort variants read from subprojects, which takes less RAM but longer time. If
-    #        unset, all variants will be read to RAM and perform a faster merge at a cost of
-    #        higher memory usage'''),
-    #sub.add_argument('-j', '--jobs', metavar='N', type=int, default=4,
-    #    help='''Number of threads used to merge subprojects. Default to 4.'''),
-    #parser.add_argument('--build',
-    #    help='''Build of the primary reference genome of the project.'''),
-    #engine = parser.add_argument_group('Database connection')
-    #engine.add_argument('--engine', choices=['mysql', 'sqlite3'], default='sqlite3',
-    #    help='''Database engine to use, can be mysql or sqlite3. Parameters --host, --user
-    #        and --passwd will be needed for the creation of a new mysql project.''')
-    #engine.add_argument('--host', default='localhost', 
-    #    help='The MySQL server that hosts the project databases.')
-    #engine.add_argument('--user', default=getpass.getuser(),
-    #    help='User name to the MySQL server. Default to current username.')
-    #engine.add_argument('--passwd',
-    #    help='Password to the MySQL server.')
-    #parser.add_argument('--batch', default=10000, 
-    #    help='Number of query per transaction. Larger number leads to better performance but requires more ram.')
 
 
 def init(args):
@@ -3498,8 +3368,6 @@ def init(args):
                 proj.remove()
             except:
                 # we might not be able to open a non-exist project if it is malformed.
-                # however, this will not completely remove the project if the project
-                # uses a MySQL engine.
                 files = glob.glob('*.proj') + glob.glob('*.lck') + \
                     glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
                 if len(files) > 0:
@@ -3510,16 +3378,8 @@ def init(args):
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))
         # create a new project
-        #
-        # args.batch is temporarily removed to keep interface clean
-        # args.build is temporarily removed to keep interface clean
-        #
-        # args.engine, host, user, passwd is disabled because MySQL support is
-        # currently lagging behind.
         with Project(name=args.project, build=None, new=True, 
-            verbosity='1' if args.verbosity is None else args.verbosity,
-            engine='sqlite3', host=None, user=None, passwd=None,
-            batch=10000) as proj:
+            verbosity='1' if args.verbosity is None else args.verbosity) as proj:
             if args.parent:
                 copier = ProjCopier(proj, args.parent, args.variants,
                     ' AND '.join(['({})'.format(x) for x in args.samples]),

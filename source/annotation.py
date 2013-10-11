@@ -53,7 +53,7 @@ class AnnoDBConfiger:
     def __init__(self, proj, annoDB, jobs=2):
         '''Create an annotation database.
         proj: current project
-        annoDB: annotation database. It can be either a mysql or sqlite database
+        annoDB: annotation database. It can be either a sqlite database
             name depend on the database engine used in the project, or a
             configuration file. In the latter case, a filename is allowed.
         '''
@@ -233,7 +233,7 @@ class AnnoDBConfiger:
                 user = res.user
                 password = res.password
                 query = res.netloc
-                db = DababaseEngine(engine='mysql', user=user, passwd=password)
+                db = DatabaseEngine()
                 cur = db.cursor()
                 res = db.execute(query)
                 filename = os.path.join(env.cache_dir, '{}_sql.txt'.format(self.name))
@@ -456,8 +456,6 @@ def use(args):
                 if not res.scheme:
                     args.source = 'annoDB/{}.ann'.format(args.source)
                 # download?
-                if proj.db.engine == 'mysql':
-                    raise RuntimeError('MySQL databases are not portable and cannot be downloaded.')
                 #
                 env.logger.info('Downloading annotation database from {}'.format(args.source))
                 try:
@@ -481,19 +479,12 @@ def use(args):
             elif args.rebuild:
                 raise ValueError('Only an .ann file can be specified when option --rebuild is set')
             elif annoDB.endswith('.DB'):
-                if proj.db.engine != 'sqlite3':
-                    raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                 if os.path.isfile(annoDB):
                     return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
-                # no extension? try mysql database, .ann and .DB
-                if proj.db.engine == 'mysql' and proj.db.hasDatabase(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields))
                 if os.path.isfile(annoDB + '.DB'):
-                    if proj.db.engine != 'sqlite3':
-                        raise ValueError('A sqlite3 annotation database cannot be used with a mysql project.')
                     try:
                         return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields))
                     except Exception as e:

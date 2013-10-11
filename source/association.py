@@ -558,9 +558,9 @@ class ResultRecorder:
                 raise ValueError('"-" is not allowed in field name {}'.format(field.name))
         if len(self.fields) != len(set([x.name for x in self.fields])):
             raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
-        print('\t'.join([x.name for x in self.fields]))
         #
         self.printer = PrettyPrinter(delimiter=None)
+        self.printer.write([x.name for x in self.fields])
         self.writer = None
         if db_name:
             db_name = db_name if not db_name.lower().endswith('.db') else db_name[:-3]

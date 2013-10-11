@@ -24,10 +24,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-'''
-This module provides utility functions and a database engine that works
-for both sqlite3 and mysql.
-'''
+'''This module provides utility functions and a database engine for sqlite'''
+
 import os
 import sys
 import glob
@@ -1823,43 +1821,19 @@ class RefGenome:
 #
 
 class DatabaseEngine:
-    '''variant tools can make use of two database engines. One is mysql, the
-    other is sqlite3. This class wraps around their DB API and provides an
-    unified interface.'''
-    def __init__(self, engine='sqlite3', batch=10000, **kwargs):
-        '''
-        engine
-            Database engine, can be mysql or sqlite3 (default)
-        batch
-            Number of query per transaction. Larger number usually leads to better
-            performance but requires more system resource.
-
-        Additional keyword parameters such as 'host', 'user' and 'passwd' are
-        passed directly to a MySQL database engine.
-        '''
-        self.engine = engine
-        self.batch = batch
+    def __init__(self):
+        #
+        self.batch = 10000
         # saved in case a new connection is needed
-        self.connectionParams = kwargs
         # not connected to any database for now
         self.dbName = None
-        if self.engine == 'mysql':
-            import MySQLdb
-            self.PH = '%s'
-            self.AI = 'AUTO_INCREMENT'
-            self.database = MySQLdb.connect(host=kwargs.get('host', 'localhost'),
-                user=kwargs.get('user', getpass.getuser()),
-                passwd=kwargs.get('passwd'))
-        else:
-            self.PH = '?'
-            self.AI = 'AUTOINCREMENT'
-            self.database = None
+        self.PH = '?'
+        self.AI = 'AUTOINCREMENT'
+        self.database = None
 
     
     def describeEngine(self):
-        if self.engine == 'mysql':
-            return 'mysql'
-        elif env.sqlite_pragma == []:
+        if env.sqlite_pragma == []:
             return 'sqlite (no pragma)'
         else:
             return 'sqlite (with pragma {})'.format(', '.join(env.sqlite_pragma))
@@ -1868,44 +1842,34 @@ class DatabaseEngine:
     #
     def newConnection(self):
         '''Create a new connection from existing configuration'''
-        return DatabaseEngine(engine=self.engine, batch=self.batch,
-            **self.connectionParams)
+        return DatabaseEngine()
         
     def connect(self, db, readonly=False, lock=None):
         '''Connect to a database'''
-        if self.engine == 'mysql':
-            if '.' in db or os.sep in db:
-                raise ValueError('Invalid database name: {}'.format(db))
-            self.dbName = db
-            cur = self.database.cursor()
-            if not self.hasDatabase(self.dbName):
-                cur.execute('CREATE DATABASE {};'.format(self.dbName))
-            cur.execute('USE {};'.format(self.dbName))
-        else:
-            db = os.path.expanduser(db)
-            self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
-            self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
-            self.database.enable_load_extension(True)
-            #
-            # We disable PROGAMA for readonly databases because we often use mutliple readers
-            # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
-            # We may need to reconsider this though because some pragma applies to 
-            # readonly databases (e.g. cache_size)
-            if readonly:
-                return
-            # this lock prevents multi process of the same vtools instance, but
-            # not for multiple vtools intances...
-            if lock is not None:
-                lock.acquire()
-            while True:
-                try:
-                    self.load_extension()
-                    break
-                except Exception as e:
-                    env.logger.warning('Retrying to open database: {}'.format(e))
-                    sleep(10)
-            if lock is not None:
-                lock.release()
+        db = os.path.expanduser(db)
+        self.dbName = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
+        self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
+        self.database.enable_load_extension(True)
+        #
+        # We disable PROGAMA for readonly databases because we often use mutliple readers
+        # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
+        # We may need to reconsider this though because some pragma applies to 
+        # readonly databases (e.g. cache_size)
+        if readonly:
+            return
+        # this lock prevents multi process of the same vtools instance, but
+        # not for multiple vtools intances...
+        if lock is not None:
+            lock.acquire()
+        while True:
+            try:
+                self.load_extension()
+                break
+            except Exception as e:
+                env.logger.warning('Retrying to open database: {}'.format(e))
+                sleep(10)
+        if lock is not None:
+            lock.release()
     
     def load_extension(self):
         cur = self.database.cursor()
@@ -1959,19 +1923,10 @@ class DatabaseEngine:
 
 
     def close(self):
-        if self.engine == 'mysql':
-            # do not know what to do
-            pass
-        else:
-            self.database.close()
+        self.database.close()
 
     def attach(self, db, name=None, lock=None):
         '''Attach another database to this one. Only needed by sqlite'''
-        if self.engine == 'mysql':
-            # create the database if needed
-            if not self.hasDatabase(db):
-                self.execute('CREATE DATABASE {};'.format(db))
-            return db
         if db.endswith('.DB') or db.endswith('.proj'):
             db = os.path.expanduser(db)
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
@@ -2023,17 +1978,11 @@ class DatabaseEngine:
 
     def detach(self, db):
         '''Detach a database'''
-        if self.engine == 'mysql':
-            return
-        else:
-            self.execute('''DETACH {}'''.format(db))
+        self.execute('''DETACH {}'''.format(db))
 
     def analyze(self):
         '''Analyze a database for better performance'''
-        if self.engine == 'mysql':
-            return
-        else:
-            self.execute('analyze;')
+        self.execute('analyze;')
 
     #
     # query
@@ -2055,29 +2004,18 @@ class DatabaseEngine:
     #
     def hasDatabase(self, db):
         '''Test if a database exists in the current connection'''
-        if self.engine == 'mysql':
-            cur = self.database.cursor()
-            cur.execute('SHOW DATABASES;')
-            return db.lower() in [x[0].lower() for x in cur.fetchall()]
-        else:
-            db = os.path.expanduser(db)
-            return os.path.isfile(db if (db.endswith('.DB') or db.endswith('.proj')) else db + '.DB')
+        db = os.path.expanduser(db)
+        return os.path.isfile(db if (db.endswith('.DB') or db.endswith('.proj')) else db + '.DB')
 
     def removeDatabase(self, db):
-        if self.engine == 'mysql':
-            cur = self.database.cursor()
-            if self.hasDatabase(db):
-                cur.execute('DROP DATABASE {};'.format(db))
-            self.database.commit()
-        else:
-            # has to have file extension
-            dbFile = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
-            try:
-                os.remove(dbFile)
-            except:
-                pass
-            if os.path.isfile(dbFile):
-                sys.exit('Failed to remove database {}'.format(db))
+        # has to have file extension
+        dbFile = db if (db.endswith('.proj') or db.endswith('.DB')) else db + '.DB'
+        try:
+            os.remove(dbFile)
+        except:
+            pass
+        if os.path.isfile(dbFile):
+            sys.exit('Failed to remove database {}'.format(db))
 
     #
     # Table
@@ -2086,20 +2024,12 @@ class DatabaseEngine:
         '''List all tables in a database'''
         cur = self.database.cursor()
         try:
-            if self.engine == 'mysql':
-                if dbName is None:
-                    cur.execute("SHOW TABLES;")
-                    return [x[0] for x in cur.fetchall()]
-                else:
-                    cur.execute("SHOW TABLES IN {};".format(dbName))
-                    return [x[0] for x in cur.fetchall()]
+            if dbName is None:
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';")
+                return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
             else:
-                if dbName is None:
-                    cur.execute("SELECT name FROM sqlite_master WHERE type='table' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';")
-                    return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
-                else:
-                    cur.execute("SELECT name FROM {0}.sqlite_master WHERE type='table' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';".format(dbName))
-                    return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
+                cur.execute("SELECT name FROM {0}.sqlite_master WHERE type='table' UNION ALL SELECT name FROM sqlite_temp_master WHERE type='table';".format(dbName))
+                return [x[0] for x in cur.fetchall() if not x[0].startswith('sqlite')]
         except:
             return []
 
@@ -2114,10 +2044,7 @@ class DatabaseEngine:
     def hasIndex(self, index):
         '''Test if an index exists in the current database '''
         cur = self.database.cursor()
-        if self.engine == 'mysql':
-            cur.execute("SHOW INDEXES;")
-            return index.lower() in [x[0].lower() for x in cur.fetchall()]
-        elif '.' in index:
+        if '.' in index:
             db, idx = index.split('.', 1)
             cur.execute("SELECT count(name) FROM {}.sqlite_master WHERE type='index' AND name={};".format(db, self.PH), (idx,))
             return cur.fetchone()[0] > 0
@@ -2126,10 +2053,7 @@ class DatabaseEngine:
             return cur.fetchone()[0] > 0
 
     def dropIndex(self, index, table):
-        if self.engine == 'mysql':
-            self.execute('DROP INDEX {} ON {};'.format(index, table))
-        else:
-            self.execute('DROP INDEX {};'.format(index))
+        self.execute('DROP INDEX {};'.format(index))
 
     def removeTable(self, table):
         '''Remove specified table'''
@@ -2137,7 +2061,6 @@ class DatabaseEngine:
         cur.execute('DROP TABLE {};'.format(table))
         # FIXME: should we automatically do VACUUM, this can be slow when the table is deletec
         # but can help performance for the creation of new tables.
-        #if self.engine == 'sqlite3':
         # NOTE: It seems that re-generating a table can be VERY slow without vacuum.
         #    cur.execute('VACUUM;')
         self.database.commit()
@@ -2166,24 +2089,19 @@ class DatabaseEngine:
     def fieldsOfTable(self, table):
         '''Get the name and type of fields in a table'''
         cur = self.database.cursor()
-        if self.engine == 'mysql':
-            # FIXME: not tested
-            cur.execute('SHOW COLUMNS FROM {};'.format(table))
-            return cur.fetchall()
+        if '.' not in table:
+            cur.execute('SELECT sql FROM sqlite_master WHERE UPPER(name) = "{}";'.format(table.upper()))
         else:
-            if '.' not in table:
-                cur.execute('SELECT sql FROM sqlite_master WHERE UPPER(name) = "{}";'.format(table.upper()))
-            else:
-                db, tbl = table.rsplit('.', 1)
-                cur.execute('SELECT sql FROM {}.sqlite_master WHERE UPPER(name) = "{}";'.format(db, tbl.upper()))
-            try:
-                schema = cur.fetchone()[0]
-            except:
-                raise ValueError('Could not get schema of table {}'.format(table))
-            fields = [x.strip() for x in schema.split(',')]
-            fields[0] = fields[0].split('(')[1].strip()
-            fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-            return [x.split(None, 1) for x in fields]
+            db, tbl = table.rsplit('.', 1)
+            cur.execute('SELECT sql FROM {}.sqlite_master WHERE UPPER(name) = "{}";'.format(db, tbl.upper()))
+        try:
+            schema = cur.fetchone()[0]
+        except:
+            raise ValueError('Could not get schema of table {}'.format(table))
+        fields = [x.strip() for x in schema.split(',')]
+        fields[0] = fields[0].split('(')[1].strip()
+        fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
+        return [x.split(None, 1) for x in fields]
 
     def binningRanges(self, build, keys, anno_name):
         '''Create a binning table for a range based annotation
@@ -2222,10 +2140,7 @@ class DatabaseEngine:
         if len(cols) == 0:
             return
         cur = self.database.cursor()
-        if self.engine == 'mysql':
-            cur.execute('ALTER TABLE {} {};'.format(table,
-                ', '.join(['DROP COLUMN {}'.format(x) for x in cols])))
-        elif '.' not in table:
+        if '.' not in table:
             # for my sqlite, we have to create a new table
             fields = self.fieldsOfTable(table)
             new_fields = ['{} {}'.format(x,y) for x,y in fields if x.lower() not in [z.lower() for z in cols]]
@@ -2267,7 +2182,7 @@ class DatabaseEngine:
 
     def numOfRows(self, table, exact=True):
         cur = self.database.cursor()
-        if not exact and self.engine == 'sqlite3':
+        if not exact:
             # this is much faster if we do not need exact count
             if '.' in table:
                 db, tbl = table.rsplit('.', 1)
@@ -2281,14 +2196,10 @@ class DatabaseEngine:
         return cur.fetchone()[0]
 
     def startProgress(self, text):
-        if self.engine == 'mysql':
-            return
         self.prog = ProgressBar(text)
         self.database.set_progress_handler(self.prog.sqliteUpdate, self.batch)
 
     def stopProgress(self):
-        if self.engine == 'mysql':
-            return
         self.prog.done()
         self.database.set_progress_handler(None, self.batch)
 
@@ -2296,13 +2207,8 @@ class DatabaseEngine:
         '''Obtain field names of a table'''
         cur = self.database.cursor()
         try:
-            if self.engine == 'mysql':
-                cur.execute('SELECT column_name FROM information_schema.columns WHERE table_name={};'.format(self.PH),
-                    table)
-                return [x[0] for x in cur.fetchall()]
-            else:
-                cur.execute('SELECT * FROM {} LIMIT 1;'.format(table))
-                return [x[0] for x in cur.description]
+            cur.execute('SELECT * FROM {} LIMIT 1;'.format(table))
+            return [x[0] for x in cur.description]
         except:
             return None
 
