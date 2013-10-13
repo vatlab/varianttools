@@ -1851,19 +1851,13 @@ class DatabaseEngine:
         self.database = sqlite3.connect(self.dbName, check_same_thread=not readonly)
         self.database.enable_load_extension(True)
         #
-        # We disable PROGAMA for readonly databases because we often use mutliple readers
-        # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
-        # We may need to reconsider this though because some pragma applies to 
-        # readonly databases (e.g. cache_size)
-        if readonly:
-            return
         # this lock prevents multi process of the same vtools instance, but
         # not for multiple vtools intances...
         if lock is not None:
             lock.acquire()
         while True:
             try:
-                self.load_extension()
+                self.load_extension(readonly)
                 break
             except Exception as e:
                 env.logger.warning('Retrying to open database: {}'.format(e))
@@ -1871,21 +1865,26 @@ class DatabaseEngine:
         if lock is not None:
             lock.release()
     
-    def load_extension(self):
-        cur = self.database.cursor()
-        for pragma in env.sqlite_pragma:
-            # if a pragma is only applicable to certain database, check its name
-            if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
-                continue
-            # No error message will be produced for wrong pragma
-            # but we may have syntax error.
-            try:
-                cur.execute('PRAGMA {}'.format(pragma))
-            except Exception as e:
-                # I cannot raise an error because uers need to open the project to reset this value.
-                sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas: {}\n'.format(pragma, e))
-            #
-            self.database.commit()
+    def load_extension(self, readonly):
+        if not readonly:
+            # We disable PROGAMA for readonly databases because we often use mutliple readers
+            # to read from a readonly database, and applying PRAGMA might cause Operationalerror.
+            # We may need to reconsider this though because some pragma applies to
+            # readonly databases (e.g. cache_size)
+            cur = self.database.cursor()
+            for pragma in env.sqlite_pragma:
+                # if a pragma is only applicable to certain database, check its name
+                if '.' in pragma.split('=')[0] and pragma.split('.', 1)[0] != self.dbName:
+                    continue
+                # No error message will be produced for wrong pragma
+                # but we may have syntax error.
+                try:
+                    cur.execute('PRAGMA {}'.format(pragma))
+                except Exception as e:
+                    # I cannot raise an error because uers need to open the project to reset this value.
+                    sys.stderr.write('Failed to set pragma "{}". Use "vtools admin --set_runtime_option sqlite_pragma=PRAGMA1=VAL,PRAGMA2=VAL" to reset pragmas: {}\n'.format(pragma, e))
+                #
+                self.database.commit()
         # trying to load extension
         loaded = False
         for path in sys.path:
