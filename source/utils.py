@@ -669,6 +669,8 @@ class PrettyPrinter:
 
     def cached_trim_print_rest(self):
         '''Print and clear cache'''
+        if not self.rows:
+            return
         # print everything in cache
         print('\n'.join([
             self.delimiter.join(
@@ -708,6 +710,8 @@ class PrettyPrinter:
             self.write = self.uncached_trim_print
 
     def cached_print_rest(self):
+        if not self.rows:
+            return
         print('\n'.join([
             self.delimiter.join(
                 [col.ljust(width) for col, width in zip(row, self.width)])
