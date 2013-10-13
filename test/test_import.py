@@ -435,8 +435,8 @@ class TestImport(ProcessTestCase):
             input = [x.split(',') for x in inputfile.readlines()]
         input = [x[:4] for x in input]
         self.assertEqual(variants, input) 
-        self.assertOutput('vtools show genotypes', '''sample_name  filename         num_genotypes  sample_genotype_fields                                                        
-samp_csv     txt/CGA.tsv.bz2  95             GT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF
+        self.assertOutput('vtools show genotypes', '''sample_name\tfilename       \tnum_genotypes\tsample_genotype_fields                                                        
+samp_csv   \ttxt/CGA.tsv.bz2\t95           \tGT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF
 ''')
 
     def testMultiSamples_1(self):
@@ -449,10 +449,10 @@ samp_csv     txt/CGA.tsv.bz2  95             GT,allele1VarScoreVAF,allele2VarSco
         self.assertEqual(numOfSample(), 3)
         self.maxDiff=None
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     6\n''', skip=3)
-        self.assertOutput('vtools show samples', '''sample_name  filename            
-SMP1         txt/sample_chr22.txt
-SMP2         txt/sample_chr22.txt
-SMP3         txt/sample_chr22.txt
+        self.assertOutput('vtools show samples', '''sample_name\tfilename            
+SMP1       \ttxt/sample_chr22.txt
+SMP2       \ttxt/sample_chr22.txt
+SMP3       \ttxt/sample_chr22.txt
 ''') 
 
     def testMultiSamples_2(self):
@@ -462,10 +462,10 @@ SMP3         txt/sample_chr22.txt
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg18')
         self.assertEqual(numOfSample(), 3)
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     9\n''', skip=3)
-        self.assertOutput('vtools show samples', '''sample_name  filename              
-SMP1         txt/sample_1_chr22.txt
-SMP2         txt/sample_1_chr22.txt
-SMP3         txt/sample_1_chr22.txt
+        self.assertOutput('vtools show samples', '''sample_name\tfilename              
+SMP1       \ttxt/sample_1_chr22.txt
+SMP2       \ttxt/sample_1_chr22.txt
+SMP3       \ttxt/sample_1_chr22.txt
 ''') 
      
 

@@ -54,7 +54,7 @@ class PrettyPrinter:
     def write(self):
         with open(self.out, 'w') as o:
             o.write('\n'.join([
-            '  '.join(
+            '\t'.join(
                 [str(col).ljust(width) for col, width in zip(row, self.width)])
             for row in self.rows]) + '\n')
 
