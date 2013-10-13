@@ -171,6 +171,7 @@ void showTrack(const std::string & track_file)
         for (; chrom != NULL; chrom = chrom->next) {
         	printf("    %-19s %u\n", chrom->name, chrom->size);
         }
+        printf("\n");
         /* the following piece of code can get number of mapped and unmapped reads
          * if we can include proper header file for khint_t etc
         size_t i;
@@ -184,6 +185,7 @@ void showTrack(const std::string & track_file)
                 putchar('\n');
         }
         */
+        /* available fields */
         printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
         printf("%-23s %s\n", "0 (INTEGER)", "1 if depth is over 0, NULL otherwise");
         printf("%-23s %s\n", "coverage (INTEGER)", "Number of reads that cover the starting position of the variant");
@@ -193,8 +195,63 @@ void showTrack(const std::string & track_file)
         printf("%-23s %s\n", "avg_qual (FLOAT)", "Average qual score of all reads");
         printf("%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
         printf("%-23s %s\n", "avg_mapq (FLOAT)", "Average mapq score of all reads");
-        printf("\nParameters min_qual and min_mapq can be used to limit the reads to the \n"
-            "ones with mapq and qual scores that exceed the specified value.\n");
+        //
+        printf("\nTags that can be outputed or used in filters, with values from the 1st record:\n");
+        /* grab the first item and show its properties */
+        bam1_t data;
+        bam1_t * bam = &data;
+        ZeroVar(bam);
+        if (bam_read1(bamf->x.bam, bam) > 0) {
+            // adapted from part of bam.c bam_format1:
+            uint8_t *s = bam1_aux(bam);
+            while (s < bam->data + bam->data_len)
+            {
+                uint8_t type, key[2];
+                key[0] = s[0];
+                key[1] = s[1];
+                s += 2;
+                type = *s;
+                ++s;
+                if (type == 'A') {
+                    printf("%c%c                      A (char)   : %c\n", key[0], key[1], *s);
+                    ++s;
+                } else if (type == 'C') {
+                    printf("%c%c                      C (int)    : %u", key[0], key[1], *s);
+                    ++s;
+                } else if (type == 'c') {
+                    printf("%c%c                      c (int8)   : %d", key[0], key[1], *(int8_t*)s);
+                    ++s;
+                } else if (type == 'S') { 
+                    printf("%c%c                      S (uint16) : %u", key[0], key[1], *(uint16_t*)s);
+                    s += 2; 
+                } else if (type == 's') {
+                    printf("%c%c                      s (int16)  : %d", key[0], key[1], *(int16_t*)s);
+                    s += 2;
+                } else if (type == 'I') {
+                    printf("%c%c                      I (uint32  : %u", key[0], key[1], *(uint32_t*)s);
+                    s += 4;
+                } else if (type == 'i') { 
+                    printf("%c%c                      i (int32)  : %d", key[0], key[1], *(int32_t*)s);
+                    s += 4;
+                } else if (type == 'f') { 
+                    printf("%c%c                      f (float)  : %g", key[0], key[1], *(float*)s);
+                    s += 4; 
+                } else if (type == 'd') { 
+                    printf("%c%c                      d (double) : %lg", key[0], key[1], *(double*)s);
+                    s += 8; 
+                } else if (type == 'Z') {
+                    printf("%c%c                      Z (string) : %s", key[0], key[1], (char *)s);
+                    s += strlen((char *)s) + 1;
+                } else if (type == 'H') {
+                    printf("%c%c                      H (string) : %s", key[0], key[1], (char *)s);
+                    s += strlen((char *)s) + 1;
+                }
+                printf("\n");
+            }
+            printf("\n");
+        }
+        printf("Parameters min_qual, min_mapq and TAG=VAL can be used to limit the reads to the \n"
+            "ones with mapq and qual scores that exceed the specified value, and with specified TAG.\n");
     } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
