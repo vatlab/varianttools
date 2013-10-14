@@ -671,6 +671,9 @@ class PrettyPrinter:
         '''Print and clear cache'''
         if not self.rows:
             return
+        # do not ljust the last column. This avoids unnecessary spaces
+        # at the end of each line
+        self.width[-1] = 0
         # print everything in cache
         print('\n'.join([
             self.delimiter.join(
@@ -712,6 +715,9 @@ class PrettyPrinter:
     def cached_print_rest(self):
         if not self.rows:
             return
+        # do not ljust the last column. This avoids unnecessary spaces
+        # at the end of each line
+        self.width[-1] = 0
         print('\n'.join([
             self.delimiter.join(
                 [col.ljust(width) for col, width in zip(row, self.width)])
