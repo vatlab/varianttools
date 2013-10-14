@@ -196,7 +196,7 @@ void showTrack(const std::string & track_file)
         printf("%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
         printf("%-23s %s\n", "avg_mapq (FLOAT)", "Average mapq score of all reads");
         //
-        printf("\nTags that can be outputed or used in filters, with values from the 1st record:\n");
+        printf("\nTags and flag that can be outputed or used in filters, with values from the 1st record:\n");
         /* grab the first item and show its properties */
         bam1_t data;
         bam1_t * bam = &data;
@@ -216,7 +216,7 @@ void showTrack(const std::string & track_file)
                     printf("%c%c                      A (char)   : %c\n", key[0], key[1], *s);
                     ++s;
                 } else if (type == 'C') {
-                    printf("%c%c                      C (int)    : %u", key[0], key[1], *s);
+                    printf("%c%c                      C (int)    : %u", key[0], key[1], *(char*)s);
                     ++s;
                 } else if (type == 'c') {
                     printf("%c%c                      c (int8)   : %d", key[0], key[1], *(int8_t*)s);
@@ -248,10 +248,13 @@ void showTrack(const std::string & track_file)
                 }
                 printf("\n");
             }
+            printf("flag                    int flag   : 0x%X (%spaired, %smapped according to bits 1 & 3)\n",
+                bam->core.flag, bam->core.flag & 1 == 0 ? "un" : "", bam->core.flag & 8 != 0 ? "un" : "");
             printf("\n");
         }
-        printf("Parameters min_qual, min_mapq and TAG=VAL can be used to limit the reads to the \n"
-            "ones with mapq and qual scores that exceed the specified value, and with specified TAG.\n");
+        printf("Parameters min_qual, min_mapq and TAG=VAL (or >, >=, <, <=, !=) can be used to limit "
+            "the reads to the ones with mapq and qual scores that exceed the specified value, and tag "
+            "satisfying specified conditions.\n");
     } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)

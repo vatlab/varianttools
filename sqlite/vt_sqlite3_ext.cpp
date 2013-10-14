@@ -79,6 +79,7 @@ static void least_not_null_func(
 
 #include <vector>
 #include <utility>
+#include <iomanip>
 #include <sstream>
 #include <exception>
 
@@ -879,6 +880,53 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, char * ref, ch
 }
 
 
+#define OP_EQ '='
+#define OP_NE '+'
+#define OP_GT '>'
+#define OP_GE '.'
+#define OP_LT '<'
+#define OP_LE ','
+
+/* There are fancier and perhaps faster methods such as functors, but I am too tired to
+   *figure out the details.
+ */
+
+// special case to speed up string comparison
+bool compare_val(char type, const char * a, const char * b)
+{
+	if (type == OP_EQ)
+		return strcmp(a, b) == 0;
+	else if (type == OP_NE)
+		return strcmp(a, b) != 0;
+	else if (type == OP_LT)
+		return strcmp(a, b) < 0;
+	else if (type == OP_LE)
+		return strcmp(a, b) <= 0;
+	else if (type == OP_GT)
+		return strcmp(a, b) > 0;
+	else if (type == OP_GE)
+		return strcmp(a, b) >= 0;
+}
+
+
+template<typename T>
+bool compare_val(char type, T a, T b)
+{
+	if (type == OP_EQ)
+		return a == b;
+	else if (type == OP_NE)
+		return a != b;
+	else if (type == OP_LT)
+		return a < b;
+	else if (type == OP_LE)
+		return a <= b;
+	else if (type == OP_GT)
+		return a > b;
+	else if (type == OP_GE)
+		return a >= b;
+}
+
+
 struct BAM_stat
 {
 	//
@@ -896,6 +944,8 @@ struct BAM_stat
 
 	// tags used in conditions, at most 12 tags are allowed, this should be more than enough
 	char cond_tag_keys[24];
+	// =, ==, !=, >, >=, <= etc
+	char cond_tag_op[12];
 	std::vector<std::string> cond_tag_values;
 	BAM_stat(size_t pos) :
 		start(pos), counter(0), calls(), qual(), map_qual(),
@@ -936,43 +986,43 @@ static int fetch_func(const bam1_t * b, void * data)
 			type = *s;
 			++s;
 			if (type == 'A') {
-				if (match >= 0 && buf->cond_tag_values[match][0] != *s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *s, uint8_t(buf->cond_tag_values[match][0])))
 					return 0;
 				++s;
 			} else if (type == 'C') {
-				if (match >= 0 && atoi(buf->cond_tag_values[match].c_str()) != *s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *s, uint8_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				++s;
 			} else if (type == 'c') {
-				if (match >= 0 && int8_t(atoi(buf->cond_tag_values[match].c_str())) != *(int8_t *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(int8_t *)s, int8_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				++s;
 			} else if (type == 'S') {
-				if (match >= 0 && uint16_t(atoi(buf->cond_tag_values[match].c_str())) != *(uint16_t *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(uint16_t *)s, uint16_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 2;
 			} else if (type == 's') {
-				if (match >= 0 && int16_t(atoi(buf->cond_tag_values[match].c_str())) != *(int16_t *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(int16_t *)s, int16_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 2;
 			} else if (type == 'I') {
-				if (match >= 0 && uint32_t(atoi(buf->cond_tag_values[match].c_str())) != *(uint32_t *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(uint32_t *)s, uint32_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 4;
 			} else if (type == 'i') {
-				if (match >= 0 && int32_t(atoi(buf->cond_tag_values[match].c_str())) != *(int32_t *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(int32_t *)s, int32_t(atoi(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 4;
 			} else if (type == 'f') {
-				if (match >= 0 && float(atof(buf->cond_tag_values[match].c_str())) != *(float *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(float *)s, float(atof(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 4;
 			} else if (type == 'd') {
-				if (match >= 0 && double(atof(buf->cond_tag_values[match].c_str())) != *(double *)s)
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], *(double *)s, double(atof(buf->cond_tag_values[match].c_str()))))
 					return 0;
 				s += 8;
 			} else if (type == 'Z' || type == 'H') {
-				if (match >= 0 && buf->cond_tag_values[match] != std::string((char *)s))
+				if (match >= 0 && !compare_val(buf->cond_tag_op[match], (const char *)s, buf->cond_tag_values[match].c_str()))
 					return 0;
 				s += strlen((char *)s) + 1;
 			}
@@ -1034,7 +1084,11 @@ static int fetch_func(const bam1_t * b, void * data)
 				buf->calls << '-';
 			}
 		}
-	} else if (buf->call_content[0] != '\0') {
+	} else if (buf->call_content[0] == '%') {
+		if (!buf->calls.str().empty())
+			buf->calls << '|';
+        buf->calls << std::hex << b->core.flag;
+    } else if (buf->call_content[0] != '\0') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
 		uint8_t * s = bam1_aux(b);
@@ -1119,7 +1173,9 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 	if (fi->name == "reads") {
 		buf.width = 5;
 		buf.call_content[0] = '*';
-	} else if (fi->name.size() == 2) {  // a tag?
+	} else if (fi->name == "flag")
+		buf.call_content[0] = '%';
+	else if (fi->name.size() == 2) {  // a tag?
 		buf.call_content[0] = fi->name[0];
 		buf.call_content[1] = fi->name[1];
 	}
@@ -1136,12 +1192,33 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 			else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads")
 				buf.shift = atoi(pch + 6);
 			// this is a tag
-			else if (strlen(pch) > 3 && pch[2] == '=') {
+			else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
 				size_t n = buf.cond_tag_values.size();
 				if (n < 12) {
 					buf.cond_tag_keys[n + n] = pch[0];
 					buf.cond_tag_keys[n + n + 1] = pch[1];
-					buf.cond_tag_values.push_back(std::string(pch + 3));
+					if (pch[2] == '=') {
+						buf.cond_tag_op[n] = OP_EQ;
+						if (pch[3] == '=')
+							buf.cond_tag_values.push_back(std::string(pch + 4));
+						else
+							buf.cond_tag_values.push_back(std::string(pch + 3));
+					} else if (pch[2] == '!' && pch[3] == '=') {
+						buf.cond_tag_op[n] = OP_NE;
+						buf.cond_tag_values.push_back(std::string(pch + 4));
+					} else if (pch[2] == '>' && pch[3] == '=') {
+						buf.cond_tag_op[n] = OP_GE;
+						buf.cond_tag_values.push_back(std::string(pch + 4));
+					} else if (pch[2] == '<' && pch[3] == '=') {
+						buf.cond_tag_op[n] = OP_LE;
+						buf.cond_tag_values.push_back(std::string(pch + 4));
+					} else if (pch[2] == '>' && pch[3] != '=') {
+						buf.cond_tag_op[n] = OP_GT;
+						buf.cond_tag_values.push_back(std::string(pch + 3));
+					} else if (pch[2] == '<' && pch[3] != '=') {
+						buf.cond_tag_op[n] = OP_LT;
+						buf.cond_tag_values.push_back(std::string(pch + 3));
+					}
 				}
 			} else
 				fprintf(stderr, "\nERROR: Unrecognized or unused parameter %s\n", pch);
@@ -1320,6 +1397,7 @@ static void track(
 			info.name_map["mapq"] = 1;
 			info.name_map["avg_qual"] = 1;
 			info.name_map["avg_mapq"] = 1;
+			info.name_map["flag"] = 1;
 			// tags
 			bam1_t data;
 			bam1_t * bam = &data;
@@ -3501,61 +3579,61 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xFunc)(sqlite3_context *, int, sqlite3_value **);
 	} aFuncs[] = {
 		/* math.h */
-		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc									},
-		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc									},
-		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc									},
-		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func									},
+		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc													},
+		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc													},
+		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc													},
+		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
 		/* XXX alias */
-		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func									},
-		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc									},
-		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc									},
-		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc									},
+		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
+		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc													},
+		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc													},
+		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc													},
 
-		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc							},
-		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc								},
-		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc								},
+		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc											},
+		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc												},
+		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc												},
 
-		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc									},
-		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc									},
-		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc									},
-		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc									},
-		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc									},
-		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc									},
-		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc									},
-		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc									},
+		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc													},
+		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc													},
+		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc													},
+		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc													},
+		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc													},
+		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc													},
+		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc													},
+		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc													},
 
-		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc									},
-		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc									},
-		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func									},
-		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc									},
-		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc									},
-		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc									},
-		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc								},
+		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc													},
+		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc													},
+		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func													},
+		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc													},
+		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc													},
+		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc													},
+		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc												},
 
-		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc									},
-		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc									},
+		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc													},
+		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc													},
 
-		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc									},
+		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc													},
 
 
 		/* string */
-		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc								},
-		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc								},
-		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc								},
-		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc									},
-		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc									},
+		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc												},
+		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
+		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
+		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc													},
+		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc													},
 #ifndef HAVE_TRIM
-		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc									},
-		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc									},
-		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc									},
-		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc								},
+		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc													},
+		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc													},
+		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc													},
+		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc												},
 #endif
-		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc								},
-		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc								},
-		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc									},
-		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc									},
-		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc									},
-		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc								},
+		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc												},
+		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc												},
+		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc													},
+		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc													},
+		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc													},
+		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc												},
 
 	};
 	/* Aggregate functions */
@@ -3568,12 +3646,12 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xStep)(sqlite3_context *, int, sqlite3_value **);
 		void (* xFinalize)(sqlite3_context *);
 	} aAggs[] = {
-		{ "stdev",			1,			 0,			  0,		   varianceStep,		   stdevFinalize																																										 },
-		{ "variance",		1,			 0,			  0,		   varianceStep,		   varianceFinalize																																										 },
-		{ "mode",			1,			 0,			  0,		   modeStep,			   modeFinalize																																											 },
-		{ "median",			1,			 0,			  0,		   modeStep,			   medianFinalize																																										 },
-		{ "lower_quartile", 1,			 0,			  0,		   modeStep,			   lower_quartileFinalize																																								 },
-		{ "upper_quartile", 1,			 0,			  0,		   modeStep,			   upper_quartileFinalize																																								 },
+		{ "stdev",			1,			 0,			  0,		   varianceStep,		   stdevFinalize																																																	 },
+		{ "variance",		1,			 0,			  0,		   varianceStep,		   varianceFinalize																																																	 },
+		{ "mode",			1,			 0,			  0,		   modeStep,			   modeFinalize																																																		 },
+		{ "median",			1,			 0,			  0,		   modeStep,			   medianFinalize																																																	 },
+		{ "lower_quartile", 1,			 0,			  0,		   modeStep,			   lower_quartileFinalize																																															 },
+		{ "upper_quartile", 1,			 0,			  0,		   modeStep,			   upper_quartileFinalize																																															 },
 	};
 	int i;
 
