@@ -311,7 +311,7 @@ class AssociationTestManager:
             # warn users what is happening
             #
             # we select samples with missing phenotype
-            where_clause = 'WHERE {}'.format(' OR '.join(['{} IS NULL'.format(x) for x in pheno + covar]))
+            where_clause = 'WHERE ({})'.format(' OR '.join(['{} IS NULL'.format(x) for x in pheno + covar]))
             if condition:
                 where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
             cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
