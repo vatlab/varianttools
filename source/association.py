@@ -308,9 +308,13 @@ class AssociationTestManager:
             cur = self.db.cursor()
             # handles missing phenotype automatically, but we need to first 
             # warn users what is happening
-            cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.\
-                format(', '.join(pheno)) + \
-                    (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else ''))
+            #
+            # we select samples with missing phenotype
+            where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NULL'.format(x) for x in pheno]))
+            if condition:
+                where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
+            cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
+                format(', '.join(pheno), where_clause))
             for rec in cur:
                 for val, fld in zip(rec[1:], pheno):
                     if val is None:
