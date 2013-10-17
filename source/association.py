@@ -305,28 +305,29 @@ class AssociationTestManager:
         '''Get a list of samples from specified condition.
         This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
+            covar = [] if covar is None else covar
             cur = self.db.cursor()
             # handles missing phenotype automatically, but we need to first 
             # warn users what is happening
             #
             # we select samples with missing phenotype
-            where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NULL'.format(x) for x in pheno]))
+            where_clause = 'WHERE {}'.format(' OR '.join(['{} IS NULL'.format(x) for x in pheno + covar]))
             if condition:
                 where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
             cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
-                format(', '.join(pheno), where_clause))
+                format(', '.join(pheno + covar), where_clause))
             for rec in cur:
-                for val, fld in zip(rec[1:], pheno):
+                for val, fld in zip(rec[1:], pheno + covar):
                     if val is None:
                         env.logger.warning('Sample {} is ignored due to missing value for phenotype {}'
-                            .format(sample_name, pheno))
+                            .format(rec[0], fld))
             #
             # now we select samples without missing phenotype
-            where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NOT NULL'.format(x) for x in pheno]))
+            where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NOT NULL'.format(x) for x in pheno + covar]))
             if condition:
                 where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
             query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
-                format(', '.join(pheno + (covar if covar is not None else [])), where_clause)
+                format(', '.join(pheno + covar), where_clause)
             env.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
@@ -358,9 +359,7 @@ class AssociationTestManager:
                 phenotypes = [safeMapFloat(x, nan=False) for x in phenotypes]
                 covariates = [safeMapFloat(x, nan=False) for x in covariates]
             except:
-                raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values: '
-                                 'missing values should be removed from analysis or '
-                                 'inferred with numeric values')
+                raise ValueError('Invalid (non-numeric) coding in phenotype/covariates values')
             return sample_IDs, sample_names, phenotypes, covariates
         except Exception as e:
             env.logger.debug(e)
