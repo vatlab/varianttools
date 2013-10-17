@@ -74,8 +74,11 @@ class TestRemove(ProcessTestCase):
         self.assertEqual(numOfSample(), 63)
         self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
         self.assertEqual(numOfSample(), 60) 
-        self.assertSucc('vtools remove samples "BMI > "40""')
-        self.assertEqual(numOfSample(), 59) 
+        self.assertSucc('vtools remove samples "BMI > 20"')
+        # note that the sample with missing BMI is still there
+        self.assertEqual(numOfSample(), 28) 
+        self.assertSucc('vtools remove samples "BMI is NULL"')
+        self.assertEqual(numOfSample(), 25) 
 
         #remove variant
     def testRemoveVar(self):
@@ -108,17 +111,17 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove phenotypes sex')
         # removing non-existing phenotype should yield just a warning
         self.assertSucc('vtools remove phenotypes non_existing')
-        self.assertOutput('vtools show samples', 'sample_name\tfilename      \taff \tBMI  ',1) 
+        self.assertOutput('vtools show samples', 'sample_name\tfilename      \taff\tBMI',1) 
     
     def testRemoveGenofield(self):
         #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
         self.maxDiff=None
-        self.assertOutput('vtools show genotypes','''SAMP2      \tvcf/SAMP2.vcf \t288          \tGT,DP_geno            \n''',-2)
+        self.assertOutput('vtools show genotypes','''SAMP2      \tvcf/SAMP2.vcf \t288          \tGT,DP_geno\n''',-2)
         self.assertFail('vtools remove geno_fields')
         self.assertFail('vtools remove geno_fields variant_id')
         self.assertFail('vtools remove geno_fields gt')
         self.assertSucc('vtools remove geno_fields DP_geno')
-        self.assertOutput('vtools show genotypes', '''SAMP2      \tvcf/SAMP2.vcf \t288          \tGT                    \n''',-2)
+        self.assertOutput('vtools show genotypes', '''SAMP2      \tvcf/SAMP2.vcf \t288          \tGT\n''',-2)
         self.assertFail('vtools remove projects')
         self.assertSucc('vtools remove project')
 
