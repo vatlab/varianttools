@@ -52,6 +52,7 @@ class PrettyPrinter:
             self.width = [max(y, len(str(x))) for y,x in zip(self.width, data)]
 
     def write(self):
+        self.width[-1] = 0
         with open(self.out, 'w') as o:
             o.write('\n'.join([
             '\t'.join(

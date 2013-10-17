@@ -3667,7 +3667,7 @@ def show(args):
                     limit_clause))
                 for rec in cur:
                     # print '' in place of empty string
-                    prt.write([str(x) for x in rec])
+                    prt.write(['.' if x is None else str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3701,7 +3701,7 @@ def show(args):
                     limit_clause))
                 for rec in cur:
                     # print '' in place of empty string
-                    prt.write([str(x) for x in rec])
+                    prt.write(['.' if x is None else str(x) for x in rec])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:

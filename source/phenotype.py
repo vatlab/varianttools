@@ -151,7 +151,7 @@ class Sample:
         self.jobs = jobs
         self.db = proj.db
 
-    def load(self, filename, allowed_fields, samples):
+    def load(self, filename, allowed_fields, samples, na_str):
         '''Load phenotype information from a file'''
         if not self.db.hasTable('sample'):
             env.logger.warning('Project does not have a sample table.')
@@ -235,43 +235,59 @@ class Sample:
             if field.lower() not in [x.lower() for x in cur_fields]:
                 self.proj.checkFieldName(field, exclude='sample')
                 fldtype = typeOfValues([x[idx] for x in records.values()])
-                env.logger.info('Adding phenotype {}'.format(field))
+                env.logger.info('Adding phenotype {} of type {}'.format(field, fldtype))
                 env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 count[1] += 1  # new
             else:
+                fldtype = self.db.typeOfColumn('sample', field)
                 count[2] += 1  # updated
+            null_count = defaultdict(int)
             for key, rec in records.iteritems():
                 # by sample_name only
                 if len(key) == 1:
                     # get matching sample
                     cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
-                    ids = [x[0] for x in cur.fetchall()]
-                    if len(ids) == 0:
-                        invalid_sample_names.add(key[0])
-                        continue
-                    for id in [x for x in ids if x in allowed_samples]:
-                        count[0] += 1
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
                 else: # by filename and sample_name
                     cur.execute('SELECT sample.sample_id FROM sample '
                         'LEFT JOIN filename ON sample.file_id = filename.file_id '
                         'WHERE filename.filename = {0} AND sample.sample_name = {0}'
                         .format(self.db.PH), key)
-                    ids = [x[0] for x in cur.fetchall()]
-                    if len(ids) == 0:
-                        invalid_sample_names.add(key[0])
-                        continue
-                    if len(ids) != 1:
-                        raise ValueError('Filename and sample should uniquely determine a sample')
-                    for id in [x for x in ids if x in allowed_samples]:
-                        count[0] += 1
-                        cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
-        env.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
-            count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
+                ids = [x[0] for x in cur.fetchall()]
+                if len(ids) == 0:
+                    invalid_sample_names.add(key[0])
+                    continue
+                #
+                for id in [x for x in ids if x in allowed_samples]:
+                    count[0] += 1
+                    if rec[idx] == na_str:
+                        null_count[field] += 1
+                        rec[idx] = None
+                    elif fldtype.upper().startswith('INT'):
+                        try:
+                            int(rec[idx])
+                        except:
+                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                                .format(rec[idx], field))
+                            null_count[field] += 1
+                            rec[idx] = None
+                    elif fldtype.upper().startswith('FLOAT'):
+                        try:
+                            float(rec[idx])
+                        except:
+                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                                .format(rec[idx], field))
+                            null_count[field] += 1
+                            rec[idx] = None
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
+        for f,c in null_count.items():
+            env.logger.warning('{} missing values are identified for phenotype {}'
+                .format(c, f))
         if invalid_sample_names:
             env.logger.warning('Samples {} in input file does not match any sample.'
                 .format(', '.join(sorted(invalid_sample_names))))
+        env.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
+            count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
         self.db.commit()
 
     def setPhenotype(self, field, expression, samples):
@@ -373,10 +389,12 @@ class Sample:
             res = status.get(ID)
             for idx, (field, expr) in enumerate(stat):
                 if new_field[field]:
-                    env.logger.debug('Adding phenotype {}'.format(field))
+                    fldtype = typeOfValues([str(status.get(x)[idx]) for x in IDs])
                     # determine the type of value
-                    self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
-                        typeOfValues([str(status.get(x)[idx]) for x in IDs])))
+                    self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
+                        .format(field, fldtype))
+                    env.logger.debug('Adding phenotype {} of type {}'
+                        .format(field, fldtype))
                     new_field[field] = False
                     count[1] += 1  # new
                 cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
@@ -420,7 +438,7 @@ def generalOutputArguments(parser):
     grp.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
     grp.add_argument('--na', default='NA',
-        help='Output string for missing value')
+        help='Input or output string for missing value..')
     grp.add_argument('-l', '--limit', default=-1, type=int,
         help='''Number of record to display. Default to all record.''')
 
@@ -437,7 +455,10 @@ def phenotypeArguments(parser):
             the imported phenotypes. Optionally, a list of phenotypes (columns 
             of the file) can be specified after filename, in which case only the
             specified phenotypes will be imported. Parameter --samples could be
-            used to limit the samples for which phenotypes are imported. '''),
+            used to limit the samples for which phenotypes are imported. Values
+            that match value of parameter --na and cannot be converted to the
+            probed type of phenotype (e.g. '' in a column of numbers) are recorded
+            as missing values.'''),
     parser.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
         help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
             using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio
@@ -479,7 +500,7 @@ def phenotype(args):
             if args.from_file:
                 filename = args.from_file[0]
                 fields = args.from_file[1:]
-                p.load(filename, fields, ' AND '.join(['({})'.format(x) for x in args.samples]))
+                p.load(filename, fields, ' AND '.join(['({})'.format(x) for x in args.samples]), args.na)
             if args.set:
                 for item in args.set:
                     try:

@@ -51,7 +51,7 @@ class TestPhenotype(ProcessTestCase):
         prt.cache(ori_file.readline().replace('sample_name', 'sample_name\tfilename').split('\t'))
         for line in ori_file:
             c1,c2,c3,c4 = line.split('\t')
-            prt.cache([c1, 'vcf/CEU.vcf.gz', c2, c3, c4])
+            prt.cache([c1, 'vcf/CEU.vcf.gz', c2, c3, '.' if c4.strip() == 'None' else c4])
         ori_file.close()
         prt.write()
         self.assertOutput('vtools show samples','', 10, 'new_file')
@@ -93,7 +93,7 @@ class TestPhenotype(ProcessTestCase):
         ori_file = open('phenotype/pheno_filename.txt', 'r')
         for line in ori_file:
             c1,c2,c3,c4,c5 = line.strip().split('\t')
-            prt.cache([c2, c1, c3, c4, c5])
+            prt.cache([c2, c1, c3, c4, c5 if c5 != 'None' else '.'])
         ori_file.close()
         prt.write()
         self.assertOutput('vtools show samples','', 0, 'new_file')
