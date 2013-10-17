@@ -305,9 +305,24 @@ class AssociationTestManager:
         '''Get a list of samples from specified condition.
         This function sets self.sample_IDs, self.phenotypes and self.covariates'''
         try:
-            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.\
-            format(', '.join(pheno + (covar if covar is not None else []))) + \
-                (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else '')
+            cur = self.db.cursor()
+            # handles missing phenotype automatically, but we need to first 
+            # warn users what is happening
+            cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id'.\
+                format(', '.join(pheno)) + \
+                    (' WHERE {}'.format(' AND '.join(['({})'.format(x) for x in condition])) if condition else ''))
+            for rec in cur:
+                for val, fld in zip(rec[1:], pheno):
+                    if val is None:
+                        env.logger.warning('Sample {} is ignored due to missing value for phenotype {}'
+                            .format(sample_name, pheno))
+            #
+            # now we select samples without missing phenotype
+            where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NOT NULL'.format(x) for x in pheno]))
+            if condition:
+                where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
+            query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
+                format(', '.join(pheno + (covar if covar is not None else [])), where_clause)
             env.logger.debug('Select phenotype and covariates using query {}'.format(query))
             cur = self.db.cursor()
             cur.execute(query)
