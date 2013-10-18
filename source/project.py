@@ -619,15 +619,7 @@ class PipelineDescription:
         self.pipelines = {}
         self.pipeline_descriptions = {}
         #
-        if name.endswith('.pipeline'):
-            if os.path.isfile(name):
-                self.name = os.path.split(name)[-1].rsplit('.', 1)[0]
-                args = self.parseArgs(name, extra_args)
-                self.parsePipeline(name, defaults=args) 
-            else:
-                raise ValueError('Pipeline description file not found: {}'
-                    .format(name))
-        elif os.path.isfile(name + '.pipeline'):
+        if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
             args = self.parseArgs(name + '.pipeline', extra_args)
             self.parsePipeline(name + '.pipeline', defaults=args) 
@@ -636,7 +628,11 @@ class PipelineDescription:
             args = self.parseArgs(name, extra_args)
             self.parsePipeline(name, defaults=args) 
         else:
-            url = 'pipeline/{}.pipeline'.format(name)
+            # not found, try online
+            if name.endswith('.pipeline'):
+                url = 'pipeline/{}'.format(name)
+            else:
+                url = 'pipeline/{}.pipeline'.format(name)
             try:
                 pipeline = downloadFile(url, quiet=True)
             except Exception as e:
