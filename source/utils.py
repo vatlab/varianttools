@@ -2235,10 +2235,12 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     has_ref_query = False
     ref_tokens = {
         'ref_sequence': '__REFSEQ__',
-        'vcf_variant': '__VCFVARIANT__'
+        'vcf_variant': '__VCFVARIANT__',
     }
     has_track_query = False
     track_tokens = {'track': '__TRACK__'}
+    has_samples_query = False
+    samples_tokens = {'samples': '__SAMPLES__'}
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2254,6 +2256,9 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         elif toval.lower() in track_tokens:
             toval = track_tokens[toval.lower()]
             has_track_query = True
+        elif toval.lower() in samples_tokens:
+            toval = samples_tokens[toval.lower()]
+            has_samples_query = True
         #
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             if before_dot:
@@ -2302,6 +2307,11 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             else:
                 query = re.sub(r'{}\s*\('.format(v), 
                     ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
+    if has_samples_query:
+        # need to pass 
+        for k,v in samples_tokens.items():
+            query = re.sub(r'{}\s*\('.format(v),
+                " {}('{}', {}, ".format(k, proj.name, 'variant.variant_id'), query)
     return query, fields
 
 def extractField(field):
