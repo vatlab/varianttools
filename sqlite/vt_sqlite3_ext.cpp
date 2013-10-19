@@ -1,4 +1,4 @@
-/*
+/**
  * $File: vtools_sqlite.c $
  * $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
  * $Rev: 4234 $
@@ -1522,6 +1522,61 @@ static void track(
 }
 
 sqlite3 * geno_db;
+typedef std::map<int, std::string> SampleIdNameMap;
+SampleIdNameMap idNameMap ;
+
+static void genotype(
+                  sqlite3_context * context,
+                  int argc,
+                  sqlite3_value ** argv
+                  )
+{
+	// parameters passed:
+	// name of project, variant_id, sample_name, and then type
+	if (argc < 3 ||
+	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL ) {
+		sqlite3_result_error(context, "please specify at least project name", -1);
+		return;
+	} else if (argc > 4) {
+		sqlite3_result_error(context, "samples function accept at most 2 parameter", -1);
+		return;
+	}
+
+	std::string proj_name = std::string((char *)sqlite3_value_text(argv[0]));
+	int variant_id = sqlite3_value_int(argv[1]);
+	char * ret_type = NULL;
+	if (argc == 3)
+		ret_type = (char *)sqlite3_value_text(argv[2]);
+
+	int result = 0;
+	// open databases
+	if (!geno_db) {
+		std::string geno_db_file = proj_name + "_genotype.DB";
+		result = sqlite3_open_v2(geno_db_file.c_str(), &geno_db, SQLITE_OPEN_READONLY, NULL);
+		if (result != SQLITE_OK) {
+			sqlite3_result_error(context, "Failed to open genotype database", -1);
+			return;
+		}
+	}
+	// run some query
+	char * sql = "SELECT * FROM genotype_1 LIMIT 1";
+	sqlite3_stmt *stmt;
+	result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+	if (result != SQLITE_OK) {
+		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+		return;
+	}
+	do {
+		result = sqlite3_step(stmt);
+		if (result == SQLITE_ROW) {
+			const unsigned char * data = sqlite3_column_text(stmt, 0);
+			sqlite3_result_text(context, (const char *)data, -1, SQLITE_TRANSIENT);
+		}
+	} while (result == SQLITE_ROW);
+	// we do not close the database because we are readonly and we need the database for
+	// next use.
+}
 
 
 static void samples(
@@ -1765,6 +1820,7 @@ int sqlite3_my_extension_init(
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
 	sqlite3_create_function(db, "track", -1, SQLITE_ANY, 0, track, 0, 0);
+	sqlite3_create_function(db, "genotype", -1, SQLITE_ANY, 0, genotype, 0, 0);
 	sqlite3_create_function(db, "samples", -1, SQLITE_ANY, 0, samples, 0, 0);
 	return 0;
 }

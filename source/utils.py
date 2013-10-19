@@ -2240,7 +2240,10 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     has_track_query = False
     track_tokens = {'track': '__TRACK__'}
     has_samples_query = False
-    samples_tokens = {'samples': '__SAMPLES__'}
+    samples_tokens = {
+            'samples': '__SAMPLES__',
+            'genotype': '__GENOTYPE__'
+    }
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2308,7 +2311,20 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 query = re.sub(r'{}\s*\('.format(v), 
                     ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
     if has_samples_query:
-        # need to pass 
+        # need to pass project name and the id of variant of interest, however, this 
+        # function is complicated and it is necessary to get a list of sample IDs and
+        # their names
+        #
+        # FIXME: need to get conditions from the query using regular expression 
+        # for function samples.
+        conditions = '1'
+        cur = proj.db.cursor()
+        cur.execute('SELECT sample_id, sample_name FROM sample, filename '
+                'WHERE sample.file_id = filename.file_id AND {};'
+                .format(condition))
+        with open(env.cache_dir, '_samples_id_list.tmp', 'w') as idMap:
+            for rec in cur:
+                idMap.write('{}\t{}\n'.format(rec[0], rec[1]))
         for k,v in samples_tokens.items():
             query = re.sub(r'{}\s*\('.format(v),
                 " {}('{}', {}, ".format(k, proj.name, 'variant.variant_id'), query)
