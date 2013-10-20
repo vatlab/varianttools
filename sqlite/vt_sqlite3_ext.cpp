@@ -82,6 +82,7 @@ static void least_not_null_func(
 #include <iomanip>
 #include <sstream>
 #include <exception>
+#include <fstream>
 
 typedef std::map<std::string, cgatools::reference::CrrFile *> RefGenomeFileMap;
 typedef std::map<std::string, int> ChrNameMap;
@@ -1522,8 +1523,8 @@ static void track(
 }
 
 sqlite3 * geno_db;
-typedef std::map<int, std::string> SampleIdNameMap;
-SampleIdNameMap idNameMap ;
+typedef std::map<std::string, int> SampleNameIdMap;
+SampleNameIdMap nameIdMap;
 
 static void genotype(
                   sqlite3_context * context,
@@ -1535,20 +1536,43 @@ static void genotype(
 	// name of project, variant_id, sample_name, and then type
 	if (argc < 3 ||
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[1]) == SQLITE_NULL ) {
-		sqlite3_result_error(context, "please specify at least project name", -1);
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL ) {
+		sqlite3_result_error(context, "please name of a sample", -1);
 		return;
 	} else if (argc > 4) {
-		sqlite3_result_error(context, "samples function accept at most 2 parameter", -1);
+		sqlite3_result_error(context, "Function genotype accepts at most 2 parameter sample_name and field", -1);
 		return;
 	}
 
 	std::string proj_name = std::string((char *)sqlite3_value_text(argv[0]));
 	int variant_id = sqlite3_value_int(argv[1]);
-	char * ret_type = NULL;
-	if (argc == 3)
-		ret_type = (char *)sqlite3_value_text(argv[2]);
-
+    char * sample_name = (char *)sqlite3_value_text(argv[2]);
+	char * ret_field = NULL;
+	if (argc == 4)
+		ret_field = (char *)sqlite3_value_text(argv[3]);
+    
+    // first try to get a ID Map, which might have already been loaded
+    if (nameIdMap.empty()) {
+        std::ifstream ids("cache/_samples_id_all.tmp");
+        while (ids.good()) {
+            // read each line and fill nameIdMap
+            int id;
+            std::string name;
+            ids >> id >> name;
+            nameIdMap[name] = id;
+            printf("ADD %d %s\n", id, name.c_str());
+        }
+    }
+    // find the name
+    SampleNameIdMap::const_iterator it = nameIdMap.find(sample_name);
+    // could not find the sample name
+    if (it == nameIdMap.end()) {
+        sqlite3_result_error(context, "Same name mismatch", -1);
+        return;
+    }
+    int sample_id = it->second;
+    printf("Sample ID %d\n", sample_id);
 	int result = 0;
 	// open databases
 	if (!geno_db) {
@@ -1560,24 +1584,44 @@ static void genotype(
 		}
 	}
 	// run some query
-	char * sql = "SELECT * FROM genotype_1 LIMIT 1";
+	char sql[255];
+    sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 1",
+        ret_field, sample_id, variant_id); 
 	sqlite3_stmt *stmt;
 	result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 	if (result != SQLITE_OK) {
 		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
 		return;
 	}
-	do {
-		result = sqlite3_step(stmt);
-		if (result == SQLITE_ROW) {
-			const unsigned char * data = sqlite3_column_text(stmt, 0);
-			sqlite3_result_text(context, (const char *)data, -1, SQLITE_TRANSIENT);
-		}
-	} while (result == SQLITE_ROW);
+    // there should be only one matching record
+	result = sqlite3_step(stmt);
+	if (result == SQLITE_ROW) {
+        // how to pass whatever type the query gets to the output???
+        switch (sqlite3_column_type(stmt, 0)) {
+        case SQLITE_INTEGER:
+            sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
+            break;
+        case SQLITE_FLOAT:
+            sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
+            break;
+        case SQLITE_TEXT:
+            sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
+            break;
+        case SQLITE_BLOB:
+            sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
+            break;
+        case SQLITE_NULL:
+            sqlite3_result_null(context);
+            break;
+        }
+	}
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
 }
 
+typedef std::map<int, std::string> IdNameMap;
+typedef std::map<std::string, IdNameMap> SampleIdNameMap;
+SampleIdNameMap idNameMap;
 
 static void samples(
                   sqlite3_context * context,
@@ -1585,23 +1629,45 @@ static void samples(
                   sqlite3_value ** argv
                   )
 {
+    /*
 	// parameters passed:
-	// name of project, variant_id, and then type
+	// name of project, variant_id, type, genotype_filter, sample_id_file
+    // sample_id_file is 
+    //
 	if (argc < 3 ||
 	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[1]) == SQLITE_NULL ) {
-		sqlite3_result_error(context, "please specify at least project name", -1);
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL ) {
+		sqlite3_result_error(context, "Please specify at least type of output", -1);
 		return;
-	} else if (argc > 3) {
-		sqlite3_result_error(context, "samples function accept at most 1 parameter", -1);
+	} else if (argc > 5) {
+		sqlite3_result_error(context, "samples function accept at most 3 parameter", -1);
 		return;
 	}
 
 	std::string proj_name = std::string((char *)sqlite3_value_text(argv[0]));
 	int variant_id = sqlite3_value_int(argv[1]);
-	char * ret_type = NULL;
-	if (argc == 3)
-		ret_type = (char *)sqlite3_value_text(argv[2]);
+	char * ret_type = (char *)sqlite3_value_text(argv[2]);
+    char * geno_filter = NULL;
+    if (argc > 3)
+        geno_filter = (char *)sqlite3_value_text(argv[3]);
+    char * sample_id_file = NULL;
+    if (argc == 4)
+        sample_id_file = (char *) sqlite3_value_text(argv[4]);
+    else
+        sample_id_file = "cache/_samples_id_all.tmp";
+
+    // see if the sample_id_file has been loaded
+    idNameMap::iterator it = idNameMap.find(sample_id_file);
+    if (iterator == idNameMap.end())
+        // read that file
+        IdNameMap * inm = new IdNameMap();
+        FILE * ff = open(sample_id_fie);
+        while () {
+            inm[id] = name;
+        }
+    }
+    IdNameMap & idMap = it->second;
 
 	int result = 0;
 	// open databases
@@ -1613,22 +1679,29 @@ static void samples(
 			return;
 		}
 	}
-	// run some query
-	char * sql = "SELECT * FROM genotype_1 LIMIT 1";
-	sqlite3_stmt *stmt;
-	result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-	if (result != SQLITE_OK) {
-		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
-		return;
-	}
-	do {
-		result = sqlite3_step(stmt);
-		if (result == SQLITE_ROW) {
-			const unsigned char * data = sqlite3_column_text(stmt, 0);
-			sqlite3_result_text(context, (const char *)data, -1, SQLITE_TRANSIENT);
-		}
-	} while (result == SQLITE_ROW);
-	// we do not close the database because we are readonly and we need the database for
+	// 
+    // go through all samples (with id)
+	std::stringstream res;
+    for () {
+        char * sql = "SELECT * FROM genotype_1 LIMIT 1";
+        sqlite3_stmt *stmt;
+        result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+        if (result != SQLITE_OK) {
+            sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+            return;
+        }
+        do {
+            result = sqlite3_step(stmt);
+            if (result == SQLITE_ROW) {
+                const unsigned char * data = sqlite3_column_text(stmt, 0);
+                sqlite3_result_text(context, (const char *)data, -1, SQLITE_TRANSIENT);
+            }
+        } while (result == SQLITE_ROW);
+    }
+	sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+    // output a string with all information
+    */
+    // we do not close the database because we are readonly and we need the database for
 	// next use.
 }
 
