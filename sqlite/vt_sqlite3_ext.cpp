@@ -1554,7 +1554,7 @@ static void genotype(
 
 	// first try to get a ID Map, which might have already been loaded
 	if (nameIdMap.empty()) {
-		std::ifstream ids("cache/_samples_id_map.txt");
+		std::ifstream ids("cache/_sample_id_map.txt");
 		while (ids.good()) {
 			// read each line and fill nameIdMap
 			int id = -1;
@@ -1568,7 +1568,9 @@ static void genotype(
 	SampleNameIdMap::const_iterator it = nameIdMap.find(sample_name);
 	// could not find the sample name
 	if (it == nameIdMap.end()) {
-		sqlite3_result_error(context, "Same name mismatch", -1);
+        char msg[255];
+        sprintf(msg, "Sample name '%s' does not match any known sample", sample_name);
+		sqlite3_result_error(context, msg, -1);
 		return;
 	}
 	int sample_id = it->second;
@@ -1695,12 +1697,12 @@ static void samples(
 			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
 			return;
 		}
-		if (first)
-			first = false;
-		else
-			res << ",";
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
+            if (first)
+                first = false;
+            else
+                res << ",";
 			if (ret_field == NULL) {
 				res << im->second;
 			} else {
@@ -1725,7 +1727,10 @@ static void samples(
 			}
 		}
 	}
-	sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+    if (res.str().empty())
+	    sqlite3_result_null(context);
+    else
+	    sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 	// output a string with all information
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
