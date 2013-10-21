@@ -1632,10 +1632,10 @@ static void samples(
                     )
 {
 	// parameters passed:
-	// name of project, variant_id, sample_id_file, [genotype_filter, field]
+	// name of project, variant_id, sample_id_file, [genotype_filter]
 	//
-	if (argc > 5) {
-		sqlite3_result_error(context, "samples function accept at most 3 parameter", -1);
+	if (argc > 4) {
+		sqlite3_result_error(context, "samples function accept at most 2 parameter", -1);
 		return;
 	}
 
@@ -1645,9 +1645,6 @@ static void samples(
 	char * geno_filter = argc > 3 ? (char *)sqlite3_value_text(argv[3]) : NULL;
 	if (geno_filter && geno_filter[0] == '\0')
 		geno_filter = NULL;
-	char * ret_field = argc > 4 ? (char *)sqlite3_value_text(argv[4]) : NULL;
-	if (ret_field && ret_field[0] == '\0')
-		ret_field = NULL;
 
 	// see if the sample_id_file has been loaded
 	SampleIdNameMap::iterator it = idNameMap.find(std::string(sample_id_file));
@@ -1686,10 +1683,8 @@ static void samples(
 	bool first = true;
 	for (; im != im_end; ++im) {
 		char sql[255];
-		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
-			ret_field == NULL ? "variant_id" : ret_field,
-			im->first, variant_id,
-			geno_filter == NULL ? "1" : geno_filter);
+		sprintf(sql, "SELECT variant_id FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
+			im->first, variant_id, geno_filter == NULL ? "1" : geno_filter);
 		//
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
@@ -1703,28 +1698,7 @@ static void samples(
                 first = false;
             else
                 res << ",";
-			if (ret_field == NULL) {
-				res << im->second;
-			} else {
-				// how to pass whatever type the query gets to the output???
-				switch (sqlite3_column_type(stmt, 0)) {
-				case SQLITE_INTEGER:
-					res << sqlite3_column_int(stmt, 0);
-					break;
-				case SQLITE_FLOAT:
-					res << sqlite3_column_double(stmt, 0);
-					break;
-				case SQLITE_TEXT:
-					res << (const char *)sqlite3_column_text(stmt, 0);
-					break;
-				case SQLITE_BLOB:
-					res << sqlite3_column_blob(stmt, 0);
-					break;
-				case SQLITE_NULL:
-					res << ".";
-					break;
-				}
-			}
+			res << im->second;
 		}
 	}
     if (res.str().empty())

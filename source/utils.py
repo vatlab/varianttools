@@ -2343,7 +2343,6 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 # optional parameters
                 #    1: sample filter
                 #    2: genotype filter
-                #    3: item to display
                 params = matchObj.group(2).strip().split(',')
                 if len(params) == 0:
                     # no parameter
@@ -2356,9 +2355,6 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 elif len(params) == 2:
                     return("samples('{}_genotype.DB', variant.variant_id, '{}', {})"
                         .format(proj.name, writeSampleIdMap(params[0]), params[1]))
-                elif len(params) == 3:
-                    return("samples('{}_genotype.DB', variant.variant_id, '{}', {}, {})"
-                        .format(proj.name, writeSampleIdMap(params[0]), params[1], params[2]))
                 else:
                     raise ValueError('At most three parameters are allowed for SQL function samples()')
         #
