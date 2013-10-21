@@ -2311,8 +2311,38 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 query = re.sub(r'{}\s*\('.format(v), 
                     ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
     if has_samples_query:
-        idNameFiles = {}
         #
+        idListFiles = {}
+        def writeIDList(cond=''):
+            #
+            # cond is a string (e.g. "'1'") and need to be evaluated as a string
+            cond = str(eval(cond)) if cond else '1'
+            if not cond:
+                cond = '1'
+            # return a file for condition
+            if cond in idListFiles:
+                return idListFiles[cond]
+            cur = proj.db.cursor()
+            # first get all sample names
+            try:
+                cur.execute('SELECT sample_id FROM sample WHERE sample_name = {} LIMIT 0,1'
+                    .format(proj.db.PH), (cond,))
+                res = cur.fetchone()
+                return res[0]
+            except Exception as e:
+                try:
+                    cur.execute('SELECT sample_id FROM sample, filename '
+                        'WHERE sample.file_id = filename.file_id AND ({});'
+                        .format(cond))
+                except:
+                    raise ValueError('Failed to identify a sample using name or condition "{}"'.format(cond))
+                filename = 'cache/_sample_id_list_{}.txt'.format(binascii.hexlify(cond))
+                with open(filename, 'w') as idList:
+                    for rec in cur:
+                        idList.write('{}\n'.format(rec[0]))
+                return filename
+        #
+        idNameFiles = {}
         def writeSampleIdMap(cond=''):
             # cond is a string (e.g. "'1'") and need to be evaluated as a string
             cond = str(eval(cond)) if cond else '1'
@@ -2335,10 +2365,36 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         #
         def handleParams(matchObj):
             if matchObj.group(1) == '__GENOTYPE__':
-                if not matchObj.group(2).strip():
-                    raise ValueError('A sample name is required for SQL function genotype()')
-                writeSampleIdMap()
-                return "genotype('{}_genotype.DB', variant.variant_id, {})".format(proj.name, matchObj.group(2))
+                # optional parameters
+                #    1: sample name or filter
+                #    2: field to output
+                params = matchObj.group(2).strip().split(',')
+                # default, all samples
+                ret = writeIDList(params[0])
+                if len(params) == 0:
+                    # a filename of IDs
+                    return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
+                        .format(proj.name, ret))
+                elif len(params) == 1:
+                    if type(ret) == str:   
+                        # a filename of IDs
+                        return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
+                            .format(proj.name, ret))
+                    else:
+                        # a single ID
+                        return("genotype('{}_genotype.DB', variant.variant_id, {})"
+                            .format(proj.name, ret))
+                elif len(params) == 2:
+                    if type(ret) == str:   
+                        # a filename of IDs
+                        return("genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
+                            .format(proj.name, ret, params[1]))
+                    else:
+                        # a single ID
+                        return("genotype('{}_genotype.DB', variant.variant_id, {}, {})"
+                            .format(proj.name, ret, params[1]))
+                else:
+                    raise ValueError('At most two parameters are allowed for SQL function samples()')
             else:
                 # optional parameters
                 #    1: sample filter
@@ -2356,7 +2412,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     return("samples('{}_genotype.DB', variant.variant_id, '{}', {})"
                         .format(proj.name, writeSampleIdMap(params[0]), params[1]))
                 else:
-                    raise ValueError('At most three parameters are allowed for SQL function samples()')
+                    raise ValueError('At most two parameters are allowed for SQL function samples()')
         #
         query = re.sub("(__SAMPLES__|__GENOTYPE__)\s*\(([^\)]*)\)", handleParams, query)
     #

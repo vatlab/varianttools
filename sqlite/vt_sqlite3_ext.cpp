@@ -329,7 +329,7 @@ struct FieldInfo
 };
 
 struct TrackInfo;
-typedef void (* track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
+typedef void (*track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -1545,79 +1545,125 @@ static void genotype(
 
 	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
 	int variant_id = sqlite3_value_int(argv[1]);
-	char * sample_name = (char *)sqlite3_value_text(argv[2]);
+	// there are two cases, if a single integer is passed
+	// otherwise a list of IDs are saved in a file
+	bool single_ID = sqlite3_value_type(argv[2]) == SQLITE_INTEGER;
+	std::vector<int> sample_IDs;
+	if (single_ID) {
+		sample_IDs.push_back(sqlite3_value_int(argv[2]));
+	} else {
+		std::ifstream ids((const char *)sqlite3_value_text(argv[2]));
+		while (ids.good()) {
+			// read each line and get sample IDs
+			int id = -1;
+			ids >> id;
+			if (id != -1)
+				sample_IDs.push_back(id);
+		}
+	}
+
 	char * ret_field = NULL;
 	if (argc == 4)
 		ret_field = (char *)sqlite3_value_text(argv[3]);
 	else
 		ret_field = "GT";
 
-	// first try to get a ID Map, which might have already been loaded
-	if (nameIdMap.empty()) {
-		std::ifstream ids("cache/_sample_id_map.txt");
-		while (ids.good()) {
-			// read each line and fill nameIdMap
-			int id = -1;
-			std::string name;
-			ids >> id >> name;
-			if (id != -1)
-				nameIdMap[name] = id;
-		}
-	}
-	// find the name
-	SampleNameIdMap::const_iterator it = nameIdMap.find(sample_name);
-	// could not find the sample name
-	if (it == nameIdMap.end()) {
-        char msg[255];
-        sprintf(msg, "Sample name '%s' does not match any known sample", sample_name);
-		sqlite3_result_error(context, msg, -1);
-		return;
-	}
-	int sample_id = it->second;
-	int result = 0;
 	// open databases
 	if (!geno_db) {
-		result = sqlite3_open_v2(geno_db_file, &geno_db, SQLITE_OPEN_READONLY, NULL);
+		int result = sqlite3_open_v2(geno_db_file, &geno_db, SQLITE_OPEN_READONLY, NULL);
 		if (result != SQLITE_OK) {
 			sqlite3_result_error(context, "Failed to open genotype database", -1);
 			return;
 		}
 	}
-	// run some query
-	char sql[255];
-	sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
-		ret_field, sample_id, variant_id);
-	sqlite3_stmt * stmt;
-	result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-	if (result != SQLITE_OK) {
-		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+
+	if (single_ID) {
+		int result = 0;
+		// run some query
+		char sql[255];
+		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
+			ret_field, sample_IDs[0], variant_id);
+		sqlite3_stmt * stmt;
+		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+		if (result != SQLITE_OK) {
+			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+			return;
+		}
+		// there should be only one matching record
+		result = sqlite3_step(stmt);
+		if (result == SQLITE_ROW) {
+			// how to pass whatever type the query gets to the output???
+			switch (sqlite3_column_type(stmt, 0)) {
+			case SQLITE_INTEGER:
+				sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
+				break;
+			case SQLITE_FLOAT:
+				sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
+				break;
+			case SQLITE_TEXT:
+				sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
+				break;
+			case SQLITE_BLOB:
+				sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
+				break;
+			case SQLITE_NULL:
+				sqlite3_result_null(context);
+				break;
+			}
+		} else
+			sqlite3_result_null(context);
 		return;
 	}
-	// there should be only one matching record
-	result = sqlite3_step(stmt);
-	if (result == SQLITE_ROW) {
-		// how to pass whatever type the query gets to the output???
-		switch (sqlite3_column_type(stmt, 0)) {
-		case SQLITE_INTEGER:
-			sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
-			break;
-		case SQLITE_FLOAT:
-			sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
-			break;
-		case SQLITE_TEXT:
-			sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
-			break;
-		case SQLITE_BLOB:
-			sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
-			break;
-		case SQLITE_NULL:
-			sqlite3_result_null(context);
-			break;
+	// if there are multiple IDs
+	// go through all samples (with id)
+	std::stringstream res;
+	bool first = true;
+	std::vector<int>::iterator it = sample_IDs.begin();
+	std::vector<int>::iterator it_end = sample_IDs.end();
+	for (; it != it_end; ++it) {
+		// run some query
+		char sql[255];
+		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
+			ret_field, *it, variant_id);
+		sqlite3_stmt * stmt;
+		int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+		if (result != SQLITE_OK) {
+			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+			return;
 		}
-	} else
-		sqlite3_result_null(context);
+		// there should be only one matching record
+		result = sqlite3_step(stmt);
+		if (result == SQLITE_ROW) {
+			if (first)
+				first = false;
+			else
+				res << ",";
+			// how to pass whatever type the query gets to the output???
+			switch (sqlite3_column_type(stmt, 0)) {
+			case SQLITE_INTEGER:
+				res << sqlite3_column_int(stmt, 0);
+				break;
+			case SQLITE_FLOAT:
+				res << sqlite3_column_double(stmt, 0);
+				break;
+			case SQLITE_TEXT:
+				res << (const char *)sqlite3_column_text(stmt, 0);
+				break;
+			case SQLITE_BLOB:
+				res << sqlite3_column_blob(stmt, 0);
+				break;
+			case SQLITE_NULL:
+				res << ".";
+				break;
+			}
+		}
+	}
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
+	if (res.str().empty())
+		sqlite3_result_null(context);
+	else
+		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 }
 
 
@@ -1694,17 +1740,17 @@ static void samples(
 		}
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
-            if (first)
-                first = false;
-            else
-                res << ",";
+			if (first)
+				first = false;
+			else
+				res << ",";
 			res << im->second;
 		}
 	}
-    if (res.str().empty())
-	    sqlite3_result_null(context);
-    else
-	    sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+	if (res.str().empty())
+		sqlite3_result_null(context);
+	else
+		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 	// output a string with all information
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
@@ -2065,8 +2111,8 @@ int sqlite3_my_extension_init(
 ** Tree is not necessarily balanced. That would require something like red&black trees of AVL
 */
 
-typedef int (* cmp_func)(const void *, const void *);
-typedef void (* map_iterator)(void *, int64_t, void *);
+typedef int (*cmp_func)(const void *, const void *);
+typedef void (*map_iterator)(void *, int64_t, void *);
 
 typedef struct node
 {
@@ -2274,7 +2320,7 @@ static int sqlite3Utf8CharLen(const char * z, int nByte)
 */
 /* LMH 2007-03-25 Changed to use errno and remove domain; no pre-checking for errors. */
 #define GEN_MATH_WRAP_DOUBLE_1(name, function) \
-	static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
+    static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
 		double rVal = 0.0, val; \
 		assert(argc == 1); \
 		switch (sqlite3_value_type(argv[0]) ) { \
@@ -3772,61 +3818,61 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xFunc)(sqlite3_context *, int, sqlite3_value **);
 	} aFuncs[] = {
 		/* math.h */
-		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc																			},
-		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc																			},
-		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc																			},
-		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																			},
+		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc																					},
+		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc																					},
+		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc																					},
+		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																					},
 		/* XXX alias */
-		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																			},
-		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc																			},
-		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc																			},
-		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc																			},
+		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																					},
+		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc																					},
+		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc																					},
+		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc																					},
 
-		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc																	},
-		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc																		},
-		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc																		},
+		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc																			},
+		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc																				},
+		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc																				},
 
-		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc																			},
-		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc																			},
-		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc																			},
-		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc																			},
-		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc																			},
-		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc																			},
-		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc																			},
-		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc																			},
+		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc																					},
+		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc																					},
+		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc																					},
+		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc																					},
+		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc																					},
+		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc																					},
+		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc																					},
+		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc																					},
 
-		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc																			},
-		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc																			},
-		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func																			},
-		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc																			},
-		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc																			},
-		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc																			},
-		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc																		},
+		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc																					},
+		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc																					},
+		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func																					},
+		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc																					},
+		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc																					},
+		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc																					},
+		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc																				},
 
-		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc																			},
-		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc																			},
+		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc																					},
+		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc																					},
 
-		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc																			},
+		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc																					},
 
 
 		/* string */
-		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc																		},
-		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																		},
-		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																		},
-		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc																			},
-		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc																			},
+		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc																				},
+		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																				},
+		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																				},
+		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc																					},
+		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc																					},
 #ifndef HAVE_TRIM
-		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc																			},
-		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc																			},
-		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc																			},
-		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc																		},
+		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc																					},
+		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc																					},
+		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc																					},
+		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc																				},
 #endif
-		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc																		},
-		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc																		},
-		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc																			},
-		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc																			},
-		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc																			},
-		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc																		},
+		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc																				},
+		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc																				},
+		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc																					},
+		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc																					},
+		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc																					},
+		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc																				},
 
 	};
 	/* Aggregate functions */
@@ -3839,12 +3885,12 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xStep)(sqlite3_context *, int, sqlite3_value **);
 		void (* xFinalize)(sqlite3_context *);
 	} aAggs[] = {
-		{ "stdev",			1,			 0,			   0,			  varianceStep,				 stdevFinalize										  },
-		{ "variance",		1,			 0,			   0,			  varianceStep,				 varianceFinalize									  },
-		{ "mode",			1,			 0,			   0,			  modeStep,					 modeFinalize										  },
-		{ "median",			1,			 0,			   0,			  modeStep,					 medianFinalize										  },
-		{ "lower_quartile", 1,			 0,			   0,			  modeStep,					 lower_quartileFinalize								  },
-		{ "upper_quartile", 1,			 0,			   0,			  modeStep,					 upper_quartileFinalize								  },
+		{ "stdev",			1,			 0,			  0,			varianceStep,			  stdevFinalize															},
+		{ "variance",		1,			 0,			  0,			varianceStep,			  varianceFinalize														},
+		{ "mode",			1,			 0,			  0,			modeStep,				  modeFinalize															},
+		{ "median",			1,			 0,			  0,			modeStep,				  medianFinalize														},
+		{ "lower_quartile", 1,			 0,			  0,			modeStep,				  lower_quartileFinalize												},
+		{ "upper_quartile", 1,			 0,			  0,			modeStep,				  upper_quartileFinalize												},
 	};
 	int i;
 
