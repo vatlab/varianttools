@@ -329,7 +329,7 @@ struct FieldInfo
 };
 
 struct TrackInfo;
-typedef void (*track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
+typedef void (* track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -889,7 +889,7 @@ static void vcfTabixTrack(void * track_file, char * chr, int pos, char * ref, ch
 #define OP_LE ','
 
 /* There are fancier and perhaps faster methods such as functors, but I am too tired to
-   *figure out the details.
+ * figure out the details.
  */
 
 // special case to speed up string comparison
@@ -1088,8 +1088,8 @@ static int fetch_func(const bam1_t * b, void * data)
 	} else if (buf->call_content[0] == '%') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
-        buf->calls << std::hex << b->core.flag;
-    } else if (buf->call_content[0] != '\0') {
+		buf->calls << std::hex << b->core.flag;
+	} else if (buf->call_content[0] != '\0') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
 		uint8_t * s = bam1_aux(b);
@@ -1522,22 +1522,20 @@ static void track(
 	(*info.handler)(info.file, chr, pos, ref, alt, &fi, &info, context);
 }
 
+
 sqlite3 * geno_db;
 typedef std::map<std::string, int> SampleNameIdMap;
 SampleNameIdMap nameIdMap;
 
 static void genotype(
-                  sqlite3_context * context,
-                  int argc,
-                  sqlite3_value ** argv
-                  )
+                     sqlite3_context * context,
+                     int argc,
+                     sqlite3_value ** argv
+                     )
 {
 	// parameters passed:
-	// name of project, variant_id, sample_name, and then type
-	if (argc < 3 ||
-	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[2]) == SQLITE_NULL ) {
+	// name of geno_db_file, variant_id, sample_name, and then type
+	if (argc < 3 || sqlite3_value_type(argv[2]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please name of a sample", -1);
 		return;
 	} else if (argc > 4) {
@@ -1545,39 +1543,39 @@ static void genotype(
 		return;
 	}
 
-	std::string proj_name = std::string((char *)sqlite3_value_text(argv[0]));
+	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
 	int variant_id = sqlite3_value_int(argv[1]);
-    char * sample_name = (char *)sqlite3_value_text(argv[2]);
+	char * sample_name = (char *)sqlite3_value_text(argv[2]);
 	char * ret_field = NULL;
 	if (argc == 4)
 		ret_field = (char *)sqlite3_value_text(argv[3]);
-    
-    // first try to get a ID Map, which might have already been loaded
-    if (nameIdMap.empty()) {
-        std::ifstream ids("cache/_samples_id_all.tmp");
-        while (ids.good()) {
-            // read each line and fill nameIdMap
-            int id;
-            std::string name;
-            ids >> id >> name;
-            nameIdMap[name] = id;
-            printf("ADD %d %s\n", id, name.c_str());
-        }
-    }
-    // find the name
-    SampleNameIdMap::const_iterator it = nameIdMap.find(sample_name);
-    // could not find the sample name
-    if (it == nameIdMap.end()) {
-        sqlite3_result_error(context, "Same name mismatch", -1);
-        return;
-    }
-    int sample_id = it->second;
-    printf("Sample ID %d\n", sample_id);
+	else
+		ret_field = "GT";
+
+	// first try to get a ID Map, which might have already been loaded
+	if (nameIdMap.empty()) {
+		std::ifstream ids("cache/_samples_id_map.txt");
+		while (ids.good()) {
+			// read each line and fill nameIdMap
+			int id = -1;
+			std::string name;
+			ids >> id >> name;
+			if (id != -1)
+				nameIdMap[name] = id;
+		}
+	}
+	// find the name
+	SampleNameIdMap::const_iterator it = nameIdMap.find(sample_name);
+	// could not find the sample name
+	if (it == nameIdMap.end()) {
+		sqlite3_result_error(context, "Same name mismatch", -1);
+		return;
+	}
+	int sample_id = it->second;
 	int result = 0;
 	// open databases
 	if (!geno_db) {
-		std::string geno_db_file = proj_name + "_genotype.DB";
-		result = sqlite3_open_v2(geno_db_file.c_str(), &geno_db, SQLITE_OPEN_READONLY, NULL);
+		result = sqlite3_open_v2(geno_db_file, &geno_db, SQLITE_OPEN_READONLY, NULL);
 		if (result != SQLITE_OK) {
 			sqlite3_result_error(context, "Failed to open genotype database", -1);
 			return;
@@ -1585,127 +1583,153 @@ static void genotype(
 	}
 	// run some query
 	char sql[255];
-    sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 1",
-        ret_field, sample_id, variant_id); 
-	sqlite3_stmt *stmt;
+	sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
+		ret_field, sample_id, variant_id);
+	sqlite3_stmt * stmt;
 	result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 	if (result != SQLITE_OK) {
 		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
 		return;
 	}
-    // there should be only one matching record
+	// there should be only one matching record
 	result = sqlite3_step(stmt);
 	if (result == SQLITE_ROW) {
-        // how to pass whatever type the query gets to the output???
-        switch (sqlite3_column_type(stmt, 0)) {
-        case SQLITE_INTEGER:
-            sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
-            break;
-        case SQLITE_FLOAT:
-            sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
-            break;
-        case SQLITE_TEXT:
-            sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
-            break;
-        case SQLITE_BLOB:
-            sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
-            break;
-        case SQLITE_NULL:
-            sqlite3_result_null(context);
-            break;
-        }
-	}
+		// how to pass whatever type the query gets to the output???
+		switch (sqlite3_column_type(stmt, 0)) {
+		case SQLITE_INTEGER:
+			sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
+			break;
+		case SQLITE_FLOAT:
+			sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
+			break;
+		case SQLITE_TEXT:
+			sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
+			break;
+		case SQLITE_BLOB:
+			sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
+			break;
+		case SQLITE_NULL:
+			sqlite3_result_null(context);
+			break;
+		}
+	} else
+		sqlite3_result_null(context);
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
 }
+
 
 typedef std::map<int, std::string> IdNameMap;
 typedef std::map<std::string, IdNameMap> SampleIdNameMap;
 SampleIdNameMap idNameMap;
 
 static void samples(
-                  sqlite3_context * context,
-                  int argc,
-                  sqlite3_value ** argv
-                  )
+                    sqlite3_context * context,
+                    int argc,
+                    sqlite3_value ** argv
+                    )
 {
-    /*
 	// parameters passed:
-	// name of project, variant_id, type, genotype_filter, sample_id_file
-    // sample_id_file is 
-    //
-	if (argc < 3 ||
-	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[2]) == SQLITE_NULL ) {
-		sqlite3_result_error(context, "Please specify at least type of output", -1);
-		return;
-	} else if (argc > 5) {
+	// name of project, variant_id, sample_id_file, [genotype_filter, field]
+	//
+	if (argc > 5) {
 		sqlite3_result_error(context, "samples function accept at most 3 parameter", -1);
 		return;
 	}
 
-	std::string proj_name = std::string((char *)sqlite3_value_text(argv[0]));
+	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
 	int variant_id = sqlite3_value_int(argv[1]);
-	char * ret_type = (char *)sqlite3_value_text(argv[2]);
-    char * geno_filter = NULL;
-    if (argc > 3)
-        geno_filter = (char *)sqlite3_value_text(argv[3]);
-    char * sample_id_file = NULL;
-    if (argc == 4)
-        sample_id_file = (char *) sqlite3_value_text(argv[4]);
-    else
-        sample_id_file = "cache/_samples_id_all.tmp";
+	char * sample_id_file = (char *)sqlite3_value_text(argv[2]);
+	char * geno_filter = argc > 3 ? (char *)sqlite3_value_text(argv[3]) : NULL;
+	if (geno_filter && geno_filter[0] == '\0')
+		geno_filter = NULL;
+	char * ret_field = argc > 4 ? (char *)sqlite3_value_text(argv[4]) : NULL;
+	if (ret_field && ret_field[0] == '\0')
+		ret_field = NULL;
 
-    // see if the sample_id_file has been loaded
-    idNameMap::iterator it = idNameMap.find(sample_id_file);
-    if (iterator == idNameMap.end())
-        // read that file
-        IdNameMap * inm = new IdNameMap();
-        FILE * ff = open(sample_id_fie);
-        while () {
-            inm[id] = name;
-        }
-    }
-    IdNameMap & idMap = it->second;
+	// see if the sample_id_file has been loaded
+	SampleIdNameMap::iterator it = idNameMap.find(std::string(sample_id_file));
+	if (it == idNameMap.end()) {
+		// read that file
+		IdNameMap inm;
+		std::ifstream ids(sample_id_file);
+		while (ids.good()) {
+			// read each line and fill nameIdMap
+			int id = -1;
+			std::string name;
+			ids >> id >> name;
+			if (id != -1)
+				inm[id] = name;
+		}
+		idNameMap[std::string(sample_id_file)] = inm;
+		// find the item
+		it = idNameMap.find(std::string(sample_id_file));
+	}
+	IdNameMap & idMap = it->second;
 
 	int result = 0;
 	// open databases
 	if (!geno_db) {
-		std::string geno_db_file = proj_name + "_genotype.DB";
-		result = sqlite3_open_v2(geno_db_file.c_str(), &geno_db, SQLITE_OPEN_READONLY, NULL);
+		result = sqlite3_open_v2(geno_db_file, &geno_db, SQLITE_OPEN_READONLY, NULL);
 		if (result != SQLITE_OK) {
 			sqlite3_result_error(context, "Failed to open genotype database", -1);
 			return;
 		}
 	}
-	// 
-    // go through all samples (with id)
+	//
+	// go through all samples (with id)
 	std::stringstream res;
-    for () {
-        char * sql = "SELECT * FROM genotype_1 LIMIT 1";
-        sqlite3_stmt *stmt;
-        result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-        if (result != SQLITE_OK) {
-            sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
-            return;
-        }
-        do {
-            result = sqlite3_step(stmt);
-            if (result == SQLITE_ROW) {
-                const unsigned char * data = sqlite3_column_text(stmt, 0);
-                sqlite3_result_text(context, (const char *)data, -1, SQLITE_TRANSIENT);
-            }
-        } while (result == SQLITE_ROW);
-    }
+	IdNameMap::iterator im = idMap.begin();
+	IdNameMap::iterator im_end = idMap.end();
+	bool first = true;
+	for (; im != im_end; ++im) {
+		char sql[255];
+		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
+			ret_field == NULL ? "variant_id" : ret_field,
+			im->first, variant_id,
+			geno_filter == NULL ? "1" : geno_filter);
+		//
+		sqlite3_stmt * stmt;
+		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+		if (result != SQLITE_OK) {
+			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+			return;
+		}
+		if (first)
+			first = false;
+		else
+			res << ",";
+		result = sqlite3_step(stmt);
+		if (result == SQLITE_ROW) {
+			if (ret_field == NULL) {
+				res << im->second;
+			} else {
+				// how to pass whatever type the query gets to the output???
+				switch (sqlite3_column_type(stmt, 0)) {
+				case SQLITE_INTEGER:
+					res << sqlite3_column_int(stmt, 0);
+					break;
+				case SQLITE_FLOAT:
+					res << sqlite3_column_double(stmt, 0);
+					break;
+				case SQLITE_TEXT:
+					res << (const char *)sqlite3_column_text(stmt, 0);
+					break;
+				case SQLITE_BLOB:
+					res << sqlite3_column_blob(stmt, 0);
+					break;
+				case SQLITE_NULL:
+					res << ".";
+					break;
+				}
+			}
+		}
+	}
 	sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
-    // output a string with all information
-    */
-    // we do not close the database because we are readonly and we need the database for
+	// output a string with all information
+	// we do not close the database because we are readonly and we need the database for
 	// next use.
 }
-
-
 
 
 /*
@@ -2062,8 +2086,8 @@ int sqlite3_my_extension_init(
 ** Tree is not necessarily balanced. That would require something like red&black trees of AVL
 */
 
-typedef int (*cmp_func)(const void *, const void *);
-typedef void (*map_iterator)(void *, int64_t, void *);
+typedef int (* cmp_func)(const void *, const void *);
+typedef void (* map_iterator)(void *, int64_t, void *);
 
 typedef struct node
 {
@@ -2271,7 +2295,7 @@ static int sqlite3Utf8CharLen(const char * z, int nByte)
 */
 /* LMH 2007-03-25 Changed to use errno and remove domain; no pre-checking for errors. */
 #define GEN_MATH_WRAP_DOUBLE_1(name, function) \
-    static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
+	static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
 		double rVal = 0.0, val; \
 		assert(argc == 1); \
 		switch (sqlite3_value_type(argv[0]) ) { \
@@ -3769,61 +3793,61 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xFunc)(sqlite3_context *, int, sqlite3_value **);
 	} aFuncs[] = {
 		/* math.h */
-		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc													},
-		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc													},
-		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc													},
-		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
+		{ "acos",		1,		   0,		  SQLITE_UTF8,		   0,		  acosFunc																			},
+		{ "asin",		1,		   0,		  SQLITE_UTF8,		   0,		  asinFunc																			},
+		{ "atan",		1,		   0,		  SQLITE_UTF8,		   0,		  atanFunc																			},
+		{ "atn2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																			},
 		/* XXX alias */
-		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func													},
-		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc													},
-		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc													},
-		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc													},
+		{ "atan2",		2,		   0,		  SQLITE_UTF8,		   0,		  atn2Func																			},
+		{ "acosh",		1,		   0,		  SQLITE_UTF8,		   0,		  acoshFunc																			},
+		{ "asinh",		1,		   0,		  SQLITE_UTF8,		   0,		  asinhFunc																			},
+		{ "atanh",		1,		   0,		  SQLITE_UTF8,		   0,		  atanhFunc																			},
 
-		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc											},
-		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc												},
-		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc												},
+		{ "difference", 2,		   0,		  SQLITE_UTF8,		   0,		  differenceFunc																	},
+		{ "degrees",	1,		   0,		  SQLITE_UTF8,		   0,		  rad2degFunc																		},
+		{ "radians",	1,		   0,		  SQLITE_UTF8,		   0,		  deg2radFunc																		},
 
-		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc													},
-		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc													},
-		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc													},
-		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc													},
-		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc													},
-		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc													},
-		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc													},
-		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc													},
+		{ "cos",		1,		   0,		  SQLITE_UTF8,		   0,		  cosFunc																			},
+		{ "sin",		1,		   0,		  SQLITE_UTF8,		   0,		  sinFunc																			},
+		{ "tan",		1,		   0,		  SQLITE_UTF8,		   0,		  tanFunc																			},
+		{ "cot",		1,		   0,		  SQLITE_UTF8,		   0,		  cotFunc																			},
+		{ "cosh",		1,		   0,		  SQLITE_UTF8,		   0,		  coshFunc																			},
+		{ "sinh",		1,		   0,		  SQLITE_UTF8,		   0,		  sinhFunc																			},
+		{ "tanh",		1,		   0,		  SQLITE_UTF8,		   0,		  tanhFunc																			},
+		{ "coth",		1,		   0,		  SQLITE_UTF8,		   0,		  cothFunc																			},
 
-		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc													},
-		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc													},
-		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func													},
-		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc													},
-		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc													},
-		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc													},
-		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc												},
+		{ "exp",		1,		   0,		  SQLITE_UTF8,		   0,		  expFunc																			},
+		{ "log",		1,		   0,		  SQLITE_UTF8,		   0,		  logFunc																			},
+		{ "log10",		1,		   0,		  SQLITE_UTF8,		   0,		  log10Func																			},
+		{ "power",		2,		   0,		  SQLITE_UTF8,		   0,		  powerFunc																			},
+		{ "sign",		1,		   0,		  SQLITE_UTF8,		   0,		  signFunc																			},
+		{ "sqrt",		1,		   0,		  SQLITE_UTF8,		   0,		  sqrtFunc																			},
+		{ "square",		1,		   0,		  SQLITE_UTF8,		   0,		  squareFunc																		},
 
-		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc													},
-		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc													},
+		{ "ceil",		1,		   0,		  SQLITE_UTF8,		   0,		  ceilFunc																			},
+		{ "floor",		1,		   0,		  SQLITE_UTF8,		   0,		  floorFunc																			},
 
-		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc													},
+		{ "pi",			0,		   0,		  SQLITE_UTF8,		   1,		  piFunc																			},
 
 
 		/* string */
-		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc												},
-		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
-		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc												},
-		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc													},
-		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc													},
+		{ "replicate",	2,		   0,		  SQLITE_UTF8,		   0,		  replicateFunc																		},
+		{ "charindex",	2,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																		},
+		{ "charindex",	3,		   0,		  SQLITE_UTF8,		   0,		  charindexFunc																		},
+		{ "leftstr",	2,		   0,		  SQLITE_UTF8,		   0,		  leftFunc																			},
+		{ "rightstr",	2,		   0,		  SQLITE_UTF8,		   0,		  rightFunc																			},
 #ifndef HAVE_TRIM
-		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc													},
-		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc													},
-		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc													},
-		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc												},
+		{ "ltrim",		1,		   0,		  SQLITE_UTF8,		   0,		  ltrimFunc																			},
+		{ "rtrim",		1,		   0,		  SQLITE_UTF8,		   0,		  rtrimFunc																			},
+		{ "trim",		1,		   0,		  SQLITE_UTF8,		   0,		  trimFunc																			},
+		{ "replace",	3,		   0,		  SQLITE_UTF8,		   0,		  replaceFunc																		},
 #endif
-		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc												},
-		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc												},
-		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc													},
-		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc													},
-		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc													},
-		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc												},
+		{ "reverse",	1,		   0,		  SQLITE_UTF8,		   0,		  reverseFunc																		},
+		{ "proper",		1,		   0,		  SQLITE_UTF8,		   0,		  properFunc																		},
+		{ "padl",		2,		   0,		  SQLITE_UTF8,		   0,		  padlFunc																			},
+		{ "padr",		2,		   0,		  SQLITE_UTF8,		   0,		  padrFunc																			},
+		{ "padc",		2,		   0,		  SQLITE_UTF8,		   0,		  padcFunc																			},
+		{ "strfilter",	2,		   0,		  SQLITE_UTF8,		   0,		  strfilterFunc																		},
 
 	};
 	/* Aggregate functions */
@@ -3836,12 +3860,12 @@ int RegisterExtensionFunctions(sqlite3 * db)
 		void (* xStep)(sqlite3_context *, int, sqlite3_value **);
 		void (* xFinalize)(sqlite3_context *);
 	} aAggs[] = {
-		{ "stdev",			1,			 0,			  0,		   varianceStep,		   stdevFinalize																																																	 },
-		{ "variance",		1,			 0,			  0,		   varianceStep,		   varianceFinalize																																																	 },
-		{ "mode",			1,			 0,			  0,		   modeStep,			   modeFinalize																																																		 },
-		{ "median",			1,			 0,			  0,		   modeStep,			   medianFinalize																																																	 },
-		{ "lower_quartile", 1,			 0,			  0,		   modeStep,			   lower_quartileFinalize																																															 },
-		{ "upper_quartile", 1,			 0,			  0,		   modeStep,			   upper_quartileFinalize																																															 },
+		{ "stdev",			1,			 0,			   0,			  varianceStep,				 stdevFinalize										  },
+		{ "variance",		1,			 0,			   0,			  varianceStep,				 varianceFinalize									  },
+		{ "mode",			1,			 0,			   0,			  modeStep,					 modeFinalize										  },
+		{ "median",			1,			 0,			   0,			  modeStep,					 medianFinalize										  },
+		{ "lower_quartile", 1,			 0,			   0,			  modeStep,					 lower_quartileFinalize								  },
+		{ "upper_quartile", 1,			 0,			   0,			  modeStep,					 upper_quartileFinalize								  },
 	};
 	int i;
 

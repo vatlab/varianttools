@@ -2311,37 +2311,59 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 query = re.sub(r'{}\s*\('.format(v), 
                     ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
     if has_samples_query:
-        for idx, (k,v) in enumerate(samples_tokens.items()):
-            sample_filter = '1'
-            # FIXME: pending
-            #if k == '__SAMPLES__':
-                # the samples function can pass a criteria to select samples
-                # the syntax is
-                #    samples(item, genotype_filter='', sample_filter='')
-                # so we should look for the last filter when there are three 
-                # parameters. A separate list of id/name map is needed and the
-                # id file needs to be passed to each of the samples function.
-                # This is very complicated and let us forget about it for now.
-                #
+        idNameFiles = {}
+        #
+        def writeSampleIdMap(cond=''):
+            # cond is a string (e.g. "'1'") and need to be evaluated as a string
+            cond = str(eval(cond)) if cond else '1'
+            if not cond:
+                cond = '1'
+            if cond in idNameFiles:
+                return idNameFiles[cond]
             cur = proj.db.cursor()
+            if cond == '1':
+                filename = 'cache/_sample_id_map.txt'
+            else:
+                filename = 'cache/_sample_id_map_{}.txt'.format(binascii.hexlify(cond))
             cur.execute('SELECT sample_id, sample_name FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id AND ({});'
-                    .format(sample_filter))
-            with open(os.path.join(env.cache_dir, '_samples_id_all.tmp'), 'w') as idMap:
+                    .format(cond))
+            with open(filename, 'w') as idMap:
                 for rec in cur:
                     idMap.write('{}\t{}\n'.format(rec[0], rec[1]))
-            # the genotype function take all samples so we do not have to pass
-            # the id map file to the function. The samples function needs to
-            # have this file (in place of the sample_filter function).
-            if k == '__GENOTYPE__':
-                query = re.sub(r'{}\s*\('.format(v),
-                    " {}('{}', {}, ".format(k, proj.name, 'variant.variant_id'), query)
+            return filename
+        #
+        def handleParams(matchObj):
+            if matchObj.group(1) == '__GENOTYPE__':
+                if not matchObj.group(2).strip():
+                    raise ValueError('A sample name is required for SQL function genotype()')
+                writeSampleIdMap()
+                return "genotype('{}_genotype.DB', variant.variant_id, {})".format(proj.name, matchObj.group(2))
             else:
-                # we pass id file name only when the sample_filter paramter is passed
-                # this part has not been implemented yet.
-                query = re.sub(r'{}\s*\('.format(v),
-                    " {}('{}', {}, ".format(k, proj.name, 'variant.variant_id'), query)
-    print('QUERY {}'.format(query))
+                # optional parameters
+                #    1: sample filter
+                #    2: genotype filter
+                #    3: item to display
+                params = matchObj.group(2).strip().split(',')
+                if len(params) == 0:
+                    # no parameter
+                    return("samples('{}_genotype.DB', variant.variant_id, '{}')"
+                        .format(proj.name, writeSampleIdMap('')))
+                elif len(params) == 1:
+                    # sample filter
+                    return("samples('{}_genotype.DB', variant.variant_id, '{}')"
+                        .format(proj.name, writeSampleIdMap(params[0])))
+                elif len(params) == 2:
+                    return("samples('{}_genotype.DB', variant.variant_id, '{}', {})"
+                        .format(proj.name, writeSampleIdMap(params[0]), params[1]))
+                elif len(params) == 3:
+                    return("samples('{}_genotype.DB', variant.variant_id, '{}', {}, {})"
+                        .format(proj.name, writeSampleIdMap(params[0]), params[1], params[2]))
+                else:
+                    raise ValueError('At most three parameters are allowed for SQL function samples()')
+        #
+        query = re.sub("(__SAMPLES__|__GENOTYPE__)\s*\(([^\)]*)\)", handleParams, query)
+    #
     return query, fields
 
 def extractField(field):
