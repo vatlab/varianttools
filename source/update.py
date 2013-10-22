@@ -358,6 +358,7 @@ def setFieldValue(proj, table, items, build):
     expr = ','.join([x.split('=',1)[1] for x in items])
     select_clause, fields = consolidateFieldName(proj, table, expr,
         build and build == proj.alt_build)
+    desc_of_field = {x.split('=',1)[0].lower(): x.split('=',1)[1] for x in items}
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
@@ -394,18 +395,20 @@ def setFieldValue(proj, table, items, build):
         count = [0]*3
         # if adding a new field
         cur_fields = proj.db.getHeaders(table)[3:]
+        type_map = {int: 'INT',
+                    float: 'FLOAT',
+                    str: 'VARCHAR(255)',
+                    unicode: 'VARCHAR(255)'}
         for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if fldType is None:
                     env.logger.warning('Use type VARCHAR for a new field {} because the values are all NULL'.format(field))
                     fldType = str
                 proj.checkFieldName(field, exclude=table)
-                env.logger.info('Adding variant info field {}'.format(field))
+                env.logger.info('Adding variant info field {} with type {}'
+                    .format(field, type_map[fldType]))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
-                    {int: 'INT',
-                     float: 'FLOAT',
-                     str: 'VARCHAR(255)',
-                     unicode: 'VARCHAR(255)'}[fldType])
+                    type_map[fldType])
                 env.logger.debug(query)
                 cur.execute(query)
                 count[1] += 1  # new
@@ -413,6 +416,14 @@ def setFieldValue(proj, table, items, build):
                 # FIXME: check the case for type mismatch
                 env.logger.info('Updating field {}'.format(field))
                 count[2] += 1  # updated
+                    # add an description
+            try:
+                proj.describeField(field, 'Evaluated from "{}" with type {} on {}'
+                    .format(desc_of_field[field.lower()], 
+                        type_map[fldType], time.strftime('%b%d', time.localtime())))
+            except Exception as e:
+                env.logger.warning('Failed to add a description to field {}: {}'
+                    .format(field, e))
         proj.db.commit()
         # really update things
         # update clause is more difficult because it needs to consolidate the
