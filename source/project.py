@@ -1548,6 +1548,22 @@ class Project:
             self.loadProperty('__date_of_{}'.format(table), ''),
             self.loadProperty('__cmd_of_{}'.format(table), '') )
             
+    def describeField(self, field, message):
+        '''Attach a message to a field.'''
+        self.saveProperty('__field_desc_of_{}'.format(field), message)
+
+    def descriptionOfField(self, field):
+        '''Get description of table'''
+        if field == 'chr':
+            return 'Chromosome name (VARCHAR)'
+        elif field == 'pos':
+            return 'Position (INT, 1-based)'
+        elif field == 'ref':
+            return 'Reference allele (VARCHAR, - for missing allele of an insertion)'
+        elif field == 'alt':
+            return 'Alternative allele (VARCHAR, - for missing allele of an deletion)'
+        return self.loadProperty('__field_desc_of_{}'.format(field), '')
+
     def createSampleTableIfNeeded(self, fields=[], table='sample'):
         if self.db.hasTable(table):
             return
@@ -3708,7 +3724,14 @@ def show(args):
                 for table in proj.getVariantTables():
                     tfields = [field for field in proj.db.getHeaders(table) if field not in ('variant_id', 'bin', 'alt_bin')]
                     if tfields:
-                        print('\n'.join(['{}.{}'.format(table, field) for field in tfields]))
+                        if args.verbosity == '0':
+                            print('\n'.join(['{}.{}'.format(table, field) for field in tfields]))
+                        else:
+                            print('\n'.join(['{}.{} {}'.format(table, field,
+                                '\n'.join(textwrap.wrap(proj.descriptionOfField(field),
+                                initial_indent=' '*(27-len(table)-len(field)),
+                                subsequent_indent=' '*29))) for field in tfields]))
+
                 for db in proj.annoDB:
                     if args.verbosity == '0':
                         print('\n'.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))

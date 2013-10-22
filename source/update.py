@@ -533,10 +533,19 @@ def setFieldValue(proj, table, items, build):
             env.logger.warning('Multiple field values are available for {} variants. Arbitrary valid values are chosen.'.format(count_multi_value))
 
 
-def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
+def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     '''Count sample allele count etc for specified sample and variant table'''
     if not proj.isVariantTable(variant_table):
         raise ValueError('"Variant table {} does not exist.'.format(decodeTableName(variant_table)))
+    #
+    IDs = None
+    if samples:
+        IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
+        if len(IDs) == 0:
+            env.logger.info('No sample is selected (or available)')
+            return
+        else:
+            env.logger.info('{} samples are selected'.format(len(IDs)))
     #
     #
     # NOTE: this function could be implemented using one or more query more
@@ -574,8 +583,10 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
     validGenotypeFields = []
     destinations = []
     fieldCalcs = []
+    desc_of_field = {}
     for stat in from_stat:
-        f, e = [x.strip() for x in stat.split('=')]
+        f, e = [x.strip() for x in stat.split('=', 1)]
+        desc_of_field[f.lower()] = e
         if f in ['chr', 'pos', 'ref', 'alt']:
             raise ValueError('Cannot overwrite existing field "{}"!'.format(f))
         if e == '#(alt)':
@@ -778,10 +789,19 @@ def calcSampleStat(proj, from_stat, IDs, variant_table, genotypes):
             env.logger.info('Resetting values at existing field {}'.format(field))
             proj.db.execute('Update {} SET {} = {};'.format('variant', field, proj.db.PH), (defaultValue, ))
         else:
-            env.logger.info('Adding variant info field {}'.format(field))
+            env.logger.info('Adding variant info field {} with type {}'.format(field, fldtype))
             proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format('variant', field, fldtype))
             if defaultValue == 0:
                 proj.db.execute ('UPDATE {} SET {} = 0'.format('variant', field))              
+        # add an description
+        try:
+            proj.describeField(field, 'Created from stat "{}" {}with type {} on {}'
+                .format(desc_of_field[field.lower()], 
+                    'for samples {}'.format(samples) if samples else '', 
+                    fldtype, time.strftime('%b%d', time.localtime())))
+        except Exception as e:
+            env.logger.warning('Failed to add a description to field {}: {}'
+                .format(field, e))
     #
     prog = ProgressBar('Updating {}'.format(decodeTableName(variant_table)), len(variants))
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
@@ -946,15 +966,7 @@ def update(args):
                 variant_table = encodeTableName(args.table) if args.table else 'variant'
                 if not proj.db.hasTable(variant_table):
                     raise ValueError('Variant table {} does not exist'.format(decodeTableName(variant_table)))
-                IDs = None
-                if args.samples:
-                    IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
-                    if len(IDs) == 0:
-                        env.logger.info('No sample is selected (or available)')
-                        return
-                    else:
-                        env.logger.info('{} samples are selected'.format(len(IDs)))
-                calcSampleStat(proj, args.from_stat, IDs, variant_table, args.genotypes)
+                calcSampleStat(proj, args.from_stat, args.samples, variant_table, args.genotypes)
         proj.close()
     except Exception as e:
         env.logger.error(e)
