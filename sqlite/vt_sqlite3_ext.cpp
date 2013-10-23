@@ -1305,12 +1305,9 @@ static void track(
                   sqlite3_value ** argv
                   )
 {
-	if (argc < 5 ||
-	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[2]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[3]) == SQLITE_NULL ||
-	    sqlite3_value_type(argv[4]) == SQLITE_NULL) {
+	// do not check the first several parameters (variants) because
+	// they are passed automatically and are assumed to be valid
+	if (argc < 5 || sqlite3_value_type(argv[4]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please specify at least filename", -1);
 		return;
 	} else if (argc > 7) {

@@ -337,6 +337,8 @@ class EmbeddedTextReader:
                             self.columnRange = self.processor.columnRange
                             first = False
                         self.num_records += 1
+                        # try to see if rec[1] can be translated to a proper integer
+                        int(rec[1])
                         if self.varIdx is not None:
                             var_key = (rec[0], rec[2], rec[3])
                             if self.getNew:
@@ -413,6 +415,8 @@ class ReaderWorker(Process):
                         if in_header:
                             continue
                     for bins,rec in self.processor.process(line):
+                        # try to see if rec[1] can be translated to a proper integer
+                        int(rec[1])
                         if first:
                             self.output.send(self.processor.columnRange)
                             first = False

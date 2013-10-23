@@ -39,7 +39,7 @@ else:
     from itertools import repeat
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, normalizeVariant, \
+from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
     splitField
 

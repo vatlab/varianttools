@@ -40,6 +40,13 @@ class TestImport(ProcessTestCase):
     def removeProj(self):
         runCmd('vtools remove project')
 
+    def testInvalidVariant(self):
+        'Test importing invalid variants (no position)'
+        self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/invalid.tsv')
+        self.assertEqual(numOfSample(), 0)
+        # the header should be ignored due ot its POS
+        self.assertEqual(numOfVariant(), 10)
+
     def testImportTXT(self):
         'Test command import'
         self.assertFail('vtools import')

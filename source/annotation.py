@@ -38,7 +38,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
-    normalizeVariant, compressFile, SQL_KEYWORDS, extractField, env
+    compressFile, SQL_KEYWORDS, extractField, env
 from .importer import LineProcessor, TextReader
 from .preprocessor import *
   
