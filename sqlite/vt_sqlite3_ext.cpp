@@ -938,7 +938,7 @@ struct BAM_stat
 	std::vector<int> qual;
 	std::vector<int> map_qual;
 	// condition
-	size_t shift;
+	int shift;
 	size_t width;
 	int min_qual;
 	int min_mapq;
@@ -961,48 +961,7 @@ struct BAM_stat
 };
 
 
-/*
-cdef inline object get_seq_range(bam1_t *src, uint32_t start, uint32_t end):
-    cdef uint8_t * p
-    cdef uint32_t k
-    cdef char * s
-
-    if not src.core.l_qseq:
-        return None
-
-    seq = PyBytes_FromStringAndSize(NULL, end - start)
-    s   = <char*>seq
-    p   = bam1_seq(src)
-
-    for k from start <= k < end:
-        # equivalent to bam_nt16_rev_table[bam1_seqi(s, i)] (see bam.c)
-        # note: do not use string literal as it will be a python string
-        s[k-start] = bam_nt16_rev_table[p[k/2] >> 4 * (1 - k%2) & 0xf]
-
-    return seq
-
-cdef char * bam_nt16_rev_table = "=ACMGRSVTWYHKDBN"
-
-
-cdef inline object get_qual_range(bam1_t *src, uint32_t start, uint32_t end):
-    cdef uint8_t * p
-    cdef uint32_t k
-    cdef char * q
-
-    p = bam1_qual(src)
-    if p[0] == 0xff:
-        return None
-
-    qual = PyBytes_FromStringAndSize(NULL, end - start)
-    q    = <char*>qual
-
-    for k from start <= k < end:
-        ## equivalent to t[i] + 33 (see bam.c)
-        q[k-start] = p[k] + 33
-
-    return qual
-*/
-
+char conv_table[] = "-AC.G...T.......N";
 
 static int fetch_func(const bam1_t * b, void * data)
 {
@@ -1024,7 +983,6 @@ static int fetch_func(const bam1_t * b, void * data)
 					break;
 				}
 			}
-
 			uint8_t type;
 			// other wise,
 			s += 2;
@@ -1073,7 +1031,7 @@ static int fetch_func(const bam1_t * b, void * data)
 			} else if (type == 'B') {
 				//
 				if (match >= 0) {
-					sqlite3_result_error(context, "Condition involves array tags (B) is not supported.", -1);
+					// sqlite3_result_error(context, "Condition involves array tags (B) is not supported.", -1);
 					return 0;
 				}
 				// get byte size
@@ -1094,68 +1052,98 @@ static int fetch_func(const bam1_t * b, void * data)
 		}
 	}
 
-	int qual = bam1_qual(b)[qpos];
-	if (qual < buf->min_qual)
-		return 0;
-	buf->counter += 1;
-	buf->qual.push_back(qual);
 	buf->map_qual.push_back(b->core.qual);
-	//
-	if (buf->call_content[0] == '*') {
-		if (buf->width > 1 && !buf->calls.str().empty())
-			buf->calls << '|';
+	// record reads into the string
+	bool record_reads = buf->call_content[0] == '*';
+	std::string reads;
+	
+	uint32_t outputstart = buf->start + buf->shift;
+	uint32_t outputend = outputstart + buf->width;
+	if (buf->start < outputstart || buf->start >= outputend) {
+		return 0;
+	}
+	fprintf(stderr, "OUTPUT S %d E %d\n", outputstart, outputend);
 
-			uint32_t outputstart = buf->start + buf->shift;
-			uint32_t outputend = outputstart + buf->width;
-			// get qpos
-			uint32_t pos = b->core.pos;
-			uint32_t qpos = 0;
-			uint32_t * cigar_p = bam1_cigar(b);
-			// k is the index to cigar string
-			// k < b->core.n_cigar
-			uint32_k = 0;
-			for (uint32_t outputpos = outputstart; outputpos < outputend; ++outputpos) {
-				if (pos == buf->start)
-					break;
-				int op = cigar_p[k] & BAM_CIGAR_MASK;
-				int l = cigar_p[k] >> BAM_CIGAR_SHIFT;
-				if (op == BAM_CMATCH) {
-					for (i == pos; i < pos + l; ++i) {
-						qpos += 1;
-					}
-					pos += l;
-				} else if (op == BAM_CINS)
-					qpos += l;
-				else if (op == BAM_CDEL || op == BAM_CREF_SKIP)
-					pos += l;
+	// pos is the supposed position 
+	uint32_t pos = b->core.pos;
+	// qpos is the location into the read itself
+	uint32_t qpos = 0;
+	uint32_t * cigar_p = bam1_cigar(b);
+	// k is the index to cigar string
+	// k < b->core.n_cigar
+	uint32_t k = 0;
+	//
+	// output pos is the window within which we would like to output 
+	while (pos < outputend) {
+		// if |......ACGT|GAAA
+		fprintf(stderr, "POS %d K %d\n", pos, k);
+		if (pos > outputstart) {
+			if (record_reads)
+				for (int i = outputstart; i < pos; ++i)
+					reads += '.';
+			outputstart = pos;
+		}
+		int op = cigar_p[k] & BAM_CIGAR_MASK;
+		int l = cigar_p[k] >> BAM_CIGAR_SHIFT;
+		if (op == BAM_CMATCH) {
+			for (int i = 0; i < l && pos < outputend; ++i) {
+				// right at the location, get quality score
+				if (pos == buf->start) {
+					int qual = bam1_qual(b)[qpos];
+					if (qual < buf->min_qual)
+						return 0;
+					else 
+						buf->qual.push_back(qual);
+				}
+				if (record_reads && pos >= outputstart) {
+					if (qpos < b->core.l_qseq)
+						reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
+					else
+						reads += '.';
+				}
+				++qpos;
+				++pos;
+			}
+		} else if (op == BAM_CINS) {
+			// right at the location, get quality score
+			if (pos == buf->start) {
+				int qual = bam1_qual(b)[qpos];
+				if (qual < buf->min_qual)
+					return 0;
+				else 
+					buf->qual.push_back(qual);
 			}
 
-
-
-		for (int i = 0; i < buf->width; ++i) {
-			int call = (qpos + i + buf->shift < b->core.l_qseq && qpos + i + buf->shift >= 0)
-			           ? bam1_seqi(bam1_seq(b), qpos + buf->shift + i) : 0;
-			switch (call) {
-			case 1:
-				buf->calls << 'A';
-				break;
-			case 2:
-				buf->calls << 'C';
-				break;
-			case 4:
-				buf->calls << 'G';
-				break;
-			case 8:
-				buf->calls << 'T';
-				break;
-			case 16:
-				buf->calls << 'N';
-				break;
-			default:
-				buf->calls << '-';
+			// for insertion, qpos will move l. pos does not move.
+			for (int i = 0; i < l; ++i) {
+				if (record_reads && pos >= outputstart)
+					reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
+				++qpos;
+			}
+		} else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
+			// for deletion, qpos will not move, pos move
+			for (int i = 0; i < l && pos < outputend; ++i, ++pos) {
+				if (pos == buf->start) {
+					int qual = bam1_qual(b)[qpos];
+					if (qual < buf->min_qual)
+						return 0;
+					else 
+						buf->qual.push_back(qual);
+				}
+				if (record_reads && pos >= outputstart)
+					reads += '-';
 			}
 		}
-	} else if (buf->call_content[0] == '%') {
+		// go to the next cigar
+		++k;
+	}
+	if (record_reads) {
+		if (buf->width > 1 && !buf->calls.str().empty())
+			buf->calls << '|';
+		buf->calls << reads;
+	}
+	buf->counter += 1;
+	if (buf->call_content[0] == '%') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
 		buf->calls << std::hex << b->core.flag;
@@ -1309,12 +1297,20 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				buf.min_qual = atoi(pch + 9);
 			else if (strncmp(pch, "min_mapq=", 9) == 0)
 				buf.min_mapq = atoi(pch + 9);
-			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads")
+			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads") {
 				buf.width = atoi(pch + 6);
-			else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads")
+				if (buf.width < 0) {
+					sqlite3_result_error(context, "Width of reads must be positive", -1);
+					return;
+				}
+			} else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads") {
 				buf.shift = atoi(pch + 6);
+				if (buf.shift > 0) {
+					sqlite3_result_error(context, "Output of reads must cover variant location (start > 0)", -1);
+					return;
+				}
 			// this is a tag
-			else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
+			} else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
 				size_t n = buf.cond_tag_values.size();
 				if (n < 12) {
 					buf.cond_tag_keys[n + n] = pch[0];
@@ -1342,12 +1338,18 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 						buf.cond_tag_values.push_back(std::string(pch + 3));
 					}
 				}
-			} else
+			} else {
 				fprintf(stderr, "\nERROR: Unrecognized or unused parameter %s\n", pch);
+				return;
+			}
 			// process argument
 			pch = strtok(NULL, "&");
 		}
 		free(query);
+	}
+	if (buf.shift + buf.width < 0) {
+		sqlite3_result_error(context, "Output of reads must cover variant location (width + shift < 0)", -1);
+		return;
 	}
 	// both start and end should be zero based.
 	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
