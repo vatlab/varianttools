@@ -960,6 +960,50 @@ struct BAM_stat
 
 };
 
+
+/*
+cdef inline object get_seq_range(bam1_t *src, uint32_t start, uint32_t end):
+    cdef uint8_t * p
+    cdef uint32_t k
+    cdef char * s
+
+    if not src.core.l_qseq:
+        return None
+
+    seq = PyBytes_FromStringAndSize(NULL, end - start)
+    s   = <char*>seq
+    p   = bam1_seq(src)
+
+    for k from start <= k < end:
+        # equivalent to bam_nt16_rev_table[bam1_seqi(s, i)] (see bam.c)
+        # note: do not use string literal as it will be a python string
+        s[k-start] = bam_nt16_rev_table[p[k/2] >> 4 * (1 - k%2) & 0xf]
+
+    return seq
+
+cdef char * bam_nt16_rev_table = "=ACMGRSVTWYHKDBN"
+
+
+cdef inline object get_qual_range(bam1_t *src, uint32_t start, uint32_t end):
+    cdef uint8_t * p
+    cdef uint32_t k
+    cdef char * q
+
+    p = bam1_qual(src)
+    if p[0] == 0xff:
+        return None
+
+    qual = PyBytes_FromStringAndSize(NULL, end - start)
+    q    = <char*>qual
+
+    for k from start <= k < end:
+        ## equivalent to t[i] + 33 (see bam.c)
+        q[k-start] = p[k] + 33
+
+    return qual
+*/
+
+
 static int fetch_func(const bam1_t * b, void * data)
 {
 	BAM_stat * buf = (BAM_stat *)data;
@@ -1027,6 +1071,11 @@ static int fetch_func(const bam1_t * b, void * data)
 					return 0;
 				s += strlen((char *)s) + 1;
 			} else if (type == 'B') {
+				//
+				if (match >= 0) {
+					sqlite3_result_error(context, "Condition involves array tags (B) is not supported.", -1);
+					return 0;
+				}
 				// get byte size
 				uint8_t subtype = *s;
 				// The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
@@ -1045,28 +1094,6 @@ static int fetch_func(const bam1_t * b, void * data)
 		}
 	}
 
-	// get qpos
-	uint32_t pos = b->core.pos;
-	uint32_t qpos = 0;
-	uint32_t * cigar_p = bam1_cigar(b);
-	for (uint32_t k = 0; k < b->core.n_cigar; ++k) {
-		if (pos == buf->start)
-			break;
-		int op = cigar_p[k] & BAM_CIGAR_MASK;
-		int l = cigar_p[k] >> BAM_CIGAR_SHIFT;
-		if (pos + l > buf->start)
-			l = buf->start - pos;
-
-		if (op == BAM_CMATCH) {
-			//for (i == pos; i < pos + l; ++i)
-			qpos += l;
-			pos += l;
-		} else if (op == BAM_CINS)
-			qpos += l;
-		else if (op == BAM_CDEL || op == BAM_CREF_SKIP)
-			pos += l;
-	}
-
 	int qual = bam1_qual(b)[qpos];
 	if (qual < buf->min_qual)
 		return 0;
@@ -1077,6 +1104,34 @@ static int fetch_func(const bam1_t * b, void * data)
 	if (buf->call_content[0] == '*') {
 		if (buf->width > 1 && !buf->calls.str().empty())
 			buf->calls << '|';
+
+			uint32_t outputstart = buf->start + buf->shift;
+			uint32_t outputend = outputstart + buf->width;
+			// get qpos
+			uint32_t pos = b->core.pos;
+			uint32_t qpos = 0;
+			uint32_t * cigar_p = bam1_cigar(b);
+			// k is the index to cigar string
+			// k < b->core.n_cigar
+			uint32_k = 0;
+			for (uint32_t outputpos = outputstart; outputpos < outputend; ++outputpos) {
+				if (pos == buf->start)
+					break;
+				int op = cigar_p[k] & BAM_CIGAR_MASK;
+				int l = cigar_p[k] >> BAM_CIGAR_SHIFT;
+				if (op == BAM_CMATCH) {
+					for (i == pos; i < pos + l; ++i) {
+						qpos += 1;
+					}
+					pos += l;
+				} else if (op == BAM_CINS)
+					qpos += l;
+				else if (op == BAM_CDEL || op == BAM_CREF_SKIP)
+					pos += l;
+			}
+
+
+
 		for (int i = 0; i < buf->width; ++i) {
 			int call = (qpos + i + buf->shift < b->core.l_qseq && qpos + i + buf->shift >= 0)
 			           ? bam1_seqi(bam1_seq(b), qpos + buf->shift + i) : 0;
