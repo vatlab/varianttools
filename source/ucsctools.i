@@ -216,37 +216,52 @@ void showTrack(const std::string & track_file)
                     printf("%c%c                      A (char)   : %c\n", key[0], key[1], *s);
                     ++s;
                 } else if (type == 'C') {
-                    printf("%c%c                      C (int)    : %u", key[0], key[1], *(char*)s);
+                    printf("%c%c                      C (int)    : %u\n", key[0], key[1], *(char*)s);
                     ++s;
                 } else if (type == 'c') {
-                    printf("%c%c                      c (int8)   : %d", key[0], key[1], *(int8_t*)s);
+                    printf("%c%c                      c (int8)   : %d\n", key[0], key[1], *(int8_t*)s);
                     ++s;
                 } else if (type == 'S') { 
-                    printf("%c%c                      S (uint16) : %u", key[0], key[1], *(uint16_t*)s);
+                    printf("%c%c                      S (uint16) : %u\n", key[0], key[1], *(uint16_t*)s);
                     s += 2; 
                 } else if (type == 's') {
-                    printf("%c%c                      s (int16)  : %d", key[0], key[1], *(int16_t*)s);
+                    printf("%c%c                      s (int16)  : %d\n", key[0], key[1], *(int16_t*)s);
                     s += 2;
                 } else if (type == 'I') {
-                    printf("%c%c                      I (uint32  : %u", key[0], key[1], *(uint32_t*)s);
+                    printf("%c%c                      I (uint32  : %u\n", key[0], key[1], *(uint32_t*)s);
                     s += 4;
                 } else if (type == 'i') { 
-                    printf("%c%c                      i (int32)  : %d", key[0], key[1], *(int32_t*)s);
+                    printf("%c%c                      i (int32)  : %d\n", key[0], key[1], *(int32_t*)s);
                     s += 4;
                 } else if (type == 'f') { 
-                    printf("%c%c                      f (float)  : %g", key[0], key[1], *(float*)s);
+                    printf("%c%c                      f (float)  : %g\n", key[0], key[1], *(float*)s);
                     s += 4; 
                 } else if (type == 'd') { 
-                    printf("%c%c                      d (double) : %lg", key[0], key[1], *(double*)s);
+                    printf("%c%c                      d (double) : %lg\n", key[0], key[1], *(double*)s);
                     s += 8; 
                 } else if (type == 'Z') {
-                    printf("%c%c                      Z (string) : %s", key[0], key[1], (char *)s);
+                    printf("%c%c                      Z (string) : %s\n", key[0], key[1], (char *)s);
                     s += strlen((char *)s) + 1;
                 } else if (type == 'H') {
-                    printf("%c%c                      H (string) : %s", key[0], key[1], (char *)s);
+                    printf("%c%c                      H (string) : %s\n", key[0], key[1], (char *)s);
                     s += strlen((char *)s) + 1;
+                } else if (type == 'B') {
+                    // get byte size
+                    uint8_t subtype = *s;
+                    // The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
+                    // integer), uint8 t (unsigned 8-bit integer), int16 t, uint16 t, int32 t, uint32 t and float,
+                    int sz = 0;
+                    if (subtype == 'c' || subtype == 'C')
+                        sz = 1;
+                    else if (subtype == 's' || subtype == 'S')
+                        sz = 2;
+                    else if (subtype == 'i' || subtype == 'I' || subtype == 'f')
+                        sz = 4;
+                    ++s;
+                    int nItem = (int) *s;
+                    s += 4 + nItem * sz;
+                    printf("%c%c                      B (array of %c, comparison not supported)\n", key[0], key[1], subtype);
                 }
-                printf("\n");
             }
             printf("flag                    int flag   : 0x%X (%spaired, %smapped according to bits 1 & 3)\n",
                 bam->core.flag, bam->core.flag & 1 == 0 ? "un" : "", bam->core.flag & 8 != 0 ? "un" : "");

@@ -1026,6 +1026,21 @@ static int fetch_func(const bam1_t * b, void * data)
 				if (match >= 0 && !compare_val(buf->cond_tag_op[match], (const char *)s, buf->cond_tag_values[match].c_str()))
 					return 0;
 				s += strlen((char *)s) + 1;
+			} else if (type == 'B') {
+				// get byte size
+				uint8_t subtype = *s;
+				// The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
+				// integer), uint8 t (unsigned 8-bit integer), int16 t, uint16 t, int32 t, uint32 t and float,
+				int sz = 0;
+				if (subtype == 'c' || subtype == 'C')
+					sz = 1;
+				else if (subtype == 's' || subtype == 'S')
+					sz = 2;
+				else if (subtype == 'i' || subtype == 'I' || subtype == 'f')
+					sz = 4;
+				++s;
+				int nItem = (int)*s;
+				s += 4 + nItem * sz;
 			}
 		}
 	}
@@ -1143,6 +1158,54 @@ static int fetch_func(const bam1_t * b, void * data)
 				if (match)
 					buf->calls << std::string((char *)s);
 				s += strlen((char *)s) + 1;
+			} else if (type == 'B') {
+				// get byte size
+				uint8_t subtype = *s;
+				// The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
+				// integer), uint8 t (unsigned 8-bit integer), int16 t, uint16 t, int32 t, uint32 t and float,
+				int sz = 0;
+				if (subtype == 'c' || subtype == 'C')
+					sz = 1;
+				else if (subtype == 's' || subtype == 'S')
+					sz = 2;
+				else if (subtype == 'i' || subtype == 'I' || subtype == 'f')
+					sz = 4;
+				++s;
+				int nItem = (int)*s;
+				s += 4;
+				for (size_t k = 0; k < nItem; ++k) {
+					if (k > 0 && match)
+						buf->calls << ",";
+					if (subtype == 'C') {
+						if (match)
+							buf->calls << (int)(*s);
+						++s;
+					} else if (subtype == 'c') {
+						if (match)
+							buf->calls << *(int8_t *)s;
+						++s;
+					} else if (subtype == 'S') {
+						if (match)
+							buf->calls << *(uint16_t *)s;
+						s += 2;
+					} else if (subtype == 's') {
+						if (match)
+							buf->calls << *(int16_t *)s;
+						s += 2;
+					} else if (subtype == 'I') {
+						if (match)
+							buf->calls << *(uint32_t *)s;
+						s += 4;
+					} else if (subtype == 'i') {
+						if (match)
+							buf->calls << *(int32_t *)s;
+						s += 4;
+					} else if (subtype == 'f') {
+						if (match)
+							buf->calls << *(float *)s;
+						s += 4;
+					}
+				}
 			}
 		}
 	}
@@ -1173,6 +1236,9 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 	// set parameters
 	if (fi->name == "reads") {
 		buf.width = 5;
+		buf.call_content[0] = '*';
+	} else if (fi->name == "calls") {
+		buf.width = 1;
 		buf.call_content[0] = '*';
 	} else if (fi->name == "flag")
 		buf.call_content[0] = '%';
@@ -1421,6 +1487,22 @@ static void track(
 						s += 8;
 					else if (type == 'Z' || type == 'H')
 						s += strlen((char *)s) + 1;
+					else if (type == 'B') {
+						// get byte size
+						uint8_t subtype = *s;
+						// The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
+						// integer), uint8 t (unsigned 8-bit integer), int16 t, uint16 t, int32 t, uint32 t and float,
+						int sz = 0;
+						if (subtype == 'c' || subtype == 'C')
+							sz = 1;
+						else if (subtype == 's' || subtype == 'S')
+							sz = 2;
+						else if (subtype == 'i' || subtype == 'I' || subtype == 'f')
+							sz = 4;
+						++s;
+						int nItem = (int)*s;
+						s += 4 + nItem * sz;
+					}
 				}
 			}
 			struct bamChromInfo * cl = bamChromList((samfile_t *)info.file);
