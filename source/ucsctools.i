@@ -191,7 +191,6 @@ void showTrack(const std::string & track_file)
         printf("%-23s %s\n", "coverage (INTEGER)", "Number of reads that cover the starting position of the variant");
         printf("%-23s %s\n", "calls", "nucleotide of the reads at the variant location");
         printf("%-23s %s\n", "reads", "nucleotide sequence around the variant location");
-        printf("%-23s %s\n", "READS", "the same as reads but use colors for insertions and variant allele");
         printf("%-23s %s\n", "qual", "A list of phred base quality of reads at the location");
         printf("%-23s %s\n", "avg_qual (FLOAT)", "Average qual score of all reads");
         printf("%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
@@ -268,11 +267,11 @@ void showTrack(const std::string & track_file)
                 bam->core.flag, bam->core.flag & 1 == 0 ? "un" : "", bam->core.flag & 8 != 0 ? "un" : "");
             printf("\n");
         }
-        printf("Parameters start (default to 0) and width (default to 5) can be used with reads (or "
-            "READS) to adjust the window around variant, with syntax reads?start=-5&width=10. min_qual, "
-            "min_mapq and TAG=VAL (or >, >=, <, <=, !=) can be used for all fields to limit the reads "
-            "to the ones with mapq and qual scores that exceed the specified value, and tag satisfying "
-            "specified conditions.\n");
+        printf("Parameters start (default to 0), width (default to 5) and color (default to 0) can be "
+            "used with reads to adjust the window around variant, and use colors for insertions and variant "
+            "allele, with syntax reads?start=-5&width=10&color=1. min_qual, min_mapq and TAG=VAL (or >, "
+            ">=, <, <=, !=) can be used for all fields to limit the reads to the ones with mapq and qual "
+            "scores that exceed the specified value, and tag satisfying specified conditions.\n");
     } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)

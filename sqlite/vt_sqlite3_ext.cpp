@@ -1308,11 +1308,6 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 	if (fi->name == "reads") {
 		buf.width = 5;
 		buf.call_content[0] = '*';
-		buf.colorize = false;
-	} else if (fi->name == "READS") {
-		buf.width = 5;
-		buf.call_content[0] = '*';
-		buf.colorize = true;
 	} else if (fi->name == "calls") {
 		buf.width = 1;
 		buf.call_content[0] = '*';
@@ -1330,13 +1325,13 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				buf.min_qual = atoi(pch + 9);
 			else if (strncmp(pch, "min_mapq=", 9) == 0)
 				buf.min_mapq = atoi(pch + 9);
-			else if (strncmp(pch, "width=", 6) == 0 && (fi->name == "reads" || fi->name == "READS")) {
+			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads") {
 				buf.width = atoi(pch + 6);
 				if (buf.width < 0) {
 					sqlite3_result_error(context, "Width of reads must be positive", -1);
 					return;
 				}
-			} else if (strncmp(pch, "start=", 6) == 0 && (fi->name == "reads" || fi->name == "READS")) {
+			} else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads") {
 				buf.shift = atoi(pch + 6);
 				if (buf.shift > 0) {
 					sqlite3_result_error(context, "Output of reads must cover variant location (start > 0)", -1);
@@ -1346,6 +1341,8 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				if (buf.width + buf.shift <= 0)
 					buf.width = - buf.shift + 1;
 				// this is a tag
+			} else if (strncmp(pch, "color=", 6) == 0) {
+				buf.colorize = atoi(pch + 6);
 			} else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
 				size_t n = buf.cond_tag_values.size();
 				if (n < 12) {
@@ -1550,7 +1547,6 @@ static void track(
 			info.name_map["coverage"] = 1;
 			info.name_map["calls"] = 1;
 			info.name_map["reads"] = 1;
-			info.name_map["READS"] = 1;
 			info.name_map["qual"] = 1;
 			info.name_map["mapq"] = 1;
 			info.name_map["avg_qual"] = 1;
