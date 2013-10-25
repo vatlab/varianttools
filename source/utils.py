@@ -605,7 +605,7 @@ def lineCount(filename, encoding='UTF-8'):
         return int(lineCount * (totalSize / 99000.))
 
 class PrettyPrinter:
-    def __init__(self, delimiter=None, max_width={}, cache_size=1000):
+    def __init__(self, delimiter=None, max_width={}, cache_size=200):
         ''' delimiter: use specified field to separate fields
             max_width: a dictionary of {col: max_width} to change long
                 text to START...END

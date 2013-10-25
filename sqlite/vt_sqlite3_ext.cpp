@@ -329,7 +329,7 @@ struct FieldInfo
 };
 
 struct TrackInfo;
-typedef void (*track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
+typedef void (* track_handler)(void *, char *, int, char *, char *, FieldInfo *, TrackInfo *, sqlite3_context *);
 
 struct TrackInfo
 {
@@ -939,7 +939,7 @@ struct BAM_stat
 	std::vector<int> map_qual;
 	// condition
 	int shift;
-	size_t width;
+	int width;
 	int min_qual;
 	int min_mapq;
 
@@ -961,7 +961,7 @@ struct BAM_stat
 };
 
 
-char conv_table[] = "-AC.G...T.......N";
+char conv_table[] = "=ACMGRSVTWYHKDBN";
 
 static int fetch_func(const bam1_t * b, void * data)
 {
@@ -1056,33 +1056,35 @@ static int fetch_func(const bam1_t * b, void * data)
 	// record reads into the string
 	bool record_reads = buf->call_content[0] == '*';
 	std::string reads;
-	
+
 	uint32_t outputstart = buf->start + buf->shift;
 	uint32_t outputend = outputstart + buf->width;
-	if (buf->start < outputstart || buf->start >= outputend) {
-		return 0;
-	}
-	fprintf(stderr, "OUTPUT S %d E %d\n", outputstart, outputend);
 
-	// pos is the supposed position 
+	// pos is the supposed position
 	uint32_t pos = b->core.pos;
+	// start position is affected by soft clip
+	uint32_t k = 0;
+	uint32_t * cigar_p = bam1_cigar(b);
+
 	// qpos is the location into the read itself
 	uint32_t qpos = 0;
-	uint32_t * cigar_p = bam1_cigar(b);
 	// k is the index to cigar string
 	// k < b->core.n_cigar
-	uint32_t k = 0;
 	//
-	// output pos is the window within which we would like to output 
+	k = 0;
+	// output pos is the window within which we would like to output
+	if (pos > outputstart && record_reads)
+		for (int i = outputstart; i < pos; ++i)
+			reads += '.';
 	while (pos < outputend) {
 		// if |......ACGT|GAAA
-		fprintf(stderr, "POS %d K %d\n", pos, k);
-		if (pos > outputstart) {
+		if (qpos >= b->core.l_qseq) {
 			if (record_reads)
-				for (int i = outputstart; i < pos; ++i)
+				for (int i = pos; i < outputend; ++i)
 					reads += '.';
-			outputstart = pos;
+			break;
 		}
+
 		int op = cigar_p[k] & BAM_CIGAR_MASK;
 		int l = cigar_p[k] >> BAM_CIGAR_SHIFT;
 		if (op == BAM_CMATCH) {
@@ -1092,14 +1094,14 @@ static int fetch_func(const bam1_t * b, void * data)
 					int qual = bam1_qual(b)[qpos];
 					if (qual < buf->min_qual)
 						return 0;
-					else 
+					else
 						buf->qual.push_back(qual);
 				}
 				if (record_reads && pos >= outputstart) {
-					if (qpos < b->core.l_qseq)
-						reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
+					if (buf->width > 1 && pos == buf->start)
+						reads += std::string("\033[94m") + conv_table[bam1_seqi(bam1_seq(b), qpos)] + "\033[0m";
 					else
-						reads += '.';
+						reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
 				}
 				++qpos;
 				++pos;
@@ -1110,16 +1112,20 @@ static int fetch_func(const bam1_t * b, void * data)
 				int qual = bam1_qual(b)[qpos];
 				if (qual < buf->min_qual)
 					return 0;
-				else 
+				else
 					buf->qual.push_back(qual);
 			}
 
 			// for insertion, qpos will move l. pos does not move.
-			for (int i = 0; i < l; ++i) {
-				if (record_reads && pos >= outputstart)
-					reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
-				++qpos;
+			if (record_reads && pos >= outputstart) {
+				if (buf->width > 1)
+					reads += "\033[32m";
+				for (int i = 0; i < l; ++i)
+					reads += conv_table[bam1_seqi(bam1_seq(b), qpos + i)] ;
+				if (buf->width > 1)
+					reads += "\033[0m";
 			}
+			qpos += l;
 		} else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
 			// for deletion, qpos will not move, pos move
 			for (int i = 0; i < l && pos < outputend; ++i, ++pos) {
@@ -1127,11 +1133,29 @@ static int fetch_func(const bam1_t * b, void * data)
 					int qual = bam1_qual(b)[qpos];
 					if (qual < buf->min_qual)
 						return 0;
-					else 
+					else
 						buf->qual.push_back(qual);
 				}
-				if (record_reads && pos >= outputstart)
-					reads += '-';
+				if (record_reads && pos >= outputstart) {
+					if (buf->width > 1 && pos == buf->start)
+						reads += "\033[94m-\033[0m";
+					else
+						reads += '-';
+				}
+			}
+		} else if (op == BAM_CSOFT_CLIP || op == BAM_CHARD_CLIP) {
+			for (int i = 0; i < l && pos < outputend; ++i) {
+				// right at the location, get quality score
+				if (pos == buf->start) {
+					int qual = bam1_qual(b)[qpos];
+					if (qual < buf->min_qual)
+						return 0;
+					else
+						buf->qual.push_back(qual);
+				}
+				// soft clip are no seq, hard clip are not
+				if (op == BAM_CSOFT_CLIP)
+					++qpos;
 			}
 		}
 		// go to the next cigar
@@ -1147,7 +1171,7 @@ static int fetch_func(const bam1_t * b, void * data)
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
 		buf->calls << std::hex << b->core.flag;
-	} else if (buf->call_content[0] != '\0') {
+	} else if (buf->call_content[0] != '*' && buf->call_content[0] != '\0') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
 		uint8_t * s = bam1_aux(b);
@@ -1309,7 +1333,10 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 					sqlite3_result_error(context, "Output of reads must cover variant location (start > 0)", -1);
 					return;
 				}
-			// this is a tag
+				// at last shit wide
+				if (buf.width + buf.shift <= 0)
+					buf.width = - buf.shift + 1;
+				// this is a tag
 			} else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
 				size_t n = buf.cond_tag_values.size();
 				if (n < 12) {
@@ -1348,7 +1375,7 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 		free(query);
 	}
 	if (buf.shift + buf.width < 0) {
-		sqlite3_result_error(context, "Output of reads must cover variant location (width + shift < 0)", -1);
+		sqlite3_result_error(context, "Output of reads must cover variant location (width + start < 0)", -1);
 		return;
 	}
 	// both start and end should be zero based.
@@ -2247,8 +2274,8 @@ int sqlite3_my_extension_init(
 ** Tree is not necessarily balanced. That would require something like red&black trees of AVL
 */
 
-typedef int (*cmp_func)(const void *, const void *);
-typedef void (*map_iterator)(void *, int64_t, void *);
+typedef int (* cmp_func)(const void *, const void *);
+typedef void (* map_iterator)(void *, int64_t, void *);
 
 typedef struct node
 {
@@ -2456,7 +2483,7 @@ static int sqlite3Utf8CharLen(const char * z, int nByte)
 */
 /* LMH 2007-03-25 Changed to use errno and remove domain; no pre-checking for errors. */
 #define GEN_MATH_WRAP_DOUBLE_1(name, function) \
-    static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
+	static void name(sqlite3_context * context, int argc, sqlite3_value * *argv){ \
 		double rVal = 0.0, val; \
 		assert(argc == 1); \
 		switch (sqlite3_value_type(argv[0]) ) { \
