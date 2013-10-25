@@ -948,9 +948,13 @@ struct BAM_stat
 	// =, ==, !=, >, >=, <= etc
 	char cond_tag_op[12];
 	std::vector<std::string> cond_tag_values;
+
+	// if use color in output
+	bool colorize;
+
 	BAM_stat(size_t pos) :
 		start(pos), counter(0), calls(), qual(), map_qual(),
-		shift(0), width(1), min_qual(0), min_mapq(), cond_tag_values()
+		shift(0), width(1), min_qual(0), min_mapq(), cond_tag_values(), colorize(false)
 	{
 		call_content[0] = '\0';
 		call_content[1] = '\0';
@@ -1098,7 +1102,7 @@ static int fetch_func(const bam1_t * b, void * data)
 						buf->qual.push_back(qual);
 				}
 				if (record_reads && pos >= outputstart) {
-					if (buf->width > 1 && pos == buf->start)
+					if (buf->width > 1 && pos == buf->start && buf->colorize)
 						reads += std::string("\033[94m") + conv_table[bam1_seqi(bam1_seq(b), qpos)] + "\033[0m";
 					else
 						reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
@@ -1118,11 +1122,11 @@ static int fetch_func(const bam1_t * b, void * data)
 
 			// for insertion, qpos will move l. pos does not move.
 			if (record_reads && pos >= outputstart) {
-				if (buf->width > 1)
+				if (buf->width > 1 && buf->colorize)
 					reads += "\033[32m";
 				for (int i = 0; i < l; ++i)
 					reads += conv_table[bam1_seqi(bam1_seq(b), qpos + i)] ;
-				if (buf->width > 1)
+				if (buf->width > 1 && buf->colorize)
 					reads += "\033[0m";
 			}
 			qpos += l;
@@ -1137,7 +1141,7 @@ static int fetch_func(const bam1_t * b, void * data)
 						buf->qual.push_back(qual);
 				}
 				if (record_reads && pos >= outputstart) {
-					if (buf->width > 1 && pos == buf->start)
+					if (buf->width > 1 && pos == buf->start && buf->colorize)
 						reads += "\033[94m-\033[0m";
 					else
 						reads += '-';
@@ -1304,6 +1308,11 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 	if (fi->name == "reads") {
 		buf.width = 5;
 		buf.call_content[0] = '*';
+		buf.colorize = false;
+	} else if (fi->name == "READS") {
+		buf.width = 5;
+		buf.call_content[0] = '*';
+		buf.colorize = true;
 	} else if (fi->name == "calls") {
 		buf.width = 1;
 		buf.call_content[0] = '*';
@@ -1321,13 +1330,13 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				buf.min_qual = atoi(pch + 9);
 			else if (strncmp(pch, "min_mapq=", 9) == 0)
 				buf.min_mapq = atoi(pch + 9);
-			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads") {
+			else if (strncmp(pch, "width=", 6) == 0 && (fi->name == "reads" || fi->name == "READS")) {
 				buf.width = atoi(pch + 6);
 				if (buf.width < 0) {
 					sqlite3_result_error(context, "Width of reads must be positive", -1);
 					return;
 				}
-			} else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads") {
+			} else if (strncmp(pch, "start=", 6) == 0 && (fi->name == "reads" || fi->name == "READS")) {
 				buf.shift = atoi(pch + 6);
 				if (buf.shift > 0) {
 					sqlite3_result_error(context, "Output of reads must cover variant location (start > 0)", -1);
@@ -1541,6 +1550,7 @@ static void track(
 			info.name_map["coverage"] = 1;
 			info.name_map["calls"] = 1;
 			info.name_map["reads"] = 1;
+			info.name_map["READS"] = 1;
 			info.name_map["qual"] = 1;
 			info.name_map["mapq"] = 1;
 			info.name_map["avg_qual"] = 1;
@@ -1663,7 +1673,7 @@ static void track(
 			std::map<std::string, int>::iterator it = info.name_map.find(fi.name);
 			if (it == info.name_map.end()) {
 				char buf[400];
-				sprintf(buf, "Unrecognized col name '%s', please check available field with command 'vtools show track %s'."
+				sprintf(buf, "Unrecognized field '%s', please check available fields with command 'vtools show track %s'."
 					         " You might also have used double quote (\") instead of single quote (') for string literal.",
 					fi.name.c_str(), track_file.c_str());
 				sqlite3_result_error(context, buf, -1);
