@@ -2303,13 +2303,28 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         for k,v in ref_tokens.items():
             query = re.sub(r'{}\s*\('.format(v), " {}('{}', ".format(k, crrFile), query)
     if has_track_query:
-        for k,v in track_tokens.items():
-            if alt_build:
-                query = re.sub(r'{}\s*\('.format(v), 
-                    ' {}({}, {}, {}, {}, '.format(k, "variant.alt_chr", "variant.alt_pos", "variant.ref", "variant.alt"), query)
+        def handleTrackParams(matchObj):
+            try:
+                filename = eval(matchObj.group(1).strip())
+            except Exception as e:
+                raise ValueError('A filename (quoted string) is needed for the first parameter of function track(), "{}" provided: {}'
+                    .format(filename, e))
+            param = matchObj.group(2)
+            if os.path.isfile(filename):
+                filenames = [filename]
             else:
-                query = re.sub(r'{}\s*\('.format(v), 
-                    ' {}({}, {}, {}, {}, '.format(k, "variant.chr", "variant.pos", "variant.ref", "variant.alt"), query)
+                filenames = glob.glob(filename)
+            #
+            if not filenames:
+                raise ValueError('No file matching name {} could be found.'.format(filename))
+            if len(filenames) > 1:
+                env.logger.info('Filename "{}" matches {} files: {}'
+                    .format(filename, len(filenames), ', '.join(filenames)))
+            if alt_build:
+                return ', '.join(["track(variant.alt_chr, variant.alt_pos, variant.ref, variant.alt, '{}' {})".format(x, param) for x in filenames])
+            else:
+                return ', '.join(["track(variant.chr, variant.pos, variant.ref, variant.alt, '{}' {})".format(x, param) for x in filenames])
+        query = re.sub("__TRACK__\s*\(\s*([^,\)]+)([^\)]*)\)", handleTrackParams, query)
     if has_samples_query:
         #
         idListFiles = {}
