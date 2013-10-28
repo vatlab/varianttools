@@ -460,19 +460,35 @@ class IgnoredRecord(Exception):
         return repr(self.value)
 
 class DiscardRecord:
-    def __init__(self, val):
+    def __init__(self, val, keepMatched=False):
         self.val = val
-        if type(self.val) == str:
-            self.__call__ = self.discard_single
+        if keepMatched:
+            if type(self.val) == str:
+                self.__call__ = self.discard_unmatched_single
+            else:
+                self.__call__ = self.discard_unmatched_multiple
         else:
-            self.__call__ = self.discard_multiple
+            if type(self.val) == str:
+                self.__call__ = self.discard_matched_single
+            else:
+                self.__call__ = self.discard_matched_multiple
 
-    def discard_single(self, item):
+    def discard_unmatched_single(self, item):
+        if item != self.val:
+            raise IgnoredRecord()
+        return item
+
+    def discard_unmatched_multiple(self, item):
+        if item not in self.val:
+            raise IgnoredRecord()
+        return item
+
+    def discard_matched_single(self, item):
         if item == self.val:
             raise IgnoredRecord()
         return item
 
-    def discard_multiple(self, item):
+    def discard_matched_multiple(self, item):
         if item in self.val:
             raise IgnoredRecord()
         return item
