@@ -1,0 +1,120 @@
+# Copyright (C) 2012 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+#
+
+[linked fields]
+*=GeneID
+
+[data sources]
+description=This database is a comprehensive report of the accessions that are 
+    related to a Entrez GeneID.  It includes sequences from the international
+    sequence collaboration, Swiss-Prot, and RefSeq. This database only keeps 
+	record with reference genome Reference GRCh37.p13 Primary Assembly.
+version=20131028
+anno_type=field
+source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/gene2refseq.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/EntrezGene2RedSeq-20131028.DB.gz
+source_type=txt
+header=1
+
+
+[tax_id]
+index=1
+adj=Nullify('-')
+type=INT NOT NULL
+comment=the unique identifier provided by NCBI Taxonomy for the species or strain/isolate
+
+[GeneID]
+index=2
+type=INT NOT NULL
+comment=the unique identifier for a gene
+
+[status]
+index=3
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= status of the RefSeq values are: INFERRED, MODEL, NA, PREDICTED, PROVISIONAL, REVIEWED, SUPPRESSED, VALIDATED
+
+[RNA_nucleotide_accession_version]
+index=4
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= may be null (-) for some genomes
+
+[RNA_nucleotide_gi]
+index=5
+adj=Nullify('-')
+type=VARCHAR(255)
+comment=the gi for an RNA nucleotide accession (e.g. NP_047184.1, NC_004871.1)
+
+[protein_accession_version]
+index=6
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= will be null (-) for RNA-coding genes
+
+[protein_gi]
+index=7
+adj=Nullify('-')
+type=VARCHAR(255)
+comment=the gi for a protein accession, '-' if not applicable
+
+[genomic_nucleotide_accession_version]
+index=8
+adj=Nullify('-')
+type=VARCHAR(255)
+comment=may be null (-) if a RefSeq was provided after the genomic accession was submitted
+
+[genomic_nucleotide_gi]
+index=9
+adj=Nullify('-')
+type=VARCHAR(255)
+comment=the gi for a genomic nucleotide accession, '-' if not applicable
+
+[start_position_on_the_genomic_accession]
+index=10
+adj=Nullify('-'), IncreaseBy(1)
+type=INT
+comment=position of the gene feature on the genomic accession, adjusted to be 1-based
+
+[end_position_on_the_genomic_accession]
+index=11
+adj=Nullify('-'), IncreaseBy(1)
+type=VARCHAR(255)
+comment=position of the gene feature on the genomic accession, adjusted to be 1-based
+
+[orientation]
+index=12
+adj=Nullify('?')
+type=VARCHAR(255)
+comment= orientation of the gene feature on the genomic accession, '?' if not applicable
+
+[assembly]
+index=13
+adj=DiscardRecord('Reference GRCh37.p13 Primary Assembly', keepMatched=True)
+type=VARCHAR(255)
+comment= the name of the assembly '-' if not applicable
+
+[mature_peptide_accession_version]
+index=14
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= will be null (-) if absent 
+
+[mature_peptide_gi]
+index=15
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= the gi for a mature peptide accession, '-' if not applicable
+
+[Symbol]
+index=16
+adj=Nullify('-')
+type=VARCHAR(255)
+comment= the default symbol for the gene
+
+
+
