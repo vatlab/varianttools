@@ -216,57 +216,63 @@ class AnnoDBConfiger:
         # download from online? However, users might want to get the latest 
         # version from online, and if they want to use a local copy, they can always
         # use option --files.
-        tempFile = None
-        try:
-            if os.path.isfile(self.source_url):
-                if not self.source_url.lower().endswith('.zip'):
-                    return [self.source_url]
+        URLs = self.source_url.strip().split()
+        ret_files = []
+        for URL in URLs:
+            tempFile = None
+            try:
+                if os.path.isfile(URL):
+                    if not URL.lower().endswith('.zip'):
+                        ret_files.append(URL)
+                    else:
+                        tempFile = URL
+                elif os.path.isfile(os.path.join(self.path, URL)):
+                    if not URL.lower().endswith('.zip'):
+                        ret_files.append(os.path.join(self.path, URL))
+                    else:
+                        tempFile = os.path.join(self.path, URL)
+                elif URL.upper().startswith('SQL:'):
+                    res = urlparse.urlparse(URL)
+                    user = res.user
+                    password = res.password
+                    query = res.netloc
+                    db = DatabaseEngine()
+                    cur = db.cursor()
+                    res = db.execute(query)
+                    filename = os.path.join(env.cache_dir, '{}_sql.txt'.format(self.name))
+                    with open(filename, 'w') as output:
+                        for rec in res:
+                            output.write('{}\n'.format(','.join([str(x) for x in rec])))
+                    ret_files.append(filename)
                 else:
-                    tempFile = self.source_url
-            elif os.path.isfile(os.path.join(self.path, self.source_url)):
-                if not self.source_url.lower().endswith('.zip'):
-                    return os.path.join(self.path, self.source_url)
-                else:
-                    tempFile = os.path.join(self.path, self.source_url)
-            elif self.source_url.upper().startswith('SQL:'):
-                res = urlparse.urlparse(self.source_url)
-                user = res.user
-                password = res.password
-                query = res.netloc
-                db = DatabaseEngine()
-                cur = db.cursor()
-                res = db.execute(query)
-                filename = os.path.join(env.cache_dir, '{}_sql.txt'.format(self.name))
-                with open(filename, 'w') as output:
-                    for rec in res:
-                        output.write('{}\n'.format(','.join([str(x) for x in rec])))
-                return [filename]
+                    filename = os.path.split(URL)[-1]
+                    if not filename.strip():
+                        raise ValueError('No source_url is specified.')
+                    env.logger.info('Downloading {}'.format(filename))
+                    tempFile = downloadFile(URL, dest_dir=env.cache_dir)
+            except Exception as e:
+                raise ValueError('Failed to download database source from {}: {}'.format(URL, e))
+            #
+            if tempFile is None:
+                continue
+            if not os.path.isfile(tempFile):
+                raise ValueError('Could not find downloaded database source')
+            # regular file?
+            if tempFile.endswith('.zip'):
+                # if zip file?
+                bundle = zipfile.ZipFile(tempFile)
+                bundle.extractall(env.cache_dir)
+                ret_files.extend([os.path.join(env.cache_dir, name) for name in bundle.namelist()])
+            elif tempFile.endswith('.tar.gz') or tempFile.endswith('.tgz'):
+                with tarfile.open(tempFile, 'r:gz') as tfile:
+                    s = delayedAction(env.logger.info, 'Decompressing {}'.format(tempFile))
+                    names = tfile.getnames()
+                    tfile.extractall(env.cache_dir)
+                    del s
+                ret_files.extend([os.path.join(env.cache_dir, name) for name in names])
             else:
-                filename = os.path.split(self.source_url)[-1]
-                if not filename.strip():
-                    raise ValueError('No source_url is specified.')
-                env.logger.info('Downloading {}'.format(filename))
-                tempFile = downloadFile(self.source_url, dest_dir=env.cache_dir)
-        except Exception as e:
-            raise ValueError('Failed to download database source from {}: {}'.format(self.source_url, e))
-        #
-        if not os.path.isfile(tempFile):
-            raise ValueError('Could not find downloaded database source')
-        # regular file?
-        if tempFile.endswith('.zip'):
-            # if zip file?
-            bundle = zipfile.ZipFile(tempFile)
-            bundle.extractall(env.cache_dir)
-            return [os.path.join(env.cache_dir, name) for name in bundle.namelist()]
-        elif tempFile.endswith('.tar.gz') or tempFile.endswith('.tgz'):
-            with tarfile.open(tempFile, 'r:gz') as tfile:
-                s = delayedAction(env.logger.info, 'Decompressing {}'.format(tempFile))
-                names = tfile.getnames()
-                tfile.extractall(env.cache_dir)
-                del s
-            return [os.path.join(env.cache_dir, name) for name in names]
-        else:
-            return [tempFile]
+                ret_files.append(tempFile)
+        return ret_files
     
     def importTxtRecords(self, db, source_files):
         #
