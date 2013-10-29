@@ -390,6 +390,8 @@ class AnnoDBConfiger:
                     dbFile = decompressGzFile(dbFile, inplace=False)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
+                except RuntimeError as e:
+                    raise
                 except Exception as e:
                     env.logger.warning('Failed to download database or downloaded database unusable: {}'
                         .format(e))

@@ -337,8 +337,6 @@ class EmbeddedTextReader:
                             self.columnRange = self.processor.columnRange
                             first = False
                         self.num_records += 1
-                        # try to see if rec[1] can be translated to a proper integer
-                        int(rec[1])
                         if self.varIdx is not None:
                             var_key = (rec[0], rec[2], rec[3])
                             if self.getNew:
@@ -415,8 +413,6 @@ class ReaderWorker(Process):
                         if in_header:
                             continue
                     for bins,rec in self.processor.process(line):
-                        # try to see if rec[1] can be translated to a proper integer
-                        int(rec[1])
                         if first:
                             self.output.send(self.processor.columnRange)
                             first = False
@@ -1322,6 +1318,11 @@ class Importer:
 
     def addVariant(self, cur, rec):
         #
+        try:
+            # try to see if rec[1] can be translated to a proper integer
+            int(rec[1])
+        except:
+            return None
         if rec[4] == '-':
             self.count[5] += 1
         elif rec[3] == '-':
@@ -1436,6 +1437,8 @@ class Importer:
         fld_cols = None
         for self.count[0], bins, rec in reader.records():
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+            if variant_id is None:
+                continue
             if genotype_status == 2:
                 if fld_cols is None:
                     col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
@@ -1492,6 +1495,8 @@ class Importer:
         fld_cols = None
         for self.count[0], bins, rec in reader.records():
             variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
+            if variant_id is None:
+                continue
             if (last_count == 0 and self.count[0] > 200) or (self.count[0] - last_count > update_after):
                 self.db.commit()
                 last_count = self.count[0]
