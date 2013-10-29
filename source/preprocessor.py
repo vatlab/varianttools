@@ -462,16 +462,32 @@ class IgnoredRecord(Exception):
 class DiscardRecord:
     def __init__(self, val, keepMatched=False):
         self.val = val
-        if keepMatched:
-            if type(self.val) == str:
-                self.__call__ = self.discard_unmatched_single
+        if hasattr(self.val, '__call__'):
+            if keepMatched:
+                self.__call__ = self.discard_unmatched_eval
             else:
-                self.__call__ = self.discard_unmatched_multiple
+                self.__call__ = self.discard_matched_eval
         else:
-            if type(self.val) == str:
-                self.__call__ = self.discard_matched_single
+            if keepMatched:
+                if type(self.val) == str:
+                    self.__call__ = self.discard_unmatched_single
+                else:
+                    self.__call__ = self.discard_unmatched_multiple
             else:
-                self.__call__ = self.discard_matched_multiple
+                if type(self.val) == str:
+                    self.__call__ = self.discard_matched_single
+                else:
+                    self.__call__ = self.discard_matched_multiple
+
+    def discard_unmatched_eval(self, item):
+        if self.val.__call__(item) is not True:
+            raise IgnoredRecord()
+        return item
+
+    def discard_matched_eval(self, item):
+        if self.val.__call__(item) is True:
+            raise IgnoredRecord()
+        return item
 
     def discard_unmatched_single(self, item):
         if item != self.val:
@@ -517,6 +533,7 @@ class _DatabaseQuerier:
         else:
             self.cur.execute(self.query, item)
         res = self.cur.fetchall()
+        #env.logger.error('{} {}, {}'.format(self.query, item, res))
         if len(res) == 1:
             return res[0][0]
         elif len(res) > 1:
