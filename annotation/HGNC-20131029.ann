@@ -28,7 +28,7 @@ comment=HGNC Approved Symbol
 
 
 [All_Symbols]
-index=2,5
+index=2,7
 type=VARCHAR(255) COLLATE NOCASE
 adj=lambda x: tuple([x[0]] + [z.strip() for z in x[1].split(',')])
 comment=All symbols, including Approved and repvious symbols
