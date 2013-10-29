@@ -25,35 +25,39 @@ header=1
 
 [chr]
 index=7
-type=VARCHAR(255)
+type=VARCHAR(255) NOT NULL
 comment=chromosome name, the same as field chromosome
 
 [start]
-index=1,2
+index=2
 type=INT NOT NULL
-adj=FieldFromDB("EntrezGene2RefSeq.DB", 'start_position_on_the_genomic_accession', 'tax_id,GeneID')
+# get start loctions from the gene2refseq database
+adj=FieldFromDB("EntrezGene2RefSeq.DB", 'start_position_on_the_genomic_accession', 'GeneID')
 comment=Start location of the gene, retrieved from EntrezGene2RefSeq.
 
 [end]
-index=1,2
+index=2
 type=INT NOT NULL
-adj=FieldFromDB("EntrezGene2RefSeq.DB", 'end_position_on_the_genomic_accession', 'tax_id,GeneID')
+# get end loctions from the gene2refseq database, this will repeat the record for each
+# isoform of the gene
+adj=FieldFromDB("EntrezGene2RefSeq.DB", 'end_position_on_the_genomic_accession', 'GeneID')
 comment=End location of the gene, retrieved from EntrezGene2RefSeq.
-
 
 [tax_id]
 index=1
+adj=DiscardRecord('9606', keepMatched=True)
 type=VARCHAR(255)
 comment=the unique identifier provided by NCBI Taxonomy for the species or strain/isolate
 
 [GeneID]
 index=2
-type=INT
+type=INT NOT NULL
 comment=the unique identifier for a gene (ASN1: geneid)
 
 [Symbol]
 index=3
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=the default symbol for the gene (ASN1: gene->locus)
 
 [LocusTag]
@@ -65,11 +69,13 @@ comment=the LocusTag value (ASN1:  gene->locus-tag)
 [Synonyms]
 index=5
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=bar-delimited set of unofficial symbols for the gene
 
 [dbXrefs]
 index=6
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=bar-delimited set of identifiers in other databases for this gene.  The unit of the set is database:value.
 
 [chromosome]
@@ -80,16 +86,19 @@ comment=the chromosome on which this gene is placed. for mitochondrial genomes, 
 [map_location]
 index=8
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=the map location for this gene
 
 [description]
 index=9
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=a descriptive name for this gene
 
 [type_of_gene]
 index=10
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=the type assigned to the gene according to the list of options. provided in http://www.ncbi.nlm.nih.gov/IEB/ToolBox/CPP_DOC/lxr/source/src/objects/entrezgene/entrezgene.asn
 
 [Symbol_from_nomenclature_authority]
@@ -113,11 +122,13 @@ comment=If exists (not NULL), indicates the status of the name from the nomencla
 [Other_designations]
 index=14
 type=VARCHAR(255)
+adj=Nullify('-')
 comment=pipe-delimited set of some alternate descriptions that have been assigned to a GeneID '-' indicates none is being reported.
 
 [Modification_date]
 index=15
-type=VARCHAR(255)
+type=VARCHAR(10)
+adj=Nullify('-')
 comment=the last date a gene record was updated, in YYYYMMDD format
 
 

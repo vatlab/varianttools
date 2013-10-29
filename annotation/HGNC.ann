@@ -1,0 +1,253 @@
+# Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+#
+
+[linked fields]
+*=All_Symbols
+
+[data sources]
+description=The HUGO Gene Nomenclature Committee (HGNC) has assigned unique gene symbols
+	and names to almost 38,000 human loci, of which around 19,000 are protein coding. 
+	genenames.org is a curated online repository of HGNC-approved gene nomenclature and 
+	associated resources including links to genomic, proteomic and phenotypic information,
+	as well as dedicated gene family pages
+version=20131029
+anno_type=field
+encoding=ISO-8859-1
+source_url=ftp://ftp.ebi.ac.uk/pub/databases/genenames/hgnc_complete_set.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/HGNC_gene-20131029.DB.gz
+source_type=txt
+
+[name]
+index=2
+type=VARCHAR(255)  COLLATE NOCASE
+comment=HGNC Approved Symbol
+
+
+[All_Symbols]
+index=2,5
+type=VARCHAR(255) COLLATE NOCASE
+adj=lambda x: tuple([x[0]] + [z.strip() for z in x[1].split(',')])
+comment=All symbols, including Approved and repvious symbols
+
+[HGNC_ID]
+index=1
+type=INT NOT NULL
+adj=RemoveLeading('HGNC:')
+comment=A unique ID provided by the HGNC. In the HTML results page this ID links to the HGNC Symbol Report for that gene.
+
+[Approved_Symbol]
+index=2
+type=VARCHAR(255)  COLLATE NOCASE
+comment=The official gene symbol that has been approved by the HGNC and is publicly available. Symbols are approved based on specific HGNC nomenclature guidelines. In the HTML results page this ID links to the HGNC Symbol Report for that gene.
+
+[Approved_Name]
+index=3
+type=VARCHAR(255)
+adj=Nullify('.')
+comment=The official gene name that has been approved by the HGNC and is publicly available. Names are approved based on specific HGNC nomenclature guidelines.
+
+[Status]
+index=4
+type=VARCHAR(50)  COLLATE NOCASE
+adj=Nullify('.')
+comment=Indicates whether the gene is classified as:
+    Approved - these genes have HGNC-approved gene symbols
+    Entry withdrawn - these previously approved genes are no longer thought to exist
+    Symbol withdrawn - a previously approved record that has since been merged into a another record
+
+[Locus_Type]
+index=5
+type=VARCHAR(100) 
+comment=Specifies the type of locus described by the given entry: gene with protein product, RNA, cluster, etc (http://www.genenames.org/data/gdlw_columndef.html#gd_app_sym)
+
+[Locus_Group]
+index=6
+type=VARCHAR(255)
+comment=Groups locus types together into related sets. See http://www.genenames.org/data/gdlw_columndef.html#gd_app_sym for details.
+
+[Previous_Symbols]
+index=7
+type=VARCHAR(255) 
+comment=Symbols previously approved by the HGNC for this gene
+
+
+[Previous_Names]
+index=8
+type=VARCHAR(255)
+comment=Gene names previously approved by the HGNC for this gene
+
+[Synonyms]
+index=9
+type=VARCHAR(255) 
+adj=Nullify('.')
+comment=Other symbols used to refer to this gene
+
+[Name_Synonyms]
+index=10
+type=VARCHAR(255)
+adj=Nullify('.')
+comment=Other names used to refer to this gene
+
+[Chromosome]
+index=11
+type=VARCHAR(255)
+adj=Nullify('.')
+comment= Indicates the location of the gene or region on the chromosome
+
+[Date_Approved]
+index=12
+type=VARCHAR(255)
+comment=
+
+[Date_Modified]
+index=13
+type=VARCHAR(255)
+comment=
+
+[Date_Symbol_Changed]
+index=14
+type=VARCHAR(255)
+comment=
+
+[Date_Name_Changed]
+index=15
+type=VARCHAR(255)
+comment=
+
+[Accession_Numbers]
+index=16
+type=VARCHAR(255)
+comment=
+
+[Enzyme_IDs]
+index=17
+type=VARCHAR(255)
+comment=
+
+[Entrez_Gene_ID]
+index=18
+type=VARCHAR(255)
+comment=
+
+[Ensembl_Gene_ID]
+index=19
+type=VARCHAR(255)
+comment=
+
+[Mouse_Genome_Database_ID]
+index=20
+type=VARCHAR(255)
+comment=
+
+[Specialist_Database_Links]
+index=21
+type=VARCHAR(255)
+comment=
+
+[Specialist_Database_IDs]
+index=22
+type=VARCHAR(255)
+comment=
+
+[Pubmed_IDs]
+index=23
+type=VARCHAR(255)
+comment=
+
+[RefSeq_IDs]
+index=24
+type=VARCHAR(255)
+comment=
+index=10
+type=VARCHAR(255)
+comment=The Reference Sequence (RefSeq) identifier for that entry, provided by the NCBI. As we do not aim to
+    curate all variants of a gene only one selected RefSeq is displayed per gene report. RefSeq aims to provide
+	a comprehensive, integrated, non-redundant set of sequences, including genomic DNA, transcript (RNA),
+	and protein products. RefSeq identifiers are designed to provide a stable reference for gene identification
+	and characterization, mutation analysis, expression studies, polymorphism discovery, and comparative
+	analyses.
+
+[Gene_Family_Tag]
+index=25
+type=VARCHAR(255)
+comment=
+
+[Gene_family_description]
+index=26
+type=VARCHAR(255)
+comment=
+
+[Record_Type]
+index=27
+type=VARCHAR(255)
+comment=
+
+[Primary_IDs]
+index=28
+type=VARCHAR(255)
+comment=
+
+[Secondary_IDs]
+index=29
+type=VARCHAR(255)
+comment=
+
+[CCDS_IDs]
+index=30
+type=VARCHAR(255)
+comment=
+
+[VEGA_IDs]
+index=31
+type=VARCHAR(255)
+comment=
+
+[Locus_Specific_Databases]
+index=32
+type=VARCHAR(255)
+comment=
+
+[Entrez_Gene_ID_NCBI]
+index=33
+type=VARCHAR(255)
+comment=
+
+[OMIM_ID_NCBI]
+index=34
+type=VARCHAR(255)
+comment=
+
+[RefSeq_NCBI]
+index=35
+type=VARCHAR(255)
+comment=
+
+[UniProt_ID_UniProt]
+index=36
+type=VARCHAR(255)
+comment=
+
+[Ensembl_ID_Ensembl]
+index=37
+type=VARCHAR(255)
+comment=
+
+[UCSC_ID_UCSC]
+index=38
+type=VARCHAR(255)
+comment=
+
+[Mouse_Genome_Database_ID_MGI]
+index=39
+type=VARCHAR(255)
+comment=
+
+[Rat_Genome_Database_ID_RGD]
+index=40
+type=VARCHAR(255)
+comment=
+
