@@ -9,10 +9,11 @@
 
 [data sources]
 description=Cosmic mutant export.  This data contains all coding point mutations.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://www.sanger.ac.uk/cosmic.  Bamford et al (2004). The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358.
-version=v67_241013.ann
+version=v67_241013
 anno_type=field
 delimiter='\t'
 source_url=ftp://ftp.sanger.ac.uk/pub/CGP/cosmic/data_export/CosmicMutantExport_v67_241013.tsv.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/CosmicMutantExport-v67_241013.DB.gz
 source_type=txt
 source_pattern=
 
