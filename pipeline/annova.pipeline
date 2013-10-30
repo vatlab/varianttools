@@ -1,0 +1,94 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=Pipeline to call ANNOVAR and import results as variant info
+  fields.
+
+geneanno_description=This pipeline export variants in specified variant
+  table (parameter --var_table, default to variant), run ANNOVAR's gene-based
+  annotation (annotate_variantion.pl --geneanno), and import specified fields
+  from output of ANNOVAR. Four fields (two for all variants and two for exonic
+  variants) are created unless you disable some of them using parameter 
+  --variant_info and --exonic_info. No input or output file is required, but a
+  snapshot could be specified, in which case the snapshot will be loaded 
+  (and overwrite the present project). 
+
+
+[DEFAULT]
+
+var_table=variant
+var_table_comment=Variant table for the variants to be analyzed.
+
+annovar=annotate_variation.pl
+annovar_comment=Full path to ANNOVAR annotate_variation.pl, if the script is
+  not in the default $PATH.
+
+humandb=humandb/
+humandb_comment=Full path to ANNOVAR humandb/ directory, if the db is not
+  in the same directory of ANNOVAR.
+
+dbtype=refGene
+dbthpe_comment=--dbtype parameter that will be passed to annotate_variation.pl --dbtype.
+  The default value if refGene, but you can also use knownGene, ensGene.
+
+variant_info=region_type, region_name
+variant_info_comment=Fields to import from the first two columns of .variant_function 
+    output of ANNOVAR. 
+
+exonic_info=mut_type, function
+exonic_info_comment=Fields to import from the .exonic_variant_function output of ANNOVAR. It
+    has to be zero, one or more of mut_type and function.
+
+[geneanno_0]
+input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
+input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
+action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
+comment=Load specified snapshot if a snapshot is specified. Otherwise use the
+  existing project.
+
+[geneanno_10]
+action=CheckCommands('%(annovar)s')
+comment=Check the existence of ANNOVAR's annotate_variation.pl command, and the sqlite3 command
+
+[geneanno_11]
+action=CheckDirs('%(humandb)s', msg='Please use option --humandb to specify its location.')
+comment=Check the existence of ANNOVAR's humandb/ directory.
+
+[geneanno_13]
+action=RunCommand('''vtools execute "select value from project where name='build'" > ${CACHE_DIR}/annovar_build.info''',
+    output='${CACHE_DIR}/annovar_build.info')
+comment=Check the build of the reference genome of the project.
+
+[geneanno_14]
+action=RunCommand('%(annovar)s  --buildver ${CACHE_DIR: open(CACHE_DIR + "/annovar_build.info").read().strip()}  -downdb %(dbtype)s %(humandb)s',
+    output=['%(humandb)s/${CACHE_DIR: open(CACHE_DIR + "/annovar_build.info").read().strip()}_%(dbtype)s.txt',
+        '%(humandb)s/${CACHE_DIR: open(CACHE_DIR + "/annovar_build.info").read().strip()}_%(dbtype)sMrna.fa'])
+comment=Download gene database
+
+[geneanno_20]
+action=RunCommand('vtools export %(var_table)s --format ANNOVAR --output ${CACHE_DIR}/annovar_input',
+    output='${CACHE_DIR}/annovar_input')
+comment=Export variants in ANNOVAR format
+
+[geneanno_30]
+action=RunCommand('%(annovar)s --geneanno --dbtype %(dbtype)s --buildver ${CACHE_DIR: open(CACHE_DIR + "/annovar_build.info").read().strip()} ${INPUT} %(humandb)s',
+    output=['${INPUT}.variant_function', '${INPUT}.exonic_variant_function'])
+comment=Execute ANNOVAR annotate_variation.pl --geneanno
+
+[geneanno_40]
+input=${OUTPUT30: OUTPUT30[0]}
+# execute this step if option --variant_info is not empty
+input_emitter=EmitInput(select=${:"%(variant_info)s".strip() != ''})
+action=RunCommand('vtools update %(var_table)s --from_file ${INPUT} --format ANNOVAR_variant_function --var_info %(variant_info)s')
+comment=Importing results from ANNOVAR output .variant_function if --variant_info is specified
+
+[geneanno_50]
+input=${OUTPUT30: OUTPUT30[1]}
+# execute this step if option --variant_info is not empty
+input_emitter=EmitInput(select=${:"%(exonic_info)s".strip() != ''})
+action=RunCommand('vtools update %(var_table)s --from_file ${INPUT} --format ANNOVAR_exonic_variant_function --var_info %(exonic_info)s')
+comment=Importing results from ANNOVAR output .exonic_variant_function if --exonic_info is specified
