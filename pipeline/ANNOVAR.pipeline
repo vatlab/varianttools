@@ -32,7 +32,7 @@ humandb_comment=Full path to ANNOVAR humandb/ directory, if the db is not
   in the same directory of ANNOVAR.
 
 dbtype=refGene
-dbthpe_comment=--dbtype parameter that will be passed to annotate_variation.pl --dbtype.
+dbtype_comment=--dbtype parameter that will be passed to annotate_variation.pl --dbtype.
   The default value if refGene, but you can also use knownGene, ensGene.
 
 variant_info=region_type, region_name
