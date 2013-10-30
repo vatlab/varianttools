@@ -215,7 +215,6 @@ class SequentialActions:
         # return the output of the last action
         return ifiles
 
-
 class CheckCommands:
     '''Check the existence of specified commands and raise an error if one of
     the commands does not exist.'''
@@ -324,18 +323,37 @@ class CheckOutput:
 class CheckFiles:
     '''Check the existence of specified files and raise an
     error if one of the files does not exist.'''
-    def __init__(self, files):
+    def __init__(self, files, msg=''):
         if type(files) == str:
             self.files = [files]
         else:
             self.files = files
+        self.msg = msg
 
     def __call__(self, ifiles):
         for f in self.files:
             if os.path.isfile(f):
                 env.logger.info('{} is located.'.format(f))
             else:
-                raise RuntimeError('Cannot locate {}.'.format(f))
+                raise RuntimeError('Cannot locate {}. {}'.format(f, self.msg))
+        return ifiles
+
+class CheckDirs:
+    '''Check the existence of specified directories and raise an
+    error if one of the directories does not exist.'''
+    def __init__(self, dirs, msg=''):
+        if type(dirs) == str:
+            self.dirs = [dirs]
+        else:
+            self.dirs = dirs
+        self.msg = msg
+
+    def __call__(self, ifiles):
+        for d in self.dirs:
+            if os.path.isdir(d):
+                env.logger.info('Directory {} is located.'.format(d))
+            else:
+                raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.msg))
         return ifiles
 
 

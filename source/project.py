@@ -2004,8 +2004,8 @@ class Project:
         info =  'Project name:                {}\n'.format(self.name)
         if self.creation_date:
             info +=  'Created on:                  {}\n'.format(self.creation_date)
-        info += 'Primary reference genome:    {}\n'.format(self.build)
-        info += 'Secondary reference genome:  {}\n'.format(self.alt_build)
+        info += 'Primary reference genome:    {}\n'.format('' if self.build is None else self.build)
+        info += 'Secondary reference genome:  {}\n'.format('' if self.alt_build is None else self.alt_build)
         #
         # list all runtime options as (name, val) pairs
         opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options]
