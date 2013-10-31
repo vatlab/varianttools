@@ -39,19 +39,19 @@ action=CheckCommands('%(java)s')
 comment=Check the existence of command java
 
 [eff_11]
+action=CheckOutput('%(java)s -jar %(snpEff_path)s/snpEff.jar -h', 'snpEff version SnpEff', True)
+comment=Check if snpEff is installed and executable
+
+[eff_12]
 action=RunCommand('cat %(snpEff_path)s/snpEff.config | grep "data_dir =" | cut -d= -f2 > ${CACHE_DIR}/snpEff.data_dir',
     output='${CACHE_DIR}/snpEff.data_dir')
-comment=Check the version of snpEff, and the data storage location in snpEff.config file.
-
-[eff_13]
-action=RunCommand('''vtools execute "select value from project where name='build'" > ${CACHE_DIR}/proj.build_info''',
-    output='${CACHE_DIR}/proj.build_info')
-comment=Check the build of the reference genome of the project.
+DATA_DIR=${CACHE_DIR: open(CACHE_DIR + "/snpEff.data_dir").read().strip()}
+comment=Check the data storage location in snpEff.config file.
 
 [eff_14]
 action=RunCommand('%(java)s -jar %(snpEff_path)s/snpEff.jar download -c %(snpEff_path)s/snpEff.config'
-    ' -v ${CACHE_DIR: open(CACHE_DIR + "/proj.build_info").read().strip()}',
-    output='${CACHE_DIR: open(CACHE_DIR + "/snpEff.data_dir").read().strip() + "/" + open(CACHE_DIR + "/proj.build_info").read().strip() + "/snpEffectPredictor.bin"}')
+    ' -v ${REF_GENOME_BUILD}',
+    output='${DATA_DIR,REF_GENOME_BUILD: DATA_DIR + "/" + REF_GENOME_BUILD + "/snpEffectPredictor.bin"}')
 comment=Download reference database for the project reference genome
  
 [eff_20]
@@ -61,7 +61,7 @@ comment=Export variants in VCF format
  
 [eff_30]
 action=RunCommand('%(java)s -jar %(opt_java)s %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config 
-    -v ${CACHE_DIR: open(CACHE_DIR + "/proj.build_info").read().strip()} ${INPUT} 
+    -v ${REF_GENOME_BUILD} ${INPUT} 
     > ${CACHE_DIR: CACHE_DIR + "/snpEff_output.vcf"}',
     output="${CACHE_DIR}/snpEff_output.vcf")
 comment=Execute snpEff eff to annotate variants
