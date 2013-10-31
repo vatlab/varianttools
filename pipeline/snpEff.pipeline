@@ -23,8 +23,8 @@ opt_java=-Xmx4g -XX:-UseGCOverheadLimit
 opt_java_comment=Option to java program. -Djava.io.tmpdir is frequently used to set java
 	temporary directory if system temporary partition is not big enough.
 
-snpeff_path=./
-snpEff_comment=Path to directory that contains snpEff.jar.
+snpEff_path=./
+snpEff_path_comment=Path to directory that contains snpEff.jar.
 
 
 [eff_0]
