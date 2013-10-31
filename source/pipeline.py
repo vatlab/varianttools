@@ -715,9 +715,9 @@ class RunCommand:
         self.working_dir = working_dir
         self.locking = locking
         if type(output) == str:
-            self.output = [output]
+            self.output = [os.path.expanduser(output)]
         else:
-            self.output = output
+            self.output = [os.path.expanduser(x) for x in output]
         #
         for filename in self.output:
             if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
