@@ -475,6 +475,12 @@ adj=ExtractFlag('STR', ';')
 fmt=FlagFormatter('STR')
 comment=Variant is a short tandem repeat
 
+[EFF]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';')
+fmt=InfoFormatter('EFF')
+comment=Variant effect annotation provided by snpEff
 
 [DP_geno]
 # Passing 'GT:DP\t0/0:64'
