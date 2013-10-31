@@ -1,0 +1,68 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=A pipeline to call snpEff to annotate variants.
+
+eff_description=This pipeline export variants in VCF format, call snpEff
+  to annotate it, and import the EFF info as an information field. This pipeline
+  will automatically download appropriate snpEff database (e.g. CRCh37.66).
+
+
+[DEFAULT]
+
+var_table=variant
+var_table_comment=Variant table for the variants to be analyzed.
+
+java=java
+java_comment=path to java. Default to 'java' (use $PATH to determine actual path)
+
+snpeff_path=./
+snpEff_comment=Path to directory that contains snpEff.jar.
+
+
+[eff_0]
+input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
+input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
+action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
+comment=Load specified snapshot if a snapshot is specified. Otherwise use the
+  existing project.
+
+[eff_10]
+action=CheckCommands('%(java)s')
+comment=Check the existence of command java
+
+[eff_11]
+action=RunCommand('cat %(snpEff_path)s/snpEff.config | grep "data_dir =" | cut -d= -f2 > ${CACHE_DIR}/snpEff.data_dir',
+    output='${CACHE_DIR}/snpEff.data_dir')
+comment=Check the version of snpEff, and the data storage location in snpEff.config file.
+
+[eff_13]
+action=RunCommand('''vtools execute "select value from project where name='build'" > ${CACHE_DIR}/proj.build_info''',
+    output='${CACHE_DIR}/proj.build_info')
+comment=Check the build of the reference genome of the project.
+
+[eff_14]
+action=RunCommand('%(java)s -jar %(snpEff_path)s/snpEff.jar download -c %(snpEff_path)s/snpEff.config'
+    ' -v ${CACHE_DIR: open(CACHE_DIR + "/proj.build_info").read().strip()}',
+    output='${CACHE_DIR: open(CACHE_DIR + "/snpEff.data_dir").read().strip() + "/" + open(CACHE_DIR + "/proj.build_info").read().strip() + "/snpEffectPredictor.bin"}')
+comment=Download reference database for the project reference genome
+ 
+[eff_20]
+action=RunCommand('vtools export %(var_table)s --format vcf --output ${CACHE_DIR}/snpEff_input.vcf',
+    output='${CACHE_DIR}/snpEff_input.vcf')
+comment=Export variants in VCF format
+ 
+[eff_30]
+action=RunCommand('%(java)s -jar %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config 
+    -v ${CACHE_DIR: open(CACHE_DIR + "/proj.build_info").read().strip()} ${INPUT} 
+    > ${CACHE_DIR: CACHE_DIR + "/snpEff_output.vcf"}',
+    output="${CACHE_DIR}/snpEff_output.vcf")
+comment=Execute snpEff eff to annotate variants
+
+[eff_40]
+action=RunCommand('vtools update %(var_table)s --from_file ${INPUT} --var_info EFF')
+comment=Importing results from snpEff
