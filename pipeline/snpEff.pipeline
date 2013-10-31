@@ -9,16 +9,19 @@ description=A pipeline to call snpEff to annotate variants.
 
 eff_description=This pipeline export variants in VCF format, call snpEff
   to annotate it, and import the EFF info as an information field. This pipeline
-  will automatically download appropriate snpEff database (e.g. CRCh37.66).
+  will automatically download appropriate snpEff database (e.g. hg19).
 
 
 [DEFAULT]
-
 var_table=variant
 var_table_comment=Variant table for the variants to be analyzed.
 
 java=java
 java_comment=path to java. Default to 'java' (use $PATH to determine actual path)
+
+opt_java=-Xmx4g -XX:-UseGCOverheadLimit
+opt_java_comment=Option to java program. -Djava.io.tmpdir is frequently used to set java
+	temporary directory if system temporary partition is not big enough.
 
 snpeff_path=./
 snpEff_comment=Path to directory that contains snpEff.jar.
@@ -57,7 +60,7 @@ action=RunCommand('vtools export %(var_table)s --format vcf --output ${CACHE_DIR
 comment=Export variants in VCF format
  
 [eff_30]
-action=RunCommand('%(java)s -jar %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config 
+action=RunCommand('%(java)s -jar %(opt_java)s %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config 
     -v ${CACHE_DIR: open(CACHE_DIR + "/proj.build_info").read().strip()} ${INPUT} 
     > ${CACHE_DIR: CACHE_DIR + "/snpEff_output.vcf"}',
     output="${CACHE_DIR}/snpEff_output.vcf")
