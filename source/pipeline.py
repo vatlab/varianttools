@@ -1085,7 +1085,8 @@ class DownloadResource:
  
 
 class Pipeline:
-    def __init__(self, name, extra_args=[]):
+    def __init__(self, proj, name, extra_args=[]):
+        self.proj = proj
         self.pipeline = PipelineDescription(name, extra_args)
 
     def var_expr(self, var):
@@ -1189,6 +1190,8 @@ class Pipeline:
             'temp_dir': env.temp_dir,
             'cache_dir': env.cache_dir,
             'local_resource': env.local_resource,
+            'ref_genome_build': self.proj.build if self.proj.build else '',
+            'vtools_version': self.proj.version,
         }
         for key, val in self.pipeline.pipeline_vars.items():
             VARS[key.lower()] = self.substitute(val, VARS)
@@ -1338,7 +1341,7 @@ def execute(args):
                     print(sep.join(['{}'.format(x) for x in rec]))
             #
             def executePipeline():                
-                pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
+                pipeline = Pipeline(proj, args.pipeline[0], extra_args=args.unknown_args)
                 # unspecified
                 if len(args.pipeline) == 1:
                     pipeline.execute(None, args.input, args.output,
