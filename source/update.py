@@ -551,7 +551,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     #
     IDs = None
     if samples:
-        IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
+        IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in samples]))
         if len(IDs) == 0:
             env.logger.info('No sample is selected (or available)')
             return
