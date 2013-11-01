@@ -2203,8 +2203,8 @@ class Project:
                         table=table, # need to join table with another table
                         link='{}.variant_id = {}.variant_id'.format(variant_table, table))]
             # Annotation database
-            if table.lower() in [x.name.lower() for x in self.annoDB]:
-                db = [x for x in self.annoDB if x.name.lower() == table][0]
+            if table.lower() in [x.linked_name.lower() for x in self.annoDB]:
+                db = [x for x in self.annoDB if x.linked_name.lower() == table][0]
                 if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
@@ -2227,18 +2227,18 @@ class Project:
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
-                        binningTable = '__rng_' + table + '_' + encodeTableName('_'.join([self.build] + db.build))
+                        binningTable = '__rng_' + db.name + '_' + encodeTableName('_'.join([self.build] + db.build))
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr '
-                                'AND variant.pos >= {0}.start AND variant.pos <= {0}.end '
-                                    .format(binningTable, table)),
+                            link= 'variant.bin = {0}.{1}.bin AND variant.chr = {0}.{1}.chr '
+                                'AND variant.pos >= {0}.{1}.start AND variant.pos <= {0}.{1}.end '
+                                    .format(table, binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
-                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))
+                            table= '{0}.{1} {0}'.format(table, db.name),
+                            link= '{0}.rowid = {0}.{1}.range_id'.format(table, binningTable))
                             ]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
