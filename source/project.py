@@ -2216,14 +2216,14 @@ class Project:
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
                                 .format(table, self.build, db.build[0], db.build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos, alt and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
@@ -2247,14 +2247,14 @@ class Project:
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3}'\
                                 .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
@@ -2263,14 +2263,14 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.alt_bin = {0}.bin AND variant.alt_chr = {0}.chr '
-                                'AND variant.alt_pos >= {0}.start AND variant.alt_pos <= {0}.end '
-                                    .format(binningTable, table)),
+                            link= 'variant.alt_bin = {0}.{1}.bin AND variant.alt_chr = {0}.{1}.chr '
+                                'AND variant.alt_pos >= {0}.{1}.start AND variant.alt_pos <= {0}.{1}.end '
+                                    .format(table, binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             # FIXME: how to use bin here?
-                            link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
+                            link= '{0}.rowid = {0}.{1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
             raise ValueError('Failed to locate field {}'.format(field))
@@ -2316,7 +2316,7 @@ class Project:
         # annotation database?
         for db in self.annoDB:
             if field.lower() in [x.name.lower() for x in db.fields]:
-                table = db.name
+                table = db.linked_name
                 if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
@@ -2328,14 +2328,14 @@ class Project:
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3}'\
                                 .format(table, self.build, db.build[0], db.build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND variant.alt = {0}.{5}'\
                                     .format(table, self.build, db.build[0], db.build[1], db.build[2], db.build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
@@ -2344,12 +2344,12 @@ class Project:
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
                             table= '{}.{}'.format(table, binningTable),
-                            link= 'variant.bin = {0}.bin AND variant.chr = {0}.chr '
-                                'AND variant.pos >= {0}.start AND variant.pos <= {0}.end '
-                                    .format(binningTable, table)),
+                            link= 'variant.bin = {0}.{1}.bin AND variant.chr = {0}.{1}.chr '
+                                'AND variant.pos >= {0}.{1}.start AND variant.pos <= {0}.{1}.end '
+                                    .format(table, binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))
@@ -2358,14 +2358,14 @@ class Project:
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.alt_chr = {0}.{2} AND variant.alt_pos = {0}.{3}'\
                                 .format(table, self.alt_build, db.alt_build[0], db.alt_build[1]))]
                     elif db.anno_type == 'variant':  # chr, pos and alt
                         return self.linkFieldToTable('{}.variant_id'.format(variant_table), 'variant') + [
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= 'variant.alt_bin = {0}.{1}_bin AND variant.chr = {0}.{2} AND variant.pos = {0}.{3} AND variant.ref = {0}.{4} AND alt = {0}.{5}'\
                                     .format(table, self.alt_build, db.alt_build[0], db.alt_build[1], db.alt_build[2], db.alt_build[3]))]
                     elif db.anno_type == 'range':  # chr, start, and end
@@ -2379,7 +2379,7 @@ class Project:
                                     .format(binningTable, table)),
                             FieldConnection(
                             field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= '{0}.rowid = {1}.range_id'.format(table, binningTable))]
                     else:
                         raise ValueError('Unsupported annotation type {}'.format(db.anno_type))

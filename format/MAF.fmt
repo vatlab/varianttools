@@ -199,24 +199,23 @@ type=VARCHAR(255)
 comment=BCR aliquot UUID for matched normal	567e8487-e29b-32d4-a716-446655443246
 
 
-
-
 [col_1]
 # Hugo_Symbol
-field=
+field=HGNC.name
 comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown". 
 
 [col_2]
-field=
+field=HGNC.Entrez_Gene_ID
 comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0". 
 
 [col_3]
 field=
-comment=Genome sequencing center reporting the variant. Set to "variant tools exported"
+adj=Constant("exported")
+comment=Genome sequencing center reporting the variant. Set to "exported"
 
 [col_4]
 field=
-adj=Constant("-")
+adj=Constant("hg19")
 comment=Any TGCA accepted genome identifier.  Can be string, integer or a float.
 
 [col_5]
@@ -228,7 +227,7 @@ field=pos
 comment=Lowest numeric position of the reported variant on the genomic reference sequence. Mutation start coordinate (1-based coordinate system).
 
 [col_7]
-field=pos
+field=pos + length(alt) - 1
 comment=Highest numeric genomic position of the reported variant on the genomic reference sequence. Mutation end coordinate (inclusive, 1-based coordinate system).
 
 [col_8]
@@ -239,7 +238,7 @@ comment=Genomic strand of the reported allele. Variants should always be reporte
 [col_9]
 field=
 adj=Constant("-")
-comment= Translational effect of variant allele. Can be Frame_Shift_Del, Frame_Shift_Ins, In_Frame_Del, In_Frame_Ins, Missense_Mutation, Nonsense_Mutation, Silent, Splice_Site, Translation_Start_Site, Nonstop_Mutation, 3'UTR, 3'Flank, 5'UTR, 5'Flank, IGR1 , Intron, RNA, Targeted_Region
+comment=Translational effect of variant allele. Can be Frame_Shift_Del, Frame_Shift_Ins, In_Frame_Del, In_Frame_Ins, Missense_Mutation, Nonsense_Mutation, Silent, Splice_Site, Translation_Start_Site, Nonstop_Mutation, 3'UTR, 3'Flank, 5'UTR, 5'Flank, IGR1 , Intron, RNA, Targeted_Region
 
 [col_10]
 field=
