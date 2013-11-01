@@ -79,8 +79,9 @@ class AnnoDB:
     The annotation.py module is responsible of creating this structure from
     various sources.
     '''
-    def __init__(self, proj, annoDB, linked_by=[], anno_type=None, linked_fields=None):
-        env.logger.debug('Loading annotation database {}'.format(annoDB))
+    def __init__(self, proj, annoDB, linked_by=[], anno_type=None, linked_fields=None, linked_name=None):
+        env.logger.debug('Loading annotation database {}{}'
+            .format(annoDB, ' as {}'.format(linked_name) if linked_name else ''))
         self.db = proj.db.newConnection()
         if self.db.hasDatabase(annoDB):
             self.db.connect(annoDB)
@@ -115,6 +116,7 @@ class AnnoDB:
             raise ValueError('Annotation database {} does not provide any field.'.format(annoDB))
         #
         self.anno_type = 'variant'
+        #
         self.linked_by = []
         for f in linked_by:
             try:
@@ -126,6 +128,10 @@ class AnnoDB:
         self.build = None
         self.alt_build = None
         self.version = None
+        if linked_name is None:
+            self.linked_name = self.name
+        else:
+            self.linked_name = linked_name
         cur.execute('SELECT * from {}_info;'.format(self.name))
         for rec in cur:
             if rec[0] == 'description':
@@ -1167,16 +1173,26 @@ class Project:
         self.creation_date = self.loadProperty('creation_date', '')
         self.annoDB = []
         for db in eval(self.loadProperty('annoDB', '[]').replace('${local_resource}', env._local_resource)):
+            # the case with alternative name
             try:
-                # remove path, remove version string, and suffix
-                db_name = os.path.split(db)[-1].split('-')[0]
-                if db_name.endswith('.DB'):
-                    db_name = db_name[:-3]
-                linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
-                anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
-                linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
-                self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
-                self.db.attach(db)
+                if type(db) == tuple:
+                    # remove path, remove version string, and suffix
+                    db_name = db[1]
+                    linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
+                    anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
+                    linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
+                    self.db.attach(db[0], db_name)
+                    self.annoDB.append(AnnoDB(self, db[0], linked_by, anno_type, linked_fields, db_name))
+                else:
+                    # remove path, remove version string, and suffix
+                    db_name = os.path.split(db)[-1].split('-')[0]
+                    if db_name.endswith('.DB'):
+                        db_name = db_name[:-3]
+                    linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
+                    anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
+                    linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
+                    self.db.attach(db)
+                    self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
             except Exception as e:
                 env.logger.warning('Cannot open annotation database {}: {}'.format(db, e))
         #
@@ -1304,21 +1320,23 @@ class Project:
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
         # DBs in different paths but with the same name are considered to be the same.
-        env.logger.info('Using annotation DB {} in project {}.'.format(db.name, self.name))
+        env.logger.info('Using annotation DB {} as {} in project {}.'
+            .format(db.name, db.linked_name, self.name))
         env.logger.info(db.description)
-        if db.name not in [x.name for x in self.annoDB]:
+        if db.linked_name not in [x.linked_name for x in self.annoDB]:
             self.annoDB.append(db)
         # if db.name is in the list, put it to the end because it is the last
         # one to be used, and might reply on some other db
         else:
-            i = [x.name for x in self.annoDB].index(db.name)
+            #env.logger.warning('Reusing annotation database {} as {}'.format(db.name, db.linked_name))
+            i = [x.linked_name for x in self.annoDB].index(db.linked_name)
             self.annoDB.append(db)
             self.annoDB.pop(i)
-        self.saveProperty('annoDB', str([os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}') for x in self.annoDB]))
+        self.saveProperty('annoDB', str([(os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}'), x.linked_name) for x in self.annoDB]))
         # an annotation database might be re-used with a different linked_field
-        self.saveProperty('{}_linked_by'.format(db.name), str(db.linked_by))
-        self.saveProperty('{}_anno_type'.format(db.name), str(db.anno_type))
-        self.saveProperty('{}_linked_fields'.format(db.name), str(db.build))
+        self.saveProperty('{}_linked_by'.format(db.linked_name), str(db.linked_by))
+        self.saveProperty('{}_anno_type'.format(db.linked_name), str(db.anno_type))
+        self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.build))
         # 
         # if a field database, connect and check 
         if db.linked_by:
@@ -2015,8 +2033,9 @@ class Project:
         info += 'Variant tables:              {}\n'.format(
             '\n'.join(sorted([' '*29 + x for x in tables])).lstrip())
         info += 'Annotation databases:        {}\n'.format(
-            '\n'.join([' '*29 + os.path.join(x.dir, x.name)
-            + (' ({})'.format(x.version) if x.version else '') for x in self.annoDB]).lstrip())
+            '\n'.join([' '*29 + x.linked_name 
+            + (' ({}{})'.format(os.path.join(x.dir, x.name), 
+                (', ' + x.version) if x.version else '')) for x in self.annoDB]).lstrip())
         return info
 
     def saveSnapshot(self, name, message, files):
@@ -2158,7 +2177,7 @@ class Project:
         '''Return one or more FieldConnections that link a field to a variant_table'''
         # if field is specified by table.field, good
         if '.' in field:
-            # possibly two dots (db.table.field), but never seen them.
+            # possibly two dots (db.field), but never seen them.
             table, field = [x.lower() for x in field.rsplit('.', 1)]
             if self.db.hasTable(table):
                 if variant_table.lower() == table.lower():
@@ -3522,7 +3541,7 @@ def remove(args):
                 for item in args.items:
                     removed = False
                     for i in range(len(proj.annoDB)):
-                        if proj.annoDB[i].name == item:
+                        if proj.annoDB[i].linked_name == item:
                             env.logger.info('Removing annotation database {} from the project'.format(item))
                             proj.annoDB.pop(i)
                             removed = True
@@ -3530,7 +3549,7 @@ def remove(args):
                     if not removed:
                         env.logger.warning('Cannot remove annotation database {} from the project'.format(item))
                 # use the un-expanded version of _local_resource to allow continued use of '~'
-                proj.saveProperty('annoDB', str([os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}') for x in proj.annoDB]))
+                proj.saveProperty('annoDB', str([(os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}'), x.linked_name) for x in proj.annoDB]))
             elif args.type == 'variants':
                 if len(args.items) == 0:
                     raise ValueError('Please specify variant tables that contain variants to be removed')
@@ -3738,11 +3757,11 @@ def show(args):
 
                 for db in proj.annoDB:
                     if args.verbosity == '0':
-                        print('\n'.join(['{}.{}'.format(db.name, x.name) for x in db.fields]))
+                        print('\n'.join(['{}.{}'.format(db.linked_name, x.name) for x in db.fields]))
                     else:
-                        print('\n'.join(['{}.{} {}'.format(db.name, x.name,
+                        print('\n'.join(['{}.{} {}'.format(db.linked_name, x.name,
                             '\n'.join(textwrap.wrap(x.comment,
-                                initial_indent=' '*(27-len(db.name)-len(x.name)),
+                                initial_indent=' '*(27-len(db.linked_name)-len(x.name)),
                                 subsequent_indent=' '*29))) for x in db.fields]))
             elif args.type == 'annotation':
                 if len(args.items) == 0:
@@ -3753,7 +3772,7 @@ def show(args):
                     dbName = args.items[0].lower()
                     if dbName.endswith('.db'):
                         dbName = dbName[:-3]
-                    annoDB = [x for x in proj.annoDB if x.name.lower() == dbName][0]
+                    annoDB = [x for x in proj.annoDB if x.linked_name.lower() == dbName][0]
                 except Exception as e:
                     raise IndexError('Database {} is not currently used in the project.'
                         .format(args.items[0]))
