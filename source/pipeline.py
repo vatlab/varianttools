@@ -551,14 +551,7 @@ def run_command(cmd, output=None, working_dir=None, max_jobs=1):
             break
     # there is a slot, start running
     if proc_lck:
-        if os.path.isfile(proc_lck):
-            proc_lck = None   # do not remove lock
-            raise RuntimeError('Output of pipeline locked by {}.lck. '
-                'Please remove this file and try again if no other '
-                'process is writing to this file.'
-                .format(output[0])) 
-        else:
-            env.lock(proc_lck)
+        env.lock(str(os.getpid()))
     proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err,
         cwd=working_dir)
     running_jobs.append(JOB(proc=proc, cmd=cmd,
@@ -595,7 +588,10 @@ def poll_jobs():
         #
         if ret < 0:
             if job.output:
-                env.unlock(job.output[0] + '.lck')
+                try:
+                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
+                except:
+                    pass
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                 .format(job.cmd[0], -ret, elapsed_time(job.start_time)))
         elif ret > 0:
@@ -603,7 +599,10 @@ def poll_jobs():
                 with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-                env.unlock(job.output[0] + '.lck')
+                try:
+                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
+                except:
+                    pass
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(job.cmd[0], elapsed_time(job.start_time), ret))
         else:
@@ -618,6 +617,10 @@ def poll_jobs():
             if len(job.cmd) == 1:
                 #
                 if job.output:
+                    # including output from previous failed runs
+                    # this step will fail if the .lck file has been changed by
+                    # another process
+                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
                     with open(job.output[0] + '.exe_info', 'a') as exe_info:
                         exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                         for f in job.output:
@@ -637,8 +640,6 @@ def poll_jobs():
                             for line in stderr:
                                 exe_info.write(line)
                     # if command succeed, remove all out_ and err_ files, 
-                    # including output from previous failed runs
-                    env.unlock(job.output[0] + '.lck')
                     for filename in glob.glob(job.output[0] + '.out_*') + \
                         glob.glob(job.output[0] + '.err_*'):
                         try:
@@ -675,7 +676,10 @@ def wait_all():
         # clean up lock files
         for job in running_jobs:
             if job is not None and job.stdout:
-                env.unlock(job.output[0] + '.lck')
+                try:
+                    env.unlock(job.output[0] + '.lck')
+                except:
+                    pass
         # raise an error instead of exit right now to give vtools
         # a chance to close databases
         raise RuntimeError('Keyboard interrupted')
@@ -703,6 +707,8 @@ class RunCommand:
         locking="exclusive"):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
+        #
+        # parameter locking is unused
         '''
         # merge mulit-line command into one line and remove extra white spaces
         if not cmd:
@@ -713,7 +719,6 @@ class RunCommand:
             self.cmd = [' '.join(x.split()) for x in cmd]
         self.max_jobs = max_jobs
         self.working_dir = working_dir
-        self.locking = locking
         if type(output) == str:
             self.output = [os.path.expanduser(output)]
         else:
@@ -736,22 +741,6 @@ class RunCommand:
             #        raise RuntimeError('Unable to write to output file ({}) because '
             #            'output file of a pipeline can can be under project, resource, '
             #            'temporary or cache directories.'.format(ofile))
-            lock_file = self.output[0] + '.lck'
-            if os.path.isfile(lock_file):
-                if self.locking == 'wait':
-                    env.logger.warning('Output of pipeline locked by {}. Please remove '
-                        'this file if no other process is writing to this file.'
-                        .format(lock_file))
-                    while True:
-                        if os.path.isfile(lock_file):
-                            time.sleep(10)
-                        else:
-                            break
-                else:
-                    raise RuntimeError('Output of pipeline locked by {} created '
-                        'by another process. Please remove this file and try again '
-                        'if no other process is writing to this file.'
-                        .format(lock_file))
             if os.path.isfile(self.output[0] + '.exe_info'):
                 with open(self.output[0] + '.exe_info') as exe_info:
                     cmd = exe_info.readline().strip()

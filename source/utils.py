@@ -165,16 +165,22 @@ class RuntimeEnvironments(object):
         # a list of lock file that will be removed when the project is killed
         self._lock_files = []
     #
-    def lock(self, filename):
-        open(filename, 'a').close()
+    def lock(self, filename, content=''):
+        with open(filename, 'w') as lockfile:
+            lockfile.write(content)
         self._lock_files.append(filename)
 
-    def unlock(self, filename):
+    def unlock(self, filename, content=''):
+        self._lock_files.remove(filename)
+        if os.path.isfile(filename):
+            return
+        with open(filename) as lockfile:
+            if lockfile.read() != content:
+                raise RuntimeError('Inconsistent lock file. The output file might have been changed by another process.')
         try:
             os.remove(filename)
         except Exception as e:
             self._logger.warning('Failed to remove lock file {}'.format(filename))
-        self._lock_files.remove(filename)
 
     def unlock_all(self):
         for filename in self._lock_files:
