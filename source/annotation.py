@@ -368,7 +368,7 @@ class AnnoDBConfiger:
         #
         writer.finalize()
 
-    def prepareDB(self, source_files=[], linked_by=[], rebuild=False, anno_type=None, linked_fields=None):
+    def prepareDB(self, source_files=[], linked_by=[], rebuild=False, anno_type=None, linked_fields=None, linked_name=None):
         '''Importing data to database. If direct_url or source_url is specified,
         they will overwrite settings in configuraiton file. If successful, this
         function set self.db to a live connection.
@@ -377,7 +377,7 @@ class AnnoDBConfiger:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
             if os.path.isfile(dbFile):
                 try:
-                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
+                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
                 except ValueError as e:
                     env.logger.debug(e)
                     env.logger.info('Existing database cannot be used.')
@@ -389,7 +389,7 @@ class AnnoDBConfiger:
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(dbFile))
                     dbFile = decompressGzFile(dbFile, inplace=False)
                     del s
-                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields)
+                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
                 except RuntimeError as e:
                     raise
                 except Exception as e:
@@ -402,7 +402,7 @@ class AnnoDBConfiger:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
             env.logger.info('Creating compressed database {}'.format(dbFile))
             compressFile(self.name + '.DB', dbFile)
-        return AnnoDB(self.proj, self.name, linked_by, anno_type, linked_fields)
+        return AnnoDB(self.proj, self.name, linked_by, anno_type, linked_fields, linked_name)
 
 
 def useArguments(parser):
@@ -413,6 +413,10 @@ def useArguments(parser):
             database from web (c.f. runtime variable $search_path) and the latest version 
             of the datavase). If all means fail, this command will try to download the
             source of the annotation database (or use source files provided by option --files).''')
+    parser.add_argument('--as', metavar='NAME',
+        help='''An alternative name for the linked database. This option allows
+            the use of shorter field names (e.g. tg.chr instead of thousandGenomes.chr)
+            and the use of multiple versions of the same database.''')
     parser.add_argument('-f', '--files', nargs='*', default=[],
         help='''A list of source files. If specified, vtools will not try to
             download and select source files. These source files will be
@@ -443,7 +447,12 @@ def useArguments(parser):
 
 def use(args):
     try:
+        # since as is a python keyword, we cannot use args.linked_name to access it and has to rename it
+        # to linked_name
+        setattr(args, 'linked_name', getattr(args, 'as'))
         with Project(verbosity=args.verbosity) as proj:
+            if args.linked_name is not None and not args.linked_name.isalnum():
+                raise ValueError('Invalid alias to annotation database: {}'.format(args.linked_name))
             # try to get source.ann, source.DB, source.DB.gz or get source.ann from 
             if os.path.isfile(args.source):
                 # if a local file?
@@ -481,26 +490,26 @@ def use(args):
                 if os.path.isfile(annoDB):
                     cfg = AnnoDBConfiger(proj, annoDB, args.jobs)
                     return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild,
-                        args.anno_type, args.linked_fields))
+                        args.anno_type, args.linked_fields, args.linked_name))
                 else:
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif args.rebuild:
                 raise ValueError('Only an .ann file can be specified when option --rebuild is set')
             elif annoDB.endswith('.DB'):
                 if os.path.isfile(annoDB):
-                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields))
+                    return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields, args.linked_name))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
                 if os.path.isfile(annoDB + '.DB'):
                     try:
-                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields))
+                        return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields, args.linked_name))
                     except Exception as e:
                         env.logger.debug(e)
                 if os.path.isfile(annoDB + '.ann'):
                     cfg = AnnoDBConfiger(proj, annoDB + '.ann', args.jobs)
                     try:
-                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild, args.anno_type, args.linked_fields))
+                        return proj.useAnnoDB(cfg.prepareDB(args.files, args.linked_by, args.rebuild, args.anno_type, args.linked_fields, args.linked_name))
                     except Exception as e:
                         env.logger.debug(e)
                 # do not know what to do
