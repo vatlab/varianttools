@@ -315,8 +315,8 @@ class TestImport(ProcessTestCase):
         self.assertEqual(numOfVariant(), 98 + 289 + 121)
         out2 = outputOfCmd('vtools output variant alt_bin alt_chr alt_pos bin chr pos')
         #
-        out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x])
-        out2 = '\n'.join([x for x in sorted(out2.split('\n')) if 'NA' not in x])
+        out1 = '\n'.join([x for x in sorted(out1.split('\n')) if 'NA' not in x]).replace(' ', '')
+        out2 = '\n'.join([x for x in sorted(out2.split('\n')) if 'NA' not in x]).replace(' ', '')
         self.assertEqual(out1, out2)
     
     def testImportMyVCF(self):
