@@ -206,18 +206,24 @@ class AnnoDB:
         for linked_field in linked_fields:
             if '.' not in linked_field:
                 linked_field = proj.linkFieldToTable(linked_field, 'variant')[-1].field
-            table, field = linked_field.split('.')
+            table, field = linked_field.rsplit('.', 1)
             if proj.isVariantTable(table):
                 try:
-                    cur.execute('CREATE INDEX IF NOT EXISTS {0}_{1} ON {0} ({1} ASC);'.format(table, field))
+                    index_name = '{0}_{1}'.format(table.replace('.', '_'), field)
+                    cur.execute('CREATE INDEX IF NOT EXISTS {0} ON {1} ({2} ASC);'
+                        .format(index_name, table, field))
                 except Exception as e:
-                    env.logger.debug(e)
+                    env.logger.debug('Failed to create index: {}'.format(e))
             else:
                 # from an annotation database
                 try:
-                    cur.execute('CREATE INDEX IF NOT EXISTS {0}.{0}_{1} ON {0} ({1} ASC);'.format(table, field))
+                    index_name = '{0}_{1}'.format(table.replace('.', '_'), field)
+                    env.logger.debug('CREATE INDEX IF NOT EXISTS {0}.{1} ON {2} ({3} ASC);'
+                        .format(table.split('.')[0], index_name, table.split('.')[-1], field))
+                    cur.execute('CREATE INDEX IF NOT EXISTS {0}.{1} ON {2} ({3} ASC);'
+                        .format(table.split('.')[0], index_name, table.split('.')[-1], field))
                 except Exception as e:
-                    env.logger.debug(e)
+                    env.logger.debug('Failed to create index: {}'.format(e))
 
     def checkLinkedFields(self, proj):
         # 
@@ -2208,8 +2214,8 @@ class Project:
                 if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
-                            field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            field= '{}.{}.{}'.format(table, db.name, field),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= ' AND '.join(['{}.{}={}'.format(table, x, y) for x,y in zip(db.build, db.linked_by)]))]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
@@ -2236,7 +2242,7 @@ class Project:
                                 'AND variant.pos >= {0}.{1}.start AND variant.pos <= {0}.{1}.end '
                                     .format(table, binningTable, table)),
                             FieldConnection(
-                            field= '{}.{}'.format(table, field),
+                            field= '{0}.{1}.{2}'.format(table, db.name, field),
                             table= '{0}.{1} {0}'.format(table, db.name),
                             link= '{0}.rowid = {0}.{1}.range_id'.format(table, binningTable))
                             ]
@@ -2267,7 +2273,7 @@ class Project:
                                 'AND variant.alt_pos >= {0}.{1}.start AND variant.alt_pos <= {0}.{1}.end '
                                     .format(table, binningTable, table)),
                             FieldConnection(
-                            field= '{}.{}'.format(table, field),
+                            field= '{0}.{1}.{2}'.format(table, db.name, field),
                             table= '{0}.{1} {0}'.format(table, db.name),
                             # FIXME: how to use bin here?
                             link= '{0}.rowid = {0}.{1}.range_id'.format(table, binningTable))]
@@ -2320,8 +2326,8 @@ class Project:
                 if db.anno_type == 'field':
                     return sum([self.linkFieldToTable(x, variant_table) for x in db.linked_by], []) + [
                         FieldConnection(
-                            field= '{}.{}'.format(table, field),
-                            table= '{}.{}'.format(table, table),
+                            field= '{}.{}.{}'.format(table, db.name, field),
+                            table= '{0}.{1} {0}'.format(table, db.name),
                             link= ' AND '.join(['{}.{}={}'.format(table, x, y) for x,y in zip(db.build, db.linked_by)]))]
                 if db.build is not None:
                     if db.anno_type == 'position':  # chr and pos
