@@ -1320,8 +1320,10 @@ class Importer:
         #
         try:
             # try to see if rec[1] can be translated to a proper integer
-            int(rec[1])
+            int(rec[2])
         except:
+            env.logger.debug('Variant without valid position is ignored: {}'
+                .format(rec))
             return None
         if rec[4] == '-':
             self.count[5] += 1
