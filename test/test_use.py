@@ -227,5 +227,21 @@ class TestUse(ProcessTestCase):
         self.assertEqual(def_out, ['9468354\t-\tA\t1'])
     
     
+    def testUseAs(self):
+        '''Testing the --as option of command vtools use'''
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #this is the default method. the linked_fields have to be in the order in the test below.
+        self.assertSucc('vtools use evs --anno_type variant --linked_fields chr pos ref alt')
+        #it is same with
+        self.assertSucc('vtools use evs --as e')
+        self.assertSucc('vtools use evs --as e1')
+        self.assertSucc('vtools show annotation e')
+        self.assertSucc('vtools output variant chr pos e.chr e1.chr')
+        self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
+        # --linked_by option will be ignored if you use the option of --anno_type variant
+        self.assertFail('vtools use evs --anno_type variant --linked_fields chr')
+
+        
 if __name__ == '__main__':
     unittest.main()
