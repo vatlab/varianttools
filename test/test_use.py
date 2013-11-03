@@ -239,8 +239,6 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools show annotation e')
         self.assertSucc('vtools output variant chr pos e.chr e1.chr')
         self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
-        # --linked_by option will be ignored if you use the option of --anno_type variant
-        self.assertFail('vtools use evs --anno_type variant --linked_fields chr')
 
         
 if __name__ == '__main__':

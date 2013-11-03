@@ -2277,12 +2277,17 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 # A.B, does not try to expand A
                 res.append((toktype, toval))
             elif after_dot:
-                # A.B, do not expand
-                res.append((toktype, toval))
                 # try to get fields:
                 try:
                     for info in proj.linkFieldToTable('{}.{}'.format(tokens[i-2][1], toval), table):
                         fields.append(info.field)
+                    # if variant field (e.g. variant.chr, do not expand
+                    # if annotation field (e.g. linked_name.table_name.field, put in table_name
+                    if info.field.count('.') == 2:
+                        res.append((toktype, info.field.split('.', 1)[1]))
+                    else:
+                        # A.B, do not expand
+                        res.append((toktype, toval))
                 except ValueError as e:
                     env.logger.debug(e)
             else:
