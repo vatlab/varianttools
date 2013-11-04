@@ -171,8 +171,9 @@ class RuntimeEnvironments(object):
         self._lock_files.append(filename)
 
     def unlock(self, filename, content=''):
-        self._lock_files.remove(filename)
-        if os.path.isfile(filename):
+        if filename in self._lock_files:
+            self._lock_files.remove(filename)
+        if not os.path.isfile(filename):
             return
         with open(filename) as lockfile:
             if lockfile.read() != content:
