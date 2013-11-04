@@ -1696,6 +1696,63 @@ sqlite3 * geno_db;
 typedef std::map<std::string, int> SampleNameIdMap;
 SampleNameIdMap nameIdMap;
 
+class genotypeParams 
+{
+public:
+	genotypeParams(const char * params = NULL) :
+		m_params(NULL), m_field(NULL), m_delimiter(NULL), m_missing(NULL)
+	{
+		if (!params)
+			return;
+
+		m_params = strdup(params);
+		char * pch = strtok(m_params, "&");
+		while (pch != NULL) {
+			if (strncmp(pch, "field=", 6) == 0)
+				m_field = pch + 6;
+			else if (strncmp(pch, "d=", 2) == 0) {
+				m_delimiter = pch + 2;
+				if (strcmp(m_delimiter, "\\t") == 0)
+					m_delimiter = "\t";
+			} else if (strncmp(pch, "missing=", 8) == 0)
+				m_missing = pch + 8;
+			else
+				fprintf(stderr, "Incorrect parameter to function genotype: %s", pch);
+			// process argument
+			pch = strtok(NULL, "&");
+		}
+	}
+	
+	~genotypeParams()
+	{
+		free(m_params);
+	}
+
+	char * field()
+	{
+		return m_field ? m_field : (char*)"GT";
+	}
+
+	char * delimiter()
+	{
+		return m_delimiter ? m_delimiter : (char*)",";
+	}
+
+	char * missing()
+	{
+		return m_missing;
+	}
+
+private:
+	// this one holds the copied stuff
+	char * m_params;
+	// the rest are just pointers
+	char * m_field;
+	char * m_delimiter;
+	char * m_missing;
+};
+
+
 static void genotype(
                      sqlite3_context * context,
                      int argc,
@@ -1703,7 +1760,7 @@ static void genotype(
                      )
 {
 	// parameters passed:
-	// name of geno_db_file, variant_id, sample_name, and then type
+	// name of geno_db_file, variant_id, sample_name, and then params
 	if (argc < 3 || sqlite3_value_type(argv[2]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please name of a sample", -1);
 		return;
@@ -1731,11 +1788,7 @@ static void genotype(
 		}
 	}
 
-	char * ret_field = NULL;
-	if (argc == 4)
-		ret_field = (char *)sqlite3_value_text(argv[3]);
-	else
-		ret_field = "GT";
+	genotypeParams params(argc == 4 ? (char *)sqlite3_value_text(argv[3]) : NULL);
 
 	// open databases
 	if (!geno_db) {
@@ -1751,7 +1804,7 @@ static void genotype(
 		// run some query
 		char sql[255];
 		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
-			ret_field, sample_IDs[0], variant_id);
+			params.field(), sample_IDs[0], variant_id);
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
@@ -1793,7 +1846,7 @@ static void genotype(
 		// run some query
 		char sql[255];
 		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
-			ret_field, *it, variant_id);
+			params.field(), *it, variant_id);
 		sqlite3_stmt * stmt;
 		int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
@@ -1806,7 +1859,7 @@ static void genotype(
 			if (first)
 				first = false;
 			else
-				res << ",";
+				res << params.delimiter();
 			// how to pass whatever type the query gets to the output???
 			switch (sqlite3_column_type(stmt, 0)) {
 			case SQLITE_INTEGER:
@@ -1822,9 +1875,15 @@ static void genotype(
 				res << sqlite3_column_blob(stmt, 0);
 				break;
 			case SQLITE_NULL:
-				res << ".";
+				res << params.missing();
 				break;
 			}
+		} else if (params.missing() != NULL) {
+			if (first)
+				first = false;
+			else
+				res << params.delimiter();
+			res << params.missing();
 		}
 	}
 	// we do not close the database because we are readonly and we need the database for

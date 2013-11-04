@@ -61,10 +61,11 @@ HUMANDB=${CACHE_DIR: open(CACHE_DIR + "/annovar.path").read().strip()[:-21] + "h
 comment=Determine the humandb path of ANNOVAR
 
 [geneanno_14]
+# REF_GENOME_BUILD is the primary build of the project, passed by default
 action=RunCommand('${ANNOVAR}  --buildver ${REF_GENOME_BUILD}  -downdb %(dbtype)s ${HUMANDB}',
     output=['${HUMANDB}/${REF_GENOME_BUILD}_%(dbtype)s.txt',
         '${HUMANDB}/${REF_GENOME_BUILD}_%(dbtype)sMrna.fa'])
-comment=Download gene database
+comment=Download gene database for specified --dbtype if they are unavailable
 
 [geneanno_20]
 action=RunCommand('vtools export %(var_table)s --format ANNOVAR --output ${CACHE_DIR}/annovar_input',
