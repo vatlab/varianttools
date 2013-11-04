@@ -413,35 +413,38 @@ def useArguments(parser):
             database from web (c.f. runtime variable $search_path) and the latest version 
             of the datavase). If all means fail, this command will try to download the
             source of the annotation database (or use source files provided by option --files).''')
-    parser.add_argument('--as', metavar='NAME',
+    grp = parser.add_argument_group('Basic link options')
+    grp.add_argument('--as', metavar='NAME',
         help='''An alternative name for the linked database. This option allows
             the use of shorter field names (e.g. tg.chr instead of thousandGenomes.chr)
             and the use of multiple versions of the same database.''')
-    parser.add_argument('-f', '--files', nargs='*', default=[],
-        help='''A list of source files. If specified, vtools will not try to
-            download and select source files. These source files will be
-            compiled into a local annotation database. This is used only
-            when no local annotation database is specified.''')
-    parser.add_argument('-l', '--linked_by', nargs='*', default=[],
+    grp.add_argument('-l', '--linked_by', nargs='*', default=[], metavar='FIELD',
         help='''A list of fields that are used to link the annotation database to
             tables in the existing project. This parameter is required only for
             'field' type of annotation databases that link to fields of existing
             tables.''')
-    parser.add_argument('--anno_type', choices=['variant', 'position', 'range', 'field'],
+    grp = parser.add_argument_group('Advanced link options')
+    grp.add_argument('--anno_type', choices=['variant', 'position', 'range', 'field'],
         help='''This option overrides type of an existing annotation database when it
             is attached to a project. It corresponds to key anno_type of the data sources
             section of an annotation file (with suffix .ann) but does not affect the .ann file
             or the database built from it.''')
-    parser.add_argument('--linked_fields', nargs='*',
+    grp.add_argument('--linked_fields', nargs='*',
         help='''An alternative set of fields that are used to link the annotation database to
             the master variant table. It should have four, two, and three values for database
             of type variant, position, and range. Similar to anno_type, this option does not
             affect the .ann file or the database built from it.''')
-    parser.add_argument('--rebuild', action='store_true',
+    grp = parser.add_argument_group('Build database from source')
+    grp.add_argument('-f', '--files', nargs='*', default=[],
+        help='''A list of source files. If specified, vtools will not try to
+            download and select source files. These source files will be
+            compiled into a local annotation database. This is used only
+            when no local annotation database is specified.''')
+    grp.add_argument('--rebuild', action='store_true',
         help='''If set, variant tools will always rebuild the annotation database from source,
             ignoring existing local and online database. In addition to $name.DB, variant tools
             will also create $name-$version.DB.gz that can be readily distributed.'''),
-    parser.add_argument('-j', '--jobs', metavar='N', type=int, default=2,
+    grp.add_argument('-j', '--jobs', metavar='N', type=int, default=2,
         help='''If need to build database from source, maximum number of processes to use.''')
 
 
