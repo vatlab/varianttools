@@ -1899,6 +1899,65 @@ typedef std::map<int, std::string> IdNameMap;
 typedef std::map<std::string, IdNameMap> SampleIdNameMap;
 SampleIdNameMap idNameMap;
 
+
+class samplesParams 
+{
+public:
+	samplesParams(const char * params = NULL) :
+		m_params(NULL), m_geno_filter(NULL), m_delimiter(NULL)
+	{
+		if (!params)
+			return;
+
+		m_params = strdup(params);
+		char * pch = strtok(m_params, "&");
+		while (pch != NULL) {
+			if (strncmp(pch, "geno_filter=", 12) == 0 && (*(pch + 12) != '\0'))
+				m_geno_filter = pch + 12;
+			//else if (strncmp(pch, "sample_filter=", 14) == 0)
+			//	m_sample_filter = pch + 14;
+			else if (strncmp(pch, "d=", 2) == 0) {
+				m_delimiter = pch + 2;
+				if (strcmp(m_delimiter, "\\t") == 0)
+					m_delimiter = "\t";
+			} else
+				fprintf(stderr, "Incorrect parameter to function samples: %s", pch);
+			// process argument
+			pch = strtok(NULL, "&");
+		}
+	}
+	
+	~samplesParams()
+	{
+		free(m_params);
+	}
+
+	char * geno_filter()
+	{
+		return m_geno_filter; 
+	}
+
+	//char * sample_filter()
+	//{
+	//	return m_sample_filter;
+	//}
+
+	char * delimiter()
+	{
+		return m_delimiter ? m_delimiter : (char*)",";
+	}
+
+private:
+	// this one holds the copied stuff
+	char * m_params;
+	// the rest are just pointers
+	char * m_geno_filter;
+	// char * m_sample_filter;
+	char * m_delimiter;
+};
+
+
+
 static void samples(
                     sqlite3_context * context,
                     int argc,
@@ -1909,16 +1968,14 @@ static void samples(
 	// name of project, variant_id, sample_id_file, [genotype_filter]
 	//
 	if (argc > 4) {
-		sqlite3_result_error(context, "samples function accept at most 2 parameter", -1);
+		sqlite3_result_error(context, "samples function accept at most one parameter", -1);
 		return;
 	}
 
 	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
 	int variant_id = sqlite3_value_int(argv[1]);
 	char * sample_id_file = (char *)sqlite3_value_text(argv[2]);
-	char * geno_filter = argc > 3 ? (char *)sqlite3_value_text(argv[3]) : NULL;
-	if (geno_filter && geno_filter[0] == '\0')
-		geno_filter = NULL;
+	samplesParams params(argc > 3 ? (char *)sqlite3_value_text(argv[3]) : NULL);
 
 	// see if the sample_id_file has been loaded
 	SampleIdNameMap::iterator it = idNameMap.find(std::string(sample_id_file));
@@ -1958,7 +2015,7 @@ static void samples(
 	for (; im != im_end; ++im) {
 		char sql[255];
 		sprintf(sql, "SELECT variant_id FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
-			im->first, variant_id, geno_filter == NULL ? "1" : geno_filter);
+			im->first, variant_id, params.geno_filter() == NULL ? "1" : params.geno_filter());
 		//
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
@@ -1971,7 +2028,7 @@ static void samples(
 			if (first)
 				first = false;
 			else
-				res << ",";
+				res << params.delimiter();
 			res << im->second;
 		}
 	}

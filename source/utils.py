@@ -2375,7 +2375,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         idNameFiles = {}
         def writeSampleIdMap(cond=''):
             # cond is a string (e.g. "'1'") and need to be evaluated as a string
-            cond = str(eval(cond)) if cond else '1'
+            cond = cond if cond else '1'
             if not cond:
                 cond = '1'
             if cond in idNameFiles:
@@ -2393,58 +2393,68 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     idMap.write('{}\t{}\n'.format(rec[0], rec[1]))
             return filename
         #
-        def handleParams(matchObj):
-            if matchObj.group(1) == '__GENOTYPE__':
-                # optional parameters
-                #    1: sample name or filter
-                #    2: field to output
-                params = matchObj.group(2).strip().split(',')
-                # default, all samples
-                ret = writeIDList(params[0])
-                if len(params) == 0:
+        def handleGenotypeParams(matchObj):
+            # optional parameters
+            #    1: sample name or filter
+            #    2: field to output
+            params = matchObj.group(1).strip().split(',')
+            # default, all samples
+            ret = writeIDList(params[0])
+            if len(params) == 0:
+                # a filename of IDs
+                return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
+                    .format(proj.name, ret))
+            elif len(params) == 1:
+                if type(ret) == str:   
                     # a filename of IDs
                     return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
                         .format(proj.name, ret))
-                elif len(params) == 1:
-                    if type(ret) == str:   
-                        # a filename of IDs
-                        return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
-                            .format(proj.name, ret))
-                    else:
-                        # a single ID
-                        return("genotype('{}_genotype.DB', variant.variant_id, {})"
-                            .format(proj.name, ret))
-                elif len(params) == 2:
-                    if type(ret) == str:   
-                        # a filename of IDs
-                        return("genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
-                            .format(proj.name, ret, params[1]))
-                    else:
-                        # a single ID
-                        return("genotype('{}_genotype.DB', variant.variant_id, {}, {})"
-                            .format(proj.name, ret, params[1]))
                 else:
-                    raise ValueError('At most two parameters are allowed for SQL function samples()')
+                    # a single ID
+                    return("genotype('{}_genotype.DB', variant.variant_id, {})"
+                        .format(proj.name, ret))
+            elif len(params) == 2:
+                if type(ret) == str:   
+                    # a filename of IDs
+                    return("genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
+                        .format(proj.name, ret, params[1]))
+                else:
+                    # a single ID
+                    return("genotype('{}_genotype.DB', variant.variant_id, {}, {})"
+                        .format(proj.name, ret, params[1]))
             else:
-                # optional parameters
-                #    1: sample filter
-                #    2: genotype filter
-                params = matchObj.group(2).strip().split(',')
-                if len(params) == 0:
-                    # no parameter
-                    return("samples('{}_genotype.DB', variant.variant_id, '{}')"
-                        .format(proj.name, writeSampleIdMap('')))
-                elif len(params) == 1:
-                    # sample filter
-                    return("samples('{}_genotype.DB', variant.variant_id, '{}')"
-                        .format(proj.name, writeSampleIdMap(params[0])))
-                elif len(params) == 2:
-                    return("samples('{}_genotype.DB', variant.variant_id, '{}', {})"
-                        .format(proj.name, writeSampleIdMap(params[0]), params[1]))
-                else:
-                    raise ValueError('At most two parameters are allowed for SQL function samples()')
+                raise ValueError('At most two parameters are allowed for SQL function samples()')
         #
-        query = re.sub("(__SAMPLES__|__GENOTYPE__)\s*\(([^\)]*)\)", handleParams, query)
+        def handleSamplesParams(matchObj):
+            # optional parameters
+            #    1: sample filter
+            #    2: genotype filter
+            try:
+                par_string = matchObj.group(1).strip()
+                if par_string:
+                    params = eval(par_string).split('&')
+                else:
+                    params = []
+            except Exception as e:
+                raise ValueError('Invalid parameter to function samples: {}, {}'.format(matchObj.group(1), e))
+            sample_filter = ''
+            for p in params:
+                if p.startswith('sample_filter='):
+                    sample_filter = p[14:]
+            # default, all samples
+            ret = writeSampleIdMap(sample_filter)
+            # put the rest of the parameter together
+            params = '&'.join([x for x in params if not x.startswith('sample_filter=')])
+            if not params:
+                # no parameter
+                return("samples('{}_genotype.DB', variant.variant_id, '{}')"
+                    .format(proj.name, ret))
+            else:
+                return("samples('{}_genotype.DB', variant.variant_id, '{}', '{}')"
+                    .format(proj.name, ret, params))
+        #
+        query = re.sub("__SAMPLES__\s*\(([^\)]*)\)", handleSamplesParams, query)
+        query = re.sub("__GENOTYPE__\s*\(([^\)]*)\)", handleGenotypeParams, query)
     #
     return query, fields
 
