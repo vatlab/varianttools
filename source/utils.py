@@ -2397,7 +2397,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             # optional parameters
             #    1: sample name or filter
             #    2: field to output
-            params = matchObj.group(1).strip().split(',')
+            params = matchObj.group(1).strip().split(',', 1)
             # default, all samples
             ret = writeIDList(params[0])
             if len(params) == 0:
@@ -2422,8 +2422,6 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     # a single ID
                     return("genotype('{}_genotype.DB', variant.variant_id, {}, {})"
                         .format(proj.name, ret, params[1]))
-            else:
-                raise ValueError('At most two parameters are allowed for SQL function samples()')
         #
         def handleSamplesParams(matchObj):
             # optional parameters
