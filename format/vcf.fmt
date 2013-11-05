@@ -482,6 +482,32 @@ adj=ExtractValue('EFF=',';')
 fmt=InfoFormatter('EFF')
 comment=Variant effect annotation provided by snpEff
 
+[EFF_Type]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('(')[0]
+fmt=InfoFormatter('EFF_Type')
+comment=Category of effect returned by snpEff, as the first entry in the EFF info. 
+    A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
+
+
+[EFF_Impact]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('(')[-1].split('|')[0]
+fmt=InfoFormatter('EFF_Impact')
+comment=Impact of variant, as the second entry in the EFF info, as explained in
+    http://snpeff.sourceforge.net/SnpEff_manual.html#eff
+
+
+[EFF_Functional_Class]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('|', 1)[-1].split('|')[0]
+fmt=InfoFormatter('EFF_Functional_Class')
+comment=Category of effect returned by snpEff, as the first entry in the EFF info. 
+    A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
+
 [DP_geno]
 # Passing 'GT:DP\t0/0:64'
 index=9, 10:

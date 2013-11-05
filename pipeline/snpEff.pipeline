@@ -26,6 +26,12 @@ opt_java_comment=Option to java program. -Djava.io.tmpdir is frequently used to 
 snpEff_path=./
 snpEff_path_comment=Path to directory that contains snpEff.jar.
 
+eff_fields=EFF
+eff_fields_comment=Fields that will be imported to the project from the output
+    of snpEff. The default value is EFF, which is the whole EFF info. You can 
+    also specify one or more off EFF_Type, EFF_Impact and Eff_Functional_Class,
+    which are from extracted from the Effect(Effct_impact|Functional_Class...
+    field.
 
 [eff_0]
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -67,5 +73,5 @@ action=RunCommand('%(java)s -jar %(opt_java)s %(snpEff_path)s/snpEff.jar -c %(sn
 comment=Execute snpEff eff to annotate variants
 
 [eff_40]
-action=RunCommand('vtools update %(var_table)s --from_file ${INPUT} --var_info EFF')
+action=RunCommand('vtools update %(var_table)s --from_file ${INPUT} --var_info %(eff_fields)s')
 comment=Importing results from snpEff
