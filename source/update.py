@@ -141,7 +141,7 @@ class Updater:
             for f in fmt.fields[fmt.ranges[1]:fmt.ranges[2]]:
                 # either insert or update, the fields must be in the master variant table
                 self.proj.checkFieldName(f.name, exclude='variant')
-                if f.name not in headers:
+                if f.name.upper() not in [x.upper() for x in headers]:
                     s = delayedAction(env.logger.info, 'Adding column {}'.format(f.name))
                     cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
                     del s

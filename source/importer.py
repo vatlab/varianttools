@@ -136,6 +136,9 @@ class LineProcessor:
                     #
                     # indexes = [8, [8,10,12,14]]
                     #
+                    if not field.index:
+                        raise ValueError('Invalid index ({}) for field {}. Perhaps it is not defined in the .fmt file.'
+                            .format(field.index, field.name))
                     for x in field.index.split(','):
                         if ':' in x:
                             # a slice
@@ -210,8 +213,8 @@ class LineProcessor:
                         self.columnRange[fIdx] = (cIdx, cIdx + count)
                         cIdx += count
                 except Exception as e:
-                    sys.exit('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
-                    raise ValueError('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
+                    env.logger.error('Incorrect value adjustment functor or function {}: {}'.format(field.adj, e))
+                    sys.exit(1)
             self.first_time = False
             self.maxInputCol += 1    # use 1-indexes maxInputCol
         #
