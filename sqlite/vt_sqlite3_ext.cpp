@@ -1662,6 +1662,15 @@ static void track(
 				*p = '\0';
 				fi.name = std::string(name);
 				fi.query = std::string(p + 1);
+				// look for all=1 and set fi.all
+				//
+				// NOTE:
+				// We are being lazy here. The all option only works for VCF, bigWig and bigBed format
+				// and these formats currently only accepts the 'all option'. The BAM format accepts
+				// a bunch of options but it does not accept 'all', so we do not have to worry about
+				// handling multiple options with 'all'
+				if (strncmp(p+1, "all=", 4) == 0)
+					fi.all = atoi(p + 5);
 				// replace ? to avoid disrupting the string
 				*p = '?';
 			} else
@@ -1678,6 +1687,7 @@ static void track(
 			fi.column = it->second;
 		}
 	}
+	// this option is now obsolete
 	if (argc >= 7) {
 		if (sqlite3_value_type(argv[6]) == SQLITE_INTEGER)
 			fi.all = sqlite3_value_int(argv[6]);
