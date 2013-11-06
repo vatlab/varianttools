@@ -40,12 +40,6 @@ export_comment=A variant table to create annotation database from for pipeline p
 action=CheckCommands('sqlite3')
 comment=Check the existence of command sqlite3, which is required for this pipeline
 
-[proj2annoDB_5]
-action=RunCommand(cmd='sqlite3 ${CMD_INPUT} \'select value from project where name="build"\'
-	> ${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}',
-	output='${CACHE_DIR}/${INPUT: INPUT[0] + ".build"}')
-comment=Dump project build information
-
 [proj2annoDB_10]
 # input   $name.proj
 # output  cache/$name.proj.schema
@@ -74,7 +68,7 @@ comment=Convert .schema to .ann definitions
 # now we have the .schema file, we need to write a .ann file
 action=RunCommand(cmd="
     echo '[linked fields]'            > ${CMD_OUTPUT: CMD_OUTPUT[0]};
-	echo '${OUTPUT5:open(OUTPUT5[0]).read().strip()}=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
+	echo '${REF_GENOME_BUILD}=chr, pos, ref, alt'       >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
 	echo '[data sources]'             >> ${CMD_OUTPUT: CMD_OUTPUT[0]};
 	echo 'description=Annotation database dumped from project ${CMD_INPUT}' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
 	echo 'delimiter=\"|\"'            >> ${CMD_OUTPUT: CMD_OUTPUT[0]}; 
