@@ -714,10 +714,23 @@ class Exporter:
                                 raise ValueError('Failed to format value {} at col {}: {}'.format(
                                     rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 # step two: apply adjusters
-                #
-                # adj: single or list
-                # no adj: must be single
-                columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
+                try:
+                    #
+                    # adj: single or list
+                    # no adj: must be single
+                    columns = [adj(fields[col] if type(col) is int else [fields[x] for x in col]) if adj else fields[col] for adj, col in col_adj]
+                except:
+                    # this part just try to get a more precise error message
+                    for adj, col in col_adj:
+                        try:
+                            if type(col) is int:
+                                adj(fields[col])
+                            elif adj:      
+                                [fields[x] for x in col]
+                            else:
+                                fields[col]
+                        except:
+                            raise ValueError('Failed to apply adjust functor to column {}'.format(col))
                 # step three: output columns
                 line = sep.join(columns)
                 output.write(line + '\n')
