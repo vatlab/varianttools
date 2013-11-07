@@ -449,7 +449,7 @@ def useArguments(parser):
 
 
 def use(args):
-    #try:
+    try:
         # since as is a python keyword, we cannot use args.linked_name to access it and has to rename it
         # to linked_name
         setattr(args, 'linked_name', getattr(args, 'as'))
@@ -518,9 +518,9 @@ def use(args):
                 # do not know what to do
                 #FIXME if line 470 fails due to "No reference genome information" then the error prompt below is misleading(wanggao) 
                 raise ValueError('Cannot find annotation database {}'.format(annoDB))
-    #except Exception as e:
-    #    env.logger.error(e)
-    #    sys.exit(1)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 
 
