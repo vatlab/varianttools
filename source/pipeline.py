@@ -699,6 +699,9 @@ def wait_all():
     running_jobs = []
 
 
+class NeedRealInput(Exception):
+    pass
+
 class NullAction:
     def __init__(self, output=[], action=''):
         '''A null action that is used to change input, output, or
@@ -772,6 +775,10 @@ class RunCommand:
                         raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
                     if not os.path.isdir(dir):
                         raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
+        # now, we cannot ignore this step, but do we have all the input files?
+        # the input can be fake .file_info files
+        if not all([os.path.isfile(x) for x in ifiles]):
+            raise NeedRealInput()
         run_command(self.cmd, output=self.output, working_dir=self.working_dir,
             max_jobs=self.max_jobs)
         # add md5 signature of input and output files
@@ -1298,15 +1305,51 @@ class Pipeline:
                     self.VARS[key.lower()] = self.substitute(val, self.VARS)
                     env.logger.debug('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key.lower()]))
+                #
+                ifiles = step_output
+                # this step is successful, go to next
+                os.chdir(saved_dir)
+                step_index += 1
+                if step_index == len(psteps):
+                    break
+            except NeedRealInput:
+                # unfortunately, a input file has been removed (replaced by .file_info) but
+                # a later steps need it. We will have to figure out how to create this 
+                # file by looking backward ...
+                to_be_regenerated = [x for x in step_input if not os.path.isfile(x)]
+                # remove all fony files so that they will be re-generated
+                for x in to_be_regenerated:
+                    if os.path.isfile(x + '.file_info'):
+                        os.remove(x + '.file_info')
+                remaining = [x for x in to_be_regenerated]
+                while step_index >= 0:
+                    step_index -= 1
+                    command = psteps[step_index]
+                    # remove all fony files so that they will be re-generated
+                    for x in self.VARS['input{}'.format(command.index)]:
+                        if os.path.isfile(x + '.file_info'):
+                            os.remove(x + '.file_info')
+                    # if any of the input file does not exist, go back further
+                    if not all([os.path.isfile(x) for x in self.VARS['input{}'.format(command.index)]]):
+                        continue
+                    # check if a real file can be generated at this step
+                    remaining = [x for x in remaining if x not in self.VARS['output{}'.format(command.index)]]
+                    if not remaining:
+                        break
+                if step_index == -1:
+                    raise RuntimeError('Cannot find a way to regenerate input file {}'
+                        .format(', '.join(remaining)))
+                else:
+                    if step_index > 1:
+                        ifiles = self.VARS['output{}'.format(psteps[step_index - 1].index)]
+                    else:
+                        ifiles = self.VARS['CMD_INPUT']
+                    env.logger.warning('Input files {} need to be re-generated from step {}.'
+                        .format(', '.join(to_be_regenerated), command.index))
+                os.chdir(saved_dir)
             except Exception as e:
                 raise RuntimeError('Failed to execute step {}_{}: {}'
                     .format(pname, command.index, e))
-            os.chdir(saved_dir)
-            ifiles = step_output
-            # this step is successful, go to next
-            step_index += 1
-            if step_index == len(psteps):
-                break
 
 
 
