@@ -55,7 +55,8 @@ comment=Check the existence of ANNOVAR's annotate_variation.pl command.
 
 [geneanno_11]
 # get full path of annovar, the command should succeed after step 10
-action=RunCommand('which ${ANNOVAR} > ${CACHE_DIR}/annovar.path')
+action=RunCommand('which ${ANNOVAR} > ${CACHE_DIR}/annovar.path',
+    output='${CACHE_DIR}/annovar.path')
 # define a pipeline variable HUMANDB that can be used by later steps
 HUMANDB=${CACHE_DIR: open(CACHE_DIR + "/annovar.path").read().strip()[:-21] + "humandb"}
 comment=Determine the humandb path of ANNOVAR
