@@ -99,7 +99,7 @@ class EmitInput:
             return False
         return True
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         selected = []
         unselected = []
         for filename in ifiles:
@@ -207,7 +207,7 @@ class SequentialActions:
             else:
                 self.actions.append(a)
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         for a in self.actions:
             # the input of the next action is the output of the
             # previous action.
@@ -278,7 +278,7 @@ class CheckCommands:
                         return name
         return None
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         for cmd in self.cmd:
             if self._which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
@@ -296,7 +296,7 @@ class CheckOutput:
         self.pattern = pattern
         self.fail = failIfMismatch
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         try:
             # do not use subprocess.check_output because I need to get
             # output even when the command returns non-zero return code
@@ -330,7 +330,7 @@ class CheckFiles:
             self.files = files
         self.msg = msg
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         for f in self.files:
             if os.path.isfile(f):
                 env.logger.info('{} is located.'.format(f))
@@ -348,7 +348,7 @@ class CheckDirs:
             self.dirs = dirs
         self.msg = msg
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         for d in self.dirs:
             if os.path.isdir(d):
                 env.logger.info('Directory {} is located.'.format(d))
@@ -356,12 +356,24 @@ class CheckDirs:
                 raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.msg))
         return ifiles
 
+class CheckVariantToolsVersion:
+    def __init__(self, version=''):
+        self.min_version = version
 
+    def __call__(self, ifiles, pipeline=None):
+        vtools_version = [int(x) for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()]
+        # e.g. minimal 2.2.0, vtools 2.1.1
+        if [int(x) for x in re.sub('\D', ' ', self.min_version).split()] > vtools_version:
+            raise RuntimeError('Version {} is required to execute this pipeline. '
+                'Please upgrade your installation of variant tools (version {})'
+                .format(self.min_version, pipeline.VARS['vtools_version']))
+        return ifiles
+        
 class CheckFastqVersion:
     def __init__(self, output):
         self.output = output
 
-    def __call__(self, fastq_file):
+    def __call__(self, fastq_file, pipeline=None):
         '''Detect the version of input fastq file. This can be very inaccurate'''
         with open(self.output, 'w') as aln_param:
             #
@@ -408,7 +420,7 @@ class FieldsFromTextFile:
     def __init__(self, output):
         self.field_output = output
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         if len(ifiles) > 1:
             raise RuntimeError('Action FieldsFromTextFile only take one input file at a time.')
         #
@@ -442,7 +454,7 @@ class GuessReadGroup:
         self.output_bam = bamfile
         self.rg_output = rgfile
 
-    def __call__(self, fastq_filename):
+    def __call__(self, fastq_filename, pipeline=None):
         '''Get read group information from names of fastq files.'''
         # Extract read group information from filename such as
         # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
@@ -695,7 +707,7 @@ class NullAction:
         else:
             self.output = output
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         if self.output:
             return self.output
         else:
@@ -728,7 +740,7 @@ class RunCommand:
             if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
                 raise RuntimeError('Output file with extension .exe_info and .lck are reserved.')
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         # substitute cmd by input_files and output_files
         if self.output:
             #for ofile in self.output:
@@ -890,7 +902,7 @@ class DecompressFiles:
         # return source file if nothing needs to be decompressed
         return [filename]
         
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         # decompress input files and return a list of output files
         filenames = []
         for filename in ifiles:
@@ -913,7 +925,7 @@ class LinkToDir:
             if not os.path.isdir(self.dest):
                 raise RuntimeError('Failed to create directory {}: {}'.format(self.dest, e))
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         ofiles = []
         for filename in ifiles:
             path, basename = os.path.split(filename)
@@ -934,7 +946,7 @@ class CountMappedReads:
         self.cutoff = cutoff
         self.output = output
 
-    def __call__(self, sam_file):
+    def __call__(self, sam_file, pipeline=None):
         #
         # count total reads and unmapped reads
         #
@@ -996,7 +1008,7 @@ class DownloadResource:
             raise RuntimeError('Failed to create pipeline resource directory '
                 .format(self.pipeline_resource))
 
-    def __call__(self, ifiles):
+    def __call__(self, ifiles, pipeline=None):
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
         lockfile = os.path.join(self.pipeline_resource, '.varianttools.lck')
@@ -1090,7 +1102,7 @@ class Pipeline:
         else:
             return str(var)
 
-    def substitute(self, text, VARS):
+    def substitute(self, text, PipelineVars):
         # if text has new line, replace it with space
         text =  ' '.join(text.split())
         # now, find ${}
@@ -1113,8 +1125,8 @@ class Pipeline:
                             pieces[idx] = self.var_expr(FUNC())
                         elif ',' not in KEY:
                             # single varialbe
-                            if KEY in VARS:
-                                VAL = VARS[KEY]
+                            if KEY in PipelineVars:
+                                VAL = PipelineVars[KEY]
                             else:
                                 env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                                     .format(piece, KEY))
@@ -1126,8 +1138,8 @@ class Pipeline:
                             VAL = []
                             for KEY in KEYS:
                                 # single varialbe
-                                if KEY in VARS:
-                                    VAL.append(VARS[KEY])
+                                if KEY in PipelineVars:
+                                    VAL.append(PipelineVars[KEY])
                                 else:
                                     env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                                         .format(piece, KEY))
@@ -1138,9 +1150,9 @@ class Pipeline:
                             .format(piece, e))
                         continue
                 else:
-                    # if KEY in VARS, replace it
-                    if KEY in VARS:
-                        pieces[idx] = self.var_expr(VARS[KEY])
+                    # if KEY in PipelineVars, replace it
+                    if KEY in PipelineVars:
+                        pieces[idx] = self.var_expr(PipelineVars[KEY])
                     else:
                         env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                             .format(piece, KEY))
@@ -1173,7 +1185,7 @@ class Pipeline:
         #
         global max_running_jobs 
         max_running_jobs = jobs
-        VARS = {
+        self.VARS = {
             'cmd_input': input_files,
             'cmd_output': output_files,
             'temp_dir': env.temp_dir,
@@ -1183,7 +1195,7 @@ class Pipeline:
             'vtools_version': self.proj.version,
         }
         for key, val in self.pipeline.pipeline_vars.items():
-            VARS[key.lower()] = self.substitute(val, VARS)
+            self.VARS[key.lower()] = self.substitute(val, self.VARS)
         #
         ifiles = input_files
         for command in psteps:
@@ -1192,7 +1204,7 @@ class Pipeline:
                     ' '.join(command.comment.split())))
             # substitute ${} variables
             if command.input:
-                step_input = shlex.split(self.substitute(command.input, VARS))
+                step_input = shlex.split(self.substitute(command.input, self.VARS))
             else:
                 step_input = ifiles
             #
@@ -1201,7 +1213,7 @@ class Pipeline:
                 raise RuntimeError('Pipeline stops at step {}_{}: No input file is available.'
                     .format(pname, command.index))
             #
-            VARS['input{}'.format(command.index)] = step_input
+            self.VARS['input{}'.format(command.index)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
             # 
@@ -1211,22 +1223,23 @@ class Pipeline:
             else:
                 try:
                     # remove ${INPUT} because it is determined by the emitter
-                    if 'input' in VARS:
-                        VARS.pop('input')
+                    if 'input' in self.VARS:
+                        self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(self.substitute(command.input_emitter, VARS))
+                    emitter = eval(self.substitute(command.input_emitter, self.VARS))
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
             #
             saved_dir = os.getcwd()
-            igroups, step_output = emitter(step_input)
+            # pass Pipeline itself to emitter
+            igroups, step_output = emitter(step_input, self)
             try:
                 for ig in igroups:
                     if not ig:
                         continue
-                    VARS['input'] = ig
-                    action = self.substitute(command.action, VARS)
+                    self.VARS['input'] = ig
+                    action = self.substitute(command.action, self.VARS)
                     env.logger.debug('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
                     env.logger.debug('Action of step {}_{}: {}'
@@ -1234,14 +1247,17 @@ class Pipeline:
                     action = eval(action)
                     if type(action) == tuple:
                         action = SequentialActions(action)
-                    ofiles = action(ig)
+                    # pass the Pipeline object itself to action
+                    # this allows the action to have access to pipeline variables
+                    # and other options
+                    ofiles = action(ig, self)
                     if type(ofiles) == str:
                         step_output.append(ofiles)
                     else:
                         step_output.extend(ofiles)
                 # wait for all pending jobs to finish
                 wait_all()
-                VARS['output{}'.format(command.index)] = step_output
+                self.VARS['output{}'.format(command.index)] = step_output
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
                 for f in step_output:
@@ -1250,9 +1266,9 @@ class Pipeline:
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
-                    VARS[key.lower()] = self.substitute(val, VARS)
+                    self.VARS[key.lower()] = self.substitute(val, self.VARS)
                     env.logger.debug('Pipeline variable {} is set to {}'
-                        .format(key, VARS[key.lower()]))
+                        .format(key, self.VARS[key.lower()]))
             except Exception as e:
                 raise RuntimeError('Failed to execute step {}_{}: {}'
                     .format(pname, command.index, e))
