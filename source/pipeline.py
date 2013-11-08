@@ -909,7 +909,7 @@ class DecompressFiles:
         for filename in ifiles:
             filenames.extend(self._decompress(filename))
         filenames.sort()
-        return filenames        
+        return filenames
 
 
 class RemoveIntermediateFiles:
@@ -1223,7 +1223,11 @@ class Pipeline:
             self.VARS[key.lower()] = self.substitute(val, self.VARS)
         #
         ifiles = input_files
-        for command in psteps:
+        step_index = 0
+        while True:
+            # step_index can jump back and forth depending on the 
+            # execution status of each step
+            command = psteps[step_index]
             env.logger.info('Executing step {}_{} of pipeline {}: {}'
                 .format(pname, command.index, self.pipeline.name,
                     ' '.join(command.comment.split())))
@@ -1286,7 +1290,7 @@ class Pipeline:
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
                 for f in step_output:
-                    if not os.path.isfile(f):
+                    if not (os.path.isfile(f) or os.path.isfile(f + '.file_info')):
                         raise RuntimeError('Output file {} does not exist after '
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
@@ -1299,6 +1303,10 @@ class Pipeline:
                     .format(pname, command.index, e))
             os.chdir(saved_dir)
             ifiles = step_output
+            # this step is successful, go to next
+            step_index += 1
+            if step_index == len(psteps):
+                break
 
 
 

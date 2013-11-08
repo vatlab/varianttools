@@ -1668,17 +1668,10 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
 class FileInfo:
     def __init__(self, filename):
         self.filename = filename
-        if os.path.isfile(self.filename):
-            self.md5 = calculateMD5(self.filename, partial=True)
-            self.size = os.path.getsize(self.filename)
-            self.ctime = os.path.getctime(self.filename)
-            self.mtime = os.path.getmtime(self.filename)
-        elif os.path.isfile(self.filename + '.file_info'):
-            with open(self.filename + '.file_info') as info:
-                self.md5 = info.readline().strip()
-                self.size = int(info.readline().strip())
-                self.ctime = float(info.readline().strip())
-                self.mtime = float(info.readline().strip())
+        self._size = None
+        self._md5 = None
+        self._mtime = None
+        self._ctime = None
 
     def save(self):
         '''Create a .file_info file with information about the original
@@ -1689,6 +1682,37 @@ class FileInfo:
                 calculateMD5(self.filename, partial=True),
                 os.path.getctime(self.filename),
                 os.path.getmtime(self.filename)))
+
+    def load(self):
+        with open(self.filename + '.file_info') as info:
+            self._size = int(info.readline().strip())
+            self._md5 = info.readline().strip()
+            self._ctime = float(info.readline().strip())
+            self._mtime = float(info.readline().strip())
+        
+    def md5(self):
+        if self._md5 is None:
+            if os.path.isfile(self.filename):
+                self._md5 = calculateMD5(self.filename, partial=True)
+            else:
+                self.load()
+        return self._md5
+
+    def size(self):
+        if self._size is None:
+            if os.path.isfile(self.filename):
+                self._size = os.path.getsize(self.filename)
+            else:
+                self.load()
+        return self._size
+
+    def mtime(self):
+        if self._mtime is None:
+            if os.path.isfile(self.filename):
+                self._mtime = os.path.getmtime(self.filename)
+            else:
+                self.load()
+        return self._mtime
 
 def existAndNewerThan(ofiles, ifiles, md5file=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
@@ -1703,10 +1727,10 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     _ofiles = [ofiles] if type(ofiles) != list else ofiles
     # file exist?
     for ifile in _ifiles:
-        if not os.path.isfile(ifile):
+        if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
             raise RuntimeError('Input file {} is not found.'.format(ifile))
     # out file does not exist
-    if not all([os.path.isfile(x) for x in _ofiles]):
+    if not all([os.path.isfile(x) or os.path.isfile(x + '.file_info') for x in _ofiles]):
         return False
     #
     # compare timestamp of input and output files
@@ -1738,15 +1762,16 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
-                if not os.path.isfile(f):
+                if not (os.path.isfile(f) or os.path.isfile(f + '.file_info')):
                     env.logger.warning('{} in {} does not exist.'.format(f, md5file))
                     return False
-                if os.path.getsize(f) != s:
+                f_info = FileInfo(f)
+                if f_info.size() != s:
                     env.logger.warning(
                         'Size of existing file differ from recorded file: {}'
                         .format(f))
                     return False
-                if calculateMD5(f, partial=True) != m.strip():
+                if f_info.md5() != m.strip():
                     env.logger.warning(
                         'md5 of existing file differ from recorded file: {}'
                         .format(f))
@@ -1755,13 +1780,28 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
         if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
             env.logger.warning('Corrupted exe_info file {}'.format(md5file))
             return False    
+    #
+    def samefile(x,y):
+        if x == y:
+            return True
+        if os.path.isfile(x):
+            if os.path.isfile(y):
+                return os.path.samefile(x, y)
+            elif os.path.isfile(y + '.file_info'):
+                return True
+            return False
+        else:
+            if os.path.isfile(y):
+                return True
+            else:
+                return False
     # check if all files have matching signature, do not check timestamp
-    if all([any([os.path.samefile(x, y) for y in md5matched]) for x in _ifiles]) \
-        and all([any([os.path.samefile(x, y) for y in md5matched]) for x in _ofiles]):
+    if all([any([samefile(x, y) for y in md5matched]) for x in _ifiles]) \
+        and all([any([samefile(x, y) for y in md5matched]) for x in _ofiles]):
         return True
     # md5 not available 
-    output_timestamp = min([os.path.getmtime(x) for x in _ofiles])
-    input_timestamp = max([os.path.getmtime(x) for x in _ifiles])
+    output_timestamp = min([FileInfo(x).mtime() for x in _ofiles])
+    input_timestamp = max([FileInfo(x).mtime() for x in _ifiles])
     if output_timestamp < input_timestamp:
         env.logger.warning('Ignoring older existing output file {}.'
             .format(', '.join(_ofiles)))
