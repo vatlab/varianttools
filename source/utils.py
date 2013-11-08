@@ -1665,6 +1665,31 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
     raise Exception('Failed to download file {}'.format(fileToGet))
 
 
+class FileInfo:
+    def __init__(self, filename):
+        self.filename = filename
+        if os.path.isfile(self.filename):
+            self.md5 = calculateMD5(self.filename, partial=True)
+            self.size = os.path.getsize(self.filename)
+            self.ctime = os.path.getctime(self.filename)
+            self.mtime = os.path.getmtime(self.filename)
+        elif os.path.isfile(self.filename + '.file_info'):
+            with open(self.filename + '.file_info') as info:
+                self.md5 = info.readline().strip()
+                self.size = int(info.readline().strip())
+                self.ctime = float(info.readline().strip())
+                self.mtime = float(info.readline().strip())
+
+    def save(self):
+        '''Create a .file_info file with information about the original
+        file.'''
+        with open(self.filename + '.file_info', 'w') as info:
+            info.write('{}\n{}\n{}\n{}\n'.format(
+                os.path.getsize(self.filename),
+                calculateMD5(self.filename, partial=True),
+                os.path.getctime(self.filename),
+                os.path.getmtime(self.filename)))
+
 def existAndNewerThan(ofiles, ifiles, md5file=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 

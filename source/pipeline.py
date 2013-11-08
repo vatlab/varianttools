@@ -45,7 +45,8 @@ import logging
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName
+    existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
+    FileInfo
     
 from .project import PipelineDescription, Project
 
@@ -909,6 +910,30 @@ class DecompressFiles:
             filenames.extend(self._decompress(filename))
         filenames.sort()
         return filenames        
+
+
+class RemoveIntermediateFiles:
+    def __init__(self, files):
+        self.files = files
+
+    def __call__(self, ifiles, pipeline=None):
+        for f in shlex.split(self.files):
+            if not os.path.isfile(f):
+                if os.path.isfile(f + '.file_info'):
+                    env.logger.debug('Missing input file. Reusing existing {}.file_info.'
+                        .format(f))
+                else:
+                    raise RuntimeError('Failed to create {}.file_info: Missing input file.'
+                        .format(f))
+            else:
+                FileInfo(f).save()
+                try:
+                    os.remove(f)
+                except e:
+                    env.logger.warning('Failed to remove intermediate file {}'
+                        .format(f))
+        return ifiles
+
 
 class LinkToDir:
     '''Create hard links of input files to a specified directory. This is 
