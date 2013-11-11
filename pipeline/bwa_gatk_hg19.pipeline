@@ -124,6 +124,11 @@ opt_gatk_applyrecalibration_indel_comment=Option to command gatk ApplyRecalibrat
 
 
 [align_0]
+action=CheckVariantToolsVersion('2.1.1')
+comment=Check the version of variant tools (version 2.1.1 and above is required
+    to execute this pipeline)
+
+[align_1]
 # resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
 # the .gz files will be automatically decompressed
 action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
@@ -256,6 +261,7 @@ input=${OUTPUT101}
 # read group is guessed from input and output file names
 action=GuessReadGroup(bamfile="${CMD_OUTPUT}",
     rgfile="${INPUT: INPUT[0] + '.RG'}")
+READGROUP=${INPUT: open(INPUT[0] + '.RG').read().strip()}
 input_emitter=EmitInput(group_by='paired', select='fastq', pass_unselected=False)
 comment=Determine (guess) a read group tag and write to a .RG file.
 
@@ -264,7 +270,7 @@ comment=Determine (guess) a read group tag and write to a .RG file.
 input=${OUTPUT101}
 # cmd=r" " is needed because there are \t in the readgroup string
 action=RunCommand(cmd=r"%(bwa)s sampe %(opt_bwa_sampe)s
-        -r '${INPUT: open(INPUT[0] + ".RG").read().strip()}'
+        -r '${READGROUP}'
         ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT: INPUT[0] + '.sai'} ${INPUT: INPUT[1] + '.sai'}
         ${INPUT: INPUT[0]} ${INPUT: INPUT[1]} > ${INPUT: INPUT[0] + '.sam'}",
@@ -294,6 +300,11 @@ input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1}, group_by="all")
 comment=Merge per-lane sam files into a single bam file. This step is skipped
 	if there is only one input file.
 
+[align_401]
+action=RemoveIntermediateFiles('${INPUT400}')
+input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1})
+comment=Remove individual bam files after they have been merged.
+
 [align_500]
 action=RunCommand(cmd="%(java)s %(opt_java)s 
         -jar %(picard_path)s/SortSam.jar 
@@ -313,6 +324,10 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         VALIDATION_STRINGENCY=LENIENT",
     output="${INPUT: INPUT[0][:-4] + '_dedup.bam'}")
 comment=Mark duplicates using picard MarkDuplicates command
+
+[align_601]
+action=RemoveIntermediateFiles('${OUTPUT500}')
+comment=Remove _sorted.bam file after deduplication is completed.
 
 [align_610]
 action=RunCommand(cmd="%(samtools)s index
@@ -392,6 +407,10 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
     output="${CMD_OUTPUT: CMD_OUTPUT[0]}")
 comment=Apply base recalibrator target
 
+[align_811]
+action=RemoveIntermediateFiles('${OUTPUT700} ${OUTPUT710}')
+comment=Remove bam files before realignment steps
+
 [align_900]
 # if there are more than 1 output file, emit input file for further processing
 # output file is specifed as the second command output
@@ -408,10 +427,14 @@ comment=Generated bam file with reduced reads if more than one output file
 	is specified
 
 
+[align_0]
+action=CheckVariantToolsVersion('2.1.1')
+comment=Check the version of variant tools (version 2.1.1 and above is required
+    to execute this pipeline)
 
-[call_0]
 # resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/*
 # the .gz files will be automatically decompressed
+[call_1]
 action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.3/hg19/1000G_omni2.5.hg19.vcf.idx.gz
