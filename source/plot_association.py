@@ -31,7 +31,7 @@ except:
     # python 3 has pickle
     import pickle
 from collections import OrderedDict
-from .utils import env, runCommand, mkdir_p, downloadFile
+from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
 from .rtester import Str4R
 
 def plotAssociation(args):
@@ -47,9 +47,15 @@ def plotAssociation(args):
     env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
     p = Plot(args, data)
     pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
+    # load R libraries
+    for l in ['ggplot2', 'scales', 'RColorBrewer', 'plyr']:
+        rlib = whereisRPackage('{}'.format(l))
+        pinput = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + pinput
     env.logger.info("Generating graph(s) ...")
     cmd = "R --slave --no-save --no-restore"
     out = runCommand(cmd, pinput)
+    if out:
+        sys.stdout.write(out)
     env.logger.info("Complete!")
     #print(pinput)
     return
@@ -272,21 +278,20 @@ class Plot:
         self.is_snv = False
         self.dat = []
         badlines = []
-        if 'chr' in headline and 'pos' in headline:
-            if headline.index('chr') == 0 and headline.index('pos') == 1:
-                # merge the 1st and 2nd columns if input data is for single SNV
-                for idx, x in enumerate(inlines[1:]):
-                    try:
-                        self.dat.append([':'.join(x[0:2])] + [x[i] for i in idxes])
-                    except IndexError:
-                        badlines.append(str(idx+2))
-                self.is_snv = True
+        if 'chr' in headline[0] and 'pos' in headline[1]:
+            # merge the 1st and 2nd columns if input data is for single SNV
+            for idx, x in enumerate(inlines[1:]):
+                try:
+                    self.dat.append([':'.join(x[0:2])] + [x[i] for i in idxes])
+                except IndexError:
+                    badlines.append(str(idx+2))
+            self.is_snv = True
         else:
-                for idx, x in enumerate(inlines[1:]):
-                    try:
-                        self.dat.append([x[0]] + [x[i] for i in idxes])
-                    except IndexError:
-                        badlines.append(str(idx+2))
+            for idx, x in enumerate(inlines[1:]):
+                try:
+                    self.dat.append([x[0]] + [x[i] for i in idxes])
+                except IndexError:
+                    badlines.append(str(idx+2))
         if len(badlines):
             env.logger.warning("The following lines are ignored due to having empty fields: {}. You may want to manually fill them up with placeholder 'NaN'.".format(', '.join(badlines)))
         return
@@ -352,7 +357,7 @@ class Plot:
             if len(multi_chrom):
                 env.logger.warning('The following genes belong to more than one chromosomes. Using whatever first entry (alphanumeric order) as the coordinate: {0}'.format(', '.join(multi_chrom)))
             if len(failed):
-                env.logger.warning('The following genes are not found in aviewer database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed)))
+                env.logger.warning('The following genes are not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed)))
         #
         rdat = OrderedDict()
         for x, y in zip(self.fields, list(zip(*dat))):
@@ -450,12 +455,11 @@ QQ_FOO = '''
 #! QQplot function
 QQplot <- function(dat, multiple=T, color='default', shapeFixed=F, shapeValue=1, title="", gwLine=T, slopeLine=T, optLines=c(), topFont=3, labelTopGenes=0, annotate=NULL, index=2)
 {
-	suppressMessages(library(ggplot2))
-	suppressMessages(library(RColorBrewer))
 	if (labelTopGenes>0 || length(annotate)>0) label=T
 	else label=F
 	qqDat <- data.frame()
 	qqTopHit <- data.frame()
+    med <- vector()
 	for( i in 2:ncol(dat) ) {
 		one <- dat[, c(1,i)]
 		names(one) <- c("gene", "obs")
@@ -464,6 +468,8 @@ QQplot <- function(dat, multiple=T, color='default', shapeFixed=F, shapeValue=1,
 		one$logObs <- -log10(as.numeric(one$obs))
 		one$ept <- -log10(c(1:length(one$obs))/(1+length(one$obs)))
 		one$method <- colnames(dat)[i]
+        lambda <- median(one$logObs)/median(one$ept)
+        med[i-1] = paste("Genomic inflation factor for method '", one$method, "' is: ", lambda, sep='')
 		if (label) {
 			topGenes <- one[which(one$logObs>=sort(one$logObs, decreasing=TRUE, na.last=NA)[labelTopGenes]), ]$gene
 			qqTopHit<- rbind(qqTopHit, one[which(one$gene %in% union(topGenes, annotate)), ])
@@ -537,7 +543,7 @@ QQplot <- function(dat, multiple=T, color='default', shapeFixed=F, shapeValue=1,
 		}
 	}
 	#label significant
-	return(pobj)
+	return(list(plot=pobj, median=med))
 }
 '''
 MANHATTAN_FOO = '''
@@ -571,9 +577,6 @@ manhattanplot <- function(dataframe, facet=F, color='default', title='', chroms=
     if (!("CHR" %in% names(d) & "BP" %in% names(d) & "P" %in% names(d))) stop("Make sure your data frame contains columns CHR, BP, and P")
     if ((labelTopGenes>0 || length(annotate)>0) && !("GENE" %in% names(d))) stop("You requested annotation but your data doesn't contains column GENE")
     if (facet && !("FACET" %in% names(d))) stop("You requested facet the plot but but your data doesn't contains column FACET")
-    suppressMessages(library(ggplot2))
-    suppressMessages(library(plyr))
-    suppressMessages(library(RColorBrewer))
     d$GENE <- as.character(d$GENE)
     d$CHR <- as.character(d$CHR)
     d$CHR[-which(d$CHR %in% as.character(c(1:22,'X','Y')))] <- 'Un'
@@ -686,8 +689,6 @@ manhattanplainplot <- function(dataframe, facetLastOne=T, color='default', title
     d=dataframe
     if (!("CHR" %in% names(d) & "BP" %in% names(d) & "P" %in% names(d))) stop("Make sure your data frame contains columns CHR, BP, and P")
     if ((labelTopGenes>0 || length(annotate)>0) && !("GENE" %in% names(d))) stop("You requested annotation but your data doesn't contains column GENE")
-    suppressMessages(library(plyr))
-    suppressMessages(library(RColorBrewer))
     d$GENE <- as.character(d$GENE)
     d$CHR <- as.character(d$CHR)
     d$CHR[-which(d$CHR %in% as.character(c(1:22,'X','Y')))] <- 'Un'
@@ -794,17 +795,19 @@ if (ncol(dat)<2) stop("data doesn't have enought columns")
 pdf(pdfname, qq_width, qq_height)
 if (onePlot) {
     pObj <- QQplot(dat, multiple=T, color=color, shapeFixed=shapeFixed, shapeValue=shapeValue, title=title, gwLine=gwLine, slopeLine=slopeLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
-    print(pObj)
+    print(pObj$plot)
+    for (i in 1:length(pObj$median)) write(pObj$median[i], stdout())
 } else {
     for( i in 2:ncol(dat) ) {
         pval <- dat[, c(1,i)]
         subtitle <- title
         if (ncol(dat)>2) subtitle <- paste(title, " ", colnames(dat)[i], " method", sep="")
         pObj <- QQplot(pval, multiple=F, color=color, shapeFixed=shapeFixed, shapeValue=shapeValue, title=subtitle, gwLine=gwLine, slopeLine=slopeLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate, index=i)
-        print(pObj)
+        print(pObj$plot)
+        for (i in 1:length(pObj$median)) write(pObj$median[i], stdout())
     }
 }
-dev.off()
+graphics.off()
 '''
 MANHATTAN_MAIN = '''
 if(topFont<1.5) topFont <- 1.5
@@ -816,7 +819,7 @@ if (ncol(dat)==4) {
     pObj <- manhattanplot(dat, facet=F, color=color, title=title, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
     pdf(pdfname, man_width, man_height)
     print(pObj)
-    dev.off()
+    graphics.off()
 } else {
     if (facet) {
         manDat <- data.frame()
@@ -830,7 +833,7 @@ if (ncol(dat)==4) {
         pdf(pdfname, man_width, man_height*length(levels(factor(manDat$FACET))))
         pObj <- manhattanplot(manDat,facet=T, color=color, title=title, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
         print(pObj)
-        dev.off()
+        graphics.off()
     } else {
         pdf(pdfname, man_width, man_height)
         for( i in 4:ncol(dat) ) {
@@ -841,7 +844,7 @@ if (ncol(dat)==4) {
             pObj <- manhattanplot(pval,facet=F, color=color, title=subtitle, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
             print(pObj)
         }
-        dev.off()
+        graphics.off()
     }
 }
 '''
@@ -870,7 +873,7 @@ if (facet) {
         manhattanplainplot(pval, facetLastOne=lastOne, color=color, title="", subtitle=subtitle, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
     }
     title(title, outer=T, line=-2, font.main= 4, cex.main=2)
-    dev.off()
+    graphics.off()
 } else {
 	pdf(pdfname, man_width, man_height)
 	par(mar=c(5,5,4,2)+0.1)
@@ -881,6 +884,6 @@ if (facet) {
         if (ncol(dat) > 4) subtitle <- paste(colnames(dat)[i], " method", sep="")
         manhattanplainplot(pval,facetLastOne=T, color=color, title=title, subtitle=subtitle, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
     }
-	dev.off()
+	graphics.off()
 }
 '''

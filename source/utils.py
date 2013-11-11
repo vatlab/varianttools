@@ -2760,3 +2760,25 @@ def mkdir_p(path):
             pass
         else:
             raise
+
+def installRPackage(libloc, package):
+    try:
+        mkdir_p(libloc)
+        sys.stderr.write('Installing {0} to {1} ...\n'.format(package, libloc))
+        runCommand(['R', '-e', 'install.packages("{0}", lib="{1}", repos="http://cran.stat.ucla.edu")'.\
+                    format(package, libloc)])
+        runCommand(["R", "-e", "library('{1}', lib.loc='{0}')".format(libloc, package)])
+    except Exception as e:
+        raise ValueError("Cannot auto-install / load R library {1}: {0}".format(e, package))
+
+def whereisRPackage(package):
+    libloc = None
+    try:
+        runCommand(["R", "-e", "library('{}')".format(package)])
+    except:
+        libloc = os.path.join(env.local_resource, 'Rlib')
+        try:
+            runCommand(["R", "-e", "library('{1}', lib.loc='{0}')".format(libloc, package)])
+        except:
+            installRPackage(libloc, package)
+    return libloc
