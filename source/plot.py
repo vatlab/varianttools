@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $File: plot_association.py $
+# $File: plot.py $
 # $LastChangedDate: 2012-06-05 12:31:19 -0500 (Tue, 05 Jun 2012) $
 # $Rev: 1179 $
 #
@@ -8,7 +8,7 @@
 # summarize, and filter variants for next-gen sequencing ananlysis.
 # Please visit http://varianttools.sourceforge.net for details.
 #
-# Copyright (C) 2012 Zongxiao He, Bo Peng and Gao Wang
+# Copyright (C) 2012 Bo Peng and Gao Wang
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -34,6 +34,61 @@ from collections import OrderedDict
 from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
 from .rtester import Str4R
 
+def RdeviceFromFilename(filename):
+    # guess the device used to plot R plot from filename
+    basename, ext = os.path.splitext(filename)
+    # default
+    device = 'postscript'
+    params = ''
+    try:
+        # functions are not available in, for example, R 2.6.2
+        if ext.lower() == '.pdf':
+            device = 'pdf'
+        elif ext.lower() == '.png':
+            device = 'png'
+            params = ', width=800, height=600'
+        elif ext.lower() == '.bmp':
+            device = 'bmp'
+            params = ', width=800, height=600'
+        elif ext.lower() in ['.jpg', '.jpeg']:
+            device = 'jpeg'
+            params = ', width=800, height=600'
+        elif ext.lower() in ['.tif', '.tiff']:
+            device = 'tiff'
+            params = ', width=800, height=600'
+        elif ext.lower() == '.eps':
+            device = 'postscript'
+    except Exception, e:
+        logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(name, e))
+        device = 'postscript'
+    return '{}("{}" {})'.format(device, filename, params)
+
+def resolvePlotFilename(name, fields):
+    if len(fields) == 1:
+        return [name]
+    else:
+        return [os.path.splitext(name)[0] + '_{}'.format(x) + os.path.splitext(name)[1] for x in fields]
+    
+def executeRScript(script):
+    # write script to log file for debugging and customization purposes
+    logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
+    logger.debug(script)
+    # start R
+    process = subprocess.Popen(['R', '--slave', '--no-save', '--no-restore'], 
+        stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    # send script and get standard output and error
+    out, err = process.communicate(script)
+    if err.strip():
+        logger.warning(err)
+    return process.wait()
+
+def loadGgplot(script):
+    # load R libraries
+    for l in ['ggplot2', 'scales', 'RColorBrewer', 'plyr']:
+        rlib = whereisRPackage('{}'.format(l))
+        script = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + script
+    return script
+
 def plotAssociation(args):
     env.logger.info("Reading from standard input ...")
     data = []
@@ -45,12 +100,9 @@ def plotAssociation(args):
             data_size += len(x)
         data.append(x.rstrip().split())
     env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
-    p = Plot(args, data)
+    p = PlotAssociation(args, data)
     pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
-    # load R libraries
-    for l in ['ggplot2', 'scales', 'RColorBrewer', 'plyr']:
-        rlib = whereisRPackage('{}'.format(l))
-        pinput = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + pinput
+    pinput = loadGgplot(pinput)
     env.logger.info("Generating graph(s) ...")
     cmd = "R --slave --no-save --no-restore"
     out = runCommand(cmd, pinput)
@@ -74,6 +126,44 @@ def manhattan_plain(args):
 	plot(args, 'manhattan')
 	return
 
+def rhist(data, output, vlines = None, normcurve = True):
+    '''draw histogram using ggplot2'''
+    if vlines:
+        vlines = Str4R(vlines)
+    else:
+        vlines = 'NULL'
+    rstr = '''
+        tryCatch( {{dat <- read.delim(pipe('cat /dev/stdin'), header=T, stringsAsFactors=F)
+        }}, error = function(e) {{ quit("no") }} )
+        stat_foo <- NULL
+        vlines <- {0}
+        fns <- c({2})
+        for (i in 1:ncol(dat)) {{  
+        if ({1}) stat_foo <- function(x) dnorm(x, mean(dat[,i], na.rm=T), sd(dat[,i], na.rm=T))
+        d <- subset(dat, select=c(colnames(dat)[i]))
+        p <- gghist(d, stat_foo, vlines=vlines, xname=colnames(dat)[i])
+        eval(parse(text=fns[i]))
+        print(p)
+        graphics.off()
+        }}'''.format(vlines, int(normcurve), ','.join([repr(RdeviceFromFilename(x)) for x in output]))
+    #
+    # Here we pipe data from standard input (which can be big),
+    # create a script dynamically, and pump it to a R process.
+    #
+    rstr = HIST_FOO + loadGgplot(rstr)
+    rscript = os.path.join(env.cache_dir, 'hist.R')
+    with open(rscript, 'w') as f:
+        f.write(rstr)
+    env.logger.info('Generating histogram {} ...'.format(repr(output)))
+    cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
+    out = runCommand(cmd, data) 
+    if out:
+        sys.stdout.write(out)
+    env.logger.info("Complete!")
+    # clean up
+    os.remove(rscript)
+    return
+
 def size(bytes):
     system = [
     (1024 ** 5, 'P'),
@@ -96,131 +186,10 @@ def size(bytes):
             suffix = multiple
     return str(amount) + suffix
 
+def ismissing(x):
+    return (x != x or x.lower() in ['none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '])
 
-class PlotAssociationOpt:
-    def __init__(self, master_parser):
-        self.master_parser = master_parser
-        subparsers = self.master_parser.add_subparsers()
-        # subparser 1
-        parserQQ = subparsers.add_parser('qq', help='QQ plot via ggplot2')
-        self.qqArguments(parserQQ)
-        self.commonArguments(parserQQ)
-        parserQQ.set_defaults(func=qq)
-        # subparser 2
-        parserMan = subparsers.add_parser('manhattan', help='Manhattan plot via ggplot2')
-        self.manArguments(parserMan)
-        self.commonArguments(parserMan)
-        parserMan.set_defaults(func=manhattan)
-        # subparser 3
-        parserManPlain = subparsers.add_parser('manhattan_plain',
-                                               help='Manhattan plot implementation not using ggplot2')
-        self.manArguments(parserManPlain)
-        self.commonArguments(parserManPlain)
-        parserManPlain.set_defaults(func=manhattan_plain)
-
-    def get(self):
-        return self.master_parser
-
-    def qqArguments(self, parser):
-        parser.add_argument('--shape',
-                metavar='INTEGER',
-                            type=int,
-                default=1,
-                help='''Choose a shape theme
-                (integer 1 to 16) for dots on QQ plot.
-                Default set to 1.''')
-        parser.add_argument('--fixed_shape',
-                            action='store_true',
-                help='''Use the same dot-shape theme for all plots''')
-        parser.add_argument('--no_slope',
-                            action='store_true',
-                help='''Do not plot the diagonal line''')
-
-    def manArguments(self, parser):
-        parser.add_argument('--chrom',
-                metavar = 'CHROMOSOME',
-                nargs = '+',
-                default=list(map(str, range(1,23))) + ['X','Y','Un'],
-                help='''Specify the particular chromosome(s) to display. Can be
-                one or multiple in this list: "{}". Slicing syntax "?:?" is 
-                supported. For example "1:22" is equivalent to displaying 
-                all autosomes; "1:Y" is equivalent to displaying 
-                all mapped chromosomes. Default set to all including unmapped 
-                chromosomes.'''.format(' '.join(list(map(str, range(1,23))) + ['X','Y','Un', '?:?'])))
-        parser.add_argument('--chrom_prefix',
-                metavar = 'PREFIX',
-                type = str,
-                default = 'chr',
-                help='''Prefix chromosome ID with a string.
-                Default is set to "chr" (X-axis will be displayed
-                as "chr1", "chr2", etc). Use "None" for no prefix.
-                ''')
-        parser.add_argument('--gene_map',
-                metavar = 'FILE',
-                type = str,
-                help='''If the plot units are genes and the program fails to map certain genes to 
-                chromosomes, you can fix it by providing a text file of genomic coordinate 
-                information of these genes. Each gene in the file is a line of 3 columns
-                specifying "GENENAME CHROM MIDPOINT_POSITION", e.g., "IKBKB 8 42128820".
-                ''')
-
-    def commonArguments(self, parser):
-        parser.add_argument("--method", default = sys.argv[2] if len(sys.argv) > 2 else '', help=argparse.SUPPRESS)
-        settings = parser.add_argument_group('graph properties')
-        settings.add_argument('-t', '--title',
-                            type=str,
-                default='',
-                            help='''Title of plot.''')
-        settings.add_argument('--color',
-                            type=str,
-                choices=CTHEME,
-                            help='''Choose a color theme from the list above to apply
-                to the plot. (via the 'RColorBrewer' package:
-                cran.r-project.org/web/packages/RColorBrewer)''')
-        settings.add_argument('--width_height',
-                metavar = 'INCHES',
-                nargs = 2,
-                help='''The width and height of the graphics region in inches''')
-        settings.add_argument('-s', '--same_page',
-                            action='store_true',
-                            help='''Plot multiple groups of p-values on the same graph''')
-        settings.add_argument('-o', '--output',
-                metavar = 'FILE',
-                type = str,
-                help='''Specify output graph filename. 
-                Output is in pdf format. It can be converted to jpg format
-                via the 'convert' command in Linux (e.g., convert -density 180 p.pdf p.jpg)''')
-        labelling = parser.add_argument_group('variants/genes highlighting')
-        labelling.add_argument('-b', '--bonferroni',
-                            action='store_true',
-                            help='''Plot the horizontal line at 0.05/N on Y-axis
-                (significance level after Bonferroni correction)''')
-        labelling.add_argument('-l', '--hlines',
-                metavar = 'POSITION',
-                nargs = '+',
-                type=float,
-                help='''Additional horizontal line(s) to
-                be drawn on the Y-axis.''')
-        labelling.add_argument('--label_top',
-                metavar='INTEGER',
-                            type=int,
-                default=1,
-                help='''Specify how many top hits (smallest p-values by rank)
-                you want to highlight with their identifiers in text.''')
-        labelling.add_argument('--label_these',
-                metavar='NAME',
-                            type=str,
-                nargs = '+',
-                help='''Specify the names of variants (chr:pos, e.g., 1:87463) 
-                or genes (genename, e.g., IKBKB) you want to
-                highlight with their identifiers in text.''')
-        labelling.add_argument('-f','--font_size',
-                metavar='SIZE',
-                            type=float,
-                default=2.5,
-                help='''Font size of text labels. Default set to '2.5'.''')
-
-
+    
 CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", 
 "RdYlBu", "RdYlGn", "Spectral","Accent", "Paired", 
 "Pastel1", "Pastel2", "Set1", "Set2", "Set3", "Blues", 
@@ -228,7 +197,7 @@ CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu
 "OrRd", "PuBu", "PuBuGn", "PuRd", "Purples", "RdPu", 
 "Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"]
 
-class Plot:
+class PlotAssociation:
     def __init__(self, args, inlines):
         '''Prepare R script to generate qq and manhattan plots'''
         if len(inlines) < 2:
@@ -885,5 +854,38 @@ if (facet) {
         manhattanplainplot(pval,facetLastOne=T, color=color, title=title, subtitle=subtitle, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
     }
 	graphics.off()
+}
+'''
+HIST_FOO = '''
+gghues <- function(n) {
+        hues = seq(15, 375, length=n+1)
+        hcl(h=hues, l=65, c=100)[1:n]
+}
+gghue <- function(n) { gghues(n)[n] }
+gghist <- function(dat, stat_foo = NULL, vlines = NULL, xname='x') {
+        average <- round(mean(dat[,xname], na.rm=T),4)
+        stdev <- round(sd(dat[,xname], na.rm=T),4)
+        #med <- round(median(dat[,xname], na.rm=T), 4)
+        r1 <- round(min(dat[,xname], na.rm=T),4)
+        r2 <- round(max(dat[,xname], na.rm=T),4)
+        # convert dat obj from numeric to data.frame
+        myplot <- ggplot(dat) +
+                        aes_string(x = xname) +
+                        geom_histogram(aes_string(y = '..density..', fill = '..density..'), color = 'white', binwidth = (r2-r1)/30) +
+                        scale_fill_gradient('bin mass', low = 'darkolivegreen3', high = colors()[552]) +
+                        geom_line(stat = 'density', size = 0.5, linetype = 2, color = 'grey50') +
+                        geom_rug(color = 'grey80') +
+                        scale_x_continuous(name = paste('\\n', xname)) +
+                        scale_y_continuous(name = 'Density\\n') +
+                        theme_bw()
+        if (!is.null(vlines)) myplot <- myplot + geom_vline(xintercept = vlines, color = '#9ACD32', linetype = 2)
+        if (!is.null(stat_foo)) {
+        myplot <- myplot + stat_function(fun = stat_foo, color = 'red')
+        plottitle <- 'Histogram & fitted vs. normal distribution density curve for "'
+        } else {
+        plottitle <- 'Histogram & fitted density curve for "'
+        } 
+        myplot <- myplot + labs(title = paste(plottitle, xname, '"\\n', 'mean = ', toString(average), '; ', 'stdev = ', toString(stdev), '; ', 'range = ', '[', toString(r1), ',', toString(r2), ']', '\\n', sep=''))
+        return(myplot)
 }
 '''

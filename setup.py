@@ -503,7 +503,7 @@ VTOOLS_FILES = ['source.__init__',
         'source.tester',
         'source.rtester',
         'source.meta',
-        'source.plot_association'
+        'source.plot'
 ]
 
 #

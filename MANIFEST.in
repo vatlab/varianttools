@@ -43,6 +43,7 @@ include source/compare.py
 include source/plinkfile.py
 include source/preprocessor.py
 include source/meta.py
+include source/plot.py
 include source/assoTests.i
 include source/cgatools.i
 include source/ucsctools.i
