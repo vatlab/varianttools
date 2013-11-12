@@ -76,6 +76,10 @@ class EmitInput:
 
     def _isFastq(self, filename):
         try:
+            if not os.path.isfile(filename) and os.path.isfile(filename + '.file_info'):
+                env.logger.info('Cannot detect the type of file because the {} has been removed.'
+                    .format(filename))
+                return True
             with open(filename) as fastq:
                 line = fastq.readline()
                 if not line.startswith('@'):
@@ -376,6 +380,11 @@ class CheckFastqVersion:
 
     def __call__(self, fastq_file, pipeline=None):
         '''Detect the version of input fastq file. This can be very inaccurate'''
+        if not os.path.isfile(fastq_file[0]) and os.path.isfile(fastq_file[0] + '.file_info'):
+            if os.path.isfile(self.output):
+                return self.output
+            else:
+                raise RuntimeError('A valid fastq file is needed to check version of fastq: .file_info detected')
         with open(self.output, 'w') as aln_param:
             #
             # This function assumes each read take 4 lines, and the last line contains
@@ -927,13 +936,13 @@ class RemoveIntermediateFiles:
         for f in shlex.split(self.files):
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
-                    env.logger.debug('Missing input file. Reusing existing {}.file_info.'
-                        .format(f))
+                    env.logger.info('Reusing existing {}.file_info.'.format(f))
                 else:
                     raise RuntimeError('Failed to create {}.file_info: Missing input file.'
                         .format(f))
             else:
                 FileInfo(f).save()
+                env.logger.info('Replace {0} with {0}.file_info'.format(f))
                 try:
                     os.remove(f)
                 except e:
@@ -961,7 +970,18 @@ class LinkToDir:
         ofiles = []
         for filename in ifiles:
             path, basename = os.path.split(filename)
-            if not os.path.samefile(filename,  os.path.join(self.dest, basename)):
+            if not os.path.isfile(filename):
+                if os.path.isfile(filename + '.file_info'):
+                    if not os.path.samefile(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info'):
+                        env.logger.info('Linking {} to {}'.format(filename, self.dest))
+                        os.link(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info')
+                    else:
+                        env.logger.debug('Reusing existing linked file_info file: {}'
+                            .format(os.path.join(self.dest, basename) + '.file_info'))
+                else:
+                    raise RuntimeError('Failed to link {} to directory {}: file does not exist'
+                        .format(filename, self.dest_dir))
+            elif not os.path.samefile(filename,  os.path.join(self.dest, basename)):
                 env.logger.info('Linking {} to {}'.format(filename, self.dest))
                 os.link(filename, os.path.join(self.dest, basename))
             ofiles.append(os.path.join(self.dest, basename))

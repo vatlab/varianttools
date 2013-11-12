@@ -26,6 +26,7 @@ RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk23_hg19
 
 # directory to save all intermediate files
 AUXILIARY_DIR=${CACHE_DIR}/%(name)s
+PRODUCTION_MODE=${:'%(production)s'.lower() in ('1', 'true', 'y', 'yes')}
 
 [DEFAULT]
 name=bwa_gatk_hg19
@@ -37,6 +38,11 @@ strict_prog_version=False
 strict_prog_version_comment=Whether or not use other version of programs if the
   exact version does not exist. Setting it to False allows variant tools to 
   use other versions of the programs.
+
+production=False
+production_comment=If set to True or 1, all intermediate files will be removed.
+  The whole pipeline would need to be rerun if a different parameter or different
+  version of external program is used.
 
 bwa=bwa
 bwa_comment=path to bwa. Default to 'bwa' (use $PATH to determine actual path)
@@ -239,14 +245,14 @@ input_emitter=EmitInput('single')
 action=CheckFastqVersion(output="${INPUT: INPUT[0] + '.aln_param'}")
 # remove all non-fastq files that might have been inputted
 input_emitter=EmitInput('single', select='fastq', pass_unselected=False)
+ALN_PARAM=${INPUT: open(INPUT[0] + ".aln_param").read().strip()}
 comment=Check the format of the input fastq file and write an option file
     with option -I if the sequences are in Illumina 1.3+ format.
 
 [align_201]
 # cannot use output of step align200, because we need a list of fastq files
 input=${OUTPUT101}
-action=RunCommand(cmd='%(bwa)s aln 
-        ${INPUT: open(INPUT[0] + ".aln_param").read().strip()}
+action=RunCommand(cmd='%(bwa)s aln ${ALN_PARAM}
         %(opt_bwa_aln)s -t 4 ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT} > ${INPUT: INPUT[0] + '.sai'}',
     output="${INPUT: INPUT[0] + '.sai'}",
@@ -301,9 +307,10 @@ comment=Merge per-lane sam files into a single bam file. This step is skipped
 	if there is only one input file.
 
 [align_401]
-action=RemoveIntermediateFiles('${INPUT400}')
-input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1})
-comment=Remove individual bam files after they have been merged.
+action=RemoveIntermediateFiles('${OUTPUT101} ${OUTPUT201} ${INPUT400}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove decompressed fastq and individual
+  bam files after a single bam file has been produced.
 
 [align_500]
 action=RunCommand(cmd="%(java)s %(opt_java)s 
@@ -408,8 +415,9 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
 comment=Apply base recalibrator target
 
 [align_811]
-action=RemoveIntermediateFiles('${OUTPUT700} ${OUTPUT710}')
-comment=Remove bam files before realignment steps
+action=RemoveIntermediateFiles('${OUTPUT500} ${OUTPUT600} ${OUTPUT700} ${OUTPUT710} ${OUTPUT610}')
+input_emitter=EmitInput(select='${PRODUCTION_MODE}')
+comment=If in production mode, remove bam files before realignment steps
 
 [align_900]
 # if there are more than 1 output file, emit input file for further processing
