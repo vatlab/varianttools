@@ -67,7 +67,10 @@ def resolvePlotFilename(name, fields):
     if len(fields) == 1:
         return [name]
     else:
-        return [os.path.splitext(name)[0] + '_{}'.format(x) + os.path.splitext(name)[1] for x in fields]
+        if name is None:
+            return [None for x in fields]
+        else:
+            return [os.path.splitext(name)[0] + '_{}'.format(x) + os.path.splitext(name)[1] for x in fields]
     
 def executeRScript(script):
     # write script to log file for debugging and customization purposes
@@ -109,7 +112,6 @@ def plotAssociation(args):
     if out:
         sys.stdout.write(out)
     env.logger.info("Complete!")
-    #print(pinput)
     return
 
 def qq(args):
@@ -126,7 +128,7 @@ def manhattan_plain(args):
 	plot(args, 'manhattan')
 	return
 
-def rhist(data, output, vlines = None, normcurve = True):
+def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_script = None):
     '''draw histogram using ggplot2'''
     if vlines:
         vlines = Str4R(vlines)
@@ -150,8 +152,11 @@ def rhist(data, output, vlines = None, normcurve = True):
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
     #
+    if save_data:
+        with open(save_data, 'w') as f:
+            f.write(data)
     rstr = HIST_FOO + loadGgplot(rstr)
-    rscript = os.path.join(env.cache_dir, 'hist.R')
+    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
     with open(rscript, 'w') as f:
         f.write(rstr)
     env.logger.info('Generating histogram {} ...'.format(repr(output)))
@@ -161,7 +166,8 @@ def rhist(data, output, vlines = None, normcurve = True):
         sys.stdout.write(out)
     env.logger.info("Complete!")
     # clean up
-    os.remove(rscript)
+    if save_script is None:
+        os.remove(rscript)
     return
 
 def size(bytes):

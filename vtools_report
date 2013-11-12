@@ -462,8 +462,8 @@ def plotFieldsArguments(parser):
     parser.add_argument('fields', nargs='+', help='A list of fields that will be outputted.')
     parser.add_argument('--variants', default='variant', metavar='TABLE',
         help='''Limit value of fields to variant in specified variant table. Default to all variants.''')
-    # parser.add_argument('--data_file', default='plot_fields.dat',
-    #     help='''Name of the output data file.''')
+    parser.add_argument('--save_data', metavar='FILENAME', help='''Save data to file.''')
+    parser.add_argument('--save_script', metavar='FILENAME', help='''Save R script to file.''')
     hist = parser.add_argument_group('Draw histogram')
     hist.add_argument('--hist',
         help='''File name of the outputted figure, which can have type PDF,
@@ -491,7 +491,35 @@ def plotFields(args):
     output = getoutput(['vtools', 'output', args.variants] + args.fields + ['--na', 'NA', '--header'])
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
-        rhist(output, fns, normcurve = args.norm_curve)
+        rhist(output, fns, normcurve = args.norm_curve,
+              save_data = args.save_data, save_script = args.save_script)
+
+#
+# command plot_pheno_fields
+#
+def plotPhenoFieldsArguments(parser):
+    parser.add_argument('fields', nargs='+', help='A list of fields that will be outputted.')
+    parser.add_argument('--samples', nargs='*',
+        help='''Conditions based on which samples are selected. Default to all samples.''')
+    parser.add_argument('--save_data', metavar='FILENAME', help='''Save data to file.''')
+    parser.add_argument('--save_script', metavar='FILENAME', help='''Save R script to file.''')
+    hist = parser.add_argument_group('Draw histogram')
+    hist.add_argument('--hist',
+        help='''File name of the outputted figure, which can have type PDF,
+            EPS, or JPG. Multiple files might be produced if more than one
+            figure is produced (e.g. MyFig_$FIELD1.pdf, MyFig_$FILED2.pdf
+            if MyFig.pdf is specified)''')
+    hist.add_argument('--norm_curve', action='store_true',
+                help='''Add a normal distribution N(mean, stdev) density curve to the histogram.''')
+    
+def plotPhenoFields(args):
+    logger.info('Gathering data for plot')
+    sarg = ['--samples', '{}'.format(args.samples)] if args.samples else []
+    output = getoutput(['vtools', 'phenotype', '--output'] + args.fields + sarg + ['--na', 'NA', '--header'])
+    if args.hist is not None:
+        fns = resolvePlotFilename(args.hist, args.fields)
+        rhist(output, fns, normcurve = args.norm_curve,
+              save_data = args.save_data, save_script = args.save_script)
 
 #
 # command plot_geno_fields
@@ -500,13 +528,12 @@ def plotGenoFieldsArguments(parser):
     parser.add_argument('fields', nargs='+', help='A list of genotype fields that will be outputted.')
     parser.add_argument('--variants', metavar='TABLE',
         help='''Limit value of fields to variant in specified variant table. Default to all variants.''')
-    # parser.add_argument('--data_file', default='plot_geno_fields.dat',
-    #     help='''Name of the output data file. Each line consists of a sample name, a field name,
-    #         followed by geno info of each variant, delimited by tabs.''')
     parser.add_argument('--samples', nargs='*',
         help='''Conditions based on which samples are selected. Default to all samples.''')
     parser.add_argument('--genotypes', nargs='*',
         help='''Conditions based on which genotypes are selected. Default to all variants.''') 
+    parser.add_argument('--save_data', metavar='FILENAME', help='''Save data to file.''')
+    parser.add_argument('--save_script', metavar='FILENAME', help='''Save R script to file.''')
     hist = parser.add_argument_group('Draw histogram')
     hist.add_argument('--hist',
         help='''File name of the outputted figure, which can have type PDF,
@@ -548,8 +575,11 @@ def plotGenoFields(args):
                     output[field].append(line)
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
-        for f, fn in zip(args.fields, fns):
-            rhist(f + '\n' + '\n'.join(map(str,output[f])), [fn], normcurve = args.norm_curve)
+        dfiles = resolvePlotFilename(args.save_data, args.fields)
+        sfiles = resolvePlotFilename(args.save_script, args.fields)
+        for f, p, d, s in zip(args.fields, fns, dfiles, sfiles):
+            rhist(f + '\n' + '\n'.join(map(str,output[f])), [p], normcurve = args.norm_curve,
+              save_data = d, save_script = s)
 
 class PlotAssociationOpt:
     def __init__(self, master_parser):
@@ -843,21 +873,26 @@ if __name__ == '__main__':
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',
-        help='''Dump values of specified variant info field(s) and/or annotation fields to
-            a file and draw various plots. It essentially calls 'vtools output $table $fields',
-            write output to a file, and utilizes R (www.r-project.org) to draw the plots. The
-            script will be written to vtools_report.log which can be extracted and customied.''')
+        help='''Draw various plots of specified variant info field(s) and/or annotation fields.
+            It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
+            to draw the plots. The output data and R script can be saved to disk and customied.''')
     plotFieldsArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=plotFields)
+    # command plot_pheno_fields
+    parser = subparsers.add_parser('plot_pheno_fields',
+        help='''Draw various plots of specified sample phenotype fields.
+            It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
+            to draw the plots. The output data and R script can be saved to disk and customied.''')
+    plotPhenoFieldsArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=plotPhenoFields)
     #
-    # command plot_fields
+    # command plot_geno_fields
     parser = subparsers.add_parser('plot_geno_fields',
-        help='''Dump values of specified genotype variant info field(s) of all or selected
-            samples to a file and draw various plots using a R script. Each line of the data
-            file starts with a sample name and a field name, followed by values of all
-            variants. Because samples can have different number of variants, the data file
-            does not have to have equal number of columns.''')
+        help='''Draw various plots of specified genotype variant info field(s) of all or selected
+            samples. It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
+            to draw the plots. The output data and R script can be saved to disk and customied.''')
     plotGenoFieldsArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=plotGenoFields)
