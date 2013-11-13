@@ -60,7 +60,7 @@ class EmitInput:
     '''Select input files of certain types, group them, and send input files
     to action. Selection criteria can be True (all input file types, default),
     'False' (select no input file), 'fastq' (check content of files), or one or
-    more file extensions (e.g. ['sam', 'bam']).  Eligible files are by default
+    more file extensions (e.g. ['.sam', '.bam']).  Eligible files are by default
     sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
     # is the index of step, but can also be sent individually (group_by='single',
     ${INPUT} equals to a list of a single file) or in pairs 
@@ -69,8 +69,19 @@ class EmitInput:
     def __init__(self, group_by='all', select=True, pass_unselected=True):
         self.group_by = group_by
         if type(select) == str:
+            if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
+                raise ValueError("Value to option select can only be True/False, "
+                    "'fastq', or a file extension with leading '.': '{}' provided."
+                    .format(select))
             self.select = [select]
+        elif select in [True, False]:
+            self.select = select
         else:
+            for s in select:
+                if s not in ['fastq', 'bam', 'sam'] and not str(s).startswith('.'):
+                    raise ValueError("Value to option select can only be True/False, "
+                        "'fastq', or a file extension with leading '.': '{}' provided."
+                        .format(s))
             self.select = select
         self.pass_unselected = pass_unselected
 
@@ -109,9 +120,9 @@ class EmitInput:
         unselected = []
         for filename in ifiles:
             match = False
-            if self.select == True:
+            if self.select is True:
                 match = True
-            elif self.select == False:
+            elif self.select is False:
                 pass
             else:   # list of types
                 for t in self.select:
@@ -689,6 +700,8 @@ def wait_all():
     global running_jobs
     try:
         while True:
+            if not running_jobs or all([x is None for x in running_jobs]):
+                break
             # sleep one second, but poll_jobs will wait 10s for each running
             # job. This avoid waiting at least 10s for simple commands
             time.sleep(1)
@@ -933,6 +946,7 @@ class RemoveIntermediateFiles:
         self.files = files
 
     def __call__(self, ifiles, pipeline=None):
+        env.logger.debug('Remove intermediate files {}'.format(self.files))
         for f in shlex.split(self.files):
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):

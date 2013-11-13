@@ -422,7 +422,7 @@ comment=Apply base recalibrator target
 
 [align_811]
 action=RemoveIntermediateFiles('${OUTPUT500} ${OUTPUT600} ${OUTPUT700} ${OUTPUT710} ${OUTPUT610}')
-input_emitter=EmitInput(select='${PRODUCTION_MODE}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
 comment=If in production mode, remove bam files before realignment steps
 
 [align_900]
