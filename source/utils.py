@@ -181,14 +181,16 @@ class RuntimeEnvironments(object):
         try:
             os.remove(filename)
         except Exception as e:
-            self._logger.warning('Failed to remove lock file {}'.format(filename))
+            self._logger.warning('Failed to remove lock file {}: {}'
+                .format(filename, e))
 
     def unlock_all(self):
         for filename in self._lock_files:
             try:
                 os.remove(filename)
             except Exception as e:
-                self._logger.warning('Failed to remove lock file {}'.format(filename))
+                self._logger.warning('Failed to remove lock file {}: {}'
+                    .format(filename, e))
         self._lock_files = []
 
     # 
@@ -1803,7 +1805,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     output_timestamp = min([FileInfo(x).mtime() for x in _ofiles])
     input_timestamp = max([FileInfo(x).mtime() for x in _ifiles])
     if output_timestamp < input_timestamp:
-        env.logger.warning('Ignoring older existing output file {}.'
+        env.logger.debug('Ignoring older existing output file {}.'
             .format(', '.join(_ofiles)))
         return False
     else:

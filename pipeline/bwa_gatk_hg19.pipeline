@@ -306,12 +306,6 @@ input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1}, group_by="all")
 comment=Merge per-lane sam files into a single bam file. This step is skipped
 	if there is only one input file.
 
-[align_401]
-action=RemoveIntermediateFiles('${OUTPUT101} ${OUTPUT201} ${INPUT400}')
-input_emitter=EmitInput(select=${PRODUCTION_MODE})
-comment=If in production mode, remove decompressed fastq and individual
-  bam files after a single bam file has been produced.
-
 [align_500]
 action=RunCommand(cmd="%(java)s %(opt_java)s 
         -jar %(picard_path)s/SortSam.jar 
@@ -319,6 +313,16 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         O=${INPUT: INPUT[0][:-4] + '_sorted.bam'} SO=coordinate",
     output="${INPUT: INPUT[0][:-4] + '_sorted.bam'}")
 comment=Sort merged bam file using picard SortSam
+
+[align_501]
+# we do not remove intermediate file 201 because they are implicitly used in 
+# step 301. step 301 will not be able to detect input file error if the .sai
+# files are replaced by .file_info
+action=RemoveIntermediateFiles('${OUTPUT101} ${OUTPUT301}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove decompressed fastq and individual
+  bam files after a single bam file has been produced.
+
 
 [align_600]
 action=RunCommand(cmd="%(java)s %(opt_java)s
@@ -331,6 +335,8 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         VALIDATION_STRINGENCY=LENIENT",
     output="${INPUT: INPUT[0][:-4] + '_dedup.bam'}")
 comment=Mark duplicates using picard MarkDuplicates command
+
+
 
 [align_601]
 action=RemoveIntermediateFiles('${OUTPUT500}')

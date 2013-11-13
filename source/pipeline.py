@@ -1255,8 +1255,8 @@ class Pipeline:
             # step_index can jump back and forth depending on the 
             # execution status of each step
             command = psteps[step_index]
-            env.logger.info('Executing step {}_{} of pipeline {}: {}'
-                .format(pname, command.index, self.pipeline.name,
+            env.logger.info('Executing [[{}.{}_{}]]: {}'
+                .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
             if command.input:
@@ -1342,7 +1342,7 @@ class Pipeline:
                     if os.path.isfile(x + '.file_info'):
                         os.remove(x + '.file_info')
                 remaining = [x for x in to_be_regenerated]
-                while step_index >= 0:
+                while step_index > 0:
                     step_index -= 1
                     command = psteps[step_index]
                     # remove all fony files so that they will be re-generated
@@ -1356,16 +1356,12 @@ class Pipeline:
                     remaining = [x for x in remaining if x not in self.VARS['output{}'.format(command.index)]]
                     if not remaining:
                         break
-                if step_index == -1:
-                    raise RuntimeError('Cannot find a way to regenerate input file {}'
-                        .format(', '.join(remaining)))
+                if step_index > 1:
+                    ifiles = self.VARS['output{}'.format(psteps[step_index - 1].index)]
                 else:
-                    if step_index > 1:
-                        ifiles = self.VARS['output{}'.format(psteps[step_index - 1].index)]
-                    else:
-                        ifiles = self.VARS['CMD_INPUT']
-                    env.logger.warning('Input files {} need to be re-generated from step {}.'
-                        .format(', '.join(to_be_regenerated), command.index))
+                    ifiles = self.VARS['cmd_input']
+                env.logger.warning('Rewinding to [[{}.{}_{}]]: input files {} need to be re-generated.'
+                    .format(self.pipeline.name, pname, command.index, ', '.join(to_be_regenerated)))
                 os.chdir(saved_dir)
             except Exception as e:
                 raise RuntimeError('Failed to execute step {}_{}: {}'
