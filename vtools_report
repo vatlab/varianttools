@@ -560,10 +560,10 @@ def plotGenoFields(args):
     else:
         where_clause = []
         if args.genotypes:
-            where_clause.append(','.join(['({})' % x for x in args.genotypes]))
+            where_clause.append(','.join(['({})'.format(x) for x in args.genotypes]))
         if args.variants:
             where_clause.append('variant_id in (select variant_id from {})'.format(args.variants))
-        where_clause = 'WHERE ' + 'AND'.join(where_clause)
+        where_clause = 'WHERE ' + ' AND '.join(where_clause)
     # get data into dict
     for g, IDs, names in getSamples(args.samples):
         for id, name in zip(IDs, names):
