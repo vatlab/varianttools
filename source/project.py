@@ -2191,7 +2191,7 @@ class Project:
                 field = '{}.{}'.format(d, f)
             table, field = [x.lower() for x in field.rsplit('.', 1)]
             # if this is a variant table
-            if self.db.hasTable(table):
+            if self.db.hasTable(table) and field.lower() in [x.lower() for x in self.db.getHeaders(table)]:
                 if variant_table.lower() == table.lower():
                     # [] connection
                     # the field is in variant_table itself, no link is needed
