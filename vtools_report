@@ -268,6 +268,8 @@ def discordanceRateArguments(parser):
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
             'filename like "MG%%"').''')
+    parser.add_argument('--variants', default='variant', metavar='TABLE',
+        help='''Limit variants to specified variant table. Default to all variants.''')
     parser.add_argument('--genotypes', nargs='*', default=[],
         help='''Limiting genotypes from samples that match conditions that
             involves genotype fields (e.g. filter by quality score, with fields
@@ -286,12 +288,21 @@ def discordanceRate(args):
         # get list of variant for each sample
         rates = []
         treat_missing_as_wildtype = getoutput(['vtools', 'show', 'runtime_option', 'treat_missing_as_wildtype'])
+        # where_clause
+        if not args.genotypes and not args.variants:
+            where_clause = ''
+        else:
+            where_clause = []
+            if args.genotypes:
+                where_clause.append(','.join(['({})'.format(x) for x in args.genotypes]))
+            if args.variants:
+                where_clause.append('variant_id in (select variant_id from {})'.format(args.variants))
+            where_clause = 'WHERE ' + ' AND '.join(where_clause)
         for i, (id_i, name_i) in enumerate(zip(sample_ids, sample_names)):
             rates.append([0] * len(sample_ids))
             output_items = []
             var_i = {}
-            for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i,
-                ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
+            for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i, where_clause)]).split('\n'):
                 var, gt = line.split()
                 var_i[var] = gt
             for j, (id_j, name_j) in enumerate(zip(sample_ids, sample_names)):
@@ -301,8 +312,7 @@ def discordanceRate(args):
                     output_items.append('0/{0}'.format(len(var_i)))
                 else:
                     var_j = {}
-                    for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j,
-                        ('WHERE ' + ','.join(['({})'.format(x) for x in args.genotypes])) if args.genotypes else '')]).split('\n'):
+                    for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j, where_clause)]).split('\n'):
                         var, gt = line.split()
                         var_j[var] = gt
                     if treat_missing_as_wildtype == 'False':
