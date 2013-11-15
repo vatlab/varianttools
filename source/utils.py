@@ -65,10 +65,12 @@ try:
         import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
         from cgatools_py2 import CrrFile, Location, Range
+        from vt_sqlite3_py2 import OperationalError
     else:
         import pickle
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
+        from vt_sqlite3_py3 import OperationalError
 
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'

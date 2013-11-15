@@ -330,9 +330,9 @@ class PlotAssociation:
                     dat.append([x[0]] + ['Un', '{0}'.format(i)] + x[1:])
                     i += 1000
             if len(multi_chrom):
-                env.logger.warning('The following genes belong to more than one chromosomes. Using whatever first entry (alphanumeric order) as the coordinate: {0}'.format(', '.join(multi_chrom)))
+                env.logger.warning('There are {1} genes belonging to more than one chromosomes. This might due to discrepancies between refgene database versions. Using whatever first entry (alphanumeric order) as the coordinate: {0}'.format(', '.join(multi_chrom), len(multi_chrom)))
             if len(failed):
-                env.logger.warning('The following genes are not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed)))
+                env.logger.warning('There are {1} genes not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed), len(failed)))
         #
         rdat = OrderedDict()
         for x, y in zip(self.fields, list(zip(*dat))):

@@ -317,7 +317,7 @@ class AssociationTestManager:
             # we select samples with missing phenotype
             where_clause = 'WHERE ({})'.format(' OR '.join(['{} IS NULL'.format(x) for x in pheno + covar]))
             if condition:
-                where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
+                where_clause += ' '.join([' AND ({})'.format(x) for x in condition])
             cur.execute('SELECT sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
                 format(', '.join(pheno + covar), where_clause))
             for rec in cur:
@@ -329,7 +329,7 @@ class AssociationTestManager:
             # now we select samples without missing phenotype
             where_clause = 'WHERE {}'.format(' AND '.join(['{} IS NOT NULL'.format(x) for x in pheno + covar]))
             if condition:
-                where_clause += ' '.join(['AND ({})'.format(x) for x in condition])
+                where_clause += ' '.join([' AND ({})'.format(x) for x in condition])
             query = 'SELECT sample_id, sample_name, {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {}'.\
                 format(', '.join(pheno + covar), where_clause)
             env.logger.debug('Select phenotype and covariates using query {}'.format(query))
