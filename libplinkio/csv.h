@@ -1,19 +1,3 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
-
 #ifndef LIBCSV_H__
 #define LIBCSV_H__
 #include <stdlib.h>
@@ -25,7 +9,7 @@ extern "C" {
 
 #define CSV_MAJOR 3
 #define CSV_MINOR 0
-#define CSV_RELEASE 0
+#define CSV_RELEASE 3
 
 /* Error Codes */
 #define CSV_SUCCESS 0
@@ -41,7 +25,9 @@ extern "C" {
 #define CSV_STRICT_FINI 4 /* causes csv_fini to return CSV_EPARSE if last
                              field is quoted and doesn't containg ending 
                              quote */
-#define CSV_APPEND_NULL 8 /* Ensure that all fields are null-ternimated */
+#define CSV_APPEND_NULL 8 /* Ensure that all fields are null-terminated */
+#define CSV_EMPTY_IS_NULL 16 /* Pass null pointer to cb1 function when
+                                empty, unquoted fields are encountered */
 
 
 /* Character values */
@@ -63,7 +49,7 @@ struct csv_parser {
   unsigned char options;
   unsigned char quote_char;
   unsigned char delim_char;
-  int (*is_delim)(unsigned char);
+  int (*is_delim)(unsigned char); /* added for plinkio */
   int (*is_space)(unsigned char);
   int (*is_term)(unsigned char);
   size_t blk_size;
@@ -77,7 +63,7 @@ int csv_init(struct csv_parser *p, unsigned char options);
 int csv_fini(struct csv_parser *p, void (*cb1)(void *, size_t, void *), void (*cb2)(int, void *), void *data);
 void csv_free(struct csv_parser *p);
 int csv_error(struct csv_parser *p);
-const char * csv_strerror(int error);
+char * csv_strerror(int error);
 size_t csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, size_t, void *), void (*cb2)(int, void *), void *data);
 size_t csv_write(void *dest, size_t dest_size, const void *src, size_t src_size);
 int csv_fwrite(FILE *fp, const void *src, size_t src_size);
@@ -91,12 +77,11 @@ unsigned char csv_get_delim(struct csv_parser *p);
 unsigned char csv_get_quote(struct csv_parser *p);
 void csv_set_space_func(struct csv_parser *p, int (*f)(unsigned char));
 void csv_set_term_func(struct csv_parser *p, int (*f)(unsigned char));
-void csv_set_delim_func(struct csv_parser *p, int (*f)(unsigned char));
 void csv_set_realloc_func(struct csv_parser *p, void *(*)(void *, size_t));
 void csv_set_free_func(struct csv_parser *p, void (*)(void *));
 void csv_set_blk_size(struct csv_parser *p, size_t);
 size_t csv_get_buffer_size(struct csv_parser *p);
-
+void csv_set_delim_func(struct csv_parser *p, int (*f)(unsigned char)); /* added for plinkio */
 #ifdef __cplusplus
 }
 #endif

@@ -1,19 +1,3 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
-
 /*
 libcsv - parse and write csv data
 Copyright (C) 2008  Robert Gamble
@@ -41,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "csv.h"
 
-#define VERSION "3.0.0"
+#define VERSION "3.0.3"
 
 #define ROW_NOT_BEGUN           0
 #define FIELD_NOT_BEGUN         1
@@ -66,7 +50,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
      entry_pos -= spaces; \
    if (p->options & CSV_APPEND_NULL) \
      ((p)->entry_buf[entry_pos]) = '\0'; \
-   if (cb1) \
+   if (cb1 && (p->options & CSV_EMPTY_IS_NULL) && !quoted && entry_pos == 0) \
+     cb1(NULL, entry_pos, data); \
+   else if (cb1) \
      cb1(p->entry_buf, entry_pos, data); \
    pstate = FIELD_NOT_BEGUN; \
    entry_pos = quoted = spaces = 0; \
@@ -82,7 +68,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define SUBMIT_CHAR(p, c) ((p)->entry_buf[entry_pos++] = (c))
 
-static const char *csv_errors[] = {"success",
+static char *csv_errors[] = {"success",
                              "error parsing data while strict checking enabled",
                              "memory exhausted while increasing buffer size",
                              "data size too large",
@@ -95,7 +81,7 @@ csv_error(struct csv_parser *p)
   return p->status;
 }
 
-const char *
+char *
 csv_strerror(int status)
 {
   /* Return a textual description of status */
@@ -143,9 +129,9 @@ csv_init(struct csv_parser *p, unsigned char options)
   p->options = options;
   p->quote_char = CSV_QUOTE;
   p->delim_char = CSV_COMMA;
+  p->is_delim = NULL;           /* added for plinkio */
   p->is_space = NULL;
   p->is_term = NULL;
-  p->is_delim = NULL;
   p->blk_size = MEM_BLK_SIZE;
   p->malloc_func = NULL;
   p->realloc_func = realloc;
@@ -189,7 +175,7 @@ csv_fini(struct csv_parser *p, void (*cb1)(void *, size_t, void *), void (*cb2)(
     return -1;
   }
 
-  switch (p->pstate) {
+  switch (pstate) {
     case FIELD_MIGHT_HAVE_ENDED:
       p->entry_pos -= p->spaces + 1;  /* get rid of spaces and original quote */
       /* Fall-through */
@@ -238,6 +224,7 @@ csv_get_quote(struct csv_parser *p)
   return p->quote_char;
 }
 
+/* added for plinkio */
 void
 csv_set_delim_func(struct csv_parser *p, int (*f)(unsigned char))
 {
@@ -317,7 +304,7 @@ csv_increase_buffer(struct csv_parser *p)
   }
 
   /* Update entry buffer pointer and entry_size if successful */
-  p->entry_buf = (unsigned char *) vp;
+  p->entry_buf = vp;
   p->entry_size += to_add;
   return 0;
 }
@@ -325,7 +312,7 @@ csv_increase_buffer(struct csv_parser *p)
 size_t
 csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, size_t, void *), void (*cb2)(int c, void *), void *data)
 {
-  unsigned const char *us = (unsigned char *) s;  /* Access input data as array of unsigned char */
+  unsigned const char *us = s;  /* Access input data as array of unsigned char */
   unsigned char c;              /* The character we are currently processing */
   size_t pos = 0;               /* The number of characters we have processed in this call */
 
@@ -363,7 +350,7 @@ csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, s
     switch (pstate) {
       case ROW_NOT_BEGUN:
       case FIELD_NOT_BEGUN:
-        if (is_space ? is_space(c) : c == CSV_SPACE || c == CSV_TAB) { /* Space or Tab */
+        if ((is_space ? is_space(c) : c == CSV_SPACE || c == CSV_TAB) && !(is_delim ? is_delim(c) : c == delim)) { /* Space or Tab */
           continue;
         } else if (is_term ? is_term(c) : c == CSV_CR || c == CSV_LF) { /* Carriage Return or Line Feed */
           if (pstate == FIELD_NOT_BEGUN) {
@@ -376,7 +363,7 @@ csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, s
             }
           }
           continue;
-        } else if (is_delim ? is_delim(c) : c == delim) { /* Comma */
+        } else if (is_delim ? is_delim(c) : c == delim) { /* delim */
           SUBMIT_FIELD(p);
           break;
         } else if (c == quote) { /* Quote */
@@ -403,7 +390,7 @@ csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, s
             SUBMIT_CHAR(p, c);
             spaces = 0;
           }
-        } else if (is_delim ? is_delim(c) : c == delim) {  /* Comma */
+        } else if (is_delim ? is_delim(c) : c == delim) {  /* delim */
           if (quoted) {
             SUBMIT_CHAR(p, c);
           } else {
@@ -426,7 +413,7 @@ csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, s
         break;
       case FIELD_MIGHT_HAVE_ENDED:
         /* This only happens when a quote character is encountered in a quoted field */
-        if (is_delim ? is_delim(c) : c == delim) {  /* Comma */
+        if (is_delim ? is_delim(c) : c == delim) {  /* delim */
           entry_pos -= spaces + 1;  /* get rid of spaces and original quote */
           SUBMIT_FIELD(p);
         } else if (is_term ? is_term(c) : c == CSV_CR || c == CSV_LF) {  /* Carriage Return or Line Feed */
@@ -473,8 +460,8 @@ csv_parse(struct csv_parser *p, const void *s, size_t len, void (*cb1)(void *, s
 size_t
 csv_write (void *dest, size_t dest_size, const void *src, size_t src_size)
 {
-  unsigned char *cdest = (unsigned char *) dest;
-  const unsigned char *csrc = (unsigned char *) src;
+  unsigned char *cdest = dest;
+  const unsigned char *csrc = src;
   size_t chars = 0;
 
   if (src == NULL)
@@ -510,7 +497,7 @@ csv_write (void *dest, size_t dest_size, const void *src, size_t src_size)
 int
 csv_fwrite (FILE *fp, const void *src, size_t src_size)
 {
-  const unsigned char *csrc = (unsigned char *) src;
+  const unsigned char *csrc = src;
 
   if (fp == NULL || src == NULL)
     return 0;
@@ -539,8 +526,8 @@ csv_fwrite (FILE *fp, const void *src, size_t src_size)
 size_t
 csv_write2 (void *dest, size_t dest_size, const void *src, size_t src_size, unsigned char quote)
 {
-  unsigned char *cdest = (unsigned char *) dest;
-  const unsigned char *csrc = (unsigned char *) src;
+  unsigned char *cdest = dest;
+  const unsigned char *csrc = src;
   size_t chars = 0;
 
   if (src == NULL)
@@ -576,7 +563,7 @@ csv_write2 (void *dest, size_t dest_size, const void *src, size_t src_size, unsi
 int
 csv_fwrite2 (FILE *fp, const void *src, size_t src_size, unsigned char quote)
 {
-  const unsigned char *csrc = (unsigned char *) src;
+  const unsigned char *csrc = src;
 
   if (fp == NULL || src == NULL)
     return 0;

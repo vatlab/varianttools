@@ -1,24 +1,16 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #include <stdlib.h>
 #include <string.h>
-#include "file.h"
 
-#include "plinkio.h"
+#include <plinkio.h>
+#include <file.h>
 
 /**
  * Concatenates the given strings and returns the concatenated
@@ -46,39 +38,53 @@ concatenate(const char *a, const char *b)
 pio_status_t
 pio_open(struct pio_file_t *plink_file, const char *plink_file_prefix)
 {
+    /* int error = 0; */
+    /* int num_samples = 0; */
+    /* int num_loci = 0; */
+    
+    char *fam_path = concatenate( plink_file_prefix, ".fam" );
+    char *bim_path = concatenate( plink_file_prefix, ".bim" );
+    char *bed_path = concatenate( plink_file_prefix, ".bed" );
+
+    pio_status_t status = pio_open_ex( plink_file, fam_path, bim_path, bed_path );
+
+    free( fam_path );
+    free( bim_path );
+    free( bed_path );
+
+    return status;
+}
+
+
+pio_status_t pio_open_ex(struct pio_file_t *plink_file, const char *fam_path, const char *bim_path, const char *bed_path)
+{
     int error = 0;
     int num_samples = 0;
     int num_loci = 0;
     
-    char *fam_path = concatenate( plink_file_prefix, ".fam" );
     if( fam_open( &plink_file->fam_file, fam_path ) == PIO_OK )
     {
         num_samples = fam_num_samples( &plink_file->fam_file );
     }
     else
     {
-        error = 1;
+        error = P_FAM_IO_ERROR;
     }
 
-    char *bim_path = concatenate( plink_file_prefix, ".bim" );
     if( bim_open( &plink_file->bim_file, bim_path ) == PIO_OK )
     {
         num_loci = bim_num_loci( &plink_file->bim_file );
     }
     else
     {
-        error = 1;
+        error = P_BIM_IO_ERROR;
     }
 
-    char *bed_path = concatenate( plink_file_prefix, ".bed" );
     if( bed_open( &plink_file->bed_file, bed_path, num_loci, num_samples ) != PIO_OK )
     {
-        error = 1;
+        error = P_BED_IO_ERROR;
     }
 
-    free( fam_path );
-    free( bim_path );
-    free( bed_path );
     if( error == 0 )
     {
         return PIO_OK;
@@ -89,7 +95,7 @@ pio_open(struct pio_file_t *plink_file, const char *plink_file_prefix)
         bim_close( &plink_file->bim_file );
         bed_close( &plink_file->bed_file );
 
-        return PIO_ERROR;
+        return error;
     }
 }
 

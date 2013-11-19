@@ -1,27 +1,28 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
-
+/**
+ * @file
+ * @brief Module for reading plink files, a set of a .fam, .bim and .bed.
+ */
 
 #ifndef __PIO_H__
 #define __PIO_H__ 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 
-#include "bed.h"
-#include "bim.h"
-#include "fam.h"
+#include <bed.h>
+#include <bim.h>
+#include <fam.h>
 
 /**
  * Abstract structure for all the files that
@@ -57,12 +58,25 @@ struct pio_file_t
 pio_status_t pio_open(struct pio_file_t *plink_file, const char *plink_file_prefix);
 
 /**
+ * Opens the given plink file, which is specificed by separate paths
+ * to the .bim, .bed and .fam files.
+ *
+ * @param plink_file Plink file.
+ * @param bed_path Path to the .fam file.
+ * @param bim_path Path to the .bim file.
+ * @param fam_path Path to the .bed file.
+ *
+ * @return PIO_OK, if all files existed and could be read. PIO_ERROR otherwise.
+ */
+pio_status_t pio_open_ex(struct pio_file_t *plink_file, const char *fam_path, const char *bim_path, const char *bed_path);
+
+/**
  * Returns a struct that contains information about the sample associated
  * with the given id. Note, any changes to this struct will be reflected if
  * you call pio_close with the save argument.
  *
  * @param plink_file Plink file.
- * @param pio_id Pio id of the sample. This is not the same as iid.
+ * @param pio_id Pio id of the sample, between 0 and pio_num_samples.
  *
  * @return The struct with the given id, or NULL if it does not exist.
  */
@@ -83,7 +97,7 @@ size_t pio_num_samples(struct pio_file_t *plink_file);
  * you call pio_close with the save argument.
  *
  * @param plink_file Plink file.
- * @param id Id of the locus, as returned by pio_next_row.
+ * @param pio_id Id of the locus, between 0 and pio_num_loci.
  *
  * @return The struct with the given id, or NULL if it does not exist.
  */
@@ -163,5 +177,9 @@ pio_status_t pio_transpose(const char *plink_file_prefix, const char *transposed
  * @param plink_file The file to close.
  */
 void pio_close(struct pio_file_t *plink_file);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __PIO_H__ */

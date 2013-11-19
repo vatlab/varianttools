@@ -1,21 +1,17 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __SNP_LOOKUP_H__
 #define __SNP_LOOKUP_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if HAVE_ENDIAN_H
 #include <endian.h>
@@ -48,5 +44,9 @@ union snp_lookup_t
 #else
 #include "snp_lookup_big.h"
 #endif /* End test endianess */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* End of __SNP_LOOKUP_H__ */

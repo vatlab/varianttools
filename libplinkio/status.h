@@ -1,21 +1,17 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __STATUS_H__
 #define __STATUS_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum pio_status_e
 {
@@ -32,9 +28,28 @@ enum pio_status_e
     /**
      * Generic error.
      */
-    PIO_ERROR
+    PIO_ERROR,
+
+    /**
+     * FAM IO error.
+     */
+    P_FAM_IO_ERROR,
+
+    /**
+     * BIM IO error.
+     */
+    P_BIM_IO_ERROR,
+    
+    /**
+     * Bed IO error.
+     */
+    P_BED_IO_ERROR
 };
 
 typedef enum pio_status_e pio_status_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* End of __STATUS_H__ */

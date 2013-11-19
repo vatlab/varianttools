@@ -1,24 +1,6 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
-
 #include <Python.h>
-
 #include <plinkio.h>
-
-#include "snparray.h"
+#include <snparray.h>
 
 /**
  * Wrapper object for a plink file. In python it will
@@ -143,10 +125,17 @@ plinkio_open(PyObject *self, PyObject *args)
     {
         return NULL;
     }
-    
-    if( pio_open( &plink_file, path ) != PIO_OK )
-    {
-        PyErr_SetString( PyExc_IOError, "Error while trying to open plink file." );
+    int pio_open_status = pio_open( &plink_file, path );
+    if( pio_open_status != PIO_OK ){
+        if (pio_open_status == P_FAM_IO_ERROR){
+            PyErr_SetString( PyExc_IOError, "Error while trying to load the FAM file." );
+        } else if (pio_open_status == P_BIM_IO_ERROR){
+            PyErr_SetString( PyExc_IOError, "Error while trying to load the BIM file." );
+        }else if (pio_open_status == P_BED_IO_ERROR){
+            PyErr_SetString( PyExc_IOError, "Error while trying to load the BED file." );
+        }else{
+            PyErr_SetString( PyExc_IOError, "Unknown plink file I/O Error." );
+        } 
         return NULL;
     }
 
@@ -297,7 +286,7 @@ plinkio_get_samples(PyObject *self, PyObject *args)
     c_plink_file_t *c_plink_file;
     int i;
     
-	if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
+    if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
     }
@@ -455,9 +444,9 @@ PyInit_cplinkio(void)
     py_snp_array_prototype.tp_new = PyType_GenericNew;
     if( PyType_Ready( &py_snp_array_prototype ) < 0 )
     {
-	// the orignal code has 'return;', which leads to a compiling error
-	// I am not sure if NULL is the right value to return here tough. 
-	//         -- Bo Peng
+        // the orignal code has 'return;', which leads to a compiling error
+        // I am not sure if NULL is the right value to return here tough.
+        //         -- Bo Peng
         return NULL;
     }
 

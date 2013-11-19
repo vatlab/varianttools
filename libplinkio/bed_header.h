@@ -1,21 +1,17 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __BED_HEADER_H__
 #define __BED_HEADER_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdlib.h>
 
@@ -125,6 +121,7 @@ void bed_header_from_bytes(struct bed_header_t *header, const unsigned char *hea
  * @param header Bed header.
  * @param header_bytes The packed header will be stored here, assumed to be at
  *                     least BED_HEADER_MAX_SIZE bytes long.
+ * @param length Size of the packed header in bytes.
  *
  */
 void bed_header_to_bytes(struct bed_header_t *header, unsigned char *header_bytes, int *length);
@@ -200,5 +197,9 @@ enum SnpOrder bed_header_snp_order(struct bed_header_t *header);
  * @param header Bed header.
  */
 void bed_header_transpose(struct bed_header_t *header);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

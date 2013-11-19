@@ -1,24 +1,19 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __BIM_H__
 #define __BIM_H__
 
-#include <utarray.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+#include <utarray.h>
 #include <status.h>
 
 /**
@@ -116,5 +111,9 @@ size_t bim_num_loci(struct pio_bim_file_t *bim_file);
  * @param bim_file Bim file.
  */
 void bim_close(struct pio_bim_file_t *bim_file);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* End of __BIM_H__ */

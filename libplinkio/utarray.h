@@ -1,19 +1,3 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
-
 /*
 Copyright (c) 2008-2011, Troy D. Hanson   http://uthash.sourceforge.net
 All rights reserved.
@@ -42,6 +26,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef UTARRAY_H
 #define UTARRAY_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define UTARRAY_VERSION 1.9.4
 
@@ -244,5 +232,8 @@ static const UT_icd ut_str_icd _UNUSED_ = {sizeof(char*),NULL,utarray_str_cpy,ut
 static const UT_icd ut_int_icd _UNUSED_ = {sizeof(int),NULL,NULL,NULL};
 static const UT_icd ut_ptr_icd _UNUSED_ = {sizeof(void*),NULL,NULL,NULL};
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* UTARRAY_H */

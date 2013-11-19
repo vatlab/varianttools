@@ -1,24 +1,19 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __FAM_PARSE_H__
 #define __FAM_PARSE_H__
 
-#include <stdio.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+#include <stdio.h>
 
 #include <fam.h>
 #include <status.h>
@@ -34,5 +29,9 @@
  * @return PIO_OK if the samples could be parsed, PIO_ERROR otherwise.
  */
 pio_status_t parse_samples(FILE *fam_fp, UT_array *sample);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* End of __FAM_PARSE_H__ */

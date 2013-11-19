@@ -1,26 +1,22 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __BED_H__
 #define __BED_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 
-#include "status.h"
-#include "bed_header.h"
+#include <status.h>
+#include <bed_header.h>
 
 /**
  * Integral type used for storing a single SNP.
@@ -142,5 +138,9 @@ void bed_close(struct pio_bed_file_t *bed_file);
  *
  */
 pio_status_t bed_transpose(const char *original_path, const char *transposed_path, size_t num_loci, size_t num_samples);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* End of __BED_H__ */

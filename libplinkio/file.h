@@ -1,21 +1,17 @@
-/* =====================================================================================
-// 
-//  This is a small C and Python library for reading Plink genotype files,
-//  written by Mattias Franberg, version 0.2.2 
-//  
-//  https://bitbucket.org/mattias_franberg/libplinkio
-//
-//  This software is not licensed or copyrighted. The varianttools developers
-//  have been contacting its author and will include the license information when we
-//  hear from the author, or replace it with alternative implementation if the author
-//  requests for a removal.
-// 
- ===================================================================================== */
-
-
+/**
+ * Copyright (c) 2012-2013, Mattias Frånberg
+ * All rights reserved.
+ *
+ * This file is distributed under the Modified BSD License. See the COPYING file
+ * for details.
+ */
 
 #ifndef __FILE_H__
 #define __FILE_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * Defines return values from file operations.
@@ -52,5 +48,9 @@ file_status_t file_copy(const char *from_path, const char *to_path);
  * @return FILE_OK if the file was removed, FILE_ERROR otherwise.
  */
 file_status_t file_remove(const char *path);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __FILE_H__ */
