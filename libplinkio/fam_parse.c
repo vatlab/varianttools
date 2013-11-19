@@ -111,11 +111,14 @@ parse_iid(const char *field, size_t length, pio_status_t *status)
 static enum sex_t
 parse_sex(const char *field, size_t length, pio_status_t *status)
 {
-    if( length != 1 )
-    {
-        *status = PIO_ERROR;
-        return PIO_UNKOWN;
-    }
+  /* http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml */
+  /*  Sex (1=male; 2=female; other=unknown) */
+
+  //if( length != 1 )
+  //{
+  //    *status = PIO_ERROR;
+  //    return PIO_UNKOWN;
+  //}
 
     *status = PIO_OK;
     if( *field == '1' )
