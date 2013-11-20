@@ -30,7 +30,7 @@ import subprocess
 import logging
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter
 from variant_tools.plot import CTHEME, plotAssociation, rhist, \
-     qq, manhattan, manhattan_plain, resolvePlotFilename
+     resolvePlotFilename
 
 #
 # These functions are utility functions used by all reports
@@ -599,18 +599,15 @@ class PlotAssociationOpt:
         parserQQ = subparsers.add_parser('qq', help='QQ plot via ggplot2')
         self.qqArguments(parserQQ)
         self.commonArguments(parserQQ)
-        parserQQ.set_defaults(func=qq)
         # subparser 2
         parserMan = subparsers.add_parser('manhattan', help='Manhattan plot via ggplot2')
         self.manArguments(parserMan)
         self.commonArguments(parserMan)
-        parserMan.set_defaults(func=manhattan)
         # subparser 3
         parserManPlain = subparsers.add_parser('manhattan_plain',
                                                help='Manhattan plot implementation not using ggplot2')
         self.manArguments(parserManPlain)
         self.commonArguments(parserManPlain)
-        parserManPlain.set_defaults(func=manhattan_plain)
 
     def get(self):
         return self.master_parser
@@ -659,7 +656,9 @@ class PlotAssociationOpt:
                 ''')
 
     def commonArguments(self, parser):
-        parser.add_argument("--method", default = sys.argv[2] if len(sys.argv) > 2 else '', help=argparse.SUPPRESS)
+        parser.add_argument("--method",
+                            default = sys.argv[2] if len(sys.argv) > 2 else '',
+                            help = argparse.SUPPRESS)
         settings = parser.add_argument_group('graph properties')
         settings.add_argument('-t', '--title',
                             type=str,

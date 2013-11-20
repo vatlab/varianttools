@@ -51,7 +51,7 @@ class MetaAnalysis:
                                  format(' != '.join([','.join(x) for x in self.header])))
         self.link_by = list(self.header[0])
         self.header = list(self.header[0])
-        self.header.extend(['beta_meta', 'p_meta', 'sample_size_meta'])
+        self.header.extend(['beta_meta', 'pvalue_meta', 'sample_size_meta'])
         for idx, d in enumerate(self.data):
             self.header.extend([d[0][i] + '_{}'.format(idx+1) for i in [self.bcol, self.pcol, self.scol]])
         # find overlapping groups
@@ -83,19 +83,25 @@ class MetaAnalysis:
         if len(bpne) <= 1:
             # nothing to do; will not meta-analyze anything
             return beta, -9
-        if self.method == "ssb":
-            # sample size based method
-            z = [(abs(qnorm(x[1] / 2.0)) * (abs(x[0]) / x[0]) if x[0] else 1, x[2]) for x in bpne]
-            z = sum([x[0] * sqrt(x[1]) for x in z]) / sqrt(sum([x[1] for x in z]))
-        else:
-            # inverse variance based method
-            # calculate std err from beta and p if se is not available
-            # 
-            var = [x[3]**2 if x[3] is not None else (x[0]/qnorm(x[1]/2.0))**2 for x in bpne]
-            w = [1/x for x in var]
-            sumw = sum(w)
-            beta = sum([x[0]*y for x, y in zip(bpne, w)]) / sumw
-            z = beta / sqrt(1/sumw)
+        # meta analysis
+        try:
+            if self.method == "ssb":
+                # sample size based method
+                z = [(abs(qnorm(x[1] / 2.0)) * (abs(x[0]) / x[0]) if x[0] else 1, x[2]) for x in bpne]
+                z = sum([x[0] * sqrt(x[1]) for x in z]) / sqrt(sum([x[1] for x in z]))
+            else:
+                # inverse variance based method
+                # calculate std err from beta and p if se is not available
+                # 
+                var = [x[3]**2 if x[3] is not None else (x[0]/qnorm(x[1]/2.0))**2 for x in bpne]
+                w = [1/x for x in var]
+                sumw = sum(w)
+                beta = sum([x[0]*y for x, y in zip(bpne, w)]) / sumw
+                z = beta / sqrt(1/sumw)
+        except:
+            # qnorm(..) is zero, i.e., not significant
+            beta = float('nan')
+            z = float('nan')
         return beta, min(pnorm(z), 1 - pnorm(z)) * 2.0
 
     def createDB(self, db_name):

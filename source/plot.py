@@ -114,20 +114,6 @@ def plotAssociation(args):
     env.logger.info("Complete!")
     return
 
-def qq(args):
-	plot(args, 'qq')
-	return
-
-def manhattan(args):
-	plot(args, 'manhattan')
-	return
-
-def manhattan_plain(args):
-	# have to adjust font for this plot
-	args.font_size = args.font_size / 2.5
-	plot(args, 'manhattan')
-	return
-
 def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_script = None):
     '''draw histogram using ggplot2'''
     if vlines:
@@ -194,7 +180,6 @@ def size(bytes):
 
 def ismissing(x):
     return (x != x or x.lower() in ['none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '])
-
     
 CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", 
 "RdYlBu", "RdYlGn", "Spectral","Accent", "Paired", 
@@ -207,8 +192,10 @@ class PlotAssociation:
     def __init__(self, args, inlines):
         '''Prepare R script to generate qq and manhattan plots'''
         if len(inlines) < 2:
-            sys.exit("ERROR: Input file is empty.")
+            raise ValueError("Input file is empty.")
         self.a = args
+        if args.method == 'manhattan_plain':
+            self.a.font_size = self.a.font_size / 2.5
         # processing chroms
         if hasattr(self.a, 'chrom'):
             allchroms = list(map(str, range(1,23))) + ['X','Y','Un']
@@ -227,7 +214,7 @@ class PlotAssociation:
                     if item not in chrom:
                         chrom.append(item)
             if len(chrom) == 0:
-                sys.exit("ERROR: Invalid --chrom input")
+                raise ValueError("Invalid --chrom input")
             self.a.chrom = chrom
         # processing gene map
         if hasattr(self.a, 'gene_map'):
@@ -235,7 +222,7 @@ class PlotAssociation:
         else:
             self.gene_map = None
         if self.gene_map and not os.path.exists(self.gene_map):
-            sys.exit("ERROR: {0} does not exist".format(self.gene_map))
+            raise ValueError("{0} does not exist".format(self.gene_map))
         self.fname = self.a.output if self.a.output else args.method
         self.m_read(inlines)
 
@@ -244,7 +231,7 @@ class PlotAssociation:
         headline = [x.replace('#','') for x in inlines[0]]
         self.fields = ['_'.join(x.split('_')[1:]) for x in headline if x.startswith('pvalue')]
         if len(self.fields) == 0:
-            sys.exit("ERROR: Invalid headers (see header convention of 'vtools associate' command output).")
+            raise ValueError("Invalid headers (see header convention of 'vtools associate' command output).")
         idxes = []
         for field in self.fields:
             idxes.append(headline.index('pvalue_' + field))
@@ -280,7 +267,7 @@ class PlotAssociation:
                 try:
                     rdat[x] = [i if i == i else None for i in list(map(float, list(y)))]
                 except ValueError as e:
-                    sys.exit("ERROR: {}".format(e))
+                    raise ValueError("{}".format(e))
         self.rdat = Str4R(rdat)
         return
 
@@ -344,7 +331,7 @@ class PlotAssociation:
                 try:
                     rdat[x] = [i if i == i else None for i in list(map(float, list(y)))]
                 except ValueError as e:
-                    sys.exit("ERROR: {}".format(e))
+                    raise ValueError("{}".format(e))
         self.rdat = Str4R(rdat)
         return
 
