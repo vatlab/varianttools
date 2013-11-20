@@ -61,10 +61,10 @@ class MetaAnalysis:
     def read(self, filename):
         try:
             f = openFile(filename)
-            head = f.readline().decode("utf-8").strip().split('\t')
+            head = [x.strip() for x in f.readline().decode("utf-8").strip().split('\t')]
             dat = {}
             for line in f.readlines():
-                line = line.decode("utf-8").strip().split('\t')
+                line = [x.strip() for x in line.decode("utf-8").strip().split('\t')]
                 dat[tuple([str(line[i]) for i in self.linker])] = [float(line[self.bcol]), float(line[self.pcol]), int(line[self.scol]), float(line[self.secol]) if self.secol else None]
             f.close()
         except Exception as e:
