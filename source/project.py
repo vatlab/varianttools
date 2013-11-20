@@ -1032,7 +1032,7 @@ class Project:
     '''
     # the following make Project a singleton class
     _instance = None
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         if not cls._instance:
             # *args, **kwargs are not passed to avoid
             # DeprecationWarning: object.__new__() takes no parameters
