@@ -440,7 +440,7 @@ comment=Generated bam file with reduced reads if more than one output file
 	is specified
 
 
-[align_0]
+[call_0]
 action=CheckVariantToolsVersion('2.1.1')
 comment=Check the version of variant tools (version 2.1.1 and above is required
     to execute this pipeline)
