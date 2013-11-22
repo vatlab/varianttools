@@ -1,0 +1,42 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+
+[linked fields]
+hg19=Chromosome,Start,End
+
+[data sources]
+anno_type=range
+description=This annotation database contains expanded exome targeted regions covered by
+	the Nextera Rapid Capture Expanded platform from illumina. 
+version=20130307
+source_url=http://supportres.illumina.com/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_expandedexome_targetedregions.txt
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/Illumina_NRCE-20130307.DB.gz
+header=7
+source_type=txt
+
+[Name]
+index=1
+type=VARCHAR(48)
+comment=Name of region
+
+[Chromosome]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[Start]
+index=3
+type=INTEGER
+adj=IncreaseBy(1)
+comment=Transcription start position
+
+[End]
+index=4
+type=INTEGER
+comment=Transcription end position
+
+# the source file has two additional columns Probe Length and Downstream probe length, but
+# they are all zero as far as I can tell.
