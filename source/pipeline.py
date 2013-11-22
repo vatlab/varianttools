@@ -661,7 +661,7 @@ def poll_jobs():
                             'the same output file {}'.format(os.getpid(), job.output[0]))
                         # try to rerun this step
                         running_jobs[idx] = None
-                        raise NeedRealInput()
+                        raise RewindExecution()
                     with open(job.output[0] + '.exe_info', 'a') as exe_info:
                         exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                         for f in job.output:
@@ -729,7 +729,7 @@ def wait_all():
     running_jobs = []
 
 
-class NeedRealInput(Exception):
+class RewindExecution(Exception):
     pass
 
 class NullAction:
@@ -808,7 +808,7 @@ class RunCommand:
         # now, we cannot ignore this step, but do we have all the input files?
         # the input can be fake .file_info files
         if not all([os.path.isfile(x) for x in ifiles]):
-            raise NeedRealInput()
+            raise RewindExecution()
         run_command(self.cmd, output=self.output, working_dir=self.working_dir,
             max_jobs=self.max_jobs)
         # add md5 signature of input and output files
@@ -1273,6 +1273,7 @@ class Pipeline:
         #
         ifiles = input_files
         step_index = 0
+        rewind_count = 0
         while True:
             # step_index can jump back and forth depending on the 
             # execution status of each step
@@ -1354,7 +1355,11 @@ class Pipeline:
                 step_index += 1
                 if step_index == len(psteps):
                     break
-            except NeedRealInput:
+            except RewindExecution:
+                rewind_count += 1
+                if rewind_count >= 3:
+                    raise RuntimeError('Failed to execute pipeline {}.{}: excessive '
+                        'rewind during execution.'.format(self.pipeline.name, pname))
                 # unfortunately, a input file has been removed (replaced by .file_info) but
                 # a later steps need it. We will have to figure out how to create this 
                 # file by looking backward ...
