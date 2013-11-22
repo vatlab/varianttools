@@ -584,7 +584,7 @@ def run_command(cmd, output=None, working_dir=None, max_jobs=1):
             break
     # there is a slot, start running
     if proc_lck:
-        env.lock(str(os.getpid()))
+        env.lock(proc_lck, str(os.getpid()))
     proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err,
         cwd=working_dir)
     running_jobs.append(JOB(proc=proc, cmd=cmd,
@@ -655,11 +655,12 @@ def poll_jobs():
                     # another process
                     env.unlock(job.output[0] + '.lck', str(os.getpid()))
                     if not os.path.isfile(job.output[0] + '.out_{}'.format(os.getpid())) \
-                        or not os.path.isfile(job.output[0] + 'err_{}'.format(os.getpid())):
-                        env.logger.warning('Could not locate process-specific output file, '
+                        or not os.path.isfile(job.output[0] + '.err_{}'.format(os.getpid())):
+                        env.logger.warning('Could not locate process-specific output file (id {}), '
                             'which might have been removed by another process that produce '
-                            'the same output file {}'.format(job.output[0]))
+                            'the same output file {}'.format(os.getpid(), job.output[0]))
                         # try to rerun this step
+                        running_jobs[idx] = None
                         raise NeedRealInput()
                     with open(job.output[0] + '.exe_info', 'a') as exe_info:
                         exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
