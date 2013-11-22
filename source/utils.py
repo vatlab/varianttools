@@ -2204,19 +2204,23 @@ class DatabaseEngine:
         insert_query = 'INSERT INTO {0} VALUES ({1}, {1}, {1}, {1}, {1});'.format(tbl, self.PH)
         prog = ProgressBar('Binning ranges', len(ranges))
         for idx, (rowid, chr, start, end) in enumerate(ranges):
-            if start > end:
-                if start > end + 1:
-                    # start == end in the original database, start > end after adjusting start position to 1-based.
-                    env.logger.warnning('Start position {} greater than ending position {} in database {}'
-                        .format(start, end, anno_name))
-                sbin = getMaxUcscBin(start-1, start)
-                ebin = sbin
-            else:
-                sbin = getMaxUcscBin(start-1, start)
-                ebin = getMaxUcscBin(end-1, end)
-            if sbin > ebin:
-                raise SystemError('Start bin greater than end bin...')
-            cur.executemany(insert_query, [(bin, chr, start, end, rowid) for bin in range(sbin, ebin + 1)])
+            try:
+                if start > end:
+                    if start > end + 1:
+                        # start == end in the original database, start > end after adjusting start position to 1-based.
+                        env.logger.warnning('Start position {} greater than ending position {} in database {}'
+                            .format(start, end, anno_name))
+                    sbin = getMaxUcscBin(start-1, start)
+                    ebin = sbin
+                else:
+                    sbin = getMaxUcscBin(start-1, start)
+                    ebin = getMaxUcscBin(end-1, end)
+                if sbin > ebin:
+                    raise SystemError('Start bin greater than end bin...')
+                cur.executemany(insert_query, [(bin, chr, start, end, rowid) for bin in range(sbin, ebin + 1)])
+            except Exception as e:
+                env.logger.warning('Failed to create bins for range {} - {}'
+                    .format(start, end))
             if idx % 100 == 99:
                 prog.update(idx + 1)
         prog.done()
