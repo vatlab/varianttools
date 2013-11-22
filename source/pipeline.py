@@ -654,6 +654,13 @@ def poll_jobs():
                     # this step will fail if the .lck file has been changed by
                     # another process
                     env.unlock(job.output[0] + '.lck', str(os.getpid()))
+                    if not os.path.isfile(job.output[0] + '.out_{}'.format(os.getpid())) \
+                        or not os.path.isfile(job.output[0] + 'err_{}'.format(os.getpid())):
+                        env.logger.warning('Could not locate process-specific output file, '
+                            'which might have been removed by another process that produce '
+                            'the same output file {}'.format(job.output[0]))
+                        # try to rerun this step
+                        raise NeedRealInput()
                     with open(job.output[0] + '.exe_info', 'a') as exe_info:
                         exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                         for f in job.output:
