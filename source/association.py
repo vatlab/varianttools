@@ -38,7 +38,7 @@ except:
 
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
-     env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter
+     env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
 from .phenotype import Sample
 from .tester import *
 from .rtester import RTest, SKAT
@@ -143,8 +143,6 @@ class AssociationTestManager:
         unknown_args, samples, genotypes, group_by, discard_samples, discard_variants):
         self.proj = proj
         self.db = proj.db
-        self.var_info = var_info
-        self.geno_info = geno_info
         self.genotypes = genotypes
         self.phenotype_names = phenotypes
         self.covariate_names = covariates
@@ -152,7 +150,7 @@ class AssociationTestManager:
         if not self.proj.isVariantTable(table):
             raise ValueError('Variant table {} does not exist.'.format(table))
         self.table = table
-        #
+        self.var_info, self.geno_info = self.getInfo(methods, var_info, geno_info)
         # step 1: get missing filter conditions
         self.missing_ind_ge, self.missing_var_ge = \
           self.getMissingFilters(discard_samples, discard_variants)
@@ -161,10 +159,15 @@ class AssociationTestManager:
         self.tests = self.getAssoTests(methods, len(covariates), unknown_args)
         self.num_extern_tests = sum([isinstance(x, ExternTest) for x in self.tests])
         #
-        # step 3: get samples and related phenotypes
+        # step 3-1: get samples and related phenotypes
         self.sample_IDs, self.sample_names, self.phenotypes, self.covariates = \
           self.getPhenotype(samples, phenotypes, covariates)
-        #
+        # step 3-2: check if all samples has all genotype info
+        has_geno_info = hasGenoInfo(self.proj, self.sample_IDs, self.geno_info)
+        if False in has_geno_info:
+            env.logger.error("Cannot find genotype information '{0}'".\
+                             format(self.geno_info[has_geno_info.index(False)]))
+            sys.exit(1)
         # step 4-1: check if tests are compatible with phenotypes
         for idx, item in enumerate([list(set(x)) for x in self.phenotypes]):
             if (list(map(float, item)) == [2.0, 1.0] or list(map(float, item)) == [1.0, 2.0]):
@@ -175,19 +178,7 @@ class AssociationTestManager:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".\
                                          format(test.__class__.__name__, '/'.join([str(int(x)) for x in item])))
-        # step 4-2: input extern weights found in var_info or geno_info
-        for m in methods:
-            if not "--extern_weight" in m:
-                continue
-            extern_weight = []
-            for item in re.match(r'.*?--extern_weight(.*?)--|.*?--extern_weight(.*?)$', m).groups():
-                if item is not None:
-                    extern_weight.extend(item.strip().split())
-            for item in extern_weight:
-                if not item in geno_info + var_info:
-                    raise ValueError('External weight "{}" is not specified by --var_info or --geno_info'.\
-                                     format(item))
-        # step 4-3: check if 'SSeq_common' is valid to use
+        # step 4-2: check if 'SSeq_common' is valid to use
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
         #
@@ -215,6 +206,28 @@ class AssociationTestManager:
         #
         # step 6: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
+
+    def getInfo(self, methods, var_info, geno_info):
+        '''automatically update var_info or geno_info if input extern weights found in either'''
+        for m in methods:
+            if not "--extern_weight" in m:
+                continue
+            extern_weight = []
+            for item in re.match(r'.*?--extern_weight(.*?)-|.*?--extern_weight(.*?)$', m).groups():
+                if item is not None:
+                    extern_weight.extend(item.strip().split())
+            for item in extern_weight:
+                if not item in geno_info + var_info:
+                    # Is extern_weight in var_info?
+                    if item in [field for field in self.proj.db.getHeaders(self.table) if field not in ('variant_id', 'bin', 'alt_bin')] + flatten([[x.name for x in db.fields] for db in self.proj.annoDB]):
+                        var_info.append(item)
+                        env.logger.info('Loading variant / annotation field "{0}" for association analysis.'.\
+                                        format(item))
+                    else:
+                        geno_info.append(item)
+                        env.logger.warning('Cannot find external weight "{0}" as a variant or annotation '\
+                                         'field. Treating it as genotype information field'.format(item))
+        return var_info, geno_info 
 
     def getMissingFilters(self, discard_samples, discard_variants):
         missing_ind_ge = 1.0
@@ -370,9 +383,10 @@ class AssociationTestManager:
             if str(e).startswith('Invalid (non-numeric) coding'):
                 raise ValueError(e)
             else:
-                raise ValueError('Failed to retrieve phenotype {}{}. Please use command '
+                raise ValueError('Failed to retrieve phenotype {}{}{}. Please use command '
                     '"vtools show samples" to see a list of phenotypes'.format(', '.join(pheno),
-                    '' if not covar else (' and/or covariate(s) ' + ', '.join(covar))))
+                    '' if not covar else (' and/or covariate(s) ' + ', '.join(covar)),
+                    '' if len(condition)==0 else (' under condition {}'.format(condition))))
 
     def identifyGroups(self, group_by):
         '''Get a list of groups according to group_by fields'''
@@ -716,7 +730,7 @@ class AssoTestsWorker(Process):
             data = {x[0]:x[1:] for x in cur.fetchall()}
         variant_id = sorted(data.keys(), key=int)
         for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] for x in variant_id]
+            var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
         return var_info, variant_id
 
     def getGenotype(self, group):
@@ -757,7 +771,7 @@ class AssoTestsWorker(Process):
             # handle genotype_info
             #
             for idx, key in enumerate(self.geno_info):
-                geno_info[key].append([x[idx+1] for x in gtmp])
+                geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
         #
         # filter samples/variants for missingness
         gname = ':'.join(list(map(str, group)))

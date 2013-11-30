@@ -52,6 +52,7 @@ import ConfigParser
 import tarfile
 import binascii
 from collections import namedtuple
+from itertools import chain
 
 try:
     # not all platforms/installations of python support bz2
@@ -2529,6 +2530,23 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     #
     return query, fields
 
+def hasGenoInfo(proj, IDs, geno_info):
+    '''return a vector of true/false for each geno_info.
+    all "true" only if all sample tables has every genotype info'''
+    if len(geno_info) == 0:
+        return [] 
+    result = [True] * len(geno_info)
+    proj.db.attach(proj.name + '_genotype')
+    try:
+        for table in ['{}_genotype.genotype_{}'.format(proj.name, id) for id in IDs]:
+            header = [x.lower() for x in proj.db.getHeaders(table)]
+            for x in geno_info:
+                if x not in header:
+                    raise ValueError(x)
+    except ValueError as e:
+        result[geno_info.index('{}'.format(e))] = False
+    return result
+    
 def extractField(field):
     '''Extract pos from strings such as pos + 100'''
     if field.isalnum():
@@ -2790,3 +2808,10 @@ def whereisRPackage(package):
         except:
             installRPackage(libloc, package)
     return libloc
+
+def flatten(listOfLists):
+    "Flatten one level of nesting"
+    return list(chain.from_iterable(listOfLists))
+
+def pairwise(x,y):
+    return flatten([[(i,j) for j in y] for i in x])

@@ -27,7 +27,7 @@
 import sys, os, re
 import time
 import argparse
-from .utils import env, downloadFile, runCommand, mkdir_p
+from .utils import env, downloadFile, runCommand, mkdir_p, flatten, pairwise
 from .project import Field
 from .tester import freq, ExternTest
 if sys.version_info.major == 2:
@@ -155,16 +155,6 @@ def timectrl(timeout_time, default):
             return retval
         return f2
     return timeout_function
-
-
-from itertools import chain
-
-def flatten(listOfLists):
-    "Flatten one level of nesting"
-    return chain.from_iterable(listOfLists)
-
-def pairwise(x,y):
-    return flatten([[(i,j) for j in y] for i in x])
 
 class RConfig:
     def __init__(self, rlist):
