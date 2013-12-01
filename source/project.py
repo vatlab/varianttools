@@ -678,6 +678,9 @@ class PipelineDescription:
         for key in args:
             if type(args[key]) == list:
                 args[key] = ','.join(args[key])
+            # use canonical string representation if necessary
+            if "'" in args[key] or '"' in args[key]:
+                args[key] = repr(args[key])
         return args
 
     def parsePipeline(self, filename, defaults):

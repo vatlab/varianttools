@@ -34,7 +34,7 @@ except ImportError:
 
 from variant_tools.utils import env
 # save the command line that has been processed by the shell. It might not work as shown.
-env.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else "'{}'".format(x) for x in sys.argv[1:]])
+env.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else repr(x) for x in sys.argv[1:]])
 
 import variant_tools.project as project
 import variant_tools.importer as importer
