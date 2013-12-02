@@ -2103,7 +2103,7 @@ class Project:
             if name.startswith('vt_'):
                 # only snapshots with name starting with vt_
                 try:
-                    print('Downloading snapshot {}.tar.gz from online'.format(name))
+                    print('Downloading snapshot {}.tar.gz from online repository'.format(name))
                     snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
                 except:
                     raise ValueError('Failed to download snapshot {}.'.format(name))

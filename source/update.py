@@ -550,6 +550,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         raise ValueError('"Variant table {} does not exist.'.format(decodeTableName(variant_table)))
     #
     IDs = None
+    ID_sex = None
     if samples:
         IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in samples]))
         if len(IDs) == 0:
@@ -579,7 +580,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         return
 
     # separate special functions...
-    alt = hom = het = other = GT = missing = wtGT = mutGT = None
+    alt = hom = het = other = GT = missing = wtGT = mutGT = maf= None
 
     # keys to speed up some operations
     MEAN = 0
@@ -616,8 +617,12 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             wtGT = f
         elif e == '#(mutGT)':
             mutGT = f
+        elif e == 'maf()':
+            maf = f
         elif e.startswith('#('):
-            raise ValueError('Unrecognized parameter {}: only parameters alt, wtGT, mutGT, missing, hom, het, other and GT are accepted for special function #'.format(stat))
+            raise ValueError('Unrecognized parameter {}: only parameters alt, '
+                'wtGT, mutGT, missing, hom, het, other and GT are accepted for '
+                'special function #'.format(stat))
         else:
             m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
             if m is None:
@@ -630,7 +635,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             fieldCalcs.append(None)
             destinations.append(dest)
     #
-    coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT]
+    coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -641,6 +646,75 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         env.logger.warning('No sample is selected.')
         return
     
+    # for maf calculation, we need to know sex and chromosome name information
+    if maf is not None:
+        # find variants on sex chromosomes
+        #
+        if variant_table == 'variant':
+            cur.execute("SELECT variant_id FROM variant WHERE chr in ('X', 'x')")
+            var_chrX = set([x[0] for x in cur.fetchall()])
+            cur.execute("SELECT variant_id FROM variant WHERE chr in ('Y', 'y')")
+            var_chrY = set([x[0] for x in cur.fetchall()])
+            cur.execute("SELECT variant_id FROM variant WHERE chr NOT IN ('1', '2', "
+                "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
+                "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
+                "'x', 'y')")
+            var_chrOther = set([x[0] for x in cur.fetchall()])
+        else:
+            cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+                "= variant.variant_id AND variant.chr in ('X', 'x')".format(variant_table))
+            var_chrX = set([x[0] for x in cur.fetchall()])
+            cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+                "= variant.variant_id AND chr in ('Y', 'y')".format(variant_table))
+            var_chrY = set([x[0] for x in cur.fetchall()])
+            cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+                "= variant.variant_id AND chr NOT IN ('1', '2', "
+                "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
+                "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
+                "'x', 'y')".format(variant_table))
+            var_chrOther = set([x[0] for x in cur.fetchall()])
+        #
+        env.logger.info('{}, {}, and {} variants on X, Y and other non-autosome '
+            'chromosomes are identifield'.format(len(var_chrX), len(var_chrY),
+                len(var_chrOther)))
+        #
+        # if there are any variants on sex chromosome, we need to know the
+        # sex of samples
+        if len(var_chrX) > 0 or len(var_chrY) > 0:
+            # find sex information
+            sample_fields = [x[0].lower() for x in proj.db.fieldsOfTable('sample')]
+            if 'sex' in sample_fields:
+                sex_field = 'sex'
+            elif 'gender' in sample_fields:
+                sex_field = 'gender'
+            else:
+                raise ValueError('Calculation of minor allele frequency (function maf) '
+                    'requires a phenotype named sex or gender with values 1/2, M/F or '
+                    'Male/Female.')
+            sex_dict = {
+                    'M': 1,
+                    1: 1,
+                    'Male': 1,
+                    'MALE': 1,
+                    'F': 2,
+                    2: 2,
+                    'Female': 2,
+                    'FEMALE' : 2
+            }
+            try:
+                # get sex
+                cur.execute('SELECT sample_id, {} FROM sample;'.format(sex_field))
+                ID_sex = {x[0]:sex_dict[x[1]] for x in cur.fetchall() if x[0] in IDs}
+            except KeyError as e:
+                raise ValueError('Invalid or missing sex value for field {}. Allowed '
+                    'values are M/F, 1/2, Male/Female.'
+                    .format(sex_field))
+            # 
+            numMales = len({x:y for x,y in ID_sex.items() if y == 1})
+            numFemales = len({x:y for x,y in ID_sex.items() if y == 2})
+            env.logger.info('{} males and {} females are identified from field {}'
+                .format(numMales, numFemales, sex_field))
+    #
     # Error checking with the user specified genotype fields
     # 1) if a field does not exist within one of the sample genotype tables a warning is issued
     # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
@@ -697,6 +771,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     prog = ProgressBar('Counting variants', len(IDs))
     prog_step = max(len(IDs) // 100, 1) 
     for id_idx, id in enumerate(IDs):
+        record_male_gt = ID_sex is not None and ID_sex[id] == 1
         where_cond = []
         if genotypes is not None and len(genotypes) != 0:
             where_cond.extend(genotypes)
@@ -717,11 +792,15 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
         for rec in cur:
             if rec[0] not in variants:
-                variants[rec[0]] = [0, 0, 0, 0]
+                # the last item is for number of genotype for male individual
+                variants[rec[0]] = [0, 0, 0, 0, 0]
                 variants[rec[0]].extend(list(fieldCalcs))
             # total valid GT
             if rec[1] is not None:
                 variants[rec[0]][3] += 1
+            # if tracking genotype of males (for maf), and the sex is male
+            if record_male_gt:
+                variants[rec[0]][4] += 1
             # type heterozygote
             if rec[1] == 1:
                 variants[rec[0]][0] += 1
@@ -738,7 +817,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if len(validGenotypeFields) > 0:
                 for index in validGenotypeIndices:
                     queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
-                    recIndex = index + 4       # first 4 attributes of variants are het, hom, double_het and GT
+                    recIndex = index + 5       # first 5 attributes of variants are het, hom, double_het, GT, GT in males
                     # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
                     # by sqlite even when the field type is INT.
                     if rec[queryIndex] in [None, '']:
@@ -774,8 +853,9 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     headers = [x.lower() for x in proj.db.getHeaders('variant')]
     table_attributes = [(alt, 'INT'), (hom, 'INT'),
             (het, 'INT'), (other, 'INT'), (GT, 'INT'),
-            (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT')]
-    fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT]
+            (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT'),
+            (maf, 'FLOAT')]
+    fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     
     for index in validGenotypeIndices:
         field = genotypeFields[index]
@@ -842,11 +922,39 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         if mutGT is not None:
             # mutGT = hom + het + other
             res.append(value[0] + value[1] + value[2])
+        if maf is not None:
+            # numerator is the number of alternative alleles (het + hom * 2 + other)
+            # denominator is total number of genotypes
+            numerator = value[0] + value[1] * 2 + value[2]
+            if id in var_chrX:
+                if env.treat_missing_as_wildtype:
+                    denominator = numFemales * 2 + numMales
+                else:
+                    denominator = (value[3] - value[4]) * 2 + value[4]
+            elif id in var_chrY:
+                if env.treat_missing_as_wildtype:
+                    denominator = numMales
+                else:
+                    denominator = value[4]
+            elif id in var_chrOther:
+                if env.treat_missing_as_wildtype:
+                    denominator = numSample
+                else:
+                    denominator = value[3]
+            else:
+                # regular autosome
+                if env.treat_missing_as_wildtype:
+                    denominator = numSample * 2
+                else:
+                    denominator = value[3] * 2
+            ratio = 0 if denominator == 0 else numerator * 1.0 / denominator
+            res.append(ratio if ratio < 0.5 else 1. - ratio)
         # for genotype_field operations, the value[operation_index] holds the result of the operation
         # except for the "mean" operation which needs to be divided by num_samples that have that variant
         try:
             for index in validGenotypeIndices:
-                operationIndex = index + 4     # the first 4 indices hold the values for hom, het, double het and total genotype
+                # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
+                operationIndex = index + 5     
                 operationCalculation = value[operationIndex]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
@@ -936,13 +1044,21 @@ def updateArguments(parser):
             genotype info (e.g. QT) of variants in all or selected samples to
             specified fields (e.g. meanQT). Functions sum, avg, max, and min
             are currently supported. In addition, special functions #(GT),
-            #(hom), #(het), #(alt), #(other), #(missing), #(wtGT) and #(mutGT)
-            are provided to count the number of valid genotypes (not missing),
-            homozygote genotypes, heterozygote genotypes, alternative alleles
-            (#(het) + 2*#(hom) + #(other)), genotypes with two different alternative
-            alleles, missing genotypes (number of samples - #(GT)), number of
-            non-missing wildtype genotypes (#(GT) - #(hom) - #(het) - #(other)),
-            and number of non-wildtype genotypes (#(hom) + #(het) + #(other))''')
+            #(hom), #(het), #(alt), #(other), #(missing), #(wtGT), #(mutGT),
+            and maf(), are provided to count the number of valid genotypes (not
+            missing), homozygote genotypes, heterozygote genotypes, alternative
+            alleles (#(het) + 2*#(hom) + #(other)), genotypes with two different
+            alternative alleles, missing genotypes (number of samples - #(GT)),
+            number of non-missing wildtype genotypes (#(GT) - #(hom) - #(het)
+            - #(other)), number of non-wildtype genotypes (#(hom) + #(het) +
+            #(other)), and minor allele frequency. The maf() function treats
+            chromosomes 1 to 22 as autosomes, X and Y as sex chromosomes, and
+            other chromosomes as single-copy manifolds. It requires a phenotype
+            named sex or gender that codes male/female by 1/2, M/F or Male/Female
+            if maf of variants on sex chromosomes are calculated. This function
+            by default calculates allele frequency among existing-alleles, but
+            will treat all missing values as wild type alleles if runtime option
+            treat_missing_as_wildtype is set to true.''')
     stat.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
