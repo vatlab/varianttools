@@ -2817,4 +2817,4 @@ def pairwise(x,y):
     return flatten([[(i,j) for j in y] for i in x])
 
 def convertDoubleQuote(x):
-    return x.replace('"', "'")
+    return '"{}"'.format(x.replace('"', "'"))

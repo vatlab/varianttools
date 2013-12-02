@@ -24,7 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys, os
+import sys, os, shlex
 import argparse
 import subprocess
 import logging
@@ -47,6 +47,8 @@ verbosity = '1'
 logger = None
 
 def getoutput(cmd):
+    if type(cmd) is str:
+        cmd = shlex.split(cmd)
     # add -v option if unspecified
     if True not in [x.startswith('-v') for x in cmd]:
         cmd.append('-v{}'.format(verbosity))
@@ -542,10 +544,12 @@ def plotPhenoFieldsArguments(parser):
                 help='''Size of dots. Default is 2.5.''')
     dot.add_argument('--discrete_color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')   
+
 def plotPhenoFields(args):
     logger.info('Gathering data for plot')
     sarg = ['--samples'] + [convertDoubleQuote(x) for x in args.samples]
-    output = getoutput(['vtools', 'phenotype', '--output'] + args.fields + sarg + ['--na', 'NA', '--header'])
+    output = getoutput('vtools phenotype --output ' + \
+                       ' '.join(args.fields + sarg) + ' --na NA --header')
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
         rhist(output, fns, normcurve = args.norm_curve,

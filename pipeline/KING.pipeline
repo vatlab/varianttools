@@ -70,7 +70,7 @@ action=CheckCommands(['${KING}', '${PLINK}'])
 comment=Check the existence of KING and PLINK command.
 
 [king_20]
-action=RunCommand('''vtools export %(var_table)s --format tped --samples """${SAMP}""" | awk '{$2=$1"_"$4;$3=0;print $0}' > ${CACHE_DIR}/%(jobname)s.tped''',
+action=RunCommand('''vtools export %(var_table)s --format tped --samples ${SAMP} | awk '{$2=$1"_"$4;$3=0;print $0}' > ${CACHE_DIR}/%(jobname)s.tped''',
   output='${CACHE_DIR}/%(jobname)s.tped')
 comment=Write selected variant and samples in tped format
 
@@ -110,7 +110,7 @@ action=RunCommand('vtools phenotype --from_file ${CACHE_DIR}/%(jobname)s-mds.vto
 comment=Import phenotype from global ancestry analysis
 
 [king_61]
-action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples """${SAMP}""" --dot %(jobname)s.mds.pdf --discrete_color Accent''',
+action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples ${SAMP} --dot %(jobname)s.mds.pdf --discrete_color Accent''',
   output='%(jobname)s.mds.pdf')
 comment=Save global ancestry inference result to plot
 
