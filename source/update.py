@@ -622,7 +622,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         elif e.startswith('#('):
             raise ValueError('Unrecognized parameter {}: only parameters alt, '
                 'wtGT, mutGT, missing, hom, het, other and GT are accepted for '
-                'special function #'.format(stat))
+                'special functions'.format(stat))
         else:
             m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
             if m is None:
@@ -651,27 +651,27 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         # find variants on sex chromosomes
         #
         if variant_table == 'variant':
-            cur.execute("SELECT variant_id FROM variant WHERE chr in ('X', 'x')")
+            cur.execute("SELECT variant_id FROM variant WHERE chr in ('X', 'x', '23')")
             var_chrX = set([x[0] for x in cur.fetchall()])
-            cur.execute("SELECT variant_id FROM variant WHERE chr in ('Y', 'y')")
+            cur.execute("SELECT variant_id FROM variant WHERE chr in ('Y', 'y', '24')")
             var_chrY = set([x[0] for x in cur.fetchall()])
             cur.execute("SELECT variant_id FROM variant WHERE chr NOT IN ('1', '2', "
                 "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
                 "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
-                "'x', 'y')")
+                "'x', 'y', '23', '24')")
             var_chrOther = set([x[0] for x in cur.fetchall()])
         else:
             cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
-                "= variant.variant_id AND variant.chr in ('X', 'x')".format(variant_table))
+                "= variant.variant_id AND variant.chr in ('X', 'x', '23')".format(variant_table))
             var_chrX = set([x[0] for x in cur.fetchall()])
             cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
-                "= variant.variant_id AND chr in ('Y', 'y')".format(variant_table))
+                "= variant.variant_id AND chr in ('Y', 'y', '24')".format(variant_table))
             var_chrY = set([x[0] for x in cur.fetchall()])
             cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
                 "= variant.variant_id AND chr NOT IN ('1', '2', "
                 "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
                 "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
-                "'x', 'y')".format(variant_table))
+                "'x', 'y', '23', '24')".format(variant_table))
             var_chrOther = set([x[0] for x in cur.fetchall()])
         #
         env.logger.info('{}, {}, and {} variants on X, Y and other non-autosome '
@@ -706,7 +706,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 cur.execute('SELECT sample_id, {} FROM sample;'.format(sex_field))
                 ID_sex = {x[0]:sex_dict[x[1]] for x in cur.fetchall() if x[0] in IDs}
             except KeyError as e:
-                raise ValueError('Invalid or missing sex value for field {}. Allowed '
+                raise ValueError('Invalid or missing value detected for field {}. Allowed '
                     'values are M/F, 1/2, Male/Female.'
                     .format(sex_field))
             # 

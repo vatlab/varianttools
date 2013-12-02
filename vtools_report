@@ -547,7 +547,7 @@ def plotPhenoFieldsArguments(parser):
 
 def plotPhenoFields(args):
     logger.info('Gathering data for plot')
-    sarg = ['--samples'] + [convertDoubleQuote(x) for x in args.samples]
+    sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
     output = getoutput('vtools phenotype --output ' + \
                        ' '.join(args.fields + sarg) + ' --na NA --header')
     if args.hist is not None:
