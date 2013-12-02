@@ -34,6 +34,39 @@ from collections import OrderedDict
 from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
 from .rtester import Str4R
 
+def size(bytes):
+    system = [
+    (1024 ** 5, 'P'),
+    (1024 ** 4, 'T'),
+    (1024 ** 3, 'G'),
+    (1024 ** 2, 'M'),
+    (1024 ** 1, 'K'),
+    (1024 ** 0, 'B'),
+    ]
+
+    for factor, suffix in system:
+        if bytes >= factor:
+            break
+    amount = int(bytes/factor)
+    if isinstance(suffix, tuple):
+        singular, multiple = suffix
+        if amount == 1:
+            suffix = singular
+        else:
+            suffix = multiple
+    return str(amount) + suffix
+
+def ismissing(x):
+    return (x != x or x.lower() in ['none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '])
+    
+CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", 
+"RdYlBu", "RdYlGn", "Spectral","Accent", "Paired", 
+"Pastel1", "Pastel2", "Set1", "Set2", "Set3", "Blues", 
+"BuGn", "BuPu", "GnBu", "Greens", "Greys", "Oranges",
+"OrRd", "PuBu", "PuBuGn", "PuRd", "Purples", "RdPu", 
+"Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"]
+
+
 def RdeviceFromFilename(filename):
     # guess the device used to plot R plot from filename
     basename, ext = os.path.splitext(filename)
@@ -92,28 +125,6 @@ def loadGgplot(script):
         script = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + script
     return script
 
-def plotAssociation(args):
-    env.logger.info("Reading from standard input ...")
-    data = []
-    data_size = 0
-    for x in sys.stdin.readlines():
-        try:
-            data_size += len(x.encode("utf-8"))
-        except:
-            data_size += len(x)
-        data.append(x.rstrip().split())
-    env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
-    p = PlotAssociation(args, data)
-    pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
-    pinput = loadGgplot(pinput)
-    env.logger.info("Generating graph(s) ...")
-    cmd = "R --slave --no-save --no-restore"
-    out = runCommand(cmd, pinput)
-    if out:
-        sys.stdout.write(out)
-    env.logger.info("Complete!")
-    return
-
 def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_script = None):
     '''draw histogram using ggplot2'''
     if vlines:
@@ -156,37 +167,61 @@ def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_
         os.remove(rscript)
     return
 
-def size(bytes):
-    system = [
-    (1024 ** 5, 'P'),
-    (1024 ** 4, 'T'),
-    (1024 ** 3, 'G'),
-    (1024 ** 2, 'M'),
-    (1024 ** 1, 'K'),
-    (1024 ** 0, 'B'),
-    ]
+def rdot(data, output, psize = 2.5, color = None,
+         save_data = None, save_script = None):
+    '''draw dotplot using ggplot2
+    input can be 1, 2 or 3 columns for x, y, and z (i.e., dot colors) axis'''
+    rstr = '''
+        tryCatch( {{dat <- read.delim(pipe('cat /dev/stdin'), header=T, stringsAsFactors=F)
+        }}, error = function(e) {{ quit("no") }} )
+        p <- ggdot(dat, psize = {0}, color = {1})
+        eval(parse(text={2}))
+        print(p)
+        graphics.off()
+        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output)))
+    #
+    # Here we pipe data from standard input (which can be big),
+    # create a script dynamically, and pump it to a R process.
+    #
+    if save_data:
+        with open(save_data, 'w') as f:
+            f.write(data)
+    rstr = DOT_FOO + loadGgplot(rstr)
+    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
+    with open(rscript, 'w') as f:
+        f.write(rstr)
+    env.logger.info('Generating dot plot {} ...'.format(repr(output)))
+    cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
+    out = runCommand(cmd, data) 
+    if out:
+        sys.stdout.write(out)
+    env.logger.info("Complete!")
+    # clean up
+    if save_script is None:
+        os.remove(rscript)
+    return
 
-    for factor, suffix in system:
-        if bytes >= factor:
-            break
-    amount = int(bytes/factor)
-    if isinstance(suffix, tuple):
-        singular, multiple = suffix
-        if amount == 1:
-            suffix = singular
-        else:
-            suffix = multiple
-    return str(amount) + suffix
-
-def ismissing(x):
-    return (x != x or x.lower() in ['none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '])
-    
-CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", 
-"RdYlBu", "RdYlGn", "Spectral","Accent", "Paired", 
-"Pastel1", "Pastel2", "Set1", "Set2", "Set3", "Blues", 
-"BuGn", "BuPu", "GnBu", "Greens", "Greys", "Oranges",
-"OrRd", "PuBu", "PuBuGn", "PuRd", "Purples", "RdPu", 
-"Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"]
+def plotAssociation(args):
+    env.logger.info("Reading from standard input ...")
+    data = []
+    data_size = 0
+    for x in sys.stdin.readlines():
+        try:
+            data_size += len(x.encode("utf-8"))
+        except:
+            data_size += len(x)
+        data.append(x.rstrip().split())
+    env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
+    p = PlotAssociation(args, data)
+    pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
+    pinput = loadGgplot(pinput)
+    env.logger.info("Generating graph(s) ...")
+    cmd = "R --slave --no-save --no-restore"
+    out = runCommand(cmd, pinput)
+    if out:
+        sys.stdout.write(out)
+    env.logger.info("Complete!")
+    return
 
 class PlotAssociation:
     def __init__(self, args, inlines):
@@ -880,5 +915,37 @@ gghist <- function(dat, stat_foo = NULL, vlines = NULL, xname='x') {
         } 
         myplot <- myplot + labs(title = paste(plottitle, xname, '"\\n', 'mean = ', toString(average), '; ', 'stdev = ', toString(stdev), '; ', 'range = ', '[', toString(r1), ',', toString(r2), ']', '\\n', sep=''))
         return(myplot)
+}
+'''
+
+DOT_FOO = '''
+ggdot <- function(dat, psize=2.5, color=NULL) {
+    xyz = colnames(dat)
+	#dat = as.data.frame(dat[order(dat[,1]),])
+    if (length(xyz) >= 3) {
+        if (!is.null(color)) dat[,3] = as.factor(dat[,3])
+        myplot = ggplot(dat, aes_string(x=xyz[1], y=xyz[2], colour=xyz[3])) +
+            xlab(paste('\\n', xyz[1], sep='')) + ylab(paste(xyz[2], '\\n', sep=''))
+        if (!is.null(color)) {
+            ncolors = length(unique(dat[,3]))
+            mycolors = rep(brewer.pal(brewer.pal.info[color,]$maxcolors, name = color), ncolors)[1:ncolors]
+            myplot = myplot + scale_colour_manual(values = mycolors)
+        }
+    } else if (length(xyz) == 2) {
+        myplot = ggplot(dat, aes_string(x=xyz[1], y=xyz[2])) + 
+            xlab(paste('\\n', xyz[1], sep='')) + ylab(paste(xyz[2], '\\n', sep=''))
+    } else {
+        dat = cbind(seq(1:nrow(dat)), dat)
+        colnames(dat) = c('index', xyz[1])
+        myplot = ggplot(dat, aes_string(x='index', y=xyz[1])) +
+            xlab(paste('\\n', 'index', sep='')) + ylab(paste(xyz[1], '\\n', sep=''))
+    }
+    myplot = myplot + geom_point(size = psize, binwidth = range(dat[,1])/30) +
+	    theme(legend.text=element_text(size=8)) +
+	    theme(legend.title=element_text(size=10)) +
+	    theme(axis.title.x=element_text(size=10)) +
+	    theme(axis.title.y=element_text(size=10)) +
+	    theme_bw()
+    return(myplot) 
 }
 '''
