@@ -488,7 +488,7 @@ def plotFieldsArguments(parser):
     the third input field is represented by color of the dots.''')
     dot.add_argument('--dot', metavar='name',
         help='''File name of the outputted figure, which can have type PDF, EPS, or JPG.''')
-    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.5,
+    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.0,
                 help='''Size of dots. Default is 2.5.''')
     dot.add_argument('--discrete_color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')
@@ -538,13 +538,13 @@ def plotPhenoFieldsArguments(parser):
     the third input field is represented by color of the dots.''')
     dot.add_argument('--dot', metavar='name',
         help='''File name of the outputted figure, which can have type PDF, EPS, or JPG.''')
-    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.5,
+    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.0,
                 help='''Size of dots. Default is 2.5.''')
     dot.add_argument('--discrete_color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')   
 def plotPhenoFields(args):
     logger.info('Gathering data for plot')
-    sarg = ['--samples', '{}'.format(args.samples)] if args.samples else []
+    sarg = ['--samples'] + ["{}".format(x.replace('"', "'")) for x in args.samples]
     output = getoutput(['vtools', 'phenotype', '--output'] + args.fields + sarg + ['--na', 'NA', '--header'])
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
@@ -580,7 +580,7 @@ def plotGenoFieldsArguments(parser):
     the third input field is represented by color of the dots.''')
     dot.add_argument('--dot', metavar='name',
         help='''File name of the outputted figure, which can have type PDF, EPS, or JPG.''')
-    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.5,
+    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.0,
                 help='''Size of dots. Default is 2.5.''')
     dot.add_argument('--discrete_color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')

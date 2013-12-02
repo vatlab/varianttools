@@ -1,0 +1,117 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (gaow@bcm.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+
+description=Pipeline to call KING to perform global ancestry and kinship inference,
+  and import ancestry analysis results as phenotypes into sample table.
+
+king_description=This pipeline exports genotypes in specified variant
+  table (parameter --var_table, default to variant) for specified samples
+  (parameter --samples, default to all samples), executes PLINK's LD pruning,
+  (R^2<0.5) and analysis selected variants using KING's population ancestry and kingship
+  analysis. Specified number of MDS components for global ancestry analysis will be
+  imported to sample table (parameter --num_comp, default to 5). A report of relatedness
+  between pairs of samples will be written to file <jobname>.relatedness.txt (parameter
+  --jobname, default to "king"). No input or output file is required for this
+  pipeline, but a snapshot could be specified, in which case the snapshot will
+  be loaded (and overwrite the present project).
+
+# define executables
+KING=${: "%(king_path)s/king" if "%(king_path)s" else "king"}
+PLINK=${: "%(plink_path)s/plink" if "%(plink_path)s" else "plink"}
+
+[DEFAULT]
+var_table=variant
+var_table_comment=Variant table for the variants to be analyzed.
+
+samples=1
+samples_comment=Samples to be analyzed.
+
+reported_ancestry=
+reported_ancestry_comment=Field name for self-reported ancestry.
+  This is the name of the column of population group information in
+  "vtools show samples" command. If specified, the global ancestry inference
+  will be reported on a graph with colored dots indicating sample's self-reported
+  ancestry group.
+
+king_path=
+king_path_comment=Path to a directory that contains the "king" program, 
+  if it is not in the default $PATH.
+
+plink_path=
+plink_path_comment=Path to a directory that contains the "plink" program, 
+  if it is not in the default $PATH.
+  
+num_comp=5
+num_comp_comment= number of MDS components in global ancestry analysis that
+  will be imported to sample table. Default is 5.
+
+jobname=king
+jobname_comment=A jobname, an identifier that will be part of filenames and field names
+  generated during the execution of this pipeline. Default set to "king". Please ONLY
+  use combination of letters and underscore ("_") for job name. 
+
+[king_0]
+input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
+input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
+action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
+comment=Load specified snapshot if a snapshot is specified. Otherwise use the
+  existing project.
+
+# [king_10]
+# action=CheckCommands(['${KING}', '${PLINK}'])
+# comment=Check the existence of KING and PLINK command.
+
+[king_20]
+action=RunCommand('''vtools export %(var_table)s --format tped --samples %(samples)s | awk '{$2=$1"_"$4;$3=0;print $0}' > ${CACHE_DIR}/%(jobname)s.tped''',
+  output='${CACHE_DIR}/%(jobname)s.tped')
+comment=Write selected variant and samples in tped format
+
+[king_21]
+action=RunCommand('mv %(var_table)s.tfam ${CACHE_DIR}/%(jobname)s.tfam',
+  output='${CACHE_DIR}/%(jobname)s.tfam')
+comment=Rename tfam file to match tped file
+
+[king_30]
+action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --indep-pairwise 50 5 0.5 --allow-no-sex --out %(jobname)s.LD.50',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.LD.50.prune.in')
+comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
+
+[king_31]
+action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --make-bed --out %(jobname)s',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
+comment=LD pruning from pre-calculated list 
+
+[king_41]
+action=RunCommand('${KING} -b %(jobname)s.bed --mds --ibs --prefix %(jobname)s-',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-pc.ped')
+comment=Global ancestry inference
+
+[king_42]
+action=RunCommand('${KING} -b %(jobname)s.bed --kinship --related --degree 3 --prefix %(jobname)s',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.kin0')
+comment=Kinship inference
+
+[king_51]
+action=RunCommand('''cut %(jobname)s-pc.ped -f 2,`seq -s, 7 $((6+%(num_comp)s))` -d " " | sed -e "s/ /\\t/g" | sed 1i"sample_name`seq -s, 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf("\\t%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
+comment=Extract MDS result for vtools phenotype import
+
+[king_52]
+input=${OUTPUT51}
+action=RunCommand('vtools phenotype --from_file ${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
+comment=Import phenotype from global ancestry analysis
+
+[king_61]
+action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples %(samples)s --dot %(jobname)s.mds.pdf --discrete_color Accent''',
+  output='%(jobname)s.mds.pdf')
+comment=Save global ancestry inference result to plot
+
+[king_62]
+action=RunCommand('''cat ${CACHE_DIR}/%(jobname)s.kin0 | cut -f 2,4,6,7,8 | awk '{ if ($5>0.0442) print $0}' | awk '{if ($5>0.354) $6="MZ"; if ($5>=0.177 && $5<=0.354) $6="1st-degree"; if ($5>=0.0884 && $5<=0.177) $6="2nd-degree"; if ($5>=0.0442 && $5<=0.0884) $6="3rd-degree"; if ($5=="Kinship") $6="Relationship"; print $0}' > %(jobname)s.RelatedIndividuals.txt''',
+  output='%(jobname)s.RelatedIndividuals.txt')
+comment=Save kinship analysis result to text file
