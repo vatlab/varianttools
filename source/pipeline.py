@@ -46,7 +46,7 @@ from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo
+    FileInfo, convertDoubleQuote
     
 from .project import PipelineDescription, Project
 

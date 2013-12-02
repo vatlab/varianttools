@@ -28,7 +28,7 @@ import sys, os
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter
+from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, convertDoubleQuote
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, \
      resolvePlotFilename
 
@@ -544,7 +544,7 @@ def plotPhenoFieldsArguments(parser):
                      help='''If specified, the third field of input will be treated as "factor" data.''')   
 def plotPhenoFields(args):
     logger.info('Gathering data for plot')
-    sarg = ['--samples'] + ["{}".format(x.replace('"', "'")) for x in args.samples]
+    sarg = ['--samples'] + [convertDoubleQuote(x) for x in args.samples]
     output = getoutput(['vtools', 'phenotype', '--output'] + args.fields + sarg + ['--na', 'NA', '--header'])
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)

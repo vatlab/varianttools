@@ -16,13 +16,14 @@ king_description=This pipeline exports genotypes in specified variant
   analysis. Specified number of MDS components for global ancestry analysis will be
   imported to sample table (parameter --num_comp, default to 5). A report of relatedness
   between pairs of samples will be written to file <jobname>.relatedness.txt (parameter
-  --jobname, default to "king"). No input or output file is required for this
+  --jobname, default to "KING"). No input or output file is required for this
   pipeline, but a snapshot could be specified, in which case the snapshot will
   be loaded (and overwrite the present project).
 
 # define executables
 KING=${: "%(king_path)s/king" if "%(king_path)s" else "king"}
 PLINK=${: "%(plink_path)s/plink" if "%(plink_path)s" else "plink"}
+SAMPLES=${: properDoubleQuote('''%(sample)s''')}
 
 [DEFAULT]
 var_table=variant
@@ -48,11 +49,11 @@ plink_path_comment=Path to a directory that contains the "plink" program,
   
 num_comp=5
 num_comp_comment= number of MDS components in global ancestry analysis that
-  will be imported to sample table. Default is 5.
+  will be imported to sample table.
 
-jobname=king
+jobname=KING
 jobname_comment=A jobname, an identifier that will be part of filenames and field names
-  generated during the execution of this pipeline. Default set to "king". Please ONLY
+  generated during the execution of this pipeline. Please ONLY
   use combination of letters and underscore ("_") for job name. 
 
 [king_0]
@@ -62,12 +63,12 @@ action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
   existing project.
 
-# [king_10]
-# action=CheckCommands(['${KING}', '${PLINK}'])
-# comment=Check the existence of KING and PLINK command.
+[king_10]
+action=CheckCommands(['${KING}', '${PLINK}'])
+comment=Check the existence of KING and PLINK command.
 
 [king_20]
-action=RunCommand('''vtools export %(var_table)s --format tped --samples %(samples)s | awk '{$2=$1"_"$4;$3=0;print $0}' > ${CACHE_DIR}/%(jobname)s.tped''',
+action=RunCommand('''vtools export %(var_table)s --format tped --samples """${SAMPLES}""" | awk '{$2=$1"_"$4;$3=0;print $0}' > ${CACHE_DIR}/%(jobname)s.tped''',
   output='${CACHE_DIR}/%(jobname)s.tped')
 comment=Write selected variant and samples in tped format
 
@@ -107,7 +108,7 @@ action=RunCommand('vtools phenotype --from_file ${CACHE_DIR}/%(jobname)s-mds.vto
 comment=Import phenotype from global ancestry analysis
 
 [king_61]
-action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples %(samples)s --dot %(jobname)s.mds.pdf --discrete_color Accent''',
+action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples """${SAMPLES}""" --dot %(jobname)s.mds.pdf --discrete_color Accent''',
   output='%(jobname)s.mds.pdf')
 comment=Save global ancestry inference result to plot
 
