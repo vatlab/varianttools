@@ -649,6 +649,13 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     # for maf calculation, we need to know sex and chromosome name information
     if maf is not None:
         # find variants on sex chromosomes
+        # 
+        # 23 -- X
+        # 24 -- Y
+        # 25 -- MT
+        # XY -- pseduo-autosomal region
+        #
+        # NOTE: Some pipelines use 24 for XY... this can be a mess
         #
         if variant_table == 'variant':
             cur.execute("SELECT variant_id FROM variant WHERE chr in ('X', 'x', '23')")
@@ -658,7 +665,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             cur.execute("SELECT variant_id FROM variant WHERE chr NOT IN ('1', '2', "
                 "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
                 "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
-                "'x', 'y', '23', '24')")
+                "'x', 'y', 'XY', 'xy', '23', '24')")
             var_chrOther = set([x[0] for x in cur.fetchall()])
         else:
             cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
@@ -671,12 +678,41 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 "= variant.variant_id AND chr NOT IN ('1', '2', "
                 "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
                 "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
-                "'x', 'y', '23', '24')".format(variant_table))
+                "'x', 'y', 'XY', 'xy', '23', '24')".format(variant_table))
             var_chrOther = set([x[0] for x in cur.fetchall()])
         #
         env.logger.info('{}, {}, and {} variants on X, Y and other non-autosome '
             'chromosomes are identifield'.format(len(var_chrX), len(var_chrY),
                 len(var_chrOther)))
+        #
+        # 1000 genomes record pseduo-autosomal regions on chromosome X, and
+        # record genotypes as homozygotes if they appear on PAR1 and PAR2 of
+        # both regions. Anyway, the following code removes variants within
+        # these regions and treat them as autosome variants.
+        #
+        PAR_X = {
+            'hg19': ([60001, 2699520], [154931044, 155270560])
+        }
+        PAR_Y = {
+            'hg19': ([10001, 2649520], [59034050, 59373566])
+        }
+        if len(var_chrX) > 0 and proj.build in PAR_X:
+            nPrev = len(var_chrX)
+            for PAR in PAR_X[proj.build]:
+                var_chrX = set([x for x in var_chrX if x < PAR[0] and x > PAR[1]])
+            if nPrev > len(var_chrX):
+                env.logger.info('{} variants in pseudo-autosomal regions on '
+                    'chromosome X are treated as autosome variants.'
+                    .format(nPrev - len(var_chrX)))
+        #
+        if len(var_chrY) > 0 and proj.build in PAR_Y:
+            nPrev = len(var_chrY)
+            for PAR in PAR_Y[proj.build]:
+                var_chrY = set([x for x in var_chrY if x < PAR[0] and x > PAR[1]])
+            if nPrev > len(var_chrY):
+                env.logger.info('{} variants in pseudo-autosomal regions on '
+                    'chromosome Y are treated as autosome variants.'
+                    .format(nPrev - len(var_chrY)))
         #
         # if there are any variants on sex chromosome, we need to know the
         # sex of samples
