@@ -28,7 +28,8 @@ import sys, os, shlex
 import argparse
 import subprocess
 import logging
-from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, convertDoubleQuote
+from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
+     convertDoubleQuote, calculateInbreedingCoef
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, \
      resolvePlotFilename
 
@@ -466,6 +467,36 @@ def sequence(args):
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
             print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
 
+
+
+#
+# command inbreeding_coef
+#
+#
+# Command trans_ratio
+#
+def inbreedingCoefArguments(parser):
+    parser.add_argument('table', 
+        help='''Variants based on which individual inbreeding coefficients are evaluated.''')
+    parser.add_argument('--samples', nargs='*',
+        help='''Conditions based on which samples are selected to have inbreeding coefficients
+              calculated. Default to all samples.''')
+    parser.add_argument('--maf_field', required=True,
+        help='''Name of the field that holds minor allele frequency for sample variants,
+            which is the field name for command
+            'vtools update table --from_stat "maf_field=maf()" --samples ...'.''')
+
+def inbreedingCoef(args):
+    table = args.table if args.table else 'variant'
+    sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
+    print "sample_name\tF_stat"
+    for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
+        # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
+        geno = [x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na nan'''.\
+                                          format(args.table if args.table else 'variant',
+                                                 name, args.maf_field)).split('\n')]
+        # print "{}\t{}".format(name, '\t'.join([str(x) for x in calculateInbreedingCoef(geno)]))
+        print "{}\t{}".format(name, calculateInbreedingCoef(geno)[0])
 
 #
 # command plot_fields
@@ -906,6 +937,18 @@ if __name__ == '__main__':
     discordanceRateArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=discordanceRate)
+    #
+    # command inbreeding_coef
+    parser = subparsers.add_parser('inbreeding_coef',
+        help='''Calculate inbreeding coefficent F for samples using selected variants''',
+        description='''Report F statistic which describe the expected degree of a reduction in
+             heterozygosity when compared to Hardy-Weinberg expectation. In simple two allele
+             system with inbreeding, P(AA) = p^2(1-F)+pF, P(aa) = q^2(1-F)+qF and P(HET) = 2pq(1-F).
+             For an individual F is estimated by F = 1 - #observed(HET) / #expected(HET).
+             Tri-allelic loci, if identified, are excluded from calculation.''')
+    inbreedingCoefArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=inbreedingCoef)
     #
     # command sequence
     parser = subparsers.add_parser('sequence',

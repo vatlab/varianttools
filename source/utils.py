@@ -2816,3 +2816,97 @@ def pairwise(x,y):
 
 def convertDoubleQuote(x):
     return '"{}"'.format(x.replace('"', "'"))
+
+
+def withinPseudoAutoRegion(chrom, pos, build):
+    # return True if position is in autosomal or pseudo-autosomal regions
+    # the position information are based on personal communication with
+    # Dr. Bert Overduin from 1000 genomes
+    if build == 'build37':
+        build = 'hg19'
+    if build == 'build36':
+        build = 'hg18'
+    PAR_X = {
+            'hg19': ([60001, 2699520], [154931044, 155270560]),
+            'hg18': ([1, 2709520], [154584238, 154913754])
+    }
+    PAR_Y = {
+            'hg19': ([10001, 2649520], [59034050, 59373566]),
+            'hg18': ([1, 2709520], [57443438, 57772954])
+    }
+    if chrom.lower() in ['x', '23']:
+        return sum([1 if item[0] < pos and item[1] > pos else 0 for item in PAR_X[build]]) >= 1 
+    elif chrom.lower() in ['y', '24']:
+        return sum([1 if item[0] < pos and item[1] > pos else 0 for item in PAR_Y[build]]) >= 1 
+    else:
+        return 0
+    
+def calculateInbreedingCoef(data, build = 'hg19', sex_check = False):
+    '''each element in dat is [chr, pos, GT, MAF]
+    return a tuple (F, InferedSex, ConflictInfo)'''
+    def call_sex(dat):
+        # make sex calls based on very apparent information
+        sex = None
+        xwt = xhomo = False
+        for locus in dat:
+            if withinPseudoAutoRegion(locus[0], int(locus[1]), build):
+                continue
+            # call 'M' if '1' on Y chromosome is observed
+            # FIXME: will be problematic if XY is coded 24 instead
+            if locus[0].lower() in ['y', '24']:
+                sex = 'M'
+                break
+            if locus[0].lower() in ['x', '23']:
+                if locus[2] == '0':
+                    xwt = True
+                if locus[2] == '2':
+                    xhomo = True
+        # call 'F' if both '0' and '2' are observed in gt and '1' on Y chromosome not observed  
+        if xhomo and xwt and sex is None:
+            sex = 'F'
+        return sex
+    #P(Homo) = F + (1-F)P(Homo by chance)
+    #P(Homo by chance) = p^2+q^2 for a biallelic locus.
+    #For an individual with N genotyped loci, we
+    #  1. count the total observed number of loci which are homozygous (O),
+    #  2. calculate the total expected number of loci homozygous by chance (E)
+    #Then, using the method of moments, we have
+    #   O = NF + (1-F)E
+    #Which rearranges to give
+    #   F = (O-E)/(N-E)
+    result = (None, None)
+    N = O = E = 0.0
+    for locus in data:
+        chrom, pos, gt, maf = (locus[0], int(locus[1]), locus[2], float(locus[3]))
+        if (not maf > 1E-8) or (gt in ['nan', '-1']):
+            # skip missing sites, tri-allilic sites or uninformative marker
+            continue
+        if sex_check:
+            # skip autochromosomal and pseudoautochromosomal regions
+            if withinPseudoAutoRegion(chrom, pos, build):
+                continue
+        N += 1
+        if gt in ['0','2']:
+            # homozygous locus
+            O += 1
+        # expected homozygousity under HWE
+        # E = 1 - 2pq
+        E += 1 - 2 * maf * (1 - maf) 
+    # Finally compute F
+    F = (O-E)/(N-E) if N-E > 0 else float('nan')
+    status = 'unknown'
+    conflict = '-'
+    if sex_check:
+        # call 'M' if F > 0.8
+        if F > 0.8:
+            status = 'M'
+        if F < 0.2:
+            status = 'F'
+        # a rough call on sex
+        rough_sex = call_sex(data)
+        if rough_sex and rough_sex != status:
+            if rough_sex == 'M':
+                conflict = 'M call is made due to mutation observed on chrY'
+            else:
+                conflict = 'F call is made due to homozygotes observed on chrX and no mutation observed on chrY'
+    return (F, status, conflict)
