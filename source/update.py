@@ -929,24 +929,72 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if id in var_chrX:
                 if env.treat_missing_as_wildtype:
                     denominator = numFemales * 2 + numMales
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'chromosome X: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#male={}+2*#female={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], numMales, numFemales))
                 else:
                     denominator = (value[3] - value[4]) * 2 + value[4]
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'chromosome X: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#maleGT={}+2*#femaleGT={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], value[4], value[3] - value[4]))
             elif id in var_chrY:
                 if env.treat_missing_as_wildtype:
                     denominator = numMales
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'chromosome Y: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#male={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], numMales))
                 else:
                     denominator = value[4]
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'chromosome X: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#maleGT={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], value[4]))
             elif id in var_chrOther:
                 if env.treat_missing_as_wildtype:
                     denominator = numSample
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'other chromosome: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#sample={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], numSample))
                 else:
                     denominator = value[3]
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'chromosome X: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=#GT={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], value[3]))
             else:
                 # regular autosome
                 if env.treat_missing_as_wildtype:
                     denominator = numSample * 2
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'autosome: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=2*#sample={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], numSample))
                 else:
                     denominator = value[3] * 2
+                    if numerator > denominator:
+                        env.logger.warning('Incorrect MAF for variant {} on '
+                        'autosome: #alt={} > #alleles={} (#alt=#het={}+2*#hom={}+#other={} '
+                        '#alleles=2*#GT={})'
+                        .format(id, numerator, denominator, value[0], value[1],
+                        value[2], value[3]))
             ratio = 0 if denominator == 0 else numerator * 1.0 / denominator
             res.append(ratio if ratio < 0.5 else 1. - ratio)
         # for genotype_field operations, the value[operation_index] holds the result of the operation
