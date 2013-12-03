@@ -2399,13 +2399,11 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 raise ValueError('A filename (quoted string) is needed for the first parameter of function track(), "{}" provided: {}'
                     .format(filename, e))
             param = matchObj.group(2)
-            if os.path.isfile(filename):
+            if os.path.isfile(filename) or '://' in filename:
                 filenames = [filename]
             else:
                 filenames = glob.glob(filename)
             #
-            if not filenames:
-                raise ValueError('No file matching name {} could be found.'.format(filename))
             if len(filenames) > 1:
                 env.logger.info('Filename "{}" matches {} files: {}'
                     .format(filename, len(filenames), ', '.join(filenames)))
