@@ -689,12 +689,16 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         # record genotypes as homozygotes if they appear on PAR1 and PAR2 of
         # both regions. Anyway, the following code removes variants within
         # these regions and treat them as autosome variants.
+        # the position information are based on personal communication with
+        # Dr. Bert Overduin from 1000 genomes
         #
         PAR_X = {
             'hg19': ([60001, 2699520], [154931044, 155270560])
+            'hg18': ([1,2709520], [154584238,154913754])
         }
         PAR_Y = {
             'hg19': ([10001, 2649520], [59034050, 59373566])
+            'hg18': ([1,2709520], [57443438,57772954])
         }
         if len(var_chrX) > 0 and proj.build in PAR_X:
             nPrev = len(var_chrX)
