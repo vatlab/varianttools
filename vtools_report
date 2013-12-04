@@ -29,7 +29,11 @@ import argparse
 import subprocess
 import logging
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
-     convertDoubleQuote, calculateInbreedingCoef
+     convertDoubleQuote, withinPseudoAutoRegion
+if sys.version_info.major == 2:
+    from variant_tools.assoTests_py2 import calculateInbreedingCoef
+else:
+    from variant_tools.assoTests_py3 import calculateInbreedingCoef
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, \
      resolvePlotFilename
 
@@ -470,10 +474,7 @@ def sequence(args):
 
 
 #
-# command inbreeding_coef
-#
-#
-# Command trans_ratio
+# command inbreeding_coefficient
 #
 def inbreedingCoefArguments(parser):
     parser.add_argument('table', 
@@ -485,6 +486,11 @@ def inbreedingCoefArguments(parser):
         help='''Name of the field that holds minor allele frequency for sample variants,
             which is the field name for command
             'vtools update table --from_stat "maf_field=maf()" --samples ...'.''')
+    parser.add_argument('--skip_autosome', action='store_true',
+                # help='''With this switch, variants on autosomes as well as on pseudo-autosomal
+                    # regions (PAR1 & PAR2) on chrX and chrY will be ignored.''')
+                help=argparse.SUPPRESS)
+
 
 def inbreedingCoef(args):
     table = args.table if args.table else 'variant'
@@ -493,11 +499,20 @@ def inbreedingCoef(args):
     print "sample_name\tF_stat"
     for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
         # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
-        geno = [x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na nan'''.\
+        geno = zip(*[x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na -9'''.\
                                           format(args.table if args.table else 'variant',
-                                                 name, args.maf_field)).split('\n')]
-        # print "{}\t{}".format(name, '\t'.join([str(x) for x in calculateInbreedingCoef(geno, build, True)]))
-        print "{}\t{}".format(name, calculateInbreedingCoef(geno, build, False)[0])
+                                                 name, args.maf_field)).split('\n')])
+        if not args.skip_autosome:
+            gt = list(map(int, geno[2]))
+            maf = list(map(float, geno[3]))
+        else:
+            gt = []
+            maf = []
+            for i in range(len(geno[0])):
+                if not withinPseudoAutoRegion(geno[0][i], int(geno[1][i]), build):
+                    gt.append(int(geno[2][i]))
+                    maf.append(float(geno[3][i]))
+        print "{}\t{}".format(name, calculateInbreedingCoef(gt, maf))
 
 #
 # command plot_fields
@@ -939,8 +954,8 @@ if __name__ == '__main__':
     addVerbosityArg(parser)
     parser.set_defaults(func=discordanceRate)
     #
-    # command inbreeding_coef
-    parser = subparsers.add_parser('inbreeding_coef',
+    # command inbreeding_coefficient
+    parser = subparsers.add_parser('inbreeding_coefficient',
         help='''Calculate inbreeding coefficent F for samples using selected variants''',
         description='''Report F statistic which describe the expected degree of a reduction in
              heterozygosity when compared to Hardy-Weinberg expectation. In simple two allele

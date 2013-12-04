@@ -92,6 +92,27 @@ class TestUpdate(ProcessTestCase):
         self.assertEqual(int(outputOfCmd("vtools execute 'select sum(CEU_cases_het) from variant'").split('\n')[0]), 1601)
         self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
         
+    def testMaf(self):
+        'Test computation of MAF'
+        # all females
+        runCmd('vtools import vcf/chromX.vcf.gz --build hg18')
+        runCmd('vtools phenotype --set "sex=2" --samples 1')
+        self.assertSucc('vtools update variant --from_stat "cnt0=#(GT)" "num0=#(alt)" "hom0=#(hom)" "het0=#(het)" "other0=#(other)" "maf0=maf()"')
+        cnt = outputOfCmd("vtools execute 'select cnt0 from variant LIMIT 10'").split('\n')
+        num = outputOfCmd("vtools execute 'select num0 from variant LIMIT 10'").split('\n')
+        maf = outputOfCmd("vtools execute 'select maf0 from variant LIMIT 10'").split('\n')
+        for i in range(10):
+            self.assertAlmostEqual(float(maf[i]), float(num[i])/float(cnt[i])/2.0)
+        # all males
+        runCmd('vtools phenotype --set "sex=1" --samples 1')
+        self.assertSucc('vtools update variant --from_stat "cnt1=#(GT)" "num1=#(alt)" "hom1=#(hom)" "het1=#(het)" "other1=#(other)" "maf1=maf()"')
+        cnt = outputOfCmd("vtools execute 'select cnt1 from variant LIMIT 10'").split('\n')
+        num = outputOfCmd("vtools execute 'select num1 from variant LIMIT 10'").split('\n')
+        maf = outputOfCmd("vtools execute 'select maf1 from variant LIMIT 10'").split('\n')
+        for i in range(10):
+            self.assertAlmostEqual(float(maf[i]), float(num[i])/float(cnt[i]))
+        
+       
     def testGenotypeSumStats(self):
         'Test command vtools update min/max/sum/mean_FIELD'
         runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')

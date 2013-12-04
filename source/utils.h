@@ -63,6 +63,10 @@ double pnhyper(double q, double m, double n, double k, double ncp = 1.0, bool up
 
 double fexact2x2(std::vector<int> dat, std::string alternative = "greater", double ncp = 1.0);
 
+double calculateInbreedingCoef(const std::vector<int> & gt,
+                               const std::vector<double> & maf);
+
+
 // the "online variance" algorithm for calculating mean and variance
 class RunningStat
 {

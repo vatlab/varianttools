@@ -23,7 +23,7 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 #include "utils.h"
-
+#include <cassert>
 #include "swigpyrun.h"
 
 bool fEqual(double a, double b)
@@ -317,6 +317,34 @@ double fexact2x2(std::vector<int> dat, std::string alternative, double ncp)
 		}
 	}
 	return s;
+}
+
+
+double calculateInbreedingCoef(const std::vector<int> & gt,
+                               const std::vector<double> & maf)
+{
+	//P(Homo) = F + (1-F)P(Homo by chance)
+	//P(Homo by chance) = p^2+q^2 for a biallelic locus.
+	//For an individual with N genotyped loci, we
+	//  1. count the total observed number of loci which are homozygous (O),
+	//  2. calculate the total expected number of loci homozygous by chance (E)
+	//Then, using the method of moments, we have
+	//   O = NF + (1-F)E
+	//Which rearranges to give
+	//   F = (O-E)/(N-E)
+	assert(gt.size() == maf.size());
+	double O = 0.0, E = 0.0, N = 0.0;
+	for (unsigned i = 0; i < maf.size(); ++i) {
+		// skip missing sites, tri-allilic sites or uninformative marker
+		if (!maf[i] > 1E-8 || gt[i] != gt[i] || gt[i] < 0) continue;
+		// observed homozygous locus found
+		if (gt[i] == 0 || gt[i] == 2) O++;
+		// expected value under HWE
+		E += 1 - 2 * maf[i] * (1 - maf[i]);
+        N++;
+	}
+	// Finally compute F
+	return (N - E > 0) ? (O - E) / (N - E) : std::numeric_limits<double>::quiet_NaN();
 }
 
 
