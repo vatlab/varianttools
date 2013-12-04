@@ -489,14 +489,15 @@ def inbreedingCoefArguments(parser):
 def inbreedingCoef(args):
     table = args.table if args.table else 'variant'
     sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
+    build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
     print "sample_name\tF_stat"
     for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
         # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
         geno = [x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na nan'''.\
                                           format(args.table if args.table else 'variant',
                                                  name, args.maf_field)).split('\n')]
-        # print "{}\t{}".format(name, '\t'.join([str(x) for x in calculateInbreedingCoef(geno)]))
-        print "{}\t{}".format(name, calculateInbreedingCoef(geno)[0])
+        # print "{}\t{}".format(name, '\t'.join([str(x) for x in calculateInbreedingCoef(geno, build, True)]))
+        print "{}\t{}".format(name, calculateInbreedingCoef(geno, build, False)[0])
 
 #
 # command plot_fields

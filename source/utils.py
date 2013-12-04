@@ -2841,7 +2841,7 @@ def withinPseudoAutoRegion(chrom, pos, build):
     else:
         return 0
     
-def calculateInbreedingCoef(data, build = 'hg19', sex_check = False):
+def calculateInbreedingCoef(data, build, sex_check = False):
     '''each element in dat is [chr, pos, GT, MAF]
     return a tuple (F, InferedSex, ConflictInfo)'''
     def call_sex(dat):
