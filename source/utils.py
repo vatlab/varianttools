@@ -2865,7 +2865,8 @@ def determineSexOfSamples(proj, sample_IDs=None):
             'F': 2,
             2: 2,
             'Female': 2,
-            'FEMALE' : 2
+            'FEMALE' : 2,
+            None: None
     }
     try:
         cur = proj.db.cursor()
@@ -2914,8 +2915,8 @@ def getVariantsOnChromosomeX(proj, variant_table='variant'):
         for PAR in PAR_X[proj.build]:
             var_chrX = set([x for x in var_chrX if x < PAR[0] and x > PAR[1]])
         if nPrev > len(var_chrX):
-            env.logger.debug('{} variants in pseudo-autosomal regions on '
-                'chromosome X are treated as autosome variants.'
+            env.logger.info('{} variants in pseudo-autosomal regions on '
+                'chromosome X are treated as autosomal variants.'
                 .format(nPrev - len(var_chrX)))
     return var_chrX
 
@@ -2947,7 +2948,7 @@ def getVariantsOnChromosomeY(proj, variant_table='variant'):
             var_chrY = set([x for x in var_chrY if x < PAR[0] and x > PAR[1]])
         if nPrev > len(var_chrY):
             env.logger.info('{} variants in pseudo-autosomal regions on '
-                'chromosome Y are treated as autosome variants.'
+                'chromosome Y are treated as autosomal variants.'
                 .format(nPrev - len(var_chrY)))
     return var_chrY
 

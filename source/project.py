@@ -4198,8 +4198,8 @@ def admin(args):
                 var_chrY = getVariantsOnChromosomeY(proj)
                 del s
                 if len(var_chrX) == 0 and len(var_chrY) == 0:
-                    env.logger.warning('Failed to validate sample sex because '
-                        'of lack of genotype on sex chromosomes.')
+                    env.logger.warning('Failed to validate sample sex: no genotype '
+                        'on non-pseudo-autosomal regions of sex chromosomes.')
                     # do not report error
                     sys.exit(0)
                 # attach genotype tables as __geno
@@ -4210,6 +4210,9 @@ def admin(args):
                 cur = proj.db.cursor()
                 for ID, sex in sample_sex.items():
                     count += 1
+                    # allow missing values for sex
+                    if sex is None:
+                        continue
                     geno_table = '__geno.genotype_{}'.format(ID)
                     # if there is no genotype ok,
                     if 'GT' not in [x[0].upper() for x in proj.db.fieldsOfTable(geno_table)]:
