@@ -661,8 +661,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             ID_sex = determineSexOfSamples(proj, IDs)
             numMales = len({x:y for x,y in ID_sex.items() if y == 1})
             numFemales = len({x:y for x,y in ID_sex.items() if y == 2})
-            env.logger.info('{} males and {} females are identified from field {}'
-                .format(numMales, numFemales, sex_field))
+            env.logger.info('{} males and {} females are identified'
+                .format(numMales, numFemales))
     #
     # Error checking with the user specified genotype fields
     # 1) if a field does not exist within one of the sample genotype tables a warning is issued

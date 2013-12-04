@@ -102,7 +102,9 @@ class TestUpdate(ProcessTestCase):
         num = outputOfCmd("vtools execute 'select num0 from variant LIMIT 10'").split('\n')
         maf = outputOfCmd("vtools execute 'select maf0 from variant LIMIT 10'").split('\n')
         for i in range(10):
-            self.assertAlmostEqual(float(maf[i]), float(num[i])/float(cnt[i])/2.0)
+            value = float(num[i])/float(cnt[i])/2.0
+            value = value if value < 0.5 else 1 - value
+            self.assertAlmostEqual(float(maf[i]), value)
         # all males
         runCmd('vtools phenotype --set "sex=1" --samples 1')
         self.assertSucc('vtools update variant --from_stat "cnt1=#(GT)" "num1=#(alt)" "hom1=#(hom)" "het1=#(het)" "other1=#(other)" "maf1=maf()"')
@@ -110,7 +112,9 @@ class TestUpdate(ProcessTestCase):
         num = outputOfCmd("vtools execute 'select num1 from variant LIMIT 10'").split('\n')
         maf = outputOfCmd("vtools execute 'select maf1 from variant LIMIT 10'").split('\n')
         for i in range(10):
-            self.assertAlmostEqual(float(maf[i]), float(num[i])/float(cnt[i]))
+            value = float(num[i])/float(cnt[i])
+            value = value if value < 0.5 else 1 - value
+            self.assertAlmostEqual(float(maf[i]), value)
         
        
     def testGenotypeSumStats(self):
