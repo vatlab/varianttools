@@ -2841,6 +2841,136 @@ def withinPseudoAutoRegion(chrom, pos, build):
     else:
         return 1
     
+def determineSexOfSamples(proj, sample_IDs=None):
+    '''Determine the sex of samples by checking phenotype sex or gender.
+    Only selected samples will be checked if sample_IDs is provided.
+    This function returns a dictionary with {ID:sex} where sex is 1 for male
+    and 2 for female.
+    '''
+     # find sex information
+    sample_fields = [x[0].lower() for x in proj.db.fieldsOfTable('sample')]
+    if 'sex' in sample_fields:
+        sex_field = 'sex'
+    elif 'gender' in sample_fields:
+        sex_field = 'gender'
+    else:
+        raise ValueError('Failed to determine sex of samples: '
+            'A phenotype named sex or gender with values 1/2, M/F or '
+            'Male/Female is required.')
+    sex_dict = {
+            'M': 1,
+            1: 1,
+            'Male': 1,
+            'MALE': 1,
+            'F': 2,
+            2: 2,
+            'Female': 2,
+            'FEMALE' : 2
+    }
+    try:
+        cur = proj.db.cursor()
+        # get sex
+        cur.execute('SELECT sample_id, {} FROM sample;'.format(sex_field))
+        if sample_IDs is not None:
+            return {x[0]:sex_dict[x[1]] for x in cur.fetchall() if x[0] in sample_IDs}
+        else:
+            return {x[0]:sex_dict[x[1]] for x in cur.fetchall()}
+    except KeyError as e:
+        raise ValueError('Invalid or missing value detected for field {}. Allowed '
+            'values are M/F, 1/2, Male/Female.'
+            .format(sex_field))
+
+# 23 -- X
+# 24 -- Y
+# 25 -- MT
+# XY -- pseduo-autosomal region
+#
+# NOTE: Some pipelines use 24 for XY... this can be a mess
+def getVariantsOnChromosomeX(proj, variant_table='variant'):
+    cur = proj.db.cursor()
+    if variant_table == 'variant':
+        cur.execute("SELECT variant_id FROM variant WHERE chr in ('X', 'x', '23')")
+    else:
+        cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+            "= variant.variant_id AND variant.chr in ('X', 'x', '23')".format(variant_table))
+    #
+    var_chrX = set([x[0] for x in cur.fetchall()])
+    #
+    env.logger.debug('{} variants on chromosome X are identifield'.format(len(var_chrX)))
+    #
+    # 1000 genomes record pseduo-autosomal regions on chromosome X, and
+    # record genotypes as homozygotes if they appear on PAR1 and PAR2 of
+    # both regions. Anyway, the following code removes variants within
+    # these regions and treat them as autosome variants.
+    # the position information are based on personal communication with
+    # Dr. Bert Overduin from 1000 genomes
+    #
+    PAR_X = {
+        'hg19': ([60001, 2699520], [154931044, 155270560]),
+        'hg18': ([1, 2709520], [154584238, 154913754])
+    }
+    if len(var_chrX) > 0 and proj.build in PAR_X:
+        nPrev = len(var_chrX)
+        for PAR in PAR_X[proj.build]:
+            var_chrX = set([x for x in var_chrX if x < PAR[0] and x > PAR[1]])
+        if nPrev > len(var_chrX):
+            env.logger.debug('{} variants in pseudo-autosomal regions on '
+                'chromosome X are treated as autosome variants.'
+                .format(nPrev - len(var_chrX)))
+    return var_chrX
+
+def getVariantsOnChromosomeY(proj, variant_table='variant'):
+    cur = proj.db.cursor()
+    if variant_table == 'variant':
+        cur.execute("SELECT variant_id FROM variant WHERE chr in ('Y', 'y', '24')")
+    else:
+        cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+            "= variant.variant_id AND chr in ('Y', 'y', '24')".format(variant_table))
+    var_chrY = set([x[0] for x in cur.fetchall()])
+    #
+    env.logger.debug('{} variants on chromosome Y are identifield'.format(len(var_chrY)))
+    #
+    # 1000 genomes record pseduo-autosomal regions on chromosome X, and
+    # record genotypes as homozygotes if they appear on PAR1 and PAR2 of
+    # both regions. Anyway, the following code removes variants within
+    # these regions and treat them as autosome variants.
+    # the position information are based on personal communication with
+    # Dr. Bert Overduin from 1000 genomes
+    #
+    PAR_Y = {
+        'hg19': ([10001, 2649520], [59034050, 59373566]),
+        'hg18': ([1, 2709520], [57443438, 57772954])
+    }
+    if len(var_chrY) > 0 and proj.build in PAR_Y:
+        nPrev = len(var_chrY)
+        for PAR in PAR_Y[proj.build]:
+            var_chrY = set([x for x in var_chrY if x < PAR[0] and x > PAR[1]])
+        if nPrev > len(var_chrY):
+            env.logger.info('{} variants in pseudo-autosomal regions on '
+                'chromosome Y are treated as autosome variants.'
+                .format(nPrev - len(var_chrY)))
+    return var_chrY
+
+
+def getVariantsOnManifolds(proj, variant_table='variant'):
+    cur = proj.db.cursor()
+    if variant_table == 'variant':
+        cur.execute("SELECT variant_id FROM variant WHERE chr NOT IN ('1', '2', "
+            "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
+            "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
+            "'x', 'y', 'XY', 'xy', '23', '24')")
+    else:
+        cur.execute("SELECT {0}.variant_id FROM {0}, variant WHERE {0}.variant_id "
+            "= variant.variant_id AND chr NOT IN ('1', '2', "
+            "'3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', "
+            "'14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',"
+            "'x', 'y', 'XY', 'xy', '23', '24')".format(variant_table))
+    var_chrOther = set([x[0] for x in cur.fetchall()])
+    #
+    env.logger.debug('{} variants on other chromosomes are identifield'.format(len(var_chrOther)))
+    return var_chrOther
+
+
 def call_sex(dat):
     # make sex calls based on very apparent information
     # dat = [chr, pos, gt]

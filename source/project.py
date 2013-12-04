@@ -54,7 +54,9 @@ from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
-    PrettyPrinter
+    PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
+    getVariantsOnChromosomeY
+
 
 
 # define a field type
@@ -4090,6 +4092,13 @@ def adminArguments(parser):
             the reference alleles of variants agree with the reference genome 
             sequence. A reference genome will be automatically downloaded if it
             does not exist in the local resource directory.''')
+    validate = parser.add_argument_group('Validate reported sex')
+    validate.add_argument('--validate_sex', action='store_true',
+        help='''Validate the sex of samples by checking the genotypes of samples
+            on sex chromosomes (excluding pseudo-autosomal regions). Sex of 
+            samples are determined by a phenotype named sex or gender with values
+            1/2, M/F or Male/Female. Inconsistency will be reported if, for example,
+            a female sample has genotypes on chromosome Y.''')
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
@@ -4182,6 +4191,67 @@ def admin(args):
                 prog.done()
                 env.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'
                     .format(count, err_count))
+            elif args.validate_sex:
+                sample_sex = determineSexOfSamples(proj)
+                s = delayedAction(env.logger.info, 'Getting variants on sex chromosomes')
+                var_chrX = getVariantsOnChromosomeX(proj)
+                var_chrY = getVariantsOnChromosomeY(proj)
+                del s
+                if len(var_chrX) == 0 and len(var_chrY) == 0:
+                    env.logger.warning('Failed to validate sample sex because '
+                        'of lack of genotype on sex chromosomes.')
+                    # do not report error
+                    sys.exit(0)
+                # attach genotype tables as __geno
+                proj.db.attach(proj.name + '_genotype', '__geno')
+                prog = ProgressBar('Validate sample sex', len(sample_sex))
+                count = 0
+                err_count = 0
+                cur = proj.db.cursor()
+                for ID, sex in sample_sex.items():
+                    count += 1
+                    geno_table = '__geno.genotype_{}'.format(ID)
+                    # if there is no genotype ok,
+                    if 'GT' not in [x[0].upper() for x in proj.db.fieldsOfTable(geno_table)]:
+                        continue
+                    if sex == 1:
+                        # for male, check if there is any 2 on chromosome X
+                        cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
+                            "{0}.variant_id = variant.variant_id AND "
+                            "variant.chr in ('X', 'x', '23') AND {0}.GT=2"
+                            .format(geno_table))
+                        for rec in cur:
+                            # var_chrX do not have variants in psudo-autosomal regions
+                            if rec[0] in var_chrX:
+                                cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
+                                    .format(ID))
+                                env.logger.warning('Homozygote variants on chromosome X is detected for male sample {}'.
+                                    format(cur.fetchone()[0]))
+                                err_count += 1
+                                break
+                    else:
+                        # for female, check if there is any genotype on chromosome Y
+                        cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
+                            "{0}.variant_id = variant.variant_id AND "
+                            "variant.chr in ('Y', 'y', '24')"
+                            .format(geno_table))
+                        for rec in cur:
+                            # var_chrY does not have variants in psudo-autosomal regions
+                            if rec[0] in var_chrY:
+                                cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
+                                    .format(ID))
+                                env.logger.warning('Variant on chromosome Y is detected for female sample {}'.
+                                    format(cur.fetchone()[0]))
+                                err_count += 1
+                                break
+                    prog.update(count + 1, err_count)
+                prog.done()
+                if err_count > 0:
+                    env.logger.info('{} out of {} samples show inconsistency in reported sex'
+                        .format(err_count, count))
+                else:
+                    env.logger.info('No consistency of sex has been detected from {} samples.'
+                        .format(count))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:
