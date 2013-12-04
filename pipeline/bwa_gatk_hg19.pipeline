@@ -228,12 +228,16 @@ action=RunCommand("%(java)s %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(o
     SECOND_END_FASTQ=${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}",
     output=["${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}",
          "${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}"])
-input_emitter=EmitInput(select=['bam', 'sam'], pass_unselected=True)
+# unselected files (e.g. non-bam/sam files) will not be passed. This allows the
+# output of this step to be generated fastq files that can be differentiated from
+# original input fastq files, so that they could be removed in production mode.
+input_emitter=EmitInput(select=['bam', 'sam'], pass_unselected=False)
 comment=Convert bam files to paired fastq files if the input is in bam/sam format.
     Other input files are returned untouched.
 
 [align_101]
-# input is output of previous step ${OUTPUT100}
+# input is input of 100 (all files), plus dumped fastq files
+input=${INPUT100} ${OUTPUT100}
 input_emitter=EmitInput('single')
 action=DecompressFiles(dest_dir="${AUXILIARY_DIR}"), LinkToDir('${AUXILIARY_DIR}')
 comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
@@ -290,6 +294,11 @@ action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}", cutoff=0.8)
 input_emitter=EmitInput('single')
 comment=Check the proportion of aligned reads and exit if there are less than
     80% of aligned reads.
+
+[align_303]
+action=RemoveIntermediateFiles('${OUTPUT100}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove fastq files dumped from bam files
 
 [align_400]
 input=${OUTPUT301}
