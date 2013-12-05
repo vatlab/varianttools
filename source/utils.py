@@ -2924,9 +2924,7 @@ def getVariantsOnChromosomeX(proj, variant_table='variant'):
     nPrev = len(var_chrX)
     if nPrev > 0:
         paRegion = PsudoAutoRegion('X', proj.build)
-        s = time.time()
         var_chrX = [x for x in var_chrX if not paRegion.check(x[1])]
-        env.logger.info('time {}'.format(time.time() - s))
         if nPrev > len(var_chrX):
             env.logger.info('{} variants in pseudo-autosomal regions on '
                 'chromosome X are treated as autosomal variants.'.format(nPrev - len(var_chrX)))
@@ -2944,9 +2942,7 @@ def getVariantsOnChromosomeY(proj, variant_table='variant'):
     nPrev = len(var_chrY)
     if nPrev > 0:
         paRegion = PsudoAutoRegion('Y', proj.build)
-        s = time.time()
         var_chrY = [x for x in var_chrY if not paRegion.check(x[1])]
-        env.logger.info('time {}'.format(time.time() - s))
         if nPrev > len(var_chrY):
             env.logger.info('{} variants in pseudo-autosomal regions on '
                 'chromosome Y are treated as autosomal variants.'.format(nPrev - len(var_chrY)))
