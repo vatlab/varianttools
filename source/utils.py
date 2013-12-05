@@ -2818,28 +2818,7 @@ def convertDoubleQuote(x):
     return '"{}"'.format(x.replace('"', "'"))
 
 
-def withinPseudoAutoRegion(chrom, pos, build):
-    # return True if position is in autosomal or pseudo-autosomal regions
-    # the position information are based on personal communication with
-    # Dr. Bert Overduin from 1000 genomes
-    if build == 'build37':
-        build = 'hg19'
-    if build == 'build36':
-        build = 'hg18'
-    PAR_X = {
-            'hg19': ([60001, 2699520], [154931044, 155270560]),
-            'hg18': ([1, 2709520], [154584238, 154913754])
-    }
-    PAR_Y = {
-            'hg19': ([10001, 2649520], [59034050, 59373566]),
-            'hg18': ([1, 2709520], [57443438, 57772954])
-    }
-    if chrom.lower() in ['x', '23']:
-        return sum([1 if item[0] < pos and item[1] > pos else 0 for item in PAR_X[build]]) >= 1 
-    elif chrom.lower() in ['y', '24']:
-        return sum([1 if item[0] < pos and item[1] > pos else 0 for item in PAR_Y[build]]) >= 1 
-    else:
-        return 1
+
     
 def determineSexOfSamples(proj, sample_IDs=None):
     '''Determine the sex of samples by checking phenotype sex or gender.
@@ -2881,6 +2860,47 @@ def determineSexOfSamples(proj, sample_IDs=None):
             'values are M/F, 1/2, Male/Female.'
             .format(sex_field))
 
+class PsudoAutoRegion:
+    def __init__(self, chrom, build):
+        if build == ['hg18', 'build36'] and chrom.lower() in ['x', '23']:
+            self.check = self.checkChrX_hg18
+        elif build in ['hg18', 'build36'] and chrom.lower() in ['y', '24']:
+            self.check = self.checkChrY_hg18
+        elif build in ['hg19', 'build37'] and chrom.lower() in ['x', '23']:
+            self.check = self.checkChrX_hg19
+        elif build in ['hg19', 'build37'] and chrom.lower() in ['y', '24']:
+            self.check = self.checkChrY_hg19
+        else:
+            env.logger.warning('Checking psudo-autosomal regions for build {} on chromosome {} is not supported'
+                .format(build, chrom))
+            self.check = self.notWithinRegion
+
+    def checkChrX_hg18(self, pos):
+        return (pos >= 1 and pos <= 2709520) or \
+            (pos >= 154584238 and pos <= 154913754)
+
+    def checkChrY_hg18(self, pos):
+        return (pos >= 1 and pos <= 2709520) or \
+            (pos >= 57443438 and pos <= 57772954)
+
+
+    def checkChrX_hg19(self, pos):
+        return (pos >= 60001 and pos <= 2699520) or \
+            (pos >= 154931044 and pos <= 155270560)
+
+    def checkChrY_hg19(self, pos):
+        return (pos >= 10001 and pos <= 2649520) or \
+            (pos >= 59034050 and pos <= 59373566)
+
+    def notWithinRegion(self, pos):
+        return False
+
+def withinPseudoAutoRegion(chrom, pos, build):
+    # return True if position is in autosomal or pseudo-autosomal regions
+    # the position information are based on personal communication with
+    # Dr. Bert Overduin from 1000 genomes
+    return PsudoAutoRegion(chrom, build).check(pos)
+
 # 1000 genomes record pseduo-autosomal regions on chromosome X, and
 # record genotypes as homozygotes if they appear on PAR1 and PAR2 of
 # both regions. Anyway, the following code removes variants within
@@ -2902,16 +2922,11 @@ def getVariantsOnChromosomeX(proj, variant_table='variant'):
     #
     var_chrX = set(cur.fetchall())
     nPrev = len(var_chrX)
-    PAR_X = {
-        'hg19': ([60001, 2699520], [154931044, 155270560]),
-        'build37': ([60001, 2699520], [154931044, 155270560]),
-        'hg18': ([1, 2709520], [154584238, 154913754]),
-        'build36': ([1, 2709520], [154584238, 154913754])
-    }
-    if nPrev > 0 and proj.build in PAR_X:
-        PAR = PAR_X[proj.build]
-        var_chrX = [x for x in var_chrX if not ((int(x[1]) > PAR[0][0] and int(x[1]) < PAR[0][1]) or \
-                                                    (int(x[1]) > PAR[1][0] and int(x[1]) < PAR[1][1]))]
+    if nPrev > 0:
+        paRegion = PsudoAutoRegion('X', proj.build)
+        s = time.time()
+        var_chrX = [x for x in var_chrX if not paRegion.check(x[1])]
+        env.logger.info('time {}'.format(time.time() - s))
         if nPrev > len(var_chrX):
             env.logger.info('{} variants in pseudo-autosomal regions on '
                 'chromosome X are treated as autosomal variants.'.format(nPrev - len(var_chrX)))
@@ -2927,16 +2942,11 @@ def getVariantsOnChromosomeY(proj, variant_table='variant'):
     #
     var_chrY = set(cur.fetchall())
     nPrev = len(var_chrY)
-    PAR_Y = {
-        'hg19': ([10001, 2649520], [59034050, 59373566]),
-        'build37': ([10001, 2649520], [59034050, 59373566]),
-        'hg18': ([1, 2709520], [57443438, 57772954]),
-        'build36': ([1, 2709520], [57443438, 57772954])
-    }
-    if nPrev > 0 and proj.build in PAR_Y:
-        PAR = PAR_Y[proj.build]
-        var_chrY = [x for x in var_chrY if not ((int(x[1]) > PAR[0][0] and int(x[1]) < PAR[0][1]) or \
-                                                    (int(x[1]) > PAR[1][0] and int(x[1]) < PAR[1][1]))]
+    if nPrev > 0:
+        paRegion = PsudoAutoRegion('Y', proj.build)
+        s = time.time()
+        var_chrY = [x for x in var_chrY if not paRegion.check(x[1])]
+        env.logger.info('time {}'.format(time.time() - s))
         if nPrev > len(var_chrY):
             env.logger.info('{} variants in pseudo-autosomal regions on '
                 'chromosome Y are treated as autosomal variants.'.format(nPrev - len(var_chrY)))
