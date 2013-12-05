@@ -2900,16 +2900,22 @@ def getVariantsOnChromosomeX(proj, variant_table='variant'):
         cur.execute("SELECT {0}.variant_id, pos FROM {0}, variant WHERE {0}.variant_id "
             "= variant.variant_id AND variant.chr in ('X', 'x', '23')".format(variant_table))
     #
-    dat = cur.fetchall()
-    nPrev = len(dat)
-    var_chrX = set([x[0] for x in dat if not withinPseudoAutoRegion('x', int(x[1]), proj.build)])
-    #
-    env.logger.debug('{} variants on chromosome X are identifield'.format(len(var_chrX)))
-    if nPrev > len(var_chrX):
-        env.logger.info('{} variants in pseudo-autosomal regions on '
-                'chromosome X are treated as autosome variants.'
-                .format(nPrev - len(var_chrX)))
-    return var_chrX
+    var_chrX = set(cur.fetchall())
+    nPrev = len(var_chrX)
+    PAR_X = {
+        'hg19': ([60001, 2699520], [154931044, 155270560]),
+        'build37': ([60001, 2699520], [154931044, 155270560]),
+        'hg18': ([1, 2709520], [154584238, 154913754]),
+        'build36': ([1, 2709520], [154584238, 154913754])
+    }
+    if nPrev > 0 and proj.build in PAR_X:
+        PAR = PAR_X[proj.build]
+        var_chrX = [x for x in var_chrX if not ((int(x[1]) > PAR[0][0] and int(x[1]) < PAR[0][1]) or \
+                                                    (int(x[1]) > PAR[1][0] and int(x[1]) < PAR[1][1]))]
+        if nPrev > len(var_chrX):
+            env.logger.info('{} variants in pseudo-autosomal regions on '
+                'chromosome X are treated as autosomal variants.'.format(nPrev - len(var_chrX)))
+    return set([x[0] for x in var_chrX])
 
 def getVariantsOnChromosomeY(proj, variant_table='variant'):
     cur = proj.db.cursor()
@@ -2918,17 +2924,24 @@ def getVariantsOnChromosomeY(proj, variant_table='variant'):
     else:
         cur.execute("SELECT {0}.variant_id, pos FROM {0}, variant WHERE {0}.variant_id "
             "= variant.variant_id AND chr in ('Y', 'y', '24')".format(variant_table))
-    dat = cur.fetchall()
-    nPrev = len(dat)
-    var_chrY = set([x[0] for x in dat if not withinPseudoAutoRegion('y', int(x[1]), proj.build)])
     #
-    env.logger.debug('{} variants on chromosome Y are identifield'.format(len(var_chrY)))
-    if nPrev > len(var_chrY):
-        env.logger.info('{} variants in pseudo-autosomal regions on '
-                'chromosome X are treated as autosome variants.'
-                .format(nPrev - len(var_chrY)))
-    return var_chrY
-
+    var_chrY = set(cur.fetchall())
+    nPrev = len(var_chrY)
+    PAR_Y = {
+        'hg19': ([10001, 2649520], [59034050, 59373566]),
+        'build37': ([10001, 2649520], [59034050, 59373566]),
+        'hg18': ([1, 2709520], [57443438, 57772954]),
+        'build36': ([1, 2709520], [57443438, 57772954])
+    }
+    if nPrev > 0 and proj.build in PAR_Y:
+        PAR = PAR_Y[proj.build]
+        var_chrY = [x for x in var_chrY if not ((int(x[1]) > PAR[0][0] and int(x[1]) < PAR[0][1]) or \
+                                                    (int(x[1]) > PAR[1][0] and int(x[1]) < PAR[1][1]))]
+        if nPrev > len(var_chrY):
+            env.logger.info('{} variants in pseudo-autosomal regions on '
+                'chromosome Y are treated as autosomal variants.'.format(nPrev - len(var_chrY)))
+    return set([x[0] for x in var_chrY])    
+        
 def getVariantsOnManifolds(proj, variant_table='variant'):
     cur = proj.db.cursor()
     if variant_table == 'variant':

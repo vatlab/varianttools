@@ -201,6 +201,72 @@ def rdot(data, output, psize = 2.5, color = None,
         os.remove(rscript)
     return
 
+def rbox(raw_data, fields, stratify, output, psize = 2, color = None,
+         save_data = None, save_script = None):
+    '''draw box using ggplot2
+    input should be 3 columns: 1st column is values, 2nd column is bin ID's and 3rd column is bin order'''
+    if stratify is not None:
+        if len(fields) > 1:
+            raise ValueError('Only one input field is allowed with --stratify option')
+        # create strata for given field
+        strata = sorted(stratify)
+        data = 'values\t{}\torder\n'.format(fields[0])
+        for item in raw_data.split('\n')[1:]:
+            if item == 'NA':
+                continue
+            else:
+                found = False 
+                for i, s in enumerate(strata):
+                    if float(item) < s:
+                        found = True
+                        if i == 0:
+                            xaxis = ('Below {}'.format(s))
+                        else:
+                            xaxis = ('{}-{}'.format(strata[i-1], s))
+                        order = i+1
+                    else:
+                        continue
+                if found is not True:
+                    xaxis = '{} or more'.format(strata[-1])
+                    order = len(strata) + 1
+            data += '{}\t{}\t{}\n'.format(item, xaxis, order) 
+    else:
+        # stack data to 3 columns retaining the input order of fields
+        data = 'values\tvariables\torder\n'
+        for item in [x.split() for x in raw_data.split('\n')[1:]]:
+            for i, x in enumerate(item):
+                data += '{}\t{}\t{}\n'.format(x, fields[i], i+1)
+    rstr = '''
+        tryCatch( {{dat <- read.delim(pipe('cat /dev/stdin'), header=T, stringsAsFactors=F)
+        }}, error = function(e) {{ quit("no") }} )
+        p <- ggbox(dat, psize = {0}, color = {1})
+        eval(parse(text={2}))
+        print(p)
+        graphics.off()
+        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output)))
+    #
+    # Here we pipe data from standard input (which can be big),
+    # create a script dynamically, and pump it to a R process.
+    #
+    if save_data:
+        with open(save_data, 'w') as f:
+            f.write(data)
+    rstr = BOX_FOO + loadGgplot(rstr)
+    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
+    with open(rscript, 'w') as f:
+        f.write(rstr)
+    env.logger.info('Generating dot plot {} ...'.format(repr(output)))
+    cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
+    out = runCommand(cmd, data) 
+    if out:
+        sys.stdout.write(out)
+    env.logger.info("Complete!")
+    # clean up
+    if save_script is None:
+        os.remove(rscript)
+    return
+
+
 def plotAssociation(args):
     env.logger.info("Reading from standard input ...")
     data = []
@@ -941,6 +1007,30 @@ ggdot <- function(dat, psize=2.5, color=NULL) {
             xlab(paste('\\n', 'index', sep='')) + ylab(paste(xyz[1], '\\n', sep=''))
     }
     myplot = myplot + geom_point(size = psize, binwidth = range(dat[,1])/30) +
+	    theme(legend.text=element_text(size=8)) +
+	    theme(legend.title=element_text(size=10)) +
+	    theme(axis.title.x=element_text(size=10)) +
+	    theme(axis.title.y=element_text(size=10)) +
+	    theme_bw()
+    return(myplot) 
+}
+'''
+BOX_FOO = '''
+ggbox <- function(dat, psize=2, color=NULL) {
+    tmp <- matrix(apply(dat[,c(2,3)], 2, unique), ncol=2)
+    tmp <- tmp[order(tmp[,2]), ]
+    levnames <- as.character(tmp[,1])
+    dat[,3] <- as.factor(dat[,3])
+    levels(dat[,3]) <- levnames
+    names = colnames(dat)
+    myplot = ggplot(dat, aes_string(x = names[3], y = names[1], fill = names[2])) +
+            xlab(paste('\\n', names[2], sep='')) + ylab(paste(names[1], '\\n', sep=''))
+    if (!is.null(color)) {
+        ncolors = length(unique(dat[,2]))
+        mycolors = rep(brewer.pal(brewer.pal.info[color,]$maxcolors, name = color), ncolors)[1:ncolors]
+        myplot = myplot + scale_fill_manual(values = mycolors)
+    }
+    myplot = myplot + geom_boxplot(outlier.size = psize) +
 	    theme(legend.text=element_text(size=8)) +
 	    theme(legend.title=element_text(size=10)) +
 	    theme(axis.title.x=element_text(size=10)) +
