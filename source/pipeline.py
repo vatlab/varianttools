@@ -994,18 +994,33 @@ class LinkToDir:
             path, basename = os.path.split(filename)
             if not os.path.isfile(filename):
                 if os.path.isfile(filename + '.file_info'):
-                    if not os.path.samefile(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info'):
+                    dest_file = os.path.join(self.dest, basename) + '.file_info'
+                    if os.path.isfile(dest_file):
+                        if not os.path.samefile(filename + '.file_info', dest_file):
+                            os.remove(dest_file)
+                            env.logger.info('Linking {} to {}'.format(filename, self.dest))
+                            os.link(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info')
+                        else:
+                            env.logger.debug('Reusing existing linked file_info file: {}'
+                                .format(os.path.join(self.dest, basename) + '.file_info'))
+                    else:
                         env.logger.info('Linking {} to {}'.format(filename, self.dest))
                         os.link(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info')
-                    else:
-                        env.logger.debug('Reusing existing linked file_info file: {}'
-                            .format(os.path.join(self.dest, basename) + '.file_info'))
                 else:
                     raise RuntimeError('Failed to link {} to directory {}: file does not exist'
                         .format(filename, self.dest_dir))
-            elif not os.path.samefile(filename,  os.path.join(self.dest, basename)):
-                env.logger.info('Linking {} to {}'.format(filename, self.dest))
-                os.link(filename, os.path.join(self.dest, basename))
+            elif:
+                dest_file = os.path.join(self.dest, basename)
+                if os.path.isfile(dest_file):
+                    if not os.path.samefile(filename, dest_file):
+                        os.remove(dest_file)
+                        env.logger.info('Linking {} to {}'.format(filename, self.dest))
+                        os.link(filename, dest_file)
+                    else:
+                        env.logger.debug('Resuing existing linked file: {}'.format(dest_file))
+                else:
+                    env.logger.info('Linking {} to {}'.format(filename, self.dest))
+                    os.link(filename, dest_file)
             ofiles.append(os.path.join(self.dest, basename))
         return ofiles
 
