@@ -67,7 +67,7 @@ CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu
 "Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"]
 
 
-def RdeviceFromFilename(filename):
+def RdeviceFromFilename(filename, width=800, height=600):
     # guess the device used to plot R plot from filename
     basename, ext = os.path.splitext(filename)
     # default
@@ -77,20 +77,22 @@ def RdeviceFromFilename(filename):
         # functions are not available in, for example, R 2.6.2
         if ext.lower() == '.pdf':
             device = 'pdf'
+            params = ', width={}/90, height={}/90'.format(width, height)
         elif ext.lower() == '.png':
             device = 'png'
-            params = ', width=800, height=600'
+            params = ', width={}, height={}'.format(width, height)
         elif ext.lower() == '.bmp':
             device = 'bmp'
-            params = ', width=800, height=600'
+            params = ', width={}, height={}'.format(width, height)
         elif ext.lower() in ['.jpg', '.jpeg']:
             device = 'jpeg'
-            params = ', width=800, height=600'
+            params = ', width={}, height={}'.format(width, height)
         elif ext.lower() in ['.tif', '.tiff']:
             device = 'tiff'
-            params = ', width=800, height=600'
+            params = ', width={}, height={}'.format(width, height)
         elif ext.lower() == '.eps':
             device = 'postscript'
+            params = ', width={}/90, height={}/90'.format(width, height)
     except Exception, e:
         logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(name, e))
         device = 'postscript'
@@ -125,7 +127,7 @@ def loadGgplot(script):
         script = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + script
     return script
 
-def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_script = None):
+def rhist(data, output, width, height, vlines = None, normcurve = True, save_data = None, save_script = None):
     '''draw histogram using ggplot2'''
     if vlines:
         vlines = Str4R(vlines)
@@ -144,7 +146,7 @@ def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_
         eval(parse(text=fns[i]))
         print(p)
         graphics.off()
-        }}'''.format(vlines, int(normcurve), ','.join([repr(RdeviceFromFilename(x)) for x in output]))
+        }}'''.format(vlines, int(normcurve), ','.join([repr(RdeviceFromFilename(x, width, height)) for x in output]))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
@@ -167,7 +169,7 @@ def rhist(data, output, vlines = None, normcurve = True, save_data = None, save_
         os.remove(rscript)
     return
 
-def rdot(data, output, psize = 2.5, color = None,
+def rdot(data, output, width, height, psize = 2.5, color = None,
          save_data = None, save_script = None):
     '''draw dotplot using ggplot2
     input can be 1, 2 or 3 columns for x, y, and z (i.e., dot colors) axis'''
@@ -178,7 +180,7 @@ def rdot(data, output, psize = 2.5, color = None,
         eval(parse(text={2}))
         print(p)
         graphics.off()
-        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output)))
+        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output, width, height)))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
@@ -201,35 +203,39 @@ def rdot(data, output, psize = 2.5, color = None,
         os.remove(rscript)
     return
 
-def rbox(raw_data, fields, stratify, output, psize = 2, color = None,
+def rbox(raw_data, fields, stratify, output, width, height, psize = 2, color = None,
          save_data = None, save_script = None):
     '''draw box using ggplot2
     input should be 3 columns: 1st column is values, 2nd column is bin ID's and 3rd column is bin order'''
     if stratify is not None:
-        if len(fields) > 1:
-            raise ValueError('Only one input field is allowed with --stratify option')
+        if len(fields) > 2:
+            raise ValueError('Less than 2 input fields are allowed with --stratify option')
         # create strata for given field
         strata = sorted(stratify)
-        data = 'values\t{}\torder\n'.format(fields[0])
+        data = '{}\t{}\torder\n'.\
+          format(
+              fields[0].replace('_','.'),
+              (fields[-1] if fields[-1]!=fields[0] else fields[-1] + '.strata').replace('_','.')
+              )
         for item in raw_data.split('\n')[1:]:
-            if item == 'NA':
+            item = item.split('\t')
+            if item[0] == 'NA':
                 continue
             else:
                 found = False 
                 for i, s in enumerate(strata):
-                    if float(item) < s:
+                    if float(item[-1]) < s:
                         found = True
                         if i == 0:
                             xaxis = ('Below {}'.format(s))
                         else:
                             xaxis = ('{}-{}'.format(strata[i-1], s))
                         order = i+1
-                    else:
-                        continue
+                        break
                 if found is not True:
                     xaxis = '{} or more'.format(strata[-1])
                     order = len(strata) + 1
-            data += '{}\t{}\t{}\n'.format(item, xaxis, order) 
+            data += '{}\t{}\t{}\n'.format(item[0], xaxis, order) 
     else:
         # stack data to 3 columns retaining the input order of fields
         data = 'values\tvariables\torder\n'
@@ -243,7 +249,7 @@ def rbox(raw_data, fields, stratify, output, psize = 2, color = None,
         eval(parse(text={2}))
         print(p)
         graphics.off()
-        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output)))
+        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output, width, height)))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.

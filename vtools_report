@@ -520,6 +520,10 @@ def inbreedingCoef(args):
 def plotFieldsCommonArguments(parser):
     parser.add_argument('--save_data', metavar='FILENAME', help='''Save data to file.''')
     parser.add_argument('--save_script', metavar='FILENAME', help='''Save R script to file.''')
+    parser.add_argument('--width', metavar='px', type=int, default=800,
+                        help='''Width of plot. Default to 800.''')
+    parser.add_argument('--height', metavar='px', type=int, default=600,
+                        help='''Height of plot. Default to 600.''')
     hist = parser.add_argument_group('Draw histogram')
     hist.add_argument('--hist',metavar='name',
         help='''File name of the outputted figure, which can have type PDF,
@@ -539,8 +543,9 @@ def plotFieldsCommonArguments(parser):
     dot.add_argument('--discrete_color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')
     box = parser.add_argument_group('''Draw box plot. Allow one or more input fields and produce
-    box plot for all fields in one graph. With --stratify option and only one input field, the box
-    plot will be generated for that field for different strata.''')
+    box plot for all fields in one graph. With --stratify option, box plot will be generated for field
+    in different strata, if there is only one input field, or for the first field in different strata of
+    the second field, if there are two input fields.''')
     box.add_argument('--box', metavar='name',
         help='''File name of the outputted figure, which can have type PDF, EPS, or JPG.''')
     box.add_argument('--stratify', metavar='C', nargs='+', type=float,
@@ -578,12 +583,13 @@ def plotFields(args):
     output = getoutput(['vtools', 'output', args.variants] + args.fields + ['--na', 'NA', '--header'])
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
-        rhist(output, fns, normcurve = args.norm_curve,
+        rhist(output, fns, args.width, args.height, normcurve = args.norm_curve,
               save_data = args.save_data, save_script = args.save_script)
     if args.dot is not None:
-        rdot(output, args.dot, args.dot_size, args.discrete_color, args.save_data, args.save_script)
+        rdot(output, args.dot, args.width, args.height, args.dot_size, args.discrete_color,
+             args.save_data, args.save_script)
     if args.box is not None:
-        rbox(output, args.fields, args.stratify, args.box,
+        rbox(output, args.fields, args.stratify, args.box,args.width, args.height,
              args.outlier_size, args.color, args.save_data, args.save_script)
             
         
@@ -603,12 +609,13 @@ def plotPhenoFields(args):
                        ' '.join(args.fields + sarg) + ' --na NA --header')
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
-        rhist(output, fns, normcurve = args.norm_curve,
+        rhist(output, fns, args.width, args.height,normcurve = args.norm_curve,
               save_data = args.save_data, save_script = args.save_script)
     if args.dot is not None:
-        rdot(output, args.dot, args.dot_size, args.discrete_color, args.save_data, args.save_script)
+        rdot(output, args.dot, args.width, args.height,
+             args.dot_size, args.discrete_color, args.save_data, args.save_script)
     if args.box is not None:
-        rbox(output, args.fields, args.stratify, args.box,
+        rbox(output, args.fields, args.stratify, args.box,args.width, args.height,
              args.outlier_size, args.color, args.save_data, args.save_script)
 
 #
@@ -649,12 +656,14 @@ def plotGenoFields(args):
         dfiles = resolvePlotFilename(args.save_data, args.fields)
         sfiles = resolvePlotFilename(args.save_script, args.fields)
         for f, p, d, s in zip(args.fields, fns, dfiles, sfiles):
-            rhist(f + '\n' + '\n'.join(map(str,output[f])), [p], normcurve = args.norm_curve,
+            rhist(f + '\n' + '\n'.join(map(str,output[f])), [p], args.width, args.height,
+                  normcurve = args.norm_curve,
               save_data = d, save_script = s)
     if args.dot is not None:
-        rdot(output, args.dot, args.dot_size, args.discrete_color, args.save_data, args.save_script)
+        rdot(output, args.dot, args.width, args.height,
+             args.dot_size, args.discrete_color, args.save_data, args.save_script)
     if args.box is not None:
-        rbox(output, args.fields, args.stratify, args.box,
+        rbox(output, args.fields, args.stratify, args.box,args.width, args.height,
              args.outlier_size, args.color, args.save_data, args.save_script)
 
 class PlotAssociationOpt:
