@@ -4228,8 +4228,12 @@ def admin(args):
                             if rec[0] in var_chrX:
                                 cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
                                     .format(ID))
-                                env.logger.warning('Homozygote variants on chromosome X is detected for male sample {}'.
-                                    format(cur.fetchone()[0]))
+                                sample_name = cur.fetchone()[0]
+                                cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
+                                    .format(rec[0]))
+                                variant = cur.fetchone()
+                                env.logger.warning('Homozygous variants on chromosome X is detected for male sample {}: {} {} {} {}'
+                                    .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
                                 err_count += 1
                                 break
                     else:
@@ -4243,8 +4247,12 @@ def admin(args):
                             if rec[0] in var_chrY:
                                 cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
                                     .format(ID))
-                                env.logger.warning('Variant on chromosome Y is detected for female sample {}'.
-                                    format(cur.fetchone()[0]))
+                                sample_name = cur.fetchone()[0]
+                                cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
+                                    .format(rec[0]))
+                                variant = cur.fetchone()
+                                env.logger.warning('Variant on chromosome Y is detected for female sample {}: {} {} {} {}'
+                                    .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
                                 err_count += 1
                                 break
                     prog.update(count + 1, err_count)
