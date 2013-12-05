@@ -4261,7 +4261,7 @@ def admin(args):
                     env.logger.info('{} out of {} samples show inconsistency in reported sex'
                         .format(err_count, count))
                 else:
-                    env.logger.info('No consistency of sex has been detected from {} samples.'
+                    env.logger.info('No inconsistency of sex has been detected from {} samples.'
                         .format(count))
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
