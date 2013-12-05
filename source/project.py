@@ -4187,7 +4187,7 @@ def admin(args):
                         err_count += 1
                         env.logger.debug('Ref allele mismatch: chr={}, pos={}, ref={}'
                             .format(chr, pos, ref))
-                    prog.update(count + 1, err_count)
+                    prog.update(count, err_count)
                 prog.done()
                 env.logger.info('{} non-insertion variants are checked. {} mismatch variants found.'
                     .format(count, err_count))
@@ -4255,7 +4255,7 @@ def admin(args):
                                     .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
                                 err_count += 1
                                 break
-                    prog.update(count + 1, err_count)
+                    prog.update(count, err_count)
                 prog.done()
                 if err_count > 0:
                     env.logger.info('{} out of {} samples show inconsistency in reported sex'
