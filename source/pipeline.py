@@ -96,7 +96,7 @@ class EmitInput:
                 if not line.startswith('@'):
                     return False
         except Exception as e:
-            env.logger.warning('Input file {} is not in fastq format: {}'.format(filename, e))
+            env.logger.debug('Input file {} is not in fastq format: {}'.format(filename, e))
             return False
         return True
 
@@ -1009,7 +1009,7 @@ class LinkToDir:
                 else:
                     raise RuntimeError('Failed to link {} to directory {}: file does not exist'
                         .format(filename, self.dest_dir))
-            elif:
+            else:
                 dest_file = os.path.join(self.dest, basename)
                 if os.path.isfile(dest_file):
                     if not os.path.samefile(filename, dest_file):
