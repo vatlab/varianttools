@@ -349,9 +349,9 @@ def sequenceArguments(parser):
         from a region-based annotation database (e.g. refGene.name2:TRIM2 or
         refGene_exon.name:NM_000947). Chromosome positions are 1-based and are inclusive
         at both ends so the chromosome region has a length of end-start+1 bp. A reversed
-        sequence will be outputted if starting position is after the ending position. For the
-        second case, multiple sequences will be printed if the name matches more than one
-        chromosomal regions.''')
+        complementary sequence will be outputted if starting position is after the
+        ending position. For the second case, multiple sequences will be printed if the
+        name matches more than one chromosomal regions.''')
     parser.add_argument('--build', nargs='?', 
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
@@ -378,7 +378,7 @@ def expandRegions(args):
             if start == 0 or end == 0:
                 raise ValueError('0 is not allowed as starting or ending position')
             if start > end:
-                regions.append((chr, start, end, '(reversed)'))
+                regions.append((chr, start, end, '(reverse complementary)'))
             else:
                 regions.append((chr, start, end, ''))
         except Exception as e:
@@ -436,6 +436,19 @@ def sequence(args):
         raise RuntimeError('Failed to get build of reference from the current project.')
     #
     ref = RefGenome(args.build)
+    #
+    complement_table = {
+        'A': 'T',
+        'T': 'A',
+        'a': 't',
+        't': 'a',
+        'G': 'C',
+        'C': 'G',
+        'g': 'c',
+        'c': 'g',
+        'N': 'N',
+        'n': 'n'
+    }
     # get chromosomal region
     for chr, start, end, comment in expandRegions(args):
         # get reference seq
@@ -445,7 +458,7 @@ def sequence(args):
         else:
             start, end = end, start
             reversed_seq = True
-            seq = ref.getSequence(chr, start, end)[::-1]
+            seq = ''.join([complement_table[x] for x in ref.getSequence(chr, start, end)[::-1]])
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr, start, end, comment))
         # break into pieces of 70 bp
         if args.numbered:
