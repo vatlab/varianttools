@@ -31,7 +31,7 @@ import subprocess
 from .project import Project
 from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
     delayedAction, encodeTableName, decodeTableName, env, validFieldName, \
-    PrettyPrinter
+    PrettyPrinter, OperationalError
 from .phenotype import Sample
 
 
@@ -158,7 +158,11 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     env.logger.debug('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
-    cur.execute(query)
+    try:
+        cur.execute(query)
+    except OperationalError as e:
+        raise RuntimeError('Failed to execute query. One or more fields might '
+            'be misspecified.')
     prt = PrettyPrinter(delimiter=args.delimiter)
     if args.header is not None:
         if len(args.header) == 0:
