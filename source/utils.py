@@ -2391,6 +2391,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
         for k,v in ref_tokens.items():
             query = re.sub(r'{}\s*\('.format(v), " {}('{}', ".format(k, crrFile), query)
+        fields.append('variant.variant_id')
     if has_track_query:
         def handleTrackParams(matchObj):
             try:
@@ -2412,6 +2413,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             else:
                 return ', '.join(["track(variant.chr, variant.pos, variant.ref, variant.alt, '{}' {})".format(x, param) for x in filenames])
         query = re.sub("__TRACK__\s*\(\s*([^,\)]+)([^\)]*)\)", handleTrackParams, query)
+        fields.append('variant.variant_id')
     if has_samples_query:
         #
         idListFiles = {}
@@ -2525,6 +2527,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         #
         query = re.sub("__SAMPLES__\s*\(([^\)]*)\)", handleSamplesParams, query)
         query = re.sub("__GENOTYPE__\s*\(([^\)]*)\)", handleGenotypeParams, query)
+        fields.append('variant.variant_id')
     #
     return query, fields
 
