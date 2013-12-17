@@ -768,8 +768,10 @@ class PipelineDescription:
                 .format(pname, self.pipeline_descriptions[pname.lower()]),
                 width=78)))
             for idx, step in enumerate(pipeline):
-                text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
-                print('\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*22)))
+                # hide a step if there is no comment
+                if step.comment:
+                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
+                    print('\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*22)))
         #
         if self.parameters:
             print('\nPipeline parameters:')
