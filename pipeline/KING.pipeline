@@ -85,7 +85,7 @@ action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.t
 comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
 
 [king_31]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --make-bed --out %(jobname)s',
+action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf 0.05 --make-bed --out %(jobname)s',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
 comment=LD pruning from pre-calculated list 
 

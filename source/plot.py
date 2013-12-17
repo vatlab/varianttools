@@ -1036,7 +1036,7 @@ ggbox <- function(dat, psize=2, color=NULL) {
         mycolors = rep(brewer.pal(brewer.pal.info[color,]$maxcolors, name = color), ncolors)[1:ncolors]
         myplot = myplot + scale_fill_manual(values = mycolors)
     }
-    myplot = myplot + geom_boxplot(outlier.size = psize) +
+    myplot = myplot + geom_boxplot(outlier.size = psize, varwidth = TRUE) +
 	    theme(legend.text=element_text(size=8)) +
 	    theme(legend.title=element_text(size=10)) +
 	    theme(axis.title.x=element_text(size=10)) +

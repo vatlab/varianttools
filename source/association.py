@@ -29,13 +29,6 @@ import time
 import random
 import math
 from copy import copy, deepcopy
-try:
-    # python 2 has pickle and cPickle
-    import cPickle as pickle
-except:
-    # python 3 has pickle
-    import pickle
-
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
      env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
