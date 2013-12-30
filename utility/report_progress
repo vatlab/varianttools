@@ -38,7 +38,7 @@ import atexit
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 try:
     import argparse
 except ImportError:
@@ -77,8 +77,8 @@ def extractEpoch(logfile):
                     else:
                         cur_step[3] = t
                     step_times.append(cur_step)
-                # cur_step recurds step, start_time, completed_time, and failed_time
-                cur_step = [(obj.group(2), int(obj.group(3))), t, None, None]
+                # cur_step recurds step, start_time, completed_time, failed_time, and on-going time
+                cur_step = [(obj.group(2), int(obj.group(3))), t, None, None, None]
                 continue
             obj = re.match(end_pattern, line)
             if obj is not None:
@@ -97,9 +97,11 @@ def extractEpoch(logfile):
                     cur_step[3] = t
                     step_times.append(cur_step)
                     cur_step = None
+        if cur_step is not None:
+            cur_step[4] = datetime.now()
+            step_times.append(cur_step)
     # remove intermediate recovery steps
-    return step_times # [x for x in step_times if x[2] is None or (x[2] - x[1]).total_seconds() > 20]
-
+    return step_times
 
 def retrieveLogFiles(files):
     logfiles = []
@@ -115,8 +117,8 @@ def retrieveLogFiles(files):
             logfiles.extend([os.path.join(tdir, x) for x in os.listdir(tdir) if x.endswith('.log')])
             atexit.register(shutil.rmtree, tdir)
     return logfiles
-            
-    
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''This script reads one or
         more local or remote log files produces by variant tools, extract
@@ -144,7 +146,7 @@ if __name__ == '__main__':
     # the earliest start time
     start_time = min([min([y[1] for y in x]) for x in events.values()])
     # the latested completed, failed or start time
-    end_time = max([max([y[2] if y[2] is not None else (y[3] if y[3] is not None else y[1]) for y in x]) for x in events.values()])
+    end_time = max([max([max([z for z in y[1:] if z is not None]) for y in x]) for x in events.values()])
     steps = list(sorted(steps))
     print('{} steps for piplines {} from {} to {} are identified'.format(
         len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
@@ -166,7 +168,7 @@ if __name__ == '__main__':
         plt.gcf().autofmt_xdate()
         #plt.xticks([0, 1], ['0', '1'], fontsize=8)
         plt.title(name)
-        for item, start, end, failed in epochs:
+        for item, start, end, failed, pending in epochs:
             step = steps.index(item)
             y = [step, step]
             x = [start, start]
@@ -181,6 +183,14 @@ if __name__ == '__main__':
                 if duration.total_seconds() > 120:
                     plt.text(start, y[0] + 0.2, duration, fontsize=5)
                 c = 'green'
+            elif pending is not None:
+                style = '-'
+                x = [start, pending]
+                duration = pending - start
+                duration = timedelta(seconds=int(duration.total_seconds()))
+                if duration.total_seconds() > 120:
+                    plt.text(start, y[0] + 0.2, duration, fontsize=5, color='purple')
+                c = 'purple'
             else:  # unknown
                 style = '-'
                 x = [start, start]
