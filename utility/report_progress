@@ -31,12 +31,21 @@ execution of pipelines.
 '''
 
 import re
+import sys
 import time
-from datetime import datetime #, strftime
-import argparse
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+from datetime import datetime
+try:
+    import argparse
+except ImportError:
+    sys.exit('Python module argparse (Python 2.7.3+) is required to execute this script')
+#
+try:
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.cm as cm
+except ImportError:
+    sys.exit('Python module matplotlib is required to execute this script')
 
 def extractEpoch(logfile):
     # this marks the start of pipeline (another pattern is 'Executing ...'
@@ -55,6 +64,13 @@ def extractEpoch(logfile):
                 t = datetime.strptime(obj.group(1), "%Y-%m-%d %H:%M:%S")
                 # if starts a new time, and not closed...
                 if cur_step is not None and (obj.group(2), int(obj.group(3))) != cur_step[0]:
+                    # if a new pipeline, or a next step, use the new time as ending time
+                    if obj.group(2) != cur_step[0][0]:
+                        cur_step[2] = t
+                    elif int(obj.group(3)) > cur_step[0][1]:
+                        cur_step[2] = t
+                    else:
+                        cur_step[3] = t
                     step_times.append(cur_step)
                 # cur_step recurds step, start_time, completed_time, and failed_time
                 cur_step = [(obj.group(2), int(obj.group(3))), t, None, None]
@@ -76,7 +92,8 @@ def extractEpoch(logfile):
                     cur_step[3] = t
                     step_times.append(cur_step)
                     cur_step = None
-    return step_times
+    # remove intermediate recovery steps
+    return step_times # [x for x in step_times if x[2] is None or (x[2] - x[1]).total_seconds() > 20]
 
 
 if __name__ == '__main__':
@@ -86,9 +103,9 @@ if __name__ == '__main__':
     parser.add_argument('logfiles', nargs='+',
         help='''One or more log files. Addresses 
         epoch = extractEpoch('LP6005253-DNA_B01.bam.log''')
-    parser.add_argument('--output', 
-        help='''Name of the output file. progress.pdf will be used if no file
-        is specified.''')
+    parser.add_argument('--output', default='progress.pdf',
+        help='''Name of the output file (in pdf format). progress.pdf will be 
+            used if no file is specified.''')
     #
     args = parser.parse_args()
     #
@@ -109,25 +126,44 @@ if __name__ == '__main__':
     print('{} steps for piplines {} from {} to {} are identified'.format(
         len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
     #
-    fig, ax = plt.subplots()
-    shifts = [x*1.0/len(events) for x in range(len(events))]
-    colors = cm.rainbow(shifts)
-    for (name, epochs), c, shift in zip(events.items(), colors, shifts):
+    #fig, ax = plt.subplots()
+    filename = args.output if args.output.endswith('.pdf') else args.output + '.pdf'
+    pp = PdfPages(filename)
+    for name, epochs in events.items():
+        print('Drawing figure for log file {}'.format(name))
+        plt.figure()
+        plt.rc('font', size=8)
+        plt.plot([], [], '-')
+        plt.grid(True, linestyle=':', color='0.75')
+        plt.xlim(start_time, end_time)
+        plt.ylim(0, len(steps))
+        plt.yticks(range(len(steps)), ['{}-{}'.format(x,y) for x,y in steps], fontsize=8)
+        plt.xlabel('Time')
+        plt.ylabel('Steps')
+        plt.gcf().autofmt_xdate()
+        #plt.xticks([0, 1], ['0', '1'], fontsize=8)
+        plt.title(name)
         for item, start, end, failed in epochs:
             step = steps.index(item)
-            y = [step + shift, step + shift]
+            y = [step, step]
             x = [start, start]
             if failed is not None:
-                style = '..'
+                style = '-'
                 x = [start, failed]
+                c = 'red'
             elif end is not None:
-                style = 'ko-'
+                style = '-'
                 x = [start, end]
+                duration = end-start
+                if duration.total_seconds() > 120:
+                    plt.text(start, y[0] + 0.2, duration, fontsize=5)
+                c = 'green'
             else:  # unknown
-                style = 'ko-'
+                style = '-'
                 x = [start, start]
+                c = 'purple'
             plt.plot(x, y, style, color=c)
-    plt.yticks(range(len(steps)), ['{}-{}'.format(x,y) for x,y in steps])
-    plt.gcf().autofmt_xdate()
-    plt.show()
+        pp.savefig()
+    pp.close()
+    print('Figures saved to {}'.format(filename))
 
