@@ -1368,6 +1368,8 @@ class Pipeline:
                 # this step is successful, go to next
                 os.chdir(saved_dir)
                 step_index += 1
+                env.logger.debug('Step {}.{}_{} is executed successfully.'
+                    .format(self.pipeline.name, pname, command.index))
                 if step_index == len(psteps):
                     break
             except RewindExecution:
@@ -1406,6 +1408,8 @@ class Pipeline:
                     .format(self.pipeline.name, pname, command.index, ', '.join(to_be_regenerated)))
                 os.chdir(saved_dir)
             except Exception as e:
+                env.logger.debug('Failed to execute step {}.{}_{}.'
+                    .format(self.pipeline.name, pname, command.index))
                 raise RuntimeError('Failed to execute step {}_{}: {}'
                     .format(pname, command.index, e))
 
