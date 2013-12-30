@@ -31,8 +31,13 @@ execution of pipelines.
 '''
 
 import re
+import os
 import sys
 import time
+import atexit
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime
 try:
     import argparse
@@ -96,13 +101,31 @@ def extractEpoch(logfile):
     return step_times # [x for x in step_times if x[2] is None or (x[2] - x[1]).total_seconds() > 20]
 
 
+def retrieveLogFiles(files):
+    logfiles = []
+    for f in files:
+        if os.path.isfile(f):
+            logfiles.append(f)
+        elif ':' in f:
+            tdir = tempfile.mkdtemp()
+            print('Copying {} to {}'.format(f, tdir))
+            ret = subprocess.call(['scp', f, tdir])
+            if ret != 0:
+                raise RuntimeError('Failed to copy files from {}'.format(f))
+            logfiles.extend([os.path.join(tdir, x) for x in os.listdir(tdir) if x.endswith('.log')])
+            atexit.register(shutil.rmtree, tdir)
+    return logfiles
+            
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''This script reads one or
         more local or remote log files produces by variant tools, extract
         starting times of steps of pipelines, and generate graphical reports''')
     parser.add_argument('logfiles', nargs='+',
-        help='''One or more log files. Addresses 
-        epoch = extractEpoch('LP6005253-DNA_B01.bam.log''')
+        help='''One or more log files. If address:path is specified, log files
+            will be copied to a temporary directory using command rcp. No
+            password can be specified so public key authentication is needed
+            if a password is needed.''')
     parser.add_argument('--output', default='progress.pdf',
         help='''Name of the output file (in pdf format). progress.pdf will be 
             used if no file is specified.''')
@@ -111,11 +134,11 @@ if __name__ == '__main__':
     #
     steps = set()
     events = {}
-    for logfile in args.logfiles:
+    for logfile in retrieveLogFiles(args.logfiles):
         e = extractEpoch(logfile)
         if e:
             steps |= set([x[0] for x in e])
-            events[logfile] = e
+            events[os.path.split(logfile)[-1]] = e
     #
     pipelines = set([x[0] for x in steps])
     # the earliest start time
