@@ -1,0 +1,108 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+
+[linked fields]
+hg18=chrom,pos,refallele,otherallele
+
+[data sources]
+anno_type=variant
+description=Allele frequency information of SNP markers of the YRI population of phase II and III of the HAPMAP project.
+header=1
+delimiter=' '
+version=hg18_20100817
+source_url=http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr1_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr2_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr3_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr4_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr5_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr6_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr7_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr8_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr9_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr10_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr11_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr12_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr13_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr14_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr15_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr16_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr17_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr18_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr19_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr20_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr21_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chr22_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrX_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrY_YRI_r28_nr.b36_fwd.txt.gz
+	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrM_YRI_r28_nr.b36_fwd.txt.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/hapmap_YRI_freq-hg18_20100817.DB.gz
+source_type=txt
+
+#
+# rs# chrom pos strand build center protLSID assayLSID panelLSID QC_code refallele refallele_freq refallele_count otherallele otherallele_freq otherallele_count totalcount
+#
+
+[rsname]
+index=1
+type=VARCHAR(255)
+comment=rsname
+
+[chrom]
+index=2
+type=VARCHAR(255)
+adj=RemoveLeading('chr')
+comment=chromosome
+
+[pos]
+index=3
+type=INT
+comment=1-based position
+
+[strand]
+index=4
+type=VARCHAR(1)
+comment=strand
+
+[refallele]
+index=4,11
+type=VARCHAR(255)
+adj=lambda x: x[1] if x[0] == '+' else {'A':'T', 'T':'A', 'G':'C', 'C':'G', '-':'-'}[x[1]]
+comment=reference allele
+
+[YRI_refallele_freq]
+index=12
+type=FLOAT
+comment=frequency of reference allele
+
+[YRI_refallele_count]
+index=13
+type=INT
+comment=Count of reference allele
+
+[otherallele]
+index=4,14
+type=VARCHAR(255)
+adj=lambda x: x[1] if x[0] == '+' else {'A':'T', 'T':'A', 'G':'C', 'C':'G', '-':'-'}[x[1]]
+comment=Other allele
+
+[YRI_otherallele_freq]
+index=15
+type=FLOAT
+comment=frequency of other allele
+
+[YRI_otherallele_count]
+index=16
+type=INT
+comment=Count of other allele
+
+[YRI_totalcount]
+index=17
+type=INT
+comment=Total allele count
+
+
+
+
