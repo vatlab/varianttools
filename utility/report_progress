@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+
+#
+# $File: report_progress $
+# $LastChangedDate: 2013-04-23 11:58:41 -0500 (Tue, 23 Apr 2013) $
+# $Rev: 1855 $
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://varianttools.sourceforge.net for details.
+#
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+'''
+This script analyze passed log files, extract time information for the
+execution of pipelines.
+'''
+
+import re
+import time
+from datetime import datetime #, strftime
+import argparse
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+
+def extractEpoch(logfile):
+    # this marks the start of pipeline (another pattern is 'Executing ...'
+    start_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sINPUT of step\s([^_]+)_(\w+)')
+    end_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sStep\s[^.].([^_]+)_(\w+) is executed successfully.')
+    failed_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sFailed to execute\s[^.].([^_]+)_(\w+).')
+    #
+    step_times = []
+    with open(logfile) as logfile:
+        # 
+        # 2013-11-25 00:15:50,751: DEBUG: INPUT of step XXXX_YYY
+        cur_step = None
+        for line in logfile:
+            obj = re.match(start_pattern, line)
+            if obj is not None:
+                t = datetime.strptime(obj.group(1), "%Y-%m-%d %H:%M:%S")
+                # if starts a new time, and not closed...
+                if cur_step is not None and (obj.group(2), int(obj.group(3))) != cur_step[0]:
+                    step_times.append(cur_step)
+                # cur_step recurds step, start_time, completed_time, and failed_time
+                cur_step = [(obj.group(2), int(obj.group(3))), t, None, None]
+                continue
+            obj = re.match(end_pattern, line)
+            if obj is not None:
+                t = datetime.strptime(obj.group(1), "%Y-%m-%d %H:%M:%S")
+                # completed successfuly
+                if cur_step is not None and (obj.group(2), int(obj.group(3))) != cur_step[0]:
+                    cur_step[2] = t
+                    step_times.append(cur_step)
+                    cur_step = None
+                continue
+            obj = re.match(failed_pattern, line)
+            if obj is not None:
+                t = datetime.strptime(obj.group(1), "%Y-%m-%d %H:%M:%S")
+                # completed successfuly
+                if cur_step is not None and (obj.group(2), int(obj.group(3))) != cur_step[0]:
+                    cur_step[3] = t
+                    step_times.append(cur_step)
+                    cur_step = None
+    return step_times
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='''This script reads one or
+        more local or remote log files produces by variant tools, extract
+        starting times of steps of pipelines, and generate graphical reports''')
+    parser.add_argument('logfiles', nargs='+',
+        help='''One or more log files. Addresses 
+        epoch = extractEpoch('LP6005253-DNA_B01.bam.log''')
+    parser.add_argument('--output', 
+        help='''Name of the output file. progress.pdf will be used if no file
+        is specified.''')
+    #
+    args = parser.parse_args()
+    #
+    steps = set()
+    events = {}
+    for logfile in args.logfiles:
+        e = extractEpoch(logfile)
+        if e:
+            steps |= set([x[0] for x in e])
+            events[logfile] = e
+    #
+    pipelines = set([x[0] for x in steps])
+    # the earliest start time
+    start_time = min([min([y[1] for y in x]) for x in events.values()])
+    # the latested completed, failed or start time
+    end_time = max([max([y[2] if y[2] is not None else (y[3] if y[3] is not None else y[1]) for y in x]) for x in events.values()])
+    steps = list(sorted(steps))
+    print('{} steps for piplines {} from {} to {} are identified'.format(
+        len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
+    #
+    fig, ax = plt.subplots()
+    shifts = [x*1.0/len(events) for x in range(len(events))]
+    colors = cm.rainbow(shifts)
+    for (name, epochs), c, shift in zip(events.items(), colors, shifts):
+        for item, start, end, failed in epochs:
+            step = steps.index(item)
+            y = [step + shift, step + shift]
+            x = [start, start]
+            if failed is not None:
+                style = '..'
+                x = [start, failed]
+            elif end is not None:
+                style = 'ko-'
+                x = [start, end]
+            else:  # unknown
+                style = 'ko-'
+                x = [start, start]
+            plt.plot(x, y, style, color=c)
+    plt.yticks(range(len(steps)), ['{}-{}'.format(x,y) for x,y in steps])
+    plt.gcf().autofmt_xdate()
+    plt.show()
+
