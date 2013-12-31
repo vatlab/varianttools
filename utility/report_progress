@@ -55,8 +55,8 @@ except ImportError:
 def extractEpoch(logfile):
     # this marks the start of pipeline (another pattern is 'Executing ...'
     start_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sINPUT of step\s([^_]+)_(\w+)')
-    end_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sStep\s[^.].([^_]+)_(\w+) is executed successfully.')
-    failed_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sFailed to execute\s[^.].([^_]+)_(\w+).')
+    end_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sStep\s[^.]+.([^_]+)_(\w+) is executed successfully.')
+    failed_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sFailed to execute\s[^.]+.([^_]+)_(\w+).')
     #
     step_times = []
     with open(logfile) as logfile:
@@ -147,6 +147,9 @@ if __name__ == '__main__':
     start_time = min([min([y[1] for y in x]) for x in events.values()])
     # the latested completed, failed or start time
     end_time = max([max([max([z for z in y[1:] if z is not None]) for y in x]) for x in events.values()])
+    # normalize to seconds
+    end_time = start_time + timedelta(seconds=int((end_time - start_time).total_seconds()))
+    pad = timedelta(seconds=(end_time - start_time).total_seconds()/40.)
     steps = list(sorted(steps))
     print('{} steps for piplines {} from {} to {} are identified'.format(
         len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
@@ -157,14 +160,20 @@ if __name__ == '__main__':
     for name, epochs in events.items():
         print('Drawing figure for log file {}'.format(name))
         plt.figure()
-        plt.rc('font', size=8)
+        plt.rc('font', size=6)
         plt.plot([], [], '-')
         plt.grid(True, linestyle=':', color='0.75')
-        plt.xlim(start_time, end_time)
-        plt.ylim(0, len(steps))
+        plt.xlim(start_time - pad, end_time + pad)
+        plt.ylim(-1, len(steps))
         plt.yticks(range(len(steps)), ['{}-{}'.format(x,y) for x,y in steps], fontsize=8)
         plt.xlabel('Time')
         plt.ylabel('Steps')
+        plt.plot([start_time, start_time], [-1, 0], '-', color='black', linewidth=0.5)
+        plt.text(start_time, -0.8, ' {}'.format(start_time), fontsize=5)
+        plt.text(start_time + timedelta(seconds=int((end_time - start_time).total_seconds()/2.)), -0.8,
+            '{} '.format(timedelta(seconds=int((end_time - start_time).total_seconds()))), fontsize=5, ha='center')
+        plt.plot([end_time, end_time], [-1, 0], '-', color='black', linewidth=0.5)
+        plt.text(end_time, -0.8, '{} '.format(end_time), fontsize=5, ha='right')
         plt.gcf().autofmt_xdate()
         #plt.xticks([0, 1], ['0', '1'], fontsize=8)
         plt.title(name)
