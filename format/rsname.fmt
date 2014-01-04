@@ -28,13 +28,13 @@ comment=Obtain chromosome from dbSNP by rsname
 [pos]
 index=%(rsname_col)s
 type=VARCHAR(20)
-adj=FieldFromDB(dbfile="%(dbfile)s", res_field='start', cond_fields='name')
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='pos', cond_fields='name')
 comment=Obtain position from dbSNP by rsname
 
 [ref]
 index=%(rsname_col)s
 type=VARCHAR(20)
-adj=FieldFromDB(dbfile="%(dbfile)s", res_field='refNCBI', cond_fields='name')
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='ref', cond_fields='name')
 comment=Obtain reference allele from dbSNP by rsname
 
 [alt]
