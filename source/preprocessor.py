@@ -583,6 +583,7 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
                 db.commit()
                 db.close()
                 db.connect(database_file, readonly=True)
+                cur = db.cursor()
         __databases[dbfile] = (cur, name)
     __db_lock.release()
     return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
