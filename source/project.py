@@ -949,7 +949,8 @@ class AnnoDBWriter:
         cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
         count = cur.fetchone()[0]
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
-        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', self.db.numOfRows(self.name)))
+        num_records = self.db.numOfRows(self.name)
+        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', num_records))
         del s
         for field in self.fields:
             s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
@@ -957,6 +958,8 @@ class AnnoDBWriter:
             missing = cur.fetchone()[0]
             cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
                 (missing,))
+            if missing == num_records:
+                env.logger.warning('Field {} has all missing values'.format(field.name))
             if 'int' in field.type.lower() or 'float' in field.type.lower():
                 cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
                 res = cur.fetchone()
@@ -967,6 +970,8 @@ class AnnoDBWriter:
                 res = cur.fetchone()
                 cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
                     self.name, self.db.PH), (res[0], field.name))
+                if res[0] == 1:
+                    env.logger.warning('Field {} has only one value in the database.'.format(field.name))
             del s
         self.db.commit()
 
