@@ -16,7 +16,7 @@ sep_comment=delimiter used to separate input fields
 rsname_col=1
 rsname_col_comment=Index for the column with rsname
 
-dbfile=dbSNP.DB
+dbfile=dbSNP-hg19_138.DB
 dbfile_comment=Name of an attached dbSNP database or path to the dbSNP database in sqlite format
 
 [chr]
