@@ -100,8 +100,10 @@ void showTrack(const std::string & track_file, const std::string output_file = s
         output = stdout;
     } else {
         output = fopen(output_file.c_str(), "w");
-        /* right now we only support filed style output for pipeline anno_util FieldFromTextFile */
-        output_style = 1;
+        if (endsWith((char*)output_file.c_str(), ".fmt"))
+            output_style = 2;
+        else
+            output_style = 1;
     }
     if (endsWith((char *)track_file.c_str(), ".vcf.gz") || 
         endsWith((char *)track_file.c_str(), ".vcf")) {
@@ -166,7 +168,6 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                 fprintf(output, "%-23s %s%s\n", buf, "genotype for sample ",
                     vcff->genotypeIds[i]);
                 // for all format fields
-                struct vcfInfoDef * def = NULL;
                 for (def = vcff->gtFormatDefs; def != NULL; def = def->next) {
                     std::string typestring = "";
                     if (def->type == vcfInfoFlag)
@@ -180,7 +181,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                 }
             }
         } else if (output_style == 1) {
-            /* output fields in .ann (or .fmt) format */
+            /* output fields in .ann format */
             fprintf(output, "# %-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
             fprintf(output, "# %-23s %d\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
             fprintf(output, "# Header: (excluding INFO and FORMAT lines)\n");
@@ -211,6 +212,80 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                 else 
                     fprintf(output, "type=VARCHAR(255)\nadj=ExtractValue('%s=', ';')\n", def->key);
                 fprintf(output, "comment=%s\n\n", def->description);
+            }
+        } else if (output_style == 2) {
+            /* output fields in .fmt format */
+            fprintf(output, "[format description]\n");
+            fprintf(output, "description=Format file to import all variant and genotype info from %s\n", track_file.c_str());
+            fprintf(output, "variant=chr,pos,ref,alt\n");
+            /* import all variant info fields */
+            struct vcfInfoDef * def = NULL;
+            fprintf(output, "variant_info=name,qual,filter");
+            for (def = vcff->infoDefs; def != NULL; def = def->next)
+                fprintf(output, ",%s", def->key);
+            fprintf(output, "\n");
+            //
+            if (vcff->genotypeCount > 0) {
+                fprintf(output, "genotype=GT\n");
+                fprintf(output, "genotype_info=");
+                bool first_field = true;
+                // skip GT
+                def = vcff->gtFormatDefs;
+                if (def != NULL)
+                    def = def->next;
+                for (; def != NULL; def = def->next) {
+                    if (first_field) {
+                        fprintf(output, "%s_geno", def->key);
+                        first_field = false;
+                    } else
+                        fprintf(output, ",%s_geno", def->key);
+                }
+                fprintf(output, "\n\n");
+            } else {
+                fprintf(output, "genotype=\n");
+                fprintf(output, "genotype_info=\n\n");
+            }
+            fprintf(output, "\n[chr]\nindex=1\ntype=VARCHAR(255)\nadj=RemoveLeading('chr')\ncomment=Chromosome\n\n");
+            fprintf(output, "[pos]\nindex=2\ntype=INTEGER\ncomment=Position (1-based)\n\n");
+			fprintf(output, "[name]\nindex=3\ntype=VARCHAR(24) NULL\ncomment=DB SNP ID\n\n");
+			fprintf(output, "[ref]\nindex=4\ntype=CHAR(1) NOT NULL\ncomment=Reference allele (as on the + strand)\n\n");
+			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\ncomment=Alternative allele (as on the + strand)\n\n");
+			fprintf(output, "[qual]\nindex=6\ntype=FLOAT\ncomment=phred-scaled quality score\n\n");
+			fprintf(output, "[filter]\nindex=7\ntype=VARCHAR(255)\ncomment=Filter\n\n");
+            //
+            for (def = vcff->infoDefs; def != NULL; def = def->next) {
+                fprintf(output, "[%s]\nindex=8\n", def->key);
+                if (def->type == vcfInfoFlag)
+                    fprintf(output, "type=INTEGER\nadj=ExtractFlag('%s', ';')\n", def->key);
+                else if (def->type == vcfInfoInteger)
+                    fprintf(output, "type=INTEGER\nadj=ExtractValue('%s=', ';')\n", def->key);
+                else if (def->type == vcfInfoFloat)
+                    fprintf(output, "type=FLOAT\nadj=ExtractValue('%s=', ';')\n", def->key);
+                else 
+                    fprintf(output, "type=VARCHAR(255)\nadj=ExtractValue('%s=', ';')\n", def->key);
+                fprintf(output, "comment=%s\n\n", def->description);
+            }
+            /* if there is genotype */
+            if (vcff->genotypeCount > 0) {
+                fprintf(output, "[GT]\nindex=10:\ntype=INTEGER\nadj=VcfGenotype(default=('0',))\nfmt=GenoFormatter(style='vcf')\n");
+                fprintf(output, "comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotypes will be ignored.\n\n");
+                def = vcff->gtFormatDefs;
+                // skip GT field, which is handled separaely
+                if (def != NULL)
+                    def = def->next;
+                for (; def != NULL; def = def->next) {
+                    fprintf(output, "[%s_geno]\nindex=9,10:\n", def->key);
+                    fprintf(output, "adj=FieldFromFormat('%s', ':')\n", def->key);
+                    if (def->type == vcfInfoFlag)
+                        fprintf(output, "type=INTEGER\n");
+                    else if (def->type == vcfInfoInteger)
+                        fprintf(output, "type=INTEGER\n");
+                    else if (def->type == vcfInfoFloat)
+                        fprintf(output, "type=FLOAT\n");
+                    else
+                        fprintf(output, "type=VARCHAR(255)\n");
+                    fprintf(output, "comment=genotype field %s: %s\n\n", def->key, def->description);
+                }
             }
         }
         vcfFileFree(&vcff);
