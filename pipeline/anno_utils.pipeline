@@ -31,6 +31,15 @@ annFileFromText_description=This pipeline reads a tab, comma or space delimited
   .ann file. If the .ann file is created correctly, it can be used to create an
   annotation database from the input text file.
 
+annFileFromVcf_description=This pipeline reads the header of a vcf file and
+  creates an .ann file with chr, pos, ref, alt, and fields from all INFO fields.
+  The input file can be a file (.vcf or .vcf.gz) or a URL (.vcf.gz only). The
+  file must be tabix-indexed if it is bgzipped. The output file is an .ann
+  file, which can be used to create an annotation database for the vcf file. 
+  This pipeline tries to guess the reference genome used from the VCF file but
+  you should always check if the correct reference genome is generated.
+
+
 [DEFAULT]
 export=variant
 export_comment=A variant table to create annotation database from for pipeline proj2annoDB
@@ -197,3 +206,32 @@ action=RunCommand(cmd=[
 	"cat ${INPUT}           >> ${CMD_OUTPUT}"],
 	output="${CMD_OUTPUT}")
 comment=Create an annotation file from fields guessed from input file
+
+
+[annFileFromVcf_10]
+# the input can be a URL, and we need a real file to bypass the valid input file
+# check
+action=FieldsFromTextFile("${CACHE_DIR}/${CMD_INPUT: os.path.basename(CMD_INPUT[0]) + '.fields'}")
+BUILD=${CACHE_DIR,CMD_INPUT: 'hg18' if [x for x in open(os.path.join(CACHE_DIR, os.path.basename(CMD_INPUT[0]) + '.fields')).read().split('\n') if 'NCBI36' in x or 'hg18' in x] else 'hg19'}
+comment=Create a feild description file from input text file.
+
+[annFileFromVcf_20]
+action=RunCommand(cmd=
+    "echo '# Please refer to http://varianttools.sourceforge.net/Annotation/New' > ${CMD_OUTPUT};
+     echo '# for a description of the format of this file.' >> ${CMD_OUTPUT};
+     echo '' >> ${CMD_OUTPUT};
+	 echo '[linked fields]' >> ${CMD_OUTPUT};
+	 echo '${BUILD}=chr,pos,ref,alt' >> ${CMD_OUTPUT};
+     echo '' >> ${CMD_OUTPUT};
+     echo '[data sources]' >> ${CMD_OUTPUT};
+     echo 'description=An annotation database created from' ${CMD_INPUT} >> ${CMD_OUTPUT};
+     echo 'version=' >> ${CMD_OUTPUT};
+     echo 'anno_type=variant' >> ${CMD_OUTPUT};
+     echo 'direct_url=' >> ${CMD_OUTPUT};
+     echo 'source_url='${CMD_INPUT} >> ${CMD_OUTPUT};
+     echo 'source_type=txt' >> ${CMD_OUTPUT};
+     echo 'source_pattern=' >> ${CMD_OUTPUT};
+     echo '' >> ${CMD_OUTPUT};
+	 cat ${INPUT}  >> ${CMD_OUTPUT}",
+	output="${CMD_OUTPUT}")
+comment=Create an annotation file from fields guessed from input vcf file
