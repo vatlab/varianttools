@@ -91,11 +91,30 @@ std::string wrap(char * input, int start=24)
     return res;
 }
 
-void showTrack(const std::string & track_file)
+void showTrack(const std::string & track_file, const std::string output_file = std::string())
 {
     char buf[255];
+    FILE * output = NULL;
+    int output_style = 0;
+    if (output_file.empty()) {
+        output = stdout;
+    } else {
+        output = fopen(output_file.c_str(), "w");
+        /* right now we only support filed style output for pipeline anno_util FieldFromTextFile */
+        output_style = 1;
+    }
     if (endsWith((char *)track_file.c_str(), ".vcf.gz") || 
         endsWith((char *)track_file.c_str(), ".vcf")) {
+        /* if it is a local file, but does not exist. This is needed
+           because vcfFileMayOpen will simply crash if file does not exist */
+        if (track_file.find_first_of(':') == std::string::npos) {
+            if (FILE * f = fopen(track_file.c_str(), "r"))
+                fclose(f);
+            else {
+                fprintf(stderr, "File %s does not exist\n", track_file.c_str());
+                return;
+            }
+        }
         vcfFile * vcff = NULL;
         if (endsWith((char *)track_file.c_str(), ".vcf"))
             vcff = vcfFileMayOpen((char *)track_file.c_str(),
@@ -106,57 +125,92 @@ void showTrack(const std::string & track_file)
         if (vcff == NULL)
              return;
         
-        printf("%-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
-        printf("%-23s %d\n\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
-        printf("Header: (excluding INFO and FORMAT lines)\n");
-        char *tok = strtok(vcff->headerString, "\n");
-        while (tok != NULL) {
-            if ( !(startsWith("##INFO", (char *)tok) || startsWith("##fileformat", (char *)tok)
-              || startsWith("##FORMAT", (char *)tok) || startsWith("#CHROM", (char *)tok)))
-                printf("%-23s %s\n", "", tok);
-            tok = strtok(NULL, "\n");
-        }
-        printf("\n");
-        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
-        printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
-        printf("%-23s %s\n", "chr (1, chrom)", "chromosome");
-        printf("%-23s %s\n", "pos (2, INTEGER)", "position (1-based)");
-        printf("%-23s %s\n", "name (3)", "name of variant");
-        printf("%-23s %s\n", "ref (4)", "reference allele");
-        printf("%-23s %s\n", "alt (5)", "alternative alleles");
-        printf("%-23s %s\n", "qual (6)", "qual");
-        printf("%-23s %s\n", "filter (7)", "filter");
-        printf("%-23s %s\n", "info (8, default)", "variant info fields");
-        //
-        struct vcfInfoDef * def = NULL;
-        for (def = vcff->infoDefs; def != NULL; def = def->next) {
-            std::string typestring = "";
-            if (def->type == vcfInfoFlag)
-                typestring = " (INTEGER, flag)";
-            else if (def->type == vcfInfoInteger)
-                typestring = " (INTEGER)";
-            else if (def->type == vcfInfoFloat)
-                typestring = " (FLOAT)";
-            sprintf(buf, "info.%s%s", def->key, typestring.c_str());
-            printf("%-23s %s\n", buf, def->description);
-        }
-        printf("%-23s %s\n", "format (9)", "genotype format");
-        for (size_t i = 0; i < vcff->genotypeCount; ++i) {
-            sprintf(buf, "%s (%lu)",  vcff->genotypeIds[i], 10 + i);
-            printf("%-23s %s%s\n", buf, "genotype for sample ",
-                vcff->genotypeIds[i]);
-            // for all format fields
+        if (output_style == 0) {
+            fprintf(output, "%-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
+            fprintf(output, "%-23s %d\n\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
+            fprintf(output, "Header: (excluding INFO and FORMAT lines)\n");
+            char *tok = strtok(vcff->headerString, "\n");
+            while (tok != NULL) {
+                if ( !(startsWith("##INFO", (char *)tok) || startsWith("##fileformat", (char *)tok)
+                  || startsWith("##FORMAT", (char *)tok) || startsWith("#CHROM", (char *)tok)))
+                    fprintf(output, "%-23s %s\n", "", tok);
+                tok = strtok(NULL, "\n");
+            }
+            fprintf(output, "\n");
+            fprintf(output, "Available fields (with type VARCHAR if unspecified or all=1):\n");
+            fprintf(output, "%-23s %s\n", "0 (INTEGER)", "1 if matched");
+            fprintf(output, "%-23s %s\n", "chr (1, chrom)", "chromosome");
+            fprintf(output, "%-23s %s\n", "pos (2, INTEGER)", "position (1-based)");
+            fprintf(output, "%-23s %s\n", "name (3)", "name of variant");
+            fprintf(output, "%-23s %s\n", "ref (4)", "reference allele");
+            fprintf(output, "%-23s %s\n", "alt (5)", "alternative alleles");
+            fprintf(output, "%-23s %s\n", "qual (6)", "qual");
+            fprintf(output, "%-23s %s\n", "filter (7)", "filter");
+            fprintf(output, "%-23s %s\n", "info (8, default)", "variant info fields");
+            //
             struct vcfInfoDef * def = NULL;
-            for (def = vcff->gtFormatDefs; def != NULL; def = def->next) {
+            for (def = vcff->infoDefs; def != NULL; def = def->next) {
                 std::string typestring = "";
                 if (def->type == vcfInfoFlag)
                     typestring = " (INTEGER, flag)";
                 else if (def->type == vcfInfoInteger)
                     typestring = " (INTEGER)";
                 else if (def->type == vcfInfoFloat)
-                typestring = " (FLOAT)";
-                sprintf(buf, "%s.%s%s", vcff->genotypeIds[i], def->key, typestring.c_str());
-                printf("%-23s %s for sample %s\n", buf, def->description, vcff->genotypeIds[i]);
+                    typestring = " (FLOAT)";
+                sprintf(buf, "info.%s%s", def->key, typestring.c_str());
+                fprintf(output, "%-23s %s\n", buf, def->description);
+            }
+            fprintf(output, "%-23s %s\n", "format (9)", "genotype format");
+            for (size_t i = 0; i < vcff->genotypeCount; ++i) {
+                sprintf(buf, "%s (%lu)",  vcff->genotypeIds[i], 10 + i);
+                fprintf(output, "%-23s %s%s\n", buf, "genotype for sample ",
+                    vcff->genotypeIds[i]);
+                // for all format fields
+                struct vcfInfoDef * def = NULL;
+                for (def = vcff->gtFormatDefs; def != NULL; def = def->next) {
+                    std::string typestring = "";
+                    if (def->type == vcfInfoFlag)
+                        typestring = " (INTEGER, flag)";
+                    else if (def->type == vcfInfoInteger)
+                        typestring = " (INTEGER)";
+                    else if (def->type == vcfInfoFloat)
+                    typestring = " (FLOAT)";
+                    sprintf(buf, "%s.%s%s", vcff->genotypeIds[i], def->key, typestring.c_str());
+                    fprintf(output, "%-23s %s for sample %s\n", buf, def->description, vcff->genotypeIds[i]);
+                }
+            }
+        } else if (output_style == 1) {
+            /* output fields in .ann (or .fmt) format */
+            fprintf(output, "# %-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
+            fprintf(output, "# %-23s %d\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
+            fprintf(output, "# Header: (excluding INFO and FORMAT lines)\n");
+            char *tok = strtok(vcff->headerString, "\n");
+            while (tok != NULL) {
+                if ( !(startsWith("##INFO", (char *)tok) || startsWith("##fileformat", (char *)tok)
+                  || startsWith("##FORMAT", (char *)tok) || startsWith("#CHROM", (char *)tok)))
+                    fprintf(output, "# %-23s %s\n", "", tok);
+                tok = strtok(NULL, "\n");
+            }
+            fprintf(output, "\n[chr]\nindex=1\ntype=VARCHAR(255)\nadj=RemoveLeading('chr')\ncomment=Chromosome\n\n");
+            fprintf(output, "[pos]\nindex=2\ntype=INTEGER\ncomment=Position (1-based)\n\n");
+			fprintf(output, "[name]\nindex=3\ntype=VARCHAR(24) NULL\ncomment=DB SNP ID\n\n");
+			fprintf(output, "[ref]\nindex=4\ntype=CHAR(1) NOT NULL\ncomment=Reference allele (as on the + strand)\n\n");
+			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\ncomment=Alternative allele (as on the + strand)\n\n");
+			fprintf(output, "[qual]\nindex=6\ntype=VARCHAR(255) NOT NULL\ncomment=Quality\n\n");
+			fprintf(output, "[filter]\nindex=7\ntype=VARCHAR(255) NOT NULL\ncomment=Filter\n\n");
+            //
+            struct vcfInfoDef * def = NULL;
+            for (def = vcff->infoDefs; def != NULL; def = def->next) {
+                fprintf(output, "[%s]\nindex=8\n", def->key);
+                if (def->type == vcfInfoFlag)
+                    fprintf(output, "type=INTEGER\nadj=ExtractFlag('%s', ';')\n", def->key);
+                else if (def->type == vcfInfoInteger)
+                    fprintf(output, "type=INTEGER\nadj=ExtractValue('%s=', ';')\n", def->key);
+                else if (def->type == vcfInfoFloat)
+                    fprintf(output, "type=FLOAT\nadj=ExtractValue('%s=', ';')\n", def->key);
+                else 
+                    fprintf(output, "type=VARCHAR(255)\nadj=ExtractValue('%s=', ';')\n", def->key);
+                fprintf(output, "comment=%s\n\n", def->description);
             }
         }
         vcfFileFree(&vcff);
@@ -172,12 +226,12 @@ void showTrack(const std::string & track_file)
         if (idx == NULL)
             return;
         struct bamChromInfo * chrom = bamChromList(bamf);
-        printf("%-23s\n%s\n", "Header:", bamf->header->text);
-        printf("%-23s %d\n", "Chrom size:", slCount(chrom));
+        fprintf(output, "%-23s\n%s\n", "Header:", bamf->header->text);
+        fprintf(output, "%-23s %d\n", "Chrom size:", slCount(chrom));
         for (; chrom != NULL; chrom = chrom->next) {
-        	printf("    %-19s %u\n", chrom->name, chrom->size);
+        	fprintf(output, "    %-19s %u\n", chrom->name, chrom->size);
         }
-        printf("\n");
+        fprintf(output, "\n");
         /* the following piece of code can get number of mapped and unmapped reads
          * if we can include proper header file for khint_t etc
         size_t i;
@@ -186,23 +240,23 @@ void showTrack(const std::string & track_file)
                 khash_t(i) *h = idx->index[i];
                 k = kh_get(i, h, BAM_MAX_BIN);
                 if (k != kh_end(h))
-                        printf("\t%llu\t%llu", (long long)kh_val(h, k).list[1].u, (long long)kh_val(h, k).list[1].v);
-                else printf("\t0\t0");
+                        fprintf(output, "\t%llu\t%llu", (long long)kh_val(h, k).list[1].u, (long long)kh_val(h, k).list[1].v);
+                else fprintf(output, "\t0\t0");
                 putchar('\n');
         }
         */
         /* available fields */
-        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
-        printf("%-23s %s\n", "0 (INTEGER)", "1 if depth is over 0, NULL otherwise");
-        printf("%-23s %s\n", "coverage (INTEGER)", "Number of reads that cover the starting position of the variant");
-        printf("%-23s %s\n", "calls", "nucleotide of the reads at the variant location");
-        printf("%-23s %s\n", "reads", "nucleotide sequence around the variant location");
-        printf("%-23s %s\n", "qual", "A list of phred base quality of reads at the location");
-        printf("%-23s %s\n", "avg_qual (FLOAT)", "Average qual score of all reads");
-        printf("%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
-        printf("%-23s %s\n", "avg_mapq (FLOAT)", "Average mapq score of all reads");
+        fprintf(output, "Available fields (with type VARCHAR if unspecified or all=1):\n");
+        fprintf(output, "%-23s %s\n", "0 (INTEGER)", "1 if depth is over 0, NULL otherwise");
+        fprintf(output, "%-23s %s\n", "coverage (INTEGER)", "Number of reads that cover the starting position of the variant");
+        fprintf(output, "%-23s %s\n", "calls", "nucleotide of the reads at the variant location");
+        fprintf(output, "%-23s %s\n", "reads", "nucleotide sequence around the variant location");
+        fprintf(output, "%-23s %s\n", "qual", "A list of phred base quality of reads at the location");
+        fprintf(output, "%-23s %s\n", "avg_qual (FLOAT)", "Average qual score of all reads");
+        fprintf(output, "%-23s %s\n", "mapq", "A list of phred base quality of alignment at the location");
+        fprintf(output, "%-23s %s\n", "avg_mapq (FLOAT)", "Average mapq score of all reads");
         //
-        printf("\nTags and flag that can be outputed or used in filters, with values from the 1st record:\n");
+        fprintf(output, "\nTags and flag that can be outputed or used in filters, with values from the 1st record:\n");
         /* grab the first item and show its properties */
         bam1_t data;
         bam1_t * bam = &data;
@@ -219,42 +273,42 @@ void showTrack(const std::string & track_file)
                 type = *s;
                 ++s;
                 if (type == 'A') {
-                    printf("%c%c                      A (char)   : %c\n", key[0], key[1], *s);
+                    fprintf(output, "%c%c                      A (char)   : %c\n", key[0], key[1], *s);
                     ++s;
                 } else if (type == 'C') {
-                    printf("%c%c                      C (int)    : %u\n", key[0], key[1], *(char*)s);
+                    fprintf(output, "%c%c                      C (int)    : %u\n", key[0], key[1], *(char*)s);
                     ++s;
                 } else if (type == 'c') {
-                    printf("%c%c                      c (int8)   : %d\n", key[0], key[1], *(int8_t*)s);
+                    fprintf(output, "%c%c                      c (int8)   : %d\n", key[0], key[1], *(int8_t*)s);
                     ++s;
                 } else if (type == 'S') { 
-                    printf("%c%c                      S (uint16) : %u\n", key[0], key[1], *(uint16_t*)s);
+                    fprintf(output, "%c%c                      S (uint16) : %u\n", key[0], key[1], *(uint16_t*)s);
                     s += 2; 
                 } else if (type == 's') {
-                    printf("%c%c                      s (int16)  : %d\n", key[0], key[1], *(int16_t*)s);
+                    fprintf(output, "%c%c                      s (int16)  : %d\n", key[0], key[1], *(int16_t*)s);
                     s += 2;
                 } else if (type == 'I') {
-                    printf("%c%c                      I (uint32  : %u\n", key[0], key[1], *(uint32_t*)s);
+                    fprintf(output, "%c%c                      I (uint32  : %u\n", key[0], key[1], *(uint32_t*)s);
                     s += 4;
                 } else if (type == 'i') { 
-                    printf("%c%c                      i (int32)  : %d\n", key[0], key[1], *(int32_t*)s);
+                    fprintf(output, "%c%c                      i (int32)  : %d\n", key[0], key[1], *(int32_t*)s);
                     s += 4;
                 } else if (type == 'f') { 
-                    printf("%c%c                      f (float)  : %g\n", key[0], key[1], *(float*)s);
+                    fprintf(output, "%c%c                      f (float)  : %g\n", key[0], key[1], *(float*)s);
                     s += 4; 
                 } else if (type == 'd') { 
-                    printf("%c%c                      d (double) : %lg\n", key[0], key[1], *(double*)s);
+                    fprintf(output, "%c%c                      d (double) : %lg\n", key[0], key[1], *(double*)s);
                     s += 8; 
                 } else if (type == 'Z') {
-                    printf("%c%c                      Z (string) : %s\n", key[0], key[1], (char *)s);
+                    fprintf(output, "%c%c                      Z (string) : %s\n", key[0], key[1], (char *)s);
                     s += strlen((char *)s) + 1;
                 } else if (type == 'H') {
-                    printf("%c%c                      H (string) : %s\n", key[0], key[1], (char *)s);
+                    fprintf(output, "%c%c                      H (string) : %s\n", key[0], key[1], (char *)s);
                     s += strlen((char *)s) + 1;
                 } else if (type == 'B') {
                     // get byte size
                     uint8_t subtype = *s;
-                    // The letter can be one of `cCsSiIf', corresponding to int8 t (signed 8-bit
+                    // The letter can be one of cCsSiIf, corresponding to int8 t (signed 8-bit
                     // integer), uint8 t (unsigned 8-bit integer), int16 t, uint16 t, int32 t, uint32 t and float,
                     int sz = 0;
                     if (subtype == 'c' || subtype == 'C')
@@ -266,14 +320,14 @@ void showTrack(const std::string & track_file)
                     ++s;
                     int nItem = (int) *s;
                     s += 4 + nItem * sz;
-                    printf("%c%c                      B (array of %c, comparison not supported)\n", key[0], key[1], subtype);
+                    fprintf(output, "%c%c                      B (array of %c, comparison not supported)\n", key[0], key[1], subtype);
                 }
             }
-            printf("flag                    int flag   : 0x%X (%spaired, %smapped according to bits 1 & 3)\n",
+            fprintf(output, "flag                    int flag   : 0x%X (%spaired, %smapped according to bits 1 & 3)\n",
                 bam->core.flag, bam->core.flag & 1 == 0 ? "un" : "", bam->core.flag & 8 != 0 ? "un" : "");
-            printf("\n");
+            fprintf(output, "\n");
         }
-        printf("Parameters start (default to 0), width (default to 5) and color (default to 0) can be "
+        fprintf(output, "Parameters start (default to 0), width (default to 5) and color (default to 0) can be "
             "used with reads to adjust the window around variant, and use colors for insertions and variant "
             "allele, with syntax reads?start=-5&width=10&color=1. min_qual, min_mapq and TAG=VAL (or >, "
             ">=, <, <=, !=) can be used for all fields to limit the reads to the ones with mapq and qual "
@@ -282,53 +336,53 @@ void showTrack(const std::string & track_file)
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
             return;
-        printf("%-23s %d\n", "Version:", bwf->version);
-        printf("%-23s %llu\n", "Primary data size",
+        fprintf(output, "%-23s %d\n", "Version:", bwf->version);
+        fprintf(output, "%-23s %llu\n", "Primary data size",
             bwf->unzoomedIndexOffset - bwf->unzoomedDataOffset);
-        printf("%-23s %d\n", "Zoom levels:", bwf->zoomLevels);
+        fprintf(output, "%-23s %d\n", "Zoom levels:", bwf->zoomLevels);
         struct bbiChromInfo *chrom, *chromList = bbiChromList(bwf);
-        printf("%-23s %d\n", "Chrom count:", slCount(chromList));
-        printf("%-23s\n", "Chrom size:", slCount(chromList));
+        fprintf(output, "%-23s %d\n", "Chrom count:", slCount(chromList));
+        fprintf(output, "%-23s\n", "Chrom size:", slCount(chromList));
         for (chrom=chromList; chrom != NULL; chrom = chrom->next)
-        	printf("    %-19s %u\n", chrom->name, chrom->size);
+        	fprintf(output, "    %-19s %u\n", chrom->name, chrom->size);
         struct bbiSummaryElement sum = bbiTotalSummary(bwf);
-        printf("%-23s %llu\n", "Bases covered:", sum.validCount);
-        printf("%-23s %f\n", "Mean:", sum.sumData/sum.validCount);
-        printf("%-23s %f\n", "Min:", sum.minVal);
-        printf("%-23s %f\n", "Max:", sum.maxVal);
-        printf("%-23s %f\n", "std:",
+        fprintf(output, "%-23s %llu\n", "Bases covered:", sum.validCount);
+        fprintf(output, "%-23s %f\n", "Mean:", sum.sumData/sum.validCount);
+        fprintf(output, "%-23s %f\n", "Min:", sum.minVal);
+        fprintf(output, "%-23s %f\n", "Max:", sum.maxVal);
+        fprintf(output, "%-23s %f\n", "std:",
             calcStdFromSums(sum.sumData, sum.sumSquares, sum.validCount));
-        printf("%-23s %d\n\n", "Number of fields:", 4);
-        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
-        printf("%-23s %s\n", "0 (INTEGER)", "1 if matched");
-        printf("%-23s %s\n", "chrom (1)", "chromosome");
-        printf("%-23s %s\n", "chromStart (2, INTEGER)", "start position (0-based)");
-        printf("%-23s %s\n", "chromEnd (3, INTEGER)", "end position (1-based)");
-        printf("%-23s %s\n", "value (4, FLOAT)", "value");
+        fprintf(output, "%-23s %d\n\n", "Number of fields:", 4);
+        fprintf(output, "Available fields (with type VARCHAR if unspecified or all=1):\n");
+        fprintf(output, "%-23s %s\n", "0 (INTEGER)", "1 if matched");
+        fprintf(output, "%-23s %s\n", "chrom (1)", "chromosome");
+        fprintf(output, "%-23s %s\n", "chromStart (2, INTEGER)", "start position (0-based)");
+        fprintf(output, "%-23s %s\n", "chromEnd (3, INTEGER)", "end position (1-based)");
+        fprintf(output, "%-23s %s\n", "value (4, FLOAT)", "value");
         bbiFileClose(&bwf);
      } else if (bigBedFileCheckSigs((char *)track_file.c_str())) {
         bbiFile * bbi = bigBedFileOpen((char *)track_file.c_str());
         if (bbi == NULL)
             return;
 
-        printf("%-23s %d\n", "Version:", bbi->version);
-        printf("%-23s %llu\n", "Item count:", bigBedItemCount(bbi));
-        printf("%-23s %llu\n", "Primary data size:",
+        fprintf(output, "%-23s %d\n", "Version:", bbi->version);
+        fprintf(output, "%-23s %llu\n", "Item count:", bigBedItemCount(bbi));
+        fprintf(output, "%-23s %llu\n", "Primary data size:",
             bbi->unzoomedIndexOffset - bbi->unzoomedDataOffset);
         struct bbiChromInfo *chrom, *chromList = bbiChromList(bbi);
-        printf("%-23s %d\n", "Zoom levels:", bbi->zoomLevels);
-        printf("%-23s %d\n", "Chrom count:", slCount(chromList));
-        printf("%-23s\n", "Chrom size:", slCount(chromList));
+        fprintf(output, "%-23s %d\n", "Zoom levels:", bbi->zoomLevels);
+        fprintf(output, "%-23s %d\n", "Chrom count:", slCount(chromList));
+        fprintf(output, "%-23s\n", "Chrom size:", slCount(chromList));
         for (chrom=chromList; chrom != NULL; chrom = chrom->next)
-        	printf("    %-19s %u\n", chrom->name, chrom->size);
+        	fprintf(output, "    %-19s %u\n", chrom->name, chrom->size);
         struct bbiSummaryElement sum = bbiTotalSummary(bbi);
-        printf("%-23s %llu\n", "Bases covered", sum.validCount);
-        printf("%-23s %f\n", "Mean depth:", sum.sumData/sum.validCount);
-        printf("%-23s %f\n", "Min depth:", sum.minVal);
-        printf("%-23s %f\n", "Max depth:", sum.maxVal);
-        printf("%-23s %f\n", "Std of depth:", calcStdFromSums(sum.sumData, sum.sumSquares, sum.validCount));
-        printf("%-23s %d\n\n", "Number of fields:", bbi->fieldCount);
-        printf("Available fields (with type VARCHAR if unspecified or all=1):\n");
+        fprintf(output, "%-23s %llu\n", "Bases covered", sum.validCount);
+        fprintf(output, "%-23s %f\n", "Mean depth:", sum.sumData/sum.validCount);
+        fprintf(output, "%-23s %f\n", "Min depth:", sum.minVal);
+        fprintf(output, "%-23s %f\n", "Max depth:", sum.maxVal);
+        fprintf(output, "%-23s %f\n", "Std of depth:", calcStdFromSums(sum.sumData, sum.sumSquares, sum.validCount));
+        fprintf(output, "%-23s %d\n\n", "Number of fields:", bbi->fieldCount);
+        fprintf(output, "Available fields (with type VARCHAR if unspecified or all=1):\n");
         struct asObject *as = bigBedAs(bbi);
         if (as != NULL)
         {
@@ -343,7 +397,7 @@ void showTrack(const std::string & track_file)
                 else if (asTypesIsFloating(ltype->type))
                     typestring = ", FLOAT";
                 sprintf(buf, "%s (%lu%s)",  col->name, i, typestring.c_str());
-                printf("%-23s %s\n", buf, wrap(col->comment, strlen(buf)).c_str());
+                fprintf(output, "%-23s %s\n", buf, wrap(col->comment, strlen(buf)).c_str());
             }
         }
         bbiFileClose(&bbi);
@@ -353,8 +407,10 @@ void showTrack(const std::string & track_file)
 			"supported.");
 		return;
 	}
+    if (!output_file.empty())
+        fclose(output);
 }
 %} 
 
 
-void showTrack(std::string & track_file);
+void showTrack(const std::string & track_file, const std::string output_file = std::string());
