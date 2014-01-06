@@ -50,6 +50,11 @@ from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     
 from .project import PipelineDescription, Project
 
+if sys.version_info.major == 2:
+    from ucsctools_py2 import showTrack
+else:
+    from ucsctools_py3 import showTrack
+
 try:
     import pysam
     hasPySam = True
@@ -436,7 +441,8 @@ class CheckFastqVersion:
 
 class FieldsFromTextFile:
     '''Read a text file, guess its delimeter, field name (from header)
-    and create field descriptions.'''
+    and create field descriptions. If a vcf file is encountered, all
+    fields will be exported'''
     
     def __init__(self, output):
         self.field_output = output
@@ -446,24 +452,27 @@ class FieldsFromTextFile:
             raise RuntimeError('Action FieldsFromTextFile only take one input file at a time.')
         #
         try:
-            with open(self.field_output, 'w') as fo:
-                csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(2048))
-                fo.write('delimiter="{}"\n\n'.format(csv_dialect.delimiter.replace('\t', r'\t')))
-                values = []
-                with open(ifiles[0], 'rU') as fi:
-                    reader = csv.reader(fi, dialect=csv_dialect)
-                    headers = reader.next()
-                    values = [[] for x in headers]
-                    for line in reader:
-                        for idx in range(len(headers)):
-                            values[idx].append(line[idx])
-                        if len(values[0]) > 100:
-                            break
-                #
-                for idx, header in enumerate(headers):
-                    fo.write('[{}]\n'.format(validFieldName(header)))
-                    fo.write('index={}\n'.format(idx+1))
-                    fo.write('type={}\n\n'.format(typeOfValues(values[idx])))
+            if ifiles[0].endswith('.vcf') or ifiles[0].endswith('.vcf.gz'):
+                showTrack(ifiles[0], self.field_output)
+            else:
+                with open(self.field_output, 'w') as fo:
+                    csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(2048))
+                    fo.write('delimiter="{}"\n\n'.format(csv_dialect.delimiter.replace('\t', r'\t')))
+                    values = []
+                    with open(ifiles[0], 'rU') as fi:
+                        reader = csv.reader(fi, dialect=csv_dialect)
+                        headers = reader.next()
+                        values = [[] for x in headers]
+                        for line in reader:
+                            for idx in range(len(headers)):
+                                values[idx].append(line[idx])
+                            if len(values[0]) > 100:
+                                break
+                    #
+                    for idx, header in enumerate(headers):
+                        fo.write('[{}]\n'.format(validFieldName(header)))
+                        fo.write('index={}\n'.format(idx+1))
+                        fo.write('type={}\n\n'.format(typeOfValues(values[idx])))
         except Exception as e:
             raise RuntimeError('Failed to guess fields from {}: {}'.format(ifiles[0], e))
         #
