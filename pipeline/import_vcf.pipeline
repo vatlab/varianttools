@@ -1,0 +1,33 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=This pipeline assists the importing of all info fields of vcf
+    files.
+
+import_vcf_description=This pipeline creates an annotation database using
+  variants and variant info fields of a variant tools project. The database
+  can then be used, for example, to filter variants from another project.
+  The input of this pipeline should be a vtools project database ($name.proj),
+  the output is a .ann file ($name.ann). $name.ann, $name.DB and $name.DB.gz
+  will be created. If a variant table is specified through parameter -export,
+  only variants in specified variant table will be dumped.
+
+[DEFAULT]
+build=
+build_comment=Build of reference genome, which will be guessed from the input
+    vcf file (if it contains a comment line with reference genome information).
+
+[import_vcf_10]
+action=FieldsFromTextFile("${CMD_OUTPUT}")
+REF_BUILD=${CMD_OUTPUT: "%(build)s" if "%(build)s" else ('hg18' if [x for x in open(CMD_OUTPUT[0]).read().split('\n') if 'NCBI36' in x or 'hg18' in x] else 'hg19')}
+comment=Create a feild description file from input text file.
+
+[import_vcf_20]
+action=RunCommand(cmd=
+    "vtools import ${CMD_INPUT} --build ${REF_BUILD} --format ${CMD_OUTPUT}")
+comment=Import input files using customized .fmt file. Please check the .fmt
+    file if the import process fails due to incorrect field information.
