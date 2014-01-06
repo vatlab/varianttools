@@ -21,6 +21,11 @@ build=
 build_comment=Build of reference genome, which will be guessed from the input
     vcf file (if it contains a comment line with reference genome information).
 
+[import_vcf_0]
+action=CheckVariantToolsVersion('2.1.1')
+comment=Check the version of variant tools (version 2.1.1 and above is required
+    to execute this pipeline)
+
 [import_vcf_10]
 action=FieldsFromTextFile("${CMD_OUTPUT}")
 REF_BUILD=${CMD_OUTPUT: "%(build)s" if "%(build)s" else ('hg18' if [x for x in open(CMD_OUTPUT[0]).read().split('\n') if 'NCBI36' in x or 'hg18' in x] else 'hg19')}
