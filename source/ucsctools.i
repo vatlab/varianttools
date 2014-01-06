@@ -94,9 +94,15 @@ std::string wrap(char * input, int start=24)
 void showTrack(const std::string & track_file)
 {
     char buf[255];
-    if (endsWith((char *)track_file.c_str(), ".vcf.gz")) {
-        vcfFile * vcff = vcfTabixFileMayOpen((char *)track_file.c_str(),
-             NULL, 0, 0, VCF_IGNORE_ERRS, 1);
+    if (endsWith((char *)track_file.c_str(), ".vcf.gz") || 
+        endsWith((char *)track_file.c_str(), ".vcf")) {
+        vcfFile * vcff = NULL;
+        if (endsWith((char *)track_file.c_str(), ".vcf"))
+            vcff = vcfFileMayOpen((char *)track_file.c_str(),
+                VCF_IGNORE_ERRS, 1, true);
+        else 
+            vcff = vcfTabixFileMayOpen((char *)track_file.c_str(),
+                NULL, 0, 0, VCF_IGNORE_ERRS, 1);
         if (vcff == NULL)
              return;
         
