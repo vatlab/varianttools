@@ -5,16 +5,17 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=This pipeline assists the importing of all info fields of vcf
-    files.
+description=This pipeline creates a customized .fmt file to import all variant
+    and genotype info fields of input vcf files.
 
-import_vcf_description=This pipeline creates an annotation database using
-  variants and variant info fields of a variant tools project. The database
-  can then be used, for example, to filter variants from another project.
-  The input of this pipeline should be a vtools project database ($name.proj),
-  the output is a .ann file ($name.ann). $name.ann, $name.DB and $name.DB.gz
-  will be created. If a variant table is specified through parameter -export,
-  only variants in specified variant table will be dumped.
+import_vcf_description=This pipeline creates a customized .fmt file by scanning
+    the header of input vcf files and imports all variant and genotype info fields
+    of the input files in VCF format. If an output file is specified (--output),
+    it will be used to save the customized .fmt file.
+
+# if an output file is given via --output, $FMT_FILE is this output,
+# otherwise it is set to cache/INPUTFILE.fmt
+FMT_FILE=${CMD_OUTPUT,CACHE_DIR,CMD_INPUT: (CMD_OUTPUT[0] if CMD_OUTPUT[0].endswith('.fmt') else CMD_OUTPUT[0] + '.fmt') if CMD_OUTPUT else os.path.join(CACHE_DIR, os.path.basename(CMD_INPUT[0]) + '.fmt')}
 
 [DEFAULT]
 build=
@@ -27,12 +28,13 @@ comment=Check the version of variant tools (version 2.1.1 and above is required
     to execute this pipeline)
 
 [import_vcf_10]
-action=FieldsFromTextFile("${CMD_OUTPUT}")
-REF_BUILD=${CMD_OUTPUT: "%(build)s" if "%(build)s" else ('hg18' if [x for x in open(CMD_OUTPUT[0]).read().split('\n') if 'NCBI36' in x or 'hg18' in x] else 'hg19')}
+action=FieldsFromTextFile("${FMT_FILE}")
+REF_BUILD=${FMT_FILE: "%(build)s" if "%(build)s" else ('hg18' if [x for x in open(FMT_FILE).read().split('\n') if 'NCBI36' in x or 'hg18' in x] else 'hg19')}
+emitter=EmitInput()
 comment=Create a feild description file from input text file.
 
 [import_vcf_20]
 action=RunCommand(cmd=
-    "vtools import ${CMD_INPUT} --build ${REF_BUILD} --format ${CMD_OUTPUT}")
+    "vtools import ${CMD_INPUT} --build ${REF_BUILD} --format ${FMT_FILE}")
 comment=Import input files using customized .fmt file. Please check the .fmt
     file if the import process fails due to incorrect field information.
