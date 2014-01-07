@@ -448,9 +448,6 @@ class FieldsFromTextFile:
         self.field_output = output
 
     def __call__(self, ifiles, pipeline=None):
-        if len(ifiles) > 1:
-            raise RuntimeError('Action FieldsFromTextFile only take one input file at a time.')
-        #
         try:
             if ifiles[0].endswith('.vcf') or ifiles[0].endswith('.vcf.gz'):
                 showTrack(ifiles[0], self.field_output)

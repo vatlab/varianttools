@@ -196,7 +196,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
             fprintf(output, "[pos]\nindex=2\ntype=INTEGER\ncomment=Position (1-based)\n\n");
 			fprintf(output, "[name]\nindex=3\ntype=VARCHAR(24) NULL\ncomment=DB SNP ID\n\n");
 			fprintf(output, "[ref]\nindex=4\ntype=CHAR(1) NOT NULL\ncomment=Reference allele (as on the + strand)\n\n");
-			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\ncomment=Alternative allele (as on the + strand)\n\n");
+			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\nadj=CheckSplit()\ncomment=Alternative allele (as on the + strand)\n\n");
 			fprintf(output, "[qual]\nindex=6\ntype=VARCHAR(255) NOT NULL\ncomment=Quality\n\n");
 			fprintf(output, "[filter]\nindex=7\ntype=VARCHAR(255) NOT NULL\ncomment=Filter\n\n");
             //
@@ -249,7 +249,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
             fprintf(output, "[pos]\nindex=2\ntype=INTEGER\ncomment=Position (1-based)\n\n");
 			fprintf(output, "[name]\nindex=3\ntype=VARCHAR(24) NULL\ncomment=DB SNP ID\n\n");
 			fprintf(output, "[ref]\nindex=4\ntype=CHAR(1) NOT NULL\ncomment=Reference allele (as on the + strand)\n\n");
-			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\ncomment=Alternative allele (as on the + strand)\n\n");
+			fprintf(output, "[alt]\nindex=5\ntype=VARCHAR(48) NOT NULL\nadj=CheckSplit()\ncomment=Alternative allele (as on the + strand)\n\n");
 			fprintf(output, "[qual]\nindex=6\ntype=FLOAT\ncomment=phred-scaled quality score\n\n");
 			fprintf(output, "[filter]\nindex=7\ntype=VARCHAR(255)\ncomment=Filter\n\n");
             //
