@@ -2025,9 +2025,9 @@ class DatabaseEngine:
         '''Attach another database to this one. Only needed by sqlite'''
         if db.endswith('.DB') or db.endswith('.proj'):
             db = os.path.expanduser(db)
-            if not os.path.isfile(db):
-                raise RuntimeError('Failed to attach database {}: file does not exist'
-                    .format(db))
+            #if not os.path.isfile(db):
+            #    raise RuntimeError('Failed to attach database {}: file does not exist'
+            #        .format(db))
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()
@@ -2047,9 +2047,9 @@ class DatabaseEngine:
             return dbName
         else:
             db = os.path.expanduser(db)
-            if not os.path.isfile(db + '.DB' if db != ':memory:' else db):
-                raise RuntimeError('Failed to attach database {}: file does not exist'
-                    .format(db))
+            #if not os.path.isfile(db + '.DB' if db != ':memory:' else db):
+            #    raise RuntimeError('Failed to attach database {}: file does not exist'
+            #        .format(db))
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()
