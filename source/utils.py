@@ -2047,7 +2047,7 @@ class DatabaseEngine:
             return dbName
         else:
             db = os.path.expanduser(db)
-            if not os.path.isfile(db):
+            if not os.path.isfile(db + '.DB' if db != ':memory:' else db):
                 raise RuntimeError('Failed to attach database {}: file does not exist'
                     .format(db))
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]

@@ -1509,7 +1509,9 @@ def execute(args):
                 try:
                     # try to execute as a SQL query
                     executeQuery()
-                except RuntimeError:
+                except RuntimeError as e:
+                    env.logger.debug('Failed to execute {} as SQL query: {}'
+                        .format(' '.join(args.pipeline), e))
                     executePipeline()
     except Exception as e:
         env.unlock_all()
