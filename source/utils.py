@@ -2011,6 +2011,13 @@ class DatabaseEngine:
             env.logger.warning('Failed to load sqlite extension module. No extended SQL functions can be used.')
 
 
+    def destroy(self):
+        self.close()
+        try:
+            os.remove(self.dbName)
+        except:
+            self.logger.warning('Failed to remove database file: {}'.format(self.dbName))
+
     def close(self):
         self.database.close()
 
@@ -2018,6 +2025,9 @@ class DatabaseEngine:
         '''Attach another database to this one. Only needed by sqlite'''
         if db.endswith('.DB') or db.endswith('.proj'):
             db = os.path.expanduser(db)
+            if not os.path.isfile(db):
+                raise RuntimeError('Failed to attach database {}: file does not exist'
+                    .format(db))
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()
@@ -2037,6 +2047,9 @@ class DatabaseEngine:
             return dbName
         else:
             db = os.path.expanduser(db)
+            if not os.path.isfile(db):
+                raise RuntimeError('Failed to attach database {}: file does not exist'
+                    .format(db))
             dbName = name if name else os.path.split(db)[-1].split('.')[0].split('-')[0]
             if lock is not None:
                 lock.acquire()

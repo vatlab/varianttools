@@ -951,6 +951,9 @@ class AnnoDBWriter:
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
         num_records = self.db.numOfRows(self.name)
         cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', num_records))
+        if num_records == 0:
+            self.db.destroy()
+            raise RuntimeError('Failed to create annotation database: no record has been imported.')
         del s
         for field in self.fields:
             s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
@@ -1209,7 +1212,7 @@ class Project:
                     self.db.attach(db)
                     self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
             except Exception as e:
-                env.logger.warning('Cannot open annotation database {}: {}'.format(db, e))
+                env.logger.warning('Cannot open annotation database {}: {}'.format(db[1] if type(db) == tuple else db, e))
         #
         # get existing meta information
         # FIXME: these are not handled correctly for now
