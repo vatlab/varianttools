@@ -4006,6 +4006,8 @@ def show(args):
                     if name is not None:
                         snapshots.append((name, date, desc, sz))
                 #
+                if snapshots:
+                    print('Local snapshots under project cache directory:')
                 for idx, (name, date, desc, sz) in enumerate(sorted(snapshots)):
                     if args.limit is not None and idx == args.limit:
                         break
@@ -4021,6 +4023,10 @@ def show(args):
                 res = ResourceManager()
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
+                if len(res.manifest) > 0:
+                    if snapshots:
+                        print('')
+                    print('Online snapshots:')
                 for idx, (ss, prop) in enumerate(res.manifest.iteritems()):
                     if args.limit is not None and nLocal + idx >= args.limit:
                         break
