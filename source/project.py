@@ -1751,8 +1751,13 @@ class Project:
         samples = cur.fetchall()
         env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
         for ID, name in samples:
-            cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
-                .format(self.name, ID, cond))
+            try:
+                cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
+                    .format(self.name, ID, cond))
+            except Exception as e:
+                env.logger.warning('Failed to remove genotypes from sample {}: {}'
+                    .format(name, e))
+                continue
             env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
 
     def renameSamples(self, cond, name1, name2=None):
