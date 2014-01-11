@@ -940,6 +940,7 @@ struct BAM_stat
 	// condition
 	int shift;
 	int width;
+	int limit;
 	int min_qual;
 	int min_mapq;
 
@@ -954,14 +955,12 @@ struct BAM_stat
 
 	BAM_stat(size_t pos) :
 		start(pos), counter(0), calls(), qual(), map_qual(),
-		shift(0), width(1), min_qual(0), min_mapq(), cond_tag_values(), colorize(false)
+		shift(0), width(1), limit(-1), min_qual(0), min_mapq(), cond_tag_values(), colorize(false)
 	{
 		call_content[0] = '\0';
 		call_content[1] = '\0';
 		call_content[2] = '\0';
 	}
-
-
 };
 
 
@@ -1165,12 +1164,14 @@ static int fetch_func(const bam1_t * b, void * data)
 		// go to the next cigar
 		++k;
 	}
+	buf->counter += 1;
+	if (buf->limit > 0 && buf->counter > buf->limit)
+		return 0;
 	if (record_reads) {
 		if (buf->width > 1 && !buf->calls.str().empty())
 			buf->calls << '|';
 		buf->calls << reads;
 	}
-	buf->counter += 1;
 	if (buf->call_content[0] == '%') {
 		if (!buf->calls.str().empty())
 			buf->calls << '|';
@@ -1341,6 +1342,8 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				if (buf.width + buf.shift <= 0)
 					buf.width = - buf.shift + 1;
 				// this is a tag
+			} else if (strncmp(pch, "limit=", 6) == 0) {
+				buf.limit = atoi(pch + 6);
 			} else if (strncmp(pch, "color=", 6) == 0) {
 				buf.colorize = atoi(pch + 6);
 			} else if (strlen(pch) > 3 && (pch[2] == '=' || pch[2] == '!' || pch[2] == '>' || pch[2] == '<')) {
@@ -1398,11 +1401,9 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 		std::stringstream res;
 		std::vector<int>::iterator it = buf.qual.begin();
 		std::vector<int>::iterator it_end = buf.qual.end();
-		bool first = true;
-		for (; it != it_end; ++it) {
-			if (first)
-				first = false;
-			else
+		int index = 0;
+		for (; it != it_end && (buf.limit < 0 || index < buf.limit); ++it, ++index) {
+			if (index > 0)
 				res << ",";
 			res << *it;
 		}
@@ -1424,11 +1425,9 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 		std::stringstream res;
 		std::vector<int>::iterator it = buf.map_qual.begin();
 		std::vector<int>::iterator it_end = buf.map_qual.end();
-		bool first = true;
-		for (; it != it_end; ++it) {
-			if (first)
-				first = false;
-			else
+		int index = 0;
+		for (; it != it_end && (buf.limit < 0 || index < buf.limit); ++it, ++index) {
+			if (index > 0)
 				res << ",";
 			res << *it;
 		}

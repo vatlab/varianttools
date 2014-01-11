@@ -406,7 +406,8 @@ void showTrack(const std::string & track_file, const std::string output_file = s
             "used with reads to adjust the window around variant, and use colors for insertions and variant "
             "allele, with syntax reads?start=-5&width=10&color=1. min_qual, min_mapq and TAG=VAL (or >, "
             ">=, <, <=, !=) can be used for all fields to limit the reads to the ones with mapq and qual "
-            "scores that exceed the specified value, and tag satisfying specified conditions.\n");
+            "scores that exceed the specified value, and tag satisfying specified conditions. Parameter limit "
+            "limits the number of reads or calls to display if the depth of coverage is high.\n");
     } else if (isBigWig((char *)track_file.c_str())) {
         struct bbiFile *bwf = bigWigFileOpen((char *)track_file.c_str());
         if (bwf == NULL)
