@@ -944,6 +944,7 @@ struct BAM_stat
 	int strand;
 	int min_qual;
 	int min_mapq;
+	char delimiter[3];
 
 	// tags used in conditions, at most 12 tags are allowed, this should be more than enough
 	char cond_tag_keys[24];
@@ -962,6 +963,9 @@ struct BAM_stat
 		call_content[0] = '\0';
 		call_content[1] = '\0';
 		call_content[2] = '\0';
+		delimiter[0] = '|';
+		delimiter[1] = '\0';
+		delimiter[2] = '\0';
 	}
 };
 
@@ -1175,16 +1179,16 @@ static int fetch_func(const bam1_t * b, void * data)
 		return 0;
 	if (record_reads) {
 		if (buf->width > 1 && !buf->calls.str().empty())
-			buf->calls << '|';
+			buf->calls << buf->delimiter;
 		buf->calls << reads;
 	}
 	if (buf->call_content[0] == '%') {
 		if (!buf->calls.str().empty())
-			buf->calls << '|';
+			buf->calls << buf->delimiter;
 		buf->calls << std::hex << b->core.flag;
 	} else if (buf->call_content[0] != '*' && buf->call_content[0] != '\0') {
 		if (!buf->calls.str().empty())
-			buf->calls << '|';
+			buf->calls << buf->delimiter;
 		uint8_t * s = bam1_aux(b);
 		while (s < b->data + b->data_len) {
 			// if the key is not found, continue
@@ -1347,6 +1351,12 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 					sqlite3_result_error(context, "Width of reads must be positive", -1);
 					return;
 				}
+			} else if (strncmp(pch, "delimiter=", 10) == 0) {
+				strncpy(buf.delimiter, pch + 10, 2);
+				if (strcmp(buf.delimiter, "\\t") == 0)
+					strcpy(buf.delimiter, "\t");
+				else if (strcmp(buf.delimiter, "\\n") == 0)
+					strcpy(buf.delimiter, "\n");
 			} else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads") {
 				buf.shift = atoi(pch + 6);
 				if (buf.shift > 0) {
@@ -1738,6 +1748,12 @@ public:
 				m_delimiter = pch + 2;
 				if (strcmp(m_delimiter, "\\t") == 0)
 					m_delimiter = "\t";
+			} else if (strncmp(pch, "delimiter=", 10) == 0) {
+				m_delimiter = pch + 10;
+				if (strcmp(m_delimiter, "\\t") == 0)
+					m_delimiter = "\t";
+				else if (strcmp(m_delimiter, "\\n") == 0)
+					m_delimiter = "\n";
 			} else if (strncmp(pch, "missing=", 8) == 0)
 				m_missing = pch + 8;
 			else
