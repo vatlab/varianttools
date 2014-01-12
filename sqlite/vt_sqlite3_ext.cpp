@@ -941,6 +941,7 @@ struct BAM_stat
 	int shift;
 	int width;
 	int limit;
+	int strand;
 	int min_qual;
 	int min_mapq;
 
@@ -955,7 +956,8 @@ struct BAM_stat
 
 	BAM_stat(size_t pos) :
 		start(pos), counter(0), calls(), qual(), map_qual(),
-		shift(0), width(1), limit(-1), min_qual(0), min_mapq(), cond_tag_values(), colorize(false)
+		shift(0), width(1), limit(-1), strand(-1), min_qual(0), min_mapq(),
+		cond_tag_values(), colorize(false)
 	{
 		call_content[0] = '\0';
 		call_content[1] = '\0';
@@ -971,6 +973,10 @@ static int fetch_func(const bam1_t * b, void * data)
 	BAM_stat * buf = (BAM_stat *)data;
 
 	if (b->core.n_cigar == 0 || b->core.qual < buf->min_mapq)
+		return 0;
+
+	// if on not on the same strand as specified, ignore
+	if (buf->strand >= 0 && (buf->strand != (b->core.flag & 0x10)))
 		return 0;
 
 	// compare tags
@@ -1326,7 +1332,16 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				buf.min_qual = atoi(pch + 9);
 			else if (strncmp(pch, "min_mapq=", 9) == 0)
 				buf.min_mapq = atoi(pch + 9);
-			else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads") {
+			else if (strncmp(pch, "strand=", 7) == 0) {
+				if (pch[7] == '+')
+					buf.strand = 0;
+				else if (pch[7] == '-')
+					buf.strand = 0x10;
+				else {
+					sqlite3_result_error(context, "Incorrect strand is specified (+ or - are acceptable)", -1);
+					return;
+				}
+			} else if (strncmp(pch, "width=", 6) == 0 && fi->name == "reads") {
 				buf.width = atoi(pch + 6);
 				if (buf.width < 0) {
 					sqlite3_result_error(context, "Width of reads must be positive", -1);
