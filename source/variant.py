@@ -174,7 +174,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
                 outputVariants(proj, table_name, [field], args)
             # if all fields are correctly specified?
             raise RuntimeError('Failed to execute query. One or more fields might '
-                        'be misspecified.')
+                        'be misspecified: {}'.format(e))
     prt = PrettyPrinter(delimiter=args.delimiter)
     if args.header is not None:
         if len(args.header) == 0:

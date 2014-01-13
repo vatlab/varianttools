@@ -347,9 +347,13 @@ struct TrackInfo
 	std::map<std::string, int> name_map;
 	// if the chromosome has leading "chr"
 	bool with_leading_chr;
+	//
+	cgatools::reference::CrrFile * reference;
+	int chrIdx;
 
 	TrackInfo() : file_type(0), file(NULL), index_file(NULL),
-		handler(NULL), default_col(0), name_map(), with_leading_chr(false)
+		handler(NULL), default_col(0), name_map(), with_leading_chr(false),
+		reference(NULL), chrIdx(0)
 	{
 	}
 
@@ -945,6 +949,9 @@ struct BAM_stat
 	int min_qual;
 	int min_mapq;
 	char delimiter[3];
+	bool show_seq;
+	int match_type;
+	std::string reference;
 
 	// tags used in conditions, at most 12 tags are allowed, this should be more than enough
 	char cond_tag_keys[24];
@@ -958,7 +965,7 @@ struct BAM_stat
 	BAM_stat(size_t pos) :
 		start(pos), counter(0), calls(), qual(), map_qual(),
 		shift(0), width(1), limit(-1), strand(-1), min_qual(0), min_mapq(),
-		cond_tag_values(), colorize(false)
+		show_seq(false), match_type(-1), reference(""), cond_tag_values(), colorize(false)
 	{
 		call_content[0] = '\0';
 		call_content[1] = '\0';
@@ -1065,7 +1072,6 @@ static int fetch_func(const bam1_t * b, void * data)
 		}
 	}
 
-	buf->map_qual.push_back(b->core.qual);
 	// record reads into the string
 	bool record_reads = buf->call_content[0] == '*';
 	std::string reads;
@@ -1085,16 +1091,23 @@ static int fetch_func(const bam1_t * b, void * data)
 	// k < b->core.n_cigar
 	//
 	k = 0;
+	const char * ref_p = buf->reference.empty() ? NULL : buf->reference.c_str();
 	// output pos is the window within which we would like to output
-	if (pos > outputstart && record_reads)
-		for (int i = outputstart; i < pos; ++i)
-			reads += '.';
+	int qual;
+	int type_matched = -1;
+	if (pos > outputstart)
+		for (int i = outputstart; i < pos; ++i) {
+			if (record_reads)
+				reads += ' ';
+			if (ref_p)
+				++ref_p;
+		}
 	while (pos < outputend) {
 		// if |......ACGT|GAAA
 		if (qpos >= b->core.l_qseq) {
 			if (record_reads)
 				for (int i = pos; i < outputend; ++i)
-					reads += '.';
+					reads += ' ';
 			break;
 		}
 
@@ -1104,17 +1117,36 @@ static int fetch_func(const bam1_t * b, void * data)
 			for (int i = 0; i < l && pos < outputend; ++i) {
 				// right at the location, get quality score
 				if (pos == buf->start) {
-					int qual = bam1_qual(b)[qpos];
+					qual = bam1_qual(b)[qpos];
 					if (qual < buf->min_qual)
 						return 0;
-					else
-						buf->qual.push_back(qual);
 				}
-				if (record_reads && pos >= outputstart) {
-					if (buf->width > 1 && pos == buf->start && buf->colorize)
-						reads += std::string("\033[94m") + conv_table[bam1_seqi(bam1_seq(b), qpos)] + "\033[0m";
-					else
-						reads += conv_table[bam1_seqi(bam1_seq(b), qpos)];
+				if (pos >= outputstart) {
+					char allele = conv_table[bam1_seqi(bam1_seq(b), qpos)];
+					if (pos == buf->start) {
+						if (ref_p) {
+							// insertion will override SNP
+							if (type_matched != 2) {
+								if (allele == *ref_p)
+									type_matched = 0;
+								else
+									type_matched = 1;
+							}
+						} else {
+							// somehow no reference genome is found (extra chromsome?)
+							type_matched = 1;
+						}
+					}
+					if (!buf->show_seq && ref_p && allele == *ref_p)
+						allele = '.';
+					if (record_reads) {
+						if (buf->width > 1 && pos == buf->start && buf->colorize)
+							reads += std::string("\033[94m") + allele + "\033[0m";
+						else
+							reads += allele;
+					}
+					if (ref_p)
+						++ref_p;
 				}
 				++qpos;
 				++pos;
@@ -1122,20 +1154,20 @@ static int fetch_func(const bam1_t * b, void * data)
 		} else if (op == BAM_CINS) {
 			// right at the location, get quality score
 			if (pos == buf->start) {
-				int qual = bam1_qual(b)[qpos];
+				// insertion will show matched single nucleotide
+				type_matched = 2;
+				qual = bam1_qual(b)[qpos];
 				if (qual < buf->min_qual)
 					return 0;
-				else
-					buf->qual.push_back(qual);
 			}
 
 			// for insertion, qpos will move l. pos does not move.
 			if (record_reads && pos >= outputstart) {
-				if (buf->width > 1 && buf->colorize)
+				if (buf->colorize)
 					reads += "\033[32m";
 				for (int i = 0; i < l; ++i)
 					reads += conv_table[bam1_seqi(bam1_seq(b), qpos + i)] ;
-				if (buf->width > 1 && buf->colorize)
+				if (buf->colorize)
 					reads += "\033[0m";
 			}
 			qpos += l;
@@ -1143,28 +1175,25 @@ static int fetch_func(const bam1_t * b, void * data)
 			// for deletion, qpos will not move, pos move
 			for (int i = 0; i < l && pos < outputend; ++i, ++pos) {
 				if (pos == buf->start) {
-					int qual = bam1_qual(b)[qpos];
+					type_matched = 3;
+					qual = bam1_qual(b)[qpos];
 					if (qual < buf->min_qual)
 						return 0;
-					else
-						buf->qual.push_back(qual);
 				}
 				if (record_reads && pos >= outputstart) {
-					if (buf->width > 1 && pos == buf->start && buf->colorize)
-						reads += "\033[94m-\033[0m";
+					if (pos == buf->start && buf->colorize)
+						reads += "\033[94m*\033[0m";
 					else
-						reads += '-';
+						reads += '*';
 				}
 			}
 		} else if (op == BAM_CSOFT_CLIP || op == BAM_CHARD_CLIP) {
 			for (int i = 0; i < l && pos < outputend; ++i) {
 				// right at the location, get quality score
 				if (pos == buf->start) {
-					int qual = bam1_qual(b)[qpos];
+					qual = bam1_qual(b)[qpos];
 					if (qual < buf->min_qual)
 						return 0;
-					else
-						buf->qual.push_back(qual);
 				}
 				// soft clip are no seq, hard clip are not
 				if (op == BAM_CSOFT_CLIP)
@@ -1174,6 +1203,16 @@ static int fetch_func(const bam1_t * b, void * data)
 		// go to the next cigar
 		++k;
 	}
+	if (type_matched == -1) {
+		fprintf(stderr, "Failed to fund the type of read. \n");
+		return 0;
+	}
+	if (buf->match_type >= 0 && buf->match_type != type_matched) {
+		return 0;
+	}
+
+	buf->map_qual.push_back(b->core.qual);
+	buf->qual.push_back(qual);
 	buf->counter += 1;
 	if (buf->limit > 0 && buf->counter > buf->limit)
 		return 0;
@@ -1336,7 +1375,17 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 				buf.min_qual = atoi(pch + 9);
 			else if (strncmp(pch, "min_mapq=", 9) == 0)
 				buf.min_mapq = atoi(pch + 9);
-			else if (strncmp(pch, "strand=", 7) == 0) {
+			else if (strncmp(pch, "show_seq=", 9) == 0)
+				buf.show_seq = *(pch + 9) == '1' || *(pch + 9) == 'y' || *(pch + 9) == 'Y';
+			else if (strncmp(pch, "type=", 5) == 0) {
+				buf.match_type = atoi(pch + 5);
+				if (buf.match_type != 0 && buf.match_type != 1 && buf.match_type != 2 && buf.match_type != 3) {
+					sqlite3_result_error(context, "Incorrect type of match is specified (0 (match), 1 (mismatch), "
+						"2 (insertion) and 3 (deletion) are acceptable)", -1);
+					return;
+				}
+					
+			} else if (strncmp(pch, "strand=", 7) == 0) {
 				if (pch[7] == '+')
 					buf.strand = 0;
 				else if (pch[7] == '-')
@@ -1360,7 +1409,7 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 			} else if (strncmp(pch, "start=", 6) == 0 && fi->name == "reads") {
 				buf.shift = atoi(pch + 6);
 				if (buf.shift > 0) {
-					sqlite3_result_error(context, "Output of reads must cover variant location (start > 0)", -1);
+					sqlite3_result_error(context, "Output of reads must cover variant location (start < 0)", -1);
 					return;
 				}
 				// at last shit wide
@@ -1411,6 +1460,16 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 	if (buf.shift + buf.width < 0) {
 		sqlite3_result_error(context, "Output of reads must cover variant location (width + start < 0)", -1);
 		return;
+	}
+	if (info->reference && info->chrIdx >= 0){
+		// get the reference genome
+		try {
+			buf.reference = info->reference->getSequence(
+				cgatools::reference::Range(info->chrIdx, pos - 1 + buf.shift, pos - 1 + buf.shift + buf.width));
+		} catch (cgatools::util::Exception & e) {
+			// position out of range
+			buf.reference.clear();
+		}
 	}
 	// both start and end should be zero based.
 	bam_fetch(sf->x.bam, idx, tid, pos - 1, pos,
@@ -1487,19 +1546,60 @@ static void track(
 {
 	// do not check the first several parameters (variants) because
 	// they are passed automatically and are assumed to be valid
-	if (argc < 5 || sqlite3_value_type(argv[4]) == SQLITE_NULL) {
+	if (argc < 6 || sqlite3_value_type(argv[5]) == SQLITE_NULL) {
 		sqlite3_result_error(context, "please specify at least filename", -1);
 		return;
-	} else if (argc > 7) {
+	} else if (argc > 8) {
 		sqlite3_result_error(context, "track function accept at most 3 parameters", -1);
 		return;
 	}
 
-	std::string track_file = std::string((char *)sqlite3_value_text(argv[4]));
+	std::string track_file = std::string((char *)sqlite3_value_text(argv[5]));
 	char * chr = (char *)sqlite3_value_text(argv[0]);
 	int pos = sqlite3_value_int(argv[1]);
 	char * ref = (char *)sqlite3_value_text(argv[2]);
 	char * alt = (char *)sqlite3_value_text(argv[3]);
+	std::string ref_file = std::string((char *)sqlite3_value_text(argv[4]));
+
+	cgatools::reference::CrrFile * cf = NULL;
+	int chrIdx = -1;
+	if (!ref_file.empty()) {
+		// get reference genome file
+		RefGenomeFileMap::const_iterator rit = refFileMap.find(ref_file);
+
+		if (rit == refFileMap.end()) {
+			try {
+				cf = new cgatools::reference::CrrFile(ref_file);
+			} catch (cgatools::util::Exception & e) {
+				sqlite3_result_error(context, e.what(), -1);
+				return;
+			}
+			refFileMap[ref_file] = cf;
+		} else {
+			cf = rit->second;
+		}
+		//
+		// get chromosome index
+		ChrNameMap::const_iterator cit = chrNameMap.find(std::string(chr));
+		if (cit == chrNameMap.end()) {
+			try {
+				// cgatools' chromosome names have leading chr
+				// we add chr to 1, 2, 3, ... etc but not to other
+				// names. There might be a problem here.
+				if (strlen(chr) <= 2)
+					chrIdx = cf->getChromosomeId("chr" + std::string(chr));
+				else
+					chrIdx = cf->getChromosomeId(std::string(chr));
+			} catch (cgatools::util::Exception & e) {
+				// unrecognized chromosome
+				//sqlite3_result_error(context, e.what(), -1);
+				chrIdx = -1;
+			}
+			chrNameMap[std::string(chr)] = chrIdx;
+		} else {
+			chrIdx = cit->second;
+		}
+	}
 
 	TrackFileMap::const_iterator it = trackFileMap.find(track_file);
 	TrackInfo info;
@@ -1668,16 +1768,18 @@ static void track(
 		trackFileMap[track_file] = info;
 		// info.print();
 	}
+	info.reference = cf;
+	info.chrIdx = chrIdx;
 	FieldInfo fi;
 	fi.column = info.default_col;
 	fi.name = "";
 	fi.all = false;
-	if (argc >= 6) {
-		if (sqlite3_value_type(argv[5]) == SQLITE_INTEGER) {
-			fi.column = sqlite3_value_int(argv[5]);
+	if (argc >= 7) {
+		if (sqlite3_value_type(argv[6]) == SQLITE_INTEGER) {
+			fi.column = sqlite3_value_int(argv[6]);
 			fi.name = "";
 		} else {
-			char * name = (char *)(sqlite3_value_text(argv[5]));
+			char * name = (char *)(sqlite3_value_text(argv[6]));
 			char * p = name;
 			while (*p != '?' && *p != '\0')
 				++p;
@@ -1712,9 +1814,9 @@ static void track(
 		}
 	}
 	// this option is now obsolete
-	if (argc >= 7) {
-		if (sqlite3_value_type(argv[6]) == SQLITE_INTEGER)
-			fi.all = sqlite3_value_int(argv[6]);
+	if (argc >= 8) {
+		if (sqlite3_value_type(argv[7]) == SQLITE_INTEGER)
+			fi.all = sqlite3_value_int(argv[7]);
 		else {
 			sqlite3_result_error(context, "wrong datatype for the last parameter. 0 or 1 (all records) is expected.", -1);
 			return;
