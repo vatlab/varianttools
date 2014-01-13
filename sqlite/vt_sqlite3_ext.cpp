@@ -1073,7 +1073,7 @@ static int fetch_func(const bam1_t * b, void * data)
 	}
 
 	// record reads into the string
-	bool record_reads = buf->call_content[0] == '*';
+	bool record_reads = buf->call_content[0] == '*' || buf->call_content[0] == '&';
 	std::string reads;
 
 	uint32_t outputstart = buf->start + buf->shift;
@@ -1216,16 +1216,23 @@ static int fetch_func(const bam1_t * b, void * data)
 	buf->counter += 1;
 	if (buf->limit > 0 && buf->counter > buf->limit)
 		return 0;
-	if (record_reads) {
-		if (buf->width > 1 && !buf->calls.str().empty())
+	if (buf->call_content[0] == '*') {
+		if (!buf->calls.str().empty())
 			buf->calls << buf->delimiter;
 		buf->calls << reads;
-	}
-	if (buf->call_content[0] == '%') {
+	} else if (buf->call_content[0] == '&') {
+		// no delimieter
+		if (reads.size() == 1 || (reads[0] == '\033' && reads.size() == 10))
+			buf->calls << reads;
+		else if (buf->colorize)
+			buf->calls << "\033[32mI\033[0m";
+		else
+			buf->calls << 'I';
+	} else if (buf->call_content[0] == '%') {
 		if (!buf->calls.str().empty())
 			buf->calls << buf->delimiter;
 		buf->calls << std::hex << b->core.flag;
-	} else if (buf->call_content[0] != '*' && buf->call_content[0] != '\0') {
+	} else if (buf->call_content[0] != '\0') {
 		if (!buf->calls.str().empty())
 			buf->calls << buf->delimiter;
 		uint8_t * s = bam1_aux(b);
@@ -1360,7 +1367,7 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 		buf.call_content[0] = '*';
 	} else if (fi->name == "calls") {
 		buf.width = 1;
-		buf.call_content[0] = '*';
+		buf.call_content[0] = '&';
 	} else if (fi->name == "flag")
 		buf.call_content[0] = '%';
 	else if (fi->name.size() == 2) {  // a tag?
