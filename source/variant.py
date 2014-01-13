@@ -161,8 +161,20 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     try:
         cur.execute(query)
     except OperationalError as e:
-        raise RuntimeError('Failed to execute query. One or more fields might '
-            'be misspecified.')
+        # if there is only one field, we know what has gone wrong
+        if len(output_fields) == 1:
+            raise RuntimeError('Failed to execute query. Field "{}" might '
+                    'be misspecified.'.format(output_fields[0]))
+        else:
+            # otherwise we need to check the syntax for each field, but
+            # we do not actually output anything with args.limit = 0
+            args.limit = 0
+            for field in output_fields:
+                # an RuntimeError will be throw for the wrong field
+                outputVariants(proj, table_name, [field], args)
+            # if all fields are correctly specified?
+            raise RuntimeError('Failed to execute query. One or more fields might '
+                        'be misspecified.')
     prt = PrettyPrinter(delimiter=args.delimiter)
     if args.header is not None:
         if len(args.header) == 0:
