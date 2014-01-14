@@ -63,6 +63,10 @@ def associateArguments(parser):
             cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
+    data.add_argument('--geno_name', default='GT',
+        help='''Field name of genotype, default to 'GT'. If another field name is specified, 
+            for example if imputation scores are available as 'DS' (dosage), then
+            the given field 'DS' will be used as genotype data for association analysis.''')
     tests = parser.add_argument_group('Association tests')
     tests.add_argument('-m', '--methods', nargs='+',
         help='''Method of one or more association tests. Parameters for each
@@ -132,7 +136,7 @@ class AssociationTestManager:
     groups:      a list of groups
     group_names: names of the group
     '''
-    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, methods,
+    def __init__(self, proj, table, phenotypes, covariates, var_info, geno_info, geno_name, methods,
         unknown_args, samples, genotypes, group_by, discard_samples, discard_variants):
         self.proj = proj
         self.db = proj.db
@@ -144,6 +148,7 @@ class AssociationTestManager:
             raise ValueError('Variant table {} does not exist.'.format(table))
         self.table = table
         self.var_info, self.geno_info = self.getInfo(methods, var_info, geno_info)
+        self.geno_name = geno_name
         # step 1: get missing filter conditions
         self.missing_ind_ge, self.missing_var_ge = \
           self.getMissingFilters(discard_samples, discard_variants)
@@ -479,6 +484,7 @@ class GenotypeLoader(Process):
         self.proj = param.proj
         self.sample_IDs = param.sample_IDs
         self.geno_info = param.geno_info
+        self.geno_name = param.geno_name
         self.geno_cond = param.genotypes
         self.group_names = param.group_names
         self.db_name = param.proj.name + '_genotype.DB'
@@ -528,11 +534,12 @@ class GenotypeLoader(Process):
                     # "Cannot connect to database" if there are multiple reading processes.
                     # We are trying five times if this happens before we terminate the process
                     select_genotype_query = '''\
-                    SELECT genotype_{0}.variant_id, GT {1}, {2} FROM cache.__asso_tmp, genotype_{0} WHERE 
+                    SELECT genotype_{0}.variant_id, {4} {1}, {2} FROM cache.__asso_tmp, genotype_{0} WHERE 
                     (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3}) ORDER BY {2}'''.\
                     format(id, ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
                            ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
-                           ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '')
+                           ' AND ({})'.format(' AND '.join(['({})'.format(x) for x in self.geno_cond])) if self.geno_cond else '',
+                        self.geno_name)
                     select_genotype_msg = 'Load sample {} using genotype loader {}'.format(id, self.index)
                     executeUntilSucceed(cur, select_genotype_query, 5, select_genotype_msg)
                 except OperationalError as e:
@@ -774,7 +781,7 @@ class AssoTestsWorker(Process):
         '''
         Filter genotypes for missing calls or lack of minor alleles. Not very efficient because 
         it copies genotype, var_info and geno_info skipping the loci to be removed.
-            - genotype is a Individual_list * Variants_list matrix of GT values 0,1,2 and nan
+            - genotype is a Individual_list * Variants_list matrix of genotype values
             - var_info is a dictionary with each key being information corresponding Variant_list
             - geno_info is a dictionary with each key having a matrix of the same structure as genotype matrix
         '''
@@ -971,7 +978,7 @@ def associate(args):
             # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
-                    args.var_info, args.geno_info, args.methods, args.unknown_args,
+                    args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
                     args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
             except ValueError as e:
                 sys.exit(e)
