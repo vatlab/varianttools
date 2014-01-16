@@ -2377,6 +2377,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                         # A.B, do not expand
                         res.append((toktype, toval))
                 except ValueError as e:
+                    res.append((toktype, toval))
                     env.logger.debug(e)
             elif toval.startswith('__'):
                 res.append((toktype, toval))
