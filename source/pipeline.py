@@ -453,7 +453,7 @@ class FieldsFromTextFile:
                 showTrack(ifiles[0], self.field_output)
             else:
                 with open(self.field_output, 'w') as fo:
-                    csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(2048))
+                    csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(8192))
                     fo.write('delimiter="{}"\n\n'.format(csv_dialect.delimiter.replace('\t', r'\t')))
                     values = []
                     with open(ifiles[0], 'rU') as fi:

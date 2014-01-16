@@ -158,7 +158,7 @@ class Sample:
             return
         # num sample, num new field, num update field
         count = [0, 0, 0]
-        csv_dialect = csv.Sniffer().sniff(open(filename, 'rU').read(2048))
+        csv_dialect = csv.Sniffer().sniff(open(filename, 'rU').read(8192))
         delimiter = csv_dialect.delimiter
         with open(filename, 'rU') as input:
             reader = csv.reader(input, dialect=csv_dialect)
