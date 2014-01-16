@@ -4,26 +4,19 @@
 # Please refer to http://varianttools.sourceforge.net/Annotation/New 
 # for a description of the format of this file.
 #
-# The best way to use this annotation source is to link your variants
-# to these gwas hits with a position range (the following uses a +/- 5000bp range):
-# vtools use gwasCatalog.ann --anno_type range --linked_fields chr position-5000 position+5000
-# 
-# Then you can generate a useful report showing what known gwas hits are near your
-# variants (the following shows Type 2 diabetes hits near your variants):
-# vtools select variant "gwasCatalog.trait == 'Type 2 diabetes'" 
-#        -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name 
-#        gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title > variants_near_diabetes_gwas_hits.txt
-
 
 [linked fields]
 hg19=chr, position
 
 [data sources]
 anno_type=position
-description=GWAS Catalog
-version=hg19_20111220
+description=This database contains single nucleotide polymorphisms (SNPs) identified by published Genome-Wide
+  Association Studies (GWAS), collected in the Catalog of Published Genome-Wide Association Studies at the
+  National Human Genome Research Institute (NHGRI). From http://www.genome.gov/gwastudies/:
+
+version=hg19_20140112
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gwasCatalog.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/gwasCatalog-hg19_20111220.DB.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/gwasCatalog-hg19_20140112.DB.gz
 source_type=txt
 encoding=ISO-8859-1
 
@@ -47,10 +40,10 @@ index=6
 type=INTEGER
 comment=PubMed ID of publication of the study
 
-#[author]
-#index=7
-#type=VARCHAR(255)
-#comment=First author of publication 
+[author]
+index=7
+type=VARCHAR(255)
+comment=First author of publication 
 
 [pubDate]
 index=8
