@@ -84,7 +84,7 @@ def extractEpoch(logfile):
             if obj is not None:
                 t = datetime.strptime(obj.group(1), "%Y-%m-%d %H:%M:%S")
                 # completed successfuly
-                if cur_step is not None and (obj.group(2), int(obj.group(3))) != cur_step[0]:
+                if cur_step is not None and (obj.group(2), int(obj.group(3))) == cur_step[0]:
                     cur_step[2] = t
                     step_times.append(cur_step)
                     cur_step = None
