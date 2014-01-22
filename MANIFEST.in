@@ -42,6 +42,7 @@ include source/rtester.py
 include source/compare.py
 include source/plinkfile.py
 include source/preprocessor.py
+include source/simulation.py
 include source/meta.py
 include source/plot.py
 include source/assoTests.i

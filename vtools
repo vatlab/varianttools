@@ -45,6 +45,7 @@ import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
 import variant_tools.pipeline as pipeline
+import variant_tools.simulation as simulation
 
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
@@ -207,7 +208,6 @@ if __name__ == '__main__':
     #
     # command associate
     #
-    # This command is not ready and will not be displayed in a formal release
     if sys.platform != 'win32':
         parser = subparsers.add_parser('associate',
             help='''Test association between variants and phenotypes''',
@@ -216,6 +216,18 @@ if __name__ == '__main__':
         association.associateArguments(parser)
         addCommonArgs(parser)
         parser.set_defaults(func=association.associate)
+    #
+    # command simulate
+    # 
+    parser = subparsers.add_parser('simulate',
+        help='''Simulate sequencing data using specified simulation
+            models.''',
+        description='''Simulate case control or family-based samples using
+            specified simulation models.''')
+    simulation.simulateArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=simulation.simulate)
+    #
     # 
     # command admin
     #
