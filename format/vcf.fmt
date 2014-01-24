@@ -236,7 +236,6 @@ comment=dbSNP membership
 index=8
 adj=ExtractValue('DP=', ';')
 fmt=InfoFormatter('DP')
-fmt=InfoFormatter('DP')
 type=INTEGER
 comment=DP fields in INFO. Total depth of samples in a vcf file.
 
