@@ -561,7 +561,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
         BaseGenotypeWriter.__init__(self, geno_info, genotype_status, sample_ids)
         # we save genotypes to many small files, with a minimal of 5 samples
         # and a maximum of 10 
-        nDBs = max(min(10, len(sample_ids) / 5), 1)
+        nDBs = max(min(10, len(sample_ids) // 5), 1)
         #
         self.dispatcher = {}
         self.geno_db = []
