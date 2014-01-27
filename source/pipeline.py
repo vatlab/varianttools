@@ -922,7 +922,8 @@ class DecompressFiles:
             #
             dest_files = []
             with tarfile.open(filename, mode) as tar:
-                files = tar.getnames()
+                # only extract files
+                files = [x.name for x in tar.getmembers() if x.isfile()]
                 # save content to a manifest
                 with open(manifest, 'w') as manifest:
                     for f in files:
@@ -1014,7 +1015,7 @@ class LinkToDir:
                         os.link(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info')
                 else:
                     raise RuntimeError('Failed to link {} to directory {}: file does not exist'
-                        .format(filename, self.dest_dir))
+                        .format(filename, self.dest))
             else:
                 dest_file = os.path.join(self.dest, basename)
                 if os.path.isfile(dest_file):
@@ -1023,7 +1024,7 @@ class LinkToDir:
                         env.logger.info('Linking {} to {}'.format(filename, self.dest))
                         os.link(filename, dest_file)
                     else:
-                        env.logger.debug('Resuing existing linked file: {}'.format(dest_file))
+                        env.logger.debug('Reusing existing linked file: {}'.format(dest_file))
                 else:
                     env.logger.info('Linking {} to {}'.format(filename, self.dest))
                     os.link(filename, dest_file)
