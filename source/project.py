@@ -4048,7 +4048,7 @@ def show(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type='pipeline')
                 nAll = len(res.manifest)
-                for idx, (pipeline, prop) in enumerate(res.manifest.iteritems()):
+                for idx, (pipeline, prop) in enumerate(sorted(res.manifest.iteritems())):
                     if args.limit is not None and idx >= args.limit:
                         break
                     if args.verbosity == '0':
