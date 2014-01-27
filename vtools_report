@@ -509,7 +509,7 @@ def inbreedingCoef(args):
     table = args.table if args.table else 'variant'
     sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
     build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
-    print "sample_name\tF_stat"
+    print("sample_name\tF_stat")
     for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
         # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
         geno = zip(*[x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na -9'''.\
@@ -525,7 +525,7 @@ def inbreedingCoef(args):
                 if not withinPseudoAutoRegion(geno[0][i], int(geno[1][i]), build):
                     gt.append(int(geno[2][i]))
                     maf.append(float(geno[3][i]))
-        print "{}\t{}".format(name, calculateInbreedingCoef(gt, maf))
+        print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
 
 #
 # command plot_fields

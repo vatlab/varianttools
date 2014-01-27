@@ -525,7 +525,7 @@ def validFieldName(name, reserved=[]):
 def decodeTableName(name):
     '''Decode a table to its name that could contain special characters'''
     if name.startswith('_'):
-        return binascii.unhexlify(name[1:])
+        return binascii.unhexlify(name[1:].encode('utf-8')).decode('utf-8')
     else:
         return name
 
@@ -535,7 +535,7 @@ def encodeTableName(name):
     # if the table name is not ALPHA + ALPHANUM, use an internal name
     if name.upper() in SQL_KEYWORDS or not name[0].isalpha() \
         or name.startswith('_') or not name.replace('_', '').isalnum():
-        return '_' + binascii.hexlify(name)
+        return '_' + binascii.hexlify(name.encode('utf-8')).decode('utf-8')
     else:
         return name
 
