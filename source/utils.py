@@ -2479,7 +2479,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                         .format(cond))
                 except:
                     raise ValueError('Failed to identify a sample using name or condition "{}"'.format(cond))
-                filename = 'cache/_sample_id_list_{}.txt'.format(binascii.hexlify(cond))
+                filename = 'cache/_sample_id_list_{}.txt'.format(binascii.hexlify(cond.encode('utf-8')).decode('utf-8'))
                 with open(filename, 'w') as idList:
                     for rec in cur:
                         idList.write('{}\n'.format(rec[0]))
@@ -2497,7 +2497,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             if cond == '1':
                 filename = 'cache/_sample_id_map.txt'
             else:
-                filename = 'cache/_sample_id_map_{}.txt'.format(binascii.hexlify(cond))
+                filename = 'cache/_sample_id_map_{}.txt'.format(binascii.hexlify(cond.encode('utf-8')).decode('utf-8'))
             cur.execute('SELECT sample_id, sample_name FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id AND ({});'
                     .format(cond))
