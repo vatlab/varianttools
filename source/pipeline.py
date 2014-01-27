@@ -1163,7 +1163,7 @@ class DownloadResource:
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
-                env.logger.error('Failed to download {}: {} {}'
+                raise RuntimeError('Failed to download {}: {} {}'
                     .format(filename, type(e).__name__, e))
             #
             if filename.endswith('.gz') and not filename.endswith('tar.gz'):
