@@ -46,7 +46,7 @@ from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote
+    FileInfo, convertDoubleQuote, openFile
     
 from .project import PipelineDescription, Project
 
@@ -92,14 +92,18 @@ class EmitInput:
 
     def _isFastq(self, filename):
         try:
-            if not os.path.isfile(filename) and os.path.isfile(filename + '.file_info'):
+            if not os.path.isfile(filename) and not os.path.isfile(filename + '.file_info'):
+                raise RuntimeError('File not found')
+            fl = FileInfo(filename).firstline()
+            if fl is None:
                 env.logger.info('Cannot detect the type of file because the {} has been removed.'
                     .format(filename))
                 return True
-            with open(filename) as fastq:
-                line = fastq.readline()
-                if not line.startswith('@'):
-                    return False
+            if not fl.startswith('@'):
+                return False
+            if filename.endswith('.gz'):
+                env.logger.warning('{}: compressed fastq file might not be '
+                    'acceptable to downstream analysis.'.format(filename))
         except Exception as e:
             env.logger.debug('Input file {} is not in fastq format: {}'.format(filename, e))
             return False
@@ -120,35 +124,54 @@ class EmitInput:
             return False
         return True
 
-    def __call__(self, ifiles, pipeline=None):
-        selected = []
-        unselected = []
-        for filename in ifiles:
-            match = False
-            if self.select is True:
-                match = True
-            elif self.select is False:
-                pass
-            else:   # list of types
-                for t in self.select:
-                    if t == 'fastq':
-                        if self._isFastq(filename):
-                            match = True
-                            break
-                    if filename.lower().endswith('.' + t.lstrip('.').lower()):
-                        match = True
-                        break
+    def _pairByReadNames(self, selected, unselected):
+        # we should pair files by actual read names
+        read_map = {}
+        for filename in selected:
+            read = FileInfo(filename).firstline().strip()
+            if read[:-1] in read_map:
+                if read.endswith('1'):
+                    if read_map[read[:-1]][0] is not None:
+                        raise RuntimeError('Fastq file {} has the same first read as {}'
+                            .format(filename, read_map[read[:-1]][0]))
+                    else:
+                        read_map[read[:-1]][0] = filename
+                elif read.endswith('2'):
+                    if read_map[read[:-1]][1] is not None:
+                        raise RuntimeError('Fastq file {} has the same first read as {}'
+                            .format(filename, read_map[read[:-1]][1]))
+                    else:
+                        read_map[read[:-1]][1] = filename
+                else:
+                    raise RuntimeError('Fastq file {} is not paired because its read name does '
+                        'not end with 1 or 2'.format(filename))
+            else:
+                if read.endswith('1'):
+                    read_map[read[:-1]] = [filename, None]
+                elif read.endswith('2'):
+                    read_map[read[:-1]] = [None, filename]
+                else:
+                    raise RuntimeError('Fastq file {} is not paired because its read name does '
+                        'not end with 1 or 2'.format(filename))
+        # now, let us go through files
+        pairs = []
+        for read, filenames in read_map.items():
+            if filenames[0] is None:
+                raise RuntimeError('Fastq file {} is not paired (no matching read is found)'
+                    .format(filenames[0]))
+            elif filenames[1] is None:
+                raise RuntimeError('Fastq file {} is not paired (no matching read is found)'
+                    .format(filenames[1]))
+            else:
+                if not self._is_paired(filenames[0], filenames[1]):
+                    env.logger.warning('{} and {} contain paired reads but the filenames '
+                        'do not follow illumina filename convention'
+                        .format(filenames[0], filenames[1]))
+                pairs.append(filenames)
+        return sorted(pairs), unselected     
+
+    def _pairByFileName(self, selected, unselected):
             #
-            if match:
-                selected.append(filename)
-            elif self.pass_unselected:
-                unselected.append(filename)
-        # for this special case, the step is skipped
-        if self.group_by == 'single':
-            return [[x] for x in selected], unselected
-        elif self.group_by == 'all':
-            return [selected], unselected
-        elif self.group_by == 'paired':
             # there is a possibility that one name differ at multiple parts
             # with another name. e.g
             #
@@ -161,6 +184,10 @@ class EmitInput:
             # 
             # the code below tries to find good pairs first, then use matched
             # locations to pair others
+            if not selected:
+                env.logger.warning('No file matching type "{}" is selected for pairing.'
+                    .format(self.select))
+                return [], unselected
             all_pairs = [[x,y] for x in selected for y in selected if self._is_paired(x,y)]
             unpaired = [x for x in selected if not any([x in y for y in all_pairs])]
             if unpaired:
@@ -213,6 +240,51 @@ class EmitInput:
                 else:
                     raise ValueError('All filenames match multiple names but no differentiating '
                         'index can pair filenames perfectly.') 
+
+    def __call__(self, ifiles, pipeline=None):
+        selected = []
+        unselected = []
+        for filename in ifiles:
+            match = False
+            if self.select is True:
+                match = True
+            elif self.select is False:
+                pass
+            else:   # list of types
+                for t in self.select:
+                    if t == 'fastq':
+                        if self._isFastq(filename):
+                            match = True
+                            break
+                    if filename.lower().endswith('.' + t.lstrip('.').lower()):
+                        match = True
+                        break
+            #
+            if match:
+                selected.append(filename)
+            elif self.pass_unselected:
+                unselected.append(filename)
+        # for this special case, the step is skipped
+        if self.group_by == 'single':
+            return [[x] for x in selected], unselected
+        elif self.group_by == 'all':
+            return [selected], unselected
+        elif self.group_by == 'paired':
+            if 'fastq' in self.select:
+                try:
+                    return self._pairByReadNames(selected, unselected)
+                except Exception as e:
+                    # if failed to pair by read name, pair by filenames
+                    env.logger.warning('Failed to pair fastq files by read names. '
+                        'Trying to pair files by filenames: {}'.format(e))
+            else:
+                # this should not happen becase we do not need to pair non-fastq files 
+                # at this point, but I will leave the code here anyway.
+                env.logger.warning('It is unsafe to pair input files by names instead of '
+                    'their content. Please add option select="fastq" if you need to '
+                    'pair input fastq files')
+            return self._pairByFileName(selected, unselected)
+
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -408,23 +480,23 @@ class CheckFastqVersion:
             # and use it to determine if it is Illumina 1.3+
             #
             qual_scores = ''
-            with open(fastq_file[0]) as fastq:
+            with openFile(fastq_file[0]) as fastq:
                 while len(qual_scores) < 1000:
                     try:
-                        line = fastq.readline()
+                        line = fastq.readline().decode('utf-8')
                     except Exception as e:
                         raise RuntimeError('Failed to read fastq file {}: {}'
                             .format(fastq_file, e))
                     if not line.startswith('@'):
                         raise ValueError('Wrong FASTA file {}'.format(fastq_file))
-                    line = fastq.readline()
-                    line = fastq.readline()
+                    line = fastq.readline().decode('utf-8')
+                    line = fastq.readline().decode('utf-8')
                     if not line.startswith('+'):
                         env.logger.warning(
                             'Suspiciout FASTA file {}: third line does not start with "+".'
                             .foramt(fastq_file))
                         return 
-                    line = fastq.readline()
+                    line = fastq.readline().decode('utf-8')
                     qual_scores += line.strip()
             #
             min_qual = min([ord(x) for x in qual_scores])

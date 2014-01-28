@@ -1677,16 +1677,18 @@ class FileInfo:
         self._md5 = None
         self._mtime = None
         self._ctime = None
+        self._first_line = None
 
     def save(self):
         '''Create a .file_info file with information about the original
         file.'''
         with open(self.filename + '.file_info', 'w') as info:
-            info.write('{}\n{}\n{}\n{}\n'.format(
+            info.write('{}\n{}\n{}\n{}\n{}\n'.format(
                 os.path.getsize(self.filename),
                 calculateMD5(self.filename, partial=True),
                 os.path.getctime(self.filename),
-                os.path.getmtime(self.filename)))
+                os.path.getmtime(self.filename),
+                self._getFirstLine(self.filename)))
 
     def load(self):
         with open(self.filename + '.file_info') as info:
@@ -1694,7 +1696,19 @@ class FileInfo:
             self._md5 = info.readline().strip()
             self._ctime = float(info.readline().strip())
             self._mtime = float(info.readline().strip())
-        
+            try:
+                self._first_line = info.readline().strip()
+            except:
+                # early version of file_info does not have first line
+                pass
+    
+    def _getFirstLine(self, filename):
+        try:
+            with openFile(filename) as input:
+                return input.readline().decode()
+        except:
+            return ''
+
     def md5(self):
         if self._md5 is None:
             if os.path.isfile(self.filename):
@@ -1718,6 +1732,14 @@ class FileInfo:
             else:
                 self.load()
         return self._mtime
+
+    def firstline(self):
+        if self._first_line is None:
+            if os.path.isfile(self.filename):
+                self._first_line = self._getFirstLine(self.filename)
+            else:
+                self.load()
+        return self._first_line
 
 def existAndNewerThan(ofiles, ifiles, md5file=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
