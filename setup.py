@@ -45,10 +45,6 @@ except ImportError:
 from source import VTOOLS_VERSION
 
 EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
-
-if not EMBEDED_BOOST:
-    print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
-
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
     '-outdir', 'source']
 
@@ -505,6 +501,40 @@ VTOOLS_FILES = ['source.__init__',
         'source.meta',
         'source.plot'
 ]
+
+
+if not EMBEDED_BOOST:
+    def downloadProgress(count, blockSize, totalSize):
+        perc = count * blockSize * 100 // totalSize
+        if perc > downloadProgress.counter: 
+            sys.stdout.write('.' * (perc - downloadProgress.counter))
+            downloadProgress.counter = perc
+        sys.stdout.flush()
+    import urllib
+    import tarfile
+    downloadProgress.counter = 0
+    try:
+        BOOST_URL = 'https://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1391094626&use_mirror=colocrossing'
+        sys.stdout.write('Downloading boost C++ library 1.49.0 ')
+        sys.stdout.flush()
+        if not os.path.isfile('boost_1_49_0.tar.gz'):
+            urllib.urlretrieve(BOOST_URL, 'boost_1_49_0.tar.gz', downloadProgress)
+        sys.stdout.write('\n')
+        # extract needed files
+        with tarfile.open('boost_1_49_0.tar.gz', 'r:gz') as tar:
+            files = [h for h in tar.getmembers() if h.name.startswith('boost_1_49_0/boost') \
+                or h.name.startswith('boost_1_49_0/libs/iostreams') \
+                or h.name.startswith('boost_1_49_0/libs/regex') \
+                or h.name.startswith('boost_1_49_0/libs/filesystem') \
+                or h.name.startswith('boost_1_49_0/libs/detail') \
+                or h.name.startswith('boost_1_49_0/libs/system') ]
+            sys.stdout.write('Extracting %d files\n' % len(files))
+            tar.extractall(members=files)
+        EMBEDED_BOOST = True
+    except Exception as e:
+        print(e)
+        print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
+
 
 #
 # Generate wrapper files (only in development mode)
