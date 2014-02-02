@@ -112,10 +112,10 @@ opt_gatk_unifiedgenotyper_comment=Option to command gatk UnifiedGenotyper
 opt_gatk_variantrecalibrator=
 opt_gatk_variantrecalibrator_comment=Option to command gatk VarintRecalibrator
 
-opt_gatk_variantrecalibrator_snp= -percentBad 0.01 -minNumBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+opt_gatk_variantrecalibrator_snp= -numBad 1000 -an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
 opt_gatk_variantrecalibrator_snp_comment=Option to command gatk VarintRecalibrator -mode SNP
 
-opt_gatk_variantrecalibrator_indel=--maxGaussians 4 -percentBad 0.01 -minNumBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
+opt_gatk_variantrecalibrator_indel=--maxGaussians 4 -numBad 1000 -an DP -an FS -an ReadPosRankSum -an MQRankSum
 opt_gatk_variantrecalibrator_indel_comment=Option to command gatk VarintRecalibrator -mode INDEL
 
 opt_gatk_applyrecalibration=--ts_filter_level 99.9
