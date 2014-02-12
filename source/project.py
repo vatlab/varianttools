@@ -1378,7 +1378,14 @@ class Project:
         cur = self.db.cursor()
         try:
             cur.execute('SELECT value FROM project WHERE name={0};'.format(self.db.PH), (key,))
-            return cur.fetchone()[0]
+            res = cur.fetchone()[0]
+            try:
+                # res can be an unicode string and need to be converted to
+                # regular string for some c extension to work.
+                return str(res)
+            except:
+                # not sure if this works for python 3, so use str(res) first
+                return res.encode('utf-8', 'ignore')
         except Exception as e:
             #env.logger.debug(e)
             #env.logger.warning('Failed to retrieve value for project property {}'.format(key))
