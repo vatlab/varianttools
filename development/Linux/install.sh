@@ -11,7 +11,7 @@ install () {
     mkdir -p $2/bin
     rm -rf $2/lib/variant_tools &> /dev/null
     mkdir -p $2/lib/variant_tools
-    cp -a $1/* $2/lib/variant_tools
+    cp -r $1/* $2/lib/variant_tools
     for cmd in vtools vtools_report; do
 	rm -rf $2/bin/$cmd &> /dev/null
 	ln -s $2/lib/variant_tools/$cmd $2/bin/$cmd
