@@ -125,7 +125,7 @@ if __name__ == '__main__':
         starting times of steps of pipelines, and generate graphical reports''')
     parser.add_argument('logfiles', nargs='+',
         help='''One or more log files. If address:path is specified, log files
-            will be copied to a temporary directory using command rcp. No
+            will be copied to a temporary directory using command scp. No
             password can be specified so public key authentication is needed
             if a password is needed.''')
     parser.add_argument('--output', default='progress.pdf',
