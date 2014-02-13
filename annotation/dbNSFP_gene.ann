@@ -4,22 +4,12 @@
 # Please refer to http://varianttools.sourceforge.net/Annotation/New 
 # for a description of the format of this file.
 #
-# ChangeLog:
-#   2011-7-15: Initial import.
-#   2011-8-20: Add citation to Liu et al.
-#   2011-9-1: separate allele frequency in 1000genomes low and high coverage data
-#             into several fields.
-#
-#   2011-9-1: separate dbSNP frequency data and gene ids.
-#   2012-12-5: version 2.0b4 prototype still needs valid url
-#   2013-8-10: version 2.0
-#   2013-10-2: version 2.1
 
 [linked fields]
 *=Gene_name
 
 [data sources]
-description=dbNSFP_gene version 2.1, maintained by Dr. Xiaoming Liu from UTSPH. Please cite
+description=dbNSFP_gene version 2.3, maintained by Dr. Xiaoming Liu from UTSPH. Please cite
 	"Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human
 	non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" and
 	"Liu X, Jian X, and Boerwinkle E. 2013. dbNSFP v2.0: A Database of Human Nonsynonymous
