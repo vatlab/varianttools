@@ -514,7 +514,7 @@ if not EMBEDED_BOOST:
     import tarfile
     downloadProgress.counter = 0
     try:
-        BOOST_URL = 'https://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1391094626&use_mirror=colocrossing'
+        BOOST_URL = 'http://hivelocity.dl.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz'
         sys.stdout.write('Downloading boost C++ library 1.49.0 ')
         sys.stdout.flush()
         if not os.path.isfile('boost_1_49_0.tar.gz'):
