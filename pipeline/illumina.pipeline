@@ -37,8 +37,9 @@ action=RunCommand(cmd=[
         'vtools admin --save_snapshot ${CMD_OUTPUT: CMD_OUTPUT[0]}
             "SNVs and Indels imported from SNPs.vcf and Indels.vcf under ${CMD_INPUT: str(len(CMD_INPUT))} directories."'],
     output='${CMD_OUTPUT: CMD_OUTPUT[0]}')
-comment=Load SNP and Indel variants from Variations/SNPs.vcf and Variations/Indels.vcf under specified directory.
-    Save all inputted variants to the first snapshot file specified by --output
+comment=Load SNP and Indel variants from Variations/SNPs.vcf and Variations/Indels.vcf
+    under specified directory. Save all inputted variants to the first snapshot file
+    specified by --output
 
 [load_data_20]
 input_emitter=EmitInput('all')

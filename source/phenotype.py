@@ -233,7 +233,8 @@ class Sample:
         for idx, field in enumerate(new_fields):
             # if adding a new field
             if field.lower() not in [x.lower() for x in cur_fields]:
-                self.proj.checkFieldName(field, exclude='sample')
+                if field.upper() in SQL_KEYWORDS:
+                    raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
                 fldtype = typeOfValues([x[idx] for x in records.values()])
                 env.logger.info('Adding phenotype {} of type {}'.format(field, fldtype))
                 env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
@@ -315,7 +316,7 @@ class Sample:
         # if adding a new field
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
-            if field.upper in SQL_KEYWORDS:
+            if field.upper() in SQL_KEYWORDS:
                 raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
             env.logger.info('Adding phenotype {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
@@ -378,7 +379,7 @@ class Sample:
         new_field = {}
         for field in [x[0] for x in stat]:
             if field.lower() not in [x.lower() for x in cur_fields]:
-                if field.upper in SQL_KEYWORDS:
+                if field.upper() in SQL_KEYWORDS:
                     raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
                 new_field[field] = True
             else:

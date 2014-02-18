@@ -2198,7 +2198,8 @@ class Project:
         if name.upper() in SQL_KEYWORDS:
             raise ValueError("Field name '{}' is not allowed because it is a reserved word.".format(name))
         for table in self.getVariantTables(): #  + ['sample', 'filename']:
-            if table == exclude:
+            if (isinstance(exclude, str) and table == exclude) or \
+                (isinstance(exclude, list) and table in exclude):
                 continue
             if name.lower() in [x.lower() for x in self.db.getHeaders(table)]:
                 raise ValueError("Field name '{}' is not allowed because it is already used in table {}".format(name, table))
