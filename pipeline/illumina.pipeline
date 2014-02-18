@@ -60,7 +60,7 @@ action=RunCommand(cmd=[
             "Raw data from MAXGT model after removing samples and variants from the POLY model"' ],
     output='${CMD_OUTPUT: CMD_OUTPUT[1]}')
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 1})
-comment=Remove _POLY samples, merge SNPs and INDELs, remove genotypes that does not pass filter 
+comment=Remove _POLY samples, merge SNPs and INDELs, remove genotypes that do not pass filter 
     (filter != "PASS"), calculate genotype count of all variants, remove variants without any
     genotype, and save results to the second  snapshot file specified by --output
 
@@ -84,7 +84,7 @@ action=RunCommand(cmd=[
             "Raw data from POLY model after removing samples and variants from the MAXGT model"' ],
     output='${CMD_OUTPUT: CMD_OUTPUT[2]}')
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 2})
-comment=Remove _MAXGT samples, merge SNPs and INDELs, remove genotypes that does not pass filter 
+comment=Remove _MAXGT samples, merge SNPs and INDELs, remove genotypes that do not pass filter 
     (filter != "PASS"), calculate genotype count of all variants, remove variants without any
     genotype, and save results to the second  snapshot file specified by --output
 
