@@ -51,6 +51,14 @@ def compareArguments(parser):
             of the first, but not in the TYPE of others (T1 - T2 - T3...) to TABLE
             if a name is specified. An optional message can be added to describe 
             the table.''')
+    parser.add_argument('--expression', metavar=('EXPR', 'DESC'), nargs='+',
+        help='''Evaluate a set expression with table names representing variants
+            in these tables. Operators | (or), & (and), - (difference) and ^ 
+            (A or B but not both) are allowed. The results will be saved to table
+            if the result is assigned to a name (e.g. --expression 'D=A-(B&C)').
+            The table names in the expression can be written as _1, _2 etc if 
+            tables are listed before the option, and be used to populate the
+            list of tables if it was left unspecified.''')
     parser.add_argument('--mode', choices=['variant', 'site', 'genotype'],
         help='''Compare variants (chr, pos, ref, alt), site (chr, pos), or
             genotype (chr, pos, ref, alt, GT for a specified sample) of 
@@ -201,6 +209,7 @@ def compareTables(proj, args):
     var_diff = set()
     var_union = set()
     var_intersect = set()
+    var_expression = set()
     cur = proj.db.cursor()
     if args.mode in [None, 'variant']:
         variants = []
@@ -222,6 +231,15 @@ def compareTables(proj, args):
             var_intersect = copy.copy(variants[0])
             for var in variants[1:]:
                var_intersect &= var 
+        if args.expression is not None:
+            var_dict = {}
+            for idx, var in enumerate(variants):
+                var_dict['_{}'.format(idx+1)] = var
+            # evaluate the expression
+            try:
+                var_expression = eval(args.expression, globals=var_dict, locals=var_dict)
+            except Exception as e:
+                raise RuntimeError('Failed to evaluate set expression {}'.format(args.expression))
     elif args.mode == 'site':
         sites = []
         record_all = args.union is not None
@@ -315,7 +333,8 @@ def compareTables(proj, args):
     for var, table_with_desc in [
             (var_intersect, args.intersection),
             (var_union, args.union),
-            (var_diff, args.difference)]:
+            (var_diff, args.difference),
+            (var_expression, args.expression)]:
         if not table_with_desc:
             continue
         table = table_with_desc[0]
@@ -352,8 +371,46 @@ def compareTables(proj, args):
         print(len(var_union))
     if args.intersection is not None:
         print(len(var_intersect))
+    if args.expression is not None:
+        print(len(var_expression))
 
-    
+def parseExpression(expr, passed_tables):
+    pieces = re.split(r'''("[^"]+"|'[^']+'|[a-zA-Z0-9_]+|\(|\)|\^|\||\&|-)''', expr)
+    result_table = None
+    tables = [x for x in passed_tables]
+    new_expr = []
+    for idx, i in enumerate(pieces):
+        if i.startswith('_'):
+            try:
+                i_value = int(i[1:]) - 1
+            except:
+                raise ValueError('Unacceptable table name {}'.format(i))
+            if i_value >= len(tables):
+                raise ValueError('Unacceptable table name {}: index out of range'.format(i))
+            new_expr.append(i)
+        elif (i.startswith('"') and i.endswith('"')) or (i.startswith("'") and i.endswith("'")):
+            if i[1:-1] in tables:
+                new_expr.append('_{}'.format(tables.index(i[1:-1]) + 1))
+            else:
+                tables.append(i[1:-1])
+                new_expr.append('_{}'.format(len(tables)))
+        elif i.replace('_', '').isalnum():
+            if i in tables:
+                new_expr.append('_{}'.format(tables.index(i) + 1))
+            else:
+                tables.append(i)
+                new_expr.append('_{}'.format(len(tables)))
+        elif i.strip() == '=':
+            if len(tables) != 1:
+                raise ValueError('Invalid set expression: {}'.format(expr))
+            result_table = tables[0]
+            tables = []
+            new_expr = []
+        elif i.strip() in ['(', ')', '&', '|', '-', '^']:
+            new_expr.append(i)
+        elif i.strip():
+            raise ValueError('Invalid set expression: {}'.format(expr))
+    return result_table, tables, ' '.join(new_expr)
 
 def compare(args):
     try:
@@ -361,6 +418,18 @@ def compare(args):
             # expand wildcard characters in args.tables
             tables = []
             allTables = proj.getVariantTables()
+            # if an expression is given but no table is specified
+            # they will be extracted
+            if args.expression:
+                result_table, tables, new_expr = parseExpression(args.expression, args.tables)
+                if not args.tables:
+                    args.tables = tables
+                else:
+                    if any([x not in args.tables for x in tables]):
+                        raise ValueError('All tables in --expression must be '
+                            'listed if not using the default table list.')
+                args.expression = new_expr
+                args.result_table = result_table
             for table in args.tables:
                 if '?' in table or '*' in table:
                     match = False
@@ -412,7 +481,8 @@ def compare(args):
             # 
             if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
                 raise ValueError('Options B_diff_A, A_diff_B, A_and_B and A_or_B are deprecated.')
-            if args.intersection is not None or args.union is not None or args.difference is not None:
+            if args.intersection is not None or args.union is not None or \
+                args.difference is not None or args.expression is not None:
                 compareTables(proj, args)
             else:
                 if args.mode in [None, 'variant']:
