@@ -74,6 +74,70 @@ class TestCompare(ProcessTestCase):
         self.assertSucc('vtools compare \'ns*\' --union u')
         self.assertTrue('u' in outputOfCmd('vtools show tables'))
 
+    def testCompareExpression1(self):
+        'Test command vtools compare (form 1)'
+        # fix me: the following only test the case with two tables, should also test for one and more than two tables
+        self.assertFail('vtools compare')
+        self.assertSucc('vtools compare -h')
+        # WARNING: No action parameter is specified. Nothing to do.
+        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
+        # error: argument --A_and_B: expected one argument
+        self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
+        self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "unique=_1 & _2"')
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
+        # WARNING: Existing table common is renamed to common_Aug09_170022.
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
+        self.assertEqual(output2list("vtools execute 'select * from common'"), ['880', '881', '882', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --expression "AorB=_1 | _2"')
+        self.assertEqual(output2list("vtools execute 'select * from AorB'"), ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --expression "AandB=_1 & _2"')
+        self.assertEqual(output2list("vtools execute 'select * from AandB'"), ['869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare d_plekhn1 ns --expression "AdiffB=_1 - _2"')
+        self.assertEqual(output2list("vtools execute 'select * from AdiffB'"), [])
+        self.assertSucc('vtools compare ns d_plekhn1 --expression "BdiffA=_1 - _2"')
+        self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
+        # use both options in one command should be allowed
+        self.assertSucc('vtools compare d_plekhn1 plekhn1  --expression "A_OR_B=_1 | _2"')
+        #
+        # handling of non-alphanum names
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "\'KK@\'=_1 | _2"')
+        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
+        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
+
+    def testCompareExpression2(self):
+        'Test command vtools compare (form 2)'
+        # fix me: the following only test the case with two tables, should also test for one and more than two tables
+        self.assertFail('vtools compare')
+        self.assertSucc('vtools compare -h')
+        # WARNING: No action parameter is specified. Nothing to do.
+        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
+        # error: argument --A_and_B: expected one argument
+        self.assertFail('vtools compare --expression "d_plekhn1 & ns_damaging"')
+        self.assertFail('vtools compare --expression "unique=d_plekhn1 & ns_damaging"')
+        self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
+        # WARNING: Existing table common is renamed to common_Aug09_170022.
+        self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
+        self.assertEqual(output2list("vtools execute 'select * from common'"), ['880', '881', '882', '893'])
+        self.assertSucc('vtools compare --expression "AorB=d_plekhn1 | ns"')
+        self.assertEqual(output2list("vtools execute 'select * from AorB'"), ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare --expression "AandB=d_plekhn1 & ns"')
+        self.assertEqual(output2list("vtools execute 'select * from AandB'"), ['869', '880', '881', '882', '889', '893'])
+        self.assertSucc('vtools compare --expression "AdiffB=d_plekhn1 -ns"')
+        self.assertEqual(output2list("vtools execute 'select * from AdiffB'"), [])
+        self.assertSucc('vtools compare --expression "BdiffA=ns-d_plekhn1"')
+        self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
+        # use both options in one command should be allowed
+        self.assertSucc('vtools compare --expression "A_OR_B=d_plekhn1|plekhn1"')
+        #
+        # handling of non-alphanum names
+        self.assertSucc('vtools compare --expression "\'KK@\'=d_plekhn1 |ns_damaging"')
+        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.assertSucc('vtools compare  --expression "\'K&K@\'=\'d@p\' & ns_damaging"')
+        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
+
     def testSimpleProj(self):
         'Test compare by site'
         runCmd('vtools init test -f')

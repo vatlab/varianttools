@@ -33,7 +33,7 @@ from .utils import ProgressBar, env, encodeTableName, decodeTableName
 from collections import defaultdict
 
 def compareArguments(parser):
-    parser.add_argument('tables', nargs='+',
+    parser.add_argument('tables', nargs='*',
         help='''variant tables to compare. Wildcard characters * and ? can be 
             used to specify multiple tables. A table name will be automatically
             repeated for the comparison of genotype of multiple samples if only
@@ -237,9 +237,9 @@ def compareTables(proj, args):
                 var_dict['_{}'.format(idx+1)] = var
             # evaluate the expression
             try:
-                var_expression = eval(args.expression, globals=var_dict, locals=var_dict)
+                var_expression = eval(args.eval_expr, var_dict, var_dict)
             except Exception as e:
-                raise RuntimeError('Failed to evaluate set expression {}'.format(args.expression))
+                raise RuntimeError('Failed to evaluate set expression {}: {}'.format(args.eval_expr, e))
     elif args.mode == 'site':
         sites = []
         record_all = args.union is not None
@@ -287,6 +287,21 @@ def compareTables(proj, args):
             for k in site_intersect:
                 for var in sites:
                     var_intersect |= var[k]
+        if args.expression is not None:
+            site_dict = {}
+            for idx, s in enumerate(sites):
+                site_dict['_{}'.format(idx+1)] = s.keys()
+            # evaluate the expression
+            try:
+                site_expr = eval(args.eval_expr, site_dict, site_dict)
+            except Exception as e:
+                raise RuntimeError('Failed to evaluate set expression {}: {}'.format(args.eval_expr, e))
+            env.logger.info('Sites in resulting tables: {}'
+                .format(len(site_expr)))
+            for k in site_expr:
+                for var in sites:
+                    if k in var:
+                        var_expression |= var[k]
     else:
         # genotype
         geno = []
@@ -329,6 +344,15 @@ def compareTables(proj, args):
             env.logger.info('Genotypes in all samples: {}'
                 .format(len(geno_intersect)))
             var_intersect = set([x[0] for x in geno_intersect])
+        if args.expression is not None:
+            var_dict = {}
+            for idx, g in enumerate(geno):
+                geno_dict['_{}'.format(idx+1)] = g
+            # evaluate the expression
+            try:
+                var_expression = set([x[0] for x in eval(args.eval_expr, geno_dict, geno_dict)])
+            except Exception as e:
+                raise RuntimeError('Failed to evaluate set expression {}: {}'.format(args.eval_expr, e))
     #
     for var, table_with_desc in [
             (var_intersect, args.intersection),
@@ -375,7 +399,7 @@ def compareTables(proj, args):
         print(len(var_expression))
 
 def parseExpression(expr, passed_tables):
-    pieces = re.split(r'''("[^"]+"|'[^']+'|[a-zA-Z0-9_]+|\(|\)|\^|\||\&|-)''', expr)
+    pieces = re.split(r'''("[^"]+"|'[^']+'|[a-zA-Z0-9_]+|\(|\)|\^|\||\&|-|=)''', expr)
     result_table = None
     tables = [x for x in passed_tables]
     new_expr = []
@@ -389,28 +413,28 @@ def parseExpression(expr, passed_tables):
                 raise ValueError('Unacceptable table name {}: index out of range'.format(i))
             new_expr.append(i)
         elif (i.startswith('"') and i.endswith('"')) or (i.startswith("'") and i.endswith("'")):
-            if i[1:-1] in tables:
+            if '=' in pieces and result_table is None:
+                result_table = i[1:-1]
+            elif i[1:-1] in tables:
                 new_expr.append('_{}'.format(tables.index(i[1:-1]) + 1))
             else:
                 tables.append(i[1:-1])
                 new_expr.append('_{}'.format(len(tables)))
         elif i.replace('_', '').isalnum():
-            if i in tables:
+            if '=' in pieces and result_table is None:
+                result_table = i
+            elif i in tables:
                 new_expr.append('_{}'.format(tables.index(i) + 1))
             else:
                 tables.append(i)
                 new_expr.append('_{}'.format(len(tables)))
         elif i.strip() == '=':
-            if len(tables) != 1:
-                raise ValueError('Invalid set expression: {}'.format(expr))
-            result_table = tables[0]
-            tables = []
-            new_expr = []
+            pass
         elif i.strip() in ['(', ')', '&', '|', '-', '^']:
             new_expr.append(i)
         elif i.strip():
-            raise ValueError('Invalid set expression: {}'.format(expr))
-    return result_table, tables, ' '.join(new_expr)
+            raise ValueError('Invalid set expression for item {}: {})'.format(i, expr))
+    return result_table, tables, ' '.join(new_expr).strip()
 
 def compare(args):
     try:
@@ -421,15 +445,25 @@ def compare(args):
             # if an expression is given but no table is specified
             # they will be extracted
             if args.expression:
-                result_table, tables, new_expr = parseExpression(args.expression, args.tables)
+                result_table, tables, new_expr = parseExpression(args.expression[0], args.tables)
                 if not args.tables:
                     args.tables = tables
+                    env.logger.info('Comparing tables {}'.format(', '.join(args.tables)))
                 else:
                     if any([x not in args.tables for x in tables]):
                         raise ValueError('All tables in --expression must be '
                             'listed if not using the default table list.')
-                args.expression = new_expr
-                args.result_table = result_table
+                if result_table is None:
+                    if len(args.expression) > 1:
+                        env.logger.warning('No table is created for expression {}'.format(args.expression[0]))
+                    args.expression = []
+                else:
+                    args.expression = [result_table, args.expression[1] if len(args.expression) > 1 else '']
+                args.eval_expr = new_expr
+            elif not args.tables:
+                raise ValueError('Please specify tables to compare.')
+            #
+            tables = []
             for table in args.tables:
                 if '?' in table or '*' in table:
                     match = False
