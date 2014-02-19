@@ -1636,6 +1636,22 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             dest = os.path.join(env.local_resource, fileToGet)
             dest_dir = os.path.split(dest)[0]
     #
+    deprecated = os.path.join(env.local_resource, 'DEPRECATED.txt')
+    if not os.path.isfile(deprecated):
+        try:
+            urllib.urlretrieve('http://vtools.houstonbioinformatics.org/DEPRECATED.txt', deprecated)
+        except Exception as e:
+            env.logger.debug('Failed to download list of deprecated resources:'.format(e))
+        finally:
+            # remove manifest_file
+            urllib.urlcleanup()
+    if os.path.isfile(deprecated):
+        deprecated_files = [x.strip() for x in open(deprecated).readlines()]
+        if fileToGet in deprecated_files:
+            raise RuntimeError('Resource file {} is deprecated and cannot be used. '
+                'Please use command "vtools admin --update_resource existing" to update your '
+                'resource files.'.format(fileToGet))
+    #
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)
     # 
