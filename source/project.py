@@ -3421,9 +3421,9 @@ def initArguments(parser):
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
     parent.add_argument('--parent', metavar='DIR',
-        help='''Directory of a parent project (e.g. --parent ../main) from which all or part
-            of variants (--variants), samples (--samples) and genotypes (--genotypes) will
-            be copied to the newly created project.'''),
+        help='''Directory or snapshot file of a parent project (e.g. --parent ../main)
+            from which all or part of variants (--variants), samples (--samples)
+            and genotypes (--genotypes) will be copied to the newly created project.'''),
     parent.add_argument('--variants', nargs='?', metavar='TABLE', default='variant',
         help='''A variant table of the parental project whose variants will be copied to
             the new project. Default to variant (all variants).'''),
@@ -3433,10 +3433,10 @@ def initArguments(parser):
         help='''Copy only genotypes that match specified conditions.''')
     children = parser.add_argument_group('Merge from children projects')
     children.add_argument('--children', nargs='+', metavar='DIR',
-        help='''A list of a subprojects (directories) that will be merged to create
-            this new project. The subprojects must have the same structure (primary
-            and alternative reference genome, variant info and phenotype). The same
-            variant tables from multiple samples will be merged. Samples from the
+        help='''A list of a subprojects (directories or snapshot files of projects) 
+            that will be merged to create this new project. The subprojects must 
+            have the same primary and alternative reference genome. Variant tables
+            with the same names from multiple samples will be merged. Samples from the
             children projects will be copied even if they were identical samples
             imported from the same source files.''')
 
@@ -3459,6 +3459,70 @@ def init(args):
                         except:
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))
+        #
+        if args.parent and not os.path.isdir(args.parent):
+            if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
+                # directly create a project from snapshot
+                parent_path = '.'
+            else:
+                parent_path = os.path.join(env.cache_dir, 'P0')
+                if os.path.isdir(parent_path):
+                    shutil.rmtree(parent_path)
+                os.mkdir(parent_path)
+            # in case args.parent is a relative path
+            if os.path.isfile(args.parent):
+                parent_snapshot = os.path.abspath(args.parent)
+            elif args.parent.startswith('vt_'):
+                parent_snapshot = args.parent
+            else:
+                raise ValueError('{} is not a local or online snapshot'.format(args.parent))
+            saved_dir = os.getcwd()
+            os.chdir(parent_path)
+            with Project(name=args.project if parent_path == '.' else os.path.basename(args.parent).split('.')[0] , new=True, 
+                verbosity='1' if parent_path == '.' else '0') as parent_proj:
+                env.logger.info('Extracting snapshot {} to {}'.format(args.parent, parent_path))
+                parent_proj.loadSnapshot(parent_snapshot)
+            os.chdir(saved_dir)
+            args.parent = parent_path
+            if parent_path == '.':
+                # no need to copy stuff...
+                return
+        #
+        if args.children:
+            # A default value 4 is given for args.jobs because more threads usually
+            # do not improve effiency
+            dirs = []
+            for idx, child in enumerate(args.children):
+                if not os.path.isdir(child):
+                    if len(args.children) == 1:
+                        child_path = '.'
+                    else:
+                        child_path = os.path.join(env.cache_dir, 'P{}'.format(idx))
+                        if os.path.isdir(child_path):
+                            shutil.rmtree(child_path)
+                        os.mkdir(child_path)
+                    # in case child is a relative path
+                    if os.path.isfile(child):
+                        child_snapshot = os.path.abspath(child)
+                    elif child.startswith('vt_'):
+                        # an online snapshot
+                        child_snapshot = child
+                    else:
+                        raise ValueError('{} is not a local or online snapshot'.format(child))
+                    saved_dir = os.getcwd()
+                    os.chdir(child_path)
+                    env.logger.info('Extracting snapshot {} to {}'.format(child, child_path))
+                    with Project(name=args.project if len(args.children) == 1 else os.path.basename(child).split('.')[0],
+                        new=True, verbosity='1' if len(args.children) == 1 else '0') as child_proj:
+                        child_proj.loadSnapshot(child_snapshot)
+                    os.chdir(saved_dir)
+                    dirs.append(child_path)
+                    if len(args.children) == 1:
+                        # no need to copy stuff
+                        return
+                else:
+                    dirs.append(child)
+            args.children = dirs
         # create a new project
         with Project(name=args.project, build=None, new=True, 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
