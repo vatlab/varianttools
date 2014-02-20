@@ -876,6 +876,8 @@ class ProgressBar:
             self.sqliteUpdate = self.empty
             self.outputProgress = self.empty
             self.done = self.empty
+            self.main = ''
+            self.finished = 0
             return
         self.main = message
         self.main_start_time = time.time()

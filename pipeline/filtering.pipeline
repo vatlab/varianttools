@@ -88,11 +88,6 @@ databases=thousandGenomes,dbSNP,refGene,ccdsGene,refGene_exon,ccdsGene_exon,Cosm
 databases_comment=Databases for which membership tables will be produced.
 
 [denovo_0]
-action=CheckVariantToolsVersion('2.2.1')
-comment=Check the version of variant tools (version 2.2.1 and above is required
-    to execute this pipeline)
-
-[denovo_5]
 # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
 # database as step input
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -105,6 +100,11 @@ PAR1=${:"%(samples)s".split(',')[0]}
 PAR2=${:'%(samples)s'.split(',')[1]}
 PROBAND=${:'%(samples)s'.split(',')[2]}
 SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split())>3 else ''}
+
+[denovo_5]
+action=CheckVariantToolsVersion('2.2.1')
+comment=Check the version of variant tools (version 2.2.1 and above is required
+    to execute this pipeline)
 
 [denovo_10]
 action=RunCommand(cmd=[
@@ -192,11 +192,6 @@ comment=Save the project to a snapshot if an output is specified.
 
 
 [recessive_0]
-action=CheckVariantToolsVersion('2.2.1')
-comment=Check the version of variant tools (version 2.2.1 and above is required
-    to execute this pipeline)
-
-[recessive_5]
 # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
 # database as step input
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -209,6 +204,11 @@ PAR1=${:"%(samples)s".split(',')[0]}
 PAR2=${:'%(samples)s'.split(',')[1]}
 PROBAND=${:'%(samples)s'.split(',')[2]}
 SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split())>3 else ''}
+
+[recessive_5]
+action=CheckVariantToolsVersion('2.2.1')
+comment=Check the version of variant tools (version 2.2.1 and above is required
+    to execute this pipeline)
 
 [recessive_10]
 action=RunCommand(cmd=[
@@ -270,7 +270,7 @@ action=RunCommand(cmd=[
 comment=Summarize the results.
 
 [recessive_200]
-input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>1})
 action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT:CMD_OUTPUT[1]}"
     "snapshot after identification of recessive variants for family %(name)s" ''')
 comment=Save the project to a snapshot if an output is specified.
