@@ -167,15 +167,15 @@ action=RunCommand(cmd=[
     r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf 'SUMMARY: Identification of de novo variants for family %(name)s\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Members: ${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
-    ("${SIBLING} (unaffected sibling)\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}" if '${SIBLING}' else "\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
-    r"printf 'Number of variants\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
+    ("${SIBLING} (unaffected sibling)\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}\n" if '${SIBLING}' else "\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
+    r"printf '\nNumber of variants:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     ] + [
-    r"printf 'de novo variants\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\nde novo variants:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_by_site'])}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Database membership\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Database membership:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     ] + 
     [ r'''printf '${:projInfo(tables=["%(name)s_denovo_in_%%s"  %% x
         for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
@@ -253,15 +253,15 @@ action=RunCommand(cmd=[
     r"printf '\n'>> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf 'SUMMARY: Identification of recessive variants for family %(name)s\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Members: ${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
+    r"printf 'Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
     ("${SIBLING} (unaffected sibling)\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}\n" if '${SIBLING}' else "\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
-    r"printf 'Number of variants\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\nNumber of variants:\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     ] + [
-    r"printf 'Recessive variants\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\nRecessive variants:\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '${:projInfo(tables='%(name)s_recessive')}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Database membership\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Database membership:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
     ] + 
     [ r'''printf '${:projInfo(tables=["%(name)s_recessive_in_%%s"  %% x
         for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
