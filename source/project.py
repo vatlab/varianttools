@@ -726,7 +726,7 @@ class PipelineDescription:
                         if item.endswith('_comment'):
                             continue
                         if item not in ['input', 'input_emitter', 'action', 'comment'] + defaults.keys():
-                            step_vars.append([item, parser.get(section, item)])
+                            step_vars.append([item, parser.get(section, item, vars=defaults)])
                     command = PipelineCommand(index=pidx,
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
