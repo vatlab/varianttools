@@ -3420,7 +3420,7 @@ def initArguments(parser):
     parent = parser.add_argument_group('Derive from a parent project')
     parser.add_argument('-f', '--force', action='store_true',
         help='''Remove a project if it already exists.''')
-    parent.add_argument('--parent', metavar='DIR',
+    parent.add_argument('--parent', metavar='DIR_or_SNAPSHOT',
         help='''Directory or snapshot file of a parent project (e.g. --parent ../main)
             from which all or part of variants (--variants), samples (--samples)
             and genotypes (--genotypes) will be copied to the newly created project.'''),
@@ -3432,7 +3432,7 @@ def initArguments(parser):
     parent.add_argument('--genotypes', nargs='*', metavar='COND', default=[],
         help='''Copy only genotypes that match specified conditions.''')
     children = parser.add_argument_group('Merge from children projects')
-    children.add_argument('--children', nargs='+', metavar='DIR',
+    children.add_argument('--children', nargs='+', metavar='DIR_OR_SNAPSHOT',
         help='''A list of a subprojects (directories or snapshot files of projects) 
             that will be merged to create this new project. The subprojects must 
             have the same primary and alternative reference genome. Variant tables
