@@ -46,7 +46,7 @@ from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote, openFile
+    FileInfo, convertDoubleQuote, openFile, encodeTableName
     
 from .project import PipelineDescription, Project
 
@@ -60,6 +60,25 @@ try:
     hasPySam = True
 except (ImportError, ValueError) as e:
     hasPySam = False
+
+# define a few functions that can be used in the lambda function 
+# of a pipeline to display information about a project
+def projInfo(table=None, format='{name:20s}:\t{num:20s}({desc})'):
+    '''Obtain information about a table and output it according to 
+    a format string (using python string format syntax for a dictionary).
+    The table description contains keys name, num, date, cmd, and desc.
+    '''
+    try:
+        with Project(verbosity='0') as proj:
+            if table is not None:
+                table_name = encodeTableName(table)
+                desc, date, cmd = proj.descriptionOfTable(table_name)
+                return format.format(name=table, 
+                    num=proj.db.numOfRows(table_name),
+                    desc=desc, date=date, cmd=cmd)
+    except Exception as e:
+        #env.logger.warning('Function projInfo failed: {}'.format(e))
+        return ''
 
 class EmitInput:
     '''Select input files of certain types, group them, and send input files
@@ -1270,11 +1289,11 @@ class Pipeline:
         else:
             return str(var)
 
-    def substitute(self, text, PipelineVars):
+    def _substitute(self, text, PipelineVars):
         # if text has new line, replace it with space
         text =  ' '.join(text.split())
         # now, find ${}
-        pieces = re.split('(\${[^}]*})', text)
+        pieces = re.split('(\${[^{}]*})', text)
         for idx, piece in enumerate(pieces):
             if piece.startswith('${') and piece.endswith('}'):
                 KEY = piece[2:-1].lower()
@@ -1327,6 +1346,14 @@ class Pipeline:
                         continue
         # now, join the pieces together, but remove all newlines
         return ' '.join(''.join(pieces).split())
+
+    def substitute(self, text, PipelineVars):
+        while True:
+            new_text = self._substitute(text, PipelineVars)
+            if new_text == text:
+                return new_text
+            else:
+                text = new_text
 
     def execute(self, pname, input_files=[], output_files=[], jobs=1):
         if pname is None:
