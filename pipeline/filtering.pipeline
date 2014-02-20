@@ -24,8 +24,10 @@ denovo_description=This pipeline identifies de novo mutations from a
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
   up to you to select variants based on these membership tables using the
-  'vtools compare' command. 
-
+  'vtools compare' command. Two optional output files are allowed. The first
+  one is a log file to which a summary report will be appended. The project
+  will be saved to a snapshot if a name (or filename with extension .tar or
+  .tar.gz) is specified as the second output.
 
 recessive_description=This pipeline identifies recessive mutations from a
   family of unaffected parents, affected offspring, and optional unaffected
@@ -47,9 +49,11 @@ recessive_description=This pipeline identifies recessive mutations from a
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
   up to you to select variants based on these membership tables using the
-  'vtools compare' command. 
-
-
+  'vtools compare' command.  Two optional output files are allowed. The first
+  one is a log file to which a summary report will be appended. The project
+  will be saved to a snapshot if a name (or filename with extension .tar or
+  .tar.gz) is specified as the second output.
+  
 
 # exon_novel_hg19_description=This pipeline 1) removes all variants from the
 #   thousand genomes project,
@@ -84,6 +88,11 @@ databases=thousandGenomes,dbSNP,refGene,ccdsGene,refGene_exon,ccdsGene_exon,Cosm
 databases_comment=Databases for which membership tables will be produced.
 
 [denovo_0]
+action=CheckVariantToolsVersion('2.2.1')
+comment=Check the version of variant tools (version 2.2.1 and above is required
+    to execute this pipeline)
+
+[denovo_5]
 # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
 # database as step input
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -111,6 +120,13 @@ action=RunCommand(cmd=[
     ] if '${SIBLING}' else []))
 comment=Select variants for each sample
 
+
+[denovo_15]
+action=RunCommand(cmd=[
+    'vtools use ' + x for x in '%(databases)s'.split(',')
+    ])
+comment=Import all annotation databases
+
 [denovo_20]
 action=RunCommand(cmd=[
     '''vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" "%(name)s_${SIBLING}" 
@@ -121,6 +137,7 @@ action=RunCommand(cmd=[
     "de novo variants for family %(name)s " '''
     ])
 comment=Locate de novo variants of the proband
+
 
 [denovo_30]
 action=RunCommand(cmd=[
@@ -135,11 +152,6 @@ action=RunCommand(cmd=[
 comment=Locate de novo variants by site (no parental variants at the sites, even if
     the variants are different). This table contains a subset of table $name_denovo.
 
-[denovo_40]
-action=RunCommand(cmd=[
-    'vtools use ' + x for x in '%(databases)s'.split(',')
-    ])
-comment=Import all annotation databases
 
 [denovo_50]
 action=RunCommand(cmd=[
@@ -149,9 +161,42 @@ action=RunCommand(cmd=[
     ])
 comment=Create variant tables according to their membership in different annotation databases
 
+[denovo_100]
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
+action=RunCommand(cmd=[
+    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'SUMMARY: Identification of de novo variants for family %(name)s\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Members: ${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
+    ("${SIBLING} (unaffected sibling)\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}" if '${SIBLING}' else "\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
+    r"printf 'Number of variants\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    ] + [
+    r"printf 'de novo variants\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_by_site'])}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Database membership\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    ] + 
+    [ r'''printf '${:projInfo(tables=["%(name)s_denovo_in_%%s"  %% x
+        for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
+    )}\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}''' ]
+  )
+comment=Summarize the results.
+
+
+[denovo_200]
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>1})
+action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT:CMD_OUTPUT[1]}" 
+  "snapshot after identification of de novo variants for family %(name)s" ''')
+comment=Save the project to a snapshot if an output is specified.
 
 
 [recessive_0]
+action=CheckVariantToolsVersion('2.2.1')
+comment=Check the version of variant tools (version 2.2.1 and above is required
+    to execute this pipeline)
+
+[recessive_5]
 # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
 # database as step input
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -175,6 +220,13 @@ action=RunCommand(cmd=[
 comment=Count the number of heterozygotes in parents, number of homozygotes in proband and
     his or her sibling, if available.
 
+[recessive_15]
+action=RunCommand(cmd=[
+    'vtools use ' + x for x in '%(databases)s'.split(',')
+    ])
+comment=Import all annotation databases
+
+
 [recessive_20]
 action=RunCommand(cmd=[
     '''vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" "%(name)s_sib_hom=0" 
@@ -186,11 +238,6 @@ action=RunCommand(cmd=[
 comment=Locate recessive variants of the proband (homozygous only in proband)
   and save variants in table $name_recessive
 
-[recessive_40]
-action=RunCommand(cmd=[
-    'vtools use ' + x for x in '%(databases)s'.split(',')
-    ])
-comment=Import all annotation databases
 
 [recessive_50]
 action=RunCommand(cmd=[
@@ -200,98 +247,32 @@ action=RunCommand(cmd=[
     ])
 comment=Create variant tables according to their membership in different annotation databases
 
+[recessive_100]
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
+action=RunCommand(cmd=[
+    r"printf '\n'>> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'SUMMARY: Identification of recessive variants for family %(name)s\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Members: ${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
+    ("${SIBLING} (unaffected sibling)\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}\n" if '${SIBLING}' else "\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
+    r"printf 'Number of variants\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    ] + [
+    r"printf 'Recessive variants\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '${:projInfo(tables='%(name)s_recessive')}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    r"printf 'Database membership\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
+    ] + 
+    [ r'''printf '${:projInfo(tables=["%(name)s_recessive_in_%%s"  %% x
+        for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
+    )}\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}''' ]
+  )
+comment=Summarize the results.
+
+[recessive_200]
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
+action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT:CMD_OUTPUT[1]}"
+    "snapshot after identification of recessive variants for family %(name)s" ''')
+comment=Save the project to a snapshot if an output is specified.
 
 
-#   vtools update variant --from_stat 'DID5141_HetP=#(het)' --samples "sample_name in ('WGS3_2', 'WGS3_3')"
-#   vtools update variant --from_stat 'DID5141_HomO=#(hom)' --samples "sample_name = 'WGS3_1'"
-  
-# 
-# source_table=variant
-# source_table_comment=Variant table at the beginning of the filtering process
-# 
-# dest_table=exon_novel_hg19
-# dest_table_comment=Variant table at the end of the filtering process
-# 
-# prefix=exon_novel
-# prefix_comment=A prefix for all intermediate variant tables
-# 
-# extra_export_fields=
-# extra_export_fields_comment=Additional export fields such as quality score
-# 
-# [exon_novel_hg19_0]
-# # if there is CMD_INPUT, treat it as a snapshot, otherwise take the project
-# # database as step input
-# input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
-# input_emitter=EmitInput(select=${INPUT0: not INPUT0[0].endswith('.proj')})
-# action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
-# comment=Load specified snapshot if a snapshot is specified. Otherwise use the
-#   existing project.
-# 
-# [exon_novel_hg19_10]
-# # input: CMD_INPUT or project file
-# # output: cache/_0.info
-# action=RunCommand(cmd=[
-# 	'vtools show table %(source_table)s > ${CACHE_DIR}/%(prefix)s_1.info'],
-# 	output="${CACHE_DIR}/%(prefix)s_1.info")
-# comment=Retrieve information of source variant table.
-# 
-# [exon_novel_hg19_20]
-# action=RunCommand(cmd=[
-# 	'vtools use thousandGenomes',
-# 	'vtools select %(source_table)s "thousandGenomes.chr IS NULL OR thousandGenomes.SCS_INFO > 3"
-# 		-t "%(prefix)s_2" "With variants in 1000 genomes, but with those that are probably pathogenic"',
-# 	'vtools show table %(prefix)s_2 > ${CACHE_DIR}/%(prefix)s_2.info'],
-# 	output="${CACHE_DIR}/%(prefix)s_2.info")
-# comment=Remove variants that are in 1000 genomes, but keep those with 
-#   SCS_INFO > 3 (probably pathogenic)
-# 
-# [exon_novel_hg19_30]
-# action=RunCommand(cmd=[
-# 	'vtools use genomicSuperDups',
-# 	'vtools select %(prefix)s_2 "genomicSuperDups.chr IS NULL"
-# 		-t "%(prefix)s_3" "Remove variants in duplicated regions."',
-# 	'vtools show table %(prefix)s_3 > ${CACHE_DIR}/%(prefix)s_3.info'],
-# 	output="${CACHE_DIR}/%(prefix)s_3.info")
-# comment=Remove variants in duplicated regions
-# 
-# [exon_novel_hg19_40]
-# action=RunCommand(cmd=[
-# 	'vtools use phastCons',
-# 	'vtools select %(prefix)s_3 "phastCons.chr IS NOT NULL"
-# 		-t "%(prefix)s_4" "Keep variants in conserved regions."',
-# 	'vtools show table %(prefix)s_4 > ${CACHE_DIR}/%(prefix)s_4.info'],
-# 	output="${CACHE_DIR}/%(prefix)s_4.info")
-# comment=Remove variants that are not in conserved regions
-# 
-# [exon_novel_hg19_50]
-# action=RunCommand(cmd=[
-# 	'vtools use refGene_exon',
-# 	'vtools select %(prefix)s_4 "refGene_exon.chr IS NOT NULL"
-# 		-t "%(dest_table)s" "Keep variants in exonic regions of UCSC ref seq genes"',
-# 	'vtools show table %(dest_table)s > ${CACHE_DIR}/%(dest_table)s.info'],
-# 	output="${CACHE_DIR}/%(dest_table)s.info")
-# comment=Remove variants not in exonic regions of UCSC ref seq genes and 
-#   create a variant table specified by parameter --dest_table (default to
-#   exon_novel_hg19).
-# 
-# [exon_novel_hg19_60]
-# action=RunCommand(cmd=[
-#     'vtools use dbNSFP',
-#     'vtools use phastConsElements',
-#     'vtools export %(dest_table)s --format csv --samples 1 
-#         --fields chr pos ref alt dbSNP.name refGene.name2
-#           dbNSFP.SIFT_score dbNSFP.Polyphen2_HDIV_score
-#           Polyphen2_HDIV_pred Polyphen2_HVAR_score Polyphen2_HVAR_pred
-#           phastConsElements.score dbSNP.func %(extra_export_fields)s
-#         --order_by chr pos 
-#         --header chr pos ref alt rsname Gene
-#           "SIFT score (<0.05 for damaging)" "Polyphen2 HDIV score"
-#           "Polyphen2 HDIV prediction"  "Polyphen2 HVAR score"  "Polyphen2 HVAR prediction"
-#           "phastCons score" "dbSNP func code" %(extra_export_fields)s "%%(sample_names)s"
-#         > ${CMD_OUTPUT} '
-#     ],
-#     output="${CMD_OUTPUT}")
-# input_emitter=EmitInput(select=${CMD_OUTPUT: bool(CMD_OUTPUT)})
-# comment=Output selected variants in csv format
-# 
-# 

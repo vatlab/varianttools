@@ -63,21 +63,25 @@ except (ImportError, ValueError) as e:
 
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
-def projInfo(table=None, format='{name:20s}:\t{num:20s}({desc})'):
+def projInfo(tables=[], format='{name:20}: {num:12} ({desc})'):
     '''Obtain information about a table and output it according to 
     a format string (using python string format syntax for a dictionary).
     The table description contains keys name, num, date, cmd, and desc.
     '''
     try:
         with Project(verbosity='0') as proj:
-            if table is not None:
+            if isinstance(tables, str):
+                tables = [tables]
+            res = []
+            for table in tables:
                 table_name = encodeTableName(table)
                 desc, date, cmd = proj.descriptionOfTable(table_name)
-                return format.format(name=table, 
+                res.append(format.format(name=table, 
                     num=proj.db.numOfRows(table_name),
-                    desc=desc, date=date, cmd=cmd)
+                    desc=desc, date=date, cmd=cmd))
+            return r'\n'.join(res)
     except Exception as e:
-        #env.logger.warning('Function projInfo failed: {}'.format(e))
+        env.logger.debug('projInfo({},{}) failed: {}'.format(tables, format, e))
         return ''
 
 class EmitInput:
@@ -857,9 +861,9 @@ class RunCommand:
         if not cmd:
             self.cmd = ['echo "None command executed."']
         elif type(cmd) == str:
-            self.cmd = [' '.join(cmd.split())]
+            self.cmd = [' '.join(cmd.split('\n'))]
         else:
-            self.cmd = [' '.join(x.split()) for x in cmd]
+            self.cmd = [' '.join(x.split('\n')) for x in cmd]
         self.max_jobs = max_jobs
         self.working_dir = working_dir
         if type(output) == str:
