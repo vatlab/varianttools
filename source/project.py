@@ -3464,15 +3464,17 @@ def init(args):
                             # we might not be able to remove files...
                             raise OSError('Failed to remove existing project {}'.format(f))
         #
+        temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
             if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
                 # directly create a project from snapshot
                 parent_path = '.'
             else:
-                parent_path = os.path.join(env.cache_dir, 'P0')
+                parent_path = os.path.join(env.cache_dir, '_SNAPSHOT_0')
                 if os.path.isdir(parent_path):
                     shutil.rmtree(parent_path)
                 os.makedirs(parent_path)
+                temp_dirs.append(parent_path)
             # in case args.parent is a relative path
             if os.path.isfile(args.parent):
                 parent_snapshot = os.path.abspath(args.parent)
@@ -3501,10 +3503,11 @@ def init(args):
                     if len(args.children) == 1:
                         child_path = '.'
                     else:
-                        child_path = os.path.join(env.cache_dir, 'P{}'.format(idx))
+                        child_path = os.path.join(env.cache_dir, '_SNAPSHOT_{}'.format(idx))
                         if os.path.isdir(child_path):
                             shutil.rmtree(child_path)
                         os.makedirs(child_path)
+                        temp_dirs.append(child_path)
                     # in case child is a relative path
                     if os.path.isfile(child):
                         child_snapshot = os.path.abspath(child)
@@ -3540,6 +3543,12 @@ def init(args):
                 # do not improve effiency
                 merger = ProjectsMerger(proj, args.children, 4)
                 merger.merge()
+        # clean up directories created from snapshots
+        for temp_dir in temp_dirs:
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
