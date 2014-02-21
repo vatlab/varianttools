@@ -331,6 +331,27 @@ class SequentialActions:
         # return the output of the last action
         return ifiles
 
+class OutputText:
+    '''Write its input to standard output, or a file if a filename is specified.
+    The text can be a list of strings. A new line is added automatically to
+    each line of the text.
+    '''
+    def __init__(self, text='', filename=None, mode='a'):
+        if not isinstance(text, str):
+            self.text = ''.join([str(x) + '\n' for x in text])
+        else:
+            self.text = text + '\n'
+        self.filename = filename
+        self.mode = mode
+
+    def __call__(self, ifiles, pipeline=None):
+        if self.filename is not None:
+            with open(self.filename, self.mode) as output:
+                output.write(self.text)
+        else:
+            sys.stdout.write(self.text)        
+        return ifiles
+
 class CheckCommands:
     '''Check the existence of specified commands and raise an error if one of
     the commands does not exist.'''

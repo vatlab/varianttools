@@ -24,10 +24,8 @@ denovo_description=This pipeline identifies de novo mutations from a
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
   up to you to select variants based on these membership tables using the
-  'vtools compare' command. Two optional output files are allowed. The first
-  one is a log file to which a summary report will be appended. The project
-  will be saved to a snapshot if a name (or filename with extension .tar or
-  .tar.gz) is specified as the second output.
+  'vtools compare' command.  The project will be saved to a snapshot if a
+  name (or filename with extension .tar or .tar.gz) is specified as the output.
 
 recessive_description=This pipeline identifies recessive mutations from a
   family of unaffected parents, affected offspring, and optional unaffected
@@ -49,33 +47,12 @@ recessive_description=This pipeline identifies recessive mutations from a
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
   up to you to select variants based on these membership tables using the
-  'vtools compare' command.  Two optional output files are allowed. The first
-  one is a log file to which a summary report will be appended. The project
+  'vtools compare' command.  Two optional output files are allowed. The project
   will be saved to a snapshot if a name (or filename with extension .tar or
-  .tar.gz) is specified as the second output.
+  .tar.gz) is specified as the output.
   
 
-# exon_novel_hg19_description=This pipeline 1) removes all variants from the
-#   thousand genomes project,
-#   2) removes variants that are in duplicated regions, 3) removes variants that
-#   are not in phastCons46ways conserved regions, and 4) removes variants that are
-#   not in exonic regions of UCSC ref genes. The source and result variant tables
-#   can be specified by parameters --source_table and --dest_table. The pipeline
-#   can be applied to the existing project (no --input is required), or a snapshot
-#   (provided to --input, project in the current folder will be overwritten). If
-#   an output file is specified, variants will be exported in csv format, with 
-#   annotation fields refGene.name2 (gene name), dbSNP name and function estimate,
-#   SIFT and PolyPhen2 scores and prediction, phastCons scores for highly conserved
-#   regions (phastConsElements), and all sample genotypes (0 for wildtype, 1 for
-#   heterozygote, 2 for homozygote). Additional fields such as quality
-#   score could be specified via option --extra_export_fields 
-# 
-# 
-# #cancer_gene_description=This pipeline selects variants in genes listed in
-# #  cancer gene census 
-# 
 [DEFAULT]
-
 samples=
 samples_comment=Name of samples for parents, offspring (proband), and sibling
   for the denovo and recessive pipelines.
@@ -163,32 +140,28 @@ comment=Create variant tables according to their membership in different annotat
 
 [denovo_100]
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
-action=RunCommand(cmd=[
-    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'SUMMARY: Identification of de novo variants for family %(name)s\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
-    ("${SIBLING} (unaffected sibling)\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}\n" if '${SIBLING}' else "\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
-    r"printf '\nNumber of variants:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    ] + [
-    r"printf '\nde novo variants:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_by_site'])}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Database membership:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    ] + 
-    [ r'''printf '${:projInfo(tables=["%(name)s_denovo_in_%%s"  %% x
-        for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
-    )}\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}''' ]
+action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT}" 
+  "snapshot after identification of de novo variants for family %(name)s" ''')
+comment=Save the project to a snapshot if an output is specified.
+
+[denovo_200]
+action=OutputText(text=[
+    "SUMMARY: Identification of de novo variants for family %(name)s",
+    "",
+    "Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + ("${SIBLING} (unaffected sibling)" if '${SIBLING}' else ""),
+    "",
+    "Number of variants:",
+    "${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}",
+    "",
+    "de novo variants:",
+    "${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_by_site'])}",
+    "",
+    "Database membership:",
+    "${:projInfo(tables=["%(name)s_denovo_in_%%s"  %% x for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]])}",
+    "",
   )
 comment=Summarize the results.
 
-
-[denovo_200]
-input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>1})
-action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT:CMD_OUTPUT[1]}" 
-  "snapshot after identification of de novo variants for family %(name)s" ''')
-comment=Save the project to a snapshot if an output is specified.
 
 
 [recessive_0]
@@ -249,30 +222,26 @@ comment=Create variant tables according to their membership in different annotat
 
 [recessive_100]
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
-action=RunCommand(cmd=[
-    r"printf '\n'>> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'SUMMARY: Identification of recessive variants for family %(name)s\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + 
-    ("${SIBLING} (unaffected sibling)\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}\n" if '${SIBLING}' else "\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}"),
-    r"printf '\nNumber of variants:\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    ] + [
-    r"printf '\nRecessive variants:\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '${:projInfo(tables='%(name)s_recessive')}\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf '\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    r"printf 'Database membership:\n' >> ${CMD_OUTPUT: CMD_OUTPUT[0]}",
-    ] + 
-    [ r'''printf '${:projInfo(tables=["%(name)s_recessive_in_%%s"  %% x
-        for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]]
-    )}\n'  >> ${CMD_OUTPUT: CMD_OUTPUT[0]}''' ]
-  )
-comment=Summarize the results.
-
-[recessive_200]
-input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>1})
-action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT:CMD_OUTPUT[1]}"
+action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT}"
     "snapshot after identification of recessive variants for family %(name)s" ''')
 comment=Save the project to a snapshot if an output is specified.
+
+[recessive_200]
+action=OutputText(text=[
+    "SUMMARY: Identification of recessive variants for family %(name)s",
+    "",
+    "Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + ("${SIBLING} (unaffected sibling)" if '${SIBLING}' else ""),
+    "",
+    "Number of variants:",
+    "${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}",
+    "",
+    "Recessive variants:",
+    "${:projInfo(tables='%(name)s_recessive')}",
+    "",
+    "Database membership:",
+    "${:projInfo(tables=["%(name)s_recessive_in_%%s"  %% x for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]])}",
+    ""
+  )
+comment=Summarize the results.
 
 
