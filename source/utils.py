@@ -863,6 +863,13 @@ try:
 except ImportError:
     pass
 
+def getTermWidth():
+    try:
+        h, w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0' * 8))[:2]
+        return w
+    except:
+        return 79
+
 class ProgressBar:
     '''A text-based progress bar, it differs from regular progress bar in that
     1. it can start from the middle with init count
@@ -907,11 +914,7 @@ class ProgressBar:
 
     def handle_resize(self, signum=None, frame=None):
         'Tries to catch resize signals sent from the terminal.'
-        try:
-            h, w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0' * 8))[:2]
-            self.term_width = w
-        except:
-            self.term_width = 79
+        self.term_width = getTermWidth()
         
     def reset(self, msg='', totalCount = None):
         if msg:

@@ -55,7 +55,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
-    getVariantsOnChromosomeY
+    getVariantsOnChromosomeY, getTermWidth
 
 
 
@@ -267,12 +267,13 @@ class AnnoDB:
 
     def describe(self, verbose=False):
         '''Describe this annotation database'''
+        textWidth = max(60, getTermWidth())
         print('Annotation database {} {}'.format(self.name, '(version {})'
             .format(self.version) if self.version else ''))
         if self.description is not None:
             print('\n'.join(textwrap.wrap(
                 '{:<23} {}'.format('Description:', self.description),
-                subsequent_indent=' '*2, width=78)))
+                subsequent_indent=' '*2, width=textWidth)))
         print('{:<23} {}'.format('Database type:', self.anno_type))
         # get linking fields
         if verbose:
@@ -305,7 +306,7 @@ class AnnoDB:
             if not verbose:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(field.name, field.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
             else:
                 print('\nField:                  {}'.format(field.name))
                 numeric = False
@@ -325,7 +326,7 @@ class AnnoDB:
                 if field.comment:
                     print('\n'.join(textwrap.wrap(
                         '{:<23} {}'.format('Comment:', field.comment),
-                        width=78, subsequent_indent=' '*24)))
+                        width=textWidth, subsequent_indent=' '*24)))
                 cur.execute('SELECT missing_entries FROM {0}_field WHERE name="{1}";'
                     .format(self.name, field.name))
                 missing = cur.fetchone()[0]
@@ -571,8 +572,9 @@ class fileFMT:
             self.columns.append(col)
 
     def describe(self):
+        textWidth = max(60, getTermWidth())
         if self.description is not None:
-            print('\n'.join(textwrap.wrap(self.description, width=78)))
+            print('\n'.join(textwrap.wrap(self.description, width=textWidth)))
         #
         if self.preprocessor is not None:
             print('Preprocessor: {}'.format(self.preprocessor))
@@ -582,7 +584,7 @@ class fileFMT:
             for col in self.columns:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(col.index, col.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
             if self.formatter:
                 print('Formatters are provided for fields: {}'.format(', '.join(self.formatter.keys())))
         else:
@@ -593,37 +595,37 @@ class fileFMT:
         for fld in self.fields[self.ranges[0]:self.ranges[1]]:
             print('\n'.join(textwrap.wrap(
                 '  {:<21} {}'.format(fld.name, fld.comment),
-                subsequent_indent=' '*24, width=78)))
+                subsequent_indent=' '*24, width=textWidth)))
         if self.ranges[1] != self.ranges[2]:
             print('\nVariant info:')
             for fld in self.fields[self.ranges[1]:self.ranges[2]]:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(fld.name, fld.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
         if self.ranges[2] != self.ranges[3]:
             print('\nGenotype:')
             for fld in self.fields[self.ranges[2]:self.ranges[3]]:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(fld.name, fld.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
         if self.ranges[3] != self.ranges[4]:
             print('\nGenotype info:')
             for fld in self.fields[self.ranges[3]:self.ranges[4]]:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(fld.name, fld.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
         if self.other_fields:
             print('\nOther fields (usable through parameters):')
             for fld in self.other_fields:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {}'.format(fld.name, fld.comment),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
         if self.parameters:
             print('\nFormat parameters:')
             for item in self.parameters:
                 print('\n'.join(textwrap.wrap(
                     '  {:<21} {} (default: {})'.format(item[0], item[2], item[1]),
-                    subsequent_indent=' '*24, width=78)))
+                    subsequent_indent=' '*24, width=textWidth)))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
@@ -758,20 +760,21 @@ class PipelineDescription:
                         .format(pname, idx + 1))
      
     def describe(self):
+        textWidth = max(60, getTermWidth())
         if self.description is not None:
-            print('\n'.join(textwrap.wrap(self.description, width=78)))
+            print('\n'.join(textwrap.wrap(self.description, width=textWidth)))
         #
         text = 'Available pipelines: {}'.format(', '.join(sorted(self.pipelines.keys())))
-        print('\n' + '\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*8)))
+        print('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8)))
         for pname, pipeline in sorted(self.pipelines.items()):
             print('\n' + '\n'.join(textwrap.wrap('Pipeline "{}":  {}'
                 .format(pname, self.pipeline_descriptions[pname.lower()]),
-                width=78)))
+                width=textWidth)))
             for idx, step in enumerate(pipeline):
                 # hide a step if there is no comment
                 if step.comment:
                     text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
-                    print('\n'.join(textwrap.wrap(text, width=78, subsequent_indent=' '*22)))
+                    print('\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*22)))
         #
         if self.parameters:
             print('\nPipeline parameters:')
@@ -3741,6 +3744,8 @@ def show(args):
             #
             limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
             omitted = '({} records omitted)'
+            # if it is too narrow, wrap it. If it is wide, make use of full term width
+            textWidth = max(60, getTermWidth())
             if args.type == 'project':
                 print(proj.summarize())
             elif args.type == 'tables':
@@ -3762,7 +3767,7 @@ def show(args):
                         print('\n'.join(textwrap.wrap(
                             ('{:<' + str(width+2) + '} {: >10,} {:>8} {}')
                             .format(decodeTableName(table), proj.db.numOfRows(table), date, desc),
-                            width=max(80, width+23+40), initial_indent='', subsequent_indent=' '*(width+23))))
+                            width=max(width+23+40, textWidth), initial_indent='', subsequent_indent=' '*(width+23))))
                 nAll = len(all_tables)
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -3782,16 +3787,16 @@ def show(args):
                 print('{:<23} {}'.format('Name:', decodeTableName(table)))
                 print('\n'.join(textwrap.wrap(
                     '{:<23} {}'.format('Description:', desc),
-                    width=78, subsequent_indent=' '*24)))
+                    width=textWidth, subsequent_indent=' '*24)))
                 print('{:<23} {}'.format('Creation date:', date))
                 print('\n'.join(textwrap.wrap(
                     '{:<23} {}'.format('Command:', cmd),
-                    width=78, subsequent_indent=' '*24)))
+                    width=textWidth, subsequent_indent=' '*24)))
                 # 
                 headers = proj.db.getHeaders(table)
                 print('\n'.join(textwrap.wrap(
                     '{:<23} {}'.format('Fields:', ', '.join(headers)),
-                    width=78, subsequent_indent=' '*24)))
+                    width=textWidth, subsequent_indent=' '*24)))
                 print('{:<23} {}'.format('Number of variants:',
                     proj.db.numOfRows(table)))
             elif args.type == 'samples':
@@ -3911,7 +3916,7 @@ def show(args):
                             print(annoDB[7:-4])
                         else:
                             text = '{:<23} {}'.format(annoDB[7:-4], prop[3])
-                            print('\n'.join(textwrap.wrap(text, width=78,
+                            print('\n'.join(textwrap.wrap(text, width=textWidth,
                                     subsequent_indent=' '*24)))
                         displayed += 1
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -3938,7 +3943,7 @@ def show(args):
                         print(fmt[7:-4])
                     else:
                         text = '{:<23} {}'.format(fmt[7:-4], prop[3])
-                        print('\n'.join(textwrap.wrap(text, width=78,
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
                             subsequent_indent=' '*24)))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
@@ -4000,7 +4005,7 @@ def show(args):
                     else:
                         print('\n'.join(textwrap.wrap(
                             '{:<23} {}'.format(test, '' if obj.__doc__ is None else obj.__doc__),
-                            subsequent_indent=' '*24, width=78)))
+                            subsequent_indent=' '*24, width=textWidth)))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'test':
@@ -4030,7 +4035,7 @@ def show(args):
                         val = str(getattr(env, '_' + opt))
                         print('{:<23} {} {}'.format(opt, val,
                             '(default)' if val == str(def_value) else '(default: {})'.format(def_value)))
-                        print('\n'.join(textwrap.wrap(description, width=78,
+                        print('\n'.join(textwrap.wrap(description, width=textWidth,
                             initial_indent=' '*24, subsequent_indent=' '*24)))
                 nAll = len(env.persistent_options)
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -4070,7 +4075,7 @@ def show(args):
                 print('{:<23} {} ({})'.format('Size:', sz, sizeExpr(sz)))
                 print('{:<23} {}'.format('Creation date:', date))
                 print('\n'.join(textwrap.wrap('{:<23} {}'.format('Description:',
-                    desc),  width=78, subsequent_indent=' '*24)))
+                    desc),  width=textWidth, subsequent_indent=' '*24)))
             elif args.type == 'snapshots':
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show snapshots"'.format(', '.join(args.items)))
@@ -4091,7 +4096,7 @@ def show(args):
                     else:
                         text = '{:<23} {} ({}, created: {})'.format(name, desc,
                             sizeExpr(sz), date)
-                        print('\n'.join(textwrap.wrap(text, width=78,
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
                             subsequent_indent=' '*24)))
                 #
                 nLocal = len(snapshots)
@@ -4110,7 +4115,7 @@ def show(args):
                     else:
                         text = '{:<23} {} ({}, online snapshot)'.format(ss[9:-7],
                             prop[3], sizeExpr(prop[0]))
-                        print('\n'.join(textwrap.wrap(text, width=78,
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
                             subsequent_indent=' '*24)))
                 nAll = nLocal + idx
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -4130,7 +4135,7 @@ def show(args):
                         print(pipeline[9:-9])
                     else:
                         text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
-                        print('\n'.join(textwrap.wrap(text, width=78,
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
                             subsequent_indent=' '*24)))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
