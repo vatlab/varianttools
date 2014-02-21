@@ -1486,6 +1486,7 @@ def decompressGzFile(filename, inplace=True, force=False):
         # if the decompressed file exists, and is newer than the .gz file, ignore
         if os.path.isfile(new_filename) \
             and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
+            and os.path.getsize(new_filename) > os.path.getsize(filename) \
             and not force:
             env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
             return new_filename
