@@ -12,12 +12,13 @@ denovo_description=This pipeline identifies de novo mutations from a
   siblings. It can be applied either to the current project (no --input is
   specified), or a snapshot (--input) for which the snapshot will be loaded
   and overwrite the existing project. The parameter --samples is required to
-  specify the name of samples in the order of parents, offspring (proband),
+  specify the name of samples in the order of offspring (proband), parents
   and sibling. Parameter --name is recommended to give all variant tables
   a prefix. This pipeline will produce tables $name_denovo (variants
   that are observed only in the proband), $name_denovo_by_site
   (variants that are observed in the proband with no variant in parents and
-  sibling at this site). And, depending on values of parameter
+  sibling at this site). A table $name_denovo_SNP will be created with all SNP markers
+  in table $name_denovo. And, depending on values of parameter
   --databases, it can produce tables $table_1kg for variants in 1000 genomes
   project, $table_dbSNP for variants in dbSNP project, and $table_refGene, 
   $table_refGene_exon, $table_ccdsGene, $table_ccdsGene_exon, $table_CancerGenomeCensus,
@@ -35,12 +36,13 @@ recessive_description=This pipeline identifies recessive mutations from a
   can be applied either to the current project (no --input is
   specified), or a snapshot (--input) for which the snapshot will be loaded
   and overwrite the existing project. The parameter --samples is required to
-  specify the name of samples in the order of parents, offspring (proband),
+  specify the name of samples in the order of offspring (proband), parents,
   and sibling. Parameter --name is recommended to give all variant tables
   a prefix. This pipeline will produce tables $name_recessive (variants
   that are observed only in the proband), $name_recessive_by_site
   (variants that are observed in the proband with no variant in parents and
-  sibling at this site). And, depending on values of parameter
+  sibling at this site). A table $name_denovo_SNP will be created with all SNP
+  markers in table $name_denovo. And, depending on values of parameter
   --databases, it can produce tables $table_1kg for variants in 1000 genomes
   project, $table_dbSNP for variants in dbSNP project, and $table_refGene, 
   $table_refGene_exon, $table_ccdsGene, $table_ccdsGene_exon, $table_CancerGenomeCensus,
@@ -100,19 +102,18 @@ comment=Select variants for each sample
 
 
 [denovo_15]
-action=RunCommand(cmd=[
-    'vtools use ' + x for x in '%(databases)s'.split(',')
-    ])
+action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
 comment=Import all annotation databases
 
 [denovo_20]
 action=RunCommand(cmd=[
-    '''vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" "%(name)s_${SIBLING}" 
-    --difference "%(name)s_denovo" "de novo variants for family %(name)s" '''
+    'vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" "%(name)s_${SIBLING}" 
+    --difference "%(name)s_denovo" "de novo variants for family %(name)s" '
     if '${SIBLING}' else
-    '''vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" 
-    --difference "%(name)s_denovo" 
-    "de novo variants for family %(name)s " '''
+    'vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" 
+    --difference "%(name)s_denovo" "de novo variants for family %(name)s " ',
+    '''vtools select "%(name)s_denovo" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
+    --to_table "(name)s_denovo_SNP" "de novo SNP markers for family %(name)s" '''
     ])
 comment=Locate de novo variants of the proband
 
@@ -155,11 +156,11 @@ action=OutputText(text=[
     "${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}",
     "",
     "de novo variants:",
-    "${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_by_site'])}",
+    "${:projInfo(tables=['%(name)s_denovo', '%(name)s_denovo_SNP', '%(name)s_denovo_by_site'])}",
     "",
     "Database membership:",
     "${:projInfo(tables=["%(name)s_denovo_in_%%s"  %% x for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]])}",
-    "",
+    ""]
   )
 comment=Summarize the results.
 
@@ -195,23 +196,21 @@ comment=Count the number of heterozygotes in parents, number of homozygotes in p
     his or her sibling, if available.
 
 [recessive_15]
-action=RunCommand(cmd=[
-    'vtools use ' + x for x in '%(databases)s'.split(',')
-    ])
+action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
 comment=Import all annotation databases
-
 
 [recessive_20]
 action=RunCommand(cmd=[
-    '''vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" "%(name)s_sib_hom=0" 
-        --to_table "%(name)s_recessive" "Recessive variants (homozygous in proband, heterozygous or wildtype in parents and sibling)" '''
+    'vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" "%(name)s_sib_hom=0" 
+        --to_table "%(name)s_recessive" "Recessive variants (homozygous in proband, heterozygous or wildtype in parents and sibling)" '
     if '${SIBLING}' else
-    '''vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" 
-        --to_table "%(name)s_recessive" "Recessive variants (homozygous in proband, heterozygous in parents)" '''
+    'vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" 
+        --to_table "%(name)s_recessive" "Recessive variants (homozygous in proband, heterozygous in parents)" ',
+    '''vtools select "%(name)s_recessive" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
+    --to_table "(name)s_recessive_SNP" "Recessive SNP markers for family %(name)s" '''
     ])
 comment=Locate recessive variants of the proband (homozygous only in proband)
   and save variants in table $name_recessive
-
 
 [recessive_50]
 action=RunCommand(cmd=[
@@ -237,11 +236,11 @@ action=OutputText(text=[
     "${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}",
     "",
     "Recessive variants:",
-    "${:projInfo(tables='%(name)s_recessive')}",
+    "${:projInfo(tables=['%(name)s_recessive', '%(name)s_recessive_SNP'])}",
     "",
     "Database membership:",
     "${:projInfo(tables=["%(name)s_recessive_in_%%s"  %% x for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]])}",
-    ""
+    ""]
   )
 comment=Summarize the results.
 

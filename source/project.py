@@ -784,7 +784,8 @@ class PipelineDescription:
                     (' '*(22-len(item[0])-2) if len(item[0])<20 else ' ') + \
                     (item[2] + ' ' if item[2] else '') + \
                     ('(default: {})'.format(item[1]) if item[1] else '')
-                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22)))
+                print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22,
+                    width=textWidth)))
         else:
             print('\nNo configurable parameter is defined for this format.\n')
 
