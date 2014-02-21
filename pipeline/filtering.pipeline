@@ -54,8 +54,9 @@ recessive_description=This pipeline identifies recessive mutations from a
 
 [DEFAULT]
 samples=
-samples_comment=Name of samples for parents, offspring (proband), and sibling
-  for the denovo and recessive pipelines.
+samples_comment=Name of samples for proband (affected offspring), his or her
+  parents (unaffected) and sibling (unaffected, if available) for the denovo
+  and recessive pipelines.
 
 name=family
 name_comment=Name of the family. All generated tables will be prefixed with
@@ -73,10 +74,10 @@ action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
    existing project.
 
-PAR1=${:"%(samples)s".split(',')[0]}
-PAR2=${:'%(samples)s'.split(',')[1]}
-PROBAND=${:'%(samples)s'.split(',')[2]}
-SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split())>3 else ''}
+PROBAND=${:'%(samples)s'.split(',')[0]}
+PAR1=${:"%(samples)s".split(',')[1]}
+PAR2=${:'%(samples)s'.split(',')[2]}
+SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split(','))>3 else ''}
 
 [denovo_5]
 action=CheckVariantToolsVersion('2.2.1')
