@@ -3468,7 +3468,7 @@ def init(args):
                 parent_path = os.path.join(env.cache_dir, 'P0')
                 if os.path.isdir(parent_path):
                     shutil.rmtree(parent_path)
-                os.mkdir(parent_path)
+                os.makedirs(parent_path)
             # in case args.parent is a relative path
             if os.path.isfile(args.parent):
                 parent_snapshot = os.path.abspath(args.parent)
@@ -3500,7 +3500,7 @@ def init(args):
                         child_path = os.path.join(env.cache_dir, 'P{}'.format(idx))
                         if os.path.isdir(child_path):
                             shutil.rmtree(child_path)
-                        os.mkdir(child_path)
+                        os.makedirs(child_path)
                     # in case child is a relative path
                     if os.path.isfile(child):
                         child_snapshot = os.path.abspath(child)
