@@ -3759,10 +3759,10 @@ def show(args):
                         print(decodeTableName(table))
                     else:
                         desc, date, cmd = proj.descriptionOfTable(table) 
-                        print(('{:<' + str(width+2) + '} {: >10,} {:>8} {}')
-                            .format(decodeTableName(table), proj.db.numOfRows(table), date, 
-                            '\n'.join(textwrap.wrap(desc, initial_indent='',
-                            subsequent_indent=' '*(width+23)))))
+                        print('\n'.join(textwrap.wrap(
+                            ('{:<' + str(width+2) + '} {: >10,} {:>8} {}')
+                            .format(decodeTableName(table), proj.db.numOfRows(table), date, desc),
+                            width=max(80, width+23+40), initial_indent='', subsequent_indent=' '*(width+23))))
                 nAll = len(all_tables)
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
