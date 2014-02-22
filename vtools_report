@@ -27,7 +27,6 @@
 import sys, os, shlex
 import argparse
 import subprocess
-import logging
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
      convertDoubleQuote, withinPseudoAutoRegion, encodeTableName
 from variant_tools.project import Project
@@ -38,19 +37,15 @@ else:
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, rbox, \
      resolvePlotFilename
 
+# save the command line that has been processed by the shell. It might not work as shown.
+env.command_line = 'vtools_report ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else repr(x) for x in sys.argv[1:]])
 #
 # These functions are utility functions used by all reports
 #
-def addVerbosityArg(parser):
-    parser.add_argument('-v', '--verbosity', default='1', choices=['0','1','2'],
+def addCommonArgs(parser):
+    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
         help='''Output error and warning (0), info (1) and debug (2) information
-            of vtools and vtools_report. Debug information are always recorded
-            in project and vtools_report log files.''')
-
-# global logger object, which will be set by getLogger() when the script
-# is executed. 
-verbosity = '1'
-logger = None
+            to standard output (default to 1).'''),
 
 def getoutput(cmd):
     if type(cmd) is str:
@@ -59,7 +54,7 @@ def getoutput(cmd):
     if True not in [x.startswith('-v') for x in cmd]:
         cmd.append('-v{}'.format(verbosity))
     # call vtools and return its output
-    logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
+    env.logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     return subprocess.check_output(cmd, env=OS_ENV).strip().decode()
@@ -69,7 +64,7 @@ def outputToFile(cmd, filename):
     if True not in [x.startswith('-v') for x in cmd]:
         cmd.append('-v{}'.format(verbosity))
     # call vtools and return its output
-    logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
+    env.logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
     # can be executed.
     with open(filename, 'w') as output:
@@ -79,29 +74,31 @@ def outputToFile(cmd, filename):
 # These functions call vtools to extract information that are needed by other
 # reports.
 #
-def getNumOfSamples():
-    logger.info('Getting number of samples')
-    return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
-
-def genotypeOfSample(proj, name, cond='GT != 0'):
+def genotypeOfSample(name=None, ID=None, cond='GT != 0'):
     '''return a list of genotypes for a sample with specified name '''
-    logger.info('Retrieving genotypes of sample {}'.format(name))
-    cur = proj.db.cursor()
-    cur.execute("SELECT sample_id FROM sample WHERE sample_name = '{}' "
-        .format(name))
-    IDs = cur.fetchall()
-    if len(IDs) == 0:
-        logger.error('No sample with name {} is identified'.format(name))
-        return None
-    elif len(IDs) > 1:
-        logger.error('{} does not identify a sample uniquely'.format(name))
-        return None
-    else:
-        ID = IDs[0][0]
-    #
-    cur.execute("SELECT variant_id, GT FROM {}_genotype.genotype_{} {}"
-        .format(proj.name, ID, 'WHERE {}'.format(cond) if cond else ''))
-    return {x[0]:x[1] for x in cur.fetchall()}
+    with Project(verbosity='1') as proj:
+        proj.db.attach('{}_genotype'.format(proj.name))
+        if name is not None:
+            env.logger.info('Retrieving genotypes of sample {}'.format(name))
+            cur = proj.db.cursor()
+            cur.execute("SELECT sample_id FROM sample WHERE sample_name = '{}' "
+                .format(name))
+            IDs = cur.fetchall()
+            if len(IDs) == 0:
+                env.logger.error('No sample with name {} is identified'.format(name))
+                return None
+            elif len(IDs) > 1:
+                env.logger.error('{} does not identify a sample uniquely'.format(name))
+                return None
+            else:
+                ID = IDs[0][0]
+        elif ID is None:
+            env.logger.error('Please specify either name or ID of sample')
+            return None
+        #
+        cur.execute("SELECT variant_id, GT FROM {}_genotype.genotype_{} {}"
+            .format(proj.name, ID, 'WHERE {}'.format(cond) if cond else ''))
+        return {x[0]:x[1] for x in cur.fetchall()}
 
 def getSamples(samples, group_by=[]):
     '''return a generator that returns samples group by group. To use this functions, call it like
@@ -316,33 +313,27 @@ def discordanceRate(args):
         # get list of variant for each sample
         rates = []
         treat_missing_as_wildtype = getoutput(['vtools', 'show', 'runtime_option', 'treat_missing_as_wildtype'])
-        # where_clause
+        # geno_condition
         if not args.genotypes and not args.variants:
-            where_clause = ''
+            geno_condition = ''
         else:
-            where_clause = []
+            geno_condition = []
             if args.genotypes:
-                where_clause.append(','.join(['({})'.format(x) for x in args.genotypes]))
+                geno_condition.append(','.join(['({})'.format(x) for x in args.genotypes]))
             if args.variants:
-                where_clause.append('variant_id in (select variant_id from {})'.format(args.variants))
-            where_clause = 'WHERE ' + ' AND '.join(where_clause)
+                geno_condition.append('variant_id in (select variant_id from {})'.format(args.variants))
+            geno_condition = ' AND '.join(geno_condition)
         for i, (id_i, name_i) in enumerate(zip(sample_ids, sample_names)):
             rates.append([0] * len(sample_ids))
             output_items = []
-            var_i = {}
-            for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_i, where_clause)]).split('\n'):
-                var, gt = line.split()
-                var_i[var] = gt
+            var_i = genotypeOfSample(ID=id_i, cond=geno_condition)
             for j, (id_j, name_j) in enumerate(zip(sample_ids, sample_names)):
                 if i > j:
                     output_items.append('{:.5f}'.format(float(rates[j][i][0]) / (rates[j][i][0] + rates[j][i][1])))
                 elif i == j:
                     output_items.append('0/{0}'.format(len(var_i)))
                 else:
-                    var_j = {}
-                    for line in getoutput(['vtools', 'execute', 'SELECT variant_id, GT FROM genotype.genotype_{} {}'.format(id_j, where_clause)]).split('\n'):
-                        var, gt = line.split()
-                        var_j[var] = gt
+                    var_j = genotypeOfSample(ID=id_j, cond=geno_condition)
                     if treat_missing_as_wildtype == 'False':
                         # find variant that exist in both samples
                         exist_in_both = [item for item in var_i.keys() if item in var_j]
@@ -444,7 +435,7 @@ def expandRegions(args):
                     except:
                         pass
                 if not regions:
-                    logger.error('No valid chromosomal region is identified for {}'.format(region)) 
+                    env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
     return regions
@@ -583,27 +574,26 @@ def inheritance(args):
     if (args.recessive and len(args.recessive) != numOff) or \
        (args.denovo and len(args.denovo) != numOff) or \
        (args.inconsistent and len(args.inconsistent) != numOff):
-        logger.error('Please specify name of a variant table for each of the {} offspring'.format(numOff))
-    with Project(verbosity='1') as proj:
-        proj.db.attach('{}_genotype'.format(proj.name))
-        # get genotypes for parents
-        par1 = genotypeOfSample(proj, args.samples[0])
-        if par1 is None:
+        env.logger.error('Please specify name of a variant table for each of the {} offspring'.format(numOff))
+    # get genotypes for parents
+    par1 = genotypeOfSample(args.samples[0])
+    if par1 is None:
+        return
+    par2 = genotypeOfSample(args.samples[1])
+    if par2 is None:
+        return
+    for idx, off in enumerate(args.samples[2:]):
+        geno = genotypeOfSample(off)
+        if geno is None:
             return
-        par2 = genotypeOfSample(proj, args.samples[1])
-        if par2 is None:
-            return
-        for idx, off in enumerate(args.samples[2:]):
-            geno = genotypeOfSample(proj, off)
-            if geno is None:
-                return
+        with Project(verbosity='1') as proj:
             if args.recessive:
                 # recessive (-1 means heterozygous for two alternative alleles)
                 par1_het = set([x for x,y in par1.items() if x in (1, -1)])
                 par2_het = set([x for x,y in par2.items() if x in (1, -1)])
                 off_hom = set([x for x,y in geno.items() if y==2])
                 off_recessive = off_hom & par1_het & par2_het
-                logger.info('Writing {} variants to table {}'.format(len(off_recessive), args.recessive[idx]))
+                env.logger.info('Writing {} variants to table {}'.format(len(off_recessive), args.recessive[idx]))
                 proj.createVariantTable(encodeTableName(args.recessive[idx]),
                     variants=sorted(off_recessive))
                 proj.describeTable(encodeTableName(args.recessive[idx]), 
@@ -611,7 +601,7 @@ def inheritance(args):
                         args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
             if args.denovo:
                 off_denovo = set([x for x in geno.keys() if x not in par1 and x not in par2])
-                logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
+                env.logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
                 proj.createVariantTable(encodeTableName(args.denovo[idx]),
                     variants=sorted(off_denovo))
                 proj.describeTable(encodeTableName(args.denovo[idx]), 
@@ -645,7 +635,7 @@ def inheritance(args):
                 case32 = set([x for x,y in par2.items() if y==2 and x not in geno])
                 case4 = set([x for x,y in par1.items() if y==2 and x in par2 and par2[x]==2 and (x in geno and geno[x] != 2)])
                 off_inconsistent = case1 | case2 | case31 | case32 | case4
-                logger.info('Writing {} variants to table {}'.format(len(off_inconsistent), args.inconsistent[idx]))
+                env.logger.info('Writing {} variants to table {}'.format(len(off_inconsistent), args.inconsistent[idx]))
                 proj.createVariantTable(encodeTableName(args.inconsistent[idx]),
                     variants=sorted(off_inconsistent))
                 proj.describeTable(encodeTableName(args.inconsistent[idx]), 
@@ -718,7 +708,7 @@ def plotFieldsArguments(parser):
     plotFieldsCommonArguments(parser)
     
 def plotFields(args):
-    logger.info('Gathering data for plot')
+    env.logger.info('Gathering data for plot')
     output = getoutput(['vtools', 'output', args.variants] + args.fields + ['--na', 'NA', '--header'])
     if args.hist is not None:
         fns = resolvePlotFilename(args.hist, args.fields)
@@ -742,7 +732,7 @@ def plotPhenoFieldsArguments(parser):
     plotFieldsCommonArguments(parser)
  
 def plotPhenoFields(args):
-    logger.info('Gathering data for plot')
+    env.logger.info('Gathering data for plot')
     sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
     output = getoutput('vtools phenotype --output ' + \
                        ' '.join(args.fields + sarg) + ' --na NA --header')
@@ -784,7 +774,7 @@ def plotGenoFields(args):
     # get data into dict
     for g, IDs, names in getSamples(args.samples):
         for id, name in zip(IDs, names):
-            logger.info('Gathering data from sample {}'.format(name))
+            env.logger.info('Gathering data from sample {}'.format(name))
             for field in args.fields:
                 values = getoutput(['vtools', 'execute',
                     'SELECT {} FROM genotype.genotype_{} {}'.format(field, id, where_clause)])
@@ -1032,7 +1022,7 @@ if __name__ == '__main__':
             commands requires a field that stores the sample count for each variant, which
             should be prepared using command 'vtools update table --from_stat "num=#(alt)"'.''')
     transRatioArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=transRatio)
     #
     # command avg_depth
@@ -1047,7 +1037,7 @@ if __name__ == '__main__':
             a field to store average depth of each variant, which should be prepared
             using command 'vtools update table --from_stat "num=#(alt)" "meanDP=avg(DP_geno)"'.''')
     avgDepthArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=avgDepth)
     #
     # command variant_stat
@@ -1063,7 +1053,7 @@ if __name__ == '__main__':
             each sample separately (e.g. --group_by filename sample_name, because those
             two fields in the sample table uniquely identify each sample.''')
     variantStatArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=variantStat)
     #
     # command discordance_rate
@@ -1079,7 +1069,7 @@ if __name__ == '__main__':
             which assumes that variants that do not appear in a sample (or filtered by
             quality score etc) are wildtype alleles.''')
     discordanceRateArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=discordanceRate)
     #
     # command inbreeding_coefficient
@@ -1091,7 +1081,7 @@ if __name__ == '__main__':
              For an individual F is estimated by F = 1 - #observed(HET) / #expected(HET).
              Tri-allelic loci, if identified, are excluded from calculation.''')
     inbreedingCoefArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=inbreedingCoef)
     #
     # command sequence
@@ -1099,7 +1089,7 @@ if __name__ == '__main__':
         help = '''Obtain DNA sequence in specified chromosomal region. This command by default 
             outputs nucleotide sequence at the reference genome.''')
     sequenceArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=sequence)
     #
     # command inheritance
@@ -1108,7 +1098,7 @@ if __name__ == '__main__':
             for each offspring, de novo and recessive variants, and variants
             that demonstrate Mendelian inconsistencies. ''')
     inheritanceArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=inheritance)
     #
     # command plot_fields
@@ -1117,7 +1107,7 @@ if __name__ == '__main__':
             It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
             to draw the plots. The output data and R script can be saved to disk and customied.''')
     plotFieldsArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=plotFields)
     # command plot_pheno_fields
     parser = subparsers.add_parser('plot_pheno_fields',
@@ -1125,7 +1115,7 @@ if __name__ == '__main__':
             It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
             to draw the plots. The output data and R script can be saved to disk and customied.''')
     plotPhenoFieldsArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=plotPhenoFields)
     #
     # command plot_geno_fields
@@ -1134,7 +1124,7 @@ if __name__ == '__main__':
             samples. It essentially calls 'vtools output $table $fields' and utilizes R (www.r-project.org)
             to draw the plots. The output data and R script can be saved to disk and customied.''')
     plotGenoFieldsArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=plotGenoFields)
     #
     # command plot_association
@@ -1143,20 +1133,17 @@ if __name__ == '__main__':
 		Input data should be in the format of the output from 'vtools associate' command
         and be piped to the program as stdardard input stream (stdin)''')
     parser = PlotAssociationOpt(parser).get()
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=plotAssociation)
     # command meta_analysis
     parser = subparsers.add_parser('meta_analysis',
         help = '''Meta analysis on multiple sets of association testing results.''')
     metaAnalysisArguments(parser)
-    addVerbosityArg(parser)
+    addCommonArgs(parser)
     parser.set_defaults(func=metaAnalysis)
     #
     # getting args
     args = master_parser.parse_args()
-    # setting global logger
-    verbosity = args.verbosity
-    logger = env.logger
     # calling the associated functions
     try:
         args.func(args)
