@@ -1901,7 +1901,23 @@ def javaXmxCheck(val):
             .format(size, ram))
 
 
-
+def isAnnoDB(annoDB):
+    '''Check if a .DB file is a valid annotation database'''
+    try:
+        db = DatabaseEngine()
+        db.connect(os.path.expanduser(annoDB))
+        filename = os.path.split(annoDB)[-1]
+        if '-' in filename:
+            name = filename.split('-')[0]
+        else:
+            name = os.path.splitext(filename)[0]
+        for table in [name, name + '_field', name + '_info']:
+            if not db.hasTable(table):
+                env.logger.warning('Skipping invalid annotation database {}. Missing table {}.'.format(annoDB, table))
+                return False
+        return True
+    except:
+        return False
 
 #
 #

@@ -38,7 +38,7 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
-    compressFile, SQL_KEYWORDS, extractField, env
+    compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB
 from .importer import LineProcessor, TextReader
 from .preprocessor import *
   
@@ -457,21 +457,29 @@ def use(args):
             if args.linked_name is not None and not args.linked_name.isalnum():
                 raise ValueError('Invalid alias to annotation database: {}'.format(args.linked_name))
             # try to get source.ann, source.DB, source.DB.gz or get source.ann from 
+            annoDB = None
             if os.path.isfile(args.source):
                 # if a local file?
                 s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source))
                 # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
                 annoDB = decompressGzFile(args.source, inplace=False)
                 del s
-            elif os.path.isfile(args.source + '.DB.gz'):
-                s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
-                annoDB = decompressGzFile(args.source + '.DB.gz', inplace=False)
-                del s
-            elif os.path.isfile(args.source + '.DB'):
-                annoDB = args.source + '.DB'
-            elif os.path.isfile(args.source + '.ann'):
-                annoDB = args.source + '.ann'
-            else:
+                if not isAnnoDB(annoDB):
+                    annoDB = None
+            if annoDB is None:
+                if os.path.isfile(args.source + '.DB.gz'):
+                    s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
+                    annoDB = decompressGzFile(args.source + '.DB.gz', inplace=False)
+                    if not isAnnoDB(annoDB):
+                        annoDB = None
+                    del s
+            if annoDB is None:
+                if os.path.isfile(args.source + '.DB') and isAnnoDB(args.source + '.DB'):
+                    annoDB = args.source + '.DB'
+            if annoDB is None:
+                if os.path.isfile(args.source + '.ann'):
+                    annoDB = args.source + '.ann'
+            if annoDB is None:
                 res = urlparse.urlsplit(args.source)
                 if not res.scheme:
                     args.source = 'annoDB/{}.ann'.format(args.source)
@@ -498,13 +506,13 @@ def use(args):
                     raise ValueError('Failed to locate configuration file {}'.format(annoDB))
             elif args.rebuild:
                 raise ValueError('Only an .ann file can be specified when option --rebuild is set')
-            elif annoDB.endswith('.DB'):
+            elif annoDB.endswith('.DB') and isAnnoDB(annoDB):
                 if os.path.isfile(annoDB):
                     return proj.useAnnoDB(AnnoDB(proj, annoDB, args.linked_by, args.anno_type, args.linked_fields, args.linked_name))
                 else:
                     raise ValueError('Failed to locate annotation database {}'.format(annoDB))
             else: # missing file extension?
-                if os.path.isfile(annoDB + '.DB'):
+                if os.path.isfile(annoDB + '.DB') and isAnnoDB(annoDB + '.DB'):
                     try:
                         return proj.useAnnoDB(AnnoDB(proj, annoDB + '.DB', args.linked_by, args.anno_type, args.linked_fields, args.linked_name))
                     except Exception as e:
