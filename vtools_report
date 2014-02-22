@@ -29,7 +29,8 @@ import argparse
 import subprocess
 import logging
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
-     convertDoubleQuote, withinPseudoAutoRegion
+     convertDoubleQuote, withinPseudoAutoRegion, encodeTableName
+from variant_tools.project import Project
 if sys.version_info.major == 2:
     from variant_tools.assoTests_py2 import calculateInbreedingCoef
 else:
@@ -81,6 +82,26 @@ def outputToFile(cmd, filename):
 def getNumOfSamples():
     logger.info('Getting number of samples')
     return int(getoutput(['vtools', 'execute', 'SELECT count(1) FROM sample']))
+
+def genotypeOfSample(proj, name, cond='GT != 0'):
+    '''return a list of genotypes for a sample with specified name '''
+    logger.info('Retrieving genotypes of sample {}'.format(name))
+    cur = proj.db.cursor()
+    cur.execute("SELECT sample_id FROM sample WHERE sample_name = '{}' "
+        .format(name))
+    IDs = cur.fetchall()
+    if len(IDs) == 0:
+        logger.error('No sample with name {} is identified'.format(name))
+        return None
+    elif len(IDs) > 1:
+        logger.error('{} does not identify a sample uniquely'.format(name))
+        return None
+    else:
+        ID = IDs[0][0]
+    #
+    cur.execute("SELECT variant_id, GT FROM {}_genotype.genotype_{} {}"
+        .format(proj.name, ID, 'WHERE {}'.format(cond) if cond else ''))
+    return {x[0]:x[1] for x in cur.fetchall()}
 
 def getSamples(samples, group_by=[]):
     '''return a generator that returns samples group by group. To use this functions, call it like
@@ -528,8 +549,75 @@ def inbreedingCoef(args):
         print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
 
 #
-# mendelian
+# inheritance
 #
+def inheritanceArguments(parser):
+    parser.add_argument('samples', nargs='+', 
+        help='''Names of samples to compare, in the order of parents and offspring.
+            Each sample name should identify a single sample.''')
+    parser.add_argument('--denovo', nargs='*',
+        help='''A list of tables to store denovo variants for each offspring.
+            DeNovo variants are defined as offspring variants that do not exist
+            in any of the parents, including the cases when the offspring have
+            different variants from what parents have at the same genomic 
+            locations.''')
+    parser.add_argument('--recessive', nargs='*',
+        help='''A list of tables to store recessive variants for each offspring.
+            Recessive variants are defined as variants that are homozygous in
+            offspring, and heterozygous in both parents.''')
+    parser.add_argument('--inconsistent', nargs='*',
+        help='''A list of tables to store variants for each offspring that
+            demonstrate mendelian inconsistencies, namely variants that are not
+            passed from parents to offspring in a Mendelian fashion. Examples
+            of inconsistent variants include de novo variants, homozygous variants
+            in offspring with only one parental carrier, wildtype offspring 
+            variants with a homozygous parent, heterozygous offspring variants 
+            with two homozygous parents, and more complicated cases when multiple
+            variants appear at the same sites.''')
+
+def inheritance(args):
+    # first check if the number of tables match the number of offspring
+    numOff = len(args.samples) - 2
+    if numOff == 0:
+        return
+    if (args.recessive and len(args.recessive) != numOff) or \
+       (args.denovo and len(args.denovo) != numOff) or \
+       (args.inconsistent and len(args.inconsistent) != numOff):
+        logger.error('Please specify name of a variant table for each of the {} offspring'.format(numOff))
+    with Project(verbosity='1') as proj:
+        proj.db.attach('{}_genotype'.format(proj.name))
+        # get genotypes for parents
+        par1 = genotypeOfSample(proj, args.samples[0])
+        if par1 is None:
+            return
+        par2 = genotypeOfSample(proj, args.samples[1])
+        if par2 is None:
+            return
+        for idx, off in enumerate(args.samples[2:]):
+            geno = genotypeOfSample(proj, off)
+            if geno is None:
+                return
+            if args.recessive:
+                # recessive (-1 means heterozygous for two alternative alleles)
+                par1_het = set([x for x,y in par1.items() if x in (1, -1)])
+                par2_het = set([x for x,y in par2.items() if x in (1, -1)])
+                off_hom = set([x for x,y in geno.items() if y==2])
+                off_recessive = off_hom & par1_het & par2_het
+                logger.info('Writing {} variants to table {}'.format(len(off_recessive), args.recessive[idx]))
+                proj.createVariantTable(encodeTableName(args.recessive[idx]),
+                    variants=sorted(off_recessive))
+                proj.describeTable(encodeTableName(args.recessive[idx]), 
+                    message='Recessive variants of sample {} with parents {} and {}'.format(
+                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+            if args.denovo:
+                off_denovo = set([x for x in geno.keys() if x not in par1 and x not in par2])
+                logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
+                proj.createVariantTable(encodeTableName(args.denovo[idx]),
+                    variants=sorted(off_denovo))
+                proj.describeTable(encodeTableName(args.denovo[idx]), 
+                    message='de novo variants of sample {} with parents {} and {}'.format(
+                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+            if args.inconsistent:
 #
 # If there is only one variant at a variant site
 # 
@@ -540,15 +628,30 @@ def inbreedingCoef(args):
 # 012 
 # 022 -> single parent yield homozygous offspring
 # 020
-# 120 -> homozygous parent yield wildtype offspring 
-# 220 
-# 221 -> double homozygous parents not yield homozygous offspring
+# 120 
+# 220 -> homozygous parent yield wildtype offspring 
+# 221 (or 22 -1)-> double homozygous parents not yield homozygous offspring
 #
 # where xyz are ordered parental (x,y) and offspring (z) genotypes.
 #
 # The situation is much more complicated when there are multiple variants
 # involved.
-#
+# 
+# there can be at most 6 variants at a site for 3 individuals.  Let us forget 
+# about these for now.
+                case1 = set([x for x in geno.keys() if x not in par1 and x not in par2])
+                case2 = set([x for x,y in geno.items() if y==2 and (x not in par1 or x not in par2)])
+                case31 = set([x for x,y in par1.items() if y==2 and x not in geno])
+                case32 = set([x for x,y in par2.items() if y==2 and x not in geno])
+                case4 = set([x for x,y in par1.items() if y==2 and x in par2 and par2[x]==2 and (x in geno and geno[x] != 2)])
+                off_inconsistent = case1 | case2 | case31 | case32 | case4
+                logger.info('Writing {} variants to table {}'.format(len(off_inconsistent), args.inconsistent[idx]))
+                proj.createVariantTable(encodeTableName(args.inconsistent[idx]),
+                    variants=sorted(off_inconsistent))
+                proj.describeTable(encodeTableName(args.inconsistent[idx]), 
+                    message='Mendelian inconsistent variants of sample {} with parents {} and {}'.format(
+                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+
 
 #
 # command plot_fields
@@ -995,13 +1098,18 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('sequence',
         help = '''Obtain DNA sequence in specified chromosomal region. This command by default 
             outputs nucleotide sequence at the reference genome.''')
-        #If a variant table is
-        #    given, it will attempt to generate a sequence with alternative alleles, using
-        #    IUB/IUPAC amino acid code. A warning message will be given if there are multiple
-        #    such sequences due to multiple alternative alleles at certain loci.''')
     sequenceArguments(parser)
     addVerbosityArg(parser)
     parser.set_defaults(func=sequence)
+    #
+    # command inheritance
+    parser = subparsers.add_parser('inheritance',
+        help = '''Given names of parents and offspring, this command locates,
+            for each offspring, de novo and recessive variants, and variants
+            that demonstrate Mendelian inconsistencies. ''')
+    inheritanceArguments(parser)
+    addVerbosityArg(parser)
+    parser.set_defaults(func=inheritance)
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',
