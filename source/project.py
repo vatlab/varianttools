@@ -1577,14 +1577,24 @@ class Project:
             env.logger.debug(e)
         del s
 
-    def createVariantTable(self, table, temporary=False):
+    def createVariantTable(self, table, temporary=False, variants=[]):
         '''Create a variant table with name. Fail if a table already exists.
         '''
         if table == 'variant':
             raise ValueError('This function cannot be used to create a master variant table')
+        if self.db.hasTable(table):
+            new_table = self.db.backupTable(table)
+            env.logger.warning('Existing table {} is renamed to {}.'
+                .format(decodeTableName(table), decodeTableName(new_table)))
         self.db.execute('''CREATE {0} TABLE {1} (
                 variant_id INTEGER PRIMARY KEY
             );'''.format('TEMPORARY' if temporary else '', table))
+        if variants:
+            # this feature is used by vtools_report
+            cur = self.db.cursor()
+            # executemany expects a sequence of tuples
+            cur.executemany('INSERT INTO {} VALUES ({})'.format(
+                table, self.db.PH), ((x,) for x in variants))
         self.db.commit()
 
     def describeTable(self, table, message, save_date=False, save_cmd=False):

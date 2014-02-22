@@ -139,6 +139,8 @@ class RuntimeEnvironments(object):
                 'directory is usually downloaded automatically upon use, but can also be '
                 'synchronized directly from http://vtools.houstonbioinformatics.org/.')
         }
+        # a default value
+        self.command_line = ''
         # path to the project cache
         self._cache_dir = 'cache'
         #

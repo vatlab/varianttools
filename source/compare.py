@@ -372,10 +372,6 @@ def compareTables(proj, args):
         if len(table_with_desc) > 2:
             raise ValueError('Only a table name and an optional table '
                 'description is allowed: %s provided'.format(table_with_desc))
-        if proj.db.hasTable(encodeTableName(table)):
-            new_table = proj.db.backupTable(encodeTableName(table))
-            env.logger.warning('Existing table {} is renamed to {}.'
-                .format(table, decodeTableName(new_table)))
         proj.createVariantTable(encodeTableName(table))
         prog = ProgressBar('Writing to ' + table, len(var))
         query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)

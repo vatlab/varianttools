@@ -376,10 +376,6 @@ def select(args, reverse=False):
                 print(count)
             # case 2: to table
             elif args.to_table:
-                if proj.db.hasTable(encodeTableName(args.to_table)):
-                    new_table = proj.db.backupTable(encodeTableName(args.to_table))
-                    env.logger.warning('Existing table {} is renamed to {}.'.format(args.to_table, decodeTableName(new_table)))
-                #
                 proj.createVariantTable(encodeTableName(args.to_table))
                 proj.describeTable(encodeTableName(args.to_table), args.table_desc, True, True)
                 if not reverse:
