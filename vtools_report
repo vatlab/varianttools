@@ -528,6 +528,29 @@ def inbreedingCoef(args):
         print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
 
 #
+# mendelian
+#
+#
+# If there is only one variant at a variant site
+# 
+# Mendelian mismatch cases are:
+# 
+# 001
+# 002 -> de novo variant
+# 012 
+# 022 -> single parent yield homozygous offspring
+# 020
+# 120 -> homozygous parent yield wildtype offspring 
+# 220 
+# 221 -> double homozygous parents not yield homozygous offspring
+#
+# where xyz are ordered parental (x,y) and offspring (z) genotypes.
+#
+# The situation is much more complicated when there are multiple variants
+# involved.
+#
+
+#
 # command plot_fields
 #
 def plotFieldsCommonArguments(parser):
