@@ -2943,10 +2943,11 @@ class SampleProcessor(threading.Thread):
 
 
 class VariantCopier(threading.Thread):
-    def __init__(self, proj, projects, status):
+    def __init__(self, proj, projects, proj_names, status):
         self.proj = proj
         #
         self.projects = projects
+        self.proj_names = proj_names
         self.status = status
         threading.Thread.__init__(self, name='copy variants')
         # set it to daemon so that it will stop after the master thread is killed
@@ -2972,17 +2973,23 @@ class VariantCopier(threading.Thread):
             # create index on __fromDB
             cur = db.cursor()
             # copy table
-            for table in db.tables():
+            tables_to_copy = db.tables()
+            for table in tables_to_copy:
                 if table in ['sample', 'filename', 'project', '__id_map']:
                     continue
                 if not db.hasTable('__fromDB.{}'.format(table)):
                     continue
                 # copy the table over with (from ...) added to table name, in order
                 # to keep track of source of variants.
-                new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(os.path.basename(proj).split('.')[0]))
-                cur.execute('''CREATE TABLE {} (variant_id INTEGER PRIMARY KEY)'''.format(new_table))
-                env.logger.debug('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
-                cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
+                # find a new name
+                new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(
+                    self.proj_names[proj]))
+                if new_table in tables_to_copy:
+                    new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(proj[:-5]))
+                if new_table not in tables_to_copy:
+                    cur.execute('''CREATE TABLE {} (variant_id INTEGER PRIMARY KEY)'''.format(new_table))
+                    env.logger.debug('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
+                    cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
                 # 
                 # if ALL_THE_SAME:
                 # table variant:
@@ -3118,6 +3125,7 @@ class ProjectsMerger:
         self.jobs = jobs
         # valid projects
         self.projects = []
+        self.proj_names = {}
         # check if all subprojects have the same structure
         structure = {}
         # use the largest project as the first one
@@ -3178,9 +3186,23 @@ class ProjectsMerger:
             # copy table message and runtime options
             cur.execute('SELECT name, value FROM __fromDB.project;')
             for name, value in cur:
-                if name.startswith('__option_') or name.startswith('__desc_of_') or \
-                    name.startswith('__date_of_') or name.startswith('__cmd_of_'):
+                if name.startswith('__option_'):
                     self.proj.saveProperty(name, value)
+                elif name.startswith('__desc_of_') or \
+                    name.startswith('__date_of_') or name.startswith('__cmd_of_'):
+                    old_table = name.split('_', 4)[-1]
+                    new_table = encodeTableName(decodeTableName(old_table) + ' (from {})'.format(
+                        self.nameOfProject(proj_file)))
+                    if name.startswith('__desc_of_'):
+                        self.proj.saveProperty('_'.join(name.split('_', 4)[:4] + [new_table]),
+                            value + ' (from {})'.format(os.path.basename(proj_file)[:-5]))
+                        self.proj.saveProperty(name, value + ' (merged)')
+                    if name.startswith('__date_of_'):
+                        self.proj.saveProperty('_'.join(name.split('_', 4)[:4] + [new_table]), value)
+                        self.proj.saveProperty(name, time.strftime('%b%d', time.localtime()))
+                    if name.startswith('__cmd_of_'):
+                        self.proj.saveProperty('_'.join(name.split('_', 4)[:4] + [new_table]), value)
+                        self.proj.saveProperty(name, env.command_line)
             #
             # analyze and create project tables
             if idx == 0:
@@ -3227,6 +3249,17 @@ class ProjectsMerger:
                 .format(table, ', '.join([x[0] for x in structure[table]])))
             cur.execute('CREATE TABLE {} ({});'.format(table, ', '.join([' '.join(x) for x in structure[table]])))
        
+    def nameOfProject(self, proj_name):
+        '''Return a unique name of a project'''
+        if proj_name not in self.proj_names:
+            name = os.path.basename(proj_name)[:-5]
+            while name in self.proj_names.values():
+                name = name + '_'
+            self.proj_names[proj_name] = name
+        env.logger.error(self.proj_names)
+        return self.proj_names[proj_name]
+
+
     def mapSamples(self, status):
         '''Population filename and sample table, return id maps
         '''
@@ -3352,7 +3385,7 @@ class ProjectsMerger:
                     self.scQueue.put(proj)
             if status.canCopyVariants():
                 status.set('__copyVariants', 'scheduled', True)
-                VariantCopier(self.proj, self.projects, status).start()
+                VariantCopier(self.proj, self.projects, self.proj_names, status).start()
                 # stop all variant cachers
                 for j in range(nJobs):
                     self.vcQueue.put(None)
