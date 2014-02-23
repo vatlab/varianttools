@@ -2977,19 +2977,12 @@ class VariantCopier(threading.Thread):
                     continue
                 if not db.hasTable('__fromDB.{}'.format(table)):
                     continue
-                # get fields of table because source and destination might have different fields
-                fields = db.fieldsOfTable('__fromDB.{}'.format(table))
-                field_names = ', '.join([x[0] for x in fields])
-                #
                 # copy the table over with (from ...) added to table name, in order
                 # to keep track of source of variants.
                 new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(os.path.basename(proj).split('.')[0]))
-                query = 'CREATE TABLE {} ({})'.format(new_table, 
-                    ', '.join('{} {}'.format(x,y) for x,y in fields))
-                env.logger.debug('Copying {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
-                cur.execute(query)
-                cur.execute('''INSERT INTO {} SELECT * FROM __fromDB.{}'''.format(new_table, table))
-                #
+                cur.execute('''CREATE TABLE {} (variant_id INTEGER PRIMARY KEY)'''.format(new_table))
+                env.logger.debug('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
+                cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
                 # 
                 # if ALL_THE_SAME:
                 # table variant:
@@ -3002,6 +2995,10 @@ class VariantCopier(threading.Thread):
                 # 
                 # NOT ALL_THE_SAME:
                 #     copy from cache
+                #
+                # get fields of table because source and destination might have different fields
+                field_names = ', '.join([x[0] for x in db.fieldsOfTable('__fromDB.{}'.format(table))])
+                #
                 #
                 if identical_ids and (table != 'variant' or keep_all):
                     query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, field_names)
@@ -3895,9 +3892,9 @@ def show(args):
                     tfields = [field for field in proj.db.getHeaders(table) if field not in ('variant_id', 'bin', 'alt_bin')]
                     if tfields:
                         if args.verbosity == '0':
-                            print('\n'.join(['{}.{}'.format(table, field) for field in tfields]))
+                            print('\n'.join(['{}.{}'.format(decodeTableName(table), field) for field in tfields]))
                         else:
-                            print('\n'.join(['{}.{} {}'.format(table, field,
+                            print('\n'.join(['{}.{} {}'.format(decodeTableName(table), field,
                                 '\n'.join(textwrap.wrap(proj.descriptionOfField(field),
                                 initial_indent=' '*(27-len(table)-len(field)),
                                 subsequent_indent=' '*29))) for field in tfields]))
