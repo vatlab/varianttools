@@ -110,9 +110,9 @@ action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
    existing project.
 
-PROBAND=${:'%(samples)s'.split(',')[0]}
-PAR1=${:"%(samples)s".split(',')[1]}
-PAR2=${:'%(samples)s'.split(',')[2]}
+PAR1=${:"%(samples)s".split(',')[0]}
+PAR2=${:'%(samples)s'.split(',')[1]}
+PROBAND=${:'%(samples)s'.split(',')[2]}
 SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split(','))>3 else ''}
 
 [denovo_5]
@@ -121,6 +121,10 @@ comment=Check the version of variant tools (version 2.2.1 and above is required
     to execute this pipeline)
 
 [denovo_10]
+action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
+comment=Import all annotation databases
+
+[denovo_15]
 action=RunCommand(cmd=[
     '''vtools select variant --samples "sample_name = '${PAR1}'"
         --to_table "%(name)s_${PAR1}" "variants from sample ${PAR1}" ''' ,
@@ -135,10 +139,6 @@ action=RunCommand(cmd=[
 comment=Select variants for each sample
 
 
-[denovo_15]
-action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
-comment=Import all annotation databases
-
 [denovo_20]
 action=RunCommand(cmd=[
     'vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" "%(name)s_${SIBLING}" 
@@ -147,7 +147,7 @@ action=RunCommand(cmd=[
     'vtools compare "%(name)s_${PROBAND}" "%(name)s_${PAR1}" "%(name)s_${PAR2}" 
     --difference "%(name)s_denovo" "de novo variants for family %(name)s " ',
     '''vtools select "%(name)s_denovo" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
-    --to_table "(name)s_denovo_SNP" "de novo SNP markers for family %(name)s" '''
+    --to_table "%(name)s_denovo_SNP" "de novo SNP markers for family %(name)s" '''
     ])
 comment=Locate de novo variants of the proband
 
@@ -212,7 +212,7 @@ comment=Load specified snapshot if a snapshot is specified. Otherwise use the
 PAR1=${:"%(samples)s".split(',')[0]}
 PAR2=${:'%(samples)s'.split(',')[1]}
 PROBAND=${:'%(samples)s'.split(',')[2]}
-SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split())>3 else ''}
+SIBLING=${:'%(samples)s'.split(',')[3] if len('%(samples)s'.split(','))>3 else ''}
 
 [recessive_5]
 action=CheckVariantToolsVersion('2.2.1')
@@ -220,6 +220,10 @@ comment=Check the version of variant tools (version 2.2.1 and above is required
     to execute this pipeline)
 
 [recessive_10]
+action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
+comment=Import all annotation databases
+
+[recessive_15]
 action=RunCommand(cmd=[
     '''vtools update variant --from_stat "%(name)s_par_het=#(het)" --samples "sample_name in ('${PAR1}', '${PAR2}')" ''',
     '''vtools update variant --from_stat "%(name)s_proband_hom=#(hom)" --samples "sample_name = '${PROBAND}'" ''']
@@ -229,10 +233,6 @@ action=RunCommand(cmd=[
 comment=Count the number of heterozygotes in parents, number of homozygotes in proband and
     his or her sibling, if available.
 
-[recessive_15]
-action=RunCommand(cmd=['vtools use ' + x for x in '%(databases)s'.split(',') ])
-comment=Import all annotation databases
-
 [recessive_20]
 action=RunCommand(cmd=[
     'vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" "%(name)s_sib_hom=0" 
@@ -241,7 +241,7 @@ action=RunCommand(cmd=[
     'vtools select variant "%(name)s_par_het=2" "%(name)s_proband_hom=1" 
         --to_table "%(name)s_recessive" "Recessive variants (homozygous in proband, heterozygous in parents)" ',
     '''vtools select "%(name)s_recessive" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
-    --to_table "(name)s_recessive_SNP" "Recessive SNP markers for family %(name)s" '''
+    --to_table "%(name)s_recessive_SNP" "Recessive SNP markers for family %(name)s" '''
     ])
 comment=Locate recessive variants of the proband (homozygous only in proband)
   and save variants in table $name_recessive
@@ -265,9 +265,6 @@ action=OutputText(text=[
     "SUMMARY: Identification of recessive variants for family %(name)s",
     "",
     "Members:\n${PAR1} ${PAR2} (unaffected parents), ${PROBAND} (affected offspring)" + ("${SIBLING} (unaffected sibling)" if '${SIBLING}' else ""),
-    "",
-    "Number of variants:",
-    "${:projInfo(tables=['%(name)s_${PAR1}', '%(name)s_${PAR2}', '%(name)s_${PROBAND}'] + (['%(name)s_${SIBLING}'] if '${SIBLING}' else []))}",
     "",
     "Recessive variants:",
     "${:projInfo(tables=['%(name)s_recessive', '%(name)s_recessive_SNP'])}",
