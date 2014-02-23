@@ -832,7 +832,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             env.logger.info('Adding variant info field {} with type {}'.format(field, fldtype))
             proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format('variant', field, fldtype))
             if defaultValue == 0:
-                proj.db.execute ('UPDATE {} SET {} = 0'.format('variant', field))              
+                proj.db.execute('UPDATE {} SET {} = 0'.format('variant', field))
         # add an description
         try:
             proj.describeField(field, 'Created from stat "{}" {}with type {} on {}'

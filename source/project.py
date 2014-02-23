@@ -2978,7 +2978,18 @@ class VariantCopier(threading.Thread):
                 if not db.hasTable('__fromDB.{}'.format(table)):
                     continue
                 # get fields of table because source and destination might have different fields
-                fields = [x[0] for x in db.fieldsOfTable('__fromDB.{}'.format(table))]
+                fields = db.fieldsOfTable('__fromDB.{}'.format(table))
+                field_names = ', '.join([x[0] for x in fields])
+                #
+                # copy the table over with (from ...) added to table name, in order
+                # to keep track of source of variants.
+                new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(os.path.basename(proj).split('.')[0]))
+                query = 'CREATE TABLE {} ({})'.format(new_table, 
+                    ', '.join('{} {}'.format(x,y) for x,y in fields))
+                env.logger.debug('Copying {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
+                cur.execute(query)
+                cur.execute('''INSERT INTO {} SELECT * FROM __fromDB.{}'''.format(new_table, table))
+                #
                 # 
                 # if ALL_THE_SAME:
                 # table variant:
@@ -2993,9 +3004,9 @@ class VariantCopier(threading.Thread):
                 #     copy from cache
                 #
                 if identical_ids and (table != 'variant' or keep_all):
-                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, ', '.join(fields))
+                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, field_names)
                 else:
-                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __cacheDB.{0};'''.format(table, ', '.join(fields))
+                    query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __cacheDB.{0};'''.format(table, field_names)
                 env.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
                     identical_ids, keep_all))
                 cur.execute(query)
