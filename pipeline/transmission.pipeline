@@ -5,7 +5,8 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=Pipelines to filter variants.
+description=Pipelines to detect different types of variants that are transmitted
+  from parents to offspring.
 
 denovo_description=This pipeline identifies de novo mutations from a
   family of unaffected parents, affected offspring, and optional unaffected
