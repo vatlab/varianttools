@@ -86,7 +86,7 @@ recessive_description=This pipeline identifies recessive mutations from a
 PAR1=${:"%(parents)s".split(',')[0]}
 PAR2=${:'%(parents)s'.split(',')[1]}
 PROBAND=${:'%(offspring)s'.split(',')[0]}
-SIBLING=${:'' if len('%(offspring)s'.split(','))>0 else '%(offspring)s'.split(',')[1]}
+SIBLING=${:'' if len('%(offspring)s'.split(','))==1 else '%(offspring)s'.split(',')[1]}
 
 
 
@@ -125,11 +125,11 @@ comment=Import all annotation databases
 
 [denovo_20]
 action=RunCommand(cmd=([
-    'vtools_report inherited --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" "${SIBLING}"
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" "${SIBLING}"
         --denovo "%(name)s_denovo_${PROBAND}" "%(name)s_denovo_${SIBLING}"',
     'vtools compare "%(name)s_denovo_${PROBAND}" "%(name)s_denovo_${SIBLING}" --difference  "%(name)s_denovo"' ]
     if '${SIBLING}' else [
-    'vtools_report inherited --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
         --denovo "%(name)s_denovo"']) + [
     '''vtools select "%(name)s_denovo" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
     --to_table "%(name)s_denovo_SNP" "Recessive SNP markers for family %(name)s" '''
@@ -191,11 +191,11 @@ comment=Import all annotation databases
 
 [recessive_20]
 action=RunCommand(cmd=([
-    'vtools_report inherited --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" "${SIBLING}"
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" "${SIBLING}"
         --recessive "%(name)s_recessive_${PROBAND}" "%(name)s_recessive_${SIBLING}"',
     'vtools compare "%(name)s_recessive_${PROBAND}" "%(name)s_recessive_${SIBLING}" --difference  "%(name)s_recessive"' ]
     if '${SIBLING}' else [
-    'vtools_report inherited --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
         --recessive "%(name)s_recessive"']) + [
     '''vtools select "%(name)s_recessive" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
     --to_table "%(name)s_recessive_SNP" "Recessive SNP markers for family %(name)s" '''

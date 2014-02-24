@@ -539,9 +539,9 @@ def inbreedingCoef(args):
         print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
 
 #
-# inherited
+# transmission
 #
-def inheritedArguments(parser):
+def transmissionArguments(parser):
     parser.add_argument('--parents', nargs=2, 
         help='''Names of parents, which should uniquely identify two samples.''')
     parser.add_argument('--offspring', nargs='+', 
@@ -566,7 +566,7 @@ def inheritedArguments(parser):
             with two homozygous parents, and more complicated cases when multiple
             variants appear at the same sites.''')
 
-def inherited(args):
+def transmission(args):
     # first check if the number of tables match the number of offspring
     numOff = len(args.offspring)
     if (args.recessive and len(args.recessive) != numOff) or \
@@ -1101,14 +1101,14 @@ if __name__ == '__main__':
     addCommonArgs(parser)
     parser.set_defaults(func=sequence)
     #
-    # command inherited
-    parser = subparsers.add_parser('inherited',
+    # command transmission
+    parser = subparsers.add_parser('transmission',
         help = '''Given names of parents and offspring, this command locates,
             for each offspring, de novo and recessive variants, and variants
             that demonstrate Mendelian inconsistencies. ''')
-    inheritedArguments(parser)
+    transmissionArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=inherited)
+    parser.set_defaults(func=transmission)
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',
