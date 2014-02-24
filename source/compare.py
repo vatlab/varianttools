@@ -29,7 +29,7 @@ import re
 import copy
 from argparse import SUPPRESS
 from .project import Project
-from .utils import ProgressBar, env, encodeTableName, decodeTableName
+from .utils import ProgressBar, env, encodeTableName, decodeTableName, matchName
 from collections import defaultdict
 
 def compareArguments(parser):
@@ -464,7 +464,7 @@ def compare(args):
                 if '?' in table or '*' in table:
                     match = False
                     for tbl in [decodeTableName(x) for x in allTables]:
-                        if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I):
+                        if matchName(table, tbl):
                             tables.append(tbl)
                             match = True
                     if not match:
@@ -477,6 +477,9 @@ def compare(args):
             for table in tables:
                 if not proj.isVariantTable(encodeTableName(table)):
                     raise ValueError('Variant table {} does not exist.'.format(table))
+            #
+            if len(tables) <= 1:
+                raise ValueError('No or only one table to compare')
             # set args.tables to its expanded version
             args.tables = tables
             #

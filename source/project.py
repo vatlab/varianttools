@@ -55,7 +55,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
-    getVariantsOnChromosomeY, getTermWidth
+    getVariantsOnChromosomeY, getTermWidth, matchName
 
 
 
@@ -3256,7 +3256,6 @@ class ProjectsMerger:
             while name in self.proj_names.values():
                 name = name + '_'
             self.proj_names[proj_name] = name
-        env.logger.error(self.proj_names)
         return self.proj_names[proj_name]
 
 
@@ -3639,7 +3638,7 @@ def remove(args):
                     if '?' in table or '*' in table:
                         matched = False
                         for tbl in [decodeTableName(x) for x in allTables]:
-                            if re.match(table.replace('?', '.{1}').replace('*', '.*'), tbl, re.I) and tbl not in removed:
+                            if matchName(table, tbl) and tbl not in removed:
                                 try:
                                     proj.removeVariantTable(encodeTableName(tbl))
                                 except Exception as e:

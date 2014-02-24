@@ -515,6 +515,13 @@ SQL_KEYWORDS = set([
 ])
 
 
+def matchName(pattern, name):
+    # 
+    for char in ('(', ')', '[', ']', '{', '}', '.', '+', '$', '|'):
+        pattern = pattern.replace(char, '\\' + char)
+    pattern = pattern.replace('?', '.{1}').replace('*', '.*')
+    return re.match(pattern, name, re.I)
+                                
 def validFieldName(name, reserved=[]):
     '''Return a valid field name from a name by converting non-alnum 
     characters with _, and add _ if the name starts with a number. If
