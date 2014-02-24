@@ -63,25 +63,48 @@ except (ImportError, ValueError) as e:
 
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
-def projInfo(tables=[], format='{name:20}: {num:12} ({desc})'):
-    '''Obtain information about a table and output it according to 
-    a format string (using python string format syntax for a dictionary).
-    The table description contains keys name, num, date, cmd, and desc.
+def projInfo(tables=[], samples=[], format_string=''):
+    '''Obtain information about one or more tables or samples and output 
+    them according to a format string (using python string format syntax for
+    a dictionary). The table description contains keys name, num, date,
+    cmd, and desc. The sample description contains keys name and num.
     '''
     try:
         with Project(verbosity='0') as proj:
-            if isinstance(tables, str):
-                tables = [tables]
             res = []
-            for table in tables:
-                table_name = encodeTableName(table)
-                desc, date, cmd = proj.descriptionOfTable(table_name)
-                res.append(format.format(name=table, 
-                    num=proj.db.numOfRows(table_name),
-                    desc=desc, date=date, cmd=cmd))
+            if tables:
+                if not format_string:
+                    format_string = '{name:20}: {num:12} ({desc})'
+                if isinstance(tables, str):
+                    tables = [tables]
+                for table in tables:
+                    table_name = encodeTableName(table)
+                    desc, date, cmd = proj.descriptionOfTable(table_name)
+                    res.append(format_string.format(name=table, 
+                        num=proj.db.numOfRows(table_name),
+                        desc=desc, date=date, cmd=cmd))
+            if samples:
+                proj.db.attach('{}_genotype'.format(proj.name))
+                cur = proj.db.cursor()
+                # get sample information
+                if not format_string:
+                    format_string = '{name:20}: {num:12}'
+                #
+                if isinstance(samples, str):
+                    samples = [samples]
+                for sample in samples:
+                    IDs = proj.selectSampleByPhenotype("sample_name = '{}'".format(sample))
+                    if len(IDs) == 0:
+                        raise ValueError('No sample with name {} is located'.format(sample))
+                    elif len(IDs) > 1:
+                        raise ValueError('Name {} matches multiple samples.'.format(sample))
+                    cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, IDs[0]))
+                    numGenotypes = cur.fetchone()[0] 
+                    res.append(format_string.format(name=sample,
+                        num=numGenotypes))
             return r'\n'.join(res)
     except Exception as e:
-        env.logger.debug('projInfo({},{}) failed: {}'.format(tables, format, e))
+        env.logger.debug('projInfo(tables={},samples={},format_string="{}") failed: {}'.format(tables, samples,format_string, e))
         return ''
 
 class EmitInput:

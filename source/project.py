@@ -3231,8 +3231,11 @@ class ProjectsMerger:
                         flds = self.db.fieldsOfTable('__fromDB.{}'.format(table))
                         for fld in flds:
                             if fld[0].lower() not in [x[0].lower() for x in structure[table]]:
-                                env.logger.warning('Field {} in table {} does not exist in all projects.'
-                                    .format(fld[0], table))
+                                # this warning is not useful because the first table (see abobe)
+                                # can have fields that do not exist in other projects.
+                                #
+                                #env.logger.warning('Field {} in table {} does not exist in all projects.'
+                                #    .format(fld[0], table))
                                 structure[table].append(fld)
             # we put the largest project the first to improve efficiency, because the
             # first project is effectively copied instead of merged.
@@ -3822,7 +3825,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'
                         .format(', '.join(args.items)))
                 all_tables = sorted(proj.getVariantTables(), key=lambda x: decodeTableName(x))
-                width = max([len(x) for x in all_tables])
+                width = max([len(decodeTableName(x)) for x in all_tables])
                 if args.verbosity != '0':
                     print(('{:<' + str(width+2) + '} {:>10} {:>8} {}')
                         .format('table', '#variants', 'date', 'message'))

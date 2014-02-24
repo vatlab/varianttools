@@ -79,7 +79,6 @@ def genotypeOfSample(name=None, ID=None, cond='GT != 0'):
     with Project(verbosity='1') as proj:
         proj.db.attach('{}_genotype'.format(proj.name))
         if name is not None:
-            env.logger.info('Retrieving genotypes of sample {}'.format(name))
             cur = proj.db.cursor()
             cur.execute("SELECT sample_id FROM sample WHERE sample_name = '{}' "
                 .format(name))
@@ -540,12 +539,13 @@ def inbreedingCoef(args):
         print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
 
 #
-# inheritance
+# inherited
 #
-def inheritanceArguments(parser):
-    parser.add_argument('samples', nargs='+', 
-        help='''Names of samples to compare, in the order of parents and offspring.
-            Each sample name should identify a single sample.''')
+def inheritedArguments(parser):
+    parser.add_argument('--parents', nargs=2, 
+        help='''Names of parents, which should uniquely identify two samples.''')
+    parser.add_argument('--offspring', nargs='+', 
+        help='''Names of one or more offspring samples.''')
     parser.add_argument('--denovo', nargs='*',
         help='''A list of tables to store denovo variants for each offspring.
             DeNovo variants are defined as offspring variants that do not exist
@@ -566,39 +566,48 @@ def inheritanceArguments(parser):
             with two homozygous parents, and more complicated cases when multiple
             variants appear at the same sites.''')
 
-def inheritance(args):
+def inherited(args):
     # first check if the number of tables match the number of offspring
-    numOff = len(args.samples) - 2
-    if numOff == 0:
-        return
+    numOff = len(args.offspring)
     if (args.recessive and len(args.recessive) != numOff) or \
        (args.denovo and len(args.denovo) != numOff) or \
        (args.inconsistent and len(args.inconsistent) != numOff):
         env.logger.error('Please specify name of a variant table for each of the {} offspring'.format(numOff))
+    if not (args.recessive or args.denovo or args.inconsistent):
+        return
     # get genotypes for parents
-    par1 = genotypeOfSample(args.samples[0])
+    par1 = genotypeOfSample(args.parents[0])
     if par1 is None:
         return
-    par2 = genotypeOfSample(args.samples[1])
+    env.logger.info('{} genotypes are located for parent {}'.format(len(par1), args.parents[0]))
+    par2 = genotypeOfSample(args.parents[1])
     if par2 is None:
         return
-    for idx, off in enumerate(args.samples[2:]):
+    env.logger.info('{} genotypes are located for parent {}'.format(len(par2), args.parents[1]))
+    for idx, off in enumerate(args.offspring):
         geno = genotypeOfSample(off)
         if geno is None:
             return
+        env.logger.info('{} genotypes are located for offspring {}'.format(len(geno), off))
         with Project(verbosity='1') as proj:
             if args.recessive:
                 # recessive (-1 means heterozygous for two alternative alleles)
-                par1_het = set([x for x,y in par1.items() if x in (1, -1)])
-                par2_het = set([x for x,y in par2.items() if x in (1, -1)])
+                par1_het = set([x for x,y in par1.items() if y in (1, -1)])
+                env.logger.info('{} heterozygous variants are found in parent {}'
+                    .format(len(par1_het), args.parents[0]))
+                par2_het = set([x for x,y in par2.items() if y in (1, -1)])
+                env.logger.info('{} heterozygous variants are found in parent {}'
+                    .format(len(par2_het), args.parents[1]))
                 off_hom = set([x for x,y in geno.items() if y==2])
+                env.logger.info('{} homozygous variants are found in offspring {}'
+                    .format(len(off_hom), off))
                 off_recessive = off_hom & par1_het & par2_het
                 env.logger.info('Writing {} variants to table {}'.format(len(off_recessive), args.recessive[idx]))
                 proj.createVariantTable(encodeTableName(args.recessive[idx]),
                     variants=sorted(off_recessive))
                 proj.describeTable(encodeTableName(args.recessive[idx]), 
                     message='Recessive variants of sample {} with parents {} and {}'.format(
-                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+                        off, args.parents[0], args.parents[1]), save_date=True)
             if args.denovo:
                 off_denovo = set([x for x in geno.keys() if x not in par1 and x not in par2])
                 env.logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
@@ -606,7 +615,7 @@ def inheritance(args):
                     variants=sorted(off_denovo))
                 proj.describeTable(encodeTableName(args.denovo[idx]), 
                     message='de novo variants of sample {} with parents {} and {}'.format(
-                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+                        off, args.parents[0], args.parents[1]), save_date=True)
             if args.inconsistent:
 #
 # If there is only one variant at a variant site
@@ -640,7 +649,7 @@ def inheritance(args):
                     variants=sorted(off_inconsistent))
                 proj.describeTable(encodeTableName(args.inconsistent[idx]), 
                     message='Mendelian inconsistent variants of sample {} with parents {} and {}'.format(
-                        args.samples[idx+2], args.samples[0], args.samples[1]), save_date=True)
+                        off, args.parents[0], args.parents[1]), save_date=True)
 
 
 #
@@ -1092,14 +1101,14 @@ if __name__ == '__main__':
     addCommonArgs(parser)
     parser.set_defaults(func=sequence)
     #
-    # command inheritance
-    parser = subparsers.add_parser('inheritance',
+    # command inherited
+    parser = subparsers.add_parser('inherited',
         help = '''Given names of parents and offspring, this command locates,
             for each offspring, de novo and recessive variants, and variants
             that demonstrate Mendelian inconsistencies. ''')
-    inheritanceArguments(parser)
+    inheritedArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=inheritance)
+    parser.set_defaults(func=inherited)
     #
     # command plot_fields
     parser = subparsers.add_parser('plot_fields',
