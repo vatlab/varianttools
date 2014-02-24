@@ -438,28 +438,6 @@ def compare(args):
             # expand wildcard characters in args.tables
             tables = []
             allTables = proj.getVariantTables()
-            # if an expression is given but no table is specified
-            # they will be extracted
-            if args.expression:
-                result_table, tables, new_expr = parseExpression(args.expression[0], args.tables)
-                if not args.tables:
-                    args.tables = tables
-                    env.logger.info('Comparing tables {}'.format(', '.join(args.tables)))
-                else:
-                    if any([x not in args.tables for x in tables]):
-                        raise ValueError('All tables in --expression must be '
-                            'listed if not using the default table list.')
-                if result_table is None:
-                    if len(args.expression) > 1:
-                        env.logger.warning('No table is created for expression {}'.format(args.expression[0]))
-                    args.expression = []
-                else:
-                    args.expression = [result_table, args.expression[1] if len(args.expression) > 1 else '']
-                args.eval_expr = new_expr
-            elif not args.tables:
-                raise ValueError('Please specify tables to compare.')
-            #
-            tables = []
             for table in args.tables:
                 if '?' in table or '*' in table:
                     match = False
@@ -473,15 +451,37 @@ def compare(args):
                             .format(table))
                 else:
                     tables.append(table)
+            # set args.tables to its expanded version
+            args.tables = tables
+            # 
+            # if an expression is given but no table is specified
+            # they will be extracted
+            if args.expression:
+                result_table, tables, new_expr = parseExpression(args.expression[0], args.tables)
+                if not args.tables:
+                    args.tables = tables
+                    env.logger.info('Comparing tables {}'.format(', '.join(args.tables)))
+                else:
+                    if any([x not in args.tables for x in tables]):
+                        raise ValueError('All tables in --expression must be '
+                            'listed if not using the default table list.')
+                if result_table is None:
+                    if len(args.expression) > 1:
+                        env.logger.warning('No table is created for expression {}, but a description is given'
+                            .format(args.expression[0]))
+                    args.expression = []
+                else:
+                    args.expression = [result_table, args.expression[1] if len(args.expression) > 1 else '']
+                args.eval_expr = new_expr
+            elif not args.tables:
+                raise ValueError('Please specify tables to compare.')
             # table?
-            for table in tables:
+            for table in args.tables:
                 if not proj.isVariantTable(encodeTableName(table)):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             #
-            if len(tables) <= 1:
+            if len(args.tables) <= 1:
                 raise ValueError('No or only one table to compare')
-            # set args.tables to its expanded version
-            args.tables = tables
             #
             # type of comparison
             if args.samples:
