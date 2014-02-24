@@ -2989,7 +2989,10 @@ class VariantCopier(threading.Thread):
                 if new_table not in tables_to_copy:
                     cur.execute('''CREATE TABLE {} (variant_id INTEGER PRIMARY KEY)'''.format(new_table))
                     env.logger.debug('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
-                    cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
+                    if identical_ids and (table != 'variant' or keep_all):
+                        cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
+                    else:
+                        cur.execute('''INSERT INTO {} SELECT variant_id FROM __cacheDB.{}'''.format(new_table, table))
                 # 
                 # if ALL_THE_SAME:
                 # table variant:
