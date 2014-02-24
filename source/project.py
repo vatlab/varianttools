@@ -3269,6 +3269,10 @@ class ProjectsMerger:
         filenames = []
         #
         duplicated_samples = 0
+        if '_merge_from' in self.db.getHeaders('sample'):
+            env.logger.warning('Existing phenotype _merge_from will be overriden')
+        else:
+            cur.execute('ALTER TABLE sample ADD _merge_from VARCHAR(255);')
         for proj in self.projects:
             self.db.attach(proj, '__proj')
             self.db.attach(proj.replace('.proj', '_genotype.DB'), '__geno')
@@ -3304,9 +3308,11 @@ class ProjectsMerger:
                 # fields (phenotypes)
                 headers = self.db.getHeaders('__proj.sample')
                 for sid in old_sid:
-                    cur.execute('''INSERT INTO sample ('file_id', {0}) SELECT {1}, {0} 
+                    cur.execute('''INSERT INTO sample ('file_id', '_merge_from', {0}) 
+                        SELECT {1}, '{2}', {0} 
                         FROM __proj.sample WHERE __proj.sample.sample_id = {1};'''\
-                        .format(', '.join(headers[2:]), self.db.PH), (new_file_id, sid))
+                        .format(', '.join(headers[2:]), self.db.PH,
+                        self.proj_names[proj]), (new_file_id, sid))
                     new_sid.append(cur.lastrowid)
                 #
                 old_sample_id.extend(old_sid)
