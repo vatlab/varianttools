@@ -52,7 +52,7 @@ def getoutput(cmd):
         cmd = shlex.split(cmd)
     # add -v option if unspecified
     if True not in [x.startswith('-v') for x in cmd]:
-        cmd.append('-v{}'.format(verbosity))
+        cmd.append('-v{}'.format(env.verbosity))
     # call vtools and return its output
     env.logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
@@ -62,7 +62,7 @@ def getoutput(cmd):
 def outputToFile(cmd, filename):
     # execute a command and send its output to a file
     if True not in [x.startswith('-v') for x in cmd]:
-        cmd.append('-v{}'.format(verbosity))
+        cmd.append('-v{}'.format(env.verbosity))
     # call vtools and return its output
     env.logger.debug('Running: ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else '"' + x.replace('"', '\"') + '"' for x in cmd]))
     # '.' is added to $PATH so that command (vtools) that is in the current directory
@@ -76,7 +76,7 @@ def outputToFile(cmd, filename):
 #
 def genotypeOfSample(name=None, ID=None, cond='GT != 0'):
     '''return a list of genotypes for a sample with specified name '''
-    with Project(verbosity='1') as proj:
+    with Project(verbosity=env.verbosity) as proj:
         proj.db.attach('{}_genotype'.format(proj.name))
         if name is not None:
             cur = proj.db.cursor()
@@ -589,7 +589,7 @@ def transmission(args):
         if geno is None:
             return
         env.logger.info('{} genotypes are located for offspring {}'.format(len(geno), off))
-        with Project(verbosity='1') as proj:
+        with Project(verbosity=env.verbosity) as proj:
             if args.recessive:
                 # recessive (-1 means heterozygous for two alternative alleles)
                 par1_het = set([x for x,y in par1.items() if y in (1, -1)])
@@ -1139,7 +1139,7 @@ if __name__ == '__main__':
     # command plot_association
     parser = subparsers.add_parser('plot_association',
         help = '''Generate QQ / Manhattan plots of p-values from association analysis.
-		Input data should be in the format of the output from 'vtools associate' command
+        Input data should be in the format of the output from 'vtools associate' command
         and be piped to the program as stdardard input stream (stdin)''')
     parser = PlotAssociationOpt(parser).get()
     addCommonArgs(parser)
@@ -1153,6 +1153,7 @@ if __name__ == '__main__':
     #
     # getting args
     args = master_parser.parse_args()
+    env.verbosity = args.verbosity
     # calling the associated functions
     try:
         args.func(args)

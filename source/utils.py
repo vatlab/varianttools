@@ -236,7 +236,8 @@ class RuntimeEnvironments(object):
     # attribute verbosity
     #
     def _set_verbosity(self, v):
-        self._verbosity = v
+        if v in ['0', '1', '2']:
+            self._verbosity = v
     #
     verbosity = property(lambda self: self._verbosity, _set_verbosity)
     #
