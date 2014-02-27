@@ -460,12 +460,19 @@ def use(args):
             annoDB = None
             if os.path.isfile(args.source):
                 # if a local file?
-                s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source))
-                # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
-                annoDB = decompressGzFile(args.source, inplace=False)
-                del s
-                if not isAnnoDB(annoDB):
-                    annoDB = None
+                if args.source.endswith('.ann'):
+                    annoDB = args.source
+                elif args.source.endswith('.DB.gz'):
+                    s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source))
+                    # do not remove local .gz file. Perhaps this is a script and we do not want to break that.
+                    annoDB = decompressGzFile(args.source, inplace=False)
+                    del s
+                    if not isAnnoDB(annoDB):
+                        annoDB = None
+                elif args.source.endswith('.DB'):
+                    annoDB = args.source
+                    if not isAnnoDB(annoDB):
+                        annoDB = None
             if annoDB is None:
                 if os.path.isfile(args.source + '.DB.gz'):
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))

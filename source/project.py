@@ -1101,6 +1101,7 @@ class Project:
         env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
         env.association_timeout = self.loadProperty('__option_association_timeout', None)
         env.logfile_verbosity = self.loadProperty('__option_logfile_verbosity', None)
+        env.term_width = self.loadProperty('__option_term_width', None)
         #env.check_update = self.loadProperty('__option_check_update', True)
         env.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
         if verbosity is None and not new:
@@ -4444,7 +4445,7 @@ def admin(args):
                     if '=' not in option:
                         raise ValueError('Runtime option should be specified as opt=value')
                     opt, value = option.split('=', 1)
-                    if opt not in env.persistent_options:
+                    if opt not in (env.persistent_options) and opt not in env.hidden_options:
                         raise ValueError('Only options {} are currently supported.'
                             .format(', '.join(env.persistent_options)))
                     try:

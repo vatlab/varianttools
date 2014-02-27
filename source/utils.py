@@ -98,6 +98,10 @@ class RuntimeEnvironments(object):
 
     def __init__(self):
         # these options could be set persistently
+        self.hidden_options = {
+            'term_width': (None, 'If set to a fix number, assuming a fixed terminal width for'
+                'outputs. This is used for testing purpose only.')
+        }
         self.persistent_options = {
             'logfile_verbosity': ('2', 'Verbosity level of the log file, can be 0 for warning '
                 'and error only, 1 for general information, or 2 for general and debug information.'),
@@ -169,6 +173,8 @@ class RuntimeEnvironments(object):
         #
         # a list of lock file that will be removed when the project is killed
         self._lock_files = []
+        #
+        self._term_width = None
     #
     def lock(self, filename, content=''):
         with open(filename, 'w') as lockfile:
@@ -208,6 +214,15 @@ class RuntimeEnvironments(object):
     #        self._check_update = False
     #
     #check_update = property(lambda self: self._check_update, _set_check_update)
+    #
+    # attribute term_width
+    def _set_term_width(self, v):
+        try:
+            self._term_width = int(v)
+        except:
+            self._term_width = None
+    #
+    term_width = property(lambda self: self._term_width, _set_term_width)
     #
     # attribute logfile_verbosity
     #
@@ -873,11 +888,13 @@ except ImportError:
     pass
 
 def getTermWidth():
+    if env.term_width is not None:
+        return env.term_width
     try:
         h, w = array('h', ioctl(sys.stderr, termios.TIOCGWINSZ, '\0' * 8))[:2]
         return w
     except:
-        return 79
+        return 78
 
 class ProgressBar:
     '''A text-based progress bar, it differs from regular progress bar in that

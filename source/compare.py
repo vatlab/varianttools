@@ -480,8 +480,8 @@ def compare(args):
                 if not proj.isVariantTable(encodeTableName(table)):
                     raise ValueError('Variant table {} does not exist.'.format(table))
             #
-            if len(args.tables) <= 1:
-                raise ValueError('No or only one table to compare')
+            if not args.tables:
+                raise ValueError('No table to compare')
             #
             # type of comparison
             if args.samples:

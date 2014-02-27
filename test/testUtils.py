@@ -187,6 +187,7 @@ def initTest(level):
     i = 1
     while True:
         runCmd('vtools init test -f') #1
+        runCmd('vtools admin --set_runtime_option term_width=78') #1
         if i == level: break
         else: i += 1
         runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
