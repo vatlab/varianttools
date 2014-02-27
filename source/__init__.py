@@ -34,12 +34,12 @@ __all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
 
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
-VTOOLS_VERSION='2.3.0svn'
+VTOOLS_VERSION='2.3.0'
 VTOOLS_REVISION='$Rev$'
 VTOOLS_REVISION=VTOOLS_REVISION[VTOOLS_REVISION.find(" ")+1:-2]
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
-VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2012 Bo Peng'''.format(VTOOLS_VERSION)
+VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2014 Bo Peng'''.format(VTOOLS_VERSION)
 VTOOLS_CITATION = '''San Lucas FA, Wang G, Scheet P, Peng B (2012) Bioinformatics 28(3):421-422'''
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
