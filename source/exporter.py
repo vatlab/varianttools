@@ -169,27 +169,46 @@ class BaseVariantReader:
 
 
     def getVariantQuery(self):
-        select_clause, fields = consolidateFieldName(self.proj, self.table,
+        select_clause, select_fields = consolidateFieldName(self.proj, self.table,
             ','.join(['variant_id', 'variant.ref', 'variant.alt'] + self.var_fields), self.export_alt_build)
         # FROM clause
         from_clause = 'FROM {} '.format(self.table)
-        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in fields], [])
+        fields_info = sum([self.proj.linkFieldToTable(x, self.table) for x in select_fields], [])
         #
         processed = set()
         where_conditions = []
         # the normal annotation databases that are 'LEFT OUTER JOIN'
         for tbl, conn in [(x.table, x.link) for x in fields_info if x.table != '']:
-            if (tbl.lower(), conn.lower()) not in processed and '.__' not in tbl:
+            if (tbl.lower(), conn.lower()) not in processed:
                 from_clause += ' LEFT OUTER JOIN {} ON {}'.format(tbl, conn)
                 processed.add((tbl.lower(), conn.lower()))
         # WHERE clause
         where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
         # GROUP BY clause
         if self.order_by_fields:
-            order_fields, tmp = consolidateFieldName(self.proj, self.table, self.order_by_fields + ',variant_id')
+            order_fields, order_field_names = consolidateFieldName(self.proj, self.table, self.order_by_fields + ',variant_id')
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
-            order_clause = ' ORDER BY {}.variant_id'.format(self.table)
+            #self.order_by_fields = '{}.variant_id'.format(self.table)
+            #order_field_names = ['{}.variant_id'.format(self.table)]
+            #order_clause = ' ORDER BY {}.variant_id'.format(self.table)
+            order_clause = ''
+        #
+        tmp_fields = list(set(select_fields + (order_field_names if self.order_by_fields else [])))
+        if 'variant.variant_id' in tmp_fields:
+            tmp_fields.remove('variant.variant_id')
+        from_clause = ('FROM (SELECT min(variant.variant_id) AS variant_variant_ID, '
+            '{} {} {} GROUP BY variant.variant_id) AS _TMP'.format(
+                ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in tmp_fields]),
+                from_clause, where_clause))
+        for fld in select_fields:
+            select_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
+                select_clause, flags=re.IGNORECASE)
+        if self.order_by_fields:
+            for fld in order_field_names:
+                order_clause = re.sub(fld.replace('.', '\.'), '_TMP.' + fld.replace('.', '_'),
+                    order_clause, flags=re.IGNORECASE)
+        #env.logger.error('SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause))
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
     def getSampleQuery(self, IDs):
