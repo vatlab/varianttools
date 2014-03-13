@@ -151,18 +151,28 @@ class Sample:
         self.jobs = jobs
         self.db = proj.db
 
-    def load(self, filename, allowed_fields, samples, na_str):
+    def load(self, filename, header, allowed_fields, samples, na_str):
         '''Load phenotype information from a file'''
         if not self.db.hasTable('sample'):
             env.logger.warning('Project does not have a sample table.')
             return
+        #
+        if header is not None:
+            if len(header) == 0:
+                raise ValueError('A list of headers is required if parameter --header is specified')
+            elif header == ['-']:
+                env.logger.info('Reading header from standard input')
+                headers = sys.stdin.read().rstrip().split()
+            else:
+                headers = header
         # num sample, num new field, num update field
         count = [0, 0, 0]
         csv_dialect = csv.Sniffer().sniff(open(filename, 'rU').read(8192))
         delimiter = csv_dialect.delimiter
         with open(filename, 'rU') as input:
             reader = csv.reader(input, dialect=csv_dialect)
-            headers = reader.next()
+            if header is None:
+                headers = reader.next()
             if len(set(headers)) != len(headers):
                 for x in set(headers):
                     headers.remove(x)
@@ -427,23 +437,7 @@ class Sample:
             print(delimiter.join([na if x is None else str(x) for x in rec]))
 
 
-def generalOutputArguments(parser):
-    grp = parser.add_argument_group('Output options')
-    grp.add_argument('--header', nargs='*',
-        help='''A complete header or a list of names that will be joined by a delimiter
-            (parameter --delimiter). If a special name - is specified, the header will
-            be read from the standard input, which is the preferred way to specify large
-            multi-line headers (e.g. cat myheader | vtools export --header -). If this
-            parameter is given without parameter, a default header will be derived from
-            field names.'''),
-    grp.add_argument('-d', '--delimiter', default='\t',
-        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
-    grp.add_argument('--na', default='NA',
-        help='Input or output string for missing value..')
-    grp.add_argument('-l', '--limit', default=-1, type=int,
-        help='''Number of record to display. Default to all record.''')
-
-
+ 
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
@@ -451,7 +445,8 @@ def phenotypeArguments(parser):
             determined by sample names in the first column, or jointly by sample
             name and filename if there is another column with header 'filename'.
             Names of phenotype fields are determined by header of the input file,
-            with non-alphanumeric characters in field names replaced by '_'. If
+            or by names provided from option --header. Non-alphanumeric
+            characters in input filed names will be replaced by '_'. If
             multiple samples in a project share the same names, they will shared
             the imported phenotypes. Optionally, a list of phenotypes (columns 
             of the file) can be specified after filename, in which case only the
@@ -483,7 +478,6 @@ def phenotypeArguments(parser):
     parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
-
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from_stat.''')
@@ -493,6 +487,23 @@ def phenotypeArguments(parser):
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Update phenotype for samples that match specified conditions.
             Use 'vtools show samples' to list usable fields in the sample table.''')
+    grp = parser.add_argument_group('Input/Output options')
+    grp.add_argument('--header', nargs='*',
+        help='''A list of header names for input file if used with option
+            --from_file. Otherwise a complete header or a list of names that
+            will be joined by a delimiter (parameter --delimiter), for option
+            --output. If a special name - is specified, the header will
+            be read from the standard input, which is the preferred way to specify large
+            multi-line headers (e.g. cat myheader | vtools export --header -). If this
+            parameter is given without parameter, a default header will be derived from
+            field names.'''),
+    grp.add_argument('-d', '--delimiter', default='\t',
+        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
+    grp.add_argument('--na', default='NA',
+        help='Input or output string for missing value..')
+    grp.add_argument('-l', '--limit', default=-1, type=int,
+        help='''Number of record to display. Default to all record.''')
+
 
 def phenotype(args):
     try:
@@ -501,7 +512,7 @@ def phenotype(args):
             if args.from_file:
                 filename = args.from_file[0]
                 fields = args.from_file[1:]
-                p.load(filename, fields, ' AND '.join(['({})'.format(x) for x in args.samples]), args.na)
+                p.load(filename, args.header, fields, ' AND '.join(['({})'.format(x) for x in args.samples]), args.na)
             if args.set:
                 for item in args.set:
                     try:
