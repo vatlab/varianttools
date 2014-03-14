@@ -28,8 +28,10 @@ import sys
 import threading
 import Queue
 import time
+import tempfile
 import re
 import csv
+import os
 from collections import defaultdict
 from .project import Project
 from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env, \
@@ -157,10 +159,19 @@ class Sample:
             env.logger.warning('Project does not have a sample table.')
             return
         #
+        from_stdin = filename == '-'
+        if from_stdin:
+            with tempfile.NamedTemporaryFile(delete=False) as tfile:
+                tfile.write(sys.stdin.read())
+                filename = tfile.name
+        #
         if header is not None:
             if len(header) == 0:
                 raise ValueError('A list of headers is required if parameter --header is specified')
             elif header == ['-']:
+                if from_stdin:
+                    raise ValueError('Cannot read header from standard input because '
+                        'input file is also read from standard input')
                 env.logger.info('Reading header from standard input')
                 headers = sys.stdin.read().rstrip().split()
             else:
@@ -229,6 +240,9 @@ class Sample:
                     raise ValueError('Duplicate sample name ({}).'
                         .format(', '.join(key)))
                 records[key] = [fields[x] for x in phenotype_idx]
+        # remove temporary file
+        if from_stdin:
+            os.remove(filename)
         #
         # get allowed samples
         cur = self.db.cursor()
@@ -441,7 +455,8 @@ class Sample:
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
     parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
-        help='''Import phenotype from a tab or space delimited file. Samples are
+        help='''Import phenotype from a tab or space delimited file, which can be
+            standard input if a name - is specified. Samples are
             determined by sample names in the first column, or jointly by sample
             name and filename if there is another column with header 'filename'.
             Names of phenotype fields are determined by header of the input file,
