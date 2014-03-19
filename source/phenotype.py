@@ -230,7 +230,7 @@ class Sample:
             for fields in reader:
                 if len(fields) != nCol:
                     env.logger.warning('Number of fields mismatch (expecting {}). Ignoring line "{}"'
-                        .format(nCol, line.strip()))
+                        .format(nCol, fields))
                     continue
                 # ignore empty line (line with empty sample name)
                 if not any([fields[x] for x in sample_idx]):

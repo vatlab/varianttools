@@ -421,7 +421,7 @@ class AssociationTestManager:
               '''.format(
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
               ''.join([', {} FLOAT'.format(x.replace('.', '_')) for x in self.var_info]),
-              ', variant_chr VARCHAR(20) NULL, variant_pos INTEGER NULL' if add_chrpos else '')
+              ', variant_chr VARCHAR(20) NOT NULL, variant_pos INTEGER NOT NULL' if add_chrpos else '')
         cur.execute(create_query)
         # ['variant.chr', 'variant.pos'] must be in the var_info table if there is any ExternTest
         if add_chrpos:
@@ -698,12 +698,11 @@ class AssoTestsWorker(Process):
         self.sampleMap = sampleMap
         self.result_fields = result_fields
         self.shelf_lock = shelf_lock
+        self.shelves = {}
         #
         self.db = DatabaseEngine()
         self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
         self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
-        #
-        self.shelves = {}
         #
         self.g_na = float('NaN')
         if env.treat_missing_as_wildtype:
@@ -712,7 +711,7 @@ class AssoTestsWorker(Process):
     def __del__(self):
         self.db.close()
         for val in self.shelves.values():
-            shelf.close()
+            val.close()
 
     def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info}
@@ -730,7 +729,10 @@ class AssoTestsWorker(Process):
             data = {x[0]:x[1:] for x in cur.fetchall()}
         variant_id = sorted(data.keys(), key=int)
         for idx, key in enumerate(self.var_info):
-            var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
+            if key not in ['variant.chr', 'variant.pos']:
+                var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
+            else:
+                var_info[key] = [data[x][idx] for x in variant_id] 
         return var_info, variant_id
 
     def getGenotype(self, group):
