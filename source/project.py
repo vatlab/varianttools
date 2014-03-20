@@ -961,23 +961,43 @@ class AnnoDBWriter:
         del s
         for field in self.fields:
             s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
-            cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
-            missing = cur.fetchone()[0]
+            cur.execute('SELECT {0} FROM {1};'.format(field.name, self.name))
+            values = [x[0] for x in cur.fetchall()]
+            #
+            missing = values.count(None)
             cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
                 (missing,))
             if missing == num_records:
                 env.logger.warning('Field {} has all missing values'.format(field.name))
-            if 'int' in field.type.lower() or 'float' in field.type.lower():
-                cur.execute('SELECT COUNT(DISTINCT {0}), MIN({0}), MAX({0}) FROM {1} WHERE {0} IS NOT NULL;'.format(field.name, self.name))
-                res = cur.fetchone()
+            if 'int' in field.type.lower():
+                values = [x for x in values if x is not None]
+                isint = [x for x in values if isinstance(x, int)]
+                distinct = set(values)
+                if len(isint) != len(values):
+                    wrong = [x for x in distinct if not isinstance(x, int)][:100]
+                    env.logger.warning('{} values are not integers for field {}: {}'
+                        .format(len(values) - len(isint), field,
+                        ', '.join([str(x) for x in wrong])))
+                #
                 cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (res[0], res[1], res[2], field.name))
+                    self.name, self.db.PH), (len(distinct), min(isint), max(isint), field.name))
+            elif 'float' in field.type.lower():
+                values = [x for x in values if x is not None]
+                isfloat = [x for x in values if isinstance(x, float)]
+                distinct = set(values)
+                if len(isfloat) != len(values):
+                    wrong = [x for x in distinct if not isinstance(x, float)][:100]
+                    env.logger.warning('{} values are not integers for field {}: {}'
+                        .format(len(values) - len(isint), field,
+                        ', '.join([str(x) for x in wrong])))
+                #
+                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                    self.name, self.db.PH), (len(distinct), min(isfloat), max(isfloat), field.name))
             else:
-                cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
-                res = cur.fetchone()
+                distinct = set(values) - set([None])
                 cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (res[0], field.name))
-                if res[0] == 1:
+                    self.name, self.db.PH), (len(distinct), field.name))
+                if len(distinct) == 1:
                     env.logger.warning('Field {} has only one value in the database.'.format(field.name))
             del s
         self.db.commit()
