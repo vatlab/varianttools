@@ -1261,9 +1261,15 @@ class ResourceManager:
         prog = ProgressBar('Scanning {} files under {}'
             .format(len(filenames), resource_dir), sum([min(x[1], 2**26) for x in filenames]))
         total_size = 0
+        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'ftp.completegenomics.com', 'format', 'annoDB']
         for filename, filesize in filenames:
-            info = self.addResource(filename, resource_dir)
-            total_size += min(info[0], 2**26)
+            if (not any([y in allowed_directory for y in filename.split('/')])) or filename.endswith('.DB') or \
+                filename.endswith('.bak') or filename.endswith('.htaccess') or '_tmp' in filename:
+                env.logger.warning('Ignore {}'.format(filename))
+                total_size += min(filesize, 2**26)
+            else:
+                info = self.addResource(filename, resource_dir)
+                total_size += min(info[0], 2**26)
             prog.update(total_size)
         prog.done()
     
