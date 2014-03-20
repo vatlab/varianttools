@@ -1264,7 +1264,8 @@ class ResourceManager:
         allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'ftp.completegenomics.com', 'format', 'annoDB']
         for filename, filesize in filenames:
             if (not any([y in allowed_directory for y in filename.split('/')])) or filename.endswith('.DB') or \
-                filename.endswith('.bak') or filename.endswith('.htaccess') or '_tmp' in filename:
+                filename.endswith('.bak') or filename.endswith('.htaccess') or filename.endswith('.log') \
+                or filename.endswith('.proj') or '_tmp' in filename:
                 env.logger.warning('Ignore {}'.format(filename))
                 total_size += min(filesize, 2**26)
             else:
@@ -1353,7 +1354,8 @@ class ResourceManager:
     def getRemoteManifest(self):
         '''Get a manifest of files on the server and parse it.'''
         try:
-            (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt')
+            (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt',
+                os.path.join(os.path.expanduser(env.local_resource), 'MANIFEST.txt'))
             #
             self.manifest = {}
             with open(manifest_file, 'r') as manifest:
