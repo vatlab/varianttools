@@ -304,9 +304,25 @@ class AnnoDB:
                 ', '.join(self.raw_refGenomes[key])))
         for field in self.fields:
             if not verbose:
-                print('\n'.join(textwrap.wrap(
-                    '  {:<21} {}'.format(field.name, field.comment),
-                    subsequent_indent=' '*24, width=textWidth)))
+                if 'chromosome' in field.type.lower():
+                    field_info = '  {} (char)'.format(field.name)
+                elif 'position' in field.type.lower():
+                    field_info = '  {} (int)'.format(field.name)
+                elif 'int' in field.type.lower():
+                    field_info = '  {} (int)'.format(field.name)
+                elif 'float' in field.type.lower():
+                    field_info = '  {} (float)'.format(field.name)
+                else:
+                    field_info = '  {} (char)'.format(field.name)
+                if len(field_info) > 23 and field.comment.strip():
+                    print(field_info)
+                    print('\n'.join(textwrap.wrap(field.comment,
+                        initial_indent=' '*24,
+                        subsequent_indent=' '*24, width=textWidth)))
+                else:
+                    print('\n'.join(textwrap.wrap(
+                        '{:<23} {}'.format(field_info, field.comment),
+                        subsequent_indent=' '*24, width=textWidth)))
             else:
                 print('\nField:                  {}'.format(field.name))
                 numeric = False
@@ -976,7 +992,7 @@ class AnnoDBWriter:
                 if len(isint) != len(values):
                     wrong = [x for x in distinct if not isinstance(x, int)][:100]
                     env.logger.warning('{} values are not integers for field {}: {}'
-                        .format(len(values) - len(isint), field,
+                        .format(len(values) - len(isint), field.name,
                         ', '.join([str(x) for x in wrong])))
                 #
                 if len(isint) == 0:
@@ -3973,19 +3989,34 @@ def show(args):
                         if args.verbosity == '0':
                             print('\n'.join(['{}.{}'.format(decodeTableName(table), field) for field in tfields]))
                         else:
-                            print('\n'.join(['{}.{} {}'.format(decodeTableName(table), field,
-                                '\n'.join(textwrap.wrap(proj.descriptionOfField(field),
-                                initial_indent=' '*(27-len(table)-len(field)),
-                                subsequent_indent=' '*29))) for field in tfields]))
+                            for field in tfields:
+                                field_info = '{}.{} ({}) '.format(decodeTableName(table), field,
+                                    proj.db.typeOfColumn('variant', field, True))
+                                field_desc = proj.descriptionOfField(field).strip()
+                                if len(field_info) > 23 and field_desc:
+                                    print(field_info)
+                                    print('\n'.join(textwrap.wrap(field_desc,
+                                        initial_indent=' '*24, width=textWidth, subsequent_indent=' '*24)))
+                                else:
+                                    print('\n'.join(textwrap.wrap(
+                                        '{:<23} {}'.format(field_info, field_desc),
+                                        width=textWidth, subsequent_indent=' '*29)))
 
                 for db in proj.annoDB:
                     if args.verbosity == '0':
                         print('\n'.join(['{}.{}'.format(db.linked_name, x.name) for x in db.fields]))
                     else:
-                        print('\n'.join(['{}.{} {}'.format(db.linked_name, x.name,
-                            '\n'.join(textwrap.wrap(x.comment,
-                                initial_indent=' '*(27-len(db.linked_name)-len(x.name)),
-                                subsequent_indent=' '*29))) for x in db.fields]))
+                        for x in db.fields:
+                            field_info = '{}.{} ({})'.format(db.linked_name, x.name,
+                                    proj.db.typeOfColumn(
+                                        '{}.{}'.format(db.name, db.linked_name), x.name, True))
+                            if len(field_info) > 23 and x.comment.strip():
+                                print(field_info)
+                                print('\n'.join(textwrap.wrap(x.comment,
+                                    initial_indent=' '*24, width=textWidth, subsequent_indent=' '*24)))
+                            else:
+                                print('\n'.join(textwrap.wrap('{:<23} {}'.format(field_info, x.comment),
+                                    width=textWidth, subsequent_indent=' '*24)))
             elif args.type == 'annotation':
                 if len(args.items) == 0:
                     raise ValueError('Please specify the annotation(s) to display')
