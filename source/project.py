@@ -979,8 +979,13 @@ class AnnoDBWriter:
                         .format(len(values) - len(isint), field,
                         ', '.join([str(x) for x in wrong])))
                 #
-                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (len(distinct), min(isint), max(isint), field.name))
+                if len(isint) == 0:
+                    env.logger.warning('No valid integer values for field {}'.format(field.name))
+                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                        self.name, self.db.PH), (len(distinct), None, None, field.name))
+                else:
+                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                        self.name, self.db.PH), (len(distinct), min(isint), max(isint), field.name))
             elif 'float' in field.type.lower():
                 values = [x for x in values if x is not None]
                 isfloat = [x for x in values if isinstance(x, float)]
@@ -988,11 +993,16 @@ class AnnoDBWriter:
                 if len(isfloat) != len(values):
                     wrong = [x for x in distinct if not isinstance(x, float)][:100]
                     env.logger.warning('{} values are not integers for field {}: {}'
-                        .format(len(values) - len(isint), field,
+                        .format(len(values) - len(isint), field.name,
                         ', '.join([str(x) for x in wrong])))
                 #
-                cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (len(distinct), min(isfloat), max(isfloat), field.name))
+                if len(isfloat) == 0:
+                    env.logger.warning('No valid float values for field {}'.format(field.name))
+                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                        self.name, self.db.PH), (len(distinct), None, None, field.name))
+                else:
+                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                        self.name, self.db.PH), (len(distinct), min(isfloat), max(isfloat), field.name))
             else:
                 distinct = set(values) - set([None])
                 cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
@@ -3798,7 +3808,7 @@ def showArguments(parser):
         'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
         'annotation', 'track', 'formats', 'format', 'tests', 'test', 
         'runtime_options', 'runtime_option', 'snapshot', 'snapshots', 
-        'pipeline', 'pipelines'],
+        'pipeline', 'pipelines', 'models', 'model'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3820,9 +3830,10 @@ def showArguments(parser):
             filename, 'snapshots' for a list of publicly available snapshots,
             and snapshots of the current project saved by command 
             'vtools admin --save_snapshots', 'pipeline PIPELINE'
-            for details of a particular align and variant calling pipeline, and
-            'pipelines' for a list of available pipelines. The default parameter
-            of this command is 'project'.''')
+            for details of a particular align and variant calling pipeline, 
+            'pipelines' for a list of available pipelines. 'model MODEL' for
+            details of a simulation model, 'models' for a list of simulation 
+            models. The default parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, name of table for
             type 'table', conditions to select samples for type 'samples', 
@@ -4120,6 +4131,40 @@ def show(args):
                         subsequent_indent=' '*15))))
                 # create an instance of the test and pass -h to it
                 test(1, ['-h']) 
+            elif args.type == 'models':
+                # it is very bad idea to use circular import, but I have no choice
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show models"'.format(', '.join(args.items)))
+                from .simulation import getAllModels
+                all_models = getAllModels()
+                nAll = len(all_models)
+                for idx, (model, obj) in enumerate(all_models):
+                    if args.limit is not None and idx == args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(model)
+                    else:
+                        print('\n'.join(textwrap.wrap(
+                            '{:<23} {}'.format(model, '' if obj.__doc__ is None else obj.__doc__),
+                            subsequent_indent=' '*24, width=textWidth)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'model':
+                from .association import getAllModels
+                if len(args.items) == 0:
+                    raise ValueError('Please specify the name of a model')
+                if len(args.items) > 1:
+                    raise ValueError('Please specify only one model')
+                models = getAllModels()
+                if args.items[0].lower() not in [x[0].lower() for x in models]:
+                    raise ValueError('Unrecognized model name {}. A list of models can be obtained from command "vtools show models"'.format(args.items[0]))
+                # model
+                model = [y for x,y in models if x.lower() == args.items[0].lower()][0]
+                print('Name:          {}'.format(args.items[0]))
+                print('Description:   {}'.format('\n'.join(textwrap.wrap(model.__doc__, initial_indent='',
+                        subsequent_indent=' '*15))))
+                # create an instance of the model and pass -h to it
+                model(1, ['-h']) 
             elif args.type == 'runtime_options':
                 for idx, (opt, (def_value, description)) in enumerate(sorted(env.persistent_options.iteritems())):
                     if args.limit is not None and idx == args.limit:
