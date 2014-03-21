@@ -376,12 +376,10 @@ class ExtractValue:
         delimiter and the name.'''
         self.name = name
         self.sep = sep
-        #self.pos = len(name)
+        self.pos = len(name)
         self.default = default
 
     def __call__(self, item):
-        if self.name not in item:
-            return self.default
         #
         # Using two partisions seems to be a tiny bit faster than 
         # split and startswith
@@ -389,8 +387,11 @@ class ExtractValue:
         #for field in item.split(self.sep):
         #    if field.startswith(self.name):
         #        return field[self.pos:]
-        ss = item.partition(self.name)
-        return ss[2].partition(self.sep)[0] if ss[2] is not None else self.default
+        if item.startswith(self.name):
+            return item.split(self.sep, 1)[0][self.pos:]
+        else:
+            ss = item.partition(self.sep + self.name)
+            return ss[2].partition(self.sep)[0] if ss[2] else self.default
 
 class IncreaseBy:
     '''Increase passed value by a given number, will convert input to integer'''
