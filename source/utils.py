@@ -2372,12 +2372,15 @@ class DatabaseEngine:
             # remove old table
             cur.execute('DROP TABLE {1}._{0}_tmp_;'.format(tbl, db))
 
-    def typeOfColumn(self, table, col):
+    def typeOfColumn(self, table, col, simplify=False):
         '''Return type of col in table'''
         fields = self.fieldsOfTable(table)
         for n, t in fields:
             if n.lower() == col.lower():
-                return t
+                if simplify:
+                    return 'char' if 'CHAR' in t.upper() else ('int' if 'INT' in t.upper() else 'float')
+                else:
+                    return t
         raise ValueError('No column called {} in table {}'.format(col, table))
 
 
