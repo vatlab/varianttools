@@ -75,15 +75,119 @@ Models:
 7. forward-time model: simupop, srv
 
 '''
+
+
+class NullModel:
+    '''A base class that defines a common interface for simulation models'''
+    def __init__(self, *method_args):
+        '''Args is arbitrary arguments, might need an additional parser to
+        parse it'''
+        # trait type
+        self.trait_type = None
+        # group name
+        self.gname = None
+        self.fields = []
+        self.parseArgs(*method_args)
+        #
+
+    def parseArgs(self, method_args):
+        # this function should never be called.
+        raise SystemError('All association tests should define their own parseArgs function')
+
+
+def getAllModels():
+    '''List all simulation models (all classes that subclasses of NullModel) in this module'''
+    return sorted([(name, obj) for name, obj in globals().iteritems() \
+        if type(obj) == type(NullModel) and issubclass(obj, NullModel) \
+            and name not in ('NullModel',)], key=lambda x: x[0])
+
 def simulateArguments(parser):
-    pass
+    parser.add_argument('--regions', nargs='+',
+        help='''One or more chromosome regions in the format of chr:start-end
+        (e.g. chr21:33,031,597-33,041,570), or Field:Value from a region-based 
+        annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+        Chromosome positions are 1-based and are inclusive at both ends so the 
+        chromosome region has a length of end-start+1 bp. For the second case,
+        multiple chromosomal regions will be selected if the  name matches more
+        than one chromosomal regions.''')
+    parser.add_argument('--model', 
+        help='''Simulation model, which defines the algorithm and default
+            parameter to simulate data. A list of model-specific parameters
+            could be specified to change the behavior of these models. Commands
+            vtools show models and vtools show model MODEL can be used to list
+            all available models and details of one model.''')
+    
+
+def expandRegions(arg_region, arg_build, proj=None):
+    if proj is None:
+        proj = Project(verbosity=args.verbosity)
+    regions = []
+    for region in arg_region:
+        try:
+            chr, location = region.split(':', 1)
+            start, end = location.split('-')
+            start = int(start.replace(',', ''))
+            end = int(end.replace(',', ''))
+            if start == 0 or end == 0:
+                raise ValueError('0 is not allowed as starting or ending position')
+            if start > end:
+                regions.append((chr, start, end, '(reverse complementary)'))
+            else:
+                regions.append((chr, start, end, ''))
+        except Exception as e:
+            # this is not a format for chr:start-end, try field:name
+            try:
+                field, value = region.split(':', 1)
+                annoDB = None
+                # now we need to figure out how to get start and end position...
+                lines = getoutput(['vtools', 'show', 'fields'])
+                for line in lines.split('\n'):
+                    try:
+                        field_name = line.split()[0]
+                    except:
+                        continue
+                    if '.' not in field_name:
+                        continue
+                    if field == field_name or field == field_name.split('.')[-1]:
+                        annoDB = field_name.split('.')[0]
+                        field = field_name.split('.')[1]
+                        break
+                if annoDB is None:
+                    raise ValueError('Cannot locate field {} in the current project'.format(field))
+                # now we have annotation database
+                # but we need to figure out how to use it
+                anno_type = getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
+                if anno_type.strip() != 'range':
+                    raise ValueError('Only field from a range-based annotation database could be used.')
+                # get the fields?
+                build = eval(getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
+                if arg_build in build:
+                    chr_field, start_field, end_field = build[arg_build]
+                else:
+                    raise ValueError('Specified build {} does not match that of the annotation database.'.format(arg_build))
+                #
+                # find the regions
+                output = getoutput(['vtools', 'execute', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                    chr_field, start_field, end_field, annoDB, annoDB, field, value)])
+                for idx, line in enumerate(output.split('\n')):
+                    try:
+                        chr, start, end = line.split()
+                        regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
+                    except:
+                        pass
+                if not regions:
+                    env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
+            except Exception as e:
+                raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
+    return regions
+
 
 def simulate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            pass
+            print expandRegions(args.regions, proj.build, proj)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
