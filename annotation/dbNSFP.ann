@@ -80,7 +80,7 @@ comment=Uniprot ID number. Multiple entries separated by ";".
 
 [Uniprot_aapos]
 index=11
-type=INTEGER NULL
+type=VARCHAR(128) NULL
 adj=Nullify('.')
 comment=amino acid position as to Uniprot. Multiple entries separated by ";".
 
@@ -110,15 +110,15 @@ comment=SLR test statistic for testing natural selection on codons. A negative v
 
 [codonpos]
 index=16
-type=INTEGER NULL
+type=VARCHAR(128) NULL
 adj=Nullify('.')
-comment=position on the codon (1, 2 or 3)
+comment=position on the codon (1, 2 or 3), multiple entries are separated by ;
 
 [fold_degenerate]
 index=17
-type=INTEGER NULL
+type=VARCHAR(20)
 adj=Nullify('.')
-comment=degenerate type (0, 2 or 3)
+comment=A list of degenerate type (0, 2 or 3), separated by ;
 
 [Ancestral_allele]
 index=18
@@ -140,9 +140,9 @@ comment=Ensembl transcript ids (separated by ";")
 
 [aapos]
 index=21
-type=INTEGER NULL
+type=VARCHAR(48) NULL
 adj=Nullify('.')
-comment=: amino acid position as to the protein "-1" if the variant is a splicing site SNP (2bp on each end of an intron)
+comment=amino acid position as to the protein "-1" if the variant is a splicing site SNP (2bp on each end of an intron), Multiple values separated by ;
 
 [aapos_SIFT]
 index=22
@@ -161,8 +161,15 @@ comment=aapos_FATHMM: ENSP id and amino acid positions corresponding to FATHMM s
 [SIFT_score]
 index=24
 type=FLOAT NULL
+adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
+comment=The same as SIFT_score_all but is of type FLOAT and is the minimal score when multiple scores are available.
+
+[SIFT_score_all]
+index=24
+type=VARCHAR(24) NULL
 adj=Nullify('.')
-comment=SIFT score, If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)"; otherwise it is predicted as "T(olerated)".
+comment=SIFT scores. If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)"; 
+	otherwise it is predicted as "T(olerated)". Multiple scores are separated by ;
 
 [SIFT_score_rankscore]
 index=25
@@ -176,21 +183,30 @@ comment=Original scores were first converted to SIFTnew=1-SIFTori,
 
 [SIFT_pred]
 index=26
+type=VARCHAR(1) NULL
+adj=lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
+comment="D" if "D" appears in SIFT_pred_all, "T" otherwise.
+
+[SIFT_pred_all]
+index=26
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=If SIFTori is smaller than 0.05 (SIFTnew>0.95) the corresponding NS is predicted as "D(amaging)"; otherwise it is predicted as "T(olerated)".
-
-[Polyphen2_HDIV_score_max]
-index=27
-type=FLOAT NULL
-adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
-comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. Use Polyphen2_HDIV_score to get a list of all scores.
+comment=If SIFTori is smaller than 0.05 (SIFTnew>0.95) the corresponding NS is predicted as 
+	"D(amaging)"; otherwise it is predicted as "T(olerated)".
 
 [Polyphen2_HDIV_score]
 index=27
+type=FLOAT NULL
+adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
+comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. 
+	Use Polyphen2_HDIV_score_all to get a list of all scores.
+
+[Polyphen2_HDIV_score_all]
+index=27
 type=VARCHAR(255)
 adj=Nullify('.')
-comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.957,1]; "possibly damaging" if it is in [0.453,0.956]; "benign" if it is in [0,0.452]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
+comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob. The score ranges from 0 to 1, and the corresponding
+	prediction is "probably damaging" if it is in [0.957,1]; "possibly damaging" if it is in [0.453,0.956]; "benign" if it is in [0,0.452]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
 
 [Polyphen2_HDIV_rankscore]
 index=28
@@ -203,21 +219,34 @@ comment=Polyphen2 HDIV scores were first ranked among all HDIV scores
 
 [Polyphen2_HDIV_pred]
 index=29
+type=VARCHAR(1) NULL
+adj=lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('P' if 'P' in x else ('B' if 'B' in x else '.')))
+comment="D" if any of the predictions in Polyphen2_HDIV_pred_all is "D". Otherwise it can be "P" is any
+       prediction is "P", or "B" is any prediction if "B".
+
+[Polyphen2_HDIV_pred_all]
+index=29
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign"). Multiple entries separated by ";". Because the availability of multiple values, use expression such as 'D' in Polyphen2_HDIV_pred instead of 'D' = Polyphen2_HDIV_pred to filter variants that are probably damaging.
-
-[Polyphen2_HVAR_score_max]
-index=30
-type=FLOAT NULL
-adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
-comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob. Use Polyphen2_HVAR_score_all to get a list of all scores.
+comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("possibly damaging") and "B" ("benign").
+	Multiple entries separated by ";". Because the availability of multiple values, use field Polyphen2_HDIV_pred = 'D'
+	to locate possibly damaging variants.
 
 [Polyphen2_HVAR_score]
 index=30
+type=FLOAT NULL
+adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
+comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob. 
+	Use Polyphen2_HVAR_score_all to get a list of all scores.
+
+[Polyphen2_HVAR_score_all]
+index=30
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 score based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is "probably damaging" if it is in [0.909,1]; "possibly damaging" if it is in [0.447,0.908]; "benign" if it is in [0,0.446]. Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" if the score is larger than 0.5. Multiple entries separated by ";".
+comment=Polyphen2 scores based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is 
+	"probably damaging" if it is in [0.909,1]; "possibly damaging" if it is in [0.447,0.908]; "benign" if it is in [0,0.446].
+	Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" 
+	if the score is larger than 0.5. Multiple entries separated by ";".
 
 [Polyphen2_HVAR_rankscore]
 index=31
@@ -230,9 +259,16 @@ comment=Polyphen2 HVAR scores were first ranked among all HVAR scores
 
 [Polyphen2_HVAR_pred]
 index=32
+type=VARCHAR(1) NULL
+adj=lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('P' if 'P' in x else ('B' if 'B' in x else '.')))
+comment="D" if any of the predictions in Polyphen2_HVAR_pred_all is "D". Otherwise it can be "P" is any
+       prediction is "P", or "B" is any prediction if "B".
+
+[Polyphen2_HVAR_pred_all]
+index=32
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment= Polyphen2 prediction based on HumVar, "D" ("porobably damaging", 
+comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging", 
 		HVAR score in [0.909,1] or rankscore in [0.62955,0.9711]), "P" ("possibly damaging", 
 		HVAR in [0.447,0.908] or rankscore in [0.44359,0.62885]) and "B" ("benign", HVAR 
 		score in [0,0.446] or rankscore in [0.01281,0.44315]). Score cutoff for binary 
@@ -316,6 +352,12 @@ comment=MutationAssessor's functional impact of a variant :
 [FATHMM_score]
 index=42
 type=FLOAT NULL
+adj=lambda x: None if x.strip() == '.' else min([float(z) for z in x.split(';')])
+comment=Mimimal (more damaging) scores of the multiple scores reported by FATHMM_score_all
+
+[FATHMM_score_all]
+index=42
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=FATHMM default score (weighted for human inherited-disease mutations with
 		Disease Ontology) (FATHMMori). Scores range from -18.09 to 11.0. Multiple scores 
@@ -331,7 +373,14 @@ comment=FATHMMori scores were ranked among all FATHMMori scores in dbNSFP.
 		scores in dbNSFP. If there are multiple scores, only the most damaging (largest) 
 		rankscore is presented. The scores range from 0 to 1.
 
+
 [FATHMM_pred]
+index=44
+type=CHAR(16) NULL
+adj=lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
+comment="D" is any of the prediction of FATHMM_pred_all is "D"
+
+[FATHMM_pred_all]
 index=44
 type=CHAR(16) NULL
 adj=Nullify('.')
@@ -414,21 +463,28 @@ comment=CADD raw scores were ranked among all CADD raw scores in dbNSFP. The
 		rankscore is the ratio of the rank of the score over the total number of CADD 
 		raw scores in dbNSFP.
 
-[GERP_NR]
+[CADD_phred]
 index=54
+type=FLOAT NULL
+adj=Nullify('.')
+comment=CADD phred-scaled score
+
+
+[GERP_NR]
+index=55
 type=FLOAT NULL
 adj=Nullify('.')
 comment=GERP++ neutral rate
 
 [GERP_RS]
-index=55
+index=56
 type=FLOAT NULL
 adj=Nullify('.')
 comment=GERP++ RS score, the larger the score, the more conserved the site.
 
 
 [GERP_RS_rankscore]
-index=56
+index=57
 type=FLOAT NULL
 adj=Nullify('.')
 comment=GERP++ RS scores were ranked among all GERP++ RS scores in dbNSFP. 
@@ -436,7 +492,7 @@ comment=GERP++ RS scores were ranked among all GERP++ RS scores in dbNSFP.
 		scores in dbNSFP.
 
 [phyloP46way_primate]
-index=57
+index=58
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP (phylogenetic p-values) conservation score based on the 
@@ -444,7 +500,7 @@ comment=phyloP (phylogenetic p-values) conservation score based on the
 		the more conserved the site.
 
 [phyloP46way_primate_rankscore]
-index=58
+index=59
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP46way_primate scores were ranked among all 
@@ -452,7 +508,7 @@ comment=phyloP46way_primate scores were ranked among all
 		score over the total number of phyloP46way_primate scores in dbNSFP.
 
 [phyloP46way_placental]
-index=59
+index=60
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP (phylogenetic p-values) conservation score based on the 
@@ -460,7 +516,7 @@ comment=phyloP (phylogenetic p-values) conservation score based on the
 		score, the more conserved the site.
 
 [phyloP46way_placental_rankscore]
-index=60
+index=61
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP46way_placental scores were ranked among all 
@@ -468,7 +524,7 @@ comment=phyloP46way_placental scores were ranked among all
 		score over the total number of phyloP46way_placental scores in dbNSFP.
 
 [phyloP100way_vertebrate]
-index=61
+index=62
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP (phylogenetic p-values) conservation score based on the 
@@ -476,7 +532,7 @@ comment=phyloP (phylogenetic p-values) conservation score based on the
 		the more conserved the site.
 
 [phyloP100way_vertebrate_rankscore]
-index=62
+index=63
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phyloP100way_vertebrate scores were ranked among all 
@@ -484,14 +540,14 @@ comment=phyloP100way_vertebrate scores were ranked among all
 		score over the total number of phyloP100way_vertebrate scores in dbNSFP.
 
 [phastCons46way_primate]
-index=63
+index=64
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons conservation score based on the multiple alignments of 
 		10 primate genomes (including human). The larger the score, the more conserved the site.
 
 [phastCons46way_primate_rankscore]
-index=64
+index=65
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons46way_primate scores were ranked among all 
@@ -499,7 +555,7 @@ comment=phastCons46way_primate scores were ranked among all
 		score over the total number of phastCons46way_primate scores in dbNSFP.
 
 [phastCons46way_placental]
-index=65
+index=66
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons conservation score based on the multiple alignments of 
@@ -507,7 +563,7 @@ comment=phastCons conservation score based on the multiple alignments of
 		the site.
 
 [phastCons46way_placental_rankscore]
-index=66
+index=67
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons46way_placental scores were ranked among all 
@@ -515,7 +571,7 @@ comment=phastCons46way_placental scores were ranked among all
 		score over the total number of phastCons46way_placental scores in dbNSFP.
 
 [phastCons100way_vertebrate]
-index=67
+index=68
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons conservation score based on the multiple alignments 
@@ -523,7 +579,7 @@ comment=phastCons conservation score based on the multiple alignments
 		the site.
 
 [phastCons100way_vertebrate_rankscore]
-index=68
+index=69
 type=FLOAT NULL
 adj=Nullify('.')
 comment=phastCons100way_vertebrate scores were ranked among 
@@ -532,20 +588,20 @@ comment=phastCons100way_vertebrate scores were ranked among
 
 
 [SiPhy_29way_pi]
-index=69
+index=70
 type=VARCHAR(255) NULL
 comment=The estimated stationary distribution of A, C, G and T at the site, 
 		using SiPhy algorithm based on 29 mammals genomes. 
 
 [SiPhy_29way_logOdds]
-index=70
+index=71
 type=FLOAT NULL
 adj=Nullify('.')
 comment=SiPhy score based on 29 mammals genomes. The larger the score, 
 		the more conserved the site.
 
 [SiPhy_29way_logOdds_rankscore]
-index=71
+index=72
 type=FLOAT NULL
 adj=Nullify('.')
 comment=SiPhy_29way_logOdds scores were ranked among all 
@@ -553,85 +609,85 @@ comment=SiPhy_29way_logOdds scores were ranked among all
 		of the score over the total number of SiPhy_29way_logOdds scores in dbNSFP.
 
 [LRT_Omega]
-index=72
+index=73
 type=FLOAT NULL
 adj=Nullify('.')
 comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)
 
 [UniSNP_ids]
-index=73
+index=74
 type=CHAR(64) NULL
 adj=Nullify('.')
 comment="rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;..."
 
 [KGp1_AC]
-index=74
+index=75
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele count in the whole 1000Gp1 data.
 
 [KGp1_AF]
-index=75
+index=76
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the whole 1000Gp1 data.
 
 [KGp1_AFR_AC]
-index=76
+index=77
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp1 African descendent samples.
 
 [KGp1_AFR_AF]
-index=77
+index=78
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp1 African descendent samples.
 
 [KGp1_EUR_AC]
-index=78
+index=79
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp1 European descendent samples.
 
 [KGp1_EUR_AF]
-index=79
+index=80
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp1 European descendent samples.
 
 [KGp1_AMR_AC]
-index=80
+index=81
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp1 American descendent samples.
 
 [KGp1_AMR_AF]
-index=81
+index=82
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp1 American descendent samples.
 
 [KGp1_ASN_AC]
-index=82
+index=83
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp1 Asian descendent samples.
 
 [KGp1_ASN_AF]
-index=83
+index=84
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp1 Asian descendent samples.
 
 [ESP6500_AA_AF]
-index=84
+index=85
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the Afrian American samples of the NHLBI GO Exome Sequencing Project (ESP6500 data set).
 
 [ESP6500_EA_AF]
-index=85
+index=86
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the European American samples of the NHLBI GO Exome Sequencing Project (ESP6500 data set).
