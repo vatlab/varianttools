@@ -30,7 +30,44 @@ try:
 except ImportError:
    from distutils.command.build_py import build_py
 
-import sys, os
+# parallel compilation
+import multiprocessing, multiprocessing.pool
+
+def compile_parallel(
+        self,
+        sources,
+        output_dir=None,
+        macros=None,
+        include_dirs=None,
+        debug=0,
+        extra_preargs=None,
+        extra_postargs=None,
+        depends=None):
+
+    # Copied from distutils.ccompiler.CCompiler
+    macros, objects, extra_postargs, pp_opts, build = self._setup_compile(
+        output_dir, macros, include_dirs, sources, depends, extra_postargs)
+    cc_args = self._get_cc_args(pp_opts, debug, extra_preargs)
+    #
+    def _single_compile(obj):
+
+        try:
+            src, ext = build[obj]
+        except KeyError:
+            return
+        self._compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
+    # convert to list, imap is evaluated on-demand
+    list(multiprocessing.pool.ThreadPool(multiprocessing.cpu_count()).imap(_single_compile, objects))
+    return objects
+
+import distutils.ccompiler
+distutils.ccompiler.CCompiler.compile=compile_parallel
+#
+import sys, os, subprocess
+# use ccache to speed up build
+if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
+    os.environ['CC'] = 'ccache gcc'
+
 #
 # if building source package, we will need to have wrapper files for both
 # versions of Python
@@ -540,7 +577,6 @@ if not EMBEDED_BOOST:
 # Generate wrapper files (only in development mode)
 #
 if 'svn' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
-    import subprocess
     #
     try:
        ret = subprocess.call(['swig -python -external-runtime source/swigpyrun.h'], shell=True)
