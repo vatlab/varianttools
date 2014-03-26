@@ -977,17 +977,6 @@ class AnnoDBWriter:
         del s
         for field in self.fields:
             s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
-            # if of char type
-            if not ('int' in field.type.lower() or 'float' in field.type.lower()):
-                cur.execute('SELECT COUNT(*) FROM {1} WHERE {0} is NULL;'.format(field.name, self.name))
-                missing = cur.fetchone()[0]
-                cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
-                    (missing,))
-                cur.execute('SELECT COUNT(DISTINCT {0}) FROM {1};'.format(field.name, self.name))
-                res = cur.fetchone()
-                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (res[0], field.name))
-                continue
             # for integer and float types, we need to retrieve the values and check if
             # they are of specified type
             cur.execute('SELECT {0} FROM {1};'.format(field.name, self.name))
@@ -1037,6 +1026,10 @@ class AnnoDBWriter:
                 del isfloat
                 del distinct
                 del values
+            else:
+                # for char type
+                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
+                    self.name, self.db.PH), (len(set(values) - set([None])) , field.name))
             del s
         self.db.commit()
 
