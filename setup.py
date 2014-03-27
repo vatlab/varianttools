@@ -65,8 +65,11 @@ distutils.ccompiler.CCompiler.compile=compile_parallel
 #
 import sys, os, subprocess
 # use ccache to speed up build
-if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
-    os.environ['CC'] = 'ccache gcc'
+# try:
+#     if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
+#         os.environ['CC'] = 'ccache gcc'
+# except OSError:
+#     pass
 
 #
 # if building source package, we will need to have wrapper files for both

@@ -1584,6 +1584,120 @@ class VariableThresholdsBt(GLMBurdenTest):
         self.use_indicator=False
         self.trait_type = 'disease'
 
+class VATStacking(GLMBurdenTest):
+    '''VAT stacking with resampling-based p-value adjustment for applying many algorithms'''
+    def __init__(self, ncovariates, *method_args):
+        # NullTest.__init__ will call parseArgs to get the parameters we need
+        NullTest.__init__(self, *method_args)
+        # set fields name for output database        
+        self.fields = [
+            Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='sample size'),
+            Field(name='num_variants', index=None, type='INT', adj=None, fmt=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
+            Field(name='total_mac', index=None, type='INT', adj=None, fmt=None, comment='total minor allele counts in a group (adjusted for MOI)'),
+            Field(name='statistic', index=None, type='FLOAT', adj=None, fmt=None, comment='test statistic. In the context of regression this is estimate of effect size for x'),
+            Field(name='pvalue', index=None, type='FLOAT', adj=None, fmt=None, comment='p-value')]
+        self.ncovariates = ncovariates
+        # FIXME: set field names based on names of weights, externweights, VT and indicator (WEVI)
+        self.regression_model = {'quantitative':0, 'disease':1}
+        self.algorithm = self._determine_algorithm()
+
+    def parseArgs(self, method_args):
+        parser = argparse.ArgumentParser(description='''VAT Stacking algorithm, using a resampling-based method for p-value adjustment for applying many tests on the same genetic region.''',
+            prog='vtools associate --method ' + self.__class__.__name__)
+        # argument that is shared by all tests
+        parser.add_argument('--name', default='stacking',
+            help='''Name of the test that will be appended to names of output fields, usually used to
+                differentiate output of different tests, or the same test with different parameters.''')
+        #
+        # arguments that are used by this test
+        parser.add_argument('-q1', '--mafupper', metavar="P", nargs = "*", type=freq,
+            help='''Minor allele frequency upper limits. All variants having sample MAF<=m1
+            will be included in analysis. Number of arguments for this option should be the same
+            as number of algorithms involved in VAT stacking.''')
+        parser.add_argument('-q2', '--maflower', metavar="P", nargs = "*", type=freq,
+            help='''Minor allele frequency lower limits. All variants having sample MAF>m2
+            will be included in analysis. Number of arguments for this option should be the same
+            as number of algorithms involved in VAT stacking.''')
+        parser.add_argument('--trait_type', required = True, type=str, choices = ['quantitative','disease'],
+            help='''Phenotype is quantitative trait or disease trait (0/1 coding).''')
+        parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
+            help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
+            Default set to 1''')
+        parser.add_argument('--use_indicator', type=str, choices = ["Y", "N"], nargs = "*",
+            help='''"Y" to this option will apply binary coding to genotype groups
+            (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise).
+            Use "N" for original coding. Number of arguments for this option should be the same
+            as number of algorithms involved in VAT stacking.''')
+        # permutations arguments
+        parser.add_argument('-p', '--permutations', required = True, metavar='N', type=int,
+            help='''Number of permutations, required for VAT stacking algorithm''')
+        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+            help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
+        parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
+            help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
+            The program will compute a p-value every 1000 permutations and compare the lower bound of the 95 percent CI
+            of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
+            specify a "C" that is slightly larger than the significance level for the study.
+            To disable the adaptive procedure, set C=1. Default is C=0.1''')
+        parser.add_argument('--variable_thresholds',  type=str, choices = ["Y", "N"], nargs = "*",
+            help='''"Y" for this option will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci. Use "N" for fixed threshold. Number of arguments for this option should be the same as number of algorithms involved in VAT stacking.''')
+        parser.add_argument('--extern_weight', nargs='*', default=[],
+            help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info' or '--geno_info'. Number of arguments for this option should be the same as number of algorithms involved in VAT stacking. Note that all weights will be masked if --use_indicator is evoked.''')
+        parser.add_argument('--weight', type=str, nargs="+", choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = ['None'],
+            help='''Internal weighting themes inspired by various association methods. Valid choices are:
+               'Browning_all', 'Browning', 'KBAC' and 'RBT'. For quantitative traits weights will be based on
+               pseudo case/ctrl status defined by comparison with the mean of the quantitative traits.
+               Number of arguments for this option should be the same as number of algorithms involved in VAT stacking.''')
+        parser.add_argument('--NA_adjust', action='store_true',
+            help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
+            be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
+            ''')
+        parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
+            default='additive',
+            help='''Mode of inheritance. Will code genotypes as 0/1/2/NA for additive mode, 0/1/NA for dominant or recessive mode. Default set to additive''')
+        args = parser.parse_args(method_args)
+        # incorporate args to this class
+        self.__dict__.update(vars(args))
+
+
+    def _determine_algorithm(self):
+        # check if WEVI arguments are compatible
+        if not self.mafupper:
+            self.mafupper = [1.0 for x in self.weight]
+        if not self.maflower:
+            self.maflower = [0.0 for x in self.weight]
+        if not self.extern_weight:
+            self.extern_weight = [[] for x in self.weight]
+        else:
+            self.extern_weight = [[x] for x in self.extern_weight]
+        if not self.use_indicator:
+            self.use_indicator = ["N" for x in self.weight]
+        if not self.variable_thresholds:
+            self.variable_thresholds = ["N" for x in self.weight]
+        for item in ['extern_weight', 'use_indicator', 'variable_thresholds', 'mafupper', 'maflower']:
+            param = eval("self.{}".format(item))
+            if param and len(self.weight) != len(param):
+                raise ValueError("--weight and --{} should have equal number of arguments".format(item))
+        # determine algorithms for StackingPermutator
+        n = self.permutations
+        ww = self.weight
+        ee = self.extern_weight
+        ii = self.use_indicator
+        pp = self.maflower
+        qq = self.mafupper
+        self.permutations = 0
+        a = []
+        for w, e, i, p, q in zip(ww, ee, ii, pp, qq):
+            self.weight = w
+            self.extern_weight = e
+            self.use_indicator = True if i == 'Y' else False
+            self.maflower = p
+            self.mafupper = q
+            a.append(GLMBurdenTest._determine_algorithm(self))
+        algorithm = t.StackingPermutator(a, [True if v == 'Y' else False for v in self.variable_thresholds],
+                                         self.permute_by.upper(), n, self.adaptive)
+        return algorithm
+         
 #
 # External tests
 # dumping data to disk, or run external standalone programs to process the data thus written

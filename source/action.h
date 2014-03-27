@@ -1043,7 +1043,7 @@ private:
 };
 
 
-// Action executor. simply execute a sequence of actions one by on AssoData object
+// Action executor. simply execute a sequence of actions one by one on AssoData object
 class AssoAlgorithm : public BasePermutator
 {
 
@@ -1194,6 +1194,61 @@ public:
 private:
 	size_t m_times;
 	unsigned m_alternative;
+	double m_sig;
+	BaseAction * m_permute;
+};
+
+/* VAT Stacking permutator
+ * m_times: number of permutations
+ * m_sig: required significance level "alpha"
+ * m_actions: a sequence of actions to be applied to AssoData
+ */
+
+class StackingPermutator : public BasePermutator
+{
+
+public:
+	StackingPermutator(const vectora & actions, const vectori & isVt,
+		char pm, size_t times, double sig)
+		: BasePermutator(actions), m_isVt(isVt), m_times(times), m_sig(sig)
+	{
+		// permute phenotypes or permute genotype scores
+		m_permute = pm == 'Y' ? (BaseAction *)(new PermuteY()) : (BaseAction *)(new PermuteAllX());
+	}
+
+
+	~StackingPermutator()
+	{
+		delete m_permute;
+	}
+
+
+	StackingPermutator(const StackingPermutator & rhs) :
+		BasePermutator(rhs),
+		m_isVt(rhs.m_isVt),
+		m_times(rhs.m_times),
+		m_sig(rhs.m_sig), m_permute(rhs.m_permute->clone())
+	{
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new StackingPermutator(*this);
+	}
+
+
+	std::string name()
+	{
+		return "StackingPermutator";
+	}
+
+
+	bool apply(AssoData & d, int timeout = 0);
+
+private:
+	vectori m_isVt;
+	size_t m_times;
 	double m_sig;
 	BaseAction * m_permute;
 };

@@ -1725,6 +1725,117 @@ bool VariablePermutator::apply(AssoData & d, int timeout)
 }
 
 
+bool StackingPermutator::apply(AssoData & d, int timeout)
+{
+	// compute mac
+	SetMaf mafsetter;
+
+	mafsetter.apply(d);
+	// MAC thresholds, uniq, sorted
+	// each element in this vector of MAC thresholds will define one subset of variant sites
+	vectorf umac = d.getArrayVar("mac");
+	// make sure umac has no decimal values
+	for (size_t i = 0; i < umac.size(); ++i) {
+		umac[i] = double(int(umac[i] + 0.5));
+	}
+	try {
+		std::sort(umac.begin(), umac.end());
+		std::vector<double>::iterator it = std::unique(umac.begin(), umac.end());
+		umac.resize(it - umac.begin());
+		if (umac.size() == 0) throw "mac is empty";
+		if (fEqual(umac.front(), 0.0)) {
+			umac.erase(umac.begin());
+		}
+		if (umac.size() == 0) throw "mac is empty";
+	} catch (...) {
+		// nothing to do
+		d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+		d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+		d.setSE(std::numeric_limits<double>::quiet_NaN());
+		return true;
+	}
+	// now umac should be a sorted vector of unique MAC's from AssoData
+	double maclower = umac.front() - std::numeric_limits<double>::epsilon();
+	//
+	RNG rng;
+	gsl_rng * gslr = rng.get();
+
+	unsigned permcount1 = 0, permcount2 = 0;
+	double pvalue = 9.0;
+	// statistics[0]: statistic
+	// statistics[1]: actual number of permutations
+	vectorf statistics(2);
+
+	Timer timer(timeout);
+	RunningStat rs;
+	// permutation loop
+	// not efficient design but gets the job done
+	for (size_t i = 0; i < m_times; ++i) {
+		vectorf pstatistics(m_actions.size());
+		for (size_t j = 0; j < m_actions.size(); ++j) {
+			AssoData * dtmp = d.clone();
+			if (!m_isVt[j]) {
+				m_actions[j]->apply(*dtmp);
+				pstatistics[j] = -std::log(dtmp->pvalue().front());
+			} else {
+				vectorf vt_statistic(0);
+				for (size_t m = 0; m < umac.size(); ++m) {
+					SetSites(umac[(umac.size() - m - 1)], maclower, true).apply(*dtmp);
+					m_actions[j]->apply(*dtmp);
+					vt_statistic.push_back(-std::log(dtmp->pvalue().front()));
+				}
+				pstatistics[j] = *max_element(vt_statistic.begin(), vt_statistic.end());
+			}
+			delete dtmp;
+		}
+		double statistic = *max_element(pstatistics.begin(), pstatistics.end());
+		if (i == 0) {
+			statistics[0] = statistic;
+			if (statistics[0] != statistics[0]) {
+				d.setStatistic(std::numeric_limits<double>::quiet_NaN());
+				d.setSE(std::numeric_limits<double>::quiet_NaN());
+				d.setPvalue(std::numeric_limits<double>::quiet_NaN());
+				d.setVar("NPERM", 0);
+				return true;
+			}
+		} else {
+			if (statistic > statistics[0]) {
+				++permcount1;
+			} else if (statistic < statistics[0]) {
+				++permcount2;
+			} else {
+				if (gsl_rng_uniform(gslr) > 0.5) ++permcount1;
+				else ++permcount2;
+			}
+			rs.Push(statistic);
+		}
+		// adaptive p-value calculation checkpoint
+		if (m_sig < 1.0) {
+			pvalue = check(permcount1, permcount2, i, 1, m_sig);
+		}
+		if (timer.timeout(i)) {
+			pvalue = -1.0 * getP(permcount1, permcount2, i, 1);
+		}
+		if (pvalue <= 1.0) {
+			statistics[1] = double(i);
+			break;
+		}
+		m_permute->apply(d);
+	}
+	if (pvalue <= 1.0) {
+		d.setPvalue(pvalue);
+	} else{
+		d.setPvalue(getP(permcount1, permcount2, m_times, 1));
+	}
+
+	statistics[1] = (statistics[1] > 0.0) ? statistics[1] : double(m_times);
+	d.setStatistic(statistics[0]);
+	d.setSE(rs.StandardDeviation());
+	d.setVar("NPERM", int(statistics[1]));
+	return true;
+}
+
+
 // foreach model:
 // 1. get weight from input info (via d.getVar)
 // 2. generate weighted sum (for wss and RBT) or recode genotype patterns by corresponding weight

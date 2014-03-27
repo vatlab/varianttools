@@ -175,7 +175,7 @@ class AssociationTestManager:
                 for test in self.tests:
                     if test.trait_type == 'disease':
                         raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".\
-                                         format(test.__class__.__name__, '/'.join([str(int(x)) for x in item])))
+                                         format(test.__class__.__name__, '/'.join([str(x) for x in item])))
         # step 4-2: check if 'SSeq_common' is valid to use
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
