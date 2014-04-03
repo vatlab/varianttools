@@ -36,6 +36,7 @@ else:
     from variant_tools.assoTests_py3 import calculateInbreedingCoef
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, rbox, \
      resolvePlotFilename
+from variant_tools.simulation import expandRegions
 
 # save the command line that has been processed by the shell. It might not work as shown.
 env.command_line = 'vtools_report ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else repr(x) for x in sys.argv[1:]])
@@ -355,14 +356,16 @@ def discordanceRate(args):
 # command sequence
 #
 def sequenceArguments(parser):
-    parser.add_argument('region', nargs='+', help='''One or more chromosome regions in
+    parser.add_argument('regions', nargs='+', help='''One or more chromosome regions in
         the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), or Field:Value
         from a region-based annotation database (e.g. refGene.name2:TRIM2 or
-        refGene_exon.name:NM_000947). Chromosome positions are 1-based and are inclusive
-        at both ends so the chromosome region has a length of end-start+1 bp. A reversed
-        complementary sequence will be outputted if starting position is after the
-        ending position. For the second case, multiple sequences will be printed if the
-        name matches more than one chromosomal regions.''')
+        refGene_exon.name:NM_000947). Several regions will be printed if the name matches
+        more than one regions. The regions will be marked by their indexes
+        but values from another field will be used if the its name is appended
+        (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
+        Chromosome positions are 1-based and are inclusive at both ends so the chromosome
+        region has a length of end-start+1 bp. A reversed complementary sequence will be
+        outputted if starting position is after the ending position.''')
     parser.add_argument('--build', nargs='?', 
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
@@ -372,72 +375,6 @@ def sequenceArguments(parser):
     parser.add_argument('--char_per_line', type=int,
         help='''Number of characters (excluding space and leading numbers) per line. Default to
             70 in regular and 60 in numbered format.''')
-    #parser.add_argument('--mutants', nargs='?',
-    #    help='''Adding mutants in specified table to the returned reference
-    #        sequence. Multiple alternative alleles at the same location
-    #        are not well-supported now.''')
-
-
-def expandRegions(args):
-    regions = []
-    for region in args.region:
-        try:
-            chr, location = region.split(':', 1)
-            start, end = location.split('-')
-            start = int(start.replace(',', ''))
-            end = int(end.replace(',', ''))
-            if start == 0 or end == 0:
-                raise ValueError('0 is not allowed as starting or ending position')
-            if start > end:
-                regions.append((chr, start, end, '(reverse complementary)'))
-            else:
-                regions.append((chr, start, end, ''))
-        except Exception as e:
-            # this is not a format for chr:start-end, try field:name
-            try:
-                field, value = region.split(':', 1)
-                annoDB = None
-                # now we need to figure out how to get start and end position...
-                lines = getoutput(['vtools', 'show', 'fields'])
-                for line in lines.split('\n'):
-                    try:
-                        field_name = line.split()[0]
-                    except:
-                        continue
-                    if '.' not in field_name:
-                        continue
-                    if field == field_name or field == field_name.split('.')[-1]:
-                        annoDB = field_name.split('.')[0]
-                        field = field_name.split('.')[1]
-                        break
-                if annoDB is None:
-                    raise ValueError('Cannot locate field {} in the current project'.format(field))
-                # now we have annotation database
-                # but we need to figure out how to use it
-                anno_type = getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
-                if anno_type.strip() != 'range':
-                    raise ValueError('Only field from a range-based annotation database could be used.')
-                # get the fields?
-                build = eval(getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
-                if args.build in build:
-                    chr_field, start_field, end_field = build[args.build]
-                else:
-                    raise ValueError('Specified build {} does not match that of the annotation database.'.format(args.build))
-                #
-                # find the regions
-                output = getoutput(['vtools', 'execute', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
-                    chr_field, start_field, end_field, annoDB, annoDB, field, value)])
-                for idx, line in enumerate(output.split('\n')):
-                    try:
-                        chr, start, end = line.split()
-                        regions.append((chr, int(start) + 1, int(end), '({} {})'.format(region, idx+1)))
-                    except:
-                        pass
-                if not regions:
-                    env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
-            except Exception as e:
-                raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
-    return regions
 
 def sequence(args):
     # get build
@@ -460,8 +397,11 @@ def sequence(args):
         'N': 'N',
         'n': 'n'
     }
+    with Project(verbosity=0) as proj:
+        regions = expandRegions(args.regions, proj, mergeRegions=False)
+        #
     # get chromosomal region
-    for chr, start, end, comment in expandRegions(args):
+    for chr, start, end, comment in regions:
         # get reference seq
         if start <= end:
             seq = ref.getSequence(chr, start, end)
@@ -470,7 +410,8 @@ def sequence(args):
             start, end = end, start
             reversed_seq = True
             seq = ''.join([complement_table[x] for x in ref.getSequence(chr, start, end)[::-1]])
-        print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr, start, end, comment))
+        print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
+            start, end, '({})'.format(comment) if comment else ''))
         # break into pieces of 70 bp
         if args.numbered:
             char_per_line = 60 if args.char_per_line is None else args.char_per_line

@@ -112,10 +112,12 @@ def simulateArguments(parser):
         help='''One or more chromosome regions in the format of chr:start-end
         (e.g. chr21:33,031,597-33,041,570), or Field:Value from a region-based 
         annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+        Multiple chromosomal regions will be selected if the name matches more
+        than one chromosomal regions. The regions will be marked by their indexes
+        but values from another field will be used if the its name is appended
+        (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
         Chromosome positions are 1-based and are inclusive at both ends so the 
-        chromosome region has a length of end-start+1 bp. For the second case,
-        multiple chromosomal regions will be selected if the  name matches more
-        than one chromosomal regions.''')
+        chromosome region has a length of end-start+1 bp.''')
     parser.add_argument('--model', 
         help='''Simulation model, which defines the algorithm and default
             parameter to simulate data. A list of model-specific parameters
@@ -124,9 +126,9 @@ def simulateArguments(parser):
             all available models and details of one model.''')
     
 
-def expandRegions(arg_region, arg_build, proj):
+def expandRegions(arg_regions, proj, mergeRegions=True):
     regions = []
-    for region in arg_region:
+    for region in arg_regions:
         try:
             chr, location = region.split(':', 1)
             start, end = location.split('-')
@@ -134,16 +136,19 @@ def expandRegions(arg_region, arg_build, proj):
             end = int(end.replace(',', ''))
             if start == 0 or end == 0:
                 raise ValueError('0 is not allowed as starting or ending position')
+            # start might be after end
             if start > end:
-                raise ValueError('Ending position {} before starting position {}'
-                    .format(end, start))
-                regions.append((chr, start, end))
+                regions.append((chr, start, end, '(reverse complementary)'))
             else:
-                regions.append((chr, start, end))
+                regions.append((chr, start, end, ''))
         except Exception as e:
             # this is not a format for chr:start-end, try field:name
             try:
-                field, value = region.rsplit(':', 1)
+                if region.count(':') == 1:
+                    field, value = region.rsplit(':', 1)
+                    comment_field = "''"
+                else:
+                    field, value, comment_field = region.rsplit(':', 2)
                 # what field is this?
                 query, fields = consolidateFieldName(proj, 'variant', field, False) 
                 # query should be just one of the fields according to things that are passed
@@ -162,24 +167,32 @@ def expandRegions(arg_region, arg_build, proj):
                 #
                 # find the regions
                 cur = proj.db.cursor()
-                cur.execute('SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
-                    chr_field, start_field, end_field, annoDB.linked_name, annoDB.name,
-                    field.rsplit('.',1)[-1], value))
-                for chr, start, end in cur:
+                try:
+                    cur.execute('SELECT {},{},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                        chr_field, start_field, end_field, comment_field, annoDB.linked_name, annoDB.name,
+                        field.rsplit('.',1)[-1], value))
+                except Exception as e:
+                    raise ValueError('Failed to search range and comment field: {}'.format(e))
+                for idx, (chr, start, end, comment) in enumerate(cur):
                     if start > end:
                         env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
                             .format(chr, start + 1, end + 1, annoDB.linked_name))
                         continue
                     try:
-                        regions.append(('chr{}'.format(chr), int(start) + 1, int(end)))
+                        if comment:
+                            regions.append(('chr{}'.format(chr), int(start), int(end), comment))
+                        else:
+                            regions.append(('chr{}'.format(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
                     except Exception as e:
                         env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
-                            .format(chr, start + 1, end + 1, annoDB.linked_name))
+                            .format(chr, start, end, annoDB.linked_name))
                 if not regions:
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
     # remove duplicates and merge ranges
+    if not mergeRegions:
+        return regions
     regions = list(set(regions))
     while True:
         merged = False
@@ -189,10 +202,18 @@ def expandRegions(arg_region, arg_build, proj):
                 r2 = regions[j]
                 if r1 is None or r2 is None:
                     continue
+                # reversed?
+                reversed = r1[1] > r1[2] or r2[1] > r2[2]
+                if reversed:
+                    r1 = (r1[0], min(r1[1], r1[2]), max(r1[1], r1[2]), r1[3])
+                    r2 = (r2[0], min(r2[1], r2[2]), max(r2[1], r2[2]), r2[3])
                 if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
-                    env.logger.info('Merging regions {}:{}-{} and {}:{}-{}'
-                        .format(r2[0], r2[1], r2[2], r1[0], r1[1], r1[2]))
-                    regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]))
+                    env.logger.info('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
+                        .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
+                    if reversed:
+                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3][:-1] + ', ' + r2[3][1:])
+                    else:
+                        regions[i] = (r1[0], max(r1[2], r2[2]), min(r1[1], r2[1]), r1[3][:-1] + ', ' + r2[3][1:])
                     regions[j] = None
                     merged = True
         if not merged:
@@ -213,7 +234,7 @@ def simulate(args):
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            print expandRegions(args.regions, proj.build, proj)
+            print expandRegions(args.regions, proj)
             #extractFromVCF(os.path.expanduser('~/vtools/test/vcf/CEU.vcf.gz'),
             #    ['1:1-100000'])
 
