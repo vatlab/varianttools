@@ -96,10 +96,13 @@ else:
 SQLITE_FOLDER = 'sqlite/{}'
 WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
 WRAPPER_PY_FILE = 'source/assoTests_{}.py'
+INTERFACE_FILE = 'source/assoTests.i'
 CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
 CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
+CGATOOLS_INTERFACE_FILE = 'source/cgatools.i'
 UCSCTOOLS_WRAPPER_CPP_FILE = 'source/ucsctools_wrap_{}.cpp'
 UCSCTOOLS_WRAPPER_PY_FILE = 'source/ucsctools_{}.py'
+UCSCTOOLS_INTERFACE_FILE = 'source/ucsctools.i'
 SQLITE_PY_FILE = 'source/vt_sqlite3_{}.py'
 
 
@@ -591,21 +594,30 @@ if 'svn' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
     # all files needed for the source package
     #
     for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
+        # we re-generate wrapper files for all versions of python only for
+        # source distribution
+        if (not SDIST) and (not PYVER.endswith(str(sys.version_info.major))):
+            continue
         if (not os.path.isfile(WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(WRAPPER_CPP_FILE.format(PYVER)) \
           or os.path.getmtime(WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), 'source/assoTests.i']), shell=True)
+            print('Generating {}'.format(WRAPPER_CPP_FILE.format(PYVER)))
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for association module.')
             os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
         #
-        if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))):
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/cgatools.i']), shell=True)
+        if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
+          or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
+            print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)))
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), CGATOOLS_INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
             os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
         #
-        if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))):
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), 'source/ucsctools.i']), shell=True)
+        if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
+          or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
+            print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)))
+            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), UCSCTOOLS_INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for ucsctools.')
             os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
