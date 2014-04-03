@@ -430,7 +430,7 @@ def expandRegions(args):
                 for idx, line in enumerate(output.split('\n')):
                     try:
                         chr, start, end = line.split()
-                        regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
+                        regions.append((chr, int(start) + 1, int(end), '({} {})'.format(region, idx+1)))
                     except:
                         pass
                 if not regions:

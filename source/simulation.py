@@ -25,7 +25,9 @@
 
 import sys, os, re
 from .project import Project
-from .utils import ProgressBar, DatabaseEngine, delayedAction, env
+from .utils import ProgressBar, DatabaseEngine, delayedAction, env,\
+    consolidateFieldName
+
 if sys.version_info.major == 2:
     from ucsctools_py2 import tabixFetch
 else:
@@ -122,9 +124,7 @@ def simulateArguments(parser):
             all available models and details of one model.''')
     
 
-def expandRegions(arg_region, arg_build, proj=None):
-    if proj is None:
-        proj = Project(verbosity=args.verbosity)
+def expandRegions(arg_region, arg_build, proj):
     regions = []
     for region in arg_region:
         try:
@@ -135,55 +135,68 @@ def expandRegions(arg_region, arg_build, proj=None):
             if start == 0 or end == 0:
                 raise ValueError('0 is not allowed as starting or ending position')
             if start > end:
-                regions.append((chr, start, end, '(reverse complementary)'))
+                raise ValueError('Ending position {} before starting position {}'
+                    .format(end, start))
+                regions.append((chr, start, end))
             else:
-                regions.append((chr, start, end, ''))
+                regions.append((chr, start, end))
         except Exception as e:
             # this is not a format for chr:start-end, try field:name
             try:
-                field, value = region.split(':', 1)
-                annoDB = None
-                # now we need to figure out how to get start and end position...
-                lines = getoutput(['vtools', 'show', 'fields'])
-                for line in lines.split('\n'):
-                    try:
-                        field_name = line.split()[0]
-                    except:
-                        continue
-                    if '.' not in field_name:
-                        continue
-                    if field == field_name or field == field_name.split('.')[-1]:
-                        annoDB = field_name.split('.')[0]
-                        field = field_name.split('.')[1]
-                        break
-                if annoDB is None:
-                    raise ValueError('Cannot locate field {} in the current project'.format(field))
+                field, value = region.rsplit(':', 1)
+                # what field is this?
+                query, fields = consolidateFieldName(proj, 'variant', field, False) 
+                # query should be just one of the fields according to things that are passed
+                if query.strip() not in fields:
+                    raise ValueError('Could not identify field {} from the present project'.format(field))
                 # now we have annotation database
-                # but we need to figure out how to use it
-                anno_type = getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="anno_type"'.format(annoDB, annoDB)])
-                if anno_type.strip() != 'range':
-                    raise ValueError('Only field from a range-based annotation database could be used.')
+                try:
+                    annoDB = [x for x in proj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
+                except:
+                    raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
+                #
+                if annoDB.anno_type != 'range':
+                    raise ValueError('{} is not linked as a range-based annotation database.'.format(annoDB.linked_name))
                 # get the fields?
-                build = eval(getoutput(['vtools', 'execute', 'SELECT value FROM {}.{}_info WHERE name="build"'.format(annoDB, annoDB)]))
-                if arg_build in build:
-                    chr_field, start_field, end_field = build[arg_build]
-                else:
-                    raise ValueError('Specified build {} does not match that of the annotation database.'.format(arg_build))
+                chr_field, start_field, end_field = annoDB.build
                 #
                 # find the regions
-                output = getoutput(['vtools', 'execute', 'SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
-                    chr_field, start_field, end_field, annoDB, annoDB, field, value)])
-                for idx, line in enumerate(output.split('\n')):
+                cur = proj.db.cursor()
+                cur.execute('SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                    chr_field, start_field, end_field, annoDB.linked_name, annoDB.name,
+                    field.rsplit('.',1)[-1], value))
+                for chr, start, end in cur:
+                    if start > end:
+                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
+                            .format(chr, start + 1, end + 1, annoDB.linked_name))
+                        continue
                     try:
-                        chr, start, end = line.split()
-                        regions.append((chr, int(start), int(end), '({} {})'.format(region, idx+1)))
-                    except:
-                        pass
+                        regions.append(('chr{}'.format(chr), int(start) + 1, int(end)))
+                    except Exception as e:
+                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
+                            .format(chr, start + 1, end + 1, annoDB.linked_name))
                 if not regions:
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
-    return regions
+    # remove duplicates and merge ranges
+    regions = list(set(regions))
+    while True:
+        merged = False
+        for i in range(len(regions)):
+            for j in range(i + 1, len(regions)):
+                r1 = regions[i]
+                r2 = regions[j]
+                if r1 is None or r2 is None:
+                    continue
+                if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
+                    env.logger.info('Merging regions {}:{}-{} and {}:{}-{}'
+                        .format(r2[0], r2[1], r2[2], r1[0], r1[1], r1[2]))
+                    regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]))
+                    regions[j] = None
+                    merged = True
+        if not merged:
+            return sorted([x for x in regions if x is not None])
 
 
 def extractFromVCF(filenameOrUrl, regions, output=''):
@@ -200,9 +213,9 @@ def simulate(args):
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            #print expandRegions(args.regions, proj.build, proj)
-            extractFromVCF(os.path.expanduser('~/vtools/test/vcf/CEU.vcf.gz'),
-                ['1:1-100000'])
+            print expandRegions(args.regions, proj.build, proj)
+            #extractFromVCF(os.path.expanduser('~/vtools/test/vcf/CEU.vcf.gz'),
+            #    ['1:1-100000'])
 
     except Exception as e:
         env.logger.error(e)
