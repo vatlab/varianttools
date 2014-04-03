@@ -27,6 +27,15 @@
 
 %module ucsctools
 
+%include "std_vector.i"
+%include "std_string.i"
+
+namespace std
+{
+    %template()         vector<string>;     /* e.g. infoFields */
+}
+
+
 %{
 extern "C" {
 #include "common.h"
@@ -71,7 +80,6 @@ extern "C" {
 }
 
 
-%include "std_string.i"
 
 %inline %{
 
@@ -486,7 +494,87 @@ void showTrack(const std::string & track_file, const std::string output_file = s
     if (!output_file.empty())
         fclose(output);
 }
+
+
+bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string> & regions, 
+    const std::string & output_file = std::string(), bool print_header=true)
+{
+    FILE * output = NULL;
+    if (output_file.empty()) {
+        output = stdout;
+    } else {
+        output = fopen(output_file.c_str(), "w");
+        if (!output) {
+            fprintf(stderr, "Failed to open output file %s.", output_file.c_str());
+            return false;
+        }
+    }
+    //
+	ti_conf_t & conf = ti_conf_vcf;
+
+    std::string fnidx = filenameOrURL + ".tbi";
+
+    tabix_t *t;
+    int is_remote = (strncmp(fnidx.c_str(), "ftp://", 6) == 0 || strncmp(fnidx.c_str(), "http://", 7) == 0) ? 1 : 0;
+    if (!is_remote )
+    {
+        // Common source of errors: new VCF is used with an old index
+        struct stat stat_tbi,stat_vcf;
+        stat(fnidx.c_str(), &stat_tbi);
+        stat(filenameOrURL.c_str(), &stat_vcf);
+        if (stat_vcf.st_mtime > stat_tbi.st_mtime )
+        {
+            fprintf(stderr, "[tabix] the index file %s either does not exist or is older than the vcf file. Please reindex.\n",
+                fnidx.c_str());
+            return false;
+        }
+    }
+    if ((t = ti_open(filenameOrURL.c_str(), 0)) == 0) {
+        fprintf(stderr, "[main] fail to open the data file.\n");
+        return false;
+    }
+
+    // retrieve from specified regions
+    int len;
+    const char *s;
+    
+    if (ti_lazy_index_load(t) < 0) {
+        fprintf(stderr,"[tabix] failed to load the index file.\n");
+        return false;
+    }
+
+    const ti_conf_t * idxconf = ti_get_conf(t->idx);
+    if ( print_header )
+    {
+        // If requested, print the header lines here
+        ti_iter_t iter = ti_query(t, 0, 0, 0);
+        while ((s = ti_read(t, iter, &len)) != 0) {
+            if ((int)(*s) != idxconf->meta_char)
+                break;
+            fputs(s, output);
+            fputc('\n', output);
+        }
+        ti_iter_destroy(iter);
+    }
+    for (int i = 0; i < regions.size(); ++i) {
+        int tid, beg, end;
+        if (ti_parse_region(t->idx, regions[i].c_str(), &tid, &beg, &end) == 0) {
+            ti_iter_t iter = ti_queryi(t, tid, beg, end);
+                while ((s = ti_read(t, iter, &len)) != 0) {
+                    fputs(s, output);
+                    fputc('\n', output);
+            }
+            ti_iter_destroy(iter);
+        } 
+    }
+    ti_close(t);
+	return true;
+}
+
 %} 
 
 
 void showTrack(const std::string & track_file, const std::string output_file = std::string());
+bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string> & regions,
+    const std::string & output_file = std::string(), bool print_header=true);
+

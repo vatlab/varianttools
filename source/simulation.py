@@ -26,6 +26,10 @@
 import sys, os, re
 from .project import Project
 from .utils import ProgressBar, DatabaseEngine, delayedAction, env
+if sys.version_info.major == 2:
+    from ucsctools_py2 import tabixFetch
+else:
+    from ucsctools_py3 import tabixFetch
 
 import argparse
 
@@ -182,12 +186,24 @@ def expandRegions(arg_region, arg_build, proj=None):
     return regions
 
 
+def extractFromVCF(filenameOrUrl, regions, output=''):
+    # This is equivalent to 
+    #
+    # tabix -h ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/
+    #     ALL.2of4intersection.20100804.genotypes.vcf.gz 2:39967768-39967768
+    #
+    #
+    tabixFetch(filenameOrUrl, regions)
+
 def simulate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            print expandRegions(args.regions, proj.build, proj)
+            #print expandRegions(args.regions, proj.build, proj)
+            extractFromVCF(os.path.expanduser('~/vtools/test/vcf/CEU.vcf.gz'),
+                ['1:1-100000'])
+
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
