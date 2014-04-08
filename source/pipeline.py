@@ -1434,8 +1434,8 @@ class Pipeline:
             'temp_dir': env.temp_dir,
             'cache_dir': env.cache_dir,
             'local_resource': env.local_resource,
-            'ref_genome_build': self.proj.build if self.proj.build else '',
-            'vtools_version': self.proj.version,
+            'ref_genome_build': '' if self.proj is None or not self.proj.build else  self.proj.build,
+            'vtools_version': '' if self.proj is None else self.proj.version,
         }
         for key, val in self.pipeline.pipeline_vars.items():
             self.VARS[key.lower()] = self.substitute(val, self.VARS)
@@ -1608,59 +1608,78 @@ def executeArguments(parser):
         help='''Delimiter used to output results of a SQL query.''')
 
 def execute(args):
+    # to keep backward compatibility, the vtools execute command
+    # can execute a SQL query and a pipeline
+    def executeQuery(proj):
+        # if there is no output, 
+        proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+        # for backward compatibility
+        proj.db.attach('{}_genotype'.format(proj.name))
+        cur = proj.db.cursor()
+        # 
+        query = ' '.join(args.pipeline)
+        if query.upper().startswith('SELECT'):
+            env.logger.debug('Analyze statement: "{}"'.format(query))
+            cur.execute('EXPLAIN QUERY PLAN ' + query)
+            for rec in cur:
+                env.logger.debug('\t'.join([str(x) for x in rec]))
+        # really execute the query
+        try:
+            cur.execute(query)
+        except Exception as e:
+            raise RuntimeError('Failed to execute SQL query "{}": {}'
+                .format(query, e))
+        proj.db.commit()
+        sep = args.delimiter
+        for rec in cur:
+            print(sep.join(['{}'.format(x) for x in rec]))
+    #
+    def executePipeline(proj):                
+        pipeline = Pipeline(proj, args.pipeline[0], extra_args=args.unknown_args)
+        # unspecified
+        if len(args.pipeline) == 1:
+            pipeline.execute(None, args.input, args.output,
+                args.jobs)
+        else:
+            for name in args.pipeline[1:]:
+                pipeline.execute(name, args.input, args.output,
+                    args.jobs)
+    # 
+    # first try to execute a pipeline without project
+    try:
+        # try to open an project, if failed assume that we are
+        # executing a pipeline without project.
+        with Project(verbosity=args.verbosity) as proj:
+            pass
+    except Exception as e:
+        env.logger.warning('Executing pipeline {} without a project'.format(args.pipeline))
+        env.temp_dir = None
+        try:
+            executePipeline(None)
+            return
+        except Exception as e:
+            env.unlock_all()
+            env.logger.error(e)
+            sys.exit(1)
+    #
+    # the normal execution with a working project
     try:
         with Project(verbosity=args.verbosity) as proj:
-            # to keep backward compatibility, the vtools execute command
-            # can execute a SQL query and a pipeline
             #
-            def executeQuery():
-                # if there is no output, 
-                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-                # for backward compatibility
-                proj.db.attach('{}_genotype'.format(proj.name))
-                cur = proj.db.cursor()
-                # 
-                query = ' '.join(args.pipeline)
-                if query.upper().startswith('SELECT'):
-                    env.logger.debug('Analyze statement: "{}"'.format(query))
-                    cur.execute('EXPLAIN QUERY PLAN ' + query)
-                    for rec in cur:
-                        env.logger.debug('\t'.join([str(x) for x in rec]))
-                # really execute the query
-                try:
-                    cur.execute(query)
-                except Exception as e:
-                    raise RuntimeError('Failed to execute SQL query "{}": {}'
-                        .format(query, e))
-                proj.db.commit()
-                sep = args.delimiter
-                for rec in cur:
-                    print(sep.join(['{}'.format(x) for x in rec]))
-            #
-            def executePipeline():                
-                pipeline = Pipeline(proj, args.pipeline[0], extra_args=args.unknown_args)
-                # unspecified
-                if len(args.pipeline) == 1:
-                    pipeline.execute(None, args.input, args.output,
-                        args.jobs)
-                else:
-                    for name in args.pipeline[1:]:
-                        pipeline.execute(name, args.input, args.output,
-                            args.jobs)
             # definitely a pipeline
             if args.input or args.output or args.unknown_args:
-                executePipeline()
+                executePipeline(proj)
             # definitely a sql query
             elif args.delimiter != '\t':
-                executeQuery()
+                executeQuery(proj)
             else:
                 try:
                     # try to execute as a SQL query
-                    executeQuery()
+                    executeQuery(proj)
                 except RuntimeError as e:
                     env.logger.debug('Failed to execute {} as SQL query: {}'
                         .format(' '.join(args.pipeline), e))
-                    executePipeline()
+                    executePipeline(proj)
     except Exception as e:
         env.unlock_all()
         env.logger.error(e)
