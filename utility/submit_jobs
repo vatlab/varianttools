@@ -155,7 +155,7 @@ class Jobs:
         # 
         # get a list of running jobs
         qstat_output = subprocess.check_output(self.qstat_cmd, shell=True)
-        running_jobs = [x for x in qstat_output.decode().split() if x in self.jobs]
+        running_jobs = [x.strip() for x in qstat_output.decode().split() if x in self.jobs]
         #
         nIgnored = 0
         nRunning = 0
@@ -260,7 +260,7 @@ notification_email (optional): an email address to which major events such as
     #
     # add variables defined in configuration file to args
     qsub_cmd = cvars['qsub_cmd'] if 'qsub_cmd' in cvars else 'qsub < $name.pbs'
-    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else 'qstat -f | grep Job_Name | cut -d= -f2'
+    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else '''qstat -f | grep 'Job_Name\|job_state' | cut -d= -f2 | awk '{printf $0 ";"; getline; print $0}' | grep -v '; C' | cut -d';' -f1'''
     mailer = Mailer(
         cvars['notification_email'] if 'notification_email' in cvars else '',
         cvars['smtp_host'] if 'smtp_host' in cvars else 'localhost',
