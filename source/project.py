@@ -1107,8 +1107,7 @@ class Project:
             cls._instance = super(Project, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, name=None, build=None, new=False, verbosity=None, 
-        verify=True, **kwargs):
+    def __init__(self, name=None, new=False, verbosity=None, verify=True, **kwargs):
         '''Create a new project (--new=True) or connect to an existing one.'''
         files = glob.glob('*.proj')
         if new: # new project
@@ -1174,12 +1173,12 @@ class Project:
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         #
         if new: 
-            self.create(build=build, **kwargs)
+            self.create(**kwargs)
             self.checkUpdate()
         else:
             self.open(verify)
 
-    def create(self, build, **kwargs):
+    def create(self, **kwargs):
         '''Create a new project'''
         # open the project file
         env.logger.info(VTOOLS_COPYRIGHT)
@@ -1190,7 +1189,7 @@ class Project:
         self.db.connect(self.proj_file)
         #
         self.creation_date = time.asctime()
-        self.build = build
+        self.build = None
         self.alt_build = None
         # no meta information for now
         self.variant_meta = None
@@ -1438,13 +1437,9 @@ class Project:
             if res is None or isinstance(res, (int, float)):
                 return res
             else:
-                if sys.version_info.major == 2:
-                    # res can be an unicode string and need to be converted to
-                    # string
-                    return str(res)
-                else:
-                    # not sure if this works for python 3, so use str(res) first
-                    return res.decode('utf-8', 'ignore')
+                # res can be an unicode string and need to be converted to
+                # string
+                return str(res)
         except Exception as e:
             #env.logger.debug(e)
             #env.logger.warning('Failed to retrieve value for project property {}'.format(key))
@@ -3648,7 +3643,7 @@ def init(args):
                     dirs.append(child)
             args.children = dirs
         # create a new project
-        with Project(name=args.project, build=None, new=True, 
+        with Project(name=args.project, new=True, 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
             if args.parent:
                 copier = ProjCopier(proj, args.parent, args.variants,
