@@ -144,7 +144,7 @@ class EmitInput:
             if fl is None:
                 env.logger.info('Cannot detect the type of file because the {} has been removed.'
                     .format(filename))
-                return True
+                return filename.lower().split('.')[-1] not in ['bam', 'sam', 'gz', 'zip']
             if not fl.startswith('@'):
                 return False
             if filename.endswith('.gz'):
@@ -1305,7 +1305,20 @@ class DownloadResource:
                 raise RuntimeError('Failed to download {}: {} {}'
                     .format(filename, type(e).__name__, e))
             #
-            if filename.endswith('.gz') and not filename.endswith('tar.gz'):
+            if filename.endswith('.tar.gz'):
+                manifest = filename + '.manifest'
+                if not os.path.isfile(manifest):
+                    with tarfile.open(filename, 'r:gz') as tar: 
+                        s = delayedAction(env.logger.info, 'Extracting {}'.format(filename))
+                        tar.extractall(self.pipeline_resource)
+                        del s
+                        # only extract files
+                        files = [x.name for x in tar.getmembers() if x.isfile()]
+                        # save content to a manifest
+                        with open(manifest, 'w') as manifest:
+                            for f in files:
+                                manifest.write(f + '\n')
+            elif filename.endswith('.gz'):
                 if not existAndNewerThan(ofiles=filename[:-3], ifiles=filename):
                     s = delayedAction(env.logger.info,
                         'Decompressing {}'.format(filename))
@@ -1652,7 +1665,7 @@ def execute(args):
         with Project(verbosity=args.verbosity) as proj:
             pass
     except Exception as e:
-        env.logger.warning('Executing pipeline {} without a project'.format(args.pipeline))
+        env.logger.warning('Executing pipeline {} without a project'.format(' '.join(args.pipeline)))
         env.temp_dir = None
         try:
             executePipeline(None)
