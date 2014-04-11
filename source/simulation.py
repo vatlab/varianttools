@@ -213,33 +213,59 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                 if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
                     env.logger.info('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
                         .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
+                    try:
+                        shared_label = [x!=y for x,y in zip(r1[3], r2[3])].index(True)
+                    except:
+                        # no shared leading string
+                        shared_label = 0
                     if reversed:
-                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3][:-1] + ', ' + r2[3][1:])
+                        regions[i] = (r1[0], max(r1[2], r2[2]), min(r1[1], r2[1]), r1[3] + ', ' + r2[3][shared_label:])
                     else:
-                        regions[i] = (r1[0], max(r1[2], r2[2]), min(r1[1], r2[1]), r1[3][:-1] + ', ' + r2[3][1:])
+                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
                     regions[j] = None
                     merged = True
         if not merged:
             return sorted([x for x in regions if x is not None])
 
 
-def extractFromVCF(filenameOrUrl, regions, output=''):
+def extractFromVCF(filenameOrUrl, regions):
     # This is equivalent to 
     #
     # tabix -h ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/
     #     ALL.2of4intersection.20100804.genotypes.vcf.gz 2:39967768-39967768
     #
     #
-    tabixFetch(filenameOrUrl, regions)
+    output = os.path.join(env.cache_dir, 'extracted.vcf')
+    tabixFetch(filenameOrUrl, [], output, True)
+    for r in regions:
+        region = '{}:{}-{}'.format(r[0][3:] if r[0].startswith('chr') else r[0], r[1], r[2])
+        env.logger.info('Retriving 1000 genomes data for region chr{}{}'.format(region,
+            ' ({})'.format(r[3] if r[3] else '')))
+        tabixFetch(filenameOrUrl, [region], output, False)
+    # extract genotypes
+    allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
+    with open(output, 'r') as vcf:
+        for line in vcf:
+            if line.startswith('#'):
+                continue
+            fields = line.split('\t')
+            chr = fields[0]
+            pos = fields[1]
+            geno = [allele_map[x[0]] + allele_map[x[2]] for x in fields[10:]]
+            geno = [(x,y) for x,y in enumerate(geno) if y != 0]
+            #env.logger.info('{} {} {}'.format(chr, pos, geno))
+    #
+    # now we need to create a simupop population ..., should we use mutational space?
+
+
+vcf1000g = 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz'
 
 def simulate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            print expandRegions(args.regions, proj)
-            #extractFromVCF(os.path.expanduser('~/vtools/test/vcf/CEU.vcf.gz'),
-            #    ['1:1-100000'])
+            extractFromVCF(vcf1000g, expandRegions(args.regions, proj))
 
     except Exception as e:
         env.logger.error(e)

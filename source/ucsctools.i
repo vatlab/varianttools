@@ -503,7 +503,10 @@ bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string
     if (output_file.empty()) {
         output = stdout;
     } else {
-        output = fopen(output_file.c_str(), "w");
+        if (print_header)
+            output = fopen(output_file.c_str(), "w");
+        else
+            output = fopen(output_file.c_str(), "a");
         if (!output) {
             fprintf(stderr, "Failed to open output file %s.", output_file.c_str());
             return false;
@@ -568,6 +571,8 @@ bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string
         } 
     }
     ti_close(t);
+    if (!output_file.empty())
+        fclose(output);
 	return true;
 }
 
