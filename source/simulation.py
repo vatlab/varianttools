@@ -183,9 +183,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                         continue
                     try:
                         if comment:
-                            regions.append(('chr{}'.format(chr), int(start), int(end), comment))
+                            regions.append((str(chr), int(start), int(end), comment))
                         else:
-                            regions.append(('chr{}'.format(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
+                            regions.append((str(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
                     except Exception as e:
                         env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
                             .format(chr, start, end, annoDB.linked_name))
@@ -227,6 +227,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
         if not merged:
             return sorted([x for x in regions if x is not None])
 
+import simuOpt
+simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=True, version='1.1.2')
+import simuPOP as sim
 
 def extractFromVCF(filenameOrUrl, regions):
     # This is equivalent to 
@@ -236,39 +239,73 @@ def extractFromVCF(filenameOrUrl, regions):
     #
     #
     output = os.path.join(env.cache_dir, 'extracted.vcf')
-    tabixFetch(filenameOrUrl, [], output, True)
+    #tabixFetch(filenameOrUrl, [], output, True)
     for r in regions:
-        region = '{}:{}-{}'.format(r[0][3:] if r[0].startswith('chr') else r[0], r[1], r[2])
+        region = '{}:{}-{}'.format(r[0], r[1], r[2])
         env.logger.info('Retriving 1000 genomes data for region chr{}{}'.format(region,
             ' ({})'.format(r[3] if r[3] else '')))
-        tabixFetch(filenameOrUrl, [region], output, False)
+        #tabixFetch(filenameOrUrl, [region], output, False)
+    #
+    # translate regions to simuPOP ...
+    lociPos = {}
+    for r in regions:
+        if r[0] in lociPos:
+            lociPos[r[0]].extend(range(r[1], r[2] + 1))
+        else:
+            lociPos[r[0]] = range(r[1], r[2] + 1)
+    chroms = lociPos.keys()
+    chroms.sort()
+    #
+    # create a dictionary of lociPos->index on each chromosome
+    lociIndex = {}
+    for chIdx,ch in enumerate(chroms):
+        lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
+    #
+    # number of individuals? 629
+    print chroms
+    pop = sim.Population(size=629, loci=[len(lociPos[x]) for x in chroms],
+        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+    #
+    # we assume 0 for wildtype, 1 for genotype
+    #
     # extract genotypes
     allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
+    mutantCount = 0
     with open(output, 'r') as vcf:
         for line in vcf:
             if line.startswith('#'):
                 continue
             fields = line.split('\t')
-            chr = fields[0]
-            pos = fields[1]
-            geno = [allele_map[x[0]] + allele_map[x[2]] for x in fields[10:]]
-            geno = [(x,y) for x,y in enumerate(geno) if y != 0]
-            #env.logger.info('{} {} {}'.format(chr, pos, geno))
-    #
-    # now we need to create a simupop population ..., should we use mutational space?
+            chr = pop.chromNames().index(fields[0])
+            pos = lociIndex[chr][int(fields[1])]
+            #
+            for ind, geno in enumerate(fields[10:]):
+                if geno[0] != 0:
+                    pop.individual(ind).setAllele(1, pos, 0, chr)
+                    mutantCount += 1
+                if geno[2] != 0:
+                    pop.individual(ind).setAllele(1, pos, 1, chr)
+                    mutantCount += 1
+    env.logger.info('{} mutants imported'.format(mutantCount))
+    pop.save('a.pop')
+    return pop
 
+from srv2 import simuRareVariants
+from simuPOP.demography import *
 
 vcf1000g = 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz'
 
 def simulate(args):
-    try:
+    #try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            extractFromVCF(vcf1000g, expandRegions(args.regions, proj))
-
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
+            #pop = extractFromVCF(vcf1000g, expandRegions(args.regions, proj))
+            pop = sim.loadPopulation('a.pop')
+            #demoMode = 
+            simuRareVariants2(pop) 
+    #except Exception as e:
+    #    env.logger.error(e)
+    #    sys.exit(1)
 
 
