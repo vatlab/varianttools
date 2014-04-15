@@ -589,7 +589,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     SUM = 1
     MIN = 2
     MAX = 3
-    operationKeys = {'avg': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
+    MEDIAN = 4
+    operationKeys = {'avg': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX, 'median': MEDIAN}
     possibleOperations = operationKeys.keys()
     
     operations = []
@@ -626,9 +627,9 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 'wtGT, mutGT, missing, hom, het, other and GT are accepted for '
                 'special functions'.format(stat))
         else:
-            m = re.match('(\w+)\s*=\s*(avg|sum|max|min)\s*\(\s*(\w+)\s*\)\s*', stat)
+            m = re.match('(\w+)\s*=\s*(avg|sum|max|min|median)\s*\(\s*(\w+)\s*\)\s*', stat)
             if m is None:
-                raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max and min'.format(stat))
+                raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max, min and median'.format(stat))
             dest, operation, field = m.groups()
             if operation not in possibleOperations:
                 raise ValueError('Unsupported operation {}. Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
@@ -1039,7 +1040,7 @@ def updateArguments(parser):
     stat.add_argument('--from_stat', metavar='EXPR', nargs='*', default=[],
         help='''One or more expressions such as meanQT=avg(QT) that aggregate
             genotype info (e.g. QT) of variants in all or selected samples to
-            specified fields (e.g. meanQT). Functions sum, avg, max, and min
+            specified fields (e.g. meanQT). Functions sum, avg, max, min and median 
             are currently supported. In addition, special functions #(GT),
             #(hom), #(het), #(alt), #(other), #(missing), #(wtGT), #(mutGT),
             and maf(), are provided to count the number of valid genotypes (not

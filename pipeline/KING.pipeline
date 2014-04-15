@@ -53,6 +53,10 @@ num_comp=5
 num_comp_comment= number of MDS components in global ancestry analysis that
   will be imported to sample table.
 
+maf=0.01
+maf_comment= Minor Allele Frequency cutoff. Variants having MAF smaller than this
+  value will be dropped from analysis.
+
 jobname=KING
 jobname_comment=A jobname, an identifier that will be part of filenames and field names
   generated during the execution of this pipeline. Please ONLY
@@ -85,7 +89,7 @@ action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.t
 comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
 
 [king_31]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf 0.05 --make-bed --out %(jobname)s',
+action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
 comment=LD pruning from pre-calculated list 
 
