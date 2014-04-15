@@ -26,7 +26,7 @@
 import sys, os, re
 from .project import Project
 from .utils import ProgressBar, DatabaseEngine, delayedAction, env,\
-    consolidateFieldName
+    consolidateFieldName, RefGenome
 
 if sys.version_info.major == 2:
     from ucsctools_py2 import tabixFetch
@@ -231,7 +231,7 @@ import simuOpt
 simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=True, version='1.1.2')
 import simuPOP as sim
 
-def extractFromVCF(filenameOrUrl, regions):
+def vcfToPop(filenameOrUrl, regions):
     # This is equivalent to 
     #
     # tabix -h ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/
@@ -295,22 +295,49 @@ from simuPOP.demography import *
 
 vcf1000g = 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz'
 demo = MultiStageModel([
-    InstantChangeModel(T=100, N0=2000),
-    ExponentialGrowthModel(T=100, NT=10000)
+    InstantChangeModel(T=100, N0=200),
+    ExponentialGrowthModel(T=100, NT=1000)
     ])
+
+def popToVcf(proj, pop, sample_names=[], filename=None):
+    # import variants to the current project
+    # first get all the
+    with open(filename, 'w') as vcf:
+        vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
+        if sample_names:
+            if len(sample_names) != pop.popSize():
+                raise ValueError('Sample names, if specified, should be assigned to'
+                    'all {} individuals.'.format(pop.popSize()))
+            vcf.write('\t'.join(sample_names) + '\n')
+        else:
+            vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
+        #
+        # get reference genome
+        ref = RefGenome(proj.build)
+        for chr in range(pop.numChrom()):
+            chr_name = pop.chromName(chr)
+            for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
+                pos = pop.locusPos(loc)
+
+
+
+                
 
 def simulate(args):
     #try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: 
             # get the model of simulation
-            #pop = extractFromVCF(vcf1000g, expandRegions(args.regions, proj))
-            pop = sim.loadPopulation('a.pop')
+            #pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
+            #pop = sim.loadPopulation('a.pop')
             #demoMode = 
-            simuRareVariants2(pop, demo, mu=1e-4, 
+            #pop = simuRareVariants2(pop, demo, mu=1e-4, 
                 #selector=getSelector('gamma1', None),
-                selector=getSelector('gamma1', None),
-                recRate=1e-8  ) 
+            #    selector=getSelector('gamma1', None),
+            #    recRate=1e-8  ) 
+            #pop.save('b.pop')
+            pop.loadPopulation('b.pop')
+            popToVcf(proj, pop, filename='b.vcf')
     #except Exception as e:
     #    env.logger.error(e)
     #    sys.exit(1)
