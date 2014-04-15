@@ -20,11 +20,13 @@ genetic diseases caused by a large number of rare variants.
 #
 
 import simuOpt
-simuOpt.setOptions(alleleType='long', optimized=True, quiet=True, version='1.0.5')
+simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=False, version='1.0.5')
 
 import simuPOP as sim
 from simuPOP.utils import ProgressBar, migrIslandRates
-from simuPOP.sandbox import RevertFixedSites, revertFixedSites, MutSpaceSelector, MutSpaceMutator, MutSpaceRecombinator
+#from simuPOP.sandbox import RevertFixedSites, revertFixedSites, MutSpaceSelector, MutSpaceMutator, MutSpaceRecombinator
+
+from .utils import env
 
 import os, sys, logging, math, time
 
@@ -305,7 +307,7 @@ options = [
 ]
 
 
-class   RandomFitness:
+class RandomFitness:
     def __init__(self):
         self.coefMap = {}
 
@@ -329,6 +331,7 @@ class   RandomFitness:
                 h = self.h
             #
             self.coefMap[loc] = s, h
+            #env.logger.info('SEL: loc:{} allele: {} s:{} h:{}'.format(loc, alleles, s, h))
         if 0 in alleles:
             return 1. - s * h
         else:
@@ -362,7 +365,7 @@ class GammaDistributedFitness(RandomFitness):
         self.theta = theta
         self.h = h
 
-    def _newS(self):
+    def _newS(self, loc, alleles):
         return sim.getRNG().randGamma(self.k, self.theta)
 
 class BoundedMixedGammaDistributedFitness(RandomFitness):
@@ -376,7 +379,7 @@ class BoundedMixedGammaDistributedFitness(RandomFitness):
         self.lower = lower
         self.upper = upper
      
-    def _newS(self):
+    def _newS(self, loc, alleles):
         if p > 0 and sim.getRNG().randUniform() < p:
             return a
         while True:
@@ -395,7 +398,7 @@ class TrimmedMixedGammaDistributedFitness(RandomFitness):
         self.lower = lower
         self.upper = upper
      
-    def _newS(self):
+    def _newS(self, loc, alleles):
         if p > 0 and sim.getRNG().randUniform() < p:
             return a
         s = sim.getRNG().randGamma(self.k, self.theta)
@@ -444,18 +447,18 @@ def getSelector(selDist, selCoef, selModel='exponential'):
     elif selDist == 'constant':
         pyFunc = ConstantFitness(s=selCoef[0], h=selCoef[1])
     #
-    mySelector = sim.PyMlSelector(func=pyFunc, mode=mode)
+    return sim.PyMlSelector(func=pyFunc, mode=mode)
 
 
 
-def simuRareVariants2(pop, demoModel, mu, selector, recRate=0, 
-        statFile='', popFile='', markerFile='', mutantFile='', genotypeFile='',
-        logger=None):
+def simuRareVariants2(pop, demoModel, mu, selector, recRate=0):
     #
     # Evolve
+    env.logger.info('Add info fields fitness and migrate_to')
     pop.addInfoFields(['fitness', 'migrate_to'])
     startTime = time.clock()
     #
+    env.logger.info('Start evolving...')
     pop.evolve(
         initOps=sim.InitSex(),
         preOps=[
@@ -467,7 +470,7 @@ def simuRareVariants2(pop, demoModel, mu, selector, recRate=0,
 5. average allele frequency * 100
 6. average fitness value
 7. minimal fitness value of the parental population
-''', at = 0) + \
+''', at = 0),
             # revert alleles at fixed loci to wildtype
             sim.RevertFixedSites(),
             # 
@@ -475,16 +478,13 @@ def simuRareVariants2(pop, demoModel, mu, selector, recRate=0,
             # selection on all loci
             selector,
             # output statistics in verbose mode
-            sim.IfElse(verbose > 0, ifOps=[
-                sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
-                    numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
-                sim.PyEval(r'"%5d %s %5d %.6f %.6f %.6f %.6f\n" '
+            sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
+                   numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
+            sim.PyEval(r'"%5d %s %5d %.6f %.6f %.6f %.6f" '
                     '% (gen, subPopSize, numOfSegSites, float(numOfMutants)/popSize, '
                     '(numOfMutants * 50. / numOfSegSites / popSize) if numOfSegSites else 0, '
                     ' meanOfInfo["fitness"], minOfInfo["fitness"])',
-                    output='>>' + statFile),
-                ], at = progGen
-            ),
+                    output=env.logger.info),
         ],
         matingScheme=sim.RandomMating(ops=
             sim.Recombinator(rates=recRate, loci=sim.ALL_AVAIL) if recRate != 0 else sim.MendelianGenoTransmitter(),
@@ -492,19 +492,17 @@ def simuRareVariants2(pop, demoModel, mu, selector, recRate=0,
         finalOps=[
             # revert fixed sites so that the final population does not have fixed sites
             sim.RevertFixedSites(),
-            sim.IfElse(verbose > 0, ifOps=[
-                # statistics after evolution
-                sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
-                    numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
-                sim.PyEval(r'"%5d %s %5d %.6f %.6f %.6f %.6f\n" '
-                    '% (gen, subPopSize, numOfSegSites, float(numOfMutants)/popSize, '
-                    '(numOfMutants * 50. / numOfSegSites / popSize) if numOfSegSites else 0, '
-                    ' meanOfInfo["fitness"], minOfInfo["fitness"])',
-                    output='>>' + statFile),
-                sim.PyEval(r'"Simulated population has %d individuals, %d segregation sites.'
-                           r'There are on average %.1f mutants per individual. Mean allele frequency is %.4f%%.\n"'
-                           r'% (popSize, numOfSegSites, numOfMutants / popSize, (numOfMutants * 50. / numOfSegSites/ popSize) if numOfSegSites else 0)' ),
-            ]),
+            # statistics after evolution
+            sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
+                numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
+            sim.PyEval(r'"%5d %s %5d %.6f %.6f %.6f %.6f\n" '
+                '% (gen, subPopSize, numOfSegSites, float(numOfMutants)/popSize, '
+                '(numOfMutants * 50. / numOfSegSites / popSize) if numOfSegSites else 0, '
+                ' meanOfInfo["fitness"], minOfInfo["fitness"])',
+                output=env.logger.info),
+            sim.PyEval(r'"Simulated population has %d individuals, %d segregation sites.'
+                       r'There are on average %.1f mutants per individual. Mean allele frequency is %.4f%%.\n"'
+                       r'% (popSize, numOfSegSites, numOfMutants / popSize, (numOfMutants * 50. / numOfSegSites/ popSize) if numOfSegSites else 0)' ),
         ],
         gen = demoModel.num_gens
     )

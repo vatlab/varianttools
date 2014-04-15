@@ -290,10 +290,14 @@ def extractFromVCF(filenameOrUrl, regions):
     pop.save('a.pop')
     return pop
 
-from srv2 import simuRareVariants
+from srv import simuRareVariants2, getSelector
 from simuPOP.demography import *
 
 vcf1000g = 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz'
+demo = MultiStageModel([
+    InstantChangeModel(T=100, N0=2000),
+    ExponentialGrowthModel(T=100, NT=10000)
+    ])
 
 def simulate(args):
     #try:
@@ -303,7 +307,10 @@ def simulate(args):
             #pop = extractFromVCF(vcf1000g, expandRegions(args.regions, proj))
             pop = sim.loadPopulation('a.pop')
             #demoMode = 
-            simuRareVariants2(pop) 
+            simuRareVariants2(pop, demo, mu=1e-4, 
+                #selector=getSelector('gamma1', None),
+                selector=getSelector('gamma1', None),
+                recRate=1e-8  ) 
     #except Exception as e:
     #    env.logger.error(e)
     #    sys.exit(1)
