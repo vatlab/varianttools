@@ -27,6 +27,7 @@ import sys, os, re
 from .project import Project
 from .utils import ProgressBar, DatabaseEngine, delayedAction, env,\
     consolidateFieldName, RefGenome
+from .importer import Importer
 
 if sys.version_info.major == 2:
     from ucsctools_py2 import tabixFetch
@@ -299,7 +300,7 @@ demo = MultiStageModel([
     ExponentialGrowthModel(T=100, NT=1000)
     ])
 
-def popToVcf(proj, pop, refGenome, sample_names=[], filename=None):
+def popToVcf(proj, refGenome, pop, sample_names=[], filename=None):
     # import variants to the current project
     # translate 0,1,2,3 to A,C,G,T
     alleleMap = {
@@ -320,11 +321,15 @@ def popToVcf(proj, pop, refGenome, sample_names=[], filename=None):
             vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
         #
         # get reference genome
-        stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
+        sim.stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
+        nAlleles = 2*pop.popSize()
+        segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]
+        env.logger.info('Genetic variants identified on {} loci'.format(len(segregated)))
+        prog = ProgressBar('Exporting simulated population', pop.totNumLoci())
         for chr in range(pop.numChrom()):
             chr_name = pop.chromName(chr)
             for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
-                if pop.dvars().alleleNum[loc][0] == 2 * pop.popSize():
+                if pop.dvars().alleleNum[loc][0] == nAlleles:
                     continue
                 pos = int(pop.locusPos(loc))
                 ref = refGenome.getBase(chr_name, pos)
@@ -332,14 +337,27 @@ def popToVcf(proj, pop, refGenome, sample_names=[], filename=None):
                 geno1 = [ind.allele(loc, 0) for ind in pop.individuals()]
                 geno2 = [ind.allele(loc, 1) for ind in pop.individuals()]
                 #
-                alt = list([alleleMap[ref][x] for x in (set(geno1) | set(geno2) - set([ref]))])
+                alt = list((set(geno1) | set(geno2)) - set([0]))
                 #
                 if len(alt) == 0:
-                    raise ValueError('No alternative allele ...')
+                    env.logger.error('No alternative allele at locus {}:{}'.format(chr_name, pos))
+                    continue
+                elif len(alt) == 1:
+                    # easier...
+                    vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
+                        chr_name, pos, ref, alleleMap[ref][alt[0]]))
+                    vcf.write('\t'.join(['{}/{}'.format(x if x==0 else 1, 
+                        y if y == 0 else 1) for x,y in zip(geno1, geno2)]) + '\n')
+                else:
+                    # we need to figure out the index of geno in alt
+                    vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
+                        chr_name, pos, ref, ','.join([alleleMap[ref][a] for a in alt])))
+                    vcf.write('\t'.join(['{}/{}'.format(x if x==0 else alt.index(x) + 1, 
+                        y if y == 0 else alt.index(y) + 1) for x,y in zip(geno1, geno2)]) + '\n')
                 #
-                vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
-                    chr_name, pos, ref, ','.join(alt)))
-                vcf.write(
+                prog.update(loc)
+        prog.done()
+
                         
                     
 
@@ -356,14 +374,19 @@ def simulate(args):
             #pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
             #pop.save('a.pop')
             #pop = sim.loadPopulation('a.pop')
-            #demoMode = 
             #pop = simuRareVariants2(pop, ref, demo, mu=1e-4, 
                 #selector=getSelector('gamma1', None),
             #    selector=getSelector('gamma1', None),
             #    recRate=1e-8  ) 
             #pop.save('b.pop')
-            pop.loadPopulation('b.pop')
-            popToVcf(proj, ref, pop, filename='b.vcf')
+            #pop = sim.loadPopulation('b.pop')
+            #popToVcf(proj, ref, pop, filename='b.vcf')
+            # import ?
+            importer = Importer(proj=proj, files=['b.vcf'],
+                build=proj.build, format='vcf', sample_name=[],
+                force=True, jobs=4, fmt_args=[])
+            importer.importFilesInParallel()
+            importer.finalize()
     #except Exception as e:
     #    env.logger.error(e)
     #    sys.exit(1)
