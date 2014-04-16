@@ -299,8 +299,15 @@ demo = MultiStageModel([
     ExponentialGrowthModel(T=100, NT=1000)
     ])
 
-def popToVcf(proj, pop, sample_names=[], filename=None):
+def popToVcf(proj, pop, refGenome, sample_names=[], filename=None):
     # import variants to the current project
+    # translate 0,1,2,3 to A,C,G,T
+    alleleMap = {
+        'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+        'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+        'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+        'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+    }
     # first get all the
     with open(filename, 'w') as vcf:
         vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
@@ -313,11 +320,28 @@ def popToVcf(proj, pop, sample_names=[], filename=None):
             vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
         #
         # get reference genome
-        ref = RefGenome(proj.build)
+        stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
         for chr in range(pop.numChrom()):
             chr_name = pop.chromName(chr)
             for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
-                pos = pop.locusPos(loc)
+                if pop.dvars().alleleNum[loc][0] == 2 * pop.popSize():
+                    continue
+                pos = int(pop.locusPos(loc))
+                ref = refGenome.getBase(chr_name, pos)
+                # genotypes
+                geno1 = [ind.allele(loc, 0) for ind in pop.individuals()]
+                geno2 = [ind.allele(loc, 1) for ind in pop.individuals()]
+                #
+                alt = list([alleleMap[ref][x] for x in (set(geno1) | set(geno2) - set([ref]))])
+                #
+                if len(alt) == 0:
+                    raise ValueError('No alternative allele ...')
+                #
+                vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
+                    chr_name, pos, ref, ','.join(alt)))
+                vcf.write(
+                        
+                    
 
 
 
@@ -326,18 +350,20 @@ def popToVcf(proj, pop, sample_names=[], filename=None):
 def simulate(args):
     #try:
         with Project(verbosity=args.verbosity) as proj:
+            ref = RefGenome(proj.build)
             # step 0: 
             # get the model of simulation
             #pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
+            #pop.save('a.pop')
             #pop = sim.loadPopulation('a.pop')
             #demoMode = 
-            #pop = simuRareVariants2(pop, demo, mu=1e-4, 
+            #pop = simuRareVariants2(pop, ref, demo, mu=1e-4, 
                 #selector=getSelector('gamma1', None),
             #    selector=getSelector('gamma1', None),
             #    recRate=1e-8  ) 
             #pop.save('b.pop')
             pop.loadPopulation('b.pop')
-            popToVcf(proj, pop, filename='b.vcf')
+            popToVcf(proj, ref, pop, filename='b.vcf')
     #except Exception as e:
     #    env.logger.error(e)
     #    sys.exit(1)

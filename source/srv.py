@@ -451,12 +451,19 @@ def getSelector(selDist, selCoef, selModel='exponential'):
 
 
 
-def simuRareVariants2(pop, demoModel, mu, selector, recRate=0):
+def simuRareVariants2(pop, refGenome, demoModel, mu, selector, recRate=0):
     #
     # Evolve
     env.logger.info('Add info fields fitness and migrate_to')
     pop.addInfoFields(['fitness', 'migrate_to'])
     startTime = time.clock()
+    #
+    base = {'A': [], 'C': [], 'G': [], 'T': [], 'N': []}
+    for chr in range(pop.numChrom()):
+        chr_name = pop.chromName(chr)
+        for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
+            ref = refGenome.getBase(chr_name, int(pop.locusPos(loc)))
+            base[ref].append(loc)
     #
     env.logger.info('Start evolving...')
     pop.evolve(
@@ -474,6 +481,17 @@ def simuRareVariants2(pop, demoModel, mu, selector, recRate=0):
             # revert alleles at fixed loci to wildtype
             sim.RevertFixedSites(),
             # 
+            # 'A' is zero, no need to map in and out
+            sim.AcgtMutator(model='K80', rate=[mu, 2], loci=base['A']),
+            sim.AcgtMutator(model='K80', rate=[mu, 2], loci=base['C'],
+                # base is C=0, 0,1,2,3 to C,G,T,A (1,2,3,0)
+                mapIn=[1,2,3,0], mapOut=[3,0,1,2]),
+            sim.AcgtMutator(model='K80', rate=[mu, 2], loci=base['G'],
+                # base is G=0, 0,1,2,3 to G,T,A,C (2,3,0,1)
+                mapIn=[2,3,0,1], mapOut=[2,3,0,1]),
+            sim.AcgtMutator(model='K80', rate=[mu, 2], loci=base['T'],
+                # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
+                mapIn=[3,0,1,2], mapOut=[1,2,3,0]),
             sim.SNPMutator(u=mu, v=mu),
             # selection on all loci
             selector,
