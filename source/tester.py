@@ -1859,13 +1859,14 @@ class ScoreSeq(ExternTest):
                 raise OSError("You Linux platform does not support SCORE-Seq program. It requires a 64bit Linux machine.")
             #
             SCORE_Seq_URL = 'http://www.bios.unc.edu/~dlin/software/SCORE-Seq/v3.0/dist/SCORE-Seq-3.0-linux-64.zip'
-            SCORE_Seq_URL_backup = 'http://www.houstonbioinformatics.org/vtools/programs/SCORE-Seq-3.0-linux-64.zip'
+            # download from vtools repository
+            SCORE_Seq_URL_backup = 'programs/SCORE-Seq-3.0-linux-64.zip'
             try:
                 env.logger.info('Downloading SCORE-Seq program (V3.0) from UNC')
                 try:
                     SCORE_Seq_zip = downloadFile(SCORE_Seq_URL, env.temp_dir)
                 except:
-                    env.logger.info('Using backup URL from houstonbioinformatics.org')
+                    env.logger.info('Using backup URL from online repository')
                     SCORE_Seq_zip = downloadFile(SCORE_Seq_URL_backup, env.temp_dir)
                 bundle = zipfile.ZipFile(SCORE_Seq_zip)
                 bundle.extractall(env.cache_dir)

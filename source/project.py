@@ -1342,7 +1342,7 @@ class Project:
         #
         # check current version of variant tools.
         try:
-            (version_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/CURRENT_VERSION.txt')
+            version_file = downloadFile('CURRENT_VERSION.txt', checkUpdate=True, quiet=True)
             with open(version_file, 'r') as version:
                 current_version = version.readline().strip()
             if [int(x) for x in re.sub('\D', ' ', current_version).split()] > \

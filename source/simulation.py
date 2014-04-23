@@ -373,14 +373,14 @@ def simulate(args):
             # get the model of simulation
             #pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
             #pop.save('a.pop')
-            #pop = sim.loadPopulation('a.pop')
-            #pop = simuRareVariants2(pop, ref, demo, mu=1e-4, 
+            pop = sim.loadPopulation('a.pop')
+            pop = simuRareVariants2(pop, ref, demo, mu=1e-4, 
                 #selector=getSelector('gamma1', None),
-            #    selector=getSelector('gamma1', None),
-            #    recRate=1e-8  ) 
+                selector=getSelector('gamma1', None),
+                recRate=1e-8  ) 
             #pop.save('b.pop')
             #pop = sim.loadPopulation('b.pop')
-            #popToVcf(proj, ref, pop, filename='b.vcf')
+            popToVcf(proj, ref, pop, filename='b.vcf')
             # import ?
             importer = Importer(proj=proj, files=['b.vcf'],
                 build=proj.build, format='vcf', sample_name=[],

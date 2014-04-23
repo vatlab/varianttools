@@ -876,7 +876,7 @@ class SKAT(RTest):
     def _install_skat(self, skat_dir):
         try:
             version = '0.82'
-            skat_url = 'http://www.houstonbioinformatics.org/vtools/programs/SKAT_{0}.tar.gz'.format(version)
+            skat_url = 'programs/SKAT_{0}.tar.gz'.format(version)
             env.logger.info('Downloading SKAT (V{0}) ...'.format(version))
             skat_tar = downloadFile(skat_url, env.temp_dir)
             mkdir_p(skat_dir)

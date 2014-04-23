@@ -393,7 +393,7 @@ class PlotAssociation:
             pfname = os.path.join(env.local_resource, 'resource/refgene.pkl')
             if not os.path.exists(pfname):
                 mkdir_p(os.path.join(env.local_resource, 'resource'))
-                downloadFile('http://vtools.houstonbioinformatics.org/resource/refgene.pkl',
+                downloadFile('resource/refgene.pkl',
                              os.path.join(env.local_resource, 'resource')) 
             with open(pfname, 'rb') as f:
                 gdict = pickle.load(f)

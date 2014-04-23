@@ -132,7 +132,7 @@ class RuntimeEnvironments(object):
                 'genotype data for association tests. The default value is the minimum of value '
                 'of option --jobs and 8. Note that a large number of reading processes might '
                 'lead to degraded performance or errors due to disk access limits.'),
-            'search_path': ('.;http://vtools.houstonbioinformatics.org/', 'A ;-separated list of '
+            'search_path': ('http://vtools.houstonbioinformatics.org/', 'A ;-separated list of '
                 'directories and URLs that are used to locate annotation database (.ann, .DB), '
                 'file format (.fmt) and other files. Reset this option allows alternative '
                 'local or online storage of such files. variant tools will append trailing '
@@ -141,7 +141,8 @@ class RuntimeEnvironments(object):
             'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
                 'resources such as reference genomes and annotation database. Files under this '
                 'directory is usually downloaded automatically upon use, but can also be '
-                'synchronized directly from http://vtools.houstonbioinformatics.org/.')
+                'synchronized directly from http://vtools.houstonbioinformatics.org/ or a '
+                'location specified by runtime option search_path.')
         }
         # a default value
         self.command_line = ''
@@ -1354,8 +1355,7 @@ class ResourceManager:
     def getRemoteManifest(self):
         '''Get a manifest of files on the server and parse it.'''
         try:
-            (manifest_file, header) = urllib.urlretrieve('http://vtools.houstonbioinformatics.org/MANIFEST.txt',
-                os.path.join(os.path.expanduser(env.local_resource), 'MANIFEST.txt'))
+            manifest_file = downloadFile('MANIFEST.txt', checkUpdate=True, quiet=True)
             #
             self.manifest = {}
             with open(manifest_file, 'r') as manifest:
@@ -1463,8 +1463,7 @@ class ResourceManager:
                 continue
             env.logger.debug('Download resource {}'.format(filename))
             try:
-                downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
-                    os.path.join(env.local_resource, filename), True)
+                downloadFile(filename, checkUpdate=True, quiet=True)
                 # check md5
                 if calculateMD5(dest_file, partial=True) != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'
@@ -1487,8 +1486,7 @@ class ResourceManager:
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
             try:
-                downloadURL('http://vtools.houstonbioinformatics.org/' + filename,
-                    os.path.join(env.local_resource, filename), False,
+                downloadFile(filename, checkUpdate=True, quiet=False, 
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
                 md5 = calculateMD5(os.path.join(env.local_resource, filename), partial=True)
@@ -1564,6 +1562,7 @@ def TEMP(filename):
 # 
 def downloadURL(URL, dest, quiet, message=None):
     # use libcurl? Recommended but not always available
+    env.logger.debug('Download {}'.format(URL))
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     if message is None:
         message = filename
@@ -1641,10 +1640,8 @@ def downloadURL(URL, dest, quiet, message=None):
     raise RuntimeError('Failed to download {}'.format(fileToGet))
 
 
-def downloadFile(fileToGet, dest_dir = None, quiet = False):
+def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False):
     '''Download file from URL to filename.'''
-    if fileToGet.startswith('http://vtools.houstonbioinformatics.org/'):
-        fileToGet = fileToGet[len('http://vtools.houstonbioinformatics.org/'):]
     #
     # if a complete URL is given, local file is something like 
     #
@@ -1678,14 +1675,11 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
             dest_dir = os.path.split(dest)[0]
     #
     deprecated = os.path.join(env.local_resource, 'DEPRECATED.txt')
-    if not os.path.isfile(deprecated):
+    if not os.path.isfile(deprecated) and fileToGet != 'DEPRECATED.txt':
         try:
-            urllib.urlretrieve('http://vtools.houstonbioinformatics.org/DEPRECATED.txt', deprecated)
+            downloadFile('DEPRECATED.txt')
         except Exception as e:
             env.logger.debug('Failed to download list of deprecated resources:'.format(e))
-        finally:
-            # remove manifest_file
-            urllib.urlcleanup()
     if os.path.isfile(deprecated):
         deprecated_files = [x.strip() for x in open(deprecated).readlines()]
         if fileToGet in deprecated_files:
@@ -1697,7 +1691,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
         os.makedirs(dest_dir)
     # 
     # if dest already exists, return it directly
-    if os.path.isfile(dest):
+    if (not checkUpdate) and os.path.isfile(dest):
         return dest
     # 
     # if a URL is given, try that URL first
@@ -1709,6 +1703,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False):
     #
     # use a search path
     for path in env.search_path.split(';'):
+        if checkUpdate and '://' not in path:
+            continue
         if '://' not in path:
             # if path is a local directory
             source_file = '{}/{}'.format(path, local_fileToGet)
