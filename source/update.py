@@ -769,7 +769,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     recIndex = index + 5       # first 5 attributes of variants are het, hom, double_het, GT, GT in males
                     # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
                     # by sqlite even when the field type is INT.
-                    if rec[queryIndex] in [None, '']:
+                    if rec[queryIndex] in [None, '', '.']:
                         continue
                     operation = operations[index]
                     field = genotypeFields[index]
