@@ -1650,9 +1650,18 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False)
     # unless a specific dest_dir is given
     #
     if '://' in fileToGet:
-        # get filename from URL
         filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
-        local_fileToGet = fileToGet.split('://', 1)[1]
+        in_search_path = False
+        for path in env.search_path.split(';'):
+            # if a path within the search path
+            if fileToGet.startswith(path):
+                local_fileToGet = fileToGet[len(path):]
+                in_search_path = True
+                break
+        #
+        if not in_search_path:
+            # get filename from URL
+            local_fileToGet = fileToGet.split('://', 1)[1]
         # use root local_resource directory if dest_dir is None
         if dest_dir is not None:
             dest = os.path.join(dest_dir, filename)
