@@ -1768,7 +1768,7 @@ class Project:
             res = cur.fetchone()
             samples[res[0]].append(res[1])
         for f in samples:
-            cur.execute('SELECT filename.filename, count(sample.sample_id) FROM filename LEFT OUTER JOIN sample on sample.file_id = filename.file_id WHERE filename.filename = ?;'),
+            cur.execute('SELECT filename.filename, count(sample.sample_id) FROM filename LEFT OUTER JOIN sample on sample.file_id = filename.file_id WHERE filename.filename = ?;',
                 (f,))
             rec = cur.fetchone()
             if rec[1] == len(samples[f]):
@@ -2023,7 +2023,7 @@ class Project:
             # change filenames
             filenames = []
             for id in ids:
-                query = 'SELECT filename FROM sample JOIN filename ON '
+                query = 'SELECT filename FROM sample JOIN filename ON ' \
                     'sample.file_id = filename.file_id WHERE sample_id = ?'
                 try:
                     cur.execute(query, (id, ))
