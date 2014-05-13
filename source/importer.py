@@ -579,7 +579,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
         else:
             self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db[0].PH)
         #
-        s = delayedAction(env.logger.info, 'Creating {} genotype tables'
+        s = delayedAction(env.logger.debug, 'Creating {} genotype tables'
             .format(len(self.sample_ids)))
         for idx, sid in enumerate(self.sample_ids):
             self.dispatcher[sid] = idx % nDBs

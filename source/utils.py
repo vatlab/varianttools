@@ -2018,10 +2018,8 @@ class DatabaseEngine:
         # not connected to any database for now
         self.dbName = None
         self.PH = '?'
-        self.AI = 'AUTOINCREMENT'
         self.database = None
 
-    
     def describeEngine(self):
         if env.sqlite_pragma == []:
             return 'sqlite (no pragma)'

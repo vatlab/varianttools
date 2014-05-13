@@ -352,8 +352,8 @@ class AnnoDB:
                         .format(100. * missing/num_records, num_records) if missing else ''))
                 if missing == num_records:
                     continue
-                cur.execute('SELECT distinct_entries {2} FROM {0}_field WHERE name={1};'.format(
-                    self.name, self.db.PH, ', min_value, max_value' if numeric else ''), (field.name,))
+                cur.execute('SELECT distinct_entries {1} FROM {0}_field WHERE name=?;'.format(
+                    self.name, ', min_value, max_value' if numeric else ''), (field.name,))
                 res = cur.fetchone()
                 print('Unique Entries:         {:,}'.format(res[0]))
                 if numeric:
@@ -840,13 +840,13 @@ class AnnoDBWriter:
         self.createFieldsTable()
         #
         for field in self.fields:
-            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
+            cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES (?,?,?,?);'.format(self.name),
                 (field.name, field.index, field.type, field.comment))
         self.db.commit()
         #
         # creating the info table
         env.logger.debug('Creating {}_info table'.format(self.name))
-        query = 'INSERT INTO {0}_info VALUES ({1},{1});'.format(self.name, self.db.PH)
+        query = 'INSERT INTO {0}_info VALUES (?,?);'.format(self.name)
         self.createInfoTable()
         cur.execute(query, ('name', self.name))
         cur.execute(query, ('anno_type', self.anno_type))
@@ -896,7 +896,7 @@ class AnnoDBWriter:
                 #            'option --update to force updating the existing fields.'.format(self.name, field.name))
             else:
                 # add new field
-                cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES ({1},{1},{1},{1});'.format(self.name, self.db.PH),
+                cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES (?,?,?,?);'.format(self.name),
                     (field.name, field.index, field.type, field.comment))
                 cur.execute('ALTER TABLE {} ADD {} {};'.format(self.name, field.name, field.type))
         #
@@ -968,9 +968,9 @@ class AnnoDBWriter:
         # calculating database statistics
         cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(self.build.values()[0]), self.name))
         count = cur.fetchone()[0]
-        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('distinct_keys', str(count)))
+        cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('distinct_keys', str(count)))
         num_records = self.db.numOfRows(self.name)
-        cur.execute('INSERT INTO {0}_info VALUES ({1}, {1});'.format(self.name, self.db.PH), ('num_records', num_records))
+        cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('num_records', num_records))
         if num_records == 0:
             self.db.destroy()
             raise RuntimeError('Failed to create annotation database: no record has been imported.')
@@ -984,7 +984,7 @@ class AnnoDBWriter:
             #
             missing = values.count(None)
             nonmissing = len(values) - missing
-            cur.execute('UPDATE {0}_field SET missing_entries={1} WHERE name="{2}";'.format(self.name, self.db.PH, field.name),
+            cur.execute('UPDATE {0}_field SET missing_entries=? WHERE name="{1}";'.format(self.name, field.name),
                 (missing,))
             if missing == num_records:
                 env.logger.warning('Field {} has all missing values'.format(field.name))
@@ -1525,9 +1525,9 @@ class Project:
         cur = self.db.cursor()
         cur.execute('''\
             CREATE TABLE filename (
-                file_id INTEGER PRIMARY KEY {0},
+                file_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename VARCHAR(256) NOT NULL
-            )'''.format(self.db.AI))
+            )''')
         # create index
         try:
             cur.execute('''CREATE UNIQUE INDEX filename_index ON filename (filename ASC);''')
@@ -1543,12 +1543,12 @@ class Project:
         #
         self.db.execute('''\
             CREATE TABLE variant (
-                variant_id INTEGER PRIMARY KEY {0},
+                variant_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bin INTEGER NULL,
                 chr VARCHAR(20) NULL,
                 pos INTEGER NULL,
                 ref VARCHAR(255) NOT NULL,
-                alt VARCHAR(255) NOT NULL {1});'''.format(self.db.AI,
+                alt VARCHAR(255) NOT NULL {0});'''.format(
                 ''.join([', {} {}\n'.format(x,y) for x,y in fields])))
         self.describeTable('variant', 'Master variant table', True, False)
         self.createIndexOnMasterVariantTable()
@@ -1681,9 +1681,9 @@ class Project:
         cur = self.db.cursor()
         query = '''\
             CREATE TABLE IF NOT EXISTS {0} (
-                sample_id INTEGER PRIMARY KEY {1},
+                sample_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_id INTEGER NOT NULL,
-                sample_name VARCHAR(256) NULL'''.format(table, self.db.AI)
+                sample_name VARCHAR(256) NULL'''.format(table)
         for (n, t) in fields:
             query += ',\n{} {} NULL'.format(n, t)
         query += ');'
@@ -1764,20 +1764,20 @@ class Project:
         cur = self.db.cursor()
         samples = defaultdict(list)
         for ID in IDs:
-            cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = {};'.format(self.db.PH), (ID,))
+            cur.execute('SELECT filename.filename, sample.sample_name FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id WHERE sample.sample_id = ?;', (ID,))
             res = cur.fetchone()
             samples[res[0]].append(res[1])
         for f in samples:
-            cur.execute('SELECT filename.filename, count(sample.sample_id) FROM filename LEFT OUTER JOIN sample on sample.file_id = filename.file_id WHERE filename.filename = {};'.format(self.db.PH),
+            cur.execute('SELECT filename.filename, count(sample.sample_id) FROM filename LEFT OUTER JOIN sample on sample.file_id = filename.file_id WHERE filename.filename = ?;'),
                 (f,))
             rec = cur.fetchone()
             if rec[1] == len(samples[f]):
                 env.logger.info('Removing {1} and all its samples ({0})'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
-                cur.execute('DELETE FROM filename WHERE filename = {}'.format(self.db.PH), (f,))
+                cur.execute('DELETE FROM filename WHERE filename = ?', (f,))
             else:
                 env.logger.info('Removing {} imported from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         for ID in IDs:
-            cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH), (ID,))
+            cur.execute('DELETE FROM sample WHERE sample_id = ?;', (ID,))
             self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
         self.db.commit()
         
@@ -1850,26 +1850,26 @@ class Project:
                     .format(cond))
             if name2 is None:
                 # rename all names to name1
-                cur.execute('UPDATE sample SET sample_name={} WHERE sample_id IN '
+                cur.execute('UPDATE sample SET sample_name=? WHERE sample_id IN '
                     '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
                     'sample.file_id = filename.file_id {});'
-                    .format(self.db.PH, where_clause), (name1, ))
+                    .format(where_clause), (name1, ))
                 env.logger.info('{} samples with names {} are renamed to {}'
                     .format(cur.rowcount, ', '.join([str(x) for x in sorted(set(names))]), name1))
             else:
                 for oldname in sorted(set(names)):
                     newname = oldname.replace(name1, name2, 1)
                     if cond.strip():
-                        where_clause = ' WHERE {} AND sample.sample_name={}'.format(cond, self.db.PH)
+                        where_clause = ' WHERE {} AND sample.sample_name=?'.format(cond)
                     else:
-                        where_clause = ' WHERE sample.sample_name={}'.format(self.db.PH)
+                        where_clause = ' WHERE sample.sample_name=?'
                     if newname == oldname:
                         continue
                     # rename all names to name1
-                    cur.execute('UPDATE sample SET sample_name={} WHERE sample_id IN '
+                    cur.execute('UPDATE sample SET sample_name=? WHERE sample_id IN '
                         '(SELECT sample_id FROM sample LEFT OUTER JOIN filename ON '
                         'sample.file_id = filename.file_id {});'
-                        .format(self.db.PH, where_clause),
+                        .format(where_clause),
                         (newname, oldname))
                     env.logger.info('Rename {} sample{} with name {} to {}'
                         .format(cur.rowcount, 's' if cur.rowcount > 1 else '',
@@ -2023,9 +2023,8 @@ class Project:
             # change filenames
             filenames = []
             for id in ids:
-                query = ('SELECT filename FROM sample JOIN filename ON '
-                    'sample.file_id = filename.file_id WHERE sample_id = {}'
-                    .format(self.db.PH))
+                query = 'SELECT filename FROM sample JOIN filename ON '
+                    'sample.file_id = filename.file_id WHERE sample_id = ?'
                 try:
                     cur.execute(query, (id, ))
                 except Exception as e:
@@ -2036,21 +2035,19 @@ class Project:
             #
             filenames = ','.join(sorted(list(set(filenames))))
             try:
-                cur.execute('INSERT INTO filename (filename) VALUES ({0});'.format(
-                    self.db.PH), (filenames,))
+                cur.execute('INSERT INTO filename (filename) VALUES (?);', (filenames,))
                 file_id = cur.lastrowid
             except:
                 # existing file id??
-                cur.execute('SELECT file_id FROM filename WHERE filename = {};'.format(
-                    self.db.PH), (filenames,))
+                cur.execute('SELECT file_id FROM filename WHERE filename = ?;', (filenames,))
                 file_id = cur.fetchone()[0]
             #
             # step 4: if things are doing all right, remove/update existing tables
             for idx, id in enumerate(ids):
                 if idx > 0:
-                    cur.execute('DELETE FROM sample WHERE sample_id = {}'.format(self.db.PH), (id,))
+                    cur.execute('DELETE FROM sample WHERE sample_id = ?', (id,))
                 else:
-                    cur.execute('UPDATE sample SET file_id={0} WHERE sample_id = {0}'.format(self.db.PH),
+                    cur.execute('UPDATE sample SET file_id=? WHERE sample_id = ?',
                         (file_id, ids[0]))
             # step 5: prepare tables to be removed
             if inPlace:
@@ -2581,7 +2578,7 @@ class ProjCopier:
         cur = self.db.cursor()
         for idx, table in enumerate(tables):
             # get schema
-            cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name={};'.format(self.db.PH),
+            cur.execute('SELECT sql FROM __fromDB.sqlite_master WHERE type="table" AND name=?;',
                 (table,))
             sql = cur.fetchone()[0]
             if self.db.hasTable(table):
@@ -2612,7 +2609,7 @@ class ProjCopier:
             allIDs = self.proj.selectSampleByPhenotype('')
             removed = [x for x in allIDs if x not in self.IDs]
             for ID in removed:
-                cur.execute('DELETE FROM sample WHERE sample_id = {};'.format(self.db.PH),
+                cur.execute('DELETE FROM sample WHERE sample_id = ?;',
                     (ID,))
             env.logger.debug('Removing {} unselected samples'.format(len(removed)))
         self.proj.saveProperty('annoDB', '[]')
@@ -2629,7 +2626,7 @@ class ProjCopier:
         for idx, ID in enumerate(sorted(self.IDs)):
             table = 'genotype_{}'.format(ID)
             # get schema
-            cur.execute('SELECT sql FROM __fromGeno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
+            cur.execute('SELECT sql FROM __fromGeno.sqlite_master WHERE type="table" AND name=?;',
                 (table,))
             sql = cur.fetchone()[0]
             if db.hasTable(table):
@@ -2783,7 +2780,7 @@ class VariantMapper(threading.Thread):
             prog.reset('mapping ids')
             cur.execute('DROP TABLE IF EXISTS __id_map;')
             cur.execute('CREATE TABLE __id_map (old_id INT, new_id INT, is_dup INT);')
-            insert_query = 'INSERT INTO __id_map values ({0}, {0}, {0});'.format(db.PH);
+            insert_query = 'INSERT INTO __id_map values (?, ?, ?);';
             identical_ids = True
             for _old_id, (_new_id, _is_duplicate) in idMaps.iteritems():
                 if _old_id != _new_id:
@@ -2963,7 +2960,7 @@ class SampleProcessor(threading.Thread):
         #
         for idx, _old_id in enumerate(self.samples):
             # create genotype table
-            cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={0};'.format(db.PH),
+            cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name=?;',
                 ('genotype_{}'.format(_old_id), ))
             sql = cur.fetchone()
             if sql is None:
@@ -3114,7 +3111,7 @@ class SampleCopier(threading.Thread):
             cur = db.cursor()
             for _old_id, _new_id in zip(self.status.get(proj, 'old_ids'), self.status.get(proj, 'new_ids')):
                 # create table
-                cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name={};'.format(db.PH),
+                cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name=?;',
                     ('genotype_{}'.format(_old_id),))
                 sql = cur.fetchone()[0].replace('genotype_{}'.format(_old_id), 'genotype_{}'.format(_new_id))
                 env.logger.debug('Running {}'.format(sql))
@@ -3196,12 +3193,10 @@ class ProjectsMerger:
             # get primary and alternative reference genome
             cur = self.db.cursor()
             # primary reference genome
-            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'
-                .format(self.db.PH), ('build',))
+            cur.execute('SELECT value FROM __fromDB.project WHERE name=?', ('build',))
             build = cur.fetchone()
             # alternative reference genome
-            cur.execute('SELECT value FROM __fromDB.project WHERE name={}'  
-                .format(self.db.PH), ('alt_build',))
+            cur.execute('SELECT value FROM __fromDB.project WHERE name=?', ('alt_build',))
             alt_build = cur.fetchone()
             #
             if build is None or alt_build is None:
@@ -3337,24 +3332,20 @@ class ProjectsMerger:
             new_sample_id = []
             for old_file_id, filename in filename_records:
                 if filename in filenames:
-                    cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id={};'
-                        .format(self.db.PH), (old_file_id, ))
+                    cur.execute('SELECT count(sample_id) FROM __proj.sample WHERE file_id=?;', (old_file_id, ))
                     cnt = cur.fetchone()[0]
                     duplicated_samples += int(cnt)
-                    cur.execute('SELECT file_id FROM filename WHERE filename = {0};'
-                        .format(self.db.PH), (filename,))
+                    cur.execute('SELECT file_id FROM filename WHERE filename = ?;', (filename,))
                     new_file_id = cur.fetchone()[0]
                     duplicate = True
                 else:
                     filenames.append(filename)
                     #
-                    cur.execute('INSERT INTO filename (filename) VALUES ({0});'
-                        .format(self.db.PH), (filename, ))
+                    cur.execute('INSERT INTO filename (filename) VALUES (?);', (filename, ))
                     new_file_id = cur.lastrowid
                     duplicate = False
                 # get samples
-                cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id={};'
-                    .format(self.db.PH), (old_file_id, ))
+                cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id=?;', (old_file_id, ))
                 old_sid = [x[0] for x in cur.fetchall()]
                 new_sid = []
                 # use __proj.sample because the project sample might have more
@@ -3362,10 +3353,9 @@ class ProjectsMerger:
                 headers = self.db.getHeaders('__proj.sample')
                 for sid in old_sid:
                     cur.execute('''INSERT INTO sample ('file_id', '_merge_from', {0}) 
-                        SELECT {1}, '{2}', {0} 
-                        FROM __proj.sample WHERE __proj.sample.sample_id = {1};'''\
-                        .format(', '.join(headers[2:]), self.db.PH,
-                        self.proj_names[proj]), (new_file_id, sid))
+                        SELECT ?, '{1}', {0} 
+                        FROM __proj.sample WHERE __proj.sample.sample_id = ?;'''\
+                        .format(', '.join(headers[2:]), self.proj_names[proj]), (new_file_id, sid))
                     new_sid.append(cur.lastrowid)
                 #
                 old_sample_id.extend(old_sid)

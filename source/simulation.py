@@ -111,24 +111,6 @@ def getAllModels():
 
 
 
-def simulateArguments(parser):
-    parser.add_argument('--regions', nargs='+',
-        help='''One or more chromosome regions in the format of chr:start-end
-        (e.g. chr21:33,031,597-33,041,570), or Field:Value from a region-based 
-        annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
-        Multiple chromosomal regions will be selected if the name matches more
-        than one chromosomal regions. The regions will be marked by their indexes
-        but values from another field will be used if the its name is appended
-        (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
-        Chromosome positions are 1-based and are inclusive at both ends so the 
-        chromosome region has a length of end-start+1 bp.''')
-    parser.add_argument('--model', 
-        help='''Simulation model, which defines the algorithm and default
-            parameter to simulate data. A list of model-specific parameters
-            could be specified to change the behavior of these models. Commands
-            vtools show models and vtools show model MODEL can be used to list
-            all available models and details of one model.''')
-    
 
 def expandRegions(arg_regions, proj, mergeRegions=True):
     regions = []
@@ -362,18 +344,34 @@ def popToVcf(proj, refGenome, pop, sample_names=[], filename=None):
                     
 
 
+def simulateArguments(parser):
+    parser.add_argument('--regions', nargs='+',
+        help='''One or more chromosome regions in the format of chr:start-end
+        (e.g. chr21:33,031,597-33,041,570), or Field:Value from a region-based 
+        annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+        Multiple chromosomal regions will be selected if the name matches more
+        than one chromosomal regions. The regions will be marked by their indexes
+        but values from another field will be used if its name is appended
+        (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
+        Chromosome positions are 1-based and are inclusive at both ends so the 
+        chromosome region has a length of end-start+1 bp.''')
+    parser.add_argument('--model', 
+        help='''Simulation model, which defines the algorithm and default
+            parameter to simulate data. A list of model-specific parameters
+            could be specified to change the behavior of these models. Commands
+            vtools show models and vtools show model MODEL can be used to list
+            all available models and details of one model.''')
+    
 
                 
 
 def simulate(args):
-    #try:
+    try:
         with Project(verbosity=args.verbosity) as proj:
             ref = RefGenome(proj.build)
             # step 0: 
             # get the model of simulation
-            #pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
-            #pop.save('a.pop')
-            pop = sim.loadPopulation('a.pop')
+            pop = vcfToPop(vcf1000g, expandRegions(args.regions, proj))
             pop = simuRareVariants2(pop, ref, demo, mu=1e-4, 
                 #selector=getSelector('gamma1', None),
                 selector=getSelector('gamma1', None),
@@ -387,8 +385,8 @@ def simulate(args):
                 force=True, jobs=4, fmt_args=[])
             importer.importFilesInParallel()
             importer.finalize()
-    #except Exception as e:
-    #    env.logger.error(e)
-    #    sys.exit(1)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 
