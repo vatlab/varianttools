@@ -2142,6 +2142,10 @@ class Project:
             mode = 'w'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
+        #
+        # if the snapshot is to be uploaded, use maximum compression, otherwise
+        # use a faster method locally
+        compresslevel = 9 if name.startswith('vt_') else 5
         # getting file size to create progress bar
         filesizes = os.path.getsize('{}.proj'.format(self.name))
         if os.path.isfile('{}_genotype.DB'.format(self.name)):
@@ -2150,7 +2154,8 @@ class Project:
             for f in files:
                 filesizes += os.path.getsize(f)
         prog = ProgressBar(name, filesizes)
-        with tarfile.open(filename, mode) as snapshot:
+        with (tarfile.open(filename, mode) if mode == 'w' else \
+            tarfile.TarFile.gzopen(filename, mode='w', compresslevel=compresslevel)) as snapshot:
             readme_file = os.path.join(env.cache_dir, '.snapshot.info')
             with open(readme_file, 'w') as readme:
                 readme.write('Snapshot of variant tools project {}.\n'.format(self.name))
@@ -2160,15 +2165,15 @@ class Project:
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
             tarinfo = snapshot.gettarinfo('{}.proj'.format(self.name), arcname='snapshot.proj')
-            snapshot.addfile(tarinfo, ProgressFileObj('{}.proj'.format(self.name), prog))
+            snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}.proj'.format(self.name)))
             if os.path.isfile('{}_genotype.DB'.format(self.name)):
                 tarinfo = snapshot.gettarinfo('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-                snapshot.addfile(tarinfo, ProgressFileObj('{}_genotype.DB'.format(self.name), prog))
+                snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}_genotype.DB'.format(self.name)))
             os.remove(readme_file)
             if files is not None:
                 for f in files:
                     tarinfo = snapshot.gettarinfo(f)
-                    snapshot.addfile(tarinfo, ProgressFileObj(f, prog))
+                    snapshot.addfile(tarinfo, ProgressFileObj(prog, f))
         prog.done()
         # add a warning message if the snapshot starts with 'vt_'
         if name.startswith('vt_'):
@@ -2200,59 +2205,58 @@ class Project:
         #
         # close project
         self.db.close()
+        prog = ProgressBar('Extracting {}'.format(name),
+            os.path.getsize(snapshot_file))
         try:
-            with tarfile.open(snapshot_file, mode) as snapshot:
+            with tarfile.open(fileobj=ProgressFileObj(prog, snapshot_file, 'rb')) as snapshot:
+                snapshot.extractall(path=env.cache_dir)
+                # running getnames before extract will effectively scan the tar file twice
                 all_files = snapshot.getnames()
                 # old snapshot uses file README. The new format has .snapshot.info and will
                 # treat README as user-provided file.
                 info_file = '.snapshot.info' if '.snapshot.info' in all_files else 'README'
                 all_files.remove(info_file)
                 # project
-                s = delayedAction(env.logger.info, 'Load project')
+                os.remove('{}.proj'.format(self.name))
                 if 'snapshot.proj' in all_files:
-                    env.logger.debug('Extracting snapshot.proj as {}.proj'.format(self.name))
-                    snapshot.extract('snapshot.proj')
-                    os.rename('snapshot.proj', '{}.proj'.format(self.name))
+                    os.rename(os.path.join(env.cache_dir, 'snapshot.proj'), '{}.proj'.format(self.name))
                     all_files.remove('snapshot.proj')
                 elif '{}.proj'.format(self.name) in all_files:
-                    env.logger.debug('Extracting {}.proj'.format(self.name))
                     # an old version of snapshot saves $name.proj
-                    snapshot.extract('{}.proj'.format(self.name))
+                    os.rename(os.path.join(env.cache_dir, '{}.proj'.format(self.name)),
+                        '{}.proj'.format(self.name))
                     all_files.remove('{}.proj'.format(self.name))
                 else:
                     raise ValueError('Invalid snapshot. Missing project database')
-                del s
                 # genotype
-                s = delayedAction(env.logger.info, 'Load genotypes')
+                if os.path.isfile('{}_genotype.DB'.format(self.name)):
+                    os.remove('{}_genotype.DB'.format(self.name))
                 if 'snapshot_genotype.DB' in all_files:
-                    env.logger.debug('Extracting snapshot_genotype.DB as {}_genotype.DB'.format(self.name))
-                    snapshot.extract('snapshot_genotype.DB'.format(self.name))
-                    os.rename('snapshot_genotype.DB', '{}_genotype.DB'.format(self.name))
+                    os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
+                        '{}_genotype.DB'.format(self.name))
                     all_files.remove('snapshot_genotype.DB')
                 elif '{}_genotype.DB'.format(self.name) in all_files:
-                    env.logger.debug('Extracting {}_genotype.DB'.format(self.name))
                     # an old version of snapshot saves $name.proj
-                    snapshot.extract('{}_genotype.DB'.format(self.name))
+                    os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.name)),
+                        '{}_genotype.DB'.format(self.name))
                     all_files.remove('{}_genotype.DB'.format(self.name))
                 else:
                     # this is ok because a project might not have any genotype
                     pass
-                del s
                 # other files
                 for f in all_files:
-                    s = delayedAction(env.logger.info, 'Extracting {}'.format(f))
-                    env.logger.debug('Extracting {}'.format(f))
                     if os.path.isfile(f):
                         env.logger.warning('Ignore existing file {}.'.format(f))
                         continue
-                    snapshot.extract(f)
-                    del s
+                    os.rename(os.path.join(env.cache_dir, f), f)
         except Exception as e:
             raise ValueError('Failed to load snapshot: {}'.format(e))
         finally:
             # re-connect the main database for proper cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
+        #
+        prog.done()
         
     def checkFieldName(self, name, exclude=None):
         '''Check if a field name has been used, or is the SQL keyword'''

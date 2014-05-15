@@ -906,6 +906,7 @@ class ProgressBar:
     def __init__(self, message, totalCount = None, initCount=0, initFailedCount=0):
         if env.verbosity == '0':
             self.update = self.empty
+            self.progressBy = self.empty
             self.curlUpdate = self.empty
             self.urllibUpdate = self.empty
             self.sqliteUpdate = self.empty
@@ -951,6 +952,8 @@ class ProgressBar:
         self.count = 0
         self.failed_count = 0
         self.totalCount = totalCount
+        self.min_progress_count = None if self.totalCount is None else self.totalCount / 1000 
+        self.last_progress_count = 0
         self.start_time = None
         self.last_time = None
         self.outputProgress()
@@ -968,16 +971,19 @@ class ProgressBar:
             count = failed_count
         # do not update if the diferent is less than 0.1% of the total count.
         # this is to avoid excess of calling the time() function
-        if self.totalCount is not None and (count - self.count) * 1000 < self.totalCount:
+        if self.totalCount is not None and (count - self.count) < self.min_progress_count:
             return
         self.count = count
         self.failed_count = failed_count
         self.outputProgress()
 
-    def readUpdate(self, count):
-        self.count += count
-        self.outputProgress()
-
+    def progressBy(self, count):
+        self.last_progress_count += count
+        if self.last_progress_count > self.min_progress_count:
+            self.count += self.last_progress_count
+            self.outputProgress()
+            self.last_progress_count = 0
+        
     def curlUpdate(self, total, existing, upload_t, upload_d):
         '''Update called from pycurl'''
         self.count = existing
@@ -1117,17 +1123,18 @@ class ProgressBar:
         sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
-class ProgressFileObj:
+class ProgressFileObj(file):
     '''A wrapper of a file object that update a progress bar
     during file read.
     '''
-    def __init__(self, filename, prog):
-        self.fileobj = open(filename, 'rb')
+    def __init__(self, prog, *args, **kwargs):
+        file.__init__(self, *args, **kwargs)
         self.prog = prog
 
-    def read(self, n):
-        self.prog.readUpdate(n)
-        return self.fileobj.read(n)
+    def read(self, n, *args):
+        self.prog.progressBy(n)
+        return file.read(self, n, *args)
+
 
 def getSnapshotInfo(name):
     '''return meta information for all snapshots'''
