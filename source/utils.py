@@ -974,6 +974,10 @@ class ProgressBar:
         self.failed_count = failed_count
         self.outputProgress()
 
+    def readUpdate(self, count):
+        self.count += count
+        self.outputProgress()
+
     def curlUpdate(self, total, existing, upload_t, upload_d):
         '''Update called from pycurl'''
         self.count = existing
@@ -1113,6 +1117,17 @@ class ProgressBar:
         sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
+class ProgressFileObj:
+    '''A wrapper of a file object that update a progress bar
+    during file read.
+    '''
+    def __init__(self, filename, prog):
+        self.fileobj = open(filename, 'rb')
+        self.prog = prog
+
+    def read(self, n):
+        self.prog.readUpdate(n)
+        return self.fileobj.read(n)
 
 def getSnapshotInfo(name):
     '''return meta information for all snapshots'''

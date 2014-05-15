@@ -55,7 +55,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
-    getVariantsOnChromosomeY, getTermWidth, matchName
+    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj
 
 
 
@@ -403,8 +403,8 @@ class fileFMT:
         fmt_parser = ConfigParser.SafeConfigParser()
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
-        parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]), description='''Parameters to override fields of
-            existing format.''')
+        parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]),
+            description='''Parameters to override fields of existing format.''')
         self.parameters = []
         for par in parameters:
             # $NAME_comment is used for documentation only
@@ -2142,8 +2142,14 @@ class Project:
             mode = 'w'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
-        #
-        s = delayedAction(env.logger.info, 'Creating snapshot')
+        # getting file size to create progress bar
+        filesizes = os.path.getsize('{}.proj'.format(self.name))
+        if os.path.isfile('{}_genotype.DB'.format(self.name)):
+            filesizes += os.path.getsize('{}_genotype.DB'.format(self.name))
+        if files is not None:
+            for f in files:
+                filesizes += os.path.getsize(f)
+        prog = ProgressBar(name, filesizes)
         with tarfile.open(filename, mode) as snapshot:
             readme_file = os.path.join(env.cache_dir, '.snapshot.info')
             with open(readme_file, 'w') as readme:
@@ -2153,23 +2159,17 @@ class Project:
                 readme.write('Info: {}\n'.format(message))
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
-            env.logger.debug('Adding .snapshot.info'.format(self.name))
-            s = delayedAction(env.logger.info, 'Copying project')
-            snapshot.add('{}.proj'.format(self.name), arcname='snapshot.proj')
-            env.logger.debug('Adding {}.proj as snapshot.proj'.format(self.name))
-            del s
+            tarinfo = snapshot.gettarinfo('{}.proj'.format(self.name), arcname='snapshot.proj')
+            snapshot.addfile(tarinfo, ProgressFileObj('{}.proj'.format(self.name), prog))
             if os.path.isfile('{}_genotype.DB'.format(self.name)):
-                s = delayedAction(env.logger.info, 'Copying genotypes')
-                snapshot.add('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-                env.logger.debug('Adding {}_genotype.DBj as snapshot_genotype.DB'.format(self.name))
-                del s
+                tarinfo = snapshot.gettarinfo('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
+                snapshot.addfile(tarinfo, ProgressFileObj('{}_genotype.DB'.format(self.name), prog))
             os.remove(readme_file)
             if files is not None:
                 for f in files:
-                    env.logger.debug('Adding {}'.format(f))
-                    s = delayedAction(env.logger.info, 'Adding {}'.format(f))
-                    snapshot.add(f)
-                    del s
+                    tarinfo = snapshot.gettarinfo(f)
+                    snapshot.addfile(tarinfo, ProgressFileObj(f, prog))
+        prog.done()
         # add a warning message if the snapshot starts with 'vt_'
         if name.startswith('vt_'):
             env.logger.warning('Snapshots with name starting with vt_ is reserved for public snapshots for documentation and training purposes.') 
