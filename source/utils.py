@@ -1504,8 +1504,12 @@ class ResourceManager:
 
     def downloadResources(self):
         '''Download resources'''
+        excluded = []
         for cnt, filename in enumerate(sorted(self.manifest.keys())):
             fileprop = self.manifest[filename]
+            if fileprop[0] > 15*(1024**3):
+                excluded.append(filename)
+                continue
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
@@ -1526,6 +1530,9 @@ class ResourceManager:
                 decompressGzFile(os.path.join(env.local_resource, filename),
                     inplace=False, force=True)
                 del s
+        if excluded:
+            env.logger.warning('Resource files larger then 15GB ({}) are not downloaded.'
+                .format(', '.join(excluded)))
 
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
@@ -1664,7 +1671,8 @@ def downloadURL(URL, dest, quiet, message=None):
     raise RuntimeError('Failed to download {}'.format(fileToGet))
 
 
-def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False):
+def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
+    message=None):
     '''Download file from URL to filename.'''
     #
     # if a complete URL is given, local file is something like 
@@ -1730,7 +1738,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False)
     # if a URL is given, try that URL first
     if '://' in fileToGet:
         try:
-            return downloadURL(fileToGet, dest, quiet)
+            return downloadURL(fileToGet, dest, quiet, message)
         except:
             pass
     #
@@ -1749,7 +1757,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False)
             # is path is a URL
             URL = '{}/{}'.format(path, local_fileToGet)
             try:
-                return downloadURL(URL, dest, quiet)
+                return downloadURL(URL, dest, quiet, message)
             except:
                 continue
     # failed to get file

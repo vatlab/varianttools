@@ -4336,7 +4336,9 @@ def adminArguments(parser):
             snapshots). Identical resources that are available locally (under
             ~/.variant_tools or runtime option $local_resource) are ignored.
             Note that option 'all' will download all versions of annotation 
-            databases which can be slow and take a lot of disk spaces.''')
+            databases which can be slow and take a lot of disk spaces. Note
+            that files larger than 15G are excluded from batch download and
+            can only be downloaded individually.''')
     merge = parser.add_argument_group('Merge samples')
     merge.add_argument('--merge_samples', action='store_true',
         help='''Merge samples with the same sample names by combining genotypes
