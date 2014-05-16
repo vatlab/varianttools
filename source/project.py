@@ -2165,15 +2165,15 @@ class Project:
             # add .snapshot.info file
             snapshot.add(readme_file, '.snapshot.info')
             tarinfo = snapshot.gettarinfo('{}.proj'.format(self.name), arcname='snapshot.proj')
-            snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}.proj'.format(self.name)))
+            snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}.proj'.format(self.name), 'rb'))
             if os.path.isfile('{}_genotype.DB'.format(self.name)):
                 tarinfo = snapshot.gettarinfo('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-                snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}_genotype.DB'.format(self.name)))
+                snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}_genotype.DB'.format(self.name), 'rb'))
             os.remove(readme_file)
             if files is not None:
                 for f in files:
                     tarinfo = snapshot.gettarinfo(f)
-                    snapshot.addfile(tarinfo, ProgressFileObj(prog, f))
+                    snapshot.addfile(tarinfo, ProgressFileObj(prog, f, 'rb'))
         prog.done()
         # add a warning message if the snapshot starts with 'vt_'
         if name.startswith('vt_'):
