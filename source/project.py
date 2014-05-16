@@ -4217,7 +4217,7 @@ def show(args):
                     raise ValueError('Please provide a snapshot name or filename')
                 elif len(args.items) > 1:
                     raise ValueError('Please specify only one snapshot')
-                if args.items[0].startswith('vt_'): # only snapshot
+                if args.items[0].startswith('vt_'): # online snapshot
                     source = 'online'
                     name = None
                     res = ResourceManager()
