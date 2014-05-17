@@ -1286,7 +1286,7 @@ class ResourceManager:
         prog = ProgressBar('Scanning {} files under {}'
             .format(len(filenames), resource_dir), sum([min(x[1], 2**26) for x in filenames]))
         total_size = 0
-        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'ftp.completegenomics.com', 'format', 'annoDB']
+        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'simulation', 'ftp.completegenomics.com', 'format', 'annoDB']
         for filename, filesize in filenames:
             if (not any([y in allowed_directory for y in filename.split('/')])) or filename.endswith('.DB') or \
                 filename.endswith('.bak') or filename.endswith('.htaccess') or filename.endswith('.log') \
@@ -1368,7 +1368,7 @@ class ResourceManager:
                 return ''
         elif filename.lower().endswith('.ann'):      # annotation
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
-        elif filename.lower().endswith('.pipeline'):      # annotation
+        elif filename.lower().endswith('.pipeline'):      # pipeline
             return self.getCommentFromConfigFile(filename, 'pipeline description', 'description')
         elif 'snapshot' in filename and filename.lower().endswith('.tar.gz'):  # snapshot
             (name, date, message) = getSnapshotInfo(filename)
@@ -1416,6 +1416,8 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
         elif resource_type == 'pipeline':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/')}
+        elif resource_type == 'simulation':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('simulation/')}
         elif resource_type == 'hg18':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':

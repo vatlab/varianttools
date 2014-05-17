@@ -3818,7 +3818,7 @@ def showArguments(parser):
         'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
         'annotation', 'track', 'formats', 'format', 'tests', 'test', 
         'runtime_options', 'runtime_option', 'snapshot', 'snapshots', 
-        'pipeline', 'pipelines', 'models', 'model'],
+        'pipeline', 'pipelines', 'simulations', 'simulation'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3841,8 +3841,8 @@ def showArguments(parser):
             and snapshots of the current project saved by command 
             'vtools admin --save_snapshots', 'pipeline PIPELINE'
             for details of a particular align and variant calling pipeline, 
-            'pipelines' for a list of available pipelines. 'model MODEL' for
-            details of a simulation model, 'models' for a list of simulation 
+            'pipelines' for a list of available pipelines. 'simulation MODEL' for
+            details of a simulation model, 'simulations' for a list of simulation 
             models. The default parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, name of table for
@@ -4156,40 +4156,36 @@ def show(args):
                         subsequent_indent=' '*15))))
                 # create an instance of the test and pass -h to it
                 test(1, ['-h']) 
-            elif args.type == 'models':
+            elif args.type == 'simulations':
                 # it is very bad idea to use circular import, but I have no choice
                 if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show models"'.format(', '.join(args.items)))
-                from .simulation import getAllModels
-                all_models = getAllModels()
-                nAll = len(all_models)
-                for idx, (model, obj) in enumerate(all_models):
-                    if args.limit is not None and idx == args.limit:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show simulations"'.format(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='simulation')
+                nAll = len(res.manifest)
+                for idx, (simulation, prop) in enumerate(sorted(res.manifest.iteritems())):
+                    if args.limit is not None and idx >= args.limit:
                         break
                     if args.verbosity == '0':
-                        print(model)
+                        print(simulation[9:-9])
                     else:
-                        print('\n'.join(textwrap.wrap(
-                            '{:<23} {}'.format(model, '' if obj.__doc__ is None else obj.__doc__),
-                            subsequent_indent=' '*24, width=textWidth)))
+                        text = '{:<23} {}'.format(simulation[9:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
+                            subsequent_indent=' '*24)))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
-            elif args.type == 'model':
-                from .association import getAllModels
+            elif args.type == 'simulation':
                 if len(args.items) == 0:
-                    raise ValueError('Please specify the name of a model')
+                    raise ValueError('Please specify the name of a simulation model')
                 if len(args.items) > 1:
-                    raise ValueError('Please specify only one model')
-                models = getAllModels()
-                if args.items[0].lower() not in [x[0].lower() for x in models]:
-                    raise ValueError('Unrecognized model name {}. A list of models can be obtained from command "vtools show models"'.format(args.items[0]))
-                # model
-                model = [y for x,y in models if x.lower() == args.items[0].lower()][0]
-                print('Name:          {}'.format(args.items[0]))
-                print('Description:   {}'.format('\n'.join(textwrap.wrap(model.__doc__, initial_indent='',
-                        subsequent_indent=' '*15))))
-                # create an instance of the model and pass -h to it
-                model(1, ['-h']) 
+                    raise ValueError('Please specify only one simulation model')
+                try:
+                    pipeline = PipelineDescription(args.items[0])
+                except Exception as e:
+                    raise IndexError('Unrecognized simulation model {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
             elif args.type == 'runtime_options':
                 for idx, (opt, (def_value, description)) in enumerate(sorted(env.persistent_options.iteritems())):
                     if args.limit is not None and idx == args.limit:
