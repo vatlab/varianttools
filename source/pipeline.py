@@ -46,20 +46,27 @@ from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote, openFile, encodeTableName
+    FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions
     
 from .project import PipelineDescription, Project
 
 if sys.version_info.major == 2:
-    from ucsctools_py2 import showTrack
+    from ucsctools_py2 import showTrack, tabixFetch
 else:
-    from ucsctools_py3 import showTrack
+    from ucsctools_py3 import showTrack, tabixFetch
 
 try:
     import pysam
     hasPySam = True
 except (ImportError, ValueError) as e:
     hasPySam = False
+
+try:
+    from srv import *
+    hasSimuPOP = True
+except ImportError as e:
+    env.logger.warning('simuPOP cannot be loaded')
+    hasSimuPOP = False
 
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
@@ -1580,6 +1587,24 @@ class Pipeline:
                 raise RuntimeError('Failed to execute step {}_{}: {}'
                     .format(pname, command.index, e))
 
+
+
+class ExtractFromVcf:
+    '''Extract gentotypes at a specified region from a vcf file.'''
+    def __init__(self, filenameOrUrl, regions, output):
+        self.filenameOrUrl = filenameOrUrl
+        self.regions = regions
+        self.output = output
+
+    def __call__(self, ifiles, pipeline=None):
+        tabixFetch(self.filenameOrUrl, [], self.output, True)
+        for r in expandRegions(self.regions, pipeline.proj):
+            region = '{}:{}-{}'.format(r[0], r[1], r[2])
+            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                ' ({})'.format(r[3] if r[3] else '')))
+            tabixFetch(self.filenameOrUrl, [region], self.output, False)
+        return self.output
+                
 
 
 def isBamPairedEnd(input_file):

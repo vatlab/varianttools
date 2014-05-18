@@ -28,7 +28,7 @@ import sys, os, shlex
 import argparse
 import subprocess
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
-     convertDoubleQuote, withinPseudoAutoRegion, encodeTableName
+     convertDoubleQuote, withinPseudoAutoRegion, encodeTableName, expandRegions
 from variant_tools.project import Project
 if sys.version_info.major == 2:
     from variant_tools.assoTests_py2 import calculateInbreedingCoef
@@ -36,7 +36,6 @@ else:
     from variant_tools.assoTests_py3 import calculateInbreedingCoef
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, rbox, \
      resolvePlotFilename
-from variant_tools.simulation import expandRegions
 
 # save the command line that has been processed by the shell. It might not work as shown.
 env.command_line = 'vtools_report ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else repr(x) for x in sys.argv[1:]])

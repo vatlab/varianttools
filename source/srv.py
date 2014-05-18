@@ -23,12 +23,136 @@ import simuOpt
 simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=False, version='1.0.5')
 
 import simuPOP as sim
-from simuPOP.utils import ProgressBar, migrIslandRates
+from simuPOP.demography import *
+
+from simuPOP.utils import migrIslandRates
 #from simuPOP.sandbox import RevertFixedSites, revertFixedSites, MutSpaceSelector, MutSpaceMutator, MutSpaceRecombinator
 
-from .utils import env
+from .utils import env, expandRegions, ProgressBar, RefGenome
 
 import os, sys, logging, math, time
+
+
+class VcfToPop:
+    '''Check out of of an command, and check if it matches a particular
+    pattern. The pipeline will exit if fail is set to True (default).'''
+    def __init__(self, regions, output):
+        self.regions = regions
+        self.output = output
+
+    def __call__(self, ifiles, pipeline):
+        # translate regions to simuPOP ...
+        lociPos = {}
+        for r in expandRegions(self.regions, pipeline.proj):
+            if r[0] in lociPos:
+                lociPos[r[0]].extend(range(r[1], r[2] + 1))
+            else:
+                lociPos[r[0]] = range(r[1], r[2] + 1)
+        chroms = lociPos.keys()
+        chroms.sort()
+        #
+        # create a dictionary of lociPos->index on each chromosome
+        lociIndex = {}
+        for chIdx,ch in enumerate(chroms):
+            lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
+        #
+        # number of individuals? 629
+        pop = sim.Population(size=629, loci=[len(lociPos[x]) for x in chroms],
+            chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+        #
+        # we assume 0 for wildtype, 1 for genotype
+        #
+        # extract genotypes
+        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
+        mutantCount = 0
+        with open(ifiles[0], 'r') as vcf:
+            for line in vcf:
+                if line.startswith('#'):
+                    continue
+                fields = line.split('\t')
+                chr = pop.chromNames().index(fields[0])
+                pos = lociIndex[chr][int(fields[1])]
+                #
+                for ind, geno in enumerate(fields[10:]):
+                    if geno[0] != 0:
+                        pop.individual(ind).setAllele(1, pos, 0, chr)
+                        mutantCount += 1
+                    if geno[2] != 0:
+                        pop.individual(ind).setAllele(1, pos, 1, chr)
+                        mutantCount += 1
+        env.logger.info('{} mutants imported'.format(mutantCount))
+        pop.save(self.output)
+        return self.output
+
+
+
+class PopToVcf:
+    def __init__(self, output, sample_names=[]):
+        self.sample_names = sample_names
+        self.output = output
+
+    def __call__(self, ifiles, pipeline):
+        # import variants to the current project
+        # translate 0,1,2,3 to A,C,G,T
+        alleleMap = {
+            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+        }
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        # first get all the
+        with open(self.output, 'w') as vcf:
+            vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
+            if self.sample_names:
+                if len(self.sample_names) != pop.popSize():
+                    raise ValueError('Sample names, if specified, should be assigned to'
+                        'all {} individuals.'.format(pop.popSize()))
+                vcf.write('\t'.join(self.sample_names) + '\n')
+            else:
+                vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
+            #
+            # get reference genome
+            refGenome = RefGenome(pipeline.proj.build)
+            sim.stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
+            nAlleles = 2*pop.popSize()
+            segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]
+            env.logger.info('Genetic variants identified on {} loci'.format(len(segregated)))
+            prog = ProgressBar('Exporting simulated population', pop.totNumLoci())
+            for chr in range(pop.numChrom()):
+                chr_name = pop.chromName(chr)
+                for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
+                    if pop.dvars().alleleNum[loc][0] == nAlleles:
+                        continue
+                    pos = int(pop.locusPos(loc))
+                    ref = refGenome.getBase(chr_name, pos)
+                    # genotypes
+                    geno1 = [ind.allele(loc, 0) for ind in pop.individuals()]
+                    geno2 = [ind.allele(loc, 1) for ind in pop.individuals()]
+                    #
+                    alt = list((set(geno1) | set(geno2)) - set([0]))
+                    #
+                    if len(alt) == 0:
+                        env.logger.error('No alternative allele at locus {}:{}'.format(chr_name, pos))
+                        continue
+                    elif len(alt) == 1:
+                        # easier...
+                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
+                            chr_name, pos, ref, alleleMap[ref][alt[0]]))
+                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else 1, 
+                            y if y == 0 else 1) for x,y in zip(geno1, geno2)]) + '\n')
+                    else:
+                        # we need to figure out the index of geno in alt
+                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
+                            chr_name, pos, ref, ','.join([alleleMap[ref][a] for a in alt])))
+                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else alt.index(x) + 1, 
+                            y if y == 0 else alt.index(y) + 1) for x,y in zip(geno1, geno2)]) + '\n')
+                    #
+                    prog.update(loc)
+            prog.done()
+        return self.output
+
 
 
 
@@ -262,4 +386,25 @@ def simuRareVariants2(pop, refGenome, demoModel, mu, selector, recRate=0):
     env.logger.info('Population simulation takes %.2f seconds' % (time.clock() - startTime))
     return pop
 
+
+class EvolvePop:
+    def __init__(self, mu, recRate, selector, demoModel, output):
+        self.mu = mu
+        self.selector = selector
+        self.recRate = recRate
+        self.demoModel = demoModel
+        self.output = output
+
+    def __call__(self, ifiles, pipeline):
+        pop = sim.loadPopulation(ifiles[0])
+        refGenome = RefGenome(pipeline.proj.build)
+        simuRareVariants2(pop,
+            refGenome=refGenome,
+        	demoModel = self.demoModel,
+            mu=self.mu, 
+            selector=self.selector,
+            recRate=self.recRate,
+            )
+        pop.save(self.output)
+        return self.output
 

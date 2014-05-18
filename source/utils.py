@@ -73,6 +73,7 @@ try:
         from cgatools_py3 import CrrFile, Location, Range
         from vt_sqlite3_py3 import OperationalError
 
+
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
@@ -1165,6 +1166,105 @@ def getSnapshotInfo(name):
     except Exception as e:
         env.logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
         return (None, None, None)
+
+
+def expandRegions(arg_regions, proj, mergeRegions=True):
+    regions = []
+    for region in arg_regions.split(';'):
+        try:
+            chr, location = region.split(':', 1)
+            start, end = location.split('-')
+            start = int(start.replace(',', ''))
+            end = int(end.replace(',', ''))
+            if start == 0 or end == 0:
+                raise ValueError('0 is not allowed as starting or ending position')
+            # start might be after end
+            if start > end:
+                regions.append((chr, start, end, '(reverse complementary)'))
+            else:
+                regions.append((chr, start, end, ''))
+        except Exception as e:
+            # this is not a format for chr:start-end, try field:name
+            try:
+                if region.count(':') == 1:
+                    field, value = region.rsplit(':', 1)
+                    comment_field = "''"
+                else:
+                    field, value, comment_field = region.rsplit(':', 2)
+                # what field is this?
+                query, fields = consolidateFieldName(proj, 'variant', field, False) 
+                # query should be just one of the fields according to things that are passed
+                if query.strip() not in fields:
+                    raise ValueError('Could not identify field {} from the present project'.format(field))
+                # now we have annotation database
+                try:
+                    annoDB = [x for x in proj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
+                except:
+                    raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
+                #
+                if annoDB.anno_type != 'range':
+                    raise ValueError('{} is not linked as a range-based annotation database.'.format(annoDB.linked_name))
+                # get the fields?
+                chr_field, start_field, end_field = annoDB.build
+                #
+                # find the regions
+                cur = proj.db.cursor()
+                try:
+                    cur.execute('SELECT {},{},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                        chr_field, start_field, end_field, comment_field, annoDB.linked_name, annoDB.name,
+                        field.rsplit('.',1)[-1], value))
+                except Exception as e:
+                    raise ValueError('Failed to search range and comment field: {}'.format(e))
+                for idx, (chr, start, end, comment) in enumerate(cur):
+                    if start > end:
+                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
+                            .format(chr, start + 1, end + 1, annoDB.linked_name))
+                        continue
+                    try:
+                        if comment:
+                            regions.append((str(chr), int(start), int(end), comment))
+                        else:
+                            regions.append((str(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
+                    except Exception as e:
+                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
+                            .format(chr, start, end, annoDB.linked_name))
+                if not regions:
+                    env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
+            except Exception as e:
+                raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
+    # remove duplicates and merge ranges
+    if not mergeRegions:
+        return regions
+    regions = list(set(regions))
+    while True:
+        merged = False
+        for i in range(len(regions)):
+            for j in range(i + 1, len(regions)):
+                r1 = regions[i]
+                r2 = regions[j]
+                if r1 is None or r2 is None:
+                    continue
+                # reversed?
+                reversed = r1[1] > r1[2] or r2[1] > r2[2]
+                if reversed:
+                    r1 = (r1[0], min(r1[1], r1[2]), max(r1[1], r1[2]), r1[3])
+                    r2 = (r2[0], min(r2[1], r2[2]), max(r2[1], r2[2]), r2[3])
+                if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
+                    env.logger.info('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
+                        .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
+                    try:
+                        shared_label = [x!=y for x,y in zip(r1[3], r2[3])].index(True)
+                    except:
+                        # no shared leading string
+                        shared_label = 0
+                    if reversed:
+                        regions[i] = (r1[0], max(r1[2], r2[2]), min(r1[1], r2[1]), r1[3] + ', ' + r2[3][shared_label:])
+                    else:
+                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
+                    regions[j] = None
+                    merged = True
+        if not merged:
+            return sorted([x for x in regions if x is not None])
 
     
 class ShelfDB:
