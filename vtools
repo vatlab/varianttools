@@ -33,8 +33,9 @@ except ImportError:
         .format(sys.version.split()[0]))
 
 from variant_tools.utils import env
-# save the command line that has been processed by the shell. It might not work as shown.
-env.command_line = 'vtools ' + ' '.join([x if (x.isalnum() or x.startswith('-')) else repr(x) for x in sys.argv[1:]])
+import subprocess
+# save the command line that has been processed by the shell.
+env.command_line = subprocess.list2cmdline(sys.argv[1:])
 
 import variant_tools.project as project
 import variant_tools.importer as importer
@@ -275,7 +276,7 @@ if __name__ == '__main__':
     # commands that accepts format and other subparsers can pass arbitrary
     # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export, pipeline.execute]:
+        update.update, exporter.export, pipeline.execute, simulation.simulate]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)
