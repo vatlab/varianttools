@@ -46,7 +46,6 @@ import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
 import variant_tools.pipeline as pipeline
-import variant_tools.simulation as simulation
 
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
@@ -224,9 +223,9 @@ if __name__ == '__main__':
             models.''',
         description='''Simulate case control or family-based samples using
             specified simulation models.''')
-    simulation.simulateArguments(parser)
+    pipeline.simulateArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=simulation.simulate)
+    parser.set_defaults(func=pipeline.simulate)
     #
     # 
     # command admin
@@ -276,7 +275,7 @@ if __name__ == '__main__':
     # commands that accepts format and other subparsers can pass arbitrary
     # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export, pipeline.execute, simulation.simulate]:
+        update.update, exporter.export, pipeline.execute, pipeline.simulate]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

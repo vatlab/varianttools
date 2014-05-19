@@ -542,7 +542,9 @@ VTOOLS_FILES = ['source.__init__',
         'source.tester',
         'source.rtester',
         'source.meta',
-        'source.plot'
+        'source.plot',
+        'source.pipeline',
+        'source.simulation'
 ]
 
 

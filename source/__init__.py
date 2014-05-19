@@ -30,7 +30,7 @@ ver = sys.version_info
 if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (ver.minor, ver.micro) < (2, 0)):
     raise SystemError('variant tools requires Python 2.7.1, Python 3.2.1 or higher. Please upgrade your Python {}.{}.{}.'.format(ver.major, ver.minor, ver.micro))
 
-__all__ = ['utils', 'project', 'vcf', 'sample', 'annotation', 'assoTests']
+__all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline', 'simulation']
 
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles

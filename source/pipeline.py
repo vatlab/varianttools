@@ -62,11 +62,11 @@ except (ImportError, ValueError) as e:
     hasPySam = False
 
 try:
-    from srv import *
-    hasSimuPOP = True
+    from simulation import *
 except ImportError as e:
-    env.logger.warning('simuPOP cannot be loaded')
-    hasSimuPOP = False
+    # The simulation functors will not be available if simulation module cannot
+    # be loaded.
+    pass
 
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
@@ -1722,6 +1722,54 @@ def execute(args):
         env.unlock_all()
         env.logger.error(e)
         sys.exit(1)
+
+
+
+#
+# vtools simulate is implemented using the pipeline execution mechanism. It 
+# essentially execute a pipeline that calls various simulation functions 
+# to simulate data.
+#
+def simulateArguments(parser):
+    parser.add_argument('model', 
+        help='''Simulation model, which defines the algorithm and default
+            parameter to simulate data. A list of model-specific parameters
+            could be specified to change the behavior of these models. Commands
+            vtools show simulations and vtools show simulation MODEL can be used to list
+            all available models and details of one model.''')
+    parser.add_argument('--seed', type=int,
+        help='''Random seed for the simulation. By default, a random seed will be
+            used to generate a random sample. A specific seed could be used to 
+            reproduce a previously generated sample. The seed for a previous
+            simulation run could be found from the simulation configuration
+            file $model_$datetime.cfg''')
+    
+def simulate(args):
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            # step 1, create a simulation configuration file.
+            model_name = os.path.basename(args.model).split('.', 1)[0]
+            if args.seed is None:
+                args.seed = random.randint(1, 2**32)
+            cfg_file = '{}_{}.cfg'.format(model_name, args.seed)
+                #time.strftime('%b%d_%H%M%S', time.localtime()),
+            with open(cfg_file, 'w') as cfg:
+                cfg.write('model={}\n'.format(args.model))
+                cfg.write('seed={}\n'.format(args.seed))
+                if '--seed' in sys.argv:
+                    # skip the seed option so to stop pipeline from distinguishing the two commands
+                    cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
+                    cfg.write("command=vtools {}\n".format( 
+                        subprocess.list2cmdline(cmd_args[1:])))
+                else:
+                    cfg.write("command={}\n".format(env.command_line))
+            env.logger.info('Simulation configuration is saved to {}'.format(cfg_file))
+            pipeline = Pipeline(proj, args.model, extra_args=args.unknown_args)
+            pipeline.execute(None, [cfg_file], [], 1)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools
