@@ -30,9 +30,12 @@ import simuPOP as sim
 from simuPOP.demography import *
 
 from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
-    calculateMD5
+    calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
+    dissectGene
 
 import os, sys, math, time, random
+from .pipeline import SkiptableAction
+from .project import Project
 
 if sys.version_info.major == 2:
     from ucsctools_py2 import tabixFetch
@@ -323,18 +326,113 @@ def getSelector(selDist, selCoef, selModel='exponential'):
     return sim.PyMlSelector(func=pyFunc, mode=mode)
 
 
+class ProteinSelector(sim.PySelector):
+    def __init__(self, regions):
+        # codon on forward strand
+        self.seq_info = {}
+        # seq_info on reverse strand
+        self.seq_info_r = {}
+        #
+        with Project(verbosity='1') as proj:
+            self.regions = expandRegions(regions, proj)
+            all_loci = set()
+            for reg in self.regions:
+                all_loci = all_loci.union(range(reg[1], reg[2]+1))
+            #
+            ref = RefGenome(proj.build)
+            genes = genesInRegions(self.regions, proj)
+            env.logger.info('{} genes are identified in the simulated region.'
+                .format(len(genes)))
+            for gene in genes:
+                stru = dissectGene(gene, proj)
+                pos = []
+                seq = ''
+                for reg in stru['coding']:
+                    seq += ref.getSequence(reg[0], reg[1], reg[2])
+                    pos.extend(range(reg[1], reg[2]+1))
+                env.logger.info('Length of coding regions of {}: {}'.format(
+                    gene, len(pos)))
+                if stru['strand'] == '+':
+                    for idx, (p, s) in enumerate(zip(pos, seq)):
+                        # if location is not in simulated region
+                        # remove
+                        if p not in all_loci:
+                            continue
+                        if idx % 3 == 0:
+                            # the complete codon must be in the simulated region
+                            if (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
+                                continue
+                            self.seq_info[p] = (p, pos[idx+1], pos[idx+2],
+                                codon_table[s + seq[idx+1] + seq[idx+2]])
+                        elif idx % 3 == 1:
+                            if (pos[idx-1] not in all_loci) or (pos[idx+1] not in all_loci):
+                                continue
+                            self.seq_info[p] = (pos[idx-1], p, pos[idx+1],
+                                codon_table[seq[idx-1] + s + seq[idx+1]])
+                        else:
+                            if (pos[idx-2] not in all_loci) or (pos[idx-1] not in all_loci):
+                                continue
+                            self.seq_info[p] = (pos[idx-2], pos[idx-1], p,
+                                codon_table[seq[idx-2] + seq[idx-1] + s])
+                else:
+                    for idx, (p, s) in enumerate(zip(pos, seq)):
+                        if p not in all_loci:
+                            continue
+                        if idx % 3 == 0:
+                            if (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
+                                continue
+                            self.seq_info_r[p] = (p, pos[idx+1], pos[idx+2],
+                                codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]])
+                        elif idx % 3 == 1:
+                            if (pos[idx-1] not in all_loci) or (pos[idx+1] not in all_loci):
+                                continue
+                            self.seq_info_r[p] = (pos[idx-1], p, pos[idx+1],
+                                codon_table_reverse_complement[seq[idx-1] + s + seq[idx+1]])
+                        else:
+                            if (pos[idx-2] not in all_loci) or (pos[idx-1] not in all_loci):
+                                continue
+                            self.seq_info_r[p] = (pos[idx-2], pos[idx-1], p,
+                                codon_table_reverse_complement[seq[idx-2] + seq[idx-1] + s])
+        # to keep things simple, remove positions that are in both forward and reverse strands
+        overlap = set(self.seq_info.keys()) & set(self.seq_info_r.keys())
+        if overlap:
+            self.seq_info_r = {x:y for x,y in self.seq_info_r.items() if x not in overlap}
+        # mutated loci
+        loci = sorted(list(self.seq_info.keys() + list(self.seq_info_r.keys())))
+        # remove all positions that are not in regions
+        env.logger.info('{} out of {} bp are in coding regions of genes {}'.format(
+            len(loci), len(all_loci), ', '.join(genes)))
+        #
+        if not genes:
+            env.logger.warning('Specified region contains no gene. A neutral model will be used.')
+            self.loci = []
+            sim.PySelector.__init__(self, func=self._neutral, loci=[])
+        else:
+            lociIndex = {int(x):idx for idx,x in enumerate(sorted(list(all_loci)))}
+            sim.PySelector.__init__(self, func=self._select, loci=[lociIndex[x] for x in loci])
 
-class EvolvePop(SkiptableAction):
+    def _neutral(self):
+        return 1
+
+    def _select(self, geno):
+        # 
+        # calculate fitness here...
+        return 1
+        
+    
+
+class EvolvePop:
     def __init__(self, mu, recRate, selector, demoModel, output):
         self.mu = mu
         self.selector = selector
         self.recRate = recRate
         self.demoModel = demoModel
-        SkiptableAction.__init__(self, cmd='EvolvePop {} {} {}\n'
-            .format(mu, recRate, output),
-            output=output)
+        self.output = [output]
+        #SkiptableAction.__init__(self, cmd='EvolvePop {} {} {}\n'
+        #    .format(mu, recRate, output),
+        #    output=output)
 
-    def _execute(self, ifiles, pipeline):
+    def __call__(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
         refGenome = RefGenome(pipeline.proj.build)
         

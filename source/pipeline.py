@@ -61,13 +61,6 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
-try:
-    from simulation import *
-except ImportError as e:
-    # The simulation functors will not be available if simulation module cannot
-    # be loaded.
-    pass
-
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
 def projInfo(tables=[], samples=[], format_string=''):
@@ -375,6 +368,13 @@ class SkiptableAction:
                     calculateMD5(f, partial=True)))
         return self.output
         
+
+try:
+    from simulation import *
+except ImportError as e:
+    # The simulation functors will not be available if simulation module cannot
+    # be loaded.
+    pass
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,

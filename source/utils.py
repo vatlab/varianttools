@@ -1250,7 +1250,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     r1 = (r1[0], min(r1[1], r1[2]), max(r1[1], r1[2]), r1[3])
                     r2 = (r2[0], min(r2[1], r2[2]), max(r2[1], r2[2]), r2[3])
                 if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
-                    env.logger.info('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
+                    env.logger.debug('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
                         .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
                     try:
                         shared_label = [x!=y for x,y in zip(r1[3], r2[3])].index(True)
@@ -3271,7 +3271,7 @@ def call_sex(dat):
         sex = 'F'
     return sex
 
-codon = {
+codon_table = {
     'TTT':'F', 'TTC':'F', 'TCT':'S', 'TCC':'S', 'TAT':'Y', 'TAC':'Y', 'TGT':'C', 'TGC':'C', 'TTA':'L', 'TCA':'S',
     'TAA':'*', 'TGA':'*', 'TTG':'L', 'TCG':'S', 'TAG':'*', 'TGG':'W', 'CTT':'L', 'CTC':'L', 'CCT':'P', 'CCC':'P',
     'CAT':'H', 'CAC':'H', 'CGT':'R', 'CGC':'R', 'CTA':'L', 'CTG':'L', 'CCA':'P', 'CCG':'P', 'CAA':'Q', 'CAG':'Q',
@@ -3280,7 +3280,8 @@ codon = {
     'GCT':'A', 'GCC':'A', 'GAT':'D', 'GAC':'D', 'GGT':'G', 'GGC':'G', 'GTA':'V', 'GTG':'V', 'GCA':'A', 'GCG':'A',
     'GAA':'E', 'GAG':'E', 'GGA':'G', 'GGG':'G'}
 
-codon_reverse_complement = {
+# codon on the reverse strand, but read on the forward-strand in forward direction
+codon_table_reverse_complement = {
     'AAG':'L', 'CTA':'*', 'TGT':'T', 'TTT':'K', 'GAT':'I', 'GTT':'N', 'TAT':'I', 'CCT':'R', 'AGG':'P', 'AGT':'T', 
     'GCT':'S', 'CTT':'K', 'TCT':'R', 'ATG':'H', 'ATT':'N', 'AAT':'I', 'CAG':'L', 'TAG':'L', 'GAG':'L', 'GTG':'H', 
     'CCA':'W', 'CGG':'P', 'ACT':'S', 'TGG':'P', 'TTG':'Q', 'GGG':'P', 'ATA':'Y', 'ACC':'G', 'ACA':'C', 'TCG':'R', 
@@ -3370,8 +3371,8 @@ def getProteinSequence(structure):
         raise ValueError('Translated sequence should have length that is multiple of 3')
     if structure['strand'] == '+':
         # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
-        return ''.join([codon[seq[i:i+3]] for i in range(0, len(seq), 3)])
+        return ''.join([codon_table[seq[i:i+3]] for i in range(0, len(seq), 3)])
     else:
         # if len(seq) == 9, range(6, -1, -3) ==> 6, 3, 0
-        return ''.join([codon_reverse_complement[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
+        return ''.join([codon_table_reverse_complement[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
 

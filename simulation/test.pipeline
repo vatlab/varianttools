@@ -42,7 +42,7 @@ comment=Convert downloaded genotype files to simuPOP populations
 [model_20]
 action=EvolvePop(output='cache/temp1.pop',
     mu=1e-4, 
-    selector=getSelector('gamma1', None),
+    selector=ProteinSelector('%(regions)s'),
     recRate=1e-8,
 	demoModel = MultiStageModel([
         InstantChangeModel(T=100, N0=200),
