@@ -51,9 +51,9 @@ from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
 from .project import PipelineDescription, Project
 
 if sys.version_info.major == 2:
-    from ucsctools_py2 import showTrack, tabixFetch
+    from ucsctools_py2 import showTrack
 else:
-    from ucsctools_py3 import showTrack, tabixFetch
+    from ucsctools_py3 import showTrack
 
 try:
     import pysam
@@ -338,6 +338,43 @@ class EmitInput:
                     'pair input fastq files')
             return self._pairByFileName(selected, unselected)
 
+
+class SkiptableAction:
+    '''Internal actions that can be skipped according to a exe_info file.
+    Actions using this class as a base class should define a _execute() function.
+    '''
+    def __init__(self, cmd, output, ignoreInput=False):
+        self.cmd = cmd
+        if isinstance(output, str):
+            self.output = [output]
+        else:
+            self.output = output
+        self.ignoreInput = ignoreInput
+
+    def __call__(self, ifiles, pipeline=None):
+        exe_info = '{}.exe_info'.format(self.output[0])
+        if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
+            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles):
+            # not that we do not care input file because it might contain different seed
+            env.logger.info('Reuse existing {}'.format(self.output[0]))
+            return self.output
+        with open(exe_info, 'w') as exe_info:
+            exe_info.write(self.cmd)
+            for f in ifiles:
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
+            self._execute(ifiles, pipeline)
+            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+            for f in self.output:
+                if not os.path.isfile(f):
+                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+        return self.output
+        
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -1588,23 +1625,6 @@ class Pipeline:
                     .format(pname, command.index, e))
 
 
-
-class ExtractFromVcf:
-    '''Extract gentotypes at a specified region from a vcf file.'''
-    def __init__(self, filenameOrUrl, regions, output):
-        self.filenameOrUrl = filenameOrUrl
-        self.regions = regions
-        self.output = output
-
-    def __call__(self, ifiles, pipeline=None):
-        tabixFetch(self.filenameOrUrl, [], self.output, True)
-        for r in expandRegions(self.regions, pipeline.proj):
-            region = '{}:{}-{}'.format(r[0], r[1], r[2])
-            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                ' ({})'.format(r[3] if r[3] else '')))
-            tabixFetch(self.filenameOrUrl, [region], self.output, False)
-        return self.output
-                
 
 
 def isBamPairedEnd(input_file):

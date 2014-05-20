@@ -1945,7 +1945,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     timestamp will be ignored if md5 signature of all ofiles
     and ifiles match.'''
     # if there is no input or output file, ofiles cannot be newer than ifiles.
-    if not ifiles or not ofiles or ifiles == ofiles:
+    if not ofiles or ifiles == ofiles:
         return False
     _ifiles = [ifiles] if type(ifiles) != list else ifiles
     _ofiles = [ofiles] if type(ofiles) != list else ofiles
@@ -2022,6 +2022,8 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     # check if all files have matching signature, do not check timestamp
     if all([any([samefile(x, y) for y in md5matched]) for x in _ifiles]) \
         and all([any([samefile(x, y) for y in md5matched]) for x in _ofiles]):
+        return True
+    if not _ifiles:
         return True
     # md5 not available 
     output_timestamp = min([FileInfo(x).mtime() for x in _ofiles])

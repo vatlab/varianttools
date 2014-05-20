@@ -51,11 +51,11 @@ action=EvolvePop(output='cache/temp1.pop',
 comment=Evolve and expand a population
 
 [model_30]
-action=PopToVcf(output='cache/temp1.vcf')
+action=PopToVcf(output=['cache/temp1.vcf', 'cache/temp1.phenotype'])
 comment=Export evolved population to an vcf file
 
 [model_40]
-action=RunCommand('vtools import ${INPUT}')
+action=RunCommand('vtools import ${INPUT:INPUT[0]}')
 comment=Import the vcf to the current project
 
 

@@ -29,20 +29,75 @@ simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=False, version='1
 import simuPOP as sim
 from simuPOP.demography import *
 
-from simuPOP.utils import migrIslandRates
+from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
+    calculateMD5
 
-from .utils import env, expandRegions, ProgressBar, RefGenome
+import os, sys, math, time, random
 
-import os, sys, logging, math, time, random
+if sys.version_info.major == 2:
+    from ucsctools_py2 import tabixFetch
+else:
+    from ucsctools_py3 import tabixFetch
 
-class VcfToPop:
+
+class SkiptablePipelineAction:
+    def __init__(self, cmd, output, ignoreInput=False):
+        self.cmd = cmd
+        if isinstance(output, str):
+            self.output = [output]
+        else:
+            self.output = output
+        self.ignoreInput = ignoreInput
+
+    def __call__(self, ifiles, pipeline=None):
+        exe_info = '{}.exe_info'.format(self.output[0])
+        if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
+            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles):
+            # not that we do not care input file because it might contain different seed
+            env.logger.info('Reuse existing {}'.format(self.output[0]))
+            return self.output
+        with open(exe_info, 'w') as exe_info:
+            exe_info.write(self.cmd)
+            for f in ifiles:
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
+            self._execute(ifiles, pipeline)
+            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+            for f in self.output:
+                if not os.path.isfile(f):
+                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+        return self.output
+        
+class ExtractFromVcf(SkiptablePipelineAction):
+    '''Extract gentotypes at a specified region from a vcf file.'''
+    def __init__(self, filenameOrUrl, regions, output):
+        self.filenameOrUrl = filenameOrUrl
+        self.regions = regions
+        SkiptablePipelineAction.__init__(self, cmd='ExtractFromVcf {} {} {}'.format(filenameOrUrl, regions, output),
+            output=output, ignoreInput=True)
+
+    def _execute(self, ifiles, pipeline):
+        tabixFetch(self.filenameOrUrl, [], self.output[0], True)
+        for r in expandRegions(self.regions, pipeline.proj):
+            region = '{}:{}-{}'.format(r[0], r[1], r[2])
+            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                ' ({})'.format(r[3] if r[3] else '')))
+            tabixFetch(self.filenameOrUrl, [region], self.output[0], False)
+        
+class VcfToPop(SkiptablePipelineAction):
     '''Check out of of an command, and check if it matches a particular
     pattern. The pipeline will exit if fail is set to True (default).'''
     def __init__(self, regions, output):
         self.regions = regions
-        self.output = output
+        SkiptablePipelineAction.__init__(self, cmd='VcfToPop {} {}\n'.format(regions, output),
+            output=output)
 
-    def __call__(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         # translate regions to simuPOP ...
         lociPos = {}
         for r in expandRegions(self.regions, pipeline.proj):
@@ -83,17 +138,15 @@ class VcfToPop:
                         pop.individual(ind).setAllele(1, pos, 1, chr)
                         mutantCount += 1
         env.logger.info('{} mutants imported'.format(mutantCount))
-        pop.save(self.output)
-        return self.output
+        pop.save(self.output[0])
 
-
-
-class PopToVcf:
+class PopToVcf(SkiptablePipelineAction):
     def __init__(self, output, sample_names=[]):
         self.sample_names = sample_names
-        self.output = output
+        SkiptablePipelineAction.__init__(self, cmd='PopToVcf {} {}\n'.format(sample_names, output),
+            output=output)
 
-    def __call__(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         # import variants to the current project
         # translate 0,1,2,3 to A,C,G,T
         alleleMap = {
@@ -104,8 +157,8 @@ class PopToVcf:
         }
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
-        # first get all the
-        with open(self.output, 'w') as vcf:
+        # output genotype
+        with open(self.output[0], 'w') as vcf:
             vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
             if self.sample_names:
                 if len(self.sample_names) != pop.popSize():
@@ -153,9 +206,11 @@ class PopToVcf:
                     #
                     prog.update(loc)
             prog.done()
-        return self.output
-
-
+        #
+        # output phenotype
+        with open(self.output[1], 'w') as phe:
+            fields = pop.infoFields()
+            phe.write('sample_name\t' + '\t'.join(fields) + '\n')
 
 
 class RandomFitness:
@@ -302,16 +357,17 @@ def getSelector(selDist, selCoef, selModel='exponential'):
 
 
 
-
-class EvolvePopulation:
+class EvolvePop(SkiptablePipelineAction):
     def __init__(self, mu, recRate, selector, demoModel, output):
         self.mu = mu
         self.selector = selector
         self.recRate = recRate
         self.demoModel = demoModel
-        self.output = output
+        SkiptablePipelineAction.__init__(self, cmd='EvolvePop {} {} {}\n'
+            .format(mu, recRate, output),
+            output=output)
 
-    def __call__(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
         refGenome = RefGenome(pipeline.proj.build)
         
@@ -397,8 +453,10 @@ class EvolvePopulation:
         )
         #
         env.logger.info('Population simulation takes %.2f seconds' % (time.clock() - startTime))
-        pop.save(self.output)
+        pop.save(self.output[0])
         return self.output
+
+
 
 electedCase = 0
 selectedControl = 0
