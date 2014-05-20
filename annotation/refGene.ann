@@ -34,7 +34,7 @@ comment=which DNA strand contains the observed alleles
 index=5
 type=INTEGER
 adj=IncreaseBy(1)
-comment=Transcription start position
+comment=Transcription start position (1-based)
 
 [txEnd]
 index=6
@@ -45,7 +45,7 @@ comment=Transcription end position
 index=7
 type=INTEGER
 adj=IncreaseBy(1)
-comment=Coding region start
+comment=Coding region start (1-based)
 
 [cdsEnd]
 index=8
@@ -59,8 +59,9 @@ comment=Number of exons
 
 [exonStarts]
 index=10
+adj=lambda item: ','.join([str(int(x)+1) for x in item.split(',') if x])+','
 type=VARCHAR(255)
-comment=Starting point of exons
+comment=Starting point of exons (adjusted to 1-based positions)
 
 [exonEnds]
 index=11
