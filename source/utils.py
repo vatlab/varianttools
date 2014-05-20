@@ -1232,7 +1232,6 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
-    translateRegions(regions, proj)
     # remove duplicates and merge ranges
     if not mergeRegions:
         return regions
@@ -3279,7 +3278,7 @@ codon = {
     'GCT':'A', 'GCC':'A', 'GAT':'D', 'GAC':'D', 'GGT':'G', 'GGC':'G', 'GTA':'V', 'GTG':'V', 'GCA':'A', 'GCG':'A',
     'GAA':'E', 'GAG':'E', 'GGA':'G', 'GGG':'G'}
 
-codon_r = {
+codon_reverse_complement = {
     'AAG':'L', 'CTA':'*', 'TGT':'T', 'TTT':'K', 'GAT':'I', 'GTT':'N', 'TAT':'I', 'CCT':'R', 'AGG':'P', 'AGT':'T', 
     'GCT':'S', 'CTT':'K', 'TCT':'R', 'ATG':'H', 'ATT':'N', 'AAT':'I', 'CAG':'L', 'TAG':'L', 'GAG':'L', 'GTG':'H', 
     'CCA':'W', 'CGG':'P', 'ACT':'S', 'TGG':'P', 'TTG':'Q', 'GGG':'P', 'ATA':'Y', 'ACC':'G', 'ACA':'C', 'TCG':'R', 
@@ -3288,62 +3287,89 @@ codon_r = {
     'TAC':'V', 'GGC':'A', 'GAC':'V', 'GCC':'G', 'CGC':'A', 'CAC':'V', 'CTC':'E', 'AAC':'V', 'AGC':'A', 'GTC':'D', 
     'ACG':'R', 'TTC':'E', 'CAT':'M', 'GCG':'R'}
 
-comp_map={
-    'A':'T', 'T':'A', 'C':'G', 'G':'C'
+complement_table = {
+    'A': 'T',
+    'T': 'A',
+    'a': 't',
+    't': 'a',
+    'G': 'C',
+    'C': 'G',
+    'g': 'c',
+    'c': 'g',
+    'N': 'N',
+    'n': 'n'
 }
 
-def translate(regions, strand, build):
-    ref = RefGenome(build)
+
+def genesInRegions(regions, proj):
+    '''Locate isoforms (refGene.name) that overlap with any part of specified
+    regions. '''
+    cur = proj.db.cursor()
+    # if a record has been processed
+    isoforms = []
+    for (chr, start, end, comment) in regions:
+        try:
+            cur.execute('SELECT name FROM refGene WHERE chr = ? AND txStart <= ? AND txEnd >= ?', (chr, end, start))
+        except Exception as e:
+            raise RuntimeError('Failed to retrieve gene information from refGene database. '
+                'Please use "vtools admin --update_resource existing" to update to the latest version '
+                'and command "vtools use refGene" to link the refGene database: {}'.format(e))
+        isoforms.extend([x[0] for x in cur.fetchall()])
+    return sorted(list(set(isoforms)))
+     
+
+def dissectGene(gene, proj):
+    cur = proj.db.cursor()
+    try:
+        cur.execute('SELECT name, chr, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 '
+            'FROM refGene WHERE name=?', (gene,))
+    except Exception as e:
+        raise RuntimeError('Failed to retrieve gene information from refGene database. '
+            'Please use "vtools admin --update_resource existing" to update to the latest version '
+            'and command "vtools use refGene" to link the refGene database: {}'.format(e))
+    rec = cur.fetchall()
+    if len(rec) > 1:
+        env.logger.warning('Multiple records was found for isoform {}. Only one of them is used.'.format(gene))
+    name, chr, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 = rec[0]
+    #
+    exonStarts = [int(x) for x in exonStarts.split(',') if x]
+    exonEnds = [int(x) for x in exonEnds.split(',') if x]
+    if cdsStart >= cdsEnd:
+        # if no coding ...
+        env.logger.debug('{} is non-coding.'.format(gene))
+    #
+    upstream = []
+    intron = []
+    exon = []
+    coding = []
+    downstream = []
+    for s, e in zip(exonStarts, exonEnds):
+        if exon:
+            intron.append((chr, exon[-1][1]+1, s-1))
+        exon.append((chr, s, e))
+        if e >= cdsStart and s <= cdsEnd:
+            cs = max(s, cdsStart)
+            ce = min(e, cdsEnd)
+            coding.append((chr, cs, ce))
+        if cdsStart > s:
+            upstream.append((chr, s, cdsStart - 1))
+        if cdsEnd < e:
+            downstream.append((chr, cdsEnd + 1, e))
+    return {'name': gene, 'strand': strand, 'intron': intron, 'exon': exon,
+        'coding': coding, 'upstream': upstream, 'downstream': downstream,
+        'build': proj.build}
+
+def getProteinSequence(structure):
+    ref = RefGenome(structure['build'])
     seq = ''
-    for reg in regions:
+    for reg in structure['coding']:
         seq += ref.getSequence(reg[0], reg[1], reg[2])
     if len(seq) // 3 * 3 != len(seq):
         raise ValueError('Translated sequence should have length that is multiple of 3')
-    if strand == '+':
+    if structure['strand'] == '+':
         # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
         return ''.join([codon[seq[i:i+3]] for i in range(0, len(seq), 3)])
     else:
         # if len(seq) == 9, range(6, -1, -3) ==> 6, 3, 0
-        return ''.join([codon_r[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
+        return ''.join([codon_reverse_complement[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
 
-
-def refSeq(regions, strand, build):
-    ref = RefGenome(build)
-    seq = ''
-    for reg in regions:
-        seq += ref.getSequence(reg[0], reg[1], reg[2])
-    if strand == '+':
-        return seq
-    else:
-        return ''.join([comp_map[x] for x in seq[::-1]])
-
-    
-def translateRegions(regions, proj):
-    '''Given a region ...
-    '''
-    cur = proj.db.cursor()
-    # if a record has been processed
-    for region in regions:
-        chr, start, end, comment = region
-        try:
-            cur.execute('SELECT name, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 '
-                'FROM refGene WHERE chr = ? AND txStart <= ? AND txEnd >= ?', (chr, end, start))
-        except Exception as e:
-            raise RuntimeError('Failed to retrieve gene information from refGene database. Please use "vtools admin --update_resource existing" to update to the latest version: {}'.format(e))
-        for rec in cur:
-            env.logger.error(rec)
-            name, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 = rec
-            #
-            DNA = []
-            mRNA = []
-            exonStarts = [int(x) for x in exonStarts.split(',') if x]
-            exonEnds = [int(x) for x in exonEnds.split(',') if x]
-            for s, e in zip(exonStarts, exonEnds):
-                DNA.append((chr, s, e))
-                if e >= cdsStart and s <= cdsEnd:
-                    cs = max(s, cdsStart)
-                    ce = min(e, cdsEnd)
-                    mRNA.append((chr, cs, ce))
-            print name, sum([x[2]-x[1]+1 for x in DNA]), sum([x[2]-x[1]+1 for x in mRNA])
-            print refSeq(DNA, strand, proj.build)
-            print translate(mRNA, strand, proj.build)

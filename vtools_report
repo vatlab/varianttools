@@ -28,7 +28,8 @@ import sys, os, shlex
 import argparse
 import subprocess
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
-     convertDoubleQuote, withinPseudoAutoRegion, encodeTableName, expandRegions
+     convertDoubleQuote, withinPseudoAutoRegion, encodeTableName, expandRegions, \
+     genesInRegions, dissectGene, getProteinSequence
 from variant_tools.project import Project
 if sys.version_info.major == 2:
     from variant_tools.assoTests_py2 import calculateInbreedingCoef
@@ -374,15 +375,15 @@ def sequenceArguments(parser):
     parser.add_argument('--char_per_line', type=int,
         help='''Number of characters (excluding space and leading numbers) per line. Default to
             70 in regular and 60 in numbered format.''')
+    parser.add_argument('--translate', nargs='*',
+        help='''Translate DNA sequence into protein sequence. variant tools will look
+            in the refGene database, find all genes that overlap with the region, locate
+            exons and coding regions, transcribe and translate the DNA sequence to protein
+            sequence. The complete protein sequence will be printed regardless of the
+            boundaries of specified regions. If one or more names (refGene.name) are 
+            specified, only specified genes will be translated.''')
 
 def sequence(args):
-    # get build
-    if args.build is None:
-        args.build = getoutput(['vtools', 'execute', 'SELECT value FROM project WHERE name="build"'])
-    if not args.build:
-        raise RuntimeError('Failed to get build of reference from the current project.')
-    #
-    ref = RefGenome(args.build)
     #
     complement_table = {
         'A': 'T',
@@ -397,8 +398,20 @@ def sequence(args):
         'n': 'n'
     }
     with Project(verbosity=0) as proj:
-        regions = expandRegions(args.regions, proj, mergeRegions=False)
+        if args.build is None:
+            args.build = proj.build
         #
+        regions = expandRegions(';'.join(args.regions), proj, mergeRegions=False)
+    #
+    if not args.build:
+        raise RuntimeError('Failed to get build of reference from the current project.')
+    if args.translate is None:
+        printDNASequence(args, regions)
+    else:
+        printProteinSequence(args, regions)
+
+def printDNASequence(args, regions):
+    ref = RefGenome(args.build)
     # get chromosomal region
     for chr, start, end, comment in regions:
         # get reference seq
@@ -434,6 +447,51 @@ def sequence(args):
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
             print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
+
+
+def printProteinSequence(args, regions):
+    # get chromosomal region
+    with Project(verbosity=0) as proj:
+        genes = genesInRegions(regions, proj)
+        if len(args.translate) > 0:
+            genes = sorted(list(set(genes) & set(args.translate)))
+        for gene in genes:
+            structure = dissectGene(gene, proj)
+            strand = structure['strand']
+            coding = structure['coding']
+            if not coding:
+                print('>protein|{}|Non-coding'.format(gene))
+                continue
+            else:
+                chr = coding[0][0]
+            print('>protein|{}|{}:{} ({} bp)'.format(gene,
+                chr if chr.startswith('chr') else 'chr' + chr,
+                ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
+                sum([y-x+1 for ch,x,y in coding])))
+            seq = getProteinSequence(structure)
+            # break into pieces of 70 bp
+            if args.numbered:
+                char_per_line = 60 if args.char_per_line is None else args.char_per_line
+                block_per_line = char_per_line / 10
+                if block_per_line * 10 != char_per_line:
+                    raise ValueError('char_per_line should be a multiple of 10 in numbered format')
+                if args.numbered == 'left':
+                    fmt = '{{:>{0}}} '.format(len(str(len(seq))))
+                    print('\n'.join([
+                        fmt.format(i+1) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
+                        for i in range(0, len(seq), char_per_line)]))
+                else:
+                    fmt = ' {{:>{0}}}'.format(len(str(end)))
+                    last_line = len(seq) / char_per_line * char_per_line
+                    residue = last_line + char_per_line - len(seq)
+                    print('\n'.join([
+                        ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)]) + 
+                        ((' ' * residue + fmt.format(len(seq))) if i == last_line \
+                            else fmt.format(i + char_per_line)) \
+                        for i in range(0, len(seq), char_per_line)]))
+            else:
+                char_per_line = 70 if args.char_per_line is None else args.char_per_line
+                print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
 
 
 
