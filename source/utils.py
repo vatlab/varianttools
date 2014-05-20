@@ -1232,6 +1232,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
+    translateRegions(regions, proj)
     # remove duplicates and merge ranges
     if not mergeRegions:
         return regions
@@ -1265,6 +1266,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     merged = True
         if not merged:
             return sorted([x for x in regions if x is not None])
+        
 
     
 class ShelfDB:
@@ -3267,3 +3269,81 @@ def call_sex(dat):
     if xhomo and sex == 'unknown':
         sex = 'F'
     return sex
+
+codon = {
+    'TTT':'F', 'TTC':'F', 'TCT':'S', 'TCC':'S', 'TAT':'Y', 'TAC':'Y', 'TGT':'C', 'TGC':'C', 'TTA':'L', 'TCA':'S',
+    'TAA':'*', 'TGA':'*', 'TTG':'L', 'TCG':'S', 'TAG':'*', 'TGG':'W', 'CTT':'L', 'CTC':'L', 'CCT':'P', 'CCC':'P',
+    'CAT':'H', 'CAC':'H', 'CGT':'R', 'CGC':'R', 'CTA':'L', 'CTG':'L', 'CCA':'P', 'CCG':'P', 'CAA':'Q', 'CAG':'Q',
+    'CGA':'R', 'CGG':'R', 'ATT':'I', 'ATC':'I', 'ACT':'T', 'ACC':'T', 'AAT':'N', 'AAC':'N', 'AGT':'S', 'AGC':'S',
+    'ATA':'I', 'ACA':'T', 'AAA':'K', 'AGA':'R', 'ATG':'M', 'ACG':'T', 'AAG':'K', 'AGG':'R', 'GTT':'V', 'GTC':'V',
+    'GCT':'A', 'GCC':'A', 'GAT':'D', 'GAC':'D', 'GGT':'G', 'GGC':'G', 'GTA':'V', 'GTG':'V', 'GCA':'A', 'GCG':'A',
+    'GAA':'E', 'GAG':'E', 'GGA':'G', 'GGG':'G'}
+
+codon_r = {
+    'AAG':'L', 'CTA':'*', 'TGT':'T', 'TTT':'K', 'GAT':'I', 'GTT':'N', 'TAT':'I', 'CCT':'R', 'AGG':'P', 'AGT':'T', 
+    'GCT':'S', 'CTT':'K', 'TCT':'R', 'ATG':'H', 'ATT':'N', 'AAT':'I', 'CAG':'L', 'TAG':'L', 'GAG':'L', 'GTG':'H', 
+    'CCA':'W', 'CGG':'P', 'ACT':'S', 'TGG':'P', 'TTG':'Q', 'GGG':'P', 'ATA':'Y', 'ACC':'G', 'ACA':'C', 'TCG':'R', 
+    'CTG':'Q', 'AGA':'S', 'ATC':'D', 'CCG':'R', 'AAA':'F', 'GCA':'C', 'CCC':'G', 'TCA':'*', 'TCC':'G', 'TTA':'*', 
+    'CGT':'T', 'GTA':'Y', 'GAA':'F', 'CGA':'S', 'TAA':'L', 'CAA':'L', 'GGA':'S', 'GGT':'T', 'TGA':'S', 'TGC':'A', 
+    'TAC':'V', 'GGC':'A', 'GAC':'V', 'GCC':'G', 'CGC':'A', 'CAC':'V', 'CTC':'E', 'AAC':'V', 'AGC':'A', 'GTC':'D', 
+    'ACG':'R', 'TTC':'E', 'CAT':'M', 'GCG':'R'}
+
+comp_map={
+    'A':'T', 'T':'A', 'C':'G', 'G':'C'
+}
+
+def translate(regions, strand, build):
+    ref = RefGenome(build)
+    seq = ''
+    for reg in regions:
+        seq += ref.getSequence(reg[0], reg[1], reg[2])
+    if len(seq) // 3 * 3 != len(seq):
+        raise ValueError('Translated sequence should have length that is multiple of 3')
+    if strand == '+':
+        # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
+        return ''.join([codon[seq[i:i+3]] for i in range(0, len(seq), 3)])
+    else:
+        # if len(seq) == 9, range(6, -1, -3) ==> 6, 3, 0
+        return ''.join([codon_r[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
+
+
+def refSeq(regions, strand, build):
+    ref = RefGenome(build)
+    seq = ''
+    for reg in regions:
+        seq += ref.getSequence(reg[0], reg[1], reg[2])
+    if strand == '+':
+        return seq
+    else:
+        return ''.join([comp_map[x] for x in seq[::-1]])
+
+    
+def translateRegions(regions, proj):
+    '''Given a region ...
+    '''
+    cur = proj.db.cursor()
+    # if a record has been processed
+    for region in regions:
+        chr, start, end, comment = region
+        try:
+            cur.execute('SELECT name, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 '
+                'FROM refGene WHERE chr = ? AND txStart <= ? AND txEnd >= ?', (chr, end, start))
+        except Exception as e:
+            raise RuntimeError('Failed to retrieve gene information from refGene database. Please use "vtools admin --update_resource existing" to update to the latest version: {}'.format(e))
+        for rec in cur:
+            env.logger.error(rec)
+            name, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 = rec
+            #
+            DNA = []
+            mRNA = []
+            exonStarts = [int(x) for x in exonStarts.split(',') if x]
+            exonEnds = [int(x) for x in exonEnds.split(',') if x]
+            for s, e in zip(exonStarts, exonEnds):
+                DNA.append((chr, s, e))
+                if e >= cdsStart and s <= cdsEnd:
+                    cs = max(s, cdsStart)
+                    ce = min(e, cdsEnd)
+                    mRNA.append((chr, cs, ce))
+            print name, sum([x[2]-x[1]+1 for x in DNA]), sum([x[2]-x[1]+1 for x in mRNA])
+            print refSeq(DNA, strand, proj.build)
+            print translate(mRNA, strand, proj.build)
