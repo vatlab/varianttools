@@ -464,10 +464,16 @@ def printProteinSequence(args, regions):
                 continue
             else:
                 chr = coding[0][0]
-            print('>protein|{}|{}:{} ({} bp)'.format(gene,
-                chr if chr.startswith('chr') else 'chr' + chr,
-                ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
-                sum([y-x+1 for ch,x,y in coding])))
+            if strand == '+':
+                print('>protein|{}|{}:{} ({} bp)'.format(gene,
+                    chr if chr.startswith('chr') else 'chr' + chr,
+                    ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
+                    sum([y-x+1 for ch,x,y in coding])))
+            else:
+                print('>protein|{}|{}:{} ({} bp on reverse strand)'.format(gene,
+                    chr if chr.startswith('chr') else 'chr' + chr,
+                    ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
+                    sum([y-x+1 for ch,x,y in coding])))
             seq = getProteinSequence(structure)
             # break into pieces of 70 bp
             if args.numbered:
@@ -1093,7 +1099,7 @@ if __name__ == '__main__':
     #
     # command sequence
     parser = subparsers.add_parser('sequence',
-        help = '''Obtain DNA sequence in specified chromosomal region. This command by default 
+        help = '''Obtain DNA or protein sequence in specified chromosomal region. This command by default 
             outputs nucleotide sequence at the reference genome.''')
     sequenceArguments(parser)
     addCommonArgs(parser)
