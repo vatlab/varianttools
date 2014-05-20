@@ -57,6 +57,16 @@ index=9
 type=INTEGER NULL
 comment=Number of exons
 
+[exonStarts]
+index=10
+type=VARCHAR(255)
+comment=Starting point of exons
+
+[exonEnds]
+index=11
+type=VARCHAR(255)
+comment=Ending point of exons
+
 [score]
 index=12
 type=INTEGER NULL
