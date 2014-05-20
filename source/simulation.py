@@ -40,45 +40,12 @@ else:
     from ucsctools_py3 import tabixFetch
 
 
-class SkiptablePipelineAction:
-    def __init__(self, cmd, output, ignoreInput=False):
-        self.cmd = cmd
-        if isinstance(output, str):
-            self.output = [output]
-        else:
-            self.output = output
-        self.ignoreInput = ignoreInput
-
-    def __call__(self, ifiles, pipeline=None):
-        exe_info = '{}.exe_info'.format(self.output[0])
-        if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
-            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles):
-            # not that we do not care input file because it might contain different seed
-            env.logger.info('Reuse existing {}'.format(self.output[0]))
-            return self.output
-        with open(exe_info, 'w') as exe_info:
-            exe_info.write(self.cmd)
-            for f in ifiles:
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
-            self._execute(ifiles, pipeline)
-            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-            for f in self.output:
-                if not os.path.isfile(f):
-                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-        return self.output
-        
-class ExtractFromVcf(SkiptablePipelineAction):
+class ExtractFromVcf(SkiptableAction):
     '''Extract gentotypes at a specified region from a vcf file.'''
     def __init__(self, filenameOrUrl, regions, output):
         self.filenameOrUrl = filenameOrUrl
         self.regions = regions
-        SkiptablePipelineAction.__init__(self, cmd='ExtractFromVcf {} {} {}'.format(filenameOrUrl, regions, output),
+        SkiptableAction.__init__(self, cmd='ExtractFromVcf {} {} {}'.format(filenameOrUrl, regions, output),
             output=output, ignoreInput=True)
 
     def _execute(self, ifiles, pipeline):
@@ -89,12 +56,12 @@ class ExtractFromVcf(SkiptablePipelineAction):
                 ' ({})'.format(r[3] if r[3] else '')))
             tabixFetch(self.filenameOrUrl, [region], self.output[0], False)
         
-class VcfToPop(SkiptablePipelineAction):
+class VcfToPop(SkiptableAction):
     '''Check out of of an command, and check if it matches a particular
     pattern. The pipeline will exit if fail is set to True (default).'''
     def __init__(self, regions, output):
         self.regions = regions
-        SkiptablePipelineAction.__init__(self, cmd='VcfToPop {} {}\n'.format(regions, output),
+        SkiptableAction.__init__(self, cmd='VcfToPop {} {}\n'.format(regions, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -140,10 +107,10 @@ class VcfToPop(SkiptablePipelineAction):
         env.logger.info('{} mutants imported'.format(mutantCount))
         pop.save(self.output[0])
 
-class PopToVcf(SkiptablePipelineAction):
+class PopToVcf(SkiptableAction):
     def __init__(self, output, sample_names=[]):
         self.sample_names = sample_names
-        SkiptablePipelineAction.__init__(self, cmd='PopToVcf {} {}\n'.format(sample_names, output),
+        SkiptableAction.__init__(self, cmd='PopToVcf {} {}\n'.format(sample_names, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -357,13 +324,13 @@ def getSelector(selDist, selCoef, selModel='exponential'):
 
 
 
-class EvolvePop(SkiptablePipelineAction):
+class EvolvePop(SkiptableAction):
     def __init__(self, mu, recRate, selector, demoModel, output):
         self.mu = mu
         self.selector = selector
         self.recRate = recRate
         self.demoModel = demoModel
-        SkiptablePipelineAction.__init__(self, cmd='EvolvePop {} {} {}\n'
+        SkiptableAction.__init__(self, cmd='EvolvePop {} {} {}\n'
             .format(mu, recRate, output),
             output=output)
 
