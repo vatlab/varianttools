@@ -1169,6 +1169,8 @@ def getSnapshotInfo(name):
 
 
 def expandRegions(arg_regions, proj, mergeRegions=True):
+    if not arg_regions:
+        raise ValueError('Empty region is specified.')
     regions = []
     for region in arg_regions.split(';'):
         try:

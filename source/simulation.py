@@ -328,16 +328,17 @@ def getSelector(selDist, selCoef, selModel='exponential'):
 
 class ProteinSelector(sim.PySelector):
     def __init__(self, regions):
-        # codon on forward strand
-        self.seq_info = {}
-        # seq_info on reverse strand
-        self.seq_info_r = {}
+        # codon information
+        self.codon_info = {}
+        self.coding_base = {}
         #
         with Project(verbosity='1') as proj:
             self.regions = expandRegions(regions, proj)
             all_loci = set()
             for reg in self.regions:
                 all_loci = all_loci.union(range(reg[1], reg[2]+1))
+            # pos:index dictionary
+            all_loci = {y:x for x,y in enumerate(sorted(all_loci))}
             #
             ref = RefGenome(proj.build)
             genes = genesInRegions(self.regions, proj)
@@ -352,71 +353,80 @@ class ProteinSelector(sim.PySelector):
                     pos.extend(range(reg[1], reg[2]+1))
                 env.logger.info('Length of coding regions of {}: {}'.format(
                     gene, len(pos)))
-                if stru['strand'] == '+':
-                    for idx, (p, s) in enumerate(zip(pos, seq)):
-                        # if location is not in simulated region
-                        # remove
-                        if p not in all_loci:
+                #
+                for idx, (p, s) in enumerate(zip(pos, seq)):
+                    if idx % 3 == 0:
+                        # the complete codon must be in the simulated region
+                        if (p not in all_loci) or (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
                             continue
-                        if idx % 3 == 0:
-                            # the complete codon must be in the simulated region
-                            if (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
-                                continue
-                            self.seq_info[p] = (p, pos[idx+1], pos[idx+2],
-                                codon_table[s + seq[idx+1] + seq[idx+2]])
-                        elif idx % 3 == 1:
-                            if (pos[idx-1] not in all_loci) or (pos[idx+1] not in all_loci):
-                                continue
-                            self.seq_info[p] = (pos[idx-1], p, pos[idx+1],
-                                codon_table[seq[idx-1] + s + seq[idx+1]])
-                        else:
-                            if (pos[idx-2] not in all_loci) or (pos[idx-1] not in all_loci):
-                                continue
-                            self.seq_info[p] = (pos[idx-2], pos[idx-1], p,
-                                codon_table[seq[idx-2] + seq[idx-1] + s])
-                else:
-                    for idx, (p, s) in enumerate(zip(pos, seq)):
-                        if p not in all_loci:
-                            continue
-                        if idx % 3 == 0:
-                            if (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
-                                continue
-                            self.seq_info_r[p] = (p, pos[idx+1], pos[idx+2],
-                                codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]])
-                        elif idx % 3 == 1:
-                            if (pos[idx-1] not in all_loci) or (pos[idx+1] not in all_loci):
-                                continue
-                            self.seq_info_r[p] = (pos[idx-1], p, pos[idx+1],
-                                codon_table_reverse_complement[seq[idx-1] + s + seq[idx+1]])
-                        else:
-                            if (pos[idx-2] not in all_loci) or (pos[idx-1] not in all_loci):
-                                continue
-                            self.seq_info_r[p] = (pos[idx-2], pos[idx-1], p,
-                                codon_table_reverse_complement[seq[idx-2] + seq[idx-1] + s])
-        # to keep things simple, remove positions that are in both forward and reverse strands
-        overlap = set(self.seq_info.keys()) & set(self.seq_info_r.keys())
-        if overlap:
-            self.seq_info_r = {x:y for x,y in self.seq_info_r.items() if x not in overlap}
+                        codon = (p, pos[idx+1], pos[idx+2],
+                            codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
+                            codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
+                            stru['strand'])
+                    self.coding_base[p] = s
+                    # for idx = 0, 1, 2 share the same codon
+                    if p in self.codon_info:
+                        if codon not in self.codon_info[p]:
+                            self.codon_info[p].append(codon)
+                    else:
+                        self.codon_info[p] = [codon]
         # mutated loci
-        loci = sorted(list(self.seq_info.keys() + list(self.seq_info_r.keys())))
+        coding_loci = sorted(self.codon_info.keys())
+        self.idxToPos = {x:y for x,y in enumerate(coding_loci)}
+        self.posToIdx = {y:x for x,y in enumerate(coding_loci)}
+        self.nCoding = len(coding_loci)
         # remove all positions that are not in regions
         env.logger.info('{} out of {} bp are in coding regions of genes {}'.format(
-            len(loci), len(all_loci), ', '.join(genes)))
+            len(coding_loci), len(all_loci), ', '.join(genes)))
         #
         if not genes:
             env.logger.warning('Specified region contains no gene. A neutral model will be used.')
-            self.loci = []
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
-            lociIndex = {int(x):idx for idx,x in enumerate(sorted(list(all_loci)))}
-            sim.PySelector.__init__(self, func=self._select, loci=[lociIndex[x] for x in loci])
+            sim.PySelector.__init__(self, func=self._select, loci=[all_loci[x] for x in coding_loci])
+        # 
+        # a cache for all fitness values
+        self.fitness_cache = {}
+        #
+        # the meaning of mutation is different according to ref sequence
+        self.mutant_map = {
+            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+        }
 
     def _neutral(self):
         return 1
 
     def _select(self, geno):
         # 
-        # calculate fitness here...
+        try:
+            return self.fitness_cache[gene]#
+        except:
+            # if fitness for gene is not cached, calculate
+            pass
+        # we can not divide the sequence into triplets because it is possible that a nucleotide
+        # belong to multiple codon with different locations.
+        mutated = set([idx for idx,x in enumerate(geno) if x != 0])
+        #
+        ac_change = set()
+        for m in mutated:
+            # first homologous copy
+            if m < self.nCoding:
+                for p0, p1, p2, ac, s in self.codon_info[m]:
+                    # p0: location
+                    # posToIdx[p0]: index in coding region
+                    # geno: mutation (0 for wildtype)
+                    # mutant_map: map mutation to nucleotide
+                    codon = self.mutant_map[self.coding_base[p0]][geno[self.posToIdx[p0]]] + \
+                            self.mutant_map[self.coding_base[p1]][geno[self.posToIdx[p1]]] + \
+                            self.mutant_map[self.coding_base[p2]][geno[self.posToIdx[p2]]]
+                    nac = codon_table[codon] if s == '+' else codon_table_reverse_complemnt[codon]
+                    # if this is a real change
+                    if nac != ac:
+                        ac_change.add((p0, ac, nac))
+        env.logger.warning(ac_change)
         return 1
         
     

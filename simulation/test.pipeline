@@ -28,6 +28,10 @@ regions_comment=One or more chromosome regions (separated by ';') in the format 
   chromosome region has a length of end-start+1 bp.'
 
 [model_0]
+action=RunCommand('vtools use refGene')
+comment=Link the refGene database to the project
+
+[model_5]
 action=ExtractFromVcf(
 	'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
 	regions='%(regions)s', output='cache/temp.vcf')

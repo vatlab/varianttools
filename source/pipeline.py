@@ -42,6 +42,7 @@ import re
 import csv
 import platform
 import logging
+import random
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
@@ -60,13 +61,6 @@ try:
     hasPySam = True
 except (ImportError, ValueError) as e:
     hasPySam = False
-
-try:
-    from simulation import *
-except ImportError as e:
-    # The simulation functors will not be available if simulation module cannot
-    # be loaded.
-    pass
 
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
@@ -375,6 +369,16 @@ class SkiptableAction:
                     calculateMD5(f, partial=True)))
         return self.output
         
+try:
+    # some functors are subclasses of SkiptableAction and has to be
+    # imported after the definition of that class.
+    from simulation import *
+except ImportError as e:
+    # The simulation functors will not be available if simulation module cannot
+    # be loaded.
+    env.logger.debug('Failed to import module simulation')
+
+
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
