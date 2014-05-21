@@ -299,7 +299,7 @@ class ProteinSelector(sim.PySelector):
             sim.PySelector.__init__(self, func=self._select, loci=[all_loci[x] for x in coding_loci])
         # 
         # a cache for all fitness values
-        self.fitness_cache = {}
+        #self.fitness_cache = {}
         #
         # the meaning of mutation is different according to ref sequence
         self.mutant_map = {
@@ -314,11 +314,11 @@ class ProteinSelector(sim.PySelector):
 
     def _select(self, geno):
         # 
-        try:
-            return self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])]
-        except KeyError:
-            # if fitness for gene is not cached, calculate it
-            pass
+        #try:
+        #    return self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])]
+        #except KeyError:
+        #    # if fitness for gene is not cached, calculate it
+        #    pass
         # we can not divide the sequence into triplets because it is possible that a nucleotide
         # belong to multiple codon with different locations.
         mutated = [idx for idx,x in enumerate(geno) if x != 0]
@@ -382,7 +382,7 @@ class ProteinSelector(sim.PySelector):
                 fitness *= 1 - self.s_stopgain
             else:
                 fitness *= 1 - self.s_missense
-        self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])] = fitness
+        #self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])] = fitness
         return fitness
     
 
