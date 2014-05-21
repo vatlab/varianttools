@@ -24,7 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import simuOpt
-simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=False, version='1.0.5')
+simuOpt.setOptions(alleleType='short', optimized=True, quiet=True, version='1.0.5')
 
 import simuPOP as sim
 from simuPOP.demography import *
@@ -183,206 +183,119 @@ class PopToVcf(SkiptableAction):
             phe.write('sample_name\t' + '\t'.join(fields) + '\n')
 
 
-class RandomFitness:
-    def __init__(self):
-        self.coefMap = {}
-
-    def _newS(self, loc, alleles):
-        raise ValueError("This function should be redefined in the subclass of this class")
-
-    def __call__(self, loc, alleles):
-        # because s is assigned for each locus, we need to make sure the
-        # same s is used for fitness of genotypes 01 (1-s) and 11 (1-2s)
-        # at each locus
-        if loc in self.coefMap:
-            s, h = self.coefMap[loc]
-        else:
-            res = self._newS(loc, alleles)
-            if type(res) in [list, tuple]:
-                if len(res) != 2:
-                    raise ValueError("A list or tuple of s, h is expected")
-                s, h = res
-            else:
-                s = res
-                h = self.h
-            #
-            self.coefMap[loc] = s, h
-            #env.logger.info('SEL: loc:{} allele: {} s:{} h:{}'.format(loc, alleles, s, h))
-        if 0 in alleles:
-            return 1. - s * h
-        else:
-            return 1. - s        
-
-
-class ConstantFitness(RandomFitness):
-    def __init__(self, s, h=0.5):
-        RandomFitness.__init__(self)
-        self.s = s
-        self.h = h
-
-    def _newS(self, loc, alleles):
-        # each mutant gets a penalty of s
-        return self.s, self.h
-
-class CustomizedFitness(RandomFitness):
-    def __init__(self, func):
-        RandomFitness.__init__(self)
-        self.func = func
-        self.h = 0.5   # default value that can be overwritten
-
-    def _newS(self, loc, alleles):
-        # each mutant gets a penalty of s
-        return self.func(loc, alleles)
-
-class GammaDistributedFitness(RandomFitness):
-    def __init__(self, k, theta, h=0.5):
-        RandomFitness.__init__(self)
-        self.k = k
-        self.theta = theta
-        self.h = h
-
-    def _newS(self, loc, alleles):
-        return sim.getRNG().randGamma(self.k, self.theta)
-
-class BoundedMixedGammaDistributedFitness(RandomFitness):
-    def __init__(self, k, theta, h=0.5, p=0, a=0, lower=-1000, upper=10000):
-        RandomFitness.__init__(self)
-        self.k = k
-        self.theta = theta
-        self.h = h
-        self.p = p
-        self.a = a
-        self.lower = lower
-        self.upper = upper
-     
-    def _newS(self, loc, alleles):
-        if p > 0 and sim.getRNG().randUniform() < p:
-            return a
-        while True:
-            s = sim.getRNG().randGamma(self.k, self.theta)
-            if s >= self.lower and s <= self.upper:
-                return s
-        
-class TrimmedMixedGammaDistributedFitness(RandomFitness):
-    def __init__(self, k, theta, h=0.5, p=0, a=0, lower=-1000, upper=10000):
-        RandomFitness.__init__(self)
-        self.k = k
-        self.theta = theta
-        self.h = h
-        self.p = p
-        self.a = a
-        self.lower = lower
-        self.upper = upper
-     
-    def _newS(self, loc, alleles):
-        if p > 0 and sim.getRNG().randUniform() < p:
-            return a
-        s = sim.getRNG().randGamma(self.k, self.theta)
-        if s >= self.lower and s <= self.upper:
-            return s
-        elif s < self.lower:
-            return 0
-        else:
-            return 1
-
-def getSelector(selDist, selCoef, selModel='exponential'):
-    # set default parameter
-    if selCoef is None:
-        # set default parameters
-        if selDist == 'mixed_gamma':
-            selCoef = (0.0186, 0.0001, 0.184, 0.160*2, 0.5, 0.0001, 0.1)
-        elif selDist == 'mixed_gamma1':
-            selCoef = (0, -1, 0.562341, 0.01, 0.5, 0.00001, 0.1)
-        elif selDist == 'gamma1':
-            selCoef = (0.23, 0.185*2, 0.5)
-        elif selDist == 'gamma2':
-            selCoef = (0.184, 0.160*2, 0.5)
-        elif selDist == 'gamma3':
-            selCoef = (0.206, 0.146*2, 0.5)
-        elif selDist == 'constant':
-            selCoef = [0.01, 0.5]
-        elif not callable(selDist):
-            raise ValueError("Unsupported random distribution")
-    #
-    # use a right selection operator.
-    mode = {'multiplicative': sim.MULTIPLICATIVE,
-        'additive': sim.ADDITIVE,
-        'exponential': sim.EXPONENTIAL}[selModel]
-    #
-    #
-    if callable(selDist):
-        pyFunc = CustomizedFitness(selDist)
-    elif selDist == 'mixed_gamma':
-        pyFunc = BoundedMixedGammaDistributedFitness(k=selCoef[2], theta=selCoef[3],
-            h=selCoef[4], p=selCoef[0], a=selfCoef[1], lower=selCoef[5], upper=selCoef[6])
-    elif selDist == 'mixed_gamma1':
-        pyFunc = TrimmedMixedGammaDistributedFitness(k=selCoef[2], theta=selCoef[3],
-            h=selCoef[4], p=selCoef[0], a=selCoef[1], lower=selCoef[5], upper=selCoef[6])
-    elif selDist.startswith('gamma'):
-        pyFunc = GammaDistributedFitness(k=selCoef[0], theta=selCoef[1])
-    elif selDist == 'constant':
-        pyFunc = ConstantFitness(s=selCoef[0], h=selCoef[1])
-    #
-    return sim.PyMlSelector(func=pyFunc, mode=mode)
-
-
 class ProteinSelector(sim.PySelector):
-    def __init__(self, regions):
-        # codon information
+    def __init__(self, regions, s_missense=0.001, s_stoploss=0.002, s_stopgain=0.01):
+        '''A protein selection operator that, for specified regions
+            1. find coding regions and pass them to PySelector
+            2. find amino acid change of each individual
+            3. return fitness caused by change of amino acid
+
+        s_missense: selection coefficient for missense (nonsynonymous mutations)
+        s_stoploss: selection coefficient for stoploss muation (elongate protein) 
+        s_stopgain: selection coefficient for stopgan muation (premature coding of protein)
+
+        Selection coefficient should be a single number (fixed s, with fitness 1-s).
+        The fitness of multiple amino acid change will be Prod(1-si) even if two changes
+        are at the same location (that is to say, a homozygote change will have fitness
+        1-2*s-s*2, which is close to an additive model for small s.
+        '''
+        self.s_missense = s_missense
+        self.s_stoploss = s_stoploss
+        self.s_stopgain = s_stopgain
+        #
+        # 
+        #                         |<- coding                                coding    ->|
+        #  exon 1     intron 1   exon 2        intron 2     exon 3      intron2     exon 4
+        # [---------]---------[---|--------]-------------[------------]----------[------|-----]
+        #
+        # We are only interested in coding sequence (mRNA). 
+        #
+        #                          xxxxxxxx              xxxxxxxxxxxxx            xxxxxx
+        # 
+        # We pass location of coding sequences to PySelector, the call back function will receive
+        # genotypes at these loci, and we need to remap these genotypes to the genome.
+        #
+        # all_loci: pos->idx in region
+        # ......................................................................................
+        #
+        # coding_loci: positions of xxxxx
+        #
+        # coding_idx2pos:    index within coding loci ==> pos
+        # coding_pos2idx:    pos within coding loci ==> index
+        # nCoding:           number of coding loci
+        # 
+        #
+        # FIXME: Right now we only handle regions on the same chromosome. Will fix it later.
+        #
+        # self.codon_info stores information  about 1 or more codon at codng regions (excluding introns)
         self.codon_info = {}
+        # self.coding_base stores reference sequence at coding regions
         self.coding_base = {}
         #
         with Project(verbosity='1') as proj:
+            # expand user provided regions to one or more (chr,start,end,comment)
             self.regions = expandRegions(regions, proj)
+            #
+            # all loci contrains all pos in the region and their indexes
             all_loci = set()
             for reg in self.regions:
                 all_loci = all_loci.union(range(reg[1], reg[2]+1))
-            # pos:index dictionary
             all_loci = {y:x for x,y in enumerate(sorted(all_loci))}
             #
             ref = RefGenome(proj.build)
             genes = genesInRegions(self.regions, proj)
             env.logger.info('{} genes are identified in the simulated region.'
                 .format(len(genes)))
+            # there can be multiple genes (isoforms) in the same regions
             for gene in genes:
                 stru = dissectGene(gene, proj)
                 pos = []
                 seq = ''
+                # find the coding regions (xxxx regions) of each gene
                 for reg in stru['coding']:
+                    # get reference sequence and positions
                     seq += ref.getSequence(reg[0], reg[1], reg[2])
                     pos.extend(range(reg[1], reg[2]+1))
                 env.logger.info('Length of coding regions of {}: {}'.format(
                     gene, len(pos)))
-                #
+                # now, try to divide coding regions by codon. Note that a codon
+                # can consist of nucleotie across two exon.
                 for idx, (p, s) in enumerate(zip(pos, seq)):
                     if idx % 3 == 0:
-                        # the complete codon must be in the simulated region
+                        # the complete codon must be in the simulated region. We do not handle
+                        # partial codon because we cannot control mutations outside of the specified
+                        # region
                         if (p not in all_loci) or (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
                             continue
+                        # information about the codon: p0, p1, p2, aa, strand
                         codon = (p, pos[idx+1], pos[idx+2],
                             codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
                             codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
                             stru['strand'])
+                    # record reference sequence
                     self.coding_base[p] = s
-                    # for idx = 0, 1, 2 share the same codon
+                    # other two positions share the same codon
+                    # because of there can be multiple genes, one basepair can be in multiple codon
                     if p in self.codon_info:
                         if codon not in self.codon_info[p]:
                             self.codon_info[p].append(codon)
                     else:
                         self.codon_info[p] = [codon]
+        #
         # mutated loci
         coding_loci = sorted(self.codon_info.keys())
-        self.idxToPos = {x:y for x,y in enumerate(coding_loci)}
-        self.posToIdx = {y:x for x,y in enumerate(coding_loci)}
+        self.coding_idx2pos = {x:y for x,y in enumerate(coding_loci)}
+        self.coding_pos2idx = {y:x for x,y in enumerate(coding_loci)}
         self.nCoding = len(coding_loci)
         # remove all positions that are not in regions
         env.logger.info('{} out of {} bp are in coding regions of genes {}'.format(
-            len(coding_loci), len(all_loci), ', '.join(genes)))
+            self.nCoding, len(all_loci), ', '.join(genes)))
         #
         if not genes:
-            env.logger.warning('Specified region contains no gene. A neutral model will be used.')
+            env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
+            # we need to send simuPOP to indexes of coding loci within the specified region
             sim.PySelector.__init__(self, func=self._select, loci=[all_loci[x] for x in coding_loci])
         # 
         # a cache for all fitness values
@@ -402,33 +315,75 @@ class ProteinSelector(sim.PySelector):
     def _select(self, geno):
         # 
         try:
-            return self.fitness_cache[gene]#
-        except:
-            # if fitness for gene is not cached, calculate
+            return self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])]
+        except KeyError:
+            # if fitness for gene is not cached, calculate it
             pass
         # we can not divide the sequence into triplets because it is possible that a nucleotide
         # belong to multiple codon with different locations.
-        mutated = set([idx for idx,x in enumerate(geno) if x != 0])
-        #
-        ac_change = set()
+        mutated = [idx for idx,x in enumerate(geno) if x != 0]
+        # 
+        # the same aa change can be caused by two mutations, we need to keep only one
+        # aa_change with the same (aa, naa, ploidy, p0)
+        aa_change = set()
         for m in mutated:
             # first homologous copy
+            aa_change_at_m = []
             if m < self.nCoding:
-                for p0, p1, p2, ac, s in self.codon_info[m]:
+                # we need to map index in coding region to their original position
+                for p0, p1, p2, aa, s in self.codon_info[self.coding_idx2pos[m]]:
                     # p0: location
-                    # posToIdx[p0]: index in coding region
+                    # coding_pos2idx[p0]: index in coding region
                     # geno: mutation (0 for wildtype)
                     # mutant_map: map mutation to nucleotide
-                    codon = self.mutant_map[self.coding_base[p0]][geno[self.posToIdx[p0]]] + \
-                            self.mutant_map[self.coding_base[p1]][geno[self.posToIdx[p1]]] + \
-                            self.mutant_map[self.coding_base[p2]][geno[self.posToIdx[p2]]]
-                    nac = codon_table[codon] if s == '+' else codon_table_reverse_complemnt[codon]
+                    codon = self.mutant_map[self.coding_base[p0]][geno[self.coding_pos2idx[p0]]] + \
+                            self.mutant_map[self.coding_base[p1]][geno[self.coding_pos2idx[p1]]] + \
+                            self.mutant_map[self.coding_base[p2]][geno[self.coding_pos2idx[p2]]]
+                    naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
                     # if this is a real change
-                    if nac != ac:
-                        ac_change.add((p0, ac, nac))
-        env.logger.warning(ac_change)
-        return 1
-        
+                    if naa != aa:
+                        aa_change_at_m.append((aa, naa, 0, p0))
+            else:
+                for p0, p1, p2, aa, s in self.codon_info[self.coding_idx2pos[m - self.nCoding]]:
+                    # p0: location
+                    # coding_pos2idx[p0]: index in coding region
+                    # geno: mutation (0 for wildtype)
+                    # mutant_map: map mutation to nucleotide
+                    codon = self.mutant_map[self.coding_base[p0]][geno[self.nCoding + self.coding_pos2idx[p0]]] + \
+                            self.mutant_map[self.coding_base[p1]][geno[self.nCoding + self.coding_pos2idx[p1]]] + \
+                            self.mutant_map[self.coding_base[p2]][geno[self.nCoding + self.coding_pos2idx[p2]]]
+                    naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
+                    # if this is a real change
+                    if naa != aa:
+                        aa_change_at_m.append((aa, naa, 1, p0))
+            #
+            # The same mutation can cause multiple aa change for different genes, we need to
+            # keep only the most damaging one.
+            if len(aa_change_at_m) == 1:
+                aa_change.add(aa_change_at_m[0])
+            elif len(aa_change_at_m) > 1:
+                # find the most damaging one
+                stopgain = [x for x in aa_change_at_m if x[1] == '*']
+                if stopgain:
+                    aa_change.add(stopgain[0])
+                stoploss = [x for x in aa_change_at_m if x[0] == '*']
+                if stoploss:
+                    aa_change.add(stoploss[0])
+                else:
+                    aa_change.add(aa_change_at_m[0])
+        #
+        # we assume a multiplicative model
+        fitness = 1
+        for aa, naa, ploidy, start in aa_change:
+            # stoploss
+            if aa == '*': 
+                fitness *= 1 - self.s_stoploss
+            elif naa == '*':
+                fitness *= 1 - self.s_stopgain
+            else:
+                fitness *= 1 - self.s_missense
+        self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])] = fitness
+        return fitness
     
 
 class EvolvePop:

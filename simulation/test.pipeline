@@ -46,11 +46,11 @@ comment=Convert downloaded genotype files to simuPOP populations
 [model_20]
 action=EvolvePop(output='cache/temp1.pop',
     mu=1e-4, 
-    selector=ProteinSelector('%(regions)s'),
+    selector=ProteinSelector('%(regions)s', s_missense=0.001, s_stoploss=0.002, s_stopgain=0.01),
     recRate=1e-8,
 	demoModel = MultiStageModel([
         InstantChangeModel(T=100, N0=200),
-        ExponentialGrowthModel(T=100, NT=1000)
+        ExponentialGrowthModel(T=100, NT=500)
      ]))
 comment=Evolve and expand a population
 
