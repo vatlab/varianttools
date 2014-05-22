@@ -338,7 +338,7 @@ class SkiptableAction:
     Actions using this class as a base class should define a _execute() function.
     '''
     def __init__(self, cmd, output, ignoreInput=False):
-        self.cmd = cmd
+        self.cmd = cmd.strip()
         if isinstance(output, str):
             self.output = [output]
         else:
@@ -353,7 +353,7 @@ class SkiptableAction:
             env.logger.info('Reuse existing {}'.format(self.output[0]))
             return self.output
         with open(exe_info, 'w') as exe_info:
-            exe_info.write(self.cmd)
+            exe_info.write(self.cmd + '\n')
             for f in ifiles:
                 # for performance considerations, use partial MD5
                 exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),

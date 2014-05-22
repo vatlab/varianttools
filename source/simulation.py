@@ -24,7 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import simuOpt
-simuOpt.setOptions(alleleType='short', optimized=True, quiet=True, version='1.0.5')
+simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
 
 import simuPOP as sim
 from simuPOP.demography import *
@@ -215,15 +215,11 @@ class ProteinSelector(sim.PySelector):
         # We pass location of coding sequences to PySelector, the call back function will receive
         # genotypes at these loci, and we need to remap these genotypes to the genome.
         #
-        # all_loci: pos->idx in region
+        # pos2idx: pos->idx in region
+        # idx2pos: idx->pos in region
         # ......................................................................................
-        #
         # coding_loci: positions of xxxxx
         #
-        # coding_idx2pos:    index within coding loci ==> pos
-        # coding_pos2idx:    pos within coding loci ==> index
-        # nCoding:           number of coding loci
-        # 
         #
         # FIXME: Right now we only handle regions on the same chromosome. Will fix it later.
         #
@@ -240,7 +236,8 @@ class ProteinSelector(sim.PySelector):
             all_loci = set()
             for reg in self.regions:
                 all_loci = all_loci.union(range(reg[1], reg[2]+1))
-            all_loci = {y:x for x,y in enumerate(sorted(all_loci))}
+            self.pos2idx = {y:x for x,y in enumerate(sorted(all_loci))}
+            self.idx2pos = {x:y for x,y in enumerate(sorted(all_loci))}
             #
             ref = RefGenome(proj.build)
             genes = genesInRegions(self.regions, proj)
@@ -282,21 +279,17 @@ class ProteinSelector(sim.PySelector):
                     else:
                         self.codon_info[p] = [codon]
         #
-        # mutated loci
-        coding_loci = sorted(self.codon_info.keys())
-        self.coding_idx2pos = {x:y for x,y in enumerate(coding_loci)}
-        self.coding_pos2idx = {y:x for x,y in enumerate(coding_loci)}
-        self.nCoding = len(coding_loci)
         # remove all positions that are not in regions
         env.logger.info('{} out of {} bp are in coding regions of genes {}'.format(
-            self.nCoding, len(all_loci), ', '.join(genes)))
+            len(self.codon_info), len(self.idx2pos), ', '.join(genes)))
         #
         if not genes:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
             # we need to send simuPOP to indexes of coding loci within the specified region
-            sim.PySelector.__init__(self, func=self._select, loci=[all_loci[x] for x in coding_loci])
+            sim.PySelector.__init__(self, func=self._select, loci=[self.pos2idx[x] for x in sorted(self.codon_info.keys())])
+
         # 
         # a cache for all fitness values
         #self.fitness_cache = {}
@@ -312,50 +305,34 @@ class ProteinSelector(sim.PySelector):
     def _neutral(self):
         return 1
 
-    def _select(self, geno):
-        # 
-        #try:
-        #    return self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])]
-        #except KeyError:
-        #    # if fitness for gene is not cached, calculate it
-        #    pass
+    def _select(self, mut):
+        # geno is arranged locus by locus (A1,A2,B1,B2 etc)
+        #
         # we can not divide the sequence into triplets because it is possible that a nucleotide
         # belong to multiple codon with different locations.
-        mutated = [idx for idx,x in enumerate(geno) if x != 0]
         # 
         # the same aa change can be caused by two mutations, we need to keep only one
         # aa_change with the same (aa, naa, ploidy, p0)
         aa_change = set()
-        for m in mutated:
-            # first homologous copy
+        N = len(self.pos2idx)
+        for m in mut.keys():
+            p = m / N  # ploidy
+            loc = m % N
             aa_change_at_m = []
-            if m < self.nCoding:
-                # we need to map index in coding region to their original position
-                for p0, p1, p2, aa, s in self.codon_info[self.coding_idx2pos[m]]:
-                    # p0: location
-                    # coding_pos2idx[p0]: index in coding region
-                    # geno: mutation (0 for wildtype)
-                    # mutant_map: map mutation to nucleotide
-                    codon = self.mutant_map[self.coding_base[p0]][geno[self.coding_pos2idx[p0]]] + \
-                            self.mutant_map[self.coding_base[p1]][geno[self.coding_pos2idx[p1]]] + \
-                            self.mutant_map[self.coding_base[p2]][geno[self.coding_pos2idx[p2]]]
-                    naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
-                    # if this is a real change
-                    if naa != aa:
-                        aa_change_at_m.append((aa, naa, 0, p0))
-            else:
-                for p0, p1, p2, aa, s in self.codon_info[self.coding_idx2pos[m - self.nCoding]]:
-                    # p0: location
-                    # coding_pos2idx[p0]: index in coding region
-                    # geno: mutation (0 for wildtype)
-                    # mutant_map: map mutation to nucleotide
-                    codon = self.mutant_map[self.coding_base[p0]][geno[self.nCoding + self.coding_pos2idx[p0]]] + \
-                            self.mutant_map[self.coding_base[p1]][geno[self.nCoding + self.coding_pos2idx[p1]]] + \
-                            self.mutant_map[self.coding_base[p2]][geno[self.nCoding + self.coding_pos2idx[p2]]]
-                    naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
-                    # if this is a real change
-                    if naa != aa:
-                        aa_change_at_m.append((aa, naa, 1, p0))
+            # we need to map index in coding region to their original position
+            for p0, p1, p2, aa, s in self.codon_info[self.idx2pos[loc]]:
+                # p0: location
+                # pos2idx[p0]: index to pos in simulated population
+                # mut: mutation (0 for wildtype)
+                #
+                # env.logger.warning([self.idx2pos[loc], mut[m], p0, mut[self.pos2idx[p0]+p*N], p1, mut[self.pos2idx[p1]+p*N], p2, mut[self.pos2idx[p2]+p*N]])
+                codon = self.mutant_map[self.coding_base[p0]][mut[self.pos2idx[p0]+p*N]] + \
+                        self.mutant_map[self.coding_base[p1]][mut[self.pos2idx[p1]+p*N]] + \
+                        self.mutant_map[self.coding_base[p2]][mut[self.pos2idx[p2]+p*N]]
+                naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
+                # if this is a real change
+                if naa != aa:
+                    aa_change_at_m.append((aa, naa, p, p0))
             #
             # The same mutation can cause multiple aa change for different genes, we need to
             # keep only the most damaging one.
@@ -366,11 +343,12 @@ class ProteinSelector(sim.PySelector):
                 stopgain = [x for x in aa_change_at_m if x[1] == '*']
                 if stopgain:
                     aa_change.add(stopgain[0])
-                stoploss = [x for x in aa_change_at_m if x[0] == '*']
-                if stoploss:
-                    aa_change.add(stoploss[0])
                 else:
-                    aa_change.add(aa_change_at_m[0])
+                    stoploss = [x for x in aa_change_at_m if x[0] == '*']
+                    if stoploss:
+                        aa_change.add(stoploss[0])
+                    else:
+                        aa_change.add(aa_change_at_m[0])
         #
         # we assume a multiplicative model
         fitness = 1
@@ -384,7 +362,6 @@ class ProteinSelector(sim.PySelector):
                 fitness *= 1 - self.s_missense
         #self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])] = fitness
         return fitness
-    
 
 class EvolvePop:
     def __init__(self, mu, recRate, selector, demoModel, output):
@@ -447,6 +424,7 @@ class EvolvePop:
                     # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
                     mapIn=[3,0,1,2], mapOut=[1,2,3,0]),
                 # selection on all loci
+                sim.TicToc(),
                 self.selector,
                 sim.IfElse('time.time() - last_time > 30', [
                     sim.PyExec('last_time = time.time()'),
