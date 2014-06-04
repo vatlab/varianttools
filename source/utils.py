@@ -1172,7 +1172,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
     if not arg_regions:
         raise ValueError('Empty region is specified.')
     regions = []
-    for region in arg_regions.split(';'):
+    if not isinstance(arg_regions, str):
+        arg_regions = ','.join(arg_regions)
+    for region in arg_regions.split(','):
         try:
             chr, location = region.split(':', 1)
             start, end = location.split('-')
@@ -1234,6 +1236,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
+    regions = sorted(regions)
     # remove duplicates and merge ranges
     if not mergeRegions:
         return regions

@@ -34,6 +34,7 @@ from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan
     dissectGene
 
 import os, sys, math, time, random
+from collections import defaultdict
 from .pipeline import SkiptableAction
 from .project import Project
 
@@ -221,8 +222,6 @@ class ProteinSelector(sim.PySelector):
         # coding_loci: positions of xxxxx
         #
         #
-        # FIXME: Right now we only handle regions on the same chromosome. Will fix it later.
-        #
         # self.codon_info stores information  about 1 or more codon at codng regions (excluding introns)
         self.codon_info = {}
         # self.coding_base stores reference sequence at coding regions
@@ -233,11 +232,18 @@ class ProteinSelector(sim.PySelector):
             self.regions = expandRegions(regions, proj)
             #
             # all loci contrains all pos in the region and their indexes
-            all_loci = set()
+            all_loci = defaultdict(set)
             for reg in self.regions:
-                all_loci = all_loci.union(range(reg[1], reg[2]+1))
-            self.pos2idx = {y:x for x,y in enumerate(sorted(all_loci))}
-            self.idx2pos = {x:y for x,y in enumerate(sorted(all_loci))}
+                all_loci[reg[0]] = all_loci[reg[0]].union(range(reg[1], reg[2]+1))
+            # find the number of loci on each chromosome
+            chroms = sorted(all_loci.keys())
+            start_idx = 0
+            self.pos2idx = {}
+            self.idx2pos = {}
+            for ch in sorted(all_loci.keys()):
+                self.pos2idx.update({(ch,y):(start_idx + x) for x,y in enumerate(sorted(all_loci[ch]))})
+                self.idx2pos.update({(start_idx + x):(ch,y) for x,y in enumerate(sorted(all_loci[ch]))})
+                start_idx += len(self.pos2idx)
             #
             ref = RefGenome(proj.build)
             genes = genesInRegions(self.regions, proj)
@@ -253,6 +259,7 @@ class ProteinSelector(sim.PySelector):
                     # get reference sequence and positions
                     seq += ref.getSequence(reg[0], reg[1], reg[2])
                     pos.extend(range(reg[1], reg[2]+1))
+                ch = reg[0]
                 env.logger.info('Length of coding regions of {}: {}'.format(
                     gene, len(pos)))
                 # now, try to divide coding regions by codon. Note that a codon
@@ -262,33 +269,35 @@ class ProteinSelector(sim.PySelector):
                         # the complete codon must be in the simulated region. We do not handle
                         # partial codon because we cannot control mutations outside of the specified
                         # region
-                        if (p not in all_loci) or (pos[idx+1] not in all_loci) or (pos[idx+2] not in all_loci):
+                        if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
                             continue
                         # information about the codon: p0, p1, p2, aa, strand
-                        codon = (p, pos[idx+1], pos[idx+2],
+                        codon = (self.pos2idx[(ch, p)], self.pos2idx[(ch, pos[idx+1])], self.pos2idx[(ch, pos[idx+2])],
                             codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
                             codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
                             stru['strand'])
                     # record reference sequence
-                    self.coding_base[p] = s
+                    self.coding_base[self.pos2idx[(ch,p)]] = s
                     # other two positions share the same codon
                     # because of there can be multiple genes, one basepair can be in multiple codon
-                    if p in self.codon_info:
-                        if codon not in self.codon_info[p]:
-                            self.codon_info[p].append(codon)
+                    if self.pos2idx[(ch,p)] in self.codon_info:
+                        if codon not in self.codon_info[self.pos2idx[(ch,p)]]:
+                            self.codon_info[self.pos2idx[(ch,p)]].append(codon)
                     else:
-                        self.codon_info[p] = [codon]
+                        self.codon_info[self.pos2idx[(ch,p)]] = [codon]
         #
         # remove all positions that are not in regions
-        env.logger.info('{} out of {} bp are in coding regions of genes {}'.format(
-            len(self.codon_info), len(self.idx2pos), ', '.join(genes)))
+        env.logger.info('{} out of {} bp ({:.2f}%) are in coding regions of genes {}'.format(
+            len(self.codon_info), len(self.idx2pos), 
+            100. * len(self.codon_info) / len(self.idx2pos), 
+            ', '.join(genes)))
         #
         if not genes:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
             # we need to send simuPOP to indexes of coding loci within the specified region
-            sim.PySelector.__init__(self, func=self._select, loci=[self.pos2idx[x] for x in sorted(self.codon_info.keys())])
+            sim.PySelector.__init__(self, func=self._select, loci=sorted(self.codon_info.keys()))
 
         # 
         # a cache for all fitness values
@@ -320,15 +329,15 @@ class ProteinSelector(sim.PySelector):
             loc = m % N
             aa_change_at_m = []
             # we need to map index in coding region to their original position
-            for p0, p1, p2, aa, s in self.codon_info[self.idx2pos[loc]]:
+            for p0, p1, p2, aa, s in self.codon_info[loc]:
                 # p0: location
                 # pos2idx[p0]: index to pos in simulated population
                 # mut: mutation (0 for wildtype)
                 #
                 # env.logger.warning([self.idx2pos[loc], mut[m], p0, mut[self.pos2idx[p0]+p*N], p1, mut[self.pos2idx[p1]+p*N], p2, mut[self.pos2idx[p2]+p*N]])
-                codon = self.mutant_map[self.coding_base[p0]][mut[self.pos2idx[p0]+p*N]] + \
-                        self.mutant_map[self.coding_base[p1]][mut[self.pos2idx[p1]+p*N]] + \
-                        self.mutant_map[self.coding_base[p2]][mut[self.pos2idx[p2]+p*N]]
+                codon = self.mutant_map[self.coding_base[p0]][mut[p0+p*N]] + \
+                        self.mutant_map[self.coding_base[p1]][mut[p1+p*N]] + \
+                        self.mutant_map[self.coding_base[p2]][mut[p2+p*N]]
                 naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
                 # if this is a real change
                 if naa != aa:
@@ -424,7 +433,7 @@ class EvolvePop:
                     # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
                     mapIn=[3,0,1,2], mapOut=[1,2,3,0]),
                 # selection on all loci
-                sim.TicToc(),
+                #sim.TicToc(),
                 self.selector,
                 sim.IfElse('time.time() - last_time > 30', [
                     sim.PyExec('last_time = time.time()'),
