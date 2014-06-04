@@ -474,165 +474,49 @@ class EvolvePop:
         return self.output
 
 
+class CaseControlSampler:
+    def __init__(self, nCase, nCtrl, penetrance, output):
+        self.nCase = nCase
+        self.nCtrl = nCtrl
+        self.penetrance = penetrance
+        self.selectedCases = 0
+        self.selectedCtrls = 0
+        SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
+            output=output)
 
-electedCase = 0
-selectedControl = 0
-discardedInds = 0
-
-alpha = -5
-beta1 = 0.20
-beta2 = 0.4
-beta3 = 0.4
-gamma1 = 0.2
-gamma2 = 0.4
-
-
-def _selectInds(off, param):
-    'Determine if the offspring can be kept.'
-    e = random.randint(0, 1)
-    g1 = off.allele(param[0], 0) + off.allele(param[0], 1)
-    g2 = off.allele(param[1], 0) + off.allele(param[1], 1)
-    logit = alpha + beta1*g1 + beta2*g2 + beta3*g1*g2 + gamma1*e*g1 + gamma2*e*g2
-    affected = random.random() < (1 / (1. + math.exp(-logit)))
-    global selectedCase, selectedControl, discardedInds
-    if affected:
-        if selectedCase < 1000:
-            off.setAffected(True)
-            selectedCase += 1
-            return True
-    else:
-        if selectedControl < 1000:
-            selectedControl += 1
-            off.setAffected(False)
-            return True
-    discardedInds += 1
-    return False
-
-def generateSample(numCase=1000, numCtrl=1000, logger=None):
-    if logger:
-        logger.info('Generating %d cases and %d controls...' % (numCase, numCtrl))
-    pop = loadPopulation('ex2_expanded.pop')
-    loci = pop.lociByNames(DPL)
-    pop.evolve(
-        matingScheme=RandomMating(
-            ops=[
-                MendelianGenoTransmitter(),
-                # an individual will be discarded if _selectInds returns False
-                PyOperator(func=_selectInds, param=loci)
-            ], 
-            subPopSize=2000
-        ),
-        gen = 1
-    )
-    pop.save('ex2_sample.pop')
-    if logger:
-        logger.info('Disease prevalence: %.4f' % (1000. / (2000 + discardedInds)))
-
-
-
- 
-
-# IDs of the parents of selected offspring
-parentalIDs = set()
-# number of discarded individuals, used to calculate disease prevalence.
-discardedInds = 0
-
-
-alpha = -0.5
-beta = -1.0
-def _myPenetrance(geno):
-    g = geno[0] + geno[1]
-    logit = alpha + beta*g
-    return math.exp(logit) / (1. + math.exp(logit))
-    #return [0.5, 0.4, 0.01][g]
-
-def _selectTrio(off, param):
-    'Determine if the offspring can be kept.'
-    global discardedInds, parentalIDs
-    if off.affected() and not (off.father_id in parentalIDs or off.mother_id in parentalIDs):
-        off.setAffected(True)
-        parentalIDs |= set([off.father_id, off.mother_id])
-        return True
-    else:
-        discardedInds += 1
-        return False
-
-def generateTrioSamples(logger=None):
-    '''
-    Generate trio samples to be analyzed by HelixTree.
-    '''
-    for popFile in ['ex3_shortsweep.pop', 'ex3_longsweep.pop']:
-        if logger:
-            logger.info('Loading population ' + popFile)
-        pop = loadPopulation(popFile)
-        locus = pop.locusByName(DPL)
-        # save a map file
-        map = open('ex3.map', 'w')
-        print >> map, 'CHROMOSOME MARKER POSITION'
-        for loc in range(pop.totNumLoci()):
-            print >> map, pop.chromName(0), pop.locusName(loc), pop.locusPos(loc)/1e6
-        map.close()
-        dat = open('ex3.dat', 'w')
-        print >> dat, 'A disease'
-        for loc in range(pop.totNumLoci()):
-            print >> dat, 'M', pop.locusName(loc)
-        dat.close()
-        pop.addInfoFields(['ind_id', 'father_id', 'mother_id'])
-        # keep parental generation
-        pop.setAncestralDepth(1)
-        # give everyone an unique ID
-        tagID(pop, reset=True)
-        stat(pop, genoFreq=locus)
-        print 'Genotype frequency: ', pop.dvars().genoFreq[locus]
+    
+    def _execute(self, ifiles, pipeline):
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        env.logger.info('Generating %d cases and %d controls...' % (self.nCase, self.nCtrl))
         pop.evolve(
-            preOps = PyPenetrance(func=_myPenetrance, loci=[locus]),
             matingScheme=RandomMating(
                 ops=[
-                    # pass genotype
                     MendelianGenoTransmitter(),
-                    # assign new ID to offspring
-                    IdTagger(),
-                    # record the parent of each offspring
-                    PedigreeTagger(),
-                    # determine offspring affection status
-                    PyPenetrance(func=_myPenetrance, loci=[locus]),
-                    # discard the offspring if it is not affected
-                    # or if parents have been chosen
-                    PyOperator(func=_selectTrio, param=locus)
-                ], subPopSize=1000
+                    # an individual will be discarded if _selectInds returns False
+                    PyOperator(func=self._selectInds)
+                ],
+                subPopSize=self.nCase + self.nCtrl,
             ),
             gen = 1
         )
-        global selectedInds, discardedInds, parentalIDs
-        sample = pop.extractIndividuals(IDs=list(parentalIDs) + list(pop.indInfo('ind_id')))
-        if logger:
-            logger.info('Saving sample to file ' + popFile.replace('.pop', '_sample.pop'))
-        sample.save(popFile.replace('.pop', '_sample.pop'))
-        if logger:
-            logger.info('Disease prevalence: %.4f' % (1000. / (1000 + discardedInds)))
-        # save file in PED format so I need to change family ID...
-        if logger:
-            logger.info('Saving sample to file ' + popFile.replace('.pop', '.ped'))
-        # write to merlin format
-        csv = open(popFile.replace('.pop', '.ped'), 'w')
-        #print >> csv, ' '.join(pop.lociNames())
-        def genoString(ind):
-            alleles = []
-            for i in range(ind.totNumLoci()):
-                alleles.extend([str(ind.allele(i, 0)+1), str(ind.allele(i, 1)+1)])
-            return ' '.join(alleles)
-        famid = 1
-        id = 1
-        for ind in sample.individuals():
-            father = sample.indByID(ind.father_id)
-            mother = sample.indByID(ind.mother_id)
-            print >> csv, famid, id, 0, 0, '1', '2' if father.affected() else '1', genoString(father)
-            print >> csv, famid, id+1, 0, 0, '2', '2' if mother.affected() else '1', genoString(mother)
-            print >> csv, famid, id+2, id, id+1, '1' if ind.sex() == MALE else '2', '2' if ind.affected() else '1', genoString(ind)
-            famid += 1
-            id += 3
-        csv.close()
-        # for next population
-        parentalIDs = set()
-        selectedInds = 0
-        discardedInds = 0
+        env.logger.info('Saving samples to population {}'.format(self.output[0]))
+        pop.save(self.output[0])
+
+    def _selectInds(off):
+        'Determine if the offspring can be kept.'
+        p = self.func(off)
+        affected = p < random.random()
+        if affected:
+            if self.selectedCases < self.nCase:
+                off.setAffected(True)
+                self.selectedCases += 1
+                return True
+        else:
+            if self.selectedCtrls < 1000:
+                self.selectedCtrls += 1
+                off.setAffected(False)
+                return True
+        return False
+
+
