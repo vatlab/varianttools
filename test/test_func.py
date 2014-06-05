@@ -61,6 +61,9 @@ class TestFunc(ProcessTestCase):
         self.assertSucc('''vtools output variant chr pos "genotype('SAMP1')"''')
         self.assertSucc(r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,')"''')
         self.assertSucc(r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,&missing=.')"''')
+        # create a sample without GT
+        runCmd('vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
+        self.assertSucc('vtools output variant chr pos genotype()')
 
     def testSamples(self):
         'Testing function samples'

@@ -1957,7 +1957,8 @@ static void genotype(
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
-			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+			//sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+			sqlite3_result_null(context);
 			return;
 		}
 		// there should be only one matching record
@@ -1999,8 +2000,9 @@ static void genotype(
 		sqlite3_stmt * stmt;
 		int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
-			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
-			return;
+			if (params.missing() != NULL)
+				res << params.missing();
+			continue;
 		}
 		// there should be only one matching record
 		result = sqlite3_step(stmt);
