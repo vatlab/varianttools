@@ -85,8 +85,9 @@ action=PopToVcf(output=['cache/temp1.vcf', 'cache/temp1.phenotype'])
 comment=Export evolved population to an vcf file
 
 [model_40]
-action=RunCommand('vtools import ${INPUT:INPUT[0]}')
-comment=Import the vcf to the current project
+action=RunCommand(['vtools import ${INPUT:INPUT[0]} --force',
+	'vtools phenotype --from_file ${INPUT:INPUT[1]}'])
+comment=Import the vcf and phenotype to the current project
 
 
 

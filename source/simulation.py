@@ -181,7 +181,23 @@ class PopToVcf(SkiptableAction):
         # output phenotype
         with open(self.output[1], 'w') as phe:
             fields = pop.infoFields()
-            phe.write('sample_name\t' + '\t'.join(fields) + '\n')
+            phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
+            prog = ProgressBar('Exporting phenotype {}'.format(','.join(fields)), pop.popSize())
+            for i in range(pop.popSize()):
+                if self.sample_names:
+                    phe.write(self.sample_names[i])
+                else:
+                    phe.write('S_{}'.format(i+1))
+                #
+                if pop.individual(i).affected():
+                    phe.write('\t2')
+                else:
+                    phe.write('\t1')
+                for info in fields:
+                    phe.write('\t{}'.format(pop.individual(i).info(info)))
+                phe.write('\n')
+                prog.update(i+1)
+            prog.done()
 
 
 def _identifyCodonInRegions(raw_regions):
@@ -594,6 +610,11 @@ class DrawCaseControlSample(SkiptableAction):
             gen = 1
         )
         self.prog.done()
+        # 
+        if 'migrate_to' in pop.infoFields():
+            pop.removeInfoFields('migrate_to')
+        if 'fitness' in pop.infoFields():
+            pop.removeInfoFields('fitness')
         env.logger.info('Saving samples to population {}'.format(self.output[0]))
         pop.save(self.output[0])
 
