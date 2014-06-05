@@ -27,6 +27,15 @@ regions_comment=One or more chromosome regions (separated by ';') in the format 
   Chromosome positions are 1-based and are inclusive at both ends so the 
   chromosome region has a length of end-start+1 bp.'
 
+cases=1000
+cases_comment=Number of affected individuals to sample from the simulated
+	population.
+
+ctrls=1000
+Ctrls_comment=Number of unaffected individuals to sample from the simulated
+	population.
+
+
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the simulation
   while boosting mutation, selection and recombination rates.
@@ -49,8 +58,7 @@ comment=Convert downloaded genotype files to simuPOP populations
 
 [model_20]
 #
-# Using a scaling factor of 10
-#
+# Using a scaling factor to increase speed of simulation
 action=EvolvePop(output='cache/temp1.pop',
     mu=1.8e-8 * %(scale)s, 
 	selector=ProteinSelector('%(regions)s', s_missense=0.001 * %(scale)s,
@@ -62,6 +70,15 @@ action=EvolvePop(output='cache/temp1.pop',
         ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
      ]))
 comment=Evolve and expand a population
+
+[model_25]
+action=DrawCaseControlSample(
+	output='cache/sample.pop',
+	penetrance=ProteinPenetrance('%(regions)s', s_missense=0.001,
+		s_stoploss=0.002, s_stopgain=0.005),
+	nCase=%(cases)s, nCtrl=%(ctrls)s
+    )
+comment=Draw case control samples from the simulated population
 
 [model_30]
 action=PopToVcf(output=['cache/temp1.vcf', 'cache/temp1.phenotype'])

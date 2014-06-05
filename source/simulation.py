@@ -184,6 +184,95 @@ class PopToVcf(SkiptableAction):
             phe.write('sample_name\t' + '\t'.join(fields) + '\n')
 
 
+def _identifyCodonInRegions(raw_regions):
+    '''Identify codon of a region'''
+    #
+    # 
+    #                         |<- coding                                coding    ->|
+    #  exon 1     intron 1   exon 2        intron 2     exon 3      intron2     exon 4
+    # [---------]---------[---|--------]-------------[------------]----------[------|-----]
+    #
+    # We are only interested in coding sequence (mRNA). 
+    #
+    #                          xxxxxxxx              xxxxxxxxxxxxx            xxxxxx
+    # 
+    # We pass location of coding sequences to PySelector, the call back function will receive
+    # genotypes at these loci, and we need to remap these genotypes to the genome.
+    #
+    # pos2idx: pos->idx in region
+    # ......................................................................................
+    # coding_loci: positions of xxxxx
+    #
+    #
+    # codon_info stores information  about 1 or more codon at codng regions (excluding introns)
+    codon_info = {}
+    # coding_base stores reference sequence at coding regions
+    coding_base = {}
+    #
+    with Project(verbosity='1') as proj:
+        # expand user provided regions to one or more (chr,start,end,comment)
+        regions = expandRegions(raw_regions, proj)
+        #
+        # all loci contrains all pos in the region and their indexes
+        all_loci = defaultdict(set)
+        for reg in regions:
+            all_loci[reg[0]] = all_loci[reg[0]].union(range(reg[1], reg[2]+1))
+        # find the number of loci on each chromosome
+        chroms = sorted(all_loci.keys())
+        start_idx = 0
+        pos2idx = {}
+        for ch in sorted(all_loci.keys()):
+            pos2idx.update({(ch,y):(start_idx + x) for x,y in enumerate(sorted(all_loci[ch]))})
+            start_idx += len(pos2idx)
+        #
+        ref = RefGenome(proj.build)
+        genes = genesInRegions(regions, proj)
+        env.logger.info('{} genes are identified in the simulated region.'
+            .format(len(genes)))
+        # there can be multiple genes (isoforms) in the same regions
+        for gene in genes:
+            stru = dissectGene(gene, proj)
+            pos = []
+            seq = ''
+            # find the coding regions (xxxx regions) of each gene
+            for reg in stru['coding']:
+                # get reference sequence and positions
+                seq += ref.getSequence(reg[0], reg[1], reg[2])
+                pos.extend(range(reg[1], reg[2]+1))
+            ch = reg[0]
+            env.logger.info('Length of coding regions of {}: {}'.format(
+                gene, len(pos)))
+            # now, try to divide coding regions by codon. Note that a codon
+            # can consist of nucleotie across two exon.
+            for idx, (p, s) in enumerate(zip(pos, seq)):
+                if idx % 3 == 0:
+                    # the complete codon must be in the simulated region. We do not handle
+                    # partial codon because we cannot control mutations outside of the specified
+                    # region
+                    if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
+                        continue
+                    # information about the codon: p0, p1, p2, aa, strand
+                    codon = (pos2idx[(ch, p)], pos2idx[(ch, pos[idx+1])], pos2idx[(ch, pos[idx+2])],
+                        codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
+                        codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
+                        stru['strand'])
+                # record reference sequence
+                coding_base[pos2idx[(ch,p)]] = s
+                # other two positions share the same codon
+                # because of there can be multiple genes, one basepair can be in multiple codon
+                if pos2idx[(ch,p)] in codon_info:
+                    if codon not in codon_info[pos2idx[(ch,p)]]:
+                        codon_info[pos2idx[(ch,p)]].append(codon)
+                else:
+                    codon_info[pos2idx[(ch,p)]] = [codon]
+    #
+    # remove all positions that are not in regions
+    env.logger.info('{} out of {} bp ({:.2f}%) are in coding regions of genes {}'.format(
+        len(codon_info), len(pos2idx), 
+        100. * len(codon_info) / len(pos2idx), 
+        ', '.join(genes)))
+    return len(pos2idx), coding_base, codon_info
+
 class ProteinSelector(sim.PySelector):
     def __init__(self, regions, s_missense=0.001, s_stoploss=0.002, s_stopgain=0.01):
         '''A protein selection operator that, for specified regions
@@ -204,95 +293,8 @@ class ProteinSelector(sim.PySelector):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        # 
-        #                         |<- coding                                coding    ->|
-        #  exon 1     intron 1   exon 2        intron 2     exon 3      intron2     exon 4
-        # [---------]---------[---|--------]-------------[------------]----------[------|-----]
-        #
-        # We are only interested in coding sequence (mRNA). 
-        #
-        #                          xxxxxxxx              xxxxxxxxxxxxx            xxxxxx
-        # 
-        # We pass location of coding sequences to PySelector, the call back function will receive
-        # genotypes at these loci, and we need to remap these genotypes to the genome.
-        #
-        # pos2idx: pos->idx in region
-        # idx2pos: idx->pos in region
-        # ......................................................................................
-        # coding_loci: positions of xxxxx
-        #
-        #
-        # self.codon_info stores information  about 1 or more codon at codng regions (excluding introns)
-        self.codon_info = {}
-        # self.coding_base stores reference sequence at coding regions
-        self.coding_base = {}
-        #
-        with Project(verbosity='1') as proj:
-            # expand user provided regions to one or more (chr,start,end,comment)
-            self.regions = expandRegions(regions, proj)
-            #
-            # all loci contrains all pos in the region and their indexes
-            all_loci = defaultdict(set)
-            for reg in self.regions:
-                all_loci[reg[0]] = all_loci[reg[0]].union(range(reg[1], reg[2]+1))
-            # find the number of loci on each chromosome
-            chroms = sorted(all_loci.keys())
-            start_idx = 0
-            self.pos2idx = {}
-            self.idx2pos = {}
-            for ch in sorted(all_loci.keys()):
-                self.pos2idx.update({(ch,y):(start_idx + x) for x,y in enumerate(sorted(all_loci[ch]))})
-                self.idx2pos.update({(start_idx + x):(ch,y) for x,y in enumerate(sorted(all_loci[ch]))})
-                start_idx += len(self.pos2idx)
-            #
-            ref = RefGenome(proj.build)
-            genes = genesInRegions(self.regions, proj)
-            env.logger.info('{} genes are identified in the simulated region.'
-                .format(len(genes)))
-            # there can be multiple genes (isoforms) in the same regions
-            for gene in genes:
-                stru = dissectGene(gene, proj)
-                pos = []
-                seq = ''
-                # find the coding regions (xxxx regions) of each gene
-                for reg in stru['coding']:
-                    # get reference sequence and positions
-                    seq += ref.getSequence(reg[0], reg[1], reg[2])
-                    pos.extend(range(reg[1], reg[2]+1))
-                ch = reg[0]
-                env.logger.info('Length of coding regions of {}: {}'.format(
-                    gene, len(pos)))
-                # now, try to divide coding regions by codon. Note that a codon
-                # can consist of nucleotie across two exon.
-                for idx, (p, s) in enumerate(zip(pos, seq)):
-                    if idx % 3 == 0:
-                        # the complete codon must be in the simulated region. We do not handle
-                        # partial codon because we cannot control mutations outside of the specified
-                        # region
-                        if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
-                            continue
-                        # information about the codon: p0, p1, p2, aa, strand
-                        codon = (self.pos2idx[(ch, p)], self.pos2idx[(ch, pos[idx+1])], self.pos2idx[(ch, pos[idx+2])],
-                            codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
-                            codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
-                            stru['strand'])
-                    # record reference sequence
-                    self.coding_base[self.pos2idx[(ch,p)]] = s
-                    # other two positions share the same codon
-                    # because of there can be multiple genes, one basepair can be in multiple codon
-                    if self.pos2idx[(ch,p)] in self.codon_info:
-                        if codon not in self.codon_info[self.pos2idx[(ch,p)]]:
-                            self.codon_info[self.pos2idx[(ch,p)]].append(codon)
-                    else:
-                        self.codon_info[self.pos2idx[(ch,p)]] = [codon]
-        #
-        # remove all positions that are not in regions
-        env.logger.info('{} out of {} bp ({:.2f}%) are in coding regions of genes {}'.format(
-            len(self.codon_info), len(self.idx2pos), 
-            100. * len(self.codon_info) / len(self.idx2pos), 
-            ', '.join(genes)))
-        #
-        if not genes:
+        self.num_loci, self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
+        if not self.codon_info:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
@@ -323,7 +325,7 @@ class ProteinSelector(sim.PySelector):
         # the same aa change can be caused by two mutations, we need to keep only one
         # aa_change with the same (aa, naa, ploidy, p0)
         aa_change = set()
-        N = len(self.pos2idx)
+        N = self.num_loci
         for m in mut.keys():
             p = m / N  # ploidy
             loc = m % N
@@ -331,10 +333,7 @@ class ProteinSelector(sim.PySelector):
             # we need to map index in coding region to their original position
             for p0, p1, p2, aa, s in self.codon_info[loc]:
                 # p0: location
-                # pos2idx[p0]: index to pos in simulated population
                 # mut: mutation (0 for wildtype)
-                #
-                # env.logger.warning([self.idx2pos[loc], mut[m], p0, mut[self.pos2idx[p0]+p*N], p1, mut[self.pos2idx[p1]+p*N], p2, mut[self.pos2idx[p2]+p*N]])
                 codon = self.mutant_map[self.coding_base[p0]][mut[p0+p*N]] + \
                         self.mutant_map[self.coding_base[p1]][mut[p1+p*N]] + \
                         self.mutant_map[self.coding_base[p2]][mut[p2+p*N]]
@@ -369,21 +368,110 @@ class ProteinSelector(sim.PySelector):
                 fitness *= 1 - self.s_stopgain
             else:
                 fitness *= 1 - self.s_missense
-        #self.fitness_cache[tuple([(x,y) for x,y in enumerate(geno) if y!=0])] = fitness
         return fitness
 
-class EvolvePop:
+class ProteinPenetrance(sim.PyPenetrance):
+    def __init__(self, regions, s_sporadic=0.0001, s_missense=0.001, 
+            s_stoploss=0.002, s_stopgain=0.01):
+        '''A protein penetrance model that is identical to ProteinSelector, but 
+            use 1 minus calculated fitness value as pentrance probability.
+        '''
+        self.s_sporadic = s_sporadic
+        self.s_missense = s_missense
+        self.s_stoploss = s_stoploss
+        self.s_stopgain = s_stopgain
+        #
+        self.num_loci, self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
+        if not self.codon_info:
+            env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
+            sim.PyPenetrance.__init__(self, func=self._neutral, loci=[])
+        else:
+            # we need to send simuPOP to indexes of coding loci within the specified region
+            sim.PyPenetrance.__init__(self, func=self._penetrance,
+                loci=sorted(self.codon_info.keys()))
+
+        # 
+        # a cache for all fitness values
+        #self.fitness_cache = {}
+        #
+        # the meaning of mutation is different according to ref sequence
+        self.mutant_map = {
+            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+        }
+
+    def _neutral(self):
+        return 1 - s_sporadic
+
+    def _penetrance(self, mut):
+        # geno is arranged locus by locus (A1,A2,B1,B2 etc)
+        #
+        # we can not divide the sequence into triplets because it is possible that a nucleotide
+        # belong to multiple codon with different locations.
+        # 
+        # the same aa change can be caused by two mutations, we need to keep only one
+        # aa_change with the same (aa, naa, ploidy, p0)
+        aa_change = set()
+        N = self.num_loci
+        for m in mut.keys():
+            p = m / N  # ploidy
+            loc = m % N
+            aa_change_at_m = []
+            # we need to map index in coding region to their original position
+            for p0, p1, p2, aa, s in self.codon_info[loc]:
+                # p0: location
+                # mut: mutation (0 for wildtype)
+                codon = self.mutant_map[self.coding_base[p0]][mut[p0+p*N]] + \
+                        self.mutant_map[self.coding_base[p1]][mut[p1+p*N]] + \
+                        self.mutant_map[self.coding_base[p2]][mut[p2+p*N]]
+                naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
+                # if this is a real change
+                if naa != aa:
+                    aa_change_at_m.append((aa, naa, p, p0))
+            #
+            # The same mutation can cause multiple aa change for different genes, we need to
+            # keep only the most damaging one.
+            if len(aa_change_at_m) == 1:
+                aa_change.add(aa_change_at_m[0])
+            elif len(aa_change_at_m) > 1:
+                # find the most damaging one
+                stopgain = [x for x in aa_change_at_m if x[1] == '*']
+                if stopgain:
+                    aa_change.add(stopgain[0])
+                else:
+                    stoploss = [x for x in aa_change_at_m if x[0] == '*']
+                    if stoploss:
+                        aa_change.add(stoploss[0])
+                    else:
+                        aa_change.add(aa_change_at_m[0])
+        #
+        # we assume a multiplicative model
+        fitness = 1 - self.s_sporadic
+        for aa, naa, ploidy, start in aa_change:
+            # stoploss
+            if aa == '*': 
+                fitness *= 1 - self.s_stoploss
+            elif naa == '*':
+                fitness *= 1 - self.s_stopgain
+            else:
+                fitness *= 1 - self.s_missense
+        return 1 - fitness
+
+
+class EvolvePop(SkiptableAction):
     def __init__(self, mu, recRate, selector, demoModel, output):
         self.mu = mu
         self.selector = selector
         self.recRate = recRate
         self.demoModel = demoModel
         self.output = [output]
-        #SkiptableAction.__init__(self, cmd='EvolvePop {} {} {}\n'
-        #    .format(mu, recRate, output),
-        #    output=output)
+        SkiptableAction.__init__(self, cmd='EvolvePop mu={} rec={} output={}\n'
+            .format(mu, recRate, output),
+            output=output)
 
-    def __call__(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
         refGenome = RefGenome(pipeline.proj.build)
         
@@ -453,6 +541,9 @@ class EvolvePop:
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites
                 sim.RevertFixedSites(),
+                #
+                # apply fitness to get final statistics and facilitate sampling
+                self.selector,
                 # statistics after evolution
                 sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
                     numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
@@ -474,7 +565,7 @@ class EvolvePop:
         return self.output
 
 
-class CaseControlSampler:
+class DrawCaseControlSample(SkiptableAction):
     def __init__(self, nCase, nCtrl, penetrance, output):
         self.nCase = nCase
         self.nCtrl = nCtrl
@@ -488,34 +579,37 @@ class CaseControlSampler:
     def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
-        env.logger.info('Generating %d cases and %d controls...' % (self.nCase, self.nCtrl))
+        self.prog = ProgressBar('Generating %d cases and %d controls...' % (self.nCase, self.nCtrl), self.nCase + self.nCtrl)
         pop.evolve(
-            matingScheme=RandomMating(
+            matingScheme=sim.RandomMating(
                 ops=[
-                    MendelianGenoTransmitter(),
+                    sim.MendelianGenoTransmitter(),
+                    # apply a penetrance model 
+                    self.penetrance,
                     # an individual will be discarded if _selectInds returns False
-                    PyOperator(func=self._selectInds)
+                    sim.PyOperator(func=self._selectInds)
                 ],
                 subPopSize=self.nCase + self.nCtrl,
             ),
             gen = 1
         )
+        self.prog.done()
         env.logger.info('Saving samples to population {}'.format(self.output[0]))
         pop.save(self.output[0])
 
-    def _selectInds(off):
+    def _selectInds(self, off):
         'Determine if the offspring can be kept.'
-        p = self.func(off)
-        affected = p < random.random()
-        if affected:
+        if off.affected():
             if self.selectedCases < self.nCase:
-                off.setAffected(True)
                 self.selectedCases += 1
+                self.prog.update(self.selectedCases + self.selectedCtrls)
                 return True
         else:
-            if self.selectedCtrls < 1000:
+            # we keep number of ctrls less than cases to keep the progress even 
+            # because it is generally much easier to find controls
+            if self.selectedCtrls < self.nCtrl and self.selectedCtrls <= self.selectedCases:
+                self.prog.update(self.selectedCases + self.selectedCtrls)
                 self.selectedCtrls += 1
-                off.setAffected(False)
                 return True
         return False
 
