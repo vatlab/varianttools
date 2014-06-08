@@ -4418,6 +4418,16 @@ def adminArguments(parser):
 
 def admin(args):
     try:
+        # update_resource could be executed without a project
+        if args.update_resource:
+            with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type=args.update_resource)
+                res.excludeExistingLocalFiles()
+                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+                res.downloadResources()
+        # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
             if args.rename_samples:
                 if len(args.rename_samples) not in [2, 3]:
@@ -4603,12 +4613,8 @@ def admin(args):
                 proj.loadSnapshot(args.load_snapshot)
                 env.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
             elif args.update_resource:
-                res = ResourceManager()
-                res.getRemoteManifest()
-                res.selectFiles(resource_type=args.update_resource)
-                res.excludeExistingLocalFiles()
-                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
-                res.downloadResources()
+                # already handled
+                pass
             else:
                 env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
