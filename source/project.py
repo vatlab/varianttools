@@ -1107,14 +1107,34 @@ class Project:
             cls._instance = super(Project, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, name=None, new=False, verbosity=None, verify=True, **kwargs):
-        '''Create a new project (--new=True) or connect to an existing one.'''
+    def __init__(self, name=None, mode=[], verbosity=None, **kwargs):
+        '''Create a new project or connect to an existing one.'''
+        if isinstance(mode, str):
+            self.mode = [mode]
+        else:
+            self.mode = mode
+        #
+        # version of vtools, useful when opening a project created by a previous
+        # version of vtools.
+        self.version = VTOOLS_VERSION
+        self.revision = VTOOLS_REVISION
+        #
         files = glob.glob('*.proj')
-        if new: # new project
+        if 'NEW_PROJ' in self.mode: # new project
             if len(files) > 0:
                 if name + '.proj' in files:
-                    raise ValueError('Project {0} already exists. Please use '.format(name) + \
-                        'option --force to remove it if you would like to start a new project.')
+                    if 'REMOVE_EXISTING' in self.mode:
+                        existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
+                            glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
+                        for f in existing_files:
+                            try:
+                                os.remove(f)
+                            except:
+                                # we might not be able to remove files...
+                                raise OSError('Failed to remove existing project {}'.format(f))
+                    else:
+                        raise ValueError('Project {0} already exists. Please use '.format(name) + \
+                            'option --force to remove it if you would like to start a new project.')
                 else:
                     raise ValueError('A project can only be created in a directory without another project.')
             if name is None:
@@ -1128,7 +1148,12 @@ class Project:
                 raise ValueError('A project name can only contain alpha-numeric characters and underscores.')
         else: # exisitng project
             if len(files) == 0:
-                raise ValueError('Cannot find any project in the current directory.')
+                if 'ALLOW_NO_PROJ' in self.mode:
+                    self.name = None
+                    env.temp_dir = None
+                    return
+                else:
+                    raise ValueError('Cannot find any project in the current directory.')
             elif len(files) > 1:
                 raise ValueError('More than one project exists in the current directory.')
             if name is None:
@@ -1138,10 +1163,6 @@ class Project:
         #
         self.name = name
         self.proj_file = self.name + '.proj'
-        # version of vtools, useful when opening a project created by a previous
-        # version of vtools.
-        self.version = VTOOLS_VERSION
-        self.revision = VTOOLS_REVISION
         #
         # create a temporary directory
         self.db = DatabaseEngine()
@@ -1154,13 +1175,13 @@ class Project:
         env.term_width = self.loadProperty('__option_term_width', None)
         #env.check_update = self.loadProperty('__option_check_update', True)
         env.associate_num_of_readers = self.loadProperty('__option_associate_num_of_readers', None)
-        if verbosity is None and not new:
+        if verbosity is None and 'NEW_PROJ' not in self.mode:
             # try to get saved verbosity level
             verbosity = self.loadProperty('__option_verbosity', None)
         # set global verbosity level and temporary directory
         env.verbosity = verbosity
         # env.verbosity will affect the creation of logger
-        env.logger = '{}{}.log'.format('>' if new else '>>', self.name)
+        env.logger = '{}{}.log'.format('>' if 'NEW_PROJ' in self.mode else '>>', self.name)
         env.logger.debug('')
         env.logger.debug(env.command_line)
         # if option temp_dir is set, the path will be used
@@ -1172,11 +1193,22 @@ class Project:
             env.temp_dir = None
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         #
-        if new: 
+        if 'NEW_PROJ' in self.mode: 
             self.create(**kwargs)
             self.checkUpdate()
         else:
-            self.open(verify)
+            self.open()
+            if 'SKIP_VERIFICATION' not in self.mode:
+                try:
+                    self.checkIntegrity()
+                except Exception as e:
+                    env.logger.warning('Skip checking integrity of project: {}'.format(e))
+            # 
+            try:
+                self.analyze()
+            except Exception as e:
+                env.logger.warning('Skip analyzing project: {}'.format(e))
+        
 
     def create(self, **kwargs):
         '''Create a new project'''
@@ -1287,17 +1319,6 @@ class Project:
                     self.upgrade(proj_rev)
                 except Exception as e:
                     env.logger.warning('Skip upgrading project: {}'.format(e))
-        if verify:
-            try:
-                self.checkIntegrity()
-            except Exception as e:
-                env.logger.warning('Skip checking integrity of project: {}'.format(e))
-        # 
-        try:
-            self.analyze()
-        except Exception as e:
-            env.logger.warning('Skip analyzing project: {}'.format(e))
-        
 
     def checkIntegrity(self):
         '''Check if the project is ok...(and try to fix it if possible)'''
@@ -1497,7 +1518,8 @@ class Project:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         '''Write everything to disk...'''
-        self.close()
+        if self.name is not None:
+            self.close()
         return exc_val is None
 
     #
@@ -3553,23 +3575,6 @@ def initArguments(parser):
 
 def init(args):
     try:
-        if args.force:
-            # silently remove all exiting project.
-            try:
-                proj = Project(verbosity='0', verify=False)
-                proj.remove()
-            except:
-                # we might not be able to open a non-exist project if it is malformed.
-                files = glob.glob('*.proj') + glob.glob('*.lck') + \
-                    glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
-                if len(files) > 0:
-                    for f in files:
-                        try:
-                            os.remove(f)
-                        except:
-                            # we might not be able to remove files...
-                            raise OSError('Failed to remove existing project {}'.format(f))
-        #
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
             if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
@@ -3590,7 +3595,8 @@ def init(args):
                 raise ValueError('{} is not a local or online snapshot'.format(args.parent))
             saved_dir = os.getcwd()
             os.chdir(parent_path)
-            with Project(name=args.project if parent_path == '.' else os.path.basename(args.parent).split('.')[0] , new=True, 
+            with Project(name=args.project if parent_path == '.' else os.path.basename(args.parent).split('.')[0],
+                mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
                 verbosity='1' if parent_path == '.' else '0') as parent_proj:
                 env.logger.info('Extracting snapshot {} to {}'.format(args.parent, parent_path))
                 parent_proj.loadSnapshot(parent_snapshot)
@@ -3626,7 +3632,8 @@ def init(args):
                     os.chdir(child_path)
                     env.logger.info('Extracting snapshot {} to {}'.format(child, child_path))
                     with Project(name=args.project if len(args.children) == 1 else os.path.basename(child).split('.')[0],
-                        new=True, verbosity='1' if len(args.children) == 1 else '0') as child_proj:
+                        mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
+                        verbosity='1' if len(args.children) == 1 else '0') as child_proj:
                         child_proj.loadSnapshot(child_snapshot)
                     os.chdir(saved_dir)
                     dirs.append(child_path)
@@ -3637,7 +3644,8 @@ def init(args):
                     dirs.append(child)
             args.children = dirs
         # create a new project
-        with Project(name=args.project, new=True, 
+        with Project(name=args.project,
+            mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
             if args.parent:
                 copier = ProjCopier(proj, args.parent, args.variants,
@@ -3857,15 +3865,19 @@ def showArguments(parser):
 
 def show(args):
     try:
-        with Project(verbosity=args.verbosity) as proj:
+        with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
             #
             limit_clause = ' LIMIT 0, {}'.format(args.limit) if args.limit is not None and args.limit >= 0 else ''
             omitted = '({} records omitted)'
             # if it is too narrow, wrap it. If it is wide, make use of full term width
             textWidth = max(60, getTermWidth())
             if args.type == 'project':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 print(proj.summarize())
             elif args.type == 'tables':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show tables"'
                         .format(', '.join(args.items)))
@@ -3889,6 +3901,8 @@ def show(args):
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'table':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
                     raise ValueError('Please specify a variant table to display')
@@ -3917,6 +3931,8 @@ def show(args):
                 print('{:<23} {}'.format('Number of variants:',
                     proj.db.numOfRows(table)))
             elif args.type == 'samples':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if not proj.db.hasTable('sample'):
                     env.logger.warning('Project does not have a sample table.')
                     return
@@ -3941,6 +3957,8 @@ def show(args):
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'phenotypes':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if not proj.db.hasTable('sample'):
                     env.logger.warning('Project does not have a sample table.')
                     return
@@ -3975,6 +3993,8 @@ def show(args):
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'fields':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if len(proj.annoDB) == 0:
                     env.logger.debug('No annotation database is attached.')
                 for table in proj.getVariantTables():
@@ -4054,6 +4074,8 @@ def show(args):
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print (omitted.format(nAll - args.limit))
             elif args.type == 'track':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if not args.items:
                     raise ValueError('Please provide a track file in tabixed vcf, '
                         'bigWig, or bigBed format')
@@ -4091,6 +4113,8 @@ def show(args):
                         .format(args.items[0], e))
                 fmt.describe()
             elif args.type == 'genotypes':
+                if proj.name is None:
+                    raise ValueError('Cannot find any project in the current directory.')
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show genotypes"'.format(', '.join(args.items)))
                 # get sample ids and attach the genotypes database

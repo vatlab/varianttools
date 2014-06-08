@@ -1843,7 +1843,7 @@ def importVariants(args):
         # the project is opened with verify=False so index on the master
         # variant table will not be created if it does not exist (because the
         # last command was a vtools import command)
-        with Project(verbosity=args.verbosity, verify=False) as proj:
+        with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)

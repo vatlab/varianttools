@@ -1707,26 +1707,8 @@ def execute(args):
                 pipeline.execute(name, args.input, args.output,
                     args.jobs)
     # 
-    # first try to execute a pipeline without project
     try:
-        # try to open an project, if failed assume that we are
-        # executing a pipeline without project.
-        with Project(verbosity=args.verbosity) as proj:
-            pass
-    except Exception as e:
-        env.logger.warning('Executing pipeline {} without a project'.format(' '.join(args.pipeline)))
-        env.temp_dir = None
-        try:
-            executePipeline(None)
-            return
-        except Exception as e:
-            env.unlock_all()
-            env.logger.error(e)
-            sys.exit(1)
-    #
-    # the normal execution with a working project
-    try:
-        with Project(verbosity=args.verbosity) as proj:
+        with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
             #
             # definitely a pipeline
             if args.input or args.output or args.unknown_args:
@@ -1770,7 +1752,7 @@ def simulateArguments(parser):
     
 def simulate(args):
     try:
-        with Project(verbosity=args.verbosity) as proj:
+        with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
             # step 1, create a simulation configuration file.
             model_name = os.path.basename(args.model).split('.', 1)[0]
             if args.seed is None:
