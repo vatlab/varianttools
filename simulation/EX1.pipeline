@@ -27,13 +27,8 @@ regions_comment=One or more chromosome regions (separated by ';') in the format 
   Chromosome positions are 1-based and are inclusive at both ends so the 
   chromosome region has a length of end-start+1 bp.'
 
-cases=1000
-cases_comment=Number of affected individuals to sample from the simulated
-	population.
-
-controls=1000
-controls_comment=Number of unaffected individuals to sample from the simulated
-	population.
+sizes=[1000, 1000, 1000]
+sizes_comment=Number of random samples draw from simulated population.
 
 
 scale=10
@@ -55,16 +50,10 @@ action=RunCommand('vtools use refGene')
 comment=Link the refGene database to the project
 
 [model_20]
-action=ExtractFromVcf(
-	'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
-	regions='%(regions)s', output='cache/temp.vcf')
+action=PopFromRegions(
+	regions='%(regions)s', size=7300/%(scale)s, output='cache/empty.pop')
 output='cache/temp.vcf'
-comment=Extract specified regions from the 1000 genomes genotype file.
-
-[model_30]
-action=VcfToPop(regions='%(regions)s', output='cache/temp.pop')
-comment=Convert downloaded genotype files to simuPOP populations
-
+comment=Create an initial population
 
 [model_40]
 #
@@ -74,21 +63,16 @@ action=EvolvePop(output='cache/temp1.pop',
 	selector=ProteinSelector('%(regions)s', s_missense=0.001 * %(scale)s,
 		s_stoploss=0.002 * %(scale)s, s_stopgain=0.005 * %(scale)s),
 	recRate=1e-8 * %(scale)s,
-	demoModel = MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
-     ]))
+	demoModel = SettlementOfNewWorldModel(T0=20000, scale=%(scale)s),
+    )
 comment=Evolve and expand a population
 
 [model_50]
-action=DrawCaseControlSample(
+action=DrawRandomSample(
 	output='cache/sample.pop',
-	penetrance=ProteinPenetrance('%(regions)s', s_missense=0.001,
-		s_stoploss=0.002, s_stopgain=0.005),
-	cases=%(cases)s, controls=%(controls)s
+	sizes=%(sizes)s
     )
-comment=Draw case control samples from the simulated population
+comment=Draw random samples from each subpopulation of the simulated population
 
 [model_60]
 action=PopToVcf(output=['cache/temp1.vcf', 'cache/temp1.phenotype'])

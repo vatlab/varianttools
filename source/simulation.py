@@ -60,6 +60,37 @@ class ExtractFromVcf(SkiptableAction):
                 ' ({})'.format(r[3] if r[3] else '')))
             tabixFetch(self.filenameOrUrl, [region], self.output[0], False)
         
+class PopFromRegions(SkiptableAction):
+    '''Create a simuPOP population from specified regions and number of individuals.
+    '''
+    def __init__(self, regions, size, output):
+        self.regions = regions
+        self.size = size
+        SkiptableAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
+            output=output)
+
+    def _execute(self, ifiles, pipeline):
+        # translate regions to simuPOP ...
+        lociPos = {}
+        for r in expandRegions(self.regions, pipeline.proj):
+            if r[0] in lociPos:
+                lociPos[r[0]].extend(range(r[1], r[2] + 1))
+            else:
+                lociPos[r[0]] = range(r[1], r[2] + 1)
+        chroms = lociPos.keys()
+        chroms.sort()
+        #
+        # create a dictionary of lociPos->index on each chromosome
+        lociIndex = {}
+        for chIdx,ch in enumerate(chroms):
+            lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
+        #
+        # number of individuals? 629
+        pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
+            chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+        pop.save(self.output[0])
+
+
 class VcfToPop(SkiptableAction):
     '''Check out of of an command, and check if it matches a particular
     pattern. The pipeline will exit if fail is set to True (default).'''
@@ -84,10 +115,8 @@ class VcfToPop(SkiptableAction):
         for chIdx,ch in enumerate(chroms):
             lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
         #
-        # number of individuals? 629
-        pop = sim.Population(size=629, loci=[len(lociPos[x]) for x in chroms],
-            chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
         #
+        pop = None
         # we assume 0 for wildtype, 1 for genotype
         #
         # extract genotypes
@@ -100,6 +129,9 @@ class VcfToPop(SkiptableAction):
                 fields = line.split('\t')
                 chr = pop.chromNames().index(fields[0])
                 pos = lociIndex[chr][int(fields[1])]
+                if pop is None:
+                    pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
+                        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
                 #
                 for ind, geno in enumerate(fields[10:]):
                     if geno[0] != 0:
@@ -582,20 +614,19 @@ class EvolvePop(SkiptableAction):
 
 
 class DrawCaseControlSample(SkiptableAction):
-    def __init__(self, nCase, nCtrl, penetrance, output):
-        self.nCase = nCase
-        self.nCtrl = nCtrl
+    def __init__(self, cases, controls, penetrance, output):
+        self.cases = cases
+        self.controls = controls
         self.penetrance = penetrance
         self.selectedCases = 0
         self.selectedCtrls = 0
         SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
             output=output)
-
     
     def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
-        self.prog = ProgressBar('Generating %d cases and %d controls...' % (self.nCase, self.nCtrl), self.nCase + self.nCtrl)
+        self.prog = ProgressBar('Generating %d cases and %d controls...' % (self.cases, self.controls), self.cases + self.controls)
         pop.evolve(
             matingScheme=sim.RandomMating(
                 ops=[
@@ -605,7 +636,7 @@ class DrawCaseControlSample(SkiptableAction):
                     # an individual will be discarded if _selectInds returns False
                     sim.PyOperator(func=self._selectInds)
                 ],
-                subPopSize=self.nCase + self.nCtrl,
+                subPopSize=self.cases + self.controls,
             ),
             gen = 1
         )
@@ -621,17 +652,39 @@ class DrawCaseControlSample(SkiptableAction):
     def _selectInds(self, off):
         'Determine if the offspring can be kept.'
         if off.affected():
-            if self.selectedCases < self.nCase:
+            if self.selectedCases < self.cases:
                 self.selectedCases += 1
                 self.prog.update(self.selectedCases + self.selectedCtrls)
                 return True
         else:
             # we keep number of ctrls less than cases to keep the progress even 
             # because it is generally much easier to find controls
-            if self.selectedCtrls < self.nCtrl and self.selectedCtrls <= self.selectedCases:
+            if self.selectedCtrls < self.controls and self.selectedCtrls <= self.selectedCases:
                 self.prog.update(self.selectedCases + self.selectedCtrls)
                 self.selectedCtrls += 1
                 return True
         return False
 
+class DrawRandomSample(SkiptableAction):
+    def __init__(self, sizes, output):
+        self.sizes = sizes
+        SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
+            output=output)
+    
+    def _execute(self, ifiles, pipeline):
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        pop.evolve(
+            matingScheme=sim.RandomMating(
+                subPopSize=self.sizes
+            ),
+            gen = 1
+        )
+        # 
+        if 'migrate_to' in pop.infoFields():
+            pop.removeInfoFields('migrate_to')
+        if 'fitness' in pop.infoFields():
+            pop.removeInfoFields('fitness')
+        env.logger.info('Saving samples to population {}'.format(self.output[0]))
+        pop.save(self.output[0])
 
