@@ -4427,6 +4427,7 @@ def admin(args):
                 res.excludeExistingLocalFiles()
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
+            sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
             if args.rename_samples:
@@ -4612,9 +4613,6 @@ def admin(args):
             elif args.load_snapshot is not None:
                 proj.loadSnapshot(args.load_snapshot)
                 env.logger.info('Snapshot {} has been loaded'.format(args.load_snapshot))
-            elif args.update_resource:
-                # already handled
-                pass
             else:
                 env.logger.warning('Please specify an operation. Type `vtools admin -h\' for available options')
     except Exception as e:
