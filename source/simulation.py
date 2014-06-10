@@ -88,6 +88,7 @@ class PopFromRegions(SkiptableAction):
         # number of individuals? 629
         pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
             chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+        env.logger.info('Saving initial population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
 

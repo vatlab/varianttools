@@ -348,17 +348,18 @@ class SkiptableAction:
     def __call__(self, ifiles, pipeline=None):
         exe_info = '{}.exe_info'.format(self.output[0])
         if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
-            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles):
+            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles,
+            exe_info):
             # not that we do not care input file because it might contain different seed
             env.logger.info('Reuse existing {}'.format(self.output[0]))
             return self.output
         with open(exe_info, 'w') as exe_info:
             exe_info.write(self.cmd + '\n')
+            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
             for f in ifiles:
                 # for performance considerations, use partial MD5
                 exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                     calculateMD5(f, partial=True)))
-            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
             self._execute(ifiles, pipeline)
             exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
             for f in self.output:
