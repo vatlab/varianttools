@@ -1653,7 +1653,20 @@ def compressFile(infile, outfile):
 
 def decompressGzFile(filename, inplace=True, force=False):
     '''Decompress a file.gz and return file if needed'''
-    if filename.lower().endswith('.gz'):
+    if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
+        dest_files = []
+        mode = 'r:gz'
+        with tarfile.open(filename, mode) as tar:
+            # only extract files
+            path = os.path.dirname(filename)
+            files = [x.name for x in tar.getmembers() if x.isfile()]
+            for f in files:
+                dest_file = os.path.join(path, os.path.basename(f))
+                dest_files.append(dest_file)
+                if not os.path.isfile(dest_file):
+                    tar.extract(f, path)
+        return dest_files
+    elif filename.lower().endswith('.gz'):
         new_filename = filename[:-3]
         # if the decompressed file exists, and is newer than the .gz file, ignore
         if os.path.isfile(new_filename) \

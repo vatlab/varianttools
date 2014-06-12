@@ -31,7 +31,7 @@ from simuPOP.demography import *
 
 from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
     calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
-    dissectGene
+    dissectGene, downloadFile, decompressGzFile
 
 import os, sys, math, time, random
 from collections import defaultdict
@@ -42,6 +42,87 @@ if sys.version_info.major == 2:
     from ucsctools_py2 import tabixFetch
 else:
     from ucsctools_py3 import tabixFetch
+
+Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
+
+def set_map_dist(pop):
+    '''Set map distance for each locus'''
+    recom = downloadFile(Recom_URL)
+    recom_files = decompressGzFile(recom)
+    recom_map = []
+    for ch in range(pop.numChrom()):
+        ch_name = pop.chromName(ch)
+        try:
+            recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
+        except Exception as e:
+            raise RuntimeError('Could not find recombination map for chromosome {}'.format(ch))
+        dist = {}
+        with open(recom_file) as recom:
+            recom.readline()
+            for line in recom:
+                try:
+                    fields = line.split()
+                    pos = int(fields[1])
+                    dist[pos] = float(fields[3])
+                except Exception as e:
+                    env.logger.warning(e)
+                    pass
+        env.logger.info('Map distance of %d markers are found' % len(dist))
+        nLoci = pop.numLoci(ch)
+        # now, try to set genetic map
+        map_dist = [-1]*nLoci;
+        cnt = 0
+        for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
+            pos = int(int(pop.locusPos(loc)))
+            try:
+                map_dist[loc] = dist[pos]
+                cnt += 1
+            except:
+                pass
+        if cnt != nLoci:
+            prev = -1     # name of the previous marker with map distance
+            next = -1     # name of the next marker with map distance
+            loc = 0
+            while (loc < nLoci):
+                # already has value
+                if map_dist[loc] != -1:
+                    prev = next = loc
+                    loc += 1
+                    continue
+                # find the ext one
+                if prev == next:
+                    next = -1
+                    for n in range(loc+1, nLoci):
+                         if map_dist[n] != -1:
+                             next = n
+                             next_pos = pop.locusPos(next)
+                             next_dis = map_dist[next]
+                             break
+                    if prev == -1:
+                        for n in range(next):
+                            # rough estimation: distance (in cM) proportional to 0.01 recombination rate
+                            map_dist[n] = map_dist[next] - (pop.locusPos(next) - pop.locusPos(n)) * 1e-8
+                    # if not found, this is at the end of a chromosome
+                    elif next == -1:
+                        for n in range(loc, nLoci):
+                            map_dist[n] = map_dist[prev] + (pop.locusPos(n) - pop.locusPos(prev)) * 1e-8
+                        break
+                    # if found, but no previous, this is the first one
+                    else:
+                        prev_pos = pop.locusPos(prev)
+                        prev_dis = map_dist[prev]
+                        for n in range(loc, next):
+                            map_dist[n] = map_dist[prev] + (pop.locusPos(n) - prev_pos) / (next_pos - prev_pos) * (next_dis - prev_dis)
+                    prev = next
+                    loc = next + 1
+        if nLoci != cnt:
+            env.logger.info('Map distance of %d markers (%.2f%% of %d) are estimated' % (nLoci - cnt,
+                (nLoci - cnt) * 100.0/nLoci, nLoci))
+        ch_map = {}
+        for loc in range(nLoci):
+            ch_map[loc] = map_dist[loc]
+        recom_map.append(ch_map)
+    pop.dvars().geneticMap = recom_map
 
 
 class ExtractFromVcf(SkiptableAction):
@@ -88,7 +169,7 @@ class PopFromRegions(SkiptableAction):
         # number of individuals? 629
         pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
             chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
-        env.logger.info('Saving initial population to {}'.format(self.output[0]))
+        set_map_dist(pop)
         pop.save(self.output[0])
 
 
@@ -142,6 +223,7 @@ class VcfToPop(SkiptableAction):
                         pop.individual(ind).setAllele(1, pos, 1, chr)
                         mutantCount += 1
         env.logger.info('{} mutants imported'.format(mutantCount))
+        set_map_dist(pop)
         pop.save(self.output[0])
 
 class PopToVcf(SkiptableAction):
