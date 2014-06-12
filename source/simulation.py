@@ -49,9 +49,11 @@ def set_map_dist(pop):
     '''Set map distance for each locus'''
     recom = downloadFile(Recom_URL)
     recom_files = decompressGzFile(recom)
-    recom_map = []
+    recom_map = {}
     for ch in range(pop.numChrom()):
         ch_name = pop.chromName(ch)
+        l_pos = int(pop.locusPos(pop.chromBegin(ch)))
+        h_pos = int(pop.locusPos(pop.chromEnd(ch)-1) + 1)
         try:
             recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
         except Exception as e:
@@ -63,14 +65,15 @@ def set_map_dist(pop):
                 try:
                     fields = line.split()
                     pos = int(fields[1])
-                    dist[pos] = float(fields[3])
+                    if pos >= l_pos and pos <= h_pos:
+                        dist[pos] = float(fields[3])
                 except Exception as e:
                     env.logger.warning(e)
-                    pass
-        env.logger.info('Map distance of %d markers are found' % len(dist))
+        env.logger.info('Map distance of %d markers within region %d-%d are found' % (len(dist), l_pos, h_pos))
         nLoci = pop.numLoci(ch)
+        endLoc = pop.chromEnd(ch)
         # now, try to set genetic map
-        map_dist = [-1]*nLoci;
+        map_dist = [-1]*endLoc;
         cnt = 0
         for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
             pos = int(int(pop.locusPos(loc)))
@@ -83,7 +86,7 @@ def set_map_dist(pop):
             prev = -1     # name of the previous marker with map distance
             next = -1     # name of the next marker with map distance
             loc = 0
-            while (loc < nLoci):
+            while (loc < endLoc):
                 # already has value
                 if map_dist[loc] != -1:
                     prev = next = loc
@@ -92,7 +95,7 @@ def set_map_dist(pop):
                 # find the ext one
                 if prev == next:
                     next = -1
-                    for n in range(loc+1, nLoci):
+                    for n in range(loc+1, endLoc):
                          if map_dist[n] != -1:
                              next = n
                              next_pos = pop.locusPos(next)
@@ -104,7 +107,7 @@ def set_map_dist(pop):
                             map_dist[n] = map_dist[next] - (pop.locusPos(next) - pop.locusPos(n)) * 1e-8
                     # if not found, this is at the end of a chromosome
                     elif next == -1:
-                        for n in range(loc, nLoci):
+                        for n in range(loc, endLoc):
                             map_dist[n] = map_dist[prev] + (pop.locusPos(n) - pop.locusPos(prev)) * 1e-8
                         break
                     # if found, but no previous, this is the first one
@@ -115,13 +118,11 @@ def set_map_dist(pop):
                             map_dist[n] = map_dist[prev] + (pop.locusPos(n) - prev_pos) / (next_pos - prev_pos) * (next_dis - prev_dis)
                     prev = next
                     loc = next + 1
-        if nLoci != cnt:
-            env.logger.info('Map distance of %d markers (%.2f%% of %d) are estimated' % (nLoci - cnt,
-                (nLoci - cnt) * 100.0/nLoci, nLoci))
-        ch_map = {}
-        for loc in range(nLoci):
-            ch_map[loc] = map_dist[loc]
-        recom_map.append(ch_map)
+        for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
+            recom_map[loc] = map_dist[loc]
+        env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
+            l_pos, h_pos, h_pos - l_pos, recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)],
+               (recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)])/pop.numLoci(ch)))
     pop.dvars().geneticMap = recom_map
 
 
@@ -592,15 +593,14 @@ class ProteinPenetrance(sim.PyPenetrance):
 
 
 class EvolvePop(SkiptableAction):
-    def __init__(self, mu, recRate, selector, demoModel, output):
+    def __init__(self, mu, selector, demoModel, scale, output):
         self.mu = mu
         self.selector = selector
-        self.recRate = recRate
         self.demoModel = demoModel
+        self.scale = scale
         self.output = [output]
-        SkiptableAction.__init__(self, cmd='EvolvePop mu={} rec={} output={}\n'
-            .format(mu, recRate, output),
-            output=output)
+        SkiptableAction.__init__(self, cmd='EvolvePop mu={} scale={} output={}\n'
+            .format(mu, scale, output), output=output)
 
     def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
@@ -624,6 +624,10 @@ class EvolvePop(SkiptableAction):
         #
         env.logger.info('Start evolving...')
         pop.dvars().last_time = time.time()
+        # try to use a genetic map
+        genetic_pos = [pop.dvars().geneticMap[x] for x in range(pop.totNumLoci())]
+        rec_rate = [genetic_pos[i+1] - genetic_pos[i] for i in range(pop.totNumLoci()-1)] + [0.5]
+        rec_rate = [x * self.scale if x >=0 else 0.5 for x in rec_rate]
         exec('import time', pop.vars(), pop.vars())
         pop.evolve(
             initOps=sim.InitSex(),
@@ -667,7 +671,7 @@ class EvolvePop(SkiptableAction):
                     ])
             ],
             matingScheme=sim.RandomMating(ops=
-                sim.Recombinator(rates=self.recRate, loci=sim.ALL_AVAIL) if self.recRate != 0 else sim.MendelianGenoTransmitter(),
+                sim.Recombinator(rates=rec_rate, loci=sim.ALL_AVAIL),
                 subPopSize=self.demoModel),
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites

@@ -62,7 +62,7 @@ action=EvolvePop(output='cache/temp1.pop',
     mu=1.8e-8 * %(scale)s, 
 	selector=ProteinSelector('%(regions)s', s_missense=0.001 * %(scale)s,
 		s_stoploss=0.002 * %(scale)s, s_stopgain=0.005 * %(scale)s),
-	recRate=1e-8 * %(scale)s,
+	scale= %(scale)s,
 	demoModel = SettlementOfNewWorldModel(T0=20000, scale=%(scale)s),
     )
 comment=Evolve and expand a population
