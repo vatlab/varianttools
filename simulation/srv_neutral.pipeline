@@ -53,10 +53,10 @@ comment=Extract specified regions from the 1000 genomes genotype file.
 #	selector=ProteinSelector('%(regions)s', s_missense=0.001 * %(scale)s,#
 #		s_stoploss=0.002 * %(scale)s, s_stopgain=0.005 * %(scale)s),
 action=EvolvePop(output='srv_neutral_evolved_{}.pop'.format('${seed}'),
-	mutModel='K80', mutRate=[1.8e-8 * %(scale)s, 2],
+	mutModel='JC69', mutRate=[1.8e-8 * %(scale)s * 4. / 3.],
 	selector=ProteinSelector('%(regions)s', s_missense=0 * %(scale)s,
 		s_stoploss=0 * %(scale)s, s_stopgain=0 * %(scale)s),
-	recScale=%(scale)s,
+	recScale=0, 
 	demoModel = MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
