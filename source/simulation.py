@@ -28,6 +28,7 @@ simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0
 
 import simuPOP as sim
 from simuPOP.demography import *
+from simuPOP.sampling import *
 
 from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
     calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
@@ -324,23 +325,41 @@ class PopToVcf(SkiptableAction):
 
 
 class OutputPopStat(SkiptableAction):
-    def __init__(self, output):
+    def __init__(self, mut_count=None, output=[]):
         self.output = output
+        self.mut_count = mut_count
         SkiptableAction.__init__(self, cmd='PopStat output={}\n'
             .format(output), output=output)
 
     def _execute(self, ifiles, pipeline):
         #
         env.logger.info('Loading population from {}'.format(ifiles[0]))
-        pop = sim.loadPopulation(ifiles[0])
-        result = self.LD_curve(pop)
-        with open(self.output[0], 'w') as ld_out:
-            for ld_stat in result.keys:
-                for sp in result[ld_stat].keys():
-                    ld_out.write('{}\t{}\t{}\n'.format(ld_stat, sp, 
-                        '\t'.join(['{:.4f}'.format(x) for x in result[ld_stat][sp]])))
+        self.pop = sim.loadPopulation(ifiles[0])
+        if self.mut_count is not None:
+            self.count_mutants()
+        #
+        #result = self.LD_curve(pop)
+        #with open(self.output[0], 'w') as ld_out:
+        #    for ld_stat in result.keys:
+        #        for sp in result[ld_stat].keys():
+        #            ld_out.write('{}\t{}\t{}\n'.format(ld_stat, sp, 
+        #                '\t'.join(['{:.4f}'.format(x) for x in result[ld_stat][sp]])))
 
 
+    def count_mutants(self):
+        #
+        sz = min(self.pop.popSize(), self.mut_count[1])
+        sample = drawRandomSample(self.pop, sz)
+        #
+        sim.stat(sample, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
+        #
+        num = [int(sz*2-x[0]) for x in sample.dvars().alleleNum.values()]
+        cnt = [0]*21
+        for n in num:
+            if n < 21:
+                cnt[n] += 1
+        with open(self.mut_count[0], 'w') as out:
+            out.write('\t'.join([str(x) for x in cnt]) + '\n')
 
     def LD_curve(self, pop, maxDist=500000, binDist=1000, maxPairs=10000):
         '''Calculating LD as a function of distance. If multiple chromosomes are

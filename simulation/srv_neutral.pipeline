@@ -65,5 +65,7 @@ action=EvolvePop(output='srv_neutral_evolved_{}.pop'.format('${seed}'),
 comment=Evolve and expand a population
 
 
-
-
+[model_41]
+action=OutputPopStat(mut_count=['loci_with_mutants_{}'.format('${seed}'), 700],
+	output='loci_with_mutants_{}'.format('${seed}'))
+comment=Count number of mutants in a sample of 700 individuals.
