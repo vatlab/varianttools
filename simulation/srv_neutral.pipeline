@@ -1,0 +1,69 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=A pipeline to simulate populations using similar parameters
+	as srv_neutral
+
+model_description=Test example for srv_neutral
+
+[DEFAULT]
+regions=
+regions_comment=One or more chromosome regions (separated by ';') in the format of
+  chr:start-end (e.g. chr21:33,031,597-33,041,570), or Field:Value from a region-based
+  annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+  Multiple chromosomal regions will be selected if the name matches more
+  than one chromosomal regions. The regions will be marked by their indexes
+  but values from another field will be used if its name is appended
+  (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
+  Chromosome positions are 1-based and are inclusive at both ends so the 
+  chromosome region has a length of end-start+1 bp.'
+
+scale=10
+scale_comment=Scaling factor to speed up the simulation by scaling down the simulation
+  while boosting mutation, selection and recombination rates.
+
+[model_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required for the
+	execution of this pipeline.
+
+[model_1]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init model')
+comment=Create a new project if there is no existing project under the current directory.
+
+[model_10]
+action=RunCommand('vtools use refGene')
+comment=Link the refGene database to the project
+
+[model_20]
+action=PopFromRegions(size=1000,
+	regions='%(regions)s', output='cache/srv_neutral_init_{}.pop'.format('${seed}'))
+output='cache/srv_neutral_init_{}.pop'.format('${seed}')
+comment=Extract specified regions from the 1000 genomes genotype file.
+
+
+[model_40]
+#
+# Using a scaling factor to increase speed of simulation
+#	selector=ProteinSelector('%(regions)s', s_missense=0.001 * %(scale)s,#
+#		s_stoploss=0.002 * %(scale)s, s_stopgain=0.005 * %(scale)s),
+action=EvolvePop(output='srv_neutral_evolved_{}.pop'.format('${seed}'),
+	mutModel='K80', mutRate=[1.8e-8 * %(scale)s, 2],
+	selector=ProteinSelector('%(regions)s', s_missense=0 * %(scale)s,
+		s_stoploss=0 * %(scale)s, s_stopgain=0 * %(scale)s),
+	recScale=%(scale)s,
+	demoModel = MultiStageModel([
+        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
+			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
+        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+     ]))
+comment=Evolve and expand a population
+
+
+
+

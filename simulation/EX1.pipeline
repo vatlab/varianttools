@@ -67,6 +67,11 @@ action=EvolvePop(output='cache/temp1.pop',
     )
 comment=Evolve and expand a population
 
+[model_45]
+action=OutputPopStat(output=['cache/LD_{}.txt'.format('${seed}'), 'cache/freq_{}.txt'.format('${seed}')])
+comment=Output statistics on LD and minor allele frequency
+
+
 [model_50]
 action=DrawRandomSample(
 	output='cache/sample.pop',

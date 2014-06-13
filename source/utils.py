@@ -1184,9 +1184,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                 raise ValueError('0 is not allowed as starting or ending position')
             # start might be after end
             if start > end:
-                regions.append((chr, start, end, '(reverse complementary)'))
+                regions.append((chr[3:] if chr.startswith('chr') else chr, start, end, '(reverse complementary)'))
             else:
-                regions.append((chr, start, end, ''))
+                regions.append((chr[3:] if chr.startswith('chr') else chr, start, end, ''))
         except Exception as e:
             # this is not a format for chr:start-end, try field:name
             try:

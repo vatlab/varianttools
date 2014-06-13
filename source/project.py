@@ -1149,6 +1149,7 @@ class Project:
         else: # exisitng project
             if len(files) == 0:
                 if 'ALLOW_NO_PROJ' in self.mode:
+                    self.build = None
                     self.name = None
                     env.temp_dir = None
                     return

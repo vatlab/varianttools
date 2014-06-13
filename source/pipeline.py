@@ -1465,7 +1465,7 @@ class Pipeline:
             else:
                 text = new_text
 
-    def execute(self, pname, input_files=[], output_files=[], jobs=1):
+    def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
@@ -1499,6 +1499,7 @@ class Pipeline:
             'ref_genome_build': '' if self.proj is None or not self.proj.build else  self.proj.build,
             'vtools_version': '' if self.proj is None else self.proj.version,
         }
+        self.VARS.update(**kwargs)
         for key, val in self.pipeline.pipeline_vars.items():
             self.VARS[key.lower()] = self.substitute(val, self.VARS)
         #
@@ -1772,7 +1773,7 @@ def simulate(args):
                     cfg.write("command={}\n".format(env.command_line))
             env.logger.info('Simulation configuration is saved to {}'.format(cfg_file))
             pipeline = Pipeline(proj, args.model, extra_args=args.unknown_args)
-            pipeline.execute(None, [cfg_file], [], 1)
+            pipeline.execute(None, [cfg_file], [], 1, seed=args.seed)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

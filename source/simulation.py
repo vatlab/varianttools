@@ -45,7 +45,7 @@ else:
 
 Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
 
-def set_map_dist(pop):
+def set_map_dist(pop, recRate=1e-8):
     '''Set map distance for each locus'''
     recom = downloadFile(Recom_URL)
     recom_files = decompressGzFile(recom)
@@ -55,9 +55,11 @@ def set_map_dist(pop):
         l_pos = int(pop.locusPos(pop.chromBegin(ch)))
         h_pos = int(pop.locusPos(pop.chromEnd(ch)-1) + 1)
         try:
+            #env.logger.error([os.path.basename(x) for x in recom_files])
+            #env.logger.error('genetic_map_GRCh37_chr{}.txt'.format(ch_name))
             recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
         except Exception as e:
-            raise RuntimeError('Could not find recombination map for chromosome {}'.format(ch))
+            raise RuntimeError('Could not find recombination map for chromosome {}: {}'.format(ch_name, e))
         dist = {}
         with open(recom_file) as recom:
             recom.readline()
@@ -70,6 +72,11 @@ def set_map_dist(pop):
                 except Exception as e:
                     env.logger.warning(e)
         env.logger.info('Map distance of %d markers within region %d-%d are found' % (len(dist), l_pos, h_pos))
+        if not dist:
+            # using generic distance
+            for idx,loc in enumerate(range(pop.chromBegin(ch), pop.chromEnd(ch))):
+                recom_map[loc] = idx*recRate
+            continue
         nLoci = pop.numLoci(ch)
         endLoc = pop.chromEnd(ch)
         # now, try to set genetic map
@@ -210,17 +217,17 @@ class VcfToPop(SkiptableAction):
                 if line.startswith('#'):
                     continue
                 fields = line.split('\t')
-                chr = pop.chromNames().index(fields[0])
-                pos = lociIndex[chr][int(fields[1])]
                 if pop is None:
                     pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
                         chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
                 #
+                chr = pop.chromNames().index(fields[0])
+                pos = lociIndex[chr][int(fields[1])]
                 for ind, geno in enumerate(fields[10:]):
-                    if geno[0] != 0:
+                    if geno[0] not in ('0', '.'):
                         pop.individual(ind).setAllele(1, pos, 0, chr)
                         mutantCount += 1
-                    if geno[2] != 0:
+                    if geno[2] not in ('0', '.'):
                         pop.individual(ind).setAllele(1, pos, 1, chr)
                         mutantCount += 1
         env.logger.info('{} mutants imported'.format(mutantCount))
@@ -314,6 +321,95 @@ class PopToVcf(SkiptableAction):
                 phe.write('\n')
                 prog.update(i+1)
             prog.done()
+
+
+class OutputPopStat(SkiptableAction):
+    def __init__(self, output):
+        self.output = output
+        SkiptableAction.__init__(self, cmd='PopStat output={}\n'
+            .format(output), output=output)
+
+    def _execute(self, ifiles, pipeline):
+        #
+        env.logger.info('Loading population from {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        result = self.LD_curve(pop)
+        with open(self.output[0], 'w') as ld_out:
+            for ld_stat in result.keys:
+                for sp in result[ld_stat].keys():
+                    ld_out.write('{}\t{}\t{}\n'.format(ld_stat, sp, 
+                        '\t'.join(['{:.4f}'.format(x) for x in result[ld_stat][sp]])))
+
+
+
+    def LD_curve(self, pop, maxDist=500000, binDist=1000, maxPairs=10000):
+        '''Calculating LD as a function of distance. If multiple chromosomes are
+        present, they are averaged.
+
+        pop
+            population to observe
+
+        maxDist
+            maximal distance. If two markers are located greater than
+            this distance, their LD is not calculated. If markers are
+            located by basepair, this value is usually 500kbp ~ 0.5 cM.
+
+        binDist
+            maxDist is separated into bins of this width. maxDist/binDist
+            determines the length of return value. This value is usually
+            1k for a maxDist of 500k.
+
+        return a dictionary of res['LD_prime' or 'R2'][spName].
+        '''
+        env.logger.info('Calculating LD values for a population, with maxDist %d and binDist %d' \
+                % (maxDist, binDist))
+        sim.stat(pop, alleleFreq=sim.ALL_AVAIL)
+        seg_sites = set([x for x in range(pop.totNumLoci()) if len(pop.dvars().alleleFreq[x]) == 1])
+        env.logger.info('LD from {} segregating sites'.format(len(seg_sites)))
+        numBin = maxDist/binDist
+        result = {'LD_prime': {}, 'R2': {}}
+        for sp in pop.subPopNames():
+            result['LD_prime'][sp] = []
+            result['R2'][sp] = []
+        pairs = [[] for dist in range(numBin)]
+        for ch in range(pop.numChrom()):
+            seg_sites_ch = [x for x in range(pop.chromBegin(ch), pop.chromEnd(ch)) if x in seg_sites]
+            chName = pop.chromName(ch)
+            for idx,i in enumerate(seg_sites_ch):
+                for j in seg_sites_ch[idx+1:]:
+                    dist = int(pop.locusPos(j) - pop.locusPos(i))
+                    if dist < maxDist and len(pairs[dist/binDist]) < maxPairs:
+                        pairs[dist / binDist].append([i, j])
+        sim.Stat(pop, popSize=True)
+        progress = ProgressBar('Calculating average LD as a function of distance (%d %dbp bins)' \
+            % (numBin, binDist), numBin)
+        for dist in range(numBin):
+            # clear previous value
+            pop.dvars().LD_prime = None
+            pop.dvars().R2 = None
+            for sp in range(pop.numSubPop()):
+                pop.dvars(sp).LD_prime = None
+                pop.dvars(sp).R2 = None
+            if len(pairs[dist]) == 0:
+                for sp in range(pop.numSubPop()):
+                    result['LD_prime'][pop.subPopName(sp)].append(0)
+                    result['R2'][pop.subPopName(sp)].append(0)
+                continue
+            sim.Stat(pop, LD = pairs[dist], LD_param = {'stat': ['LD_prime', 'R2']})
+            avgLD = [0]*pop.numSubPop()
+            avgR2 = [0]*pop.numSubPop()
+            for sp in range(pop.numSubPop()):
+                LD_var = pop.dvars(sp).LD_prime
+                R2_var = pop.dvars(sp).R2
+                for pair in pairs[dist]:
+                    avgLD[sp] += LD_var[pair[0]][pair[1]]
+                    avgR2[sp] += R2_var[pair[0]][pair[1]]
+                result['LD_prime'][pop.subPopName(sp)].append(avgLD[sp] / len(pairs[dist]))
+                result['R2'][pop.subPopName(sp)].append(avgR2[sp] / len(pairs[dist]))
+            progress.update(dist + 1)
+        progress.done()
+        return result
+
 
 
 def _identifyCodonInRegions(raw_regions):
@@ -426,8 +522,8 @@ class ProteinSelector(sim.PySelector):
         self.s_stopgain = s_stopgain
         #
         self.num_loci, self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
-        if not self.codon_info:
-            env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
+        if (not self.codon_info) or (s_missense == 0 and s_stoploss == 0 and s_stopgain == 0):
+            env.logger.warning('Specified region does not contain any gene or all selection coefficient is zero. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
             # we need to send simuPOP to indexes of coding loci within the specified region
@@ -593,14 +689,18 @@ class ProteinPenetrance(sim.PyPenetrance):
 
 
 class EvolvePop(SkiptableAction):
-    def __init__(self, mu, selector, demoModel, scale, output):
-        self.mu = mu
+    def __init__(self,
+        selector = None, demoModel=None, 
+        mutModel='K80', mutRate=[1.8e-8, 2], 
+        recScale=1, output=[]):
+        self.mutModel = mutModel
+        self.mutRate = mutRate
         self.selector = selector
         self.demoModel = demoModel
-        self.scale = scale
+        self.recScale = recScale
         self.output = [output]
-        SkiptableAction.__init__(self, cmd='EvolvePop mu={} scale={} output={}\n'
-            .format(mu, scale, output), output=output)
+        SkiptableAction.__init__(self, cmd='EvolvePop mutModel={} mutRate={}, recScale={} output={}\n'
+            .format(mutModel, mutRate, recScale, output), output=output)
 
     def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
@@ -627,7 +727,7 @@ class EvolvePop(SkiptableAction):
         # try to use a genetic map
         genetic_pos = [pop.dvars().geneticMap[x] for x in range(pop.totNumLoci())]
         rec_rate = [genetic_pos[i+1] - genetic_pos[i] for i in range(pop.totNumLoci()-1)] + [0.5]
-        rec_rate = [x * self.scale if x >=0 else 0.5 for x in rec_rate]
+        rec_rate = [x * self.recScale if x >=0 else 0.5 for x in rec_rate]
         exec('import time', pop.vars(), pop.vars())
         pop.evolve(
             initOps=sim.InitSex(),
@@ -645,14 +745,14 @@ class EvolvePop(SkiptableAction):
                 sim.RevertFixedSites(),
                 # 
                 # 'A' is zero, no need to map in and out
-                sim.AcgtMutator(model='K80', rate=[self.mu, 2], loci=base['A']),
-                sim.AcgtMutator(model='K80', rate=[self.mu, 2], loci=base['C'],
+                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['A']),
+                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['C'],
                     # base is C=0, 0,1,2,3 to C,G,T,A (1,2,3,0)
                     mapIn=[1,2,3,0], mapOut=[3,0,1,2]),
-                sim.AcgtMutator(model='K80', rate=[self.mu, 2], loci=base['G'],
+                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['G'],
                     # base is G=0, 0,1,2,3 to G,T,A,C (2,3,0,1)
                     mapIn=[2,3,0,1], mapOut=[2,3,0,1]),
-                sim.AcgtMutator(model='K80', rate=[self.mu, 2], loci=base['T'],
+                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['T'],
                     # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
                     mapIn=[3,0,1,2], mapOut=[1,2,3,0]),
                 # selection on all loci
@@ -671,7 +771,7 @@ class EvolvePop(SkiptableAction):
                     ])
             ],
             matingScheme=sim.RandomMating(ops=
-                sim.Recombinator(rates=rec_rate, loci=sim.ALL_AVAIL),
+                sim.MendelianGenoTransmitter() if self.recScale == 0 else sim.Recombinator(rates=rec_rate, loci=sim.ALL_AVAIL),
                 subPopSize=self.demoModel),
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites
