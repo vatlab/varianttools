@@ -354,12 +354,28 @@ class OutputPopStat(SkiptableAction):
         sim.stat(sample, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
         #
         num = [int(sz*2-x[0]) for x in sample.dvars().alleleNum.values()]
-        cnt = [0]*21
+        cnt = [0]*(sz*2 + 1)
         for n in num:
-            if n < 21:
-                cnt[n] += 1
+            cnt[n] += 1
         with open(self.mut_count[0], 'w') as out:
-            out.write('\t'.join([str(x) for x in cnt]) + '\n')
+            # output number of loci in each frequency class
+            out.write('## number of mutant\t#loci in this mutant class\n')
+            for idx,c in enumerate(cnt):
+                if c != 0:
+                    out.write('#{}\t{}\n'.format(idx, c))
+            out.write('## index, chr, position, #0, #1, #2, #3\n')
+            # output allele counts at each locus
+            for ch in range(self.pop.numChrom()):
+                ch_name = self.pop.chromName(ch)
+                for i in range(self.pop.chromBegin(ch), self.pop.chromEnd(ch)):
+                    if int(sample.dvars().alleleNum[i][0]) != sz*2:
+                        out.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(i+1, 
+                            ch_name,
+                            int(self.pop.locusPos(i)),
+                            int(sample.dvars().alleleNum[i][0]),
+                            int(sample.dvars().alleleNum[i][1]),
+                            int(sample.dvars().alleleNum[i][2]),
+                            int(sample.dvars().alleleNum[i][3])))
 
     def LD_curve(self, pop, maxDist=500000, binDist=1000, maxPairs=10000):
         '''Calculating LD as a function of distance. If multiple chromosomes are
