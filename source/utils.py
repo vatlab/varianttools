@@ -32,7 +32,6 @@ import glob
 import logging
 import subprocess
 import urllib
-import urlparse
 import getpass
 import time
 import tempfile
@@ -63,12 +62,14 @@ except:
 
 try:
     if sys.version_info.major == 2:
+        import urlparse
         import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
         from cgatools_py2 import CrrFile, Location, Range
         from vt_sqlite3_py2 import OperationalError
     else:
         import pickle
+        import urllib.parse as urlparse
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
         from vt_sqlite3_py3 import OperationalError
@@ -1124,18 +1125,33 @@ class ProgressBar:
         sys.stderr.write('\r' + ''.join(msg) + '\n')
         sys.stderr.flush()
 
-class ProgressFileObj(file):
-    '''A wrapper of a file object that update a progress bar
-    during file read.
-    '''
-    def __init__(self, prog, *args, **kwargs):
-        file.__init__(self, *args, **kwargs)
-        self.prog = prog
 
-    def read(self, n, *args):
-        self.prog.progressBy(n)
-        return file.read(self, n, *args)
+if sys.version_info.major == 2:
+    class ProgressFileObj(file):
+        '''A wrapper of a file object that update a progress bar
+        during file read.
+        '''
+        def __init__(self, prog, *args, **kwargs):
+            file.__init__(self, *args, **kwargs)
+            self.prog = prog
 
+        def read(self, n, *args):
+            self.prog.progressBy(n)
+            return file.read(self, n, *args)
+else:
+    # FIXME: this curently might not work.
+    from io import FileIO
+    class ProgressFileObj(FileIO):
+        '''A wrapper of a file object that update a progress bar
+        during file read.
+        '''
+        def __init__(self, prog, *args, **kwargs):
+            file.__init__(self, *args, **kwargs)
+            self.prog = prog
+
+        def read(self, n, *args):
+            self.prog.progressBy(n)
+            return file.read(self, n, *args)
 
 def getSnapshotInfo(name):
     '''return meta information for all snapshots'''

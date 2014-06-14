@@ -72,7 +72,7 @@ def set_map_dist(pop, recRate=1e-8):
                         dist[pos] = float(fields[3])
                 except Exception as e:
                     env.logger.warning(e)
-        env.logger.info('Map distance of %d markers within region %d-%d are found' % (len(dist), l_pos, h_pos))
+        env.logger.info('Map distance of %d markers within region %s:%d-%d are found' % (len(dist), ch_name, l_pos, h_pos))
         if not dist:
             # using generic distance
             for idx,loc in enumerate(range(pop.chromBegin(ch), pop.chromEnd(ch))):
@@ -491,18 +491,23 @@ def _identifyCodonInRegions(raw_regions):
                 gene, len(pos)))
             # now, try to divide coding regions by codon. Note that a codon
             # can consist of nucleotie across two exon.
+            skip_codon = True
             for idx, (p, s) in enumerate(zip(pos, seq)):
                 if idx % 3 == 0:
                     # the complete codon must be in the simulated region. We do not handle
                     # partial codon because we cannot control mutations outside of the specified
                     # region
                     if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
+                        skip_codon = True
                         continue
                     # information about the codon: p0, p1, p2, aa, strand
                     codon = (pos2idx[(ch, p)], pos2idx[(ch, pos[idx+1])], pos2idx[(ch, pos[idx+2])],
                         codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
                         codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
                         stru['strand'])
+                    skip_codon = False
+                if skip_codon:
+                    continue
                 # record reference sequence
                 coding_base[pos2idx[(ch,p)]] = s
                 # other two positions share the same codon
