@@ -503,10 +503,9 @@ def _identifyCodonInRegions(raw_regions):
                 seq += ref.getSequence(reg[0], reg[1], reg[2])
                 pos.extend(range(reg[1], reg[2]+1))
             ch = reg[0]
-            env.logger.info('Length of coding regions of {}: {}'.format(
-                gene, len(pos)))
             # now, try to divide coding regions by codon. Note that a codon
             # can consist of nucleotie across two exon.
+            within = 0
             skip_codon = True
             for idx, (p, s) in enumerate(zip(pos, seq)):
                 if idx % 3 == 0:
@@ -524,6 +523,7 @@ def _identifyCodonInRegions(raw_regions):
                     skip_codon = False
                 if skip_codon:
                     continue
+                within += 1
                 # record reference sequence
                 coding_base[pos2idx[(ch,p)]] = s
                 # other two positions share the same codon
@@ -533,12 +533,16 @@ def _identifyCodonInRegions(raw_regions):
                         codon_info[pos2idx[(ch,p)]].append(codon)
                 else:
                     codon_info[pos2idx[(ch,p)]] = [codon]
+            env.logger.info('Length of all coding regions of {}: {} ({} within specified regions)'.format(
+                gene, len(pos), within))
     #
     # remove all positions that are not in regions
     env.logger.info('{} out of {} bp ({:.2f}%) are in coding regions of genes {}'.format(
         len(codon_info), len(pos2idx), 
         100. * len(codon_info) / len(pos2idx), 
         ', '.join(genes)))
+    with open('coding.txt', 'w') as coding:
+        coding.write(''.join([str(x)+'\n' for x in sorted(codon_info.keys())]))
     return len(pos2idx), coding_base, codon_info
 
 class ProteinSelector(sim.PySelector):

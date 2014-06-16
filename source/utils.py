@@ -1190,7 +1190,17 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
     regions = []
     if not isinstance(arg_regions, str):
         arg_regions = ','.join(arg_regions)
+    # used to keep track of chr or field name to allow 
+    # specification of regions such as refGename.name2:G1,G2,G3
+    last_chr_or_field = None
     for region in arg_regions.split(','):
+        if ':' in region:
+            last_chr_or_field = region.split(':', 1)[0]
+        else:
+            if last_chr_or_field is None:
+                raise ValueError('Invalid field specification: {}'.format(region))
+            else:
+                region = '{}:{}'.format(last_chr_or_field, region)
         try:
             chr, location = region.split(':', 1)
             start, end = location.split('-')
@@ -1255,6 +1265,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
     regions = sorted(regions)
     # remove duplicates and merge ranges
     if not mergeRegions:
+        env.logger.info('Regions to be simulated ({} bp): {}'.format(
+            sum([abs(x[2]-x[1])+1 for x in regions]),
+           ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
         return regions
     regions = list(set(regions))
     while True:
@@ -1285,7 +1298,11 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     regions[j] = None
                     merged = True
         if not merged:
-            return sorted([x for x in regions if x is not None])
+            regions = sorted([x for x in regions if x is not None])
+            env.logger.info('Regions to be simulated ({} bp): {}'.format(
+                sum([abs(x[2]-x[1])+1 for x in regions]),
+                ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
+            return regions
         
 
     
