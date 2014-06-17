@@ -627,6 +627,42 @@ class ProteinSelector(sim.PySelector):
                 fitness *= 1 - self.s_missense
         return fitness
 
+class RefGenomeMutator(sim.PyOperator):
+    def __init__(self, regions, model, rate):
+        # 
+        base = {'A': [], 'C': [], 'G': [], 'T': [], 'N': []}
+        with Project(verbosity='1') as proj:
+            refGenome = RefGenome(proj.build)
+            idx = 0
+            for r in expandRegions(regions, proj):
+                for s in refGenome.getSequence(r[0], r[1], r[2]):
+                    base[s].append(idx)
+                    idx += 1
+        #
+        env.logger.info('Simulated regions with {:,} basepair have {:,} A, '
+            '{:,} C, {:,} G, {:,} T, and {:,} N on reference genome.'
+            .format(idx, len(base['A']), len(base['C']), 
+            len(base['G']), len(base['T']), len(base['N'])))
+        self.mutators = [
+            sim.AcgtMutator(model=model, rate=rate, loci=base['A']),
+            sim.AcgtMutator(model=model, rate=rate, loci=base['C'],
+                  # base is C=0, 0,1,2,3 to C,G,T,A (1,2,3,0)
+                  mapIn=[1,2,3,0], mapOut=[3,0,1,2]),
+            sim.AcgtMutator(model=model, rate=rate, loci=base['G'],
+                # base is G=0, 0,1,2,3 to G,T,A,C (2,3,0,1)
+                mapIn=[2,3,0,1], mapOut=[2,3,0,1]),
+            sim.AcgtMutator(model=model, rate=rate, loci=base['T'],
+                # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
+                mapIn=[3,0,1,2], mapOut=[1,2,3,0])
+        ]
+        sim.PyOperator.__init__(self, func=self._mutate)
+        
+    def _mutate(self, pop):
+        for m in self.mutators:
+            m.apply(pop)
+        return True
+        
+
 class ProteinPenetrance(sim.PyPenetrance):
     def __init__(self, regions, s_sporadic=0.0001, s_missense=0.001, 
             s_stoploss=0.002, s_stopgain=0.01):
@@ -720,36 +756,22 @@ class ProteinPenetrance(sim.PyPenetrance):
 class EvolvePopulation(SkiptableAction):
     def __init__(self,
         selector = None, demoModel=None, 
-        mutModel='K80', mutRate=[1.8e-8, 2], 
+        mutator = None, 
         recScale=1, output=[]):
-        self.mutModel = mutModel
-        self.mutRate = mutRate
+        self.mutator = sim.NoneOp() if mutator is None else mutator
         self.selector = sim.NoneOp() if selector is None else selector
         self.demoModel = demoModel
         self.recScale = recScale
         self.output = [output]
-        SkiptableAction.__init__(self, cmd='EvolvePop mutModel={} mutRate={}, recScale={} output={}\n'
-            .format(mutModel, mutRate, recScale, output), output=output)
+        SkiptableAction.__init__(self, cmd='EvolvePop recScale={} output={}\n'
+            .format(recScale, output), output=output)
 
     def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
-        refGenome = RefGenome(pipeline.proj.build)
-        
         # Evolve
         env.logger.info('Add info fields fitness and migrate_to')
         pop.addInfoFields(['fitness', 'migrate_to'])
         startTime = time.clock()
-        #
-        base = {'A': [], 'C': [], 'G': [], 'T': [], 'N': []}
-        for chr in range(pop.numChrom()):
-            chr_name = pop.chromName(chr)
-            for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
-                ref = refGenome.getBase(chr_name, int(pop.locusPos(loc)))
-                base[ref].append(loc)
-        env.logger.info('Simulated regions with {:,} basepair have {:,} A, '
-            '{:,} C, {:,} G, {:,} T, and {:,} N on reference genome.'
-            .format(pop.totNumLoci(), len(base['A']), len(base['C']), 
-            len(base['G']), len(base['T']), len(base['N'])))
         #
         env.logger.info('Start evolving...')
         pop.dvars().last_time = time.time()
@@ -757,8 +779,8 @@ class EvolvePopulation(SkiptableAction):
         genetic_pos = [pop.dvars().geneticMap[x] for x in range(pop.totNumLoci())]
         rec_rate = [genetic_pos[i+1] - genetic_pos[i] for i in range(pop.totNumLoci()-1)] + [0.5]
         rec_rate = [x * self.recScale if x >=0 else 0.5 for x in rec_rate]
-        with open('rec.txt', 'w') as rr:
-            rr.write('\n'.join(['{:.8e} {:.8e}'.format(f,g) for f,g in zip(genetic_pos, rec_rate)]))
+        #with open('rec.txt', 'w') as rr:
+        #    rr.write('\n'.join(['{:.8e} {:.8e}'.format(f,g) for f,g in zip(genetic_pos, rec_rate)]))
         exec('import time', pop.vars(), pop.vars())
         pop.evolve(
             initOps=sim.InitSex(),
@@ -776,17 +798,7 @@ class EvolvePopulation(SkiptableAction):
                 sim.RevertFixedSites(),
                 # 
                 # 'A' is zero, no need to map in and out
-                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['A']),
-                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['C'],
-                    # base is C=0, 0,1,2,3 to C,G,T,A (1,2,3,0)
-                    mapIn=[1,2,3,0], mapOut=[3,0,1,2]),
-                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['G'],
-                    # base is G=0, 0,1,2,3 to G,T,A,C (2,3,0,1)
-                    mapIn=[2,3,0,1], mapOut=[2,3,0,1]),
-                sim.AcgtMutator(model=self.mutModel, rate=self.mutRate, loci=base['T'],
-                    # base is T=0, 0,1,2,3 to T,A,C,G (3,0,1,2)
-                    mapIn=[3,0,1,2], mapOut=[1,2,3,0]),
-                # selection on all loci
+                self.mutator,
                 #sim.TicToc(),
                 self.selector,
                 sim.IfElse('time.time() - last_time > 30', [

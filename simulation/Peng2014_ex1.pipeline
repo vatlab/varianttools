@@ -63,8 +63,7 @@ comment=Create an empty simuPOP population for specified regions.
 [neutral_40]
 action=EvolvePopulation(
 	output='srv_neutral_evolved_${seed}.pop',
-	mutModel='JC69',
-	mutRate=[1.8e-8 * %(scale)s * 4. / 3.],
+	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	recScale=%(scale)s,
 	demoModel = MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
@@ -114,8 +113,7 @@ comment=Create an empty simuPOP population for specified regions.
 [with_selection_40]
 action=EvolvePopulation(
 	output='srv_with_selection_evolved_${seed}.pop',
-	mutModel='JC69',
-	mutRate=[1.8e-8 * %(scale)s * 4. / 3.],
+	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	selector=ProteinSelector('%(regions)s', s_missense=0.005 * %(scale)s,
 		s_stoploss=0.02 * %(scale)s, s_stopgain=0.1 * %(scale)s),
 	recScale=%(scale)s,
@@ -167,8 +165,7 @@ comment=Create an empty simuPOP population for specified regions.
 [resample_40]
 action=EvolvePopulation(
 	output='srv_resample_sampled_${seed}.pop',
-	mutModel='JC69',
-	mutRate=[1.8e-8 * %(scale)s * 4. / 3.],
+	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	recScale=%(scale)s,
