@@ -34,7 +34,12 @@ from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan
     calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
     dissectGene, downloadFile, decompressGzFile
 
-import os, sys, math, time, random
+import os
+import sys
+import math
+import time
+import random
+import tempfile
 from collections import defaultdict
 from .pipeline import SkiptableAction
 from .project import Project
@@ -46,174 +51,64 @@ else:
 
 Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
 
-def set_map_dist(pop, recRate=1e-8):
-    '''Set map distance for each locus'''
-    recom = downloadFile(Recom_URL)
-    recom_files = decompressGzFile(recom)
-    recom_map = {}
-    for ch in range(pop.numChrom()):
-        ch_name = pop.chromName(ch)
-        l_pos = int(pop.locusPos(pop.chromBegin(ch)))
-        h_pos = int(pop.locusPos(pop.chromEnd(ch)-1) + 1)
-        try:
-            #env.logger.error([os.path.basename(x) for x in recom_files])
-            #env.logger.error('genetic_map_GRCh37_chr{}.txt'.format(ch_name))
-            recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
-        except Exception as e:
-            raise RuntimeError('Could not find recombination map for chromosome {}: {}'.format(ch_name, e))
-        dist = {}
-        with open(recom_file) as recom:
-            recom.readline()
-            for line in recom:
-                try:
-                    fields = line.split()
-                    pos = int(fields[1])
-                    if pos >= l_pos and pos <= h_pos:
-                        dist[pos] = float(fields[3])
-                except Exception as e:
-                    env.logger.warning(e)
-        env.logger.info('Map distance of %d markers within region %s:%d-%d are found' % (len(dist), ch_name, l_pos, h_pos))
-        if not dist:
-            # using generic distance
-            for idx,loc in enumerate(range(pop.chromBegin(ch), pop.chromEnd(ch))):
-                recom_map[loc] = idx*recRate
-            continue
-        nLoci = pop.numLoci(ch)
-        endLoc = pop.chromEnd(ch)
-        # now, try to set genetic map
-        map_dist = [-1]*endLoc;
-        cnt = 0
-        for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
-            pos = int(int(pop.locusPos(loc)))
-            try:
-                map_dist[loc] = dist[pos]
-                cnt += 1
-            except:
-                pass
-        if cnt != nLoci:
-            prev = -1     # name of the previous marker with map distance
-            next = -1     # name of the next marker with map distance
-            loc = 0
-            while (loc < endLoc):
-                # already has value
-                if map_dist[loc] != -1:
-                    prev = next = loc
-                    loc += 1
-                    continue
-                # find the ext one
-                if prev == next:
-                    next = -1
-                    for n in range(loc+1, endLoc):
-                         if map_dist[n] != -1:
-                             next = n
-                             next_pos = pop.locusPos(next)
-                             next_dis = map_dist[next]
-                             break
-                    if prev == -1:
-                        for n in range(next):
-                            # rough estimation: distance (in cM) proportional to 0.01 recombination rate
-                            map_dist[n] = map_dist[next] - (pop.locusPos(next) - pop.locusPos(n)) * 1e-8
-                    # if not found, this is at the end of a chromosome
-                    elif next == -1:
-                        for n in range(loc, endLoc):
-                            map_dist[n] = map_dist[prev] + (pop.locusPos(n) - pop.locusPos(prev)) * 1e-8
-                        break
-                    # if found, but no previous, this is the first one
-                    else:
-                        prev_pos = pop.locusPos(prev)
-                        prev_dis = map_dist[prev]
-                        for n in range(loc, next):
-                            map_dist[n] = map_dist[prev] + (pop.locusPos(n) - prev_pos) / (next_pos - prev_pos) * (next_dis - prev_dis)
-                    prev = next
-                    loc = next + 1
-        for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
-            recom_map[loc] = map_dist[loc]
-        env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
-            l_pos, h_pos, h_pos - l_pos, recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)],
-               (recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)])/pop.numLoci(ch)))
-    pop.dvars().geneticMap = recom_map
 
-
-class ExtractFromVcf(SkiptableAction):
-    '''Extract gentotypes at a specified region from a vcf file.'''
-    def __init__(self, filenameOrUrl, regions, output):
-        self.filenameOrUrl = filenameOrUrl
-        self.regions = regions
-        SkiptableAction.__init__(self, cmd='ExtractFromVcf {} {} {}'.format(filenameOrUrl, regions, output),
-            output=output, ignoreInput=True)
-
-    def _execute(self, ifiles, pipeline):
-        tabixFetch(self.filenameOrUrl, [], self.output[0], True)
-        for r in expandRegions(self.regions, pipeline.proj):
-            region = '{}:{}-{}'.format(r[0], r[1], r[2])
-            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                ' ({})'.format(r[3] if r[3] else '')))
-            tabixFetch(self.filenameOrUrl, [region], self.output[0], False)
-        
 class CreatePopulation(SkiptableAction):
     '''Create a simuPOP population from specified regions and number of individuals.
     '''
-    def __init__(self, regions, size, output):
+    def __init__(self, regions, size=None, importGenotypeFrom=None, output=[]):
         self.regions = regions
         self.size = size
+        self.sourceURL = importGenotypeFrom
         SkiptableAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
         # translate regions to simuPOP ...
         lociPos = {}
+        if self.sourceURL is not None:
+            self.sourceFile = tempfile.NamedTemporaryFile(dir=env.temp_dir, delete=False).name
+            tabixFetch(self.sourceURL, [], self.sourceFile, True)
         for r in expandRegions(self.regions, pipeline.proj):
             if r[0] in lociPos:
                 lociPos[r[0]].extend(range(r[1], r[2] + 1))
             else:
                 lociPos[r[0]] = range(r[1], r[2] + 1)
+            #
+            if self.sourceURL is not None:
+                region = '{}:{}-{}'.format(r[0], r[1], r[2])
+                env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                    ' ({})'.format(r[3] if r[3] else '')))
+                tabixFetch(self.sourceURL, [region], self.sourceFile, False)
+        #
         chroms = lociPos.keys()
         chroms.sort()
         #
-        # create a dictionary of lociPos->index on each chromosome
-        lociIndex = {}
-        for chIdx,ch in enumerate(chroms):
-            lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
         #
-        # number of individuals? 629
-        pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
-            chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
-        set_map_dist(pop)
+        if self.sourceURL is not None:
+            pop = self._extractVcf(chroms, lociPos)
+            if self.size is not None and pop.popSize() != self.size:
+                env.logger.warning('Population imported from {} has {} individuals where a '
+                    'population of size {} is requested'.format(self.sourceURL,
+                    pop.popSize(), self.size))
+        else:
+            pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
+                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+        #
+        self.set_map_dist(pop)
+        #
+        env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
-
-class VcfToPop(SkiptableAction):
-    '''Check out of of an command, and check if it matches a particular
-    pattern. The pipeline will exit if fail is set to True (default).'''
-    def __init__(self, regions, output):
-        self.regions = regions
-        SkiptableAction.__init__(self, cmd='VcfToPop {} {}\n'.format(regions, output),
-            output=output)
-
-    def _execute(self, ifiles, pipeline):
-        # translate regions to simuPOP ...
-        lociPos = {}
-        for r in expandRegions(self.regions, pipeline.proj):
-            if r[0] in lociPos:
-                lociPos[r[0]].extend(range(r[1], r[2] + 1))
-            else:
-                lociPos[r[0]] = range(r[1], r[2] + 1)
-        chroms = lociPos.keys()
-        chroms.sort()
-        #
+    def _extractVcf(self, chroms, lociPos):
+        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
+        mutantCount = 0
         # create a dictionary of lociPos->index on each chromosome
         lociIndex = {}
         for chIdx,ch in enumerate(chroms):
             lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
         #
-        #
         pop = None
-        # we assume 0 for wildtype, 1 for genotype
-        #
-        # extract genotypes
-        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
-        mutantCount = 0
-        with open(ifiles[0], 'r') as vcf:
+        with open(self.sourceFile, 'r') as vcf:
             for line in vcf:
                 if line.startswith('#'):
                     continue
@@ -231,9 +126,95 @@ class VcfToPop(SkiptableAction):
                     if geno[2] not in ('0', '.'):
                         pop.individual(ind).setAllele(1, pos, 1, chr)
                         mutantCount += 1
-        env.logger.info('{} mutants imported'.format(mutantCount))
-        set_map_dist(pop)
-        pop.save(self.output[0])
+        return pop
+
+    def set_map_dist(self, pop, recRate=1e-8):
+        '''Set map distance for each locus'''
+        recom = downloadFile(Recom_URL)
+        recom_files = decompressGzFile(recom)
+        recom_map = {}
+        for ch in range(pop.numChrom()):
+            ch_name = pop.chromName(ch)
+            l_pos = int(pop.locusPos(pop.chromBegin(ch)))
+            h_pos = int(pop.locusPos(pop.chromEnd(ch)-1) + 1)
+            try:
+                #env.logger.error([os.path.basename(x) for x in recom_files])
+                #env.logger.error('genetic_map_GRCh37_chr{}.txt'.format(ch_name))
+                recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
+            except Exception as e:
+                raise RuntimeError('Could not find recombination map for chromosome {}: {}'.format(ch_name, e))
+            dist = {}
+            with open(recom_file) as recom:
+                recom.readline()
+                for line in recom:
+                    try:
+                        fields = line.split()
+                        pos = int(fields[1])
+                        if pos >= l_pos and pos <= h_pos:
+                            dist[pos] = float(fields[3])
+                    except Exception as e:
+                        env.logger.warning(e)
+            env.logger.info('Map distance of %d markers within region %s:%d-%d are found' % (len(dist), ch_name, l_pos, h_pos))
+            if not dist:
+                # using generic distance
+                for idx,loc in enumerate(range(pop.chromBegin(ch), pop.chromEnd(ch))):
+                    recom_map[loc] = idx*recRate
+                continue
+            nLoci = pop.numLoci(ch)
+            endLoc = pop.chromEnd(ch)
+            # now, try to set genetic map
+            map_dist = [-1]*endLoc;
+            cnt = 0
+            for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
+                pos = int(int(pop.locusPos(loc)))
+                try:
+                    map_dist[loc] = dist[pos]
+                    cnt += 1
+                except:
+                    pass
+            if cnt != nLoci:
+                prev = -1     # name of the previous marker with map distance
+                next = -1     # name of the next marker with map distance
+                loc = 0
+                while (loc < endLoc):
+                    # already has value
+                    if map_dist[loc] != -1:
+                        prev = next = loc
+                        loc += 1
+                        continue
+                    # find the ext one
+                    if prev == next:
+                        next = -1
+                        for n in range(loc+1, endLoc):
+                             if map_dist[n] != -1:
+                                 next = n
+                                 next_pos = pop.locusPos(next)
+                                 next_dis = map_dist[next]
+                                 break
+                        if prev == -1:
+                            for n in range(next):
+                                # rough estimation: distance (in cM) proportional to 0.01 recombination rate
+                                map_dist[n] = map_dist[next] - (pop.locusPos(next) - pop.locusPos(n)) * 1e-8
+                        # if not found, this is at the end of a chromosome
+                        elif next == -1:
+                            for n in range(loc, endLoc):
+                                map_dist[n] = map_dist[prev] + (pop.locusPos(n) - pop.locusPos(prev)) * 1e-8
+                            break
+                        # if found, but no previous, this is the first one
+                        else:
+                            prev_pos = pop.locusPos(prev)
+                            prev_dis = map_dist[prev]
+                            for n in range(loc, next):
+                                map_dist[n] = map_dist[prev] + (pop.locusPos(n) - prev_pos) / (next_pos - prev_pos) * (next_dis - prev_dis)
+                        prev = next
+                        loc = next + 1
+            for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
+                recom_map[loc] = map_dist[loc]
+            env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
+                l_pos, h_pos, h_pos - l_pos, recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)],
+                   (recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)])/pop.numLoci(ch)))
+        pop.dvars().geneticMap = recom_map
+
 
 class PopToVcf(SkiptableAction):
     def __init__(self, output, sample_names=[]):
