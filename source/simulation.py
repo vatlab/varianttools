@@ -80,17 +80,15 @@ class CreatePopulation(SkiptableAction):
                     ' ({})'.format(r[3] if r[3] else '')))
                 tabixFetch(self.sourceURL, [region], self.sourceFile, False)
         #
-        chroms = lociPos.keys()
-        chroms.sort()
-        #
-        #
         if self.sourceURL is not None:
-            pop = self._extractVcf(chroms, lociPos)
+            pop = self._extractVcf(lociPos)
             if self.size is not None and pop.popSize() != self.size:
                 env.logger.warning('Population imported from {} has {} individuals where a '
                     'population of size {} is requested'.format(self.sourceURL,
                     pop.popSize(), self.size))
         else:
+            chroms = lociPos.keys()
+            chroms.sort()
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
                 chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
         #
@@ -99,7 +97,10 @@ class CreatePopulation(SkiptableAction):
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
-    def _extractVcf(self, chroms, lociPos):
+    def _extractVcf(self, lociPos):
+        chroms = lociPos.keys()
+        chroms.sort()
+        #
         allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
         mutantCount = 0
         # create a dictionary of lociPos->index on each chromosome

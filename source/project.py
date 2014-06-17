@@ -648,7 +648,7 @@ class fileFMT:
 
 
 class PipelineDescription:
-    def __init__(self, name, extra_args=[]):
+    def __init__(self, name, extra_args=[], folder='pipeline'):
         '''Pipeline configuration file'''
         self.description = None
         self.pipeline_vars = {}
@@ -666,9 +666,9 @@ class PipelineDescription:
         else:
             # not found, try online
             if name.endswith('.pipeline'):
-                url = 'pipeline/{}'.format(name)
+                url = '{}/{}'.format(folder, name)
             else:
-                url = 'pipeline/{}.pipeline'.format(name)
+                url = '{}/{}.pipeline'.format(folder, name)
             try:
                 pipeline = downloadFile(url, quiet=True)
             except Exception as e:
@@ -4193,9 +4193,9 @@ def show(args):
                     if args.limit is not None and idx >= args.limit:
                         break
                     if args.verbosity == '0':
-                        print(simulation[9:-9])
+                        print(simulation[11:-9])
                     else:
-                        text = '{:<23} {}'.format(simulation[9:-9], prop[3])
+                        text = '{:<23} {}'.format(simulation[11:-9], prop[3])
                         print('\n'.join(textwrap.wrap(text, width=textWidth,
                             subsequent_indent=' '*24)))
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -4206,7 +4206,7 @@ def show(args):
                 if len(args.items) > 1:
                     raise ValueError('Please specify only one simulation model')
                 try:
-                    pipeline = PipelineDescription(args.items[0])
+                    pipeline = PipelineDescription(args.items[0], folder='simulation')
                 except Exception as e:
                     raise IndexError('Unrecognized simulation model {}: {}'
                         .format(args.items[0], e))
