@@ -1150,7 +1150,7 @@ class RemoveIntermediateFiles:
 
     def __call__(self, ifiles, pipeline=None):
         env.logger.debug('Remove intermediate files {}'.format(self.files))
-        for f in shlex.split(self.files):
+        for f in shlex.split(self.files) if isinstance(self.files, str) else self.files:
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
                     env.logger.info('Reusing existing {}.file_info.'.format(f))
@@ -1739,46 +1739,54 @@ def execute(args):
 # to simulate data.
 #
 def simulateArguments(parser):
-    parser.add_argument('model', 
-        help='''Simulation model, which defines the algorithm and default
-            parameter to simulate data. A list of model-specific parameters
-            could be specified to change the behavior of these models. Commands
-            vtools show simulations and vtools show simulation MODEL can be used to list
-            all available models and details of one model.''')
+    parser.add_argument('model', nargs='+', metavar='MODEL',
+        help='''Name of a model to simulate. It should be the name of a model
+            description file with optional names for specific models within the
+            descrition file to simulate. A list of model-specific parameters could be 
+            specified to change the behavior of these models. Please use command
+            "vtools show simulations" to get a list all available simulation
+            models and "vtools show simulation MODEL" for details of a particular
+            simulation model.''')
     parser.add_argument('--seed', type=int,
-        help='''Random seed for the simulation. By default, a random seed will be
-            used to generate a random sample. A specific seed could be used to 
-            reproduce a previously generated sample. The seed for a previous
-            simulation run could be found from the simulation configuration
-            file $model_$datetime.cfg''')
+        help='''Random seed for the simulation. A random seed will be used by
+            default but a specific seed could be used to reproduce a previously
+            executed simulation.''')
     
 def simulate(args):
     try:
         with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
             # step 1, create a simulation configuration file.
-            model_name = os.path.basename(args.model).split('.', 1)[0]
+            model_name = os.path.basename(args.model[0]).split('.', 1)[0]
             if args.seed is None:
-                args.seed = random.randint(1, 2**32)
-            cfg_file = '{}_{}.cfg'.format(model_name, args.seed)
-                #time.strftime('%b%d_%H%M%S', time.localtime()),
+                args.seed = random.randint(1, 2**32-1)
+            if not os.path.isdir(env.cache_dir):
+                os.mkdir(env.cache_dir)
+            if len(args.model) == 1:
+                cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed)
+            else:
+                cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed)
+            #
             with open(cfg_file, 'w') as cfg:
-                cfg.write('model={}\n'.format(args.model))
+                cfg.write('model={}\n'.format(' '.join(args.model)))
                 cfg.write('seed={}\n'.format(args.seed))
                 if '--seed' in sys.argv:
                     # skip the seed option so to stop pipeline from distinguishing the two commands
                     cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
-                    cfg.write("command=vtools {}\n".format( 
-                        subprocess.list2cmdline(cmd_args[1:])))
+                    cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
                 else:
                     cfg.write("command={}\n".format(env.command_line))
-            env.logger.info('Simulation configuration is saved to {}'.format(cfg_file))
-            pipeline = Pipeline(proj, args.model, extra_args=args.unknown_args)
-            pipeline.execute(None, [cfg_file], [], 1, seed=args.seed)
+            #
+            env.logger.info('Starting simulation {}'.format(cfg_file))
+            pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args)
+            if len(args.model) == 1:
+                pipeline.execute(None, [cfg_file], [], 1, seed=args.seed)
+            else:
+                for name in args.model[1:]:
+                    pipeline.execute(name, [cfg_file], [], 1, seed=args.seed)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
 
 
 if __name__ == '__main__':
-    # for testing purposes only. The main interface is provided in vtools
     pass

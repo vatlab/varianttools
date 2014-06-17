@@ -150,7 +150,7 @@ class ExtractFromVcf(SkiptableAction):
                 ' ({})'.format(r[3] if r[3] else '')))
             tabixFetch(self.filenameOrUrl, [region], self.output[0], False)
         
-class PopFromRegions(SkiptableAction):
+class CreatePopulation(SkiptableAction):
     '''Create a simuPOP population from specified regions and number of individuals.
     '''
     def __init__(self, regions, size, output):
@@ -324,10 +324,13 @@ class PopToVcf(SkiptableAction):
             prog.done()
 
 
-class OutputPopStat(SkiptableAction):
-    def __init__(self, mut_count=None, output=[]):
-        self.output = output
+class OutputPopulationStatistics(SkiptableAction):
+    def __init__(self, mut_count=None):
+        output = []
         self.mut_count = mut_count
+        if self.mut_count:
+            output.append(self.mut_count[0])
+        self.output = output
         SkiptableAction.__init__(self, cmd='PopStat output={}\n'
             .format(output), output=output)
 
@@ -732,14 +735,14 @@ class ProteinPenetrance(sim.PyPenetrance):
         return 1 - fitness
 
 
-class EvolvePop(SkiptableAction):
+class EvolvePopulation(SkiptableAction):
     def __init__(self,
         selector = None, demoModel=None, 
         mutModel='K80', mutRate=[1.8e-8, 2], 
         recScale=1, output=[]):
         self.mutModel = mutModel
         self.mutRate = mutRate
-        self.selector = selector
+        self.selector = sim.NoneOp() if selector is None else selector
         self.demoModel = demoModel
         self.recScale = recScale
         self.output = [output]
@@ -772,6 +775,8 @@ class EvolvePop(SkiptableAction):
         genetic_pos = [pop.dvars().geneticMap[x] for x in range(pop.totNumLoci())]
         rec_rate = [genetic_pos[i+1] - genetic_pos[i] for i in range(pop.totNumLoci()-1)] + [0.5]
         rec_rate = [x * self.recScale if x >=0 else 0.5 for x in rec_rate]
+        with open('rec.txt', 'w') as rr:
+            rr.write('\n'.join(['{:.8e} {:.8e}'.format(f,g) for f,g in zip(genetic_pos, rec_rate)]))
         exec('import time', pop.vars(), pop.vars())
         pop.evolve(
             initOps=sim.InitSex(),
